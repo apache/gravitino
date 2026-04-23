@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service;
 
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
@@ -49,6 +50,8 @@ public class TestIcebergExceptionMapper {
     checkExceptionStatus(new ValidationException(""), 400);
     checkExceptionStatus(new NamespaceNotEmptyException(""), 400);
     checkExceptionStatus(new NotAuthorizedException(""), 401);
+    checkExceptionStatus(new TokenExpiredException("expired"), 419);
+    checkExceptionStatus(new AuthenticationTimeoutException("expired"), 419);
     checkExceptionStatus(new ForbiddenException(""), 403);
     checkExceptionStatus(new NotFoundException(), 404);
     checkExceptionStatus(new NoSuchNamespaceException(""), 404);

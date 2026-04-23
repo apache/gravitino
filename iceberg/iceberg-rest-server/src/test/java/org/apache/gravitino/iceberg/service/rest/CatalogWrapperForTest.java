@@ -91,7 +91,7 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
 
   private void appendSampleData(Namespace namespace, String tableName) {
     try {
-      Table table = catalog.loadTable(TableIdentifier.of(namespace, tableName));
+      Table table = getCatalog().loadTable(TableIdentifier.of(namespace, tableName));
       // Append multiple times to create multiple snapshots for incremental scan testing
       for (int i = 0; i < 3; i++) {
         Path tempFile = Files.createTempFile("plan-scan-" + i, ".parquet");

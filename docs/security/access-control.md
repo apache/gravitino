@@ -152,6 +152,7 @@ The following metadata objects support ownership:
 | Fileset              |
 | Role                 |
 | Model                |
+| Function             |
 | Tag                  |
 | JobTemplate          |
 | Job                  |
@@ -178,7 +179,7 @@ Groups can be granted roles and privileges, but they cannot be owners of securab
 
 ### Metadata Objects
 
-Metadata objects are entities managed by Gravitino, such as catalogs, schemas, tables, filesets, topics, roles, and metalakes.
+Metadata objects are entities managed by Gravitino, such as catalogs, schemas, tables, filesets, topics, models, functions, roles, and metalakes.
 
 **Naming Convention:**
 - Each metadata object has a **type** and a **name**
@@ -205,7 +206,9 @@ Metalake (top level)
         ├── Table
         ├── View
         ├── Topic
-        └── Fileset
+        ├── Fileset
+        ├── Model
+        └── Function
 ```
 
 ![object_image](../assets/security/object.png)
@@ -272,7 +275,7 @@ Gravitino provides a comprehensive set of privileges organized by the type of op
 
 | Name          | Supports Securable Object | Operation                                                                                                     |
 |---------------|---------------------------|---------------------------------------------------------------------------------------------------------------|
-| MANAGE_GRANTS | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Grants the ability to manage privileges on securable objects. When bound to a **Metalake**, also allows assigning and revoking roles for users and groups across the entire metalake. When bound to a **Catalog, Schema, Table, View, Topic, Fileset, or Model**, privilege management is scoped to that object and its descendants only. |
+| MANAGE_GRANTS | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function | Grants the ability to manage privileges on securable objects. When bound to a **Metalake**, also allows assigning and revoking roles for users and groups across the entire metalake. When bound to a **Catalog, Schema, Table, View, Topic, Fileset, Model, or Function**, privilege management is scoped to that object and its descendants only. |
 
 ### Catalog privileges
 
@@ -359,6 +362,14 @@ The privileges `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated and will
 | USE_MODEL            | Metalake, Catalog, Schema, Model | View the metadata of the model and download all the model versions                 |
 | CREATE_MODEL         | Metalake, Catalog, Schema        | Register a model, this is deprecated. Please use `REGISTER_MODEL` instead.         |
 | CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Link a model version, this is deprecated. Please use `LINK_MODEL_VERSION` instead. |
+
+### Function privileges
+
+| Name              | Supports Securable Object           | Operation                                                                             |
+|-------------------|-------------------------------------|---------------------------------------------------------------------------------------|
+| REGISTER_FUNCTION | Metalake, Catalog, Schema           | Register a function                                                                   |
+| EXECUTE_FUNCTION  | Metalake, Catalog, Schema, Function | View the metadata of the function and execute the function                            |
+| MODIFY_FUNCTION   | Metalake, Catalog, Schema, Function | Alter or drop the function                                                            |
 
 ### Tag privileges
 
@@ -955,11 +966,11 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 GravitinoClient client = ...
 
-// Grant the privilege allowing `SELEC_TABLE` for the `schema` to `role1`        
+// Grant the privilege allowing `SELECT_TABLE` for the `schema` to `role1`        
 MetadataObject schema = ...
 Role role = client.grantPrivilegesToRole("role1", schema, Lists.newArrayList(Privileges.SelectTable.allow()));        
 
-// Grant the privilege allowing `SELEC_TABLE` for the `table` to `role1`        
+// Grant the privilege allowing `SELECT_TABLE` for the `table` to `role1`        
 MetadataObject table = ...
 Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Privileges.SelectTable.allow()));
 ```
@@ -1191,6 +1202,8 @@ Owner owner = client.getOwner(table);
 
 You can set the owner of a metadata object.
 
+The request path for REST API is `/api/metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectName}`.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
 
@@ -1310,6 +1323,11 @@ The following table lists the required privileges for each API.
 | delete model version              | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
 | alter model version               | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
 | delete model version alias        | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the model, schema, metalake, catalog.                                                                                             |
+| register function                 | First, you should have the privilege to load the catalog and the schema. Then, you have `REGISTER_FUNCTION` on the metalake, catalog, schema or are the owner of the metalake, catalog, schema                                                |
+| alter function                    | First, you should have the privilege to load the catalog and the schema. Then, you have `MODIFY_FUNCTION` on the metalake, catalog, schema, function or are one of the owners of the metalake, catalog, schema, function                      |
+| drop function                     | First, you should have the privilege to load the catalog and the schema. Then, you have `MODIFY_FUNCTION` on the metalake, catalog, schema, function or are one of the owners of the metalake, catalog, schema, function                      |
+| list functions                    | First, you should have the privilege to load the catalog and the schema. Then the owner of the schema, catalog, metalake can see all the functions, others can see the functions which they can load                                          |
+| load function                     | First, you should have the privilege to load the catalog and the schema. Then, you are one of the owners of the function, schema, catalog, metalake or have `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` on the function, schema, catalog, metalake |
 | add user                          | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
 | remove user                       | `MANAGE_USERS` on the metalake  or the owner of the metalake                                                                                                                                                                                  |
 | get user                          | `MANAGE_USERS` on the metalake  or the owner of the metalake or himself                                                                                                                                                                       |

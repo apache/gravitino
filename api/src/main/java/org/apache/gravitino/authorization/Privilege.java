@@ -145,7 +145,13 @@ public interface Privilege {
     /** The privilege to create a view. */
     CREATE_VIEW(0L, 1L << 28),
     /** The privilege to select data from a view. */
-    SELECT_VIEW(0L, 1L << 29);
+    SELECT_VIEW(0L, 1L << 29),
+    /** The privilege to register a function. */
+    REGISTER_FUNCTION(0L, 1L << 30),
+    /** The privilege to execute (invoke) a function. */
+    EXECUTE_FUNCTION(0L, 1L << 31),
+    /** The privilege to alter a function's metadata. */
+    MODIFY_FUNCTION(0L, 1L << 32);
 
     private final long highBits;
     private final long lowBits;

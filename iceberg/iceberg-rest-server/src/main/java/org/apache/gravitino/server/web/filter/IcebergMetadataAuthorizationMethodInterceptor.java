@@ -27,6 +27,8 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -42,7 +44,6 @@ import org.apache.iceberg.rest.RESTUtil;
  */
 public class IcebergMetadataAuthorizationMethodInterceptor
     extends BaseMetadataAuthorizationMethodInterceptor {
-
   private final String metalakeName = IcebergRESTServerContext.getInstance().metalakeName();
 
   @Override
@@ -134,5 +135,33 @@ public class IcebergMetadataAuthorizationMethodInterceptor
   @Override
   protected boolean isExceptionPropagate(Exception e) {
     return e.getClass().getName().startsWith("org.apache.iceberg.exceptions");
+  }
+
+  /**
+   * Skip local authorization only when this server proxies requests to another Gravitino-backed
+   * Iceberg REST catalog. In that topology, the downstream REST backend performs authorization and
+   * this interceptor avoids duplicate checks.
+   */
+  @Override
+  protected boolean shouldSkipAuthorization(Map<EntityType, NameIdentifier> nameIdentifierMap) {
+    if (!IcebergRESTServerContext.getInstance().skipAuthorizationForRestBackend()) {
+      return false;
+    }
+
+    NameIdentifier catalogId = nameIdentifierMap.get(EntityType.CATALOG);
+    if (catalogId == null) {
+      return false;
+    }
+
+    IcebergCatalogWrapperManager wrapperManager =
+        IcebergRESTServerContext.getInstance().catalogWrapperManager();
+    if (wrapperManager == null) {
+      return false;
+    }
+
+    IcebergCatalogWrapper catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
+    // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
+    // authorization. IRC2 handles authorization.
+    return catalogWrapper.isRESTCatalog();
   }
 }

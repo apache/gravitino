@@ -398,17 +398,25 @@ public class TestFunctionMetaService extends TestJDBCBackend {
       FunctionMetaService.getInstance().updateFunction(functionIdent, e -> updatedFunction);
     }
 
-    // Verify all 5 versions exist
-    assertEquals(5, listFunctionVersions(function.id()).size());
+    // Verify all 5 versions are active before retention cleanup
+    Map<Integer, Long> versionDeletedMap = listFunctionVersions(function.id());
+    assertEquals(5, versionDeletedMap.size());
+    for (int version = 1; version <= 5; version++) {
+      assertVersionActive(versionDeletedMap, version);
+    }
 
     // Soft delete versions by retention count (keep only 2)
     FunctionMetaService.getInstance().deleteFunctionVersionsByRetentionCount(2L, 100);
 
-    // Verify 3 versions are soft deleted
-    Map<Integer, Long> versionDeletedMap = listFunctionVersions(function.id());
+    // Verify versions 1-3 are soft deleted and versions 4-5 remain active
+    versionDeletedMap = listFunctionVersions(function.id());
     assertEquals(5, versionDeletedMap.size());
-    assertEquals(2, versionDeletedMap.values().stream().filter(value -> value == 0L).count());
-    assertEquals(3, versionDeletedMap.values().stream().filter(value -> value != 0L).count());
+    for (int version = 1; version <= 3; version++) {
+      assertVersionSoftDeleted(versionDeletedMap, version);
+    }
+    for (int version = 4; version <= 5; version++) {
+      assertVersionActive(versionDeletedMap, version);
+    }
   }
 
   @TestTemplate
@@ -495,5 +503,15 @@ public class TestFunctionMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return versionDeletedTime;
+  }
+
+  private void assertVersionActive(Map<Integer, Long> versionDeletedMap, int version) {
+    assertTrue(versionDeletedMap.containsKey(version));
+    assertEquals(0L, versionDeletedMap.get(version));
+  }
+
+  private void assertVersionSoftDeleted(Map<Integer, Long> versionDeletedMap, int version) {
+    assertTrue(versionDeletedMap.containsKey(version));
+    assertTrue(versionDeletedMap.get(version) > 0L);
   }
 }

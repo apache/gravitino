@@ -329,7 +329,6 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       ColumnHandle column,
       Optional<String> comment) {
     String columnName = getColumnName(column);
-
     String commentString = "";
     if (comment.isPresent() && !StringUtils.isBlank(comment.get())) {
       commentString = comment.get();

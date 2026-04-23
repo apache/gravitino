@@ -23,10 +23,15 @@ LABEL maintainer="dev@gravitino.apache.org"
 RUN apt-get update && apt-get install -y \
     python-is-python3
 
-WORKDIR /root/gravitino-lance-rest-server
+WORKDIR /opt/gravitino-lance-rest-server
 
-COPY packages/gravitino-lance-rest-server /root/gravitino-lance-rest-server
+COPY packages/gravitino-lance-rest-server /opt/gravitino-lance-rest-server
+
+RUN chmod -R g+rwX /opt/gravitino-lance-rest-server \
+    && chmod +x /opt/gravitino-lance-rest-server/bin/start-lance-rest-server.sh
 
 EXPOSE 9101
 
-ENTRYPOINT ["/bin/bash", "/root/gravitino-lance-rest-server/bin/start-lance-rest-server.sh"]
+USER 1000
+
+ENTRYPOINT ["/bin/bash", "/opt/gravitino-lance-rest-server/bin/start-lance-rest-server.sh"]

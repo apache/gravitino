@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -47,6 +49,7 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -97,7 +100,7 @@ public class TestIcebergTableHookDispatcher {
     IcebergConfigProvider mockConfigProvider = mock(IcebergConfigProvider.class);
     when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
     when(mockConfigProvider.getDefaultCatalogName()).thenReturn(TEST_CATALOG);
-    IcebergRESTServerContext.create(mockConfigProvider, false, false, null);
+    IcebergRESTServerContext.create(mockConfigProvider, false, false, true, null);
 
     // Create hook dispatcher
     hookDispatcher = new IcebergTableHookDispatcher(mockDispatcher);
@@ -259,9 +262,37 @@ public class TestIcebergTableHookDispatcher {
   }
 
   @Test
-  public void testUpdateTablePassesThrough() {
+  public void testCreateTableSkipsImportAndOwnershipForStageCreate() {
+    Namespace namespace = Namespace.of("test_schema");
+    CreateTableRequest request =
+        CreateTableRequest.builder()
+            .withName("test_table")
+            .withSchema(TABLE_SCHEMA)
+            .stageCreate()
+            .build();
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.createTable(mockContext, namespace, request)).thenReturn(mockResponse);
+
+    LoadTableResponse result = hookDispatcher.createTable(mockContext, namespace, request);
+
+    Assertions.assertEquals(mockResponse, result);
+    verify(mockDispatcher).createTable(mockContext, namespace, request);
+
+    // Verify table import was NOT called for staged create
+    verify(mockTableDispatcher, never()).loadTable(any());
+
+    // Verify ownership was NOT set for staged create
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testUpdateTableImportsAndSetsOwnershipForStagedCommit() {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
-    UpdateTableRequest request = mock(UpdateTableRequest.class);
+    // A staged create commit carries AssertTableDoesNotExist as its requirement.
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()), Collections.emptyList());
     LoadTableResponse mockResponse = mock(LoadTableResponse.class);
 
     when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
@@ -270,6 +301,40 @@ public class TestIcebergTableHookDispatcher {
 
     Assertions.assertEquals(mockResponse, result);
     verify(mockDispatcher).updateTable(mockContext, tableId, request);
+
+    // Verify table import was called
+    NameIdentifier gravitinoTableId =
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
+    verify(mockTableDispatcher).loadTable(gravitinoTableId);
+
+    // Verify ownership was set
+    ArgumentCaptor<String> userCaptor = ArgumentCaptor.forClass(String.class);
+    verify(mockOwnerDispatcher)
+        .setOwner(eq(TEST_METALAKE), any(), userCaptor.capture(), eq(Owner.Type.USER));
+    Assertions.assertEquals(TEST_USER, userCaptor.getValue());
+  }
+
+  @Test
+  public void testUpdateTableSkipsImportForRegularUpdate() {
+    TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
+    // Regular table update (e.g. property change): no AssertTableDoesNotExist requirement.
+    // Import and ownership must NOT be triggered regardless of entity store state.
+    UpdateTableRequest request =
+        new UpdateTableRequest(Collections.emptyList(), Collections.emptyList());
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+
+    when(mockDispatcher.updateTable(mockContext, tableId, request)).thenReturn(mockResponse);
+
+    LoadTableResponse result = hookDispatcher.updateTable(mockContext, tableId, request);
+
+    Assertions.assertEquals(mockResponse, result);
+    verify(mockDispatcher).updateTable(mockContext, tableId, request);
+
+    // Verify table import was NOT called for a regular update
+    verify(mockTableDispatcher, never()).loadTable(any());
+
+    // Verify ownership was NOT set
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test

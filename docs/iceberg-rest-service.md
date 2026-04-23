@@ -130,12 +130,15 @@ If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to tr
 
 Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gravitino Iceberg REST service acts as IRC1 and forwards catalog operations to IRC2.
 
-| Configuration item                       | Description                                                                                                                   | Default value | Required | Since Version |
-|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.catalog-backend` | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.     | `memory`      | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.uri`             | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                 | (none)        | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.warehouse`       | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2. | (none)        | No       | 0.2.0         |
-| `gravitino.iceberg-rest.data-access`     | Data access mode exposed to Iceberg REST clients via `/v1/config`. Supported values: `vended-credentials`, `remote-signing`.  | (none)        | No       | 1.3.0         |
+By default, when the backend catalog is a REST catalog, IRC1 skips authorization and behaves as a proxy. IRC2 handles authorization. If you want IRC1 to keep authorization checks, set `gravitino.iceberg-rest.disable-rest-authz=false`.
+
+| Configuration item                                                  | Description                                                                                                                                                    | Default value | Required | Since Version |
+|---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend`                            | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.                                      | `memory`      | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.uri`                                        | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                                                  | (none)        | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.warehouse`                                  | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2.                                  | (none)        | No       | 0.2.0         |
+| `gravitino.iceberg-rest.data-access`                                | Data access mode exposed to Iceberg REST clients via `/v1/config`. Supported values: `vended-credentials`, `remote-signing`.                                   | (none)        | No       | 1.3.0         |
+| `gravitino.iceberg-rest.disable-rest-authz`                         | Whether IRC1 disables authorization when the target backend catalog is a REST catalog. Set to `false` if you want IRC1 to enforce authorization before proxying. | `true`        | No       | 1.3.0         |
 
 IRC1 configuration example if IRC2 using HDFS storage:
 
@@ -157,6 +160,10 @@ gravitino.iceberg-rest.header.X-Iceberg-Access-Delegation = vended-credentials
 ```
 
 IRC1 must also configure S3 configurations if the client side requests credential vending.
+
+:::caution
+If IRC2 does not enforce authorization, keeping `gravitino.iceberg-rest.disable-rest-authz=true` can leave operations unprotected. Set it to `false` to enforce authorization in IRC1.
+:::
 
 `data-access` is returned in `/v1/config` defaults for REST clients:
 
@@ -468,7 +475,7 @@ View operations are supported when using the JDBC catalog backend with schema ve
 
 | Configuration item                           | Description                                                                                | Default value | Required | Since Version |
 |----------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Set to `V1` to enable view operations.    | `V0`          | No       | 1.2.0         |
+| `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Set to `V1` to enable view operations.     | `V0`          | No       | 1.2.0         |
 
 ### Other Apache Iceberg catalog properties
 
@@ -573,232 +580,6 @@ curl  http://127.0.0.1:9001/iceberg/v1/config
 ```
 
 Normally you will see the output like `{"defaults":{},"overrides":{}, "endpoints":["GET /v1/{prefix}/namespaces", ...]}%`.
-
-## Exploring the Apache Gravitino Iceberg REST catalog service with Apache Spark
-
-### Deploying Apache Spark with Apache Iceberg support
-
-Follow the [Spark Iceberg start guide](https://iceberg.apache.org/docs/1.10.0/spark-getting-started/) to set up Apache Spark's and Apache Iceberg's environment.
-
-### Starting the Apache Spark client with the Apache Iceberg REST catalog
-
-| Configuration item                       | Description                                                               |
-|------------------------------------------|---------------------------------------------------------------------------|
-| `spark.sql.catalog.${catalog-name}.type` | The Spark catalog type; should set to `rest`.                             |
-| `spark.sql.catalog.${catalog-name}.uri`  | Spark Iceberg REST catalog URI, such as `http://127.0.0.1:9001/iceberg/`. |
-
-For example, we can configure Spark catalog options to use Gravitino Iceberg REST catalog with the catalog name `rest`.
-
-```shell
-./bin/spark-sql -v \
---packages org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.3.1 \
---conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
---conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog  \
---conf spark.sql.catalog.rest.type=rest  \
---conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/
-```
-
-You may need to adjust the Iceberg Spark runtime jar file name according to the real version number in your environment. If you want to access the data stored in cloud, you need to download corresponding jars (please refer to the cloud storage part) and place it in the classpath of Spark. If you want to enable credential vending, please set `credential-providers` to a proper value in the server side, set `spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation` = `vended-credentials` in the client side.
-
-For other storages not managed by Gravitino, the properties wouldn't transfer from the server to client automatically, if you want to pass custom properties to initialize `FileIO`, you could add it by `spark.sql.catalog.${iceberg_catalog_name}.${configuration_key}` = `{property_value}`.
-
-### Exploring Apache Iceberg with Apache Spark SQL
-
-```sql
-// First change to use the `rest` catalog
-USE rest;
-CREATE DATABASE IF NOT EXISTS dml;
-CREATE TABLE dml.test (id bigint COMMENT 'unique id') using iceberg;
-DESCRIBE TABLE EXTENDED dml.test;
-INSERT INTO dml.test VALUES (1), (2);
-SELECT * FROM dml.test;
-```
-
-## Apache Flink Integration
-
-You can use Apache Flink to connect to the Gravitino Iceberg REST catalog service. Below is an example of how to create a catalog and access tables using Flink SQL:
-
-```
-CREATE CATALOG my_catalog WITH (
-  'type' = 'iceberg',
-  'catalog-type' = 'rest',
-  'uri' = 'http://localhost:9001/iceberg/',
-  'header.X-Iceberg-Access-Delegation' = 'vended-credentials',
-  'rest.auth.type' = 'basic',
-  'rest.auth.basic.username' = 'manager',
-  'rest.auth.basic.password' = 'mock'
-);
-```
-
-After creating the catalog, you can use standard Flink SQL commands to explore and manage your Iceberg tables:
-
-```
-USE CATALOG my_catalog;
-SHOW DATABASES;
-USE default;
-SHOW TABLES;
-CREATE TABLE `my_catalog`.`default`.`sample`  (
-     id BIGINT COMMENT 'unique id',
-     data STRING
-);
-INSERT INTO `my_catalog`.`default`.`sample` VALUES (1, 'a');
-SELECT * FROM `my_catalog`.`default`.`sample`;
-```
-
-## Exploring the Apache Gravitino Iceberg REST catalog service with Trino
-
-### Deploying Trino with Apache Iceberg support
-
-To configure the Iceberg connector, create a catalog properties file like `etc/catalog/rest.properties` that references the Iceberg connector.
-
-```
-connector.name=iceberg
-iceberg.catalog.type=rest
-iceberg.rest-catalog.uri=http://localhost:9001/iceberg/
-fs.hadoop.enabled=true
-```
-
-Please refer to [Trino Iceberg document](https://trino.io/docs/current/connector/iceberg.html) for more details.
-
-### Exploring Apache Iceberg with Trino SQL
-
-```sql
-USE rest.dml;
-DELETE FROM rest.dml.test WHERE id = 2;
-SELECT * FROM test;
-```
-
-## Exploring the Apache Gravitino Iceberg REST catalog service with Apache Doris
-
-### Creating Iceberg catalog in Apache Doris
-
-```
-CREATE CATALOG iceberg PROPERTIES (
-    "uri" = "http://localhost:9001/iceberg/",
-    "type" = "iceberg",
-    "iceberg.catalog.type" = "rest",
-    "s3.endpoint" = "http://s3.ap-southeast-2.amazonaws.com",
-    "s3.region" = "ap-southeast-2",
-    "s3.access_key" = "xxx",
-    "s3.secret_key" = "xxx"
-);
-```
-
-### Exploring Apache Iceberg with Apache Doris SQL
-
-```sql
-SWITCH iceberg;
-CREATE DATABASE db;
-USE db;
-CREATE TABLE t(a int);
-INSERT INTO t values(1);
-SELECT * FROM t;
-```
-
-## Exploring the Apache Gravitino Iceberg REST catalog service with StarRocks
-
-### Creating Iceberg catalog in StarRocks
-
-```
-CREATE EXTERNAL CATALOG 'iceberg'
-COMMENT "Gravitino Iceberg REST catalog on MinIO"
-PROPERTIES
-(
-  "type"="iceberg",
-  "iceberg.catalog.type"="rest",
-  "iceberg.catalog.uri"="http://iceberg-rest:9001/iceberg",
-  "aws.s3.access_key"="admin",
-  "aws.s3.secret_key"="password",
-  "aws.s3.endpoint"="http://minio:9000",
-  "aws.s3.enable_path_style_access"="true",
-  "client.factory"="com.starrocks.connector.iceberg.IcebergAwsClientFactory"
-);
-```
-
-Please note that, you should set `client.factory` explicitly.
-
-### Exploring Apache Iceberg with StarRocks SQL
-
-```sql
-SET CATALOG iceberg;
-CREATE DATABASE db;
-USE db;
-CREATE TABLE t(a int);
-INSERT INTO t values(1);
-SELECT * FROM t;
-```
-
-### Exploring Apache Iceberg with PyIceberg
-
-```python
-from pyiceberg.catalog import load_catalog
-
-catalog = load_catalog(
-    "my_rest_catalog", 
-    **{
-        "type": "rest",
-        "uri": "http://localhost:9001/iceberg",
-        "header.X-Iceberg-Access-Delegation":"vended-credentials",
-        "auth": {"type": "noop"},
-    }
-)
-
-table_identifier = "db.table"
-table = catalog.load_table(table_identifier)
-print(table.scan().to_arrow())
-```
-
-### Exploring Apache Iceberg with Ray
-
-[Ray](https://www.ray.io/) is a unified framework for scaling AI and Python applications. Ray Data provides native support for reading and writing Iceberg tables through the REST catalog.
-
-:::note
-Ray Data only supports reading from and writing to existing Iceberg tables. It does not support DDL operations such as creating, dropping, or altering tables, schemas, or catalogs. You need to use other tools like Spark or PyIceberg to manage table metadata.
-:::
-
-#### Writing to Iceberg tables with Ray
-
-```python
-import ray
-import pandas as pd
-
-docs = [{"id": i, "data": f"Doc {i}"} for i in range(4)]
-ds = ray.data.from_pandas(pd.DataFrame(docs))
-ds.write_iceberg(
-    table_identifier="default.sample",
-    catalog_kwargs={
-        "name": "default",
-        "type": "rest",
-        "uri": "http://localhost:9001/iceberg/",
-        "header.X-Iceberg-Access-Delegation": "vended-credentials",
-        "auth": {
-            "type": "basic",
-            "basic": {"username": "manager", "password": "mock"}
-        }
-    }
-)
-```
-
-#### Reading Iceberg tables with Ray
-
-```python
-import ray
-
-ds = ray.data.read_iceberg(
-    table_identifier="default.sample",
-    catalog_kwargs={
-        "name": "default",
-        "type": "rest",
-        "uri": "http://localhost:9001/iceberg/",
-        "header.X-Iceberg-Access-Delegation": "vended-credentials",
-        "auth": {
-            "type": "basic",
-            "basic": {"username": "manager", "password": "mock"}
-        }
-    }
-)
-ds.show(limit=1)
-```
 
 ## Docker instructions
 

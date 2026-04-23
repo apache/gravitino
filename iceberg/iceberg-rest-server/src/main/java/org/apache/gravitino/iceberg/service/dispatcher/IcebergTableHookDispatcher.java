@@ -34,6 +34,7 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -59,14 +60,11 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
     LoadTableResponse response = dispatcher.createTable(context, namespace, createTableRequest);
-    importTable(context.catalogName(), namespace, createTableRequest.name());
-    IcebergOwnershipUtils.setTableOwner(
-        metalake,
-        context.catalogName(),
-        namespace,
-        createTableRequest.name(),
-        context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+    // Skip import and ownership for staged creates (credential vending).
+    // The table will be imported when the staged table is committed via updateTable.
+    if (!createTableRequest.stageCreate()) {
+      importTableAndSetOwner(context, namespace, createTableRequest.name());
+    }
 
     return response;
   }
@@ -76,7 +74,18 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       UpdateTableRequest updateTableRequest) {
-    return dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
+    LoadTableResponse response =
+        dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
+    // Import the table and set ownership only when committing a staged table create.
+    // A staged create commit is identified by the AssertTableDoesNotExist requirement,
+    // which is set by UpdateRequirements.forCreateTable().
+    boolean isStagedCreateCommit =
+        updateTableRequest.requirements().stream()
+            .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
+    if (isStagedCreateCommit) {
+      importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
+    }
+    return response;
   }
 
   @Override
@@ -191,15 +200,23 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     return dispatcher.getTableMetadataLocation(context, tableIdentifier);
   }
 
-  private void importTable(String catalogName, Namespace namespace, String tableName) {
+  private void importTableAndSetOwner(
+      IcebergRequestContext context, Namespace namespace, String tableName) {
     TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake,
-              catalogName,
+              context.catalogName(),
               TableIdentifier.of(namespace, tableName),
               HierarchicalSchemaUtil.namespaceSeparator()));
     }
+    IcebergOwnershipUtils.setTableOwner(
+        metalake,
+        context.catalogName(),
+        namespace,
+        tableName,
+        context.userName(),
+        GravitinoEnv.getInstance().ownerDispatcher());
   }
 }

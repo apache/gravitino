@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.filter;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -28,14 +29,24 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
 import org.apache.gravitino.Configs;
+import java.util.Optional;
+import javax.ws.rs.core.Response;
+import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
+import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.exceptions.ForbiddenException;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -56,7 +67,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     IcebergConfigProvider mockConfigProvider = Mockito.mock(IcebergConfigProvider.class);
     Mockito.when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
     Mockito.when(mockConfigProvider.getDefaultCatalogName()).thenReturn(TEST_CATALOG);
-    IcebergRESTServerContext.create(mockConfigProvider, false, false, null);
+    IcebergRESTServerContext.create(mockConfigProvider, false, false, true, null);
   }
 
   @Test
@@ -203,39 +214,256 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
 
   @Test
   public void testExtractFlatSchemaNamespace() throws Exception {
+      IcebergMetadataAuthorizationMethodInterceptor interceptor =
+              new IcebergMetadataAuthorizationMethodInterceptor();
+
+      Method testMethod =
+              TestOperations.class.getMethod(
+                      "testTableOperation", String.class, String.class, String.class);
+      Parameter[] parameters = testMethod.getParameters();
+
+      String encodedNamespace =
+              RESTUtil.encodeNamespace(org.apache.iceberg.catalog.Namespace.of("my_schema"));
+      Object[] args = new Object[]{TEST_CATALOG + "/", encodedNamespace, "my_table"};
+
+      GravitinoEnv mockEnv = Mockito.mock(GravitinoEnv.class);
+      org.apache.gravitino.Config mockConfig = Mockito.mock(org.apache.gravitino.Config.class);
+      Mockito.when(mockConfig.get(Configs.SCHEMA_NAMESPACE_SEPARATOR)).thenReturn(":");
+      Mockito.when(mockEnv.config()).thenReturn(mockConfig);
+
+      try (MockedStatic<GravitinoEnv> mockedStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+          mockedStatic.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+
+          Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
+                  interceptor.extractNameIdentifierFromParameters(parameters, args);
+
+          NameIdentifier schemaId = nameIdentifierMap.get(Entity.EntityType.SCHEMA);
+          assertNotNull(schemaId);
+          assertEquals("my_schema", schemaId.name());
+      }
+  }
+
+  @Test
+  public void testInvokeSkipsAuthorizationForRestCatalog() throws Throwable {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST wrapper = Mockito.mock(CatalogWrapperForREST.class);
+    RESTCatalog restCatalog = Mockito.mock(RESTCatalog.class);
+    Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
+    Mockito.when(wrapper.getCatalog()).thenReturn(restCatalog);
+    Mockito.when(wrapper.isRESTCatalog()).thenReturn(true);
+    resetContext(wrapperManager, true);
+
+    Method method =
+        TestOperations.class.getMethod(
+            "testTableOperationWithAuthorizationExpression",
+            String.class,
+            String.class,
+            String.class);
+    MethodInvocation invocation = Mockito.mock(MethodInvocation.class);
+    Mockito.when(invocation.getMethod()).thenReturn(method);
+    Mockito.when(invocation.getArguments())
+        .thenReturn(new Object[] {TEST_CATALOG + "/", TEST_SCHEMA, "tbl"});
+    Mockito.when(invocation.proceed()).thenReturn("PROCEEDED");
+
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor() {
+          @Override
+          protected Optional<AuthorizationHandler> createAuthorizationHandler(
+              Parameter[] parameters, Object[] args) {
+            return Optional.of(
+                new AuthorizationHandler() {
+                  @Override
+                  public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap)
+                      throws ForbiddenException {
+                    throw new RuntimeException("test");
+                  }
+
+                  @Override
+                  public boolean authorizationCompleted() {
+                    return false;
+                  }
+                });
+          }
+        };
+    Object result = interceptor.invoke(invocation);
+
+    assertEquals("PROCEEDED", result);
+    Mockito.verify(invocation, Mockito.times(1)).proceed();
+  }
+
+  @Test
+  public void testInvokeDoesNotSkipAuthorizationForNonRestCatalog() throws Throwable {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST wrapper = Mockito.mock(CatalogWrapperForREST.class);
+    Catalog nonRestCatalog = Mockito.mock(Catalog.class);
+    Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
+    Mockito.when(wrapper.getCatalog()).thenReturn(nonRestCatalog);
+    Mockito.when(wrapper.isRESTCatalog()).thenReturn(false);
+    resetContext(wrapperManager, true);
+
+    Method method =
+        TestOperations.class.getMethod(
+            "testTableOperationWithAuthorizationExpression",
+            String.class,
+            String.class,
+            String.class);
+    MethodInvocation invocation = Mockito.mock(MethodInvocation.class);
+    Mockito.when(invocation.getMethod()).thenReturn(method);
+    Mockito.when(invocation.getArguments())
+        .thenReturn(new Object[] {TEST_CATALOG + "/", TEST_SCHEMA, "tbl"});
+    Mockito.when(invocation.proceed()).thenReturn("PROCEEDED");
+
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor() {
+          @Override
+          protected Optional<AuthorizationHandler> createAuthorizationHandler(
+              Parameter[] parameters, Object[] args) {
+            return Optional.of(
+                new AuthorizationHandler() {
+                  @Override
+                  public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap)
+                      throws ForbiddenException {
+                    throw new RuntimeException("test");
+                  }
+
+                  @Override
+                  public boolean authorizationCompleted() {
+                    return false;
+                  }
+                });
+          }
+        };
+    Object result = interceptor.invoke(invocation);
+
+    assertNotEquals("PROCEEDED", result);
+  }
+
+  private void resetContext(IcebergCatalogWrapperManager wrapperManager) {
+    resetContext(wrapperManager, true);
+  }
+
+  private void resetContext(
+      IcebergCatalogWrapperManager wrapperManager, boolean skipAuthorizationForRestBackend) {
+    IcebergConfigProvider mockConfigProvider = Mockito.mock(IcebergConfigProvider.class);
+    Mockito.when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
+    Mockito.when(mockConfigProvider.getDefaultCatalogName()).thenReturn(TEST_CATALOG);
+    IcebergRESTServerContext.create(
+        mockConfigProvider, false, false, skipAuthorizationForRestBackend, wrapperManager);
+  }
+
+  @Test
+  public void testInvokeDoesNotSkipAuthorizationForRestCatalogWhenFlagDisabled() throws Throwable {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST wrapper = Mockito.mock(CatalogWrapperForREST.class);
+    RESTCatalog restCatalog = Mockito.mock(RESTCatalog.class);
+    Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
+    Mockito.when(wrapper.getCatalog()).thenReturn(restCatalog);
+    Mockito.when(wrapper.isRESTCatalog()).thenReturn(true);
+    resetContext(wrapperManager, false);
+
+    Method method =
+        TestOperations.class.getMethod(
+            "testTableOperationWithAuthorizationExpression",
+            String.class,
+            String.class,
+            String.class);
+    MethodInvocation invocation = Mockito.mock(MethodInvocation.class);
+    Mockito.when(invocation.getMethod()).thenReturn(method);
+    Mockito.when(invocation.getArguments())
+        .thenReturn(new Object[] {TEST_CATALOG + "/", TEST_SCHEMA, "tbl"});
+    Mockito.when(invocation.proceed()).thenReturn("PROCEEDED");
+
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor() {
+          @Override
+          protected Optional<AuthorizationHandler> createAuthorizationHandler(
+              Parameter[] parameters, Object[] args) {
+            throw new RuntimeException("test");
+          }
+        };
+    Object result = interceptor.invoke(invocation);
+
+    assertNotEquals("PROCEEDED", result);
+  }
+
+  @Test
+  public void testInvokeSkipAuthorizationStillUsesCommonProceedExceptionMapping() throws Throwable {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    CatalogWrapperForREST wrapper = Mockito.mock(CatalogWrapperForREST.class);
+    RESTCatalog restCatalog = Mockito.mock(RESTCatalog.class);
+    Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG)).thenReturn(wrapper);
+    Mockito.when(wrapper.getCatalog()).thenReturn(restCatalog);
+    Mockito.when(wrapper.isRESTCatalog()).thenReturn(true);
+    resetContext(wrapperManager, true);
+
+    Method method =
+        TestOperations.class.getMethod(
+            "testTableOperationWithAuthorizationExpression",
+            String.class,
+            String.class,
+            String.class);
+    MethodInvocation invocation = Mockito.mock(MethodInvocation.class);
+    Mockito.when(invocation.getMethod()).thenReturn(method);
+    Mockito.when(invocation.getArguments())
+        .thenReturn(new Object[] {TEST_CATALOG + "/", TEST_SCHEMA, "tbl"});
+    Mockito.when(invocation.proceed()).thenThrow(new RuntimeException("operation failed"));
+
     IcebergMetadataAuthorizationMethodInterceptor interceptor =
         new IcebergMetadataAuthorizationMethodInterceptor();
+    Object result = interceptor.invoke(invocation);
 
-    Method testMethod =
+    assertTrue(result instanceof Response);
+    Response response = (Response) result;
+    assertEquals(500, response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals("operation failed", errorResponse.message());
+  }
+
+  @Test
+  public void testInvokeShouldSkipAuthorizationWrapperLookupFailureReturnsAuthInternalError()
+      throws Throwable {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG))
+        .thenThrow(new IllegalArgumentException("wrapper lookup failed"));
+    resetContext(wrapperManager, true);
+
+    Method method =
         TestOperations.class.getMethod(
-            "testTableOperation", String.class, String.class, String.class);
-    Parameter[] parameters = testMethod.getParameters();
+            "testTableOperationWithAuthorizationExpression",
+            String.class,
+            String.class,
+            String.class);
+    MethodInvocation invocation = Mockito.mock(MethodInvocation.class);
+    Mockito.when(invocation.getMethod()).thenReturn(method);
+    Mockito.when(invocation.getArguments())
+        .thenReturn(new Object[] {TEST_CATALOG + "/", TEST_SCHEMA, "tbl"});
+    Mockito.when(invocation.proceed()).thenReturn("PROCEEDED");
 
-    String encodedNamespace =
-        RESTUtil.encodeNamespace(org.apache.iceberg.catalog.Namespace.of("my_schema"));
-    Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+    Object result = interceptor.invoke(invocation);
 
-    GravitinoEnv mockEnv = Mockito.mock(GravitinoEnv.class);
-    org.apache.gravitino.Config mockConfig = Mockito.mock(org.apache.gravitino.Config.class);
-    Mockito.when(mockConfig.get(Configs.SCHEMA_NAMESPACE_SEPARATOR)).thenReturn(":");
-    Mockito.when(mockEnv.config()).thenReturn(mockConfig);
-
-    try (MockedStatic<GravitinoEnv> mockedStatic = Mockito.mockStatic(GravitinoEnv.class)) {
-      mockedStatic.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
-
-      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-          interceptor.extractNameIdentifierFromParameters(parameters, args);
-
-      NameIdentifier schemaId = nameIdentifierMap.get(Entity.EntityType.SCHEMA);
-      assertNotNull(schemaId);
-      assertEquals("my_schema", schemaId.name());
-    }
+    assertTrue(result instanceof Response);
+    Response response = (Response) result;
+    assertEquals(500, response.getStatus());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals("RuntimeException", errorResponse.type());
+    assertTrue(
+        errorResponse.message().contains("Authorization failed due to system internal error"));
   }
 
   /** Test operations class to provide method annotations for testing. */
   @SuppressWarnings("unused")
   public static class TestOperations {
     public void testTableOperation(
+        @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String prefix,
+        @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String namespace,
+        @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table) {
+      // Test method
+    }
+
+    @AuthorizationExpression(expression = "true")
+    public void testTableOperationWithAuthorizationExpression(
         @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String prefix,
         @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String namespace,
         @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table) {
