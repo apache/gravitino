@@ -115,6 +115,34 @@ public class TestFunctionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testGetFunctionIdBySchemaIdAndFunctionName() throws IOException {
+    String functionName = GravitinoITUtils.genRandomName("test_function");
+    Namespace ns = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(RandomIdGenerator.INSTANCE.nextId(), ns, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(metalakeName, catalogName, schemaName), Entity.EntityType.SCHEMA);
+    Long functionId =
+        FunctionMetaService.getInstance()
+            .getFunctionIdBySchemaIdAndFunctionName(schemaId, functionName);
+    assertEquals(function.id(), functionId);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            FunctionMetaService.getInstance()
+                .getFunctionIdBySchemaIdAndFunctionName(schemaId, functionName + "_missing"));
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            FunctionMetaService.getInstance()
+                .getFunctionIdBySchemaIdAndFunctionName(-1L, functionName));
+  }
+
+  @TestTemplate
   public void testMultipleVersionsInStorage() throws IOException {
     // This test verifies that multiple versions are created in storage layer
     // even though the API always returns the latest version
