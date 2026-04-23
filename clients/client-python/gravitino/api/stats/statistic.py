@@ -45,11 +45,11 @@ class Statistic(Auditable, ABC):
     def value(self) -> StatisticValue[Any] | None:
         """Get the value of the statistic.
 
-        he value is optional. If the statistic is not set, the value will be empty.
+        The value is optional. If the statistic is not set, this method returns `None`.
 
         Returns:
-            StatisticValue:
-                An optional containing the value of the statistic if it is set, otherwise empty.
+            StatisticValue[Any] | None:
+                The statistic value, or `None` if it is unset.
         """
 
     @abstractmethod
@@ -57,8 +57,8 @@ class Statistic(Auditable, ABC):
         """The statistic is predefined by Gravitino if the value is true.
 
         The statistic is defined by users if the value is false. For example, the statistic
-        "row_count" is a reserved statistic. A custom statistic name must start with "custom."
-        prefix to avoid name conflict with reserved statistics. Because Gravitino may add more
+        "row_count" is a reserved statistic. A custom statistic name must start with "custom-"
+        prefix to avoid name conflict with reserved statistics, because Gravitino may add more
         reserved statistics in the future.
 
         Returns:

@@ -206,11 +206,11 @@ class ForbiddenException(GravitinoRuntimeException):
 
 
 class IllegalStatisticNameException(IllegalArgumentException):
-    """An exception thrown when statistic has an illegal name"""
+    """An exception thrown when a statistic has an illegal name."""
 
 
 class UnmodifiableStatisticException(UnsupportedOperationException):
-    """An exception thrown when users modify an unmodifiable statistic"""
+    """An exception thrown when attempting to modify an unmodifiable statistic."""
 
 
 class NoSuchTableException(NotFoundException):
