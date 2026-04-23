@@ -37,7 +37,9 @@ public class GlueColumn extends BaseColumn {
    *   <li>{@code Column.name()} → {@code name}
    *   <li>{@code Column.type()} → {@code dataType} via {@link GlueTypeConverter#toGravitino}
    *   <li>{@code Column.comment()} → {@code comment} (nullable)
-   *   <li>Glue has no nullability metadata → {@code nullable = true} always
+   *   <li>Glue has no nullability metadata → {@code nullable = true} always (the Glue {@link
+   *       Column} schema only exposes Name, Type, Comment, and Parameters; see
+   *       https://docs.aws.amazon.com/glue/latest/webapi/API_Column.html)
    *   <li>Glue has no auto-increment concept → {@code autoIncrement = false} always
    * </ul>
    *

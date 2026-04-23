@@ -53,7 +53,10 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
   @Override
   public Type toGravitino(String glueType) {
-    if (glueType == null || glueType.isEmpty()) {
+    if (glueType == null) {
+      throw new IllegalArgumentException("Glue column type must not be null");
+    }
+    if (glueType.isEmpty()) {
       return Types.ExternalType.of("");
     }
     String lower = glueType.trim().toLowerCase(ROOT);
@@ -125,6 +128,9 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
     // Complex types (array<...>, map<...>, struct<...>, uniontype<...>) and anything unknown
     // are preserved as ExternalType so the original string survives the round-trip.
+    // Glue stores all column types as plain strings (not a parsed TypeInfo structure), so
+    // full recursive parsing of nested types would require reimplementing Hive's type parser.
+    // This is deferred intentionally; ExternalType keeps the original string intact.
     return Types.ExternalType.of(glueType);
   }
 
