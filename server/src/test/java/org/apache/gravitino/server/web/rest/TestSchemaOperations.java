@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -44,6 +45,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
@@ -177,6 +179,27 @@ public class TestSchemaOperations extends BaseOperationsTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testListSchemasWithParentSchemaPassToDispatcher() {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "A:sales");
+    when(dispatcher.listSchemas(any())).thenReturn(new NameIdentifier[] {ident});
+
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .queryParam("parentSchema", "A")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    EntityListResponse listResp = resp.readEntity(EntityListResponse.class);
+    Assertions.assertEquals(0, listResp.getCode());
+    Assertions.assertEquals(1, listResp.identifiers().length);
+    Assertions.assertEquals("A:sales", listResp.identifiers()[0].name());
+
+    verify(dispatcher).listSchemas(eq(Namespace.of(metalake, catalog, "A")));
   }
 
   @Test
@@ -476,59 +499,6 @@ public class TestSchemaOperations extends BaseOperationsTest {
     ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp4.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp4.getType());
-  }
-
-  @Test
-  public void testListSchemasWithParentSchemaFilter() {
-    // Set up schemas: top-level "A", "B" and nested "A:sales", "A:reports", "A:sales:q1"
-    NameIdentifier identA = NameIdentifier.of(metalake, catalog, "A");
-    NameIdentifier identB = NameIdentifier.of(metalake, catalog, "B");
-    NameIdentifier identASales = NameIdentifier.of(metalake, catalog, "A:sales");
-    NameIdentifier identAReports = NameIdentifier.of(metalake, catalog, "A:reports");
-    NameIdentifier identASalesQ1 = NameIdentifier.of(metalake, catalog, "A:sales:q1");
-
-    when(dispatcher.listSchemas(any()))
-        .thenReturn(new NameIdentifier[] {identA, identB, identASales, identAReports, identASalesQ1});
-
-    // No parentSchema — should return only top-level schemas
-    Response resp =
-        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    EntityListResponse listResp = resp.readEntity(EntityListResponse.class);
-    Assertions.assertEquals(0, listResp.getCode());
-    NameIdentifier[] topLevel = listResp.identifiers();
-    Assertions.assertEquals(2, topLevel.length);
-
-    // parentSchema=A — should return direct children of A: A:sales, A:reports
-    Response resp2 =
-        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
-            .queryParam("parentSchema", "A")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
-    EntityListResponse listResp2 = resp2.readEntity(EntityListResponse.class);
-    NameIdentifier[] childrenOfA = listResp2.identifiers();
-    Assertions.assertEquals(2, childrenOfA.length);
-
-    // parentSchema=A:sales — should return direct children: A:sales:q1
-    Response resp3 =
-        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
-            .queryParam("parentSchema", "A:sales")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp3.getStatus());
-    EntityListResponse listResp3 = resp3.readEntity(EntityListResponse.class);
-    NameIdentifier[] childrenOfASales = listResp3.identifiers();
-    Assertions.assertEquals(1, childrenOfASales.length);
-    Assertions.assertEquals("A:sales:q1", childrenOfASales[0].name());
   }
 
   private static Schema mockSchema(String name, String comment, Map<String, String> properties) {

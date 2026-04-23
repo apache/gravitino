@@ -54,6 +54,8 @@ public class AuthorizeExecutorFactory {
           entityType,
           secondaryExpression,
           secondaryExpressionCondition);
+      case CREATE_SCHEMA -> new CreateSchemaAuthorizationExecutor(
+          parameters, args, expression, metadataContext, pathParams, entityType);
     };
   }
 }

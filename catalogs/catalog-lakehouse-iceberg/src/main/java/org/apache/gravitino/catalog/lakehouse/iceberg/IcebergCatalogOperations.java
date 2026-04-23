@@ -156,12 +156,22 @@ public class IcebergCatalogOperations
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     try {
-      List<org.apache.iceberg.catalog.Namespace> namespaces =
-          icebergCatalogWrapper
-              .listNamespace(IcebergCatalogWrapperHelper.getIcebergNamespace())
-              .namespaces();
-
       String separator = HierarchicalSchemaUtil.namespaceSeparator();
+      org.apache.iceberg.catalog.Namespace icebergParent;
+      if (namespace.length() == 2) {
+        icebergParent = org.apache.iceberg.catalog.Namespace.empty();
+      } else {
+        String parentPath =
+            String.join(
+                separator, Arrays.copyOfRange(namespace.levels(), 2, namespace.length()));
+        icebergParent =
+            IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(parentPath, separator);
+      }
+
+      List<org.apache.iceberg.catalog.Namespace> namespaces =
+          icebergCatalogWrapper.listNamespace(icebergParent).namespaces();
+
+      Namespace catalogNamespace = Namespace.of(namespace.level(0), namespace.level(1));
       return namespaces.stream()
           .map(
               icebergNamespace -> {
@@ -170,7 +180,7 @@ public class IcebergCatalogOperations
                 String logicalName =
                     IcebergCatalogWrapperHelper.icebergNamespaceToSchemaName(
                         icebergNamespace, separator);
-                return NameIdentifier.of(namespace, logicalName);
+                return NameIdentifier.of(catalogNamespace, logicalName);
               })
           .toArray(NameIdentifier[]::new);
     } catch (NoSuchNamespaceException e) {

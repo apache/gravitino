@@ -20,10 +20,6 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -46,7 +42,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
@@ -59,6 +54,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -104,11 +100,11 @@ public class SchemaOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
+            Namespace schemaNS =
+                StringUtils.isBlank(parentSchema)
+                    ? NamespaceUtil.ofSchema(metalake, catalog)
+                    : Namespace.of(metalake, catalog, parentSchema);
             NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
-            // Apply hierarchical filtering first to reduce the set before the more expensive
-            // authorization check.
-            idents = filterByParentSchema(idents, parentSchema);
             idents =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
@@ -135,12 +131,13 @@ public class SchemaOperations {
   @ResponseMetered(name = "create-schema", absolute = true)
   @AuthorizationExpression(
       expression = "ANY(OWNER, METALAKE, CATALOG) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
-      accessMetadataType = MetadataObject.Type.CATALOG)
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createSchema(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      SchemaCreateRequest request) {
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.CREATE_SCHEMA)
+          SchemaCreateRequest request) {
     LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
     try {
       return Utils.doAs(
@@ -259,36 +256,5 @@ public class SchemaOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.DROP, schema, catalog, e);
     }
-  }
-
-  /**
-   * Filters the given schema identifiers by hierarchical parent scope.
-   *
-   * <ul>
-   *   <li>When {@code parentSchema} is blank, returns only top-level schemas (names without the
-   *       namespace separator).
-   *   <li>When {@code parentSchema} is provided, returns only the direct children under that
-   *       parent.
-   * </ul>
-   *
-   * <p>Schema names are expected to be in the logical format (using the configured external
-   * separator, default {@code ":"}) as returned by {@link SchemaDispatcher#listSchemas}.
-   */
-  private NameIdentifier[] filterByParentSchema(
-      NameIdentifier[] idents, String parentSchema) {
-    String separator = HierarchicalSchemaUtil.namespaceSeparator();
-
-    List<String> allNames = new ArrayList<>(idents.length);
-    for (NameIdentifier ident : idents) {
-      allNames.add(ident.name());
-    }
-
-    Optional<String> normalizedParent =
-        StringUtils.isBlank(parentSchema) ? Optional.empty() : Optional.of(parentSchema);
-    List<String> filtered = HierarchicalSchemaUtil.filterDirectChildren(allNames, normalizedParent, separator);
-
-    return Arrays.stream(idents)
-        .filter(ident -> filtered.contains(ident.name()))
-        .toArray(NameIdentifier[]::new);
   }
 }
