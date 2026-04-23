@@ -20,12 +20,14 @@ package org.apache.gravitino.catalog.glue;
 
 import static java.util.Locale.ROOT;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.DataTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -69,12 +71,8 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
   @Override
   public Type toGravitino(String glueType) {
-    if (glueType == null) {
-      throw new IllegalArgumentException("Glue column type must not be null");
-    }
-    if (glueType.isEmpty()) {
-      return Types.ExternalType.of("");
-    }
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(glueType), "Glue column type must not be blank");
     String lower = glueType.trim().toLowerCase(ROOT);
 
     switch (lower) {

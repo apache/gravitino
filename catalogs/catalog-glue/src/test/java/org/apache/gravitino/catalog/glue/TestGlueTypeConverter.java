@@ -136,13 +136,10 @@ class TestGlueTypeConverter {
   }
 
   @Test
-  void testNullInputThrows() {
+  void testBlankInputThrows() {
     assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino(null));
-  }
-
-  @Test
-  void testEmptyInputBecomesExternalType() {
-    assertInstanceOf(Types.ExternalType.class, CONVERTER.toGravitino(""));
+    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino(""));
+    assertThrows(IllegalArgumentException.class, () -> CONVERTER.toGravitino("   "));
   }
 
   @Test
