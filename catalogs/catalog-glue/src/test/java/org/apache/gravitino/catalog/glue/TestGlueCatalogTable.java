@@ -60,7 +60,7 @@ import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 import software.amazon.awssdk.services.glue.model.UpdateTableResponse;
 
-class TestGlueCatalogOperationsTable {
+class TestGlueCatalogTable {
 
   private GlueCatalogOperations ops;
   private GlueClient mockClient;
