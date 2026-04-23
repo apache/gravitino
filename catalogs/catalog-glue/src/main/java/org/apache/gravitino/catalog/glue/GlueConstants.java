@@ -78,5 +78,36 @@ public final class GlueConstants {
   /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
   public static final String METADATA_LOCATION = "metadata_location";
 
+  // -------------------------------------------------------------------------
+  // StorageDescriptor-derived table properties (stored in Gravitino properties map)
+  // -------------------------------------------------------------------------
+
+  /** Table data location from {@code StorageDescriptor.location()}. */
+  public static final String LOCATION = "location";
+
+  /** InputFormat class name from {@code StorageDescriptor.inputFormat()}. */
+  public static final String INPUT_FORMAT = "input-format";
+
+  /** OutputFormat class name from {@code StorageDescriptor.outputFormat()}. */
+  public static final String OUTPUT_FORMAT = "output-format";
+
+  /** SerDe library class name from {@code StorageDescriptor.serDeInfo().serializationLibrary()}. */
+  public static final String SERDE_LIB = "serde-lib";
+
+  /** SerDe name from {@code StorageDescriptor.serDeInfo().name()}. */
+  public static final String SERDE_NAME = "serde-name";
+
+  /**
+   * Prefix for SerDe parameters from {@code StorageDescriptor.serDeInfo().parameters()}. Each SerDe
+   * parameter key {@code k} is stored as {@code "serde.parameter." + k}.
+   */
+  public static final String SERDE_PARAMETER_PREFIX = "serde.parameter.";
+
+  /**
+   * Glue table type from {@code Table.tableType()}. Common values: {@code EXTERNAL_TABLE}, {@code
+   * MANAGED_TABLE}.
+   */
+  public static final String TABLE_TYPE = "table-type";
+
   private GlueConstants() {}
 }
