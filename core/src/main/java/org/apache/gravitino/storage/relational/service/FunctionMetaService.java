@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -43,6 +44,8 @@ import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.po.FunctionMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FunctionPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -153,12 +156,22 @@ public class FunctionMetaService {
                     FunctionMetaMapper.class,
                     mapper -> mapper.softDeleteFunctionMetaByFunctionId(functionId))),
 
-        // delete function versions after meta deletion
+        // delete function versions, owner rels, and securable object rels after meta deletion
         () -> {
           if (functionDeletedCount.get() > 0) {
             SessionUtils.doWithoutCommit(
                 FunctionVersionMetaMapper.class,
                 mapper -> mapper.softDeleteFunctionVersionsByFunctionId(functionId));
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        functionId, MetadataObject.Type.FUNCTION.name()));
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        functionId, MetadataObject.Type.FUNCTION.name()));
           }
         });
 

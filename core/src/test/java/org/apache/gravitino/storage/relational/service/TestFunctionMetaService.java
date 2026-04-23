@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -37,18 +39,15 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.function.FunctionDefinition;
-import org.apache.gravitino.function.FunctionDefinitions;
-import org.apache.gravitino.function.FunctionImpl;
-import org.apache.gravitino.function.FunctionImpls;
-import org.apache.gravitino.function.FunctionParam;
-import org.apache.gravitino.function.FunctionParams;
-import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FunctionEntity;
-import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -250,6 +249,37 @@ public class TestFunctionMetaService extends TestJDBCBackend {
 
     FunctionMetaService.getInstance().insertFunction(function, false);
 
+    // Set up owner relation
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user1",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    OwnerMetaService.getInstance()
+        .setOwner(function.nameIdentifier(), function.type(), user.nameIdentifier(), user.type());
+
+    // Set up role/securable object relation
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            SecurableObjects.ofCatalog(
+                catalogName, Lists.newArrayList(Privileges.UseCatalog.allow())),
+            schemaName,
+            Lists.newArrayList(Privileges.UseSchema.allow()));
+    SecurableObject functionObject =
+        SecurableObjects.ofFunction(
+            schemaObject, functionName, Lists.newArrayList(Privileges.ExecuteFunction.allow()));
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            Lists.newArrayList(functionObject),
+            ImmutableMap.of());
+    RoleMetaService.getInstance().insertRole(role, false);
+
     NameIdentifier functionIdent =
         NameIdentifier.of(metalakeName, catalogName, schemaName, functionName);
     assertTrue(FunctionMetaService.getInstance().deleteFunction(functionIdent));
@@ -258,6 +288,12 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     assertThrows(
         NoSuchEntityException.class,
         () -> FunctionMetaService.getInstance().getFunctionByIdentifier(functionIdent));
+
+    // Verify owner relation is cleaned up
+    assertEquals(0, countActiveOwnerRelForMetadataObject(function.id(), "FUNCTION"));
+
+    // Verify securable object (role) relation is cleaned up
+    assertEquals(0, countActiveObjectRelForRole(role.id()));
   }
 
   @TestTemplate
@@ -490,27 +526,46 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     assertTrue(loadedFunction.deterministic());
   }
 
-  private FunctionEntity createFunctionEntity(
-      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
-    FunctionParam param1 = FunctionParams.of("param1", Types.IntegerType.get());
-    FunctionParam param2 = FunctionParams.of("param2", Types.StringType.get());
-    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT param1 + 1");
-    FunctionDefinition definition =
-        FunctionDefinitions.of(
-            new FunctionParam[] {param1, param2},
-            Types.IntegerType.get(),
-            new FunctionImpl[] {impl});
+  private int countActiveOwnerRelForMetadataObject(
+      Long metadataObjectId, String metadataObjectType) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM owner_meta"
+                        + " WHERE metadata_object_id = %d AND metadata_object_type = '%s'"
+                        + " AND deleted_at = 0",
+                    metadataObjectId, metadataObjectType))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      throw new RuntimeException("No result for countActiveOwnerRelForMetadataObject");
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
+  }
 
-    return FunctionEntity.builder()
-        .withId(id)
-        .withName(name)
-        .withNamespace(namespace)
-        .withComment("test function comment")
-        .withFunctionType(FunctionType.SCALAR)
-        .withDeterministic(false)
-        .withDefinitions(new FunctionDefinition[] {definition})
-        .withAuditInfo(auditInfo)
-        .build();
+  private int countActiveObjectRelForRole(Long roleId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM role_meta_securable_object"
+                        + " WHERE role_id = %d AND deleted_at = 0",
+                    roleId))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      throw new RuntimeException("No result for countActiveObjectRelForRole");
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
   }
 
   private Map<Integer, Long> listFunctionVersions(Long functionId) {
