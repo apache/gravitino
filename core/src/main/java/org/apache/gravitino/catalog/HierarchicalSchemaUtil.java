@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 
@@ -50,7 +51,13 @@ public final class HierarchicalSchemaUtil {
    * @return the configured separator string (default {@code ":"})
    */
   public static String namespaceSeparator() {
-    return GravitinoEnv.getInstance().config().get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+    Config config = GravitinoEnv.getInstance().config();
+    if (config == null) {
+      return Configs.SCHEMA_NAMESPACE_SEPARATOR.getDefaultValue();
+    }
+    String separator = config.get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
+    return StringUtils.defaultIfBlank(
+        separator, Configs.SCHEMA_NAMESPACE_SEPARATOR.getDefaultValue());
   }
 
   /**

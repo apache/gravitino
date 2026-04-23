@@ -100,39 +100,20 @@ public class TestSchemaHookDispatcher {
     NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
     NameIdentifier parentAB = NameIdentifier.of(METALAKE, CATALOG, "A:B");
     Schema mockSchema = mock(Schema.class);
-    Schema parentSchema = mock(Schema.class);
 
     when(mockDispatcher.schemaExists(parentA)).thenReturn(false);
     when(mockDispatcher.schemaExists(parentAB)).thenReturn(false);
-    when(mockDispatcher.createSchema(eq(parentA), isNull(), eq(Collections.emptyMap())))
-        .thenReturn(parentSchema);
-    when(mockDispatcher.createSchema(eq(parentAB), isNull(), eq(Collections.emptyMap())))
-        .thenReturn(parentSchema);
     when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
 
     hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
-    // Verify parents were created in order
-    verify(mockDispatcher, times(1))
-        .createSchema(eq(parentA), isNull(), eq(Collections.emptyMap()));
-    verify(mockDispatcher, times(1))
-        .createSchema(eq(parentAB), isNull(), eq(Collections.emptyMap()));
+    // Parents are auto-created by catalog; hook dispatcher only creates target schema.
+    verify(mockDispatcher, never()).createSchema(eq(parentA), any(), any());
+    verify(mockDispatcher, never()).createSchema(eq(parentAB), any(), any());
     verify(mockDispatcher, times(1)).createSchema(eq(ident), any(), any());
 
-    // Verify owner set for both parents and the schema itself (3 calls total)
-    verify(mockOwnerDispatcher, times(3)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
-    verify(mockOwnerDispatcher, times(1))
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(parentA, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
-    verify(mockOwnerDispatcher, times(1))
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(parentAB, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
+    // Verify owner is set for the requested schema.
+    verify(mockOwnerDispatcher, times(1)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
     verify(mockOwnerDispatcher, times(1))
         .setOwner(
             eq(METALAKE),
@@ -147,24 +128,21 @@ public class TestSchemaHookDispatcher {
     NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
     NameIdentifier parentAB = NameIdentifier.of(METALAKE, CATALOG, "A:B");
     Schema mockSchema = mock(Schema.class);
-    Schema parentSchema = mock(Schema.class);
 
     // A already exists, A:B does not
     when(mockDispatcher.schemaExists(parentA)).thenReturn(true);
     when(mockDispatcher.schemaExists(parentAB)).thenReturn(false);
-    when(mockDispatcher.createSchema(eq(parentAB), isNull(), eq(Collections.emptyMap())))
-        .thenReturn(parentSchema);
     when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
 
     hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
-    // A should NOT be created, A:B should be created
-    verify(mockDispatcher, never()).createSchema(eq(parentA), isNull(), eq(Collections.emptyMap()));
-    verify(mockDispatcher, times(1))
-        .createSchema(eq(parentAB), isNull(), eq(Collections.emptyMap()));
+    // Parents are auto-created by catalog; hook dispatcher should not create them explicitly.
+    verify(mockDispatcher, never()).createSchema(eq(parentA), any(), any());
+    verify(mockDispatcher, never()).createSchema(eq(parentAB), any(), any());
+    verify(mockDispatcher, times(1)).createSchema(eq(ident), any(), any());
 
-    // Owner set only for A:B (the created parent) and A:B:C (2 calls)
-    verify(mockOwnerDispatcher, times(2)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
+    // Verify owner is set for the requested schema.
+    verify(mockOwnerDispatcher, times(1)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
   }
 
   @Test
@@ -192,18 +170,14 @@ public class TestSchemaHookDispatcher {
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B");
     NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
     Schema mockSchema = mock(Schema.class);
-    Schema parentSchema = mock(Schema.class);
 
     when(mockDispatcher.schemaExists(parentA)).thenReturn(false);
-    when(mockDispatcher.createSchema(eq(parentA), isNull(), eq(Collections.emptyMap())))
-        .thenReturn(parentSchema);
     when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
 
     // Should not throw even with null ownerDispatcher
     hookDispatcher.createSchema(ident, null, Collections.emptyMap());
 
-    verify(mockDispatcher, times(1))
-        .createSchema(eq(parentA), isNull(), eq(Collections.emptyMap()));
+    verify(mockDispatcher, never()).createSchema(eq(parentA), any(), any());
     verify(mockDispatcher, times(1)).createSchema(eq(ident), any(), any());
   }
 }

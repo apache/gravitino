@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -50,7 +51,6 @@ import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /** Test for {@link IcebergMetadataAuthorizationMethodInterceptor}. */
@@ -194,14 +194,10 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         RESTUtil.encodeNamespace(org.apache.iceberg.catalog.Namespace.of("A", "B", "C"));
     Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
 
-    GravitinoEnv mockEnv = Mockito.mock(GravitinoEnv.class);
     org.apache.gravitino.Config mockConfig = Mockito.mock(org.apache.gravitino.Config.class);
     Mockito.when(mockConfig.get(Configs.SCHEMA_NAMESPACE_SEPARATOR)).thenReturn(":");
-    Mockito.when(mockEnv.config()).thenReturn(mockConfig);
-
-    try (MockedStatic<GravitinoEnv> mockedStatic = Mockito.mockStatic(GravitinoEnv.class)) {
-      mockedStatic.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
-
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
+    try {
       Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
           interceptor.extractNameIdentifierFromParameters(parameters, args);
 
@@ -209,6 +205,8 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
       assertNotNull(schemaId);
       // Expect full logical path, not just the last level
       assertEquals("A:B:C", schemaId.name());
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "config", null, true);
     }
   }
 
@@ -226,20 +224,18 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         RESTUtil.encodeNamespace(org.apache.iceberg.catalog.Namespace.of("my_schema"));
     Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
 
-    GravitinoEnv mockEnv = Mockito.mock(GravitinoEnv.class);
     org.apache.gravitino.Config mockConfig = Mockito.mock(org.apache.gravitino.Config.class);
     Mockito.when(mockConfig.get(Configs.SCHEMA_NAMESPACE_SEPARATOR)).thenReturn(":");
-    Mockito.when(mockEnv.config()).thenReturn(mockConfig);
-
-    try (MockedStatic<GravitinoEnv> mockedStatic = Mockito.mockStatic(GravitinoEnv.class)) {
-      mockedStatic.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
-
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
+    try {
       Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
           interceptor.extractNameIdentifierFromParameters(parameters, args);
 
       NameIdentifier schemaId = nameIdentifierMap.get(Entity.EntityType.SCHEMA);
       assertNotNull(schemaId);
       assertEquals("my_schema", schemaId.name());
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "config", null, true);
     }
   }
 

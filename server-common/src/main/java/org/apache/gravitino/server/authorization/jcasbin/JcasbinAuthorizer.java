@@ -506,7 +506,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       for (String scope : HierarchicalSchemaUtil.allScopes(schemaPath, separator)) {
         chain.add(MetadataObjects.of(catalogName, scope, MetadataObject.Type.SCHEMA));
       }
-      return chain;
+      return ImmutableList.copyOf(chain);
     }
 
     private Long getMetadataIdQuietly(MetadataObject metadataObject, String metalake) {

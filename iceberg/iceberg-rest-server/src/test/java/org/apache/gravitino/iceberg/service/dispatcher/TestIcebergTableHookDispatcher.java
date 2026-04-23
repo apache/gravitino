@@ -304,7 +304,8 @@ public class TestIcebergTableHookDispatcher {
 
     // Verify table import was called
     NameIdentifier gravitinoTableId =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
     verify(mockTableDispatcher).loadTable(gravitinoTableId);
 
     // Verify ownership was set
