@@ -35,7 +35,6 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
-import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 
 /**
  * Through dynamic proxy, obtain the annotations on the method and parameter list to perform
@@ -99,18 +98,6 @@ public class IcebergMetadataAuthorizationMethodInterceptor
         continue;
       }
 
-      // For CREATE_NAMESPACE, inject the target namespace as SCHEMA so that the standard
-      // expression can evaluate against it. JcasbinAuthorizer's inheritance chain will skip
-      // the not-yet-existing entity and walk up to existing parents automatically.
-      IcebergAuthorizationMetadata icebergMetadata =
-          parameter.getAnnotation(IcebergAuthorizationMetadata.class);
-      if (icebergMetadata != null
-          && icebergMetadata.type() == IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE) {
-        Namespace ns = ((CreateNamespaceRequest) args[i]).namespace();
-        String schemaName = String.join(separator, ns.levels());
-        nameIdentifierMap.put(
-            Entity.EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, schemaName));
-      }
     }
     return nameIdentifierMap;
   }
@@ -135,6 +122,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
             return Optional.of(new RenameTableAuthzHandler(parameters, args));
           case RENAME_VIEW:
             return Optional.of(new RenameViewAuthzHandler(parameters, args));
+          case CREATE_NAMESPACE:
+            return Optional.of(new CreateNamespaceAuthzHandler(parameters, args));
           default:
             break;
         }
