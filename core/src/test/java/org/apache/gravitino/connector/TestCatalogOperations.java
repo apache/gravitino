@@ -75,7 +75,6 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
-import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
@@ -90,13 +89,11 @@ import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
-import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -303,223 +300,6 @@ public class TestCatalogOperations
     } else {
       return false;
     }
-  }
-
-  // ViewCatalog methods
-  @Override
-  public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
-    return views.keySet().stream()
-        .filter(ident -> ident.namespace().equals(namespace))
-        .toArray(NameIdentifier[]::new);
-  }
-
-  @Override
-  public View loadView(NameIdentifier ident) throws NoSuchViewException {
-    if (views.containsKey(ident)) {
-      return views.get(ident);
-    } else {
-      throw new NoSuchViewException("View %s does not exist", ident);
-    }
-  }
-
-  @Override
-  public View createView(
-      NameIdentifier ident,
-      String comment,
-      Column[] columns,
-      Representation[] representations,
-      String defaultCatalog,
-      String defaultSchema,
-      Map<String, String> properties)
-      throws NoSuchSchemaException, ViewAlreadyExistsException {
-    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-    if (!schemas.containsKey(schemaIdent)) {
-      throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
-    }
-    if (views.containsKey(ident)) {
-      throw new ViewAlreadyExistsException("View %s already exists", ident);
-    }
-
-    final String viewName = ident.name();
-    final String viewComment = comment;
-    final Column[] viewColumns =
-        columns != null ? Arrays.copyOf(columns, columns.length) : new Column[0];
-    final Representation[] viewRepresentations =
-        representations != null
-            ? Arrays.copyOf(representations, representations.length)
-            : new Representation[0];
-    final String viewDefaultCatalog = defaultCatalog;
-    final String viewDefaultSchema = defaultSchema;
-    final Map<String, String> viewProperties =
-        properties != null ? Maps.newHashMap(properties) : Maps.newHashMap();
-    final AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-
-    View view =
-        new View() {
-          @Override
-          public String name() {
-            return viewName;
-          }
-
-          @Override
-          public String comment() {
-            return viewComment;
-          }
-
-          @Override
-          public Column[] columns() {
-            return Arrays.copyOf(viewColumns, viewColumns.length);
-          }
-
-          @Override
-          public Representation[] representations() {
-            return Arrays.copyOf(viewRepresentations, viewRepresentations.length);
-          }
-
-          @Override
-          public String defaultCatalog() {
-            return viewDefaultCatalog;
-          }
-
-          @Override
-          public String defaultSchema() {
-            return viewDefaultSchema;
-          }
-
-          @Override
-          public Map<String, String> properties() {
-            return Maps.newHashMap(viewProperties);
-          }
-
-          @Override
-          public AuditInfo auditInfo() {
-            return auditInfo;
-          }
-        };
-    views.put(ident, view);
-    return view;
-  }
-
-  @Override
-  public View alterView(NameIdentifier ident, ViewChange... changes)
-      throws NoSuchViewException, IllegalArgumentException {
-    if (!views.containsKey(ident)) {
-      throw new NoSuchViewException("View %s does not exist", ident);
-    }
-
-    View existingView = views.get(ident);
-    String newName = existingView.name();
-    String newComment = existingView.comment();
-    Column[] newColumns = existingView.columns();
-    Representation[] newRepresentations = existingView.representations();
-    String newDefaultCatalog = existingView.defaultCatalog();
-    String newDefaultSchema = existingView.defaultSchema();
-    Map<String, String> newProps =
-        existingView.properties() != null
-            ? Maps.newHashMap(existingView.properties())
-            : Maps.newHashMap();
-    NameIdentifier newIdent = ident;
-
-    for (ViewChange change : changes) {
-      if (change instanceof ViewChange.SetProperty) {
-        newProps.put(
-            ((ViewChange.SetProperty) change).getProperty(),
-            ((ViewChange.SetProperty) change).getValue());
-      } else if (change instanceof ViewChange.RemoveProperty) {
-        newProps.remove(((ViewChange.RemoveProperty) change).getProperty());
-      } else if (change instanceof ViewChange.RenameView) {
-        newName = ((ViewChange.RenameView) change).getNewName();
-        newIdent = NameIdentifier.of(ident.namespace(), newName);
-        if (!newIdent.equals(ident) && views.containsKey(newIdent)) {
-          throw new ViewAlreadyExistsException("View %s already exists", newIdent);
-        }
-      } else if (change instanceof ViewChange.ReplaceView) {
-        ViewChange.ReplaceView replaceView = (ViewChange.ReplaceView) change;
-        newColumns = replaceView.getColumns();
-        newRepresentations = replaceView.getRepresentations();
-        newDefaultCatalog = replaceView.getDefaultCatalog();
-        newDefaultSchema = replaceView.getDefaultSchema();
-        newComment = replaceView.getComment();
-      }
-    }
-
-    final String updatedViewName = newName;
-    final String updatedViewComment = newComment;
-    final Column[] updatedColumns =
-        newColumns != null ? Arrays.copyOf(newColumns, newColumns.length) : new Column[0];
-    final Representation[] updatedRepresentations =
-        newRepresentations != null
-            ? Arrays.copyOf(newRepresentations, newRepresentations.length)
-            : new Representation[0];
-    final String updatedDefaultCatalog = newDefaultCatalog;
-    final String updatedDefaultSchema = newDefaultSchema;
-    final Map<String, String> updatedProperties = Maps.newHashMap(newProps);
-    final AuditInfo updatedAuditInfo =
-        AuditInfo.builder()
-            .withCreator(
-                existingView.auditInfo() != null && existingView.auditInfo().creator() != null
-                    ? existingView.auditInfo().creator()
-                    : "test")
-            .withCreateTime(
-                existingView.auditInfo() != null && existingView.auditInfo().createTime() != null
-                    ? existingView.auditInfo().createTime()
-                    : Instant.now())
-            .withLastModifier("test")
-            .withLastModifiedTime(Instant.now())
-            .build();
-
-    View updatedView =
-        new View() {
-          @Override
-          public String name() {
-            return updatedViewName;
-          }
-
-          @Override
-          public String comment() {
-            return updatedViewComment;
-          }
-
-          @Override
-          public Column[] columns() {
-            return Arrays.copyOf(updatedColumns, updatedColumns.length);
-          }
-
-          @Override
-          public Representation[] representations() {
-            return Arrays.copyOf(updatedRepresentations, updatedRepresentations.length);
-          }
-
-          @Override
-          public String defaultCatalog() {
-            return updatedDefaultCatalog;
-          }
-
-          @Override
-          public String defaultSchema() {
-            return updatedDefaultSchema;
-          }
-
-          @Override
-          public Map<String, String> properties() {
-            return Maps.newHashMap(updatedProperties);
-          }
-
-          @Override
-          public AuditInfo auditInfo() {
-            return updatedAuditInfo;
-          }
-        };
-
-    views.remove(ident);
-    views.put(newIdent, updatedView);
-    return updatedView;
-  }
-
-  @Override
-  public boolean dropView(NameIdentifier ident) {
-    return views.remove(ident) != null;
   }
 
   @Override
@@ -1642,5 +1422,14 @@ public class TestCatalogOperations
     }
 
     return aliasList.toArray(new String[0]);
+  }
+
+  @Override
+  public View loadView(NameIdentifier ident) throws NoSuchViewException {
+    if (views.containsKey(ident)) {
+      return views.get(ident);
+    } else {
+      throw new NoSuchViewException("View %s does not exist", ident);
+    }
   }
 }

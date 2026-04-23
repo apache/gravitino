@@ -37,11 +37,16 @@ public interface ViewCatalog {
   /**
    * List the views in a namespace from the catalog.
    *
+   * <p>This is a default method that throws {@link UnsupportedOperationException}. Catalog
+   * implementations that support view management should override this method.
+   *
    * @param namespace A namespace.
    * @return An array of view identifiers in the namespace.
    * @throws NoSuchSchemaException If the schema does not exist.
    */
-  NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException;
+  default NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("listViews is not supported");
+  }
 
   /**
    * Load view metadata by {@link NameIdentifier} from the catalog.
@@ -69,6 +74,9 @@ public interface ViewCatalog {
   /**
    * Create a view in the catalog.
    *
+   * <p>This is a default method that throws {@link UnsupportedOperationException}. Catalog
+   * implementations that support view management should override this method.
+   *
    * @param ident A view identifier.
    * @param comment The view comment, may be {@code null}.
    * @param columns The output columns of the view.
@@ -83,7 +91,7 @@ public interface ViewCatalog {
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws ViewAlreadyExistsException If the view already exists.
    */
-  View createView(
+  default View createView(
       NameIdentifier ident,
       @Nullable String comment,
       Column[] columns,
@@ -91,7 +99,9 @@ public interface ViewCatalog {
       @Nullable String defaultCatalog,
       @Nullable String defaultSchema,
       Map<String, String> properties)
-      throws NoSuchSchemaException, ViewAlreadyExistsException;
+      throws NoSuchSchemaException, ViewAlreadyExistsException {
+    throw new UnsupportedOperationException("createView is not supported");
+  }
 
   /**
    * Apply the {@link ViewChange changes} to a view in the catalog.
@@ -99,20 +109,30 @@ public interface ViewCatalog {
    * <p>Implementations may reject the change. If any change is rejected, no changes should be
    * applied to the view.
    *
+   * <p>This is a default method that throws {@link UnsupportedOperationException}. Catalog
+   * implementations that support view management should override this method.
+   *
    * @param ident A view identifier.
    * @param changes View changes to apply to the view.
    * @return The updated view metadata.
    * @throws NoSuchViewException If the view does not exist.
    * @throws IllegalArgumentException If the change is rejected by the implementation.
    */
-  View alterView(NameIdentifier ident, ViewChange... changes)
-      throws NoSuchViewException, IllegalArgumentException;
+  default View alterView(NameIdentifier ident, ViewChange... changes)
+      throws NoSuchViewException, IllegalArgumentException {
+    throw new UnsupportedOperationException("alterView is not supported");
+  }
 
   /**
    * Drop a view from the catalog.
    *
+   * <p>This is a default method that throws {@link UnsupportedOperationException}. Catalog
+   * implementations that support view management should override this method.
+   *
    * @param ident A view identifier.
    * @return True if the view is dropped, false if the view does not exist.
    */
-  boolean dropView(NameIdentifier ident);
+  default boolean dropView(NameIdentifier ident) {
+    throw new UnsupportedOperationException("dropView is not supported");
+  }
 }

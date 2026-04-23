@@ -50,7 +50,6 @@ import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
-import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
@@ -59,13 +58,11 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTabl
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
-import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -626,73 +623,6 @@ public class IcebergCatalogOperations
       throw new ConnectionFailedException(
           e, "Failed to run listNamespace on Iceberg catalog: %s", e.getMessage());
     }
-  }
-
-  /**
-   * List view identifiers in a namespace.
-   *
-   * @param namespace A namespace.
-   * @return An array of view identifiers in the namespace.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   */
-  @Override
-  public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
-    throw new UnsupportedOperationException("listViews is not supported in Iceberg catalog yet");
-  }
-
-  /**
-   * Create a view in the catalog.
-   *
-   * @param ident A view identifier.
-   * @param comment The view comment.
-   * @param columns The output columns of the view.
-   * @param representations The representations of the view.
-   * @param defaultCatalog The default catalog used to resolve unqualified identifiers referenced by
-   *     the view definition, or {@code null} if not set.
-   * @param defaultSchema The default schema used to resolve unqualified identifiers referenced by
-   *     the view definition, or {@code null} if not set.
-   * @param properties The view properties.
-   * @return The created view metadata.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   * @throws ViewAlreadyExistsException If the view already exists.
-   */
-  @Override
-  public View createView(
-      NameIdentifier ident,
-      String comment,
-      Column[] columns,
-      Representation[] representations,
-      String defaultCatalog,
-      String defaultSchema,
-      Map<String, String> properties)
-      throws NoSuchSchemaException, ViewAlreadyExistsException {
-    throw new UnsupportedOperationException("createView is not supported in Iceberg catalog yet");
-  }
-
-  /**
-   * Apply changes to a view in the catalog.
-   *
-   * @param ident A view identifier.
-   * @param changes View changes to apply to the view.
-   * @return The updated view metadata.
-   * @throws NoSuchViewException If the view does not exist.
-   * @throws IllegalArgumentException If the change is rejected by the implementation.
-   */
-  @Override
-  public View alterView(NameIdentifier ident, ViewChange... changes)
-      throws NoSuchViewException, IllegalArgumentException {
-    throw new UnsupportedOperationException("alterView is not supported in Iceberg catalog yet");
-  }
-
-  /**
-   * Drop a view from the catalog.
-   *
-   * @param ident A view identifier.
-   * @return True if the view is dropped, false if the view does not exist.
-   */
-  @Override
-  public boolean dropView(NameIdentifier ident) {
-    throw new UnsupportedOperationException("dropView is not supported in Iceberg catalog yet");
   }
 
   /**

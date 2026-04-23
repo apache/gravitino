@@ -29,7 +29,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -52,9 +51,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
-import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
-import org.apache.gravitino.rel.ViewChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -366,83 +363,5 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     // Verify view was re-imported
     GenericEntity viewEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
     Assertions.assertNotNull(viewEntity);
-  }
-
-  @Test
-  public void testCreateViewNeedImportingSchema() throws IOException {
-    Namespace viewNs = Namespace.of(metalake, catalog, "schema68");
-    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "create_view_need_import_schema");
-    Map<String, String> props = ImmutableMap.of("k1", "v1");
-
-    TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
-    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
-    testCatalogOperations.createSchema(
-        NameIdentifier.of(viewNs.levels()), "", Collections.emptyMap());
-
-    Assertions.assertFalse(
-        entityStore.exists(NameIdentifier.of(viewNs.levels()), Entity.EntityType.SCHEMA));
-
-    viewOperationDispatcher.createView(
-        viewIdent,
-        "comment",
-        new Column[0],
-        new Representation[] {
-          SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
-        },
-        null,
-        null,
-        props);
-
-    Assertions.assertTrue(
-        entityStore.exists(NameIdentifier.of(viewNs.levels()), Entity.EntityType.SCHEMA));
-  }
-
-  @Test
-  public void testDropViewRemovesEntityFromStore() throws IOException {
-    Namespace viewNs = Namespace.of(metalake, catalog, "schema69");
-    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "drop_view_remove_entity");
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaOperationDispatcher.createSchema(NameIdentifier.of(viewNs.levels()), "comment", props);
-
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    View mockView = createMockView("drop_view_remove_entity", props, auditInfo);
-
-    TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
-    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
-    testCatalogOperations.views.put(viewIdent, mockView);
-
-    viewOperationDispatcher.loadView(viewIdent);
-    Assertions.assertTrue(entityStore.exists(viewIdent, VIEW));
-
-    Assertions.assertTrue(viewOperationDispatcher.dropView(viewIdent));
-    Assertions.assertFalse(entityStore.exists(viewIdent, VIEW));
-  }
-
-  @Test
-  public void testAlterViewRename() throws IOException {
-    Namespace viewNs = Namespace.of(metalake, catalog, "schema70");
-    NameIdentifier oldIdent = NameIdentifier.of(viewNs, "rename_view_old");
-    NameIdentifier newIdent = NameIdentifier.of(viewNs, "rename_view_new");
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaOperationDispatcher.createSchema(NameIdentifier.of(viewNs.levels()), "comment", props);
-
-    AuditInfo auditInfo =
-        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
-    View mockView = createMockView("rename_view_old", props, auditInfo);
-    TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
-    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
-    testCatalogOperations.views.put(oldIdent, mockView);
-
-    View altered =
-        viewOperationDispatcher.alterView(oldIdent, ViewChange.rename("rename_view_new"));
-    Assertions.assertEquals("rename_view_new", altered.name());
-
-    Assertions.assertThrows(
-        NoSuchViewException.class, () -> viewOperationDispatcher.loadView(oldIdent));
-    Assertions.assertEquals("rename_view_new", viewOperationDispatcher.loadView(newIdent).name());
   }
 }

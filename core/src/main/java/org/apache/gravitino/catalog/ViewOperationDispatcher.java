@@ -18,33 +18,29 @@
  */
 package org.apache.gravitino.catalog;
 
-import static org.apache.gravitino.Entity.EntityType.VIEW;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
-import static org.apache.gravitino.utils.NameIdentifierUtil.getSchemaIdentifier;
 
 import java.io.IOException;
-import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
-import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.GenericEntity;
-import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
-import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.storage.IdGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** {@code ViewOperationDispatcher} is the operation dispatcher for view operations. */
+/**
+ * {@code ViewOperationDispatcher} is the operation dispatcher for view operations.
+ *
+ * <p>Currently only supports loadView() with EntityStore auto-import. Full CRUD operations
+ * (listViews, createView, alterView, dropView) will be implemented in a follow-up PR.
+ */
 public class ViewOperationDispatcher extends OperationDispatcher implements ViewDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(ViewOperationDispatcher.class);
@@ -91,153 +87,6 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     }
 
     return entityCombinedView;
-  }
-
-  /**
-   * List the views in a namespace.
-   *
-   * @param namespace A namespace.
-   * @return An array of view identifiers in the namespace.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   */
-  @Override
-  public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
-    return doWithCatalog(
-        getCatalogIdentifier(NameIdentifier.of(namespace.levels())),
-        c -> c.doWithViewOps(v -> v.listViews(namespace)),
-        NoSuchSchemaException.class);
-  }
-
-  /**
-   * Create a view in the catalog.
-   *
-   * @param ident A view identifier.
-   * @param comment The view comment, may be {@code null}.
-   * @param columns The output columns of the view.
-   * @param representations The representations of the view.
-   * @param defaultCatalog The default catalog used to resolve unqualified identifiers referenced by
-   *     the view definition, or {@code null} if not set.
-   * @param defaultSchema The default schema used to resolve unqualified identifiers referenced by
-   *     the view definition, or {@code null} if not set.
-   * @param properties The view properties.
-   * @return The created view metadata.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   * @throws ViewAlreadyExistsException If the view already exists.
-   */
-  @Override
-  public View createView(
-      NameIdentifier ident,
-      String comment,
-      Column[] columns,
-      Representation[] representations,
-      String defaultCatalog,
-      String defaultSchema,
-      Map<String, String> properties)
-      throws NoSuchSchemaException, ViewAlreadyExistsException {
-    SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
-    NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-    schemaDispatcher.loadSchema(schemaIdent);
-
-    return TreeLockUtils.doWithTreeLock(
-        schemaIdent,
-        LockType.WRITE,
-        () ->
-            internalCreateView(
-                ident,
-                comment,
-                columns,
-                representations,
-                defaultCatalog,
-                defaultSchema,
-                properties));
-  }
-
-  /**
-   * Apply the {@link ViewChange changes} to a view in the catalog.
-   *
-   * @param ident A view identifier.
-   * @param changes View changes to apply to the view.
-   * @return The updated view metadata.
-   * @throws NoSuchViewException If the view does not exist.
-   * @throws IllegalArgumentException If the change is rejected by the implementation.
-   */
-  @Override
-  public View alterView(NameIdentifier ident, ViewChange... changes)
-      throws NoSuchViewException, IllegalArgumentException {
-    NameIdentifier lockIdentifier = ident;
-    LockType lockType = LockType.READ;
-    for (ViewChange change : changes) {
-      if (change instanceof ViewChange.RenameView) {
-        lockIdentifier = getSchemaIdentifier(ident);
-        lockType = LockType.WRITE;
-        break;
-      }
-    }
-
-    return TreeLockUtils.doWithTreeLock(
-        lockIdentifier,
-        lockType,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(ident),
-                c -> c.doWithViewOps(v -> v.alterView(ident, changes)),
-                NoSuchViewException.class,
-                IllegalArgumentException.class));
-  }
-
-  /**
-   * Drop a view from the catalog.
-   *
-   * @param ident A view identifier.
-   * @return True if the view is dropped, false if the view does not exist.
-   */
-  @Override
-  public boolean dropView(NameIdentifier ident) {
-    NameIdentifier schemaIdentifier = getSchemaIdentifier(ident);
-    return TreeLockUtils.doWithTreeLock(
-        schemaIdentifier,
-        LockType.WRITE,
-        () -> {
-          boolean droppedFromCatalog =
-              doWithCatalog(
-                  getCatalogIdentifier(ident),
-                  c -> c.doWithViewOps(v -> v.dropView(ident)),
-                  RuntimeException.class);
-
-          try {
-            store.delete(ident, VIEW);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
-          return droppedFromCatalog;
-        });
-  }
-
-  private View internalCreateView(
-      NameIdentifier ident,
-      String comment,
-      Column[] columns,
-      Representation[] representations,
-      String defaultCatalog,
-      String defaultSchema,
-      Map<String, String> properties) {
-    return doWithCatalog(
-        getCatalogIdentifier(ident),
-        c ->
-            c.doWithViewOps(
-                v ->
-                    v.createView(
-                        ident,
-                        comment,
-                        columns,
-                        representations,
-                        defaultCatalog,
-                        defaultSchema,
-                        properties)),
-        NoSuchSchemaException.class,
-        ViewAlreadyExistsException.class);
   }
 
   /**
