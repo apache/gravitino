@@ -70,6 +70,23 @@ public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeE
   }
 
   @Override
+  public void close() {
+    if (isClosed()) {
+      return;
+    }
+
+    try {
+      super.close();
+    } finally {
+      closeClientFactory();
+    }
+  }
+
+  void closeClientFactory() {
+    clientFactory.close();
+  }
+
+  @Override
   protected void close(HiveClient client) {
     LOG.info("Closing Hive Metastore client");
     client.close();
