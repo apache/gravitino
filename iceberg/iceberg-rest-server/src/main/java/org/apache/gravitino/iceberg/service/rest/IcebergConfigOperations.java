@@ -57,9 +57,9 @@ public class IcebergConfigOperations {
 
   private final IcebergCatalogWrapperManager catalogWrapperManager;
 
-  // Iceberg 1.10.1's Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN uses a broken path that is missing the
-  // namespaces/{namespace} segment (fixed in apache/iceberg#14120, targeting 1.11.x). We override
-  // it here with the correct namespace-scoped path until we upgrade.
+  // TODO: Iceberg 1.10.1's Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN uses a broken path that is missing
+  // the namespaces/{namespace} segment (fixed in apache/iceberg#14120, targeting 1.11.x).
+  // We override it here with the correct namespace-scoped path until we upgrade.
   private static final Endpoint V1_SUBMIT_TABLE_SCAN_PLAN =
       Endpoint.create("POST", "/v1/{prefix}/namespaces/{namespace}/tables/{table}/plan");
 
