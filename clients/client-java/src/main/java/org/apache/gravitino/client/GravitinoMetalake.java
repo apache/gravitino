@@ -537,7 +537,7 @@ public class GravitinoMetalake extends MetalakeDTO
    */
   @Override
   public Tag alterTag(String name, TagChange... changes)
-      throws NoSuchTagException, IllegalArgumentException {
+      throws NoSuchTagException, IllegalArgumentException, TagAlreadyExistsException {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "tag name must not be null or empty");
     List<TagUpdateRequest> updates =
         Arrays.stream(changes).map(DTOConverters::toTagUpdateRequest).collect(Collectors.toList());
