@@ -87,8 +87,7 @@ public class TestIcebergCatalogCapability {
   public void testDefaultConstructorUsesColonSeparator() {
     IcebergCatalogCapability capability = new IcebergCatalogCapability();
 
-    CapabilityResult result =
-        capability.specificationOnName(Capability.Scope.SCHEMA, "team:sales");
+    CapabilityResult result = capability.specificationOnName(Capability.Scope.SCHEMA, "team:sales");
     Assertions.assertTrue(result.supported());
   }
 

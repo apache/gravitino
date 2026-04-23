@@ -127,7 +127,10 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         // Delete the entity for the dropped namespace (schema).
         store.delete(
             IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                metalake, context.catalogName(), namespace, HierarchicalSchemaUtil.namespaceSeparator()),
+                metalake,
+                context.catalogName(),
+                namespace,
+                HierarchicalSchemaUtil.namespaceSeparator()),
             Entity.EntityType.SCHEMA);
       }
     } catch (NoSuchEntityException ignore) {
@@ -180,7 +183,9 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake, catalogName, TableIdentifier.of(namespace, tableName),
+              metalake,
+              catalogName,
+              TableIdentifier.of(namespace, tableName),
               HierarchicalSchemaUtil.namespaceSeparator()));
     }
   }
@@ -193,5 +198,4 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
               metalake, catalogName, namespace, HierarchicalSchemaUtil.namespaceSeparator()));
     }
   }
-
 }

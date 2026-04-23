@@ -30,9 +30,9 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /**
  * Authorization executor for {@code createSchema} operations.
  *
- * <p>For nested schema names (e.g. {@code A:B:C}), injects the parent schema ({@code A:B}) into
- * the metadata context so that the standard expression can evaluate {@code CREATE_SCHEMA} against
- * the already-existing parent. {@link
+ * <p>For nested schema names (e.g. {@code A:B:C}), injects the parent schema ({@code A:B}) into the
+ * metadata context so that the standard expression can evaluate {@code CREATE_SCHEMA} against the
+ * already-existing parent. {@link
  * org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer} then walks the inheritance
  * chain ({@code A:B → A → CATALOG}) automatically.
  *

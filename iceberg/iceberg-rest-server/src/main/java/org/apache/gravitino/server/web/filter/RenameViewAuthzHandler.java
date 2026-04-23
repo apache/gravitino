@@ -82,8 +82,7 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
     // The source view is NOT extracted via standard @AuthorizationMetadata annotations
     // because it's embedded in the RenameTableRequest body
     String separator = HierarchicalSchemaUtil.namespaceSeparator();
-    String sourceSchema =
-        String.join(separator, renameViewRequest.source().namespace().levels());
+    String sourceSchema = String.join(separator, renameViewRequest.source().namespace().levels());
     String sourceView = renameViewRequest.source().name();
 
     nameIdentifierMap.put(

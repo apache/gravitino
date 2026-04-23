@@ -29,7 +29,8 @@ public class IcebergCatalogCapability implements Capability {
   /**
    * Creates a capability with the given external namespace separator.
    *
-   * @param namespaceSeparator the external separator used in logical schema names (e.g. {@code ":"})
+   * @param namespaceSeparator the external separator used in logical schema names (e.g. {@code
+   *     ":"})
    */
   public IcebergCatalogCapability(String namespaceSeparator) {
     this.namespaceSeparator = namespaceSeparator;

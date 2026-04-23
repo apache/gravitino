@@ -161,7 +161,8 @@ public class TestIcebergTableHookDispatcher {
     verify(mockDispatcher).dropTable(mockContext, tableId, false);
 
     NameIdentifier expectedIdentifier =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId, ":");
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
     verify(mockEntityStore).delete(expectedIdentifier, Entity.EntityType.TABLE);
   }
 
@@ -170,7 +171,8 @@ public class TestIcebergTableHookDispatcher {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
 
     NameIdentifier expectedIdentifier =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId, ":");
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
     doThrow(new NoSuchEntityException("Table not found"))
         .when(mockEntityStore)
         .delete(expectedIdentifier, Entity.EntityType.TABLE);

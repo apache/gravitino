@@ -82,8 +82,7 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
     // The source table is NOT extracted via standard @AuthorizationMetadata annotations
     // because it's embedded in the RenameTableRequest body
     String separator = HierarchicalSchemaUtil.namespaceSeparator();
-    String sourceSchema =
-        String.join(separator, renameTableRequest.source().namespace().levels());
+    String sourceSchema = String.join(separator, renameTableRequest.source().namespace().levels());
     String sourceTable = renameTableRequest.source().name();
 
     nameIdentifierMap.put(

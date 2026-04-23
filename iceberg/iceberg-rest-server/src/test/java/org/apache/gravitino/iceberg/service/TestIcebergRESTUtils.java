@@ -87,5 +87,4 @@ public class TestIcebergRESTUtils {
       Assertions.assertEquals(field, clonedField);
     }
   }
-
 }

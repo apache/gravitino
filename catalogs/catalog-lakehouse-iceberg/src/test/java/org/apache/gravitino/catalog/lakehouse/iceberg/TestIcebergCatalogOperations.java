@@ -137,7 +137,8 @@ public class TestIcebergCatalogOperations {
     ArgumentCaptor<CreateNamespaceRequest> captor =
         ArgumentCaptor.forClass(CreateNamespaceRequest.class);
     verify(mockWrapper).createNamespace(captor.capture());
-    Assertions.assertArrayEquals(new String[] {"team", "sales"}, captor.getValue().namespace().levels());
+    Assertions.assertArrayEquals(
+        new String[] {"team", "sales"}, captor.getValue().namespace().levels());
   }
 
   // ─── loadSchema ──────────────────────────────────────────────────────────────
@@ -217,11 +218,9 @@ public class TestIcebergCatalogOperations {
 
     Assertions.assertEquals(2, result.length);
     // Flat namespace stays as-is
-    Assertions.assertTrue(
-        Arrays.stream(result).anyMatch(id -> "mydb".equals(id.name())));
+    Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "mydb".equals(id.name())));
     // Multi-level Iceberg namespace is joined with the configured separator
-    Assertions.assertTrue(
-        Arrays.stream(result).anyMatch(id -> "A:B:C".equals(id.name())));
+    Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "A:B:C".equals(id.name())));
   }
 
   @Test

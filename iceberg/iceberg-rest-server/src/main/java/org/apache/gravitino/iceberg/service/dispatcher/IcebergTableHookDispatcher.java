@@ -89,7 +89,10 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
         // Delete the entity for the dropped table.
         store.delete(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, context.catalogName(), tableIdentifier, HierarchicalSchemaUtil.namespaceSeparator()),
+                metalake,
+                context.catalogName(),
+                tableIdentifier,
+                HierarchicalSchemaUtil.namespaceSeparator()),
             Entity.EntityType.TABLE);
       }
     } catch (NoSuchEntityException ignore) {
@@ -193,9 +196,10 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake, catalogName, TableIdentifier.of(namespace, tableName),
+              metalake,
+              catalogName,
+              TableIdentifier.of(namespace, tableName),
               HierarchicalSchemaUtil.namespaceSeparator()));
     }
   }
-
 }

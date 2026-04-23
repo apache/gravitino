@@ -21,7 +21,6 @@ package org.apache.gravitino.catalog;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
@@ -65,7 +64,8 @@ public final class HierarchicalSchemaUtil {
    * @return the physical schema name using {@code .} as separator
    */
   public static String logicalToPhysical(String logicalPath, String separator) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(logicalPath), "logicalPath must not be blank");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(logicalPath), "logicalPath must not be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(separator), "separator must not be blank");
     return logicalPath.replace(separator, PHYSICAL_SEPARATOR);
   }
@@ -81,7 +81,8 @@ public final class HierarchicalSchemaUtil {
    * @return the logical schema path using the external separator
    */
   public static String physicalToLogical(String physicalName, String separator) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(physicalName), "physicalName must not be blank");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(physicalName), "physicalName must not be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(separator), "separator must not be blank");
     return physicalName.replace(PHYSICAL_SEPARATOR, separator);
   }

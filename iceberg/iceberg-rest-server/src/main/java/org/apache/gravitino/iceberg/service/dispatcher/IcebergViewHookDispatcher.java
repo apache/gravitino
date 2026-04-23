@@ -104,7 +104,10 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
       if (store != null) {
         store.delete(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, context.catalogName(), viewIdentifier, HierarchicalSchemaUtil.namespaceSeparator()),
+                metalake,
+                context.catalogName(),
+                viewIdentifier,
+                HierarchicalSchemaUtil.namespaceSeparator()),
             Entity.EntityType.VIEW);
         LOG.info(
             "Successfully removed view from Gravitino entity store: {}.{}.{}.{}",
@@ -204,7 +207,9 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
       try {
         viewDispatcher.loadView(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, catalogName, TableIdentifier.of(namespace, viewName),
+                metalake,
+                catalogName,
+                TableIdentifier.of(namespace, viewName),
                 HierarchicalSchemaUtil.namespaceSeparator()));
         LOG.info(
             "Successfully imported view into Gravitino: {}.{}.{}.{}",
@@ -224,5 +229,4 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
       }
     }
   }
-
 }

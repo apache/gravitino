@@ -18,7 +18,6 @@
 package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.junit.Assert.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -173,9 +172,7 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     Catalog catalogByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
 
     // Normal user can now create "A:B:E" via inheritance from "A".
-    catalogByNormalUser
-        .asSchemas()
-        .createSchema("A:B:E", "inherited from A", new HashMap<>());
+    catalogByNormalUser.asSchemas().createSchema("A:B:E", "inherited from A", new HashMap<>());
 
     // Verify "A:B:E" was created.
     String[] schemas = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().listSchemas();
@@ -222,14 +219,13 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     Catalog catalogByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
 
     // Normal user can now load "A:B:C".
-    org.apache.gravitino.Schema loaded =
-        catalogByNormalUser.asSchemas().loadSchema(SCHEMA_ABC);
+    org.apache.gravitino.Schema loaded = catalogByNormalUser.asSchemas().loadSchema(SCHEMA_ABC);
     assertEquals(SCHEMA_ABC, loaded.name());
   }
 
   /**
-   * Dropping a nested schema requires ownership or catalog ownership. Normal user without
-   * ownership cannot drop; after becoming owner, they can.
+   * Dropping a nested schema requires ownership or catalog ownership. Normal user without ownership
+   * cannot drop; after becoming owner, they can.
    */
   @Test
   @Order(7)
@@ -259,9 +255,9 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   /**
-   * Tests that {@code create_schema} cannot be bound to a SCHEMA-level securable object before
-   * the canBindTo change (this is now allowed). Grants {@code CreateSchema.allow()} on a schema
-   * object and verifies no exception is thrown.
+   * Tests that {@code create_schema} cannot be bound to a SCHEMA-level securable object before the
+   * canBindTo change (this is now allowed). Grants {@code CreateSchema.allow()} on a schema object
+   * and verifies no exception is thrown.
    */
   @Test
   @Order(8)

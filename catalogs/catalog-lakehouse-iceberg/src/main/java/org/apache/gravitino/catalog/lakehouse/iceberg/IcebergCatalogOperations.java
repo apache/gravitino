@@ -36,8 +36,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -162,8 +162,7 @@ public class IcebergCatalogOperations
         icebergParent = org.apache.iceberg.catalog.Namespace.empty();
       } else {
         String parentPath =
-            String.join(
-                separator, Arrays.copyOfRange(namespace.levels(), 2, namespace.length()));
+            String.join(separator, Arrays.copyOfRange(namespace.levels(), 2, namespace.length()));
         icebergParent =
             IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(parentPath, separator);
       }
@@ -467,8 +466,7 @@ public class IcebergCatalogOperations
           IcebergCatalogWrapperHelper.getIcebergNamespaceFromSchemaName(
               schemaName, HierarchicalSchemaUtil.namespaceSeparator());
       NameIdentifier tableIdentForIceberg =
-          NameIdentifier.of(
-              Namespace.of(icebergNs.levels()), tableIdent.name());
+          NameIdentifier.of(Namespace.of(icebergNs.levels()), tableIdent.name());
       IcebergTableChange icebergTableChange =
           icebergCatalogWrapperHelper.buildIcebergTableChanges(tableIdentForIceberg, changes);
       LoadTableResponse loadTableResponse = icebergCatalogWrapper.updateTable(icebergTableChange);

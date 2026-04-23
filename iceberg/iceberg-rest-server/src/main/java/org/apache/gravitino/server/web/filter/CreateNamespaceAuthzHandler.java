@@ -27,7 +27,6 @@ import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 
@@ -37,8 +36,8 @@ import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
  * expression can check {@code CREATE_SCHEMA} against the already-existing parent.
  *
  * <p>For top-level namespaces no SCHEMA is injected and the standard expression falls back to
- * CATALOG-level checks. Authorization is completed by the standard expression evaluator
- * ({@link #authorizationCompleted()} returns {@code false}).
+ * CATALOG-level checks. Authorization is completed by the standard expression evaluator ({@link
+ * #authorizationCompleted()} returns {@code false}).
  */
 public class CreateNamespaceAuthzHandler implements AuthorizationHandler {
   private final Parameter[] parameters;

@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -41,7 +42,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.util.regex.Pattern;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -231,7 +231,8 @@ public class IcebergNamespaceOperations {
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createNamespace(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
-      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE)
+      @IcebergAuthorizationMetadata(
+              type = IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE)
           CreateNamespaceRequest createNamespaceRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(

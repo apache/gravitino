@@ -56,7 +56,8 @@ class TestIcebergIdentifierUtils {
   void toGravitinoSchemaIdentifierConvertsCorrectly() {
     Namespace icebergNamespace = Namespace.of("db");
     NameIdentifier result =
-        IcebergIdentifierUtils.toGravitinoSchemaIdentifier("metalake", "catalog", icebergNamespace, ":");
+        IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+            "metalake", "catalog", icebergNamespace, ":");
 
     assertEquals("metalake", result.namespace().level(0));
     assertEquals("catalog", result.namespace().level(1));
@@ -67,7 +68,8 @@ class TestIcebergIdentifierUtils {
   void toGravitinoSchemaIdentifierNestedNamespaceConvertsCorrectly() {
     Namespace icebergNamespace = Namespace.of("A", "B", "C");
     NameIdentifier result =
-        IcebergIdentifierUtils.toGravitinoSchemaIdentifier("metalake", "catalog", icebergNamespace, ":");
+        IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+            "metalake", "catalog", icebergNamespace, ":");
 
     assertEquals("A:B:C", result.name());
   }

@@ -179,8 +179,8 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     Parameter[] parameters = testMethod.getParameters();
 
     // Namespace "A/B/C" encoded using Iceberg REST convention (%1F as level separator)
-    String encodedNamespace = RESTUtil.encodeNamespace(
-        org.apache.iceberg.catalog.Namespace.of("A", "B", "C"));
+    String encodedNamespace =
+        RESTUtil.encodeNamespace(org.apache.iceberg.catalog.Namespace.of("A", "B", "C"));
     Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
 
     GravitinoEnv mockEnv = Mockito.mock(GravitinoEnv.class);
@@ -211,8 +211,8 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
             "testTableOperation", String.class, String.class, String.class);
     Parameter[] parameters = testMethod.getParameters();
 
-    String encodedNamespace = RESTUtil.encodeNamespace(
-        org.apache.iceberg.catalog.Namespace.of("my_schema"));
+    String encodedNamespace =
+        RESTUtil.encodeNamespace(org.apache.iceberg.catalog.Namespace.of("my_schema"));
     Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
 
     GravitinoEnv mockEnv = Mockito.mock(GravitinoEnv.class);

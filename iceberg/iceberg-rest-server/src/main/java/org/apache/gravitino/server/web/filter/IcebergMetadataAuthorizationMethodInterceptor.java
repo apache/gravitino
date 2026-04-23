@@ -97,7 +97,6 @@ public class IcebergMetadataAuthorizationMethodInterceptor
         }
         continue;
       }
-
     }
     return nameIdentifierMap;
   }

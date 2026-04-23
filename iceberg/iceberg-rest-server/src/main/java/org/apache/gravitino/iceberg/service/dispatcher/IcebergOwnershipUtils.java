@@ -84,7 +84,9 @@ public class IcebergOwnershipUtils {
           metalake,
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, tableName),
+                  metalake,
+                  catalogName,
+                  TableIdentifier.of(namespace, tableName),
                   HierarchicalSchemaUtil.namespaceSeparator()),
               Entity.EntityType.TABLE),
           user,
@@ -114,12 +116,13 @@ public class IcebergOwnershipUtils {
           metalake,
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, viewName),
+                  metalake,
+                  catalogName,
+                  TableIdentifier.of(namespace, viewName),
                   HierarchicalSchemaUtil.namespaceSeparator()),
               Entity.EntityType.VIEW),
           user,
           Owner.Type.USER);
     }
   }
-
 }

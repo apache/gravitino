@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.GravitinoEnv;
@@ -540,19 +539,21 @@ public class SchemaMetaService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Converts a logical schema name (e.g. {@code "A:B:C"}) to the physical dot-separated form
-   * (e.g. {@code "A.B.C"}) used in the database. Non-nested names are returned unchanged.
+   * Converts a logical schema name (e.g. {@code "A:B:C"}) to the physical dot-separated form (e.g.
+   * {@code "A.B.C"}) used in the database. Non-nested names are returned unchanged.
    */
   private String toPhysicalSchemaName(String logicalName) {
-    return HierarchicalSchemaUtil.logicalToPhysical(logicalName, HierarchicalSchemaUtil.namespaceSeparator());
+    return HierarchicalSchemaUtil.logicalToPhysical(
+        logicalName, HierarchicalSchemaUtil.namespaceSeparator());
   }
 
   /**
-   * Converts a physical schema name (e.g. {@code "A.B.C"}) back to the logical separator form
-   * (e.g. {@code "A:B:C"}). Non-nested names are returned unchanged.
+   * Converts a physical schema name (e.g. {@code "A.B.C"}) back to the logical separator form (e.g.
+   * {@code "A:B:C"}). Non-nested names are returned unchanged.
    */
   private String toLogicalSchemaName(String physicalName) {
-    return HierarchicalSchemaUtil.physicalToLogical(physicalName, HierarchicalSchemaUtil.namespaceSeparator());
+    return HierarchicalSchemaUtil.physicalToLogical(
+        physicalName, HierarchicalSchemaUtil.namespaceSeparator());
   }
 
   /**
@@ -588,9 +589,9 @@ public class SchemaMetaService {
   }
 
   /**
-   * Returns a {@link SchemaEntity} whose {@code name()} is the physical representation suitable
-   * for storage. If the entity carries a logical name (contains the separator), it is converted to
-   * the physical dot-separated form. Otherwise the original entity is returned unchanged.
+   * Returns a {@link SchemaEntity} whose {@code name()} is the physical representation suitable for
+   * storage. If the entity carries a logical name (contains the separator), it is converted to the
+   * physical dot-separated form. Otherwise the original entity is returned unchanged.
    */
   private SchemaEntity toPhysicalEntity(SchemaEntity entity) {
     String separator = HierarchicalSchemaUtil.namespaceSeparator();

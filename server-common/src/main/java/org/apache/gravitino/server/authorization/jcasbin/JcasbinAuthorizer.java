@@ -47,11 +47,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
-import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -464,7 +464,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         List<MetadataObject> chain = buildSchemaInheritanceChain(metadataObject);
         for (MetadataObject scopeObject : chain) {
           Long metadataId = getMetadataIdQuietly(scopeObject, metalake);
-          if (metadataId != null && authorizeByJcasbin(userId, scopeObject, metadataId, privilege)) {
+          if (metadataId != null
+              && authorizeByJcasbin(userId, scopeObject, metadataId, privilege)) {
             return true;
           }
         }
@@ -483,8 +484,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     /**
      * Builds the logical schema inheritance chain for a SCHEMA MetadataObject. For a schema named
-     * {@code "catalog.A:B:C"} this returns MetadataObjects for {@code catalog.A:B:C},
-     * {@code catalog.A:B}, and {@code catalog.A} in that order.
+     * {@code "catalog.A:B:C"} this returns MetadataObjects for {@code catalog.A:B:C}, {@code
+     * catalog.A:B}, and {@code catalog.A} in that order.
      *
      * <p>For flat (non-nested) schemas the list contains only the original object.
      */

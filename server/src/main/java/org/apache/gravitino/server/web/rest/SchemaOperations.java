@@ -88,8 +88,7 @@ public class SchemaOperations {
   public Response listSchemas(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
-          String catalog,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @DefaultValue("") @QueryParam("parentSchema") String parentSchema) {
     LOG.info(
         "Received list schema request for catalog: {}.{}, parentSchema: {}",

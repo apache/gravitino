@@ -257,10 +257,10 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     schemaMetaService.insertSchema(nested3, false);
 
     List<SchemaEntity> listed =
-        schemaMetaService.listSchemasByNamespace(
-            NamespaceUtil.ofSchema(metalakeName, catalogName));
+        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName));
 
-    List<String> names = listed.stream().map(SchemaEntity::name).collect(java.util.stream.Collectors.toList());
+    List<String> names =
+        listed.stream().map(SchemaEntity::name).collect(java.util.stream.Collectors.toList());
     Assertions.assertTrue(names.contains("flat"), "flat name must be present");
     Assertions.assertTrue(names.contains("A:B"), "2-level logical name must be present");
     Assertions.assertTrue(names.contains("A:B:C"), "3-level logical name must be present");

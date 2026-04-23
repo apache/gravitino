@@ -34,7 +34,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
@@ -160,8 +159,7 @@ public class TestSchemaHookDispatcher {
     hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
     // A should NOT be created, A:B should be created
-    verify(mockDispatcher, never())
-        .createSchema(eq(parentA), isNull(), eq(Collections.emptyMap()));
+    verify(mockDispatcher, never()).createSchema(eq(parentA), isNull(), eq(Collections.emptyMap()));
     verify(mockDispatcher, times(1))
         .createSchema(eq(parentAB), isNull(), eq(Collections.emptyMap()));
 
@@ -181,8 +179,7 @@ public class TestSchemaHookDispatcher {
     hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
     // A should NOT be created since it exists
-    verify(mockDispatcher, never())
-        .createSchema(eq(parentA), isNull(), eq(Collections.emptyMap()));
+    verify(mockDispatcher, never()).createSchema(eq(parentA), isNull(), eq(Collections.emptyMap()));
 
     // Only A:B gets owner set
     verify(mockOwnerDispatcher, times(1)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
