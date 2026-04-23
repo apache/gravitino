@@ -1,6 +1,6 @@
 --
 -- Licensed to the Apache Software Foundation (ASF) under one
--- or more contributor license agreements.  See the NOTICE file--
+-- or more contributor license agreements.  See the NOTICE file
 --  distributed with this work for additional information
 -- regarding copyright ownership.  The ASF licenses this file
 -- to you under the Apache License, Version 2.0 (the
@@ -493,6 +493,8 @@ CREATE TABLE IF NOT EXISTS owner_meta (
 
 CREATE INDEX IF NOT EXISTS owner_meta_idx_owner_id ON owner_meta (owner_id);
 CREATE INDEX IF NOT EXISTS owner_meta_idx_metadata_object_id ON owner_meta (metadata_object_id);
+CREATE INDEX IF NOT EXISTS idx_owner_meta_del_upd_obj
+    ON owner_meta (deleted_at, updated_at, metadata_object_id);
 COMMENT ON TABLE owner_meta IS 'owner relation';
 COMMENT ON COLUMN owner_meta.id IS 'auto increment id';
 COMMENT ON COLUMN owner_meta.metalake_id IS 'metalake id';

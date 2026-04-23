@@ -20,8 +20,11 @@ package org.apache.gravitino.storage.relational.po.auth;
 
 /** Step 1a result: user identity + role-list staleness sentinel. */
 public class UserAuthInfo {
-  private final long userId;
-  private final long updatedAt;
+  private long userId;
+  private long updatedAt;
+
+  /** Required by MyBatis for result mapping. */
+  public UserAuthInfo() {}
 
   public UserAuthInfo(long userId, long updatedAt) {
     this.userId = userId;
@@ -32,7 +35,15 @@ public class UserAuthInfo {
     return userId;
   }
 
+  public void setUserId(long userId) {
+    this.userId = userId;
+  }
+
   public long getUpdatedAt() {
     return updatedAt;
+  }
+
+  public void setUpdatedAt(long updatedAt) {
+    this.updatedAt = updatedAt;
   }
 }

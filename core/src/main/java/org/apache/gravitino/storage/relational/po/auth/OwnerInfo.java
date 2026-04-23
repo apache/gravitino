@@ -20,8 +20,11 @@ package org.apache.gravitino.storage.relational.po.auth;
 
 /** Step 2.5: owner identity for a single metadata object. */
 public class OwnerInfo {
-  private final long ownerId;
-  private final String ownerType;
+  private long ownerId;
+  private String ownerType;
+
+  /** Required by MyBatis for result mapping. */
+  public OwnerInfo() {}
 
   public OwnerInfo(long ownerId, String ownerType) {
     this.ownerId = ownerId;
@@ -32,7 +35,15 @@ public class OwnerInfo {
     return ownerId;
   }
 
+  public void setOwnerId(long ownerId) {
+    this.ownerId = ownerId;
+  }
+
   public String getOwnerType() {
     return ownerType;
+  }
+
+  public void setOwnerType(String ownerType) {
+    this.ownerType = ownerType;
   }
 }

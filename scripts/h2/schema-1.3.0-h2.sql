@@ -292,7 +292,8 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_oid` (`owner_id`),
-    KEY `idx_meid` (`metadata_object_id`)
+    KEY `idx_meid` (`metadata_object_id`),
+    KEY `idx_owner_meta_del_upd_obj` (`deleted_at`, `updated_at`, `metadata_object_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `model_meta` (

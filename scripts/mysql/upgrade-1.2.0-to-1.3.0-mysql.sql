@@ -54,6 +54,8 @@ CREATE INDEX idx_role_meta_del_upd
     ON role_meta (role_id, deleted_at, updated_at);
 CREATE INDEX idx_owner_meta_obj_del_upd
     ON owner_meta (metadata_object_id, deleted_at, updated_at);
+CREATE INDEX idx_owner_meta_del_upd_obj
+    ON owner_meta (deleted_at, updated_at, metadata_object_id);
 
 -- Backfill: set updated_at = audit_info-extracted time (use 1 as safe default for existing rows)
 UPDATE `role_meta`  SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;
@@ -80,5 +82,5 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `operate_type`  VARCHAR(16)     NOT NULL COMMENT 'DROP | CREATE | ALTER (ALTER covers rename and other structural changes)',
   `created_at`    BIGINT          NOT NULL,
   PRIMARY KEY (`id`),
-  INDEX `idx_created_at` (`created_at`)
+  INDEX `idx_ecl_created_at` (`created_at`)
 ) COMMENT 'Append-only log of entity structural changes. One row per affected entity per operation. The entity change poller reads this table to drive targeted invalidation of metadataIdCache on HA peer nodes. Rows older than the retention window (default 1 h) are pruned periodically.';

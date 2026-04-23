@@ -117,6 +117,7 @@ public class OwnerRelPO {
       Preconditions.checkArgument(ownerRelPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(ownerRelPO.lastVersion != null, "Last version is required");
       Preconditions.checkArgument(ownerRelPO.deletedAt != null, "Deleted at is required");
+      Preconditions.checkArgument(ownerRelPO.updatedAt != null, "Updated at is required");
     }
   }
 }

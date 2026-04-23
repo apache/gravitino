@@ -26,6 +26,7 @@ CREATE INDEX IF NOT EXISTS `idx_user_meta_name_del_upd` ON `user_meta`(`metalake
 CREATE INDEX IF NOT EXISTS `idx_group_meta_del_upd` ON `group_meta`(`group_id`, `deleted_at`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_role_meta_del_upd` ON `role_meta`(`role_id`, `deleted_at`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_owner_meta_obj_del_upd` ON `owner_meta`(`metadata_object_id`, `deleted_at`, `updated_at`);
+CREATE INDEX IF NOT EXISTS `idx_owner_meta_del_upd_obj` ON `owner_meta`(`deleted_at`, `updated_at`, `metadata_object_id`);
 
 UPDATE `role_meta`  SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;
 UPDATE `user_meta`  SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;

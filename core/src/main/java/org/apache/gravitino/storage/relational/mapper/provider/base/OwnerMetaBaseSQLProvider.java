@@ -241,13 +241,14 @@ public class OwnerMetaBaseSQLProvider {
   public String selectOwnerByMetadataObjectId(@Param("metadataObjectId") long metadataObjectId) {
     return "SELECT owner_id as ownerId, owner_type as ownerType FROM "
         + OWNER_TABLE_NAME
-        + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0";
+        + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
+        + " ORDER BY updated_at DESC, id DESC LIMIT 1";
   }
 
   public String selectChangedOwners(@Param("updatedAtAfter") long updatedAtAfter) {
     return "SELECT metadata_object_id as metadataObjectId, updated_at as updatedAt"
         + " FROM "
         + OWNER_TABLE_NAME
-        + " WHERE updated_at > #{updatedAtAfter} ORDER BY updated_at";
+        + " WHERE deleted_at = 0 AND updated_at > #{updatedAtAfter} ORDER BY updated_at, id LIMIT 1000";
   }
 }
