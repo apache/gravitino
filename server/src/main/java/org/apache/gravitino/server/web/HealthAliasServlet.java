@@ -26,8 +26,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
- * Serves root-level health paths ({@code /health}, {@code /health/live}, {@code /health/ready}) by
- * forwarding to the canonical {@code /api/health/*} endpoints.
+ * Serves root-level health paths ({@code /health}, {@code /health/live}, {@code /health/ready},
+ * {@code /health.html}) by forwarding to the canonical {@code /api/health/*} endpoints.
  *
  * <p>This alias exists for compatibility with enterprise global traffic managers that require
  * probes at well-known root paths. The canonical implementation remains at {@code /api/health}.
