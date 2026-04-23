@@ -148,6 +148,11 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     Preconditions.checkArgument(
         partition instanceof IdentityPartition, "Glue only supports identity partitions");
     IdentityPartition ip = (IdentityPartition) partition;
+    Preconditions.checkArgument(
+        ip.values().length == partitionColNames.length,
+        "Partition values count (%s) must match partition columns count (%s)",
+        ip.values().length,
+        partitionColNames.length);
 
     List<String> values = new ArrayList<>(ip.values().length);
     for (Literal<?> v : ip.values()) {
@@ -221,14 +226,25 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
 
   /**
    * Parses a Hive-style partition name (e.g. {@code dt=2024-01-01/country=us}) into an ordered list
-   * of values.
+   * of values, validating that the keys match the table's partition columns in order.
    */
-  private static List<String> parsePartitionName(String partitionName) {
+  private List<String> parsePartitionName(String partitionName) {
     String[] parts = partitionName.split("/");
+    Preconditions.checkArgument(
+        parts.length == partitionColNames.length,
+        "Partition name '%s' has %s segment(s) but table has %s partition column(s)",
+        partitionName,
+        parts.length,
+        partitionColNames.length);
     List<String> values = new ArrayList<>(parts.length);
-    for (String part : parts) {
-      int eq = part.indexOf('=');
-      values.add(eq >= 0 ? part.substring(eq + 1) : part);
+    for (int i = 0; i < parts.length; i++) {
+      int eq = parts[i].indexOf('=');
+      Preconditions.checkArgument(
+          eq >= 0 && parts[i].substring(0, eq).equals(partitionColNames[i]),
+          "Partition segment '%s' does not match expected column '%s'",
+          parts[i],
+          partitionColNames[i]);
+      values.add(parts[i].substring(eq + 1));
     }
     return values;
   }

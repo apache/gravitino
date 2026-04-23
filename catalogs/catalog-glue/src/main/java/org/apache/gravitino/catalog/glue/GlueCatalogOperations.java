@@ -534,6 +534,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       SortOrder[] sortOrders) {
 
     int partCount = partitions.length;
+    Preconditions.checkArgument(
+        columns.length >= partCount,
+        "columns.length (%s) must be >= number of partition columns (%s)",
+        columns.length,
+        partCount);
     int dataCount = columns.length - partCount;
 
     List<software.amazon.awssdk.services.glue.model.Column> glueDataCols = new ArrayList<>();
@@ -668,14 +673,15 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  /**
-   * Finds the first column matching {@code name} in {@code cols}, replaces it with the result of
-   * {@code updater}, and returns {@code true} if a replacement was made.
-   */
+  /** Passes {@link #catalogId} to {@code setter} when it is non-null. */
   private void applyCatalogId(Consumer<String> setter) {
     if (catalogId != null) setter.accept(catalogId);
   }
 
+  /**
+   * Finds the first column matching {@code name} in {@code cols}, replaces it with the result of
+   * {@code updater}, and returns {@code true} if a replacement was made.
+   */
   private static boolean replaceColumn(
       List<Column> cols, String name, UnaryOperator<Column> updater) {
     for (int i = 0; i < cols.size(); i++) {
