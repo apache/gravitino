@@ -28,4 +28,10 @@ runs:
       shell: bash
       run: |
         mkdir -p ~/.gradle
-        echo "org.gradle.java.installations.paths=${{ steps.setup-jdk24.outputs.path }}" >> ~/.gradle/gradle.properties
+        GRADLE_PROPERTIES=~/.gradle/gradle.properties
+        TMP=$(mktemp)
+        if [ -f "${GRADLE_PROPERTIES}" ]; then
+          awk '!/^org\.gradle\.java\.installations\.paths=/' "${GRADLE_PROPERTIES}" > "${TMP}"
+        fi
+        echo "org.gradle.java.installations.paths=${{ steps.setup-jdk24.outputs.path }}" >> "${TMP}"
+        mv "${TMP}" "${GRADLE_PROPERTIES}"
