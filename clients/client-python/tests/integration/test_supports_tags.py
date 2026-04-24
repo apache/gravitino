@@ -104,6 +104,9 @@ class TestSupportsTags(IntegrationTestEnv):
         cls._gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=cls._metalake_name
         )
+        cls._metalake = cls._gravitino_admin_client.create_metalake(
+            cls._metalake_name, comment="test metalake", properties={}
+        )
         cls._model_catalog = cls._gravitino_client.create_catalog(
             name=cls._model_catalog_name,
             catalog_type=Catalog.Type.MODEL,
