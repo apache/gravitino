@@ -153,6 +153,51 @@ Examples:
   with existing names.
 - Physical separator in storage remains fixed as `.`.
 - Recommended: keep logical separator stable after nested namespace is enabled for a catalog.
+- Delimiter is configured at server level for nested-namespace parsing behavior.
+
+Two delimiter-governance options are under evaluation:
+
+- **Option 1 (restricted delimiter set)**:
+  - Server only accepts delimiters from a predefined allowed set.
+  - Delimiter is treated as a reserved hierarchy marker in nested-aware flows.
+  - Behavior difference for new object creation:
+    - Iceberg nested schema creation that uses delimiter as hierarchy path is allowed.
+    - Hive creation of a non-nested schema name that contains the configured delimiter is rejected
+      with validation error.
+- **Option 2 (unrestricted delimiter)**:
+  - Server allows any delimiter value configured by users.
+  - Compatibility is prioritized for engines that treat schema name as plain string.
+  - Behavior difference for new object creation:
+    - Hive can create a non-nested schema successfully even when the schema name contains the
+      configured delimiter.
+    - Nested interpretation is applied only in nested-aware request paths (for example Iceberg
+      namespace APIs), not as a blanket rule for all engines.
+
+### Delimiter Validation and Rejection Rationale
+
+Delimiter validity should be explicit and observable, not implicit.
+
+- Validation checkpoints:
+  - Validate delimiter when server starts or when delimiter configuration is updated.
+  - Re-validate against existing catalog schema names before enabling nested mode for a catalog.
+  - Reject invalid delimiter configuration early before request-time namespace operations.
+- Validation rules:
+  - Delimiter must be a single non-empty character.
+  - Delimiter must not be `.` because `.` is reserved as physical storage separator.
+  - Delimiter should avoid characters that cause parser or route ambiguity in REST/SQL contexts
+    (for example `/`).
+  - Under Option 1, delimiter must belong to server predefined allowlist.
+  - Under Option 2, delimiter is user-defined but still must pass safety checks above.
+- Rejection rationale (why some delimiters are not permitted):
+  - Avoid hierarchical parsing ambiguity and inconsistent split/join behavior.
+  - Preserve compatibility with existing schema/table identifier parsing across engines.
+  - Prevent migration risk where existing names collide with hierarchy semantics.
+  - Keep cross-engine behavior predictable when Iceberg and Hive treat schema names differently.
+- Error reporting requirements:
+  - Return actionable validation error containing rejected delimiter, rejection reason, and
+    suggested alternatives.
+  - Example: "Delimiter '/' is not allowed because it conflicts with path parsing. Try ':', ';',
+    or '$'."
 
 
 ### Parsing Sequence Diagram
