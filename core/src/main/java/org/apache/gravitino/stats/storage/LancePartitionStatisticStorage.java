@@ -197,13 +197,13 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       this.scheduler =
           new ScheduledThreadPoolExecutor(
               1, newDaemonThreadFactory("lance-partition-statistic-storage-cache-cleaner"));
-
       this.datasetCache =
           Optional.of(
               Caffeine.newBuilder()
                   .maximumSize(datasetCacheSize)
                   .scheduler(Scheduler.forScheduledExecutorService(this.scheduler))
-                  .evictionListener(
+                  .executor(Runnable::run)
+                  .removalListener(
                       (RemovalListener<Long, Dataset>)
                           (key, value, cause) -> {
                             if (value != null) {
@@ -304,7 +304,6 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
               .transactionProperties(Collections.emptyMap())
               .build();
       newDataset = appendTxn.commit();
-
       Dataset finalNewDataset = newDataset;
       datasetCache.ifPresent(cache -> cache.put(tableId, finalNewDataset));
     } finally {
@@ -346,7 +345,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
         dataset.delete(filterSQL);
       }
     } finally {
-      if (!datasetCache.isPresent() && dataset != null) {
+      if (!datasetCache.isPresent()) {
         dataset.close();
       }
     }
@@ -495,9 +494,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       Long tableId, String partitionFilter) {
 
     Dataset dataset = getDataset(tableId);
-
     String filter = "table_id = " + tableId + partitionFilter;
-
     try (LanceScanner scanner =
         dataset.newScan(
             new ScanOptions.Builder()
