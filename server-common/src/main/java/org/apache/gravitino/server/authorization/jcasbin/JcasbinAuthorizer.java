@@ -620,6 +620,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return false;
     }
     OwnerInfo owner = ownerOpt.get();
+    // We compare by entity ID rather than name to guard against stale cache entries.
+    // If a user/group is deleted and recreated with the same name, the cached OwnerInfo
+    // still holds the old ID. A name-only comparison would incorrectly grant ownership
+    // to the new entity. The extra IO to fetch the current entity ensures correctness.
     if (owner.type == Entity.EntityType.USER) {
       try {
         UserEntity userEntity = getUserEntity(principal.getName(), metalake);
@@ -630,8 +634,24 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
     } else if (owner.type == Entity.EntityType.GROUP) {
       if (principal instanceof UserPrincipal) {
-        return ((UserPrincipal) principal)
-            .getGroups().stream().anyMatch(g -> g.getGroupname().equals(owner.name));
+        for (UserGroup group : ((UserPrincipal) principal).getGroups()) {
+          if (group.getGroupname().equals(owner.name)) {
+            try {
+              GroupEntity groupEntity =
+                  GravitinoEnv.getInstance()
+                      .entityStore()
+                      .get(
+                          NameIdentifierUtil.ofGroup(metalake, group.getGroupname()),
+                          Entity.EntityType.GROUP,
+                          GroupEntity.class);
+              return Objects.equals(groupEntity.id(), owner.id);
+            } catch (Exception e) {
+              LOG.debug(
+                  "Can not get group entity for ownership check: {}", group.getGroupname(), e);
+              return false;
+            }
+          }
+        }
       }
       return false;
     }
