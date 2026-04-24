@@ -17,13 +17,17 @@
 -- under the License.
 --
 
--- using default '{}' to fill in the new column for compatibility
+-- add audit_info as nullable first for MySQL 5.7 compatibility
 ALTER TABLE `view_meta`
-    ADD COLUMN `audit_info` MEDIUMTEXT NOT NULL DEFAULT '{}' COMMENT 'view audit info' AFTER `schema_id`;
+    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'view audit info' AFTER `schema_id`;
 
--- remove the default value for audit_info
+-- backfill existing rows before enforcing NOT NULL
+UPDATE `view_meta`
+    SET `audit_info` = '{}'
+    WHERE `audit_info` IS NULL;
+
 ALTER TABLE `view_meta`
-    ALTER COLUMN `audit_info` DROP DEFAULT;
+    MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view audit info' AFTER `schema_id`;
 
 CREATE TABLE IF NOT EXISTS `view_version_info` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
