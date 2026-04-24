@@ -45,6 +45,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -52,6 +53,7 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
@@ -87,7 +89,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Cache<Long, Boolean> loadedRoles;
 
-  private Cache<Long, Optional<Long>> ownerRel;
+  private Cache<Long, Optional<OwnerInfo>> ownerRel;
 
   private Executor executor = null;
 
@@ -218,15 +220,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       AuthorizationRequestContext requestContext) {
-    Long userId;
     boolean result;
     try {
       Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
       loadOwnerPolicy(metalake, metadataObject, metadataId);
-      UserEntity userEntity = getUserEntity(principal.getName(), metalake);
-      userId = userEntity.id();
-      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
+      result = checkOwnership(principal, metalake, metadataId);
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);
       result = false;
@@ -457,14 +455,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return false;
       }
       loadRolePrivilege(metalake, username, userId, requestContext);
-      return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
+      return authorizeByJcasbin(userId, metalake, metadataObject, metadataId, privilege);
     }
 
     private boolean authorizeByJcasbin(
-        Long userId, MetadataObject metadataObject, Long metadataId, String privilege) {
+        Long userId,
+        String metalake,
+        MetadataObject metadataObject,
+        Long metadataId,
+        String privilege) {
       if (AuthConstants.OWNER.equals(privilege)) {
-        Optional<Long> owner = ownerRel.getIfPresent(metadataId);
-        return Objects.equals(Optional.of(userId), owner);
+        return checkOwnership(PrincipalUtils.getCurrentPrincipal(), metalake, metadataId);
       }
       return enforcer.enforce(
           String.valueOf(userId),
@@ -556,7 +557,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         for (Entity ownerEntity : owners) {
           if (ownerEntity instanceof UserEntity) {
             UserEntity user = (UserEntity) ownerEntity;
-            ownerRel.put(metadataId, Optional.of(user.id()));
+            ownerRel.put(
+                metadataId,
+                Optional.of(new OwnerInfo(user.id(), Entity.EntityType.USER, user.name())));
+          } else if (ownerEntity instanceof GroupEntity) {
+            GroupEntity group = (GroupEntity) ownerEntity;
+            ownerRel.put(
+                metadataId,
+                Optional.of(new OwnerInfo(group.id(), Entity.EntityType.GROUP, group.name())));
           }
         }
       }
@@ -599,6 +607,47 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                 .toUpperCase(java.util.Locale.ROOT),
             condition.name().toLowerCase(java.util.Locale.ROOT));
       }
+    }
+  }
+
+  /**
+   * Checks whether the given principal is the owner of the metadata object identified by
+   * metadataId. Supports both user and group ownership.
+   */
+  private boolean checkOwnership(Principal principal, String metalake, Long metadataId) {
+    Optional<OwnerInfo> ownerOpt = ownerRel.getIfPresent(metadataId);
+    if (ownerOpt == null || !ownerOpt.isPresent()) {
+      return false;
+    }
+    OwnerInfo owner = ownerOpt.get();
+    if (owner.type == Entity.EntityType.USER) {
+      try {
+        UserEntity userEntity = getUserEntity(principal.getName(), metalake);
+        return Objects.equals(userEntity.id(), owner.id);
+      } catch (Exception e) {
+        LOG.debug("Can not get user entity for ownership check", e);
+        return false;
+      }
+    } else if (owner.type == Entity.EntityType.GROUP) {
+      if (principal instanceof UserPrincipal) {
+        return ((UserPrincipal) principal)
+            .getGroups().stream().anyMatch(g -> g.getGroupname().equals(owner.name));
+      }
+      return false;
+    }
+    return false;
+  }
+
+  /** Holds the owner identity for a metadata object in the owner cache. */
+  static class OwnerInfo {
+    final Long id;
+    final Entity.EntityType type;
+    final String name;
+
+    OwnerInfo(Long id, Entity.EntityType type, String name) {
+      this.id = id;
+      this.type = type;
+      this.name = name;
     }
   }
 }
