@@ -70,7 +70,7 @@ public class JobHookDispatcher implements JobOperationDispatcher {
       }
     } catch (Exception e) {
       LOG.warn(
-          "Fail to set owner for job template {}, job template exists without owner",
+          "Failed to set owner for job template {}, job template exists without owner",
           jobTemplateEntity.name(),
           e);
     }
@@ -121,7 +121,7 @@ public class JobHookDispatcher implements JobOperationDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for job {}, job exists without owner", jobEntity.name(), e);
+      LOG.warn("Failed to set owner for job {}, job exists without owner", jobEntity.name(), e);
     }
 
     return jobEntity;

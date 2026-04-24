@@ -109,6 +109,17 @@ public class CapabilityHelpers {
     return NameIdentifier.of(namespace, name);
   }
 
+  /**
+   * Convenience overload that loads the catalog capability for {@code ident} and applies it to the
+   * identifier. Use this from call sites (e.g. HookDispatchers) that need a normalized identifier
+   * but do not already hold a {@link Capability} instance.
+   */
+  public static NameIdentifier applyCapabilities(
+      NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
+    Capability capability = getCapability(ident, catalogManager);
+    return applyCapabilities(ident, scope, capability);
+  }
+
   public static NameIdentifier[] applyCaseSensitive(
       NameIdentifier[] idents, Capability.Scope scope, Capability capabilities) {
     return Arrays.stream(idents)

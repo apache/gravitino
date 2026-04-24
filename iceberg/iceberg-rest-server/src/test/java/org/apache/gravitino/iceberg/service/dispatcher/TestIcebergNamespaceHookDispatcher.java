@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -129,5 +130,51 @@ public class TestIcebergNamespaceHookDispatcher {
 
     Assertions.assertEquals(mockResponse, result);
     verify(mockDispatcher).registerTable(mockContext, namespace, mockRequest);
+  }
+
+  @Test
+  public void testCreateNamespacePropagatesImportFailure() {
+    Namespace namespace = Namespace.of("test_schema");
+    CreateNamespaceRequest mockRequest = mock(CreateNamespaceRequest.class);
+    when(mockRequest.namespace()).thenReturn(namespace);
+
+    CreateNamespaceResponse mockResponse = mock(CreateNamespaceResponse.class);
+    when(mockDispatcher.createNamespace(mockContext, mockRequest)).thenReturn(mockResponse);
+
+    // Schema import (loadSchema) throwing must propagate so the caller learns the namespace
+    // exists in Iceberg but is not registered in Gravitino. setOwner is therefore unreachable.
+    SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+    doThrow(new RuntimeException("Import failed")).when(schemaDispatcher).loadSchema(any());
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> hookDispatcher.createNamespace(mockContext, mockRequest));
+
+    Assertions.assertEquals("Import failed", thrown.getMessage());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testRegisterTablePropagatesImportFailure() {
+    Namespace namespace = Namespace.of("test_schema");
+    RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
+    when(mockRequest.name()).thenReturn("test_table");
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
+        .thenReturn(mockResponse);
+
+    // Table import (loadTable) throwing must propagate so the caller learns the table exists in
+    // Iceberg but is not registered in Gravitino. setOwner is therefore unreachable.
+    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
+    doThrow(new RuntimeException("Import failed")).when(tableDispatcher).loadTable(any());
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.registerTable(mockContext, namespace, mockRequest));
+
+    Assertions.assertEquals("Import failed", thrown.getMessage());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 }

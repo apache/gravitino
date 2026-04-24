@@ -35,27 +35,32 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.catalog.TestTableOperationDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -71,8 +76,10 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestTableHookDispatcher extends TestOperationDispatcher {
@@ -84,7 +91,7 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
   private static AuthorizationPlugin authorizationPlugin;
 
   @BeforeAll
-  public static void initialize() throws IOException, IllegalAccessException {
+  public static void initialize() throws Exception {
     TestTableOperationDispatcher.initialize();
 
     tableHookDispatcher =
@@ -101,6 +108,7 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
     CatalogManager.CatalogWrapper catalogWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(catalogWrapper.catalog()).thenReturn(catalog);
+    Mockito.when(catalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
 
     Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
     Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
@@ -179,6 +187,52 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
           }
           schemaHookDispatcher.dropSchema(NameIdentifier.of(tableNs.levels()), true);
         });
+  }
+
+  @Test
+  public void testCreateTableSetsOwnerWithNormalizedIdentifier() throws Exception {
+    // Self-contained: use a fresh hook with a directly-mocked TableDispatcher and a case-
+    // insensitive catalog so we can verify the helper passes a normalized ident to setOwner.
+    CatalogManager savedCatalogManager = GravitinoEnv.getInstance().catalogManager();
+    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Mockito.when(mockWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
+    Mockito.when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockWrapper);
+
+    OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
+    TableDispatcher mockTableDispatcher = Mockito.mock(TableDispatcher.class);
+    Mockito.when(
+            mockTableDispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(Mockito.mock(Table.class));
+
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+
+    try {
+      TableHookDispatcher localHook = new TableHookDispatcher(mockTableDispatcher);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_norm", "MY_TABLE");
+      localHook.createTable(
+          ident,
+          new Column[0],
+          "comment",
+          ImmutableMap.of(),
+          new Transform[0],
+          Distributions.NONE,
+          new SortOrder[0],
+          new Index[0]);
+
+      ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
+      Mockito.verify(mockOwnerDispatcher)
+          .setOwner(eq(metalake), captor.capture(), any(), eq(Owner.Type.USER));
+      Assertions.assertEquals("my_table", captor.getValue().name());
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+    }
   }
 
   @Test
@@ -265,5 +319,12 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
     TableChange renameChange = TableChange.rename("newName");
     tableHookDispatcher.alterTable(tableIdent, renameChange);
     Mockito.verify(authorizationPlugin).onMetadataUpdated(any());
+  }
+
+  private static class CaseInsensitiveCapability implements Capability {
+    @Override
+    public CapabilityResult caseSensitiveOnName(Scope scope) {
+      return CapabilityResult.unsupported("case-insensitive");
+    }
   }
 }

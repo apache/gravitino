@@ -360,4 +360,28 @@ public class TestIcebergTableHookDispatcher {
     Assertions.assertEquals(mockResponse, result);
     verify(mockDispatcher).loadTable(mockContext, tableId);
   }
+
+  @Test
+  public void testCreateTablePropagatesImportFailure() {
+    Namespace namespace = Namespace.of("test_schema");
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("test_table").withSchema(TABLE_SCHEMA).build();
+
+    LoadTableResponse mockResponse = mock(LoadTableResponse.class);
+    when(mockDispatcher.createTable(mockContext, namespace, request)).thenReturn(mockResponse);
+
+    // Import failure (the loadTable call) must propagate so the caller learns the table exists in
+    // Iceberg but is not registered in Gravitino. setOwner is therefore unreachable.
+    doThrow(new RuntimeException("Import failed")).when(mockTableDispatcher).loadTable(any());
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createTable(mockContext, namespace, request));
+
+    Assertions.assertEquals("Import failed", thrown.getMessage());
+    verify(mockDispatcher).createTable(mockContext, namespace, request);
+    verify(mockTableDispatcher).loadTable(any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
 }

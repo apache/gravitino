@@ -21,6 +21,7 @@ package org.apache.gravitino.hook;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -29,7 +30,9 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -41,18 +44,23 @@ public class TestMetalakeHookDispatcher {
   private MetalakeHookDispatcher hookDispatcher;
   private MetalakeDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
+  private AccessControlDispatcher mockAccessControlDispatcher;
 
   @BeforeEach
   public void setUp() throws IllegalAccessException {
     mockDispatcher = mock(MetalakeDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
+    mockAccessControlDispatcher = mock(AccessControlDispatcher.class);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "accessControlDispatcher", mockAccessControlDispatcher, true);
     hookDispatcher = new MetalakeHookDispatcher(mockDispatcher);
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", null, true);
   }
 
   @Test
@@ -69,5 +77,43 @@ public class TestMetalakeHookDispatcher {
 
     Assertions.assertEquals(mockMetalake, result);
     verify(mockDispatcher).createMetalake(any(), any(), any());
+  }
+
+  @Test
+  public void testCreateMetalakeProceedsToSetOwnerWhenUserAlreadyExists() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake");
+    Metalake mockMetalake = mock(Metalake.class);
+    when(mockDispatcher.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
+
+    // Benign case: the creator is already registered in the metalake (e.g. from a prior call or
+    // from simple-auth pre-registration). setOwner should still run because the user exists.
+    doThrow(new UserAlreadyExistsException("User already exists"))
+        .when(mockAccessControlDispatcher)
+        .addUser(any(), any());
+
+    Metalake result = hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap());
+
+    Assertions.assertEquals(mockMetalake, result);
+    verify(mockAccessControlDispatcher).addUser(any(), any());
+    verify(mockOwnerDispatcher).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testCreateMetalakeSkipsSetOwnerWhenAddUserFails() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake");
+    Metalake mockMetalake = mock(Metalake.class);
+    when(mockDispatcher.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
+
+    // Real addUser failure (e.g. storage I/O): the user is not registered, so setOwner would fail
+    // validation regardless. We log a warning and skip setOwner; the metalake is still returned.
+    doThrow(new RuntimeException("Add user failed"))
+        .when(mockAccessControlDispatcher)
+        .addUser(any(), any());
+
+    Metalake result = hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap());
+
+    Assertions.assertEquals(mockMetalake, result);
+    verify(mockAccessControlDispatcher).addUser(any(), any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 }

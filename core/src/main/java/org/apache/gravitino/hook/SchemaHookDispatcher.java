@@ -29,7 +29,9 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -66,14 +68,20 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
     try {
       OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
       if (ownerManager != null) {
+        // The inner NormalizeDispatcher case-folds the schema name based on catalog capabilities,
+        // so the entity is stored under the normalized identifier. Apply the same normalization
+        // here so the owner is attached to the same identifier the manager sees.
+        NameIdentifier normalizedIdent =
+            CapabilityHelpers.applyCapabilities(
+                ident, Capability.Scope.SCHEMA, GravitinoEnv.getInstance().catalogManager());
         ownerManager.setOwner(
-            ident.namespace().level(0),
-            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA),
+            normalizedIdent.namespace().level(0),
+            NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA),
             PrincipalUtils.getCurrentUserName(),
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for schema {}, schema exists without owner", ident, e);
+      LOG.warn("Failed to set owner for schema {}, schema exists without owner", ident, e);
     }
     return schema;
   }

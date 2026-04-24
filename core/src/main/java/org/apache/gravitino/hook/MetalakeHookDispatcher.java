@@ -32,6 +32,7 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -68,10 +69,25 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
     Metalake metalake = dispatcher.createMetalake(ident, comment, properties);
 
     // Add the creator to the metalake
-    AccessControlDispatcher accessControlDispatcher =
-        GravitinoEnv.getInstance().accessControlDispatcher();
-    if (accessControlDispatcher != null) {
-      accessControlDispatcher.addUser(ident.name(), PrincipalUtils.getCurrentUserName());
+    try {
+      AccessControlDispatcher accessControlDispatcher =
+          GravitinoEnv.getInstance().accessControlDispatcher();
+      if (accessControlDispatcher != null) {
+        accessControlDispatcher.addUser(ident.name(), PrincipalUtils.getCurrentUserName());
+      }
+    } catch (UserAlreadyExistsException e) {
+      // The creator is already registered as a user in the metalake; setOwner can still proceed.
+      LOG.debug(
+          "Creator already registered as user for metalake {}, proceeding to set owner", ident, e);
+    } catch (Exception e) {
+      // The creator could not be added, so setOwner would fail validation regardless. Skip it;
+      // the user can be added later and ownership can be set out-of-band.
+      LOG.warn(
+          "Failed to add creator as user for metalake {}, skipping setOwner; "
+              + "metalake exists without creator user",
+          ident,
+          e);
+      return metalake;
     }
 
     try {
@@ -85,7 +101,7 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for metalake {}, metalake exists without owner", ident, e);
+      LOG.warn("Failed to set owner for metalake {}, metalake exists without owner", ident, e);
     }
     return metalake;
   }

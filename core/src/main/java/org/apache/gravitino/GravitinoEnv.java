@@ -550,35 +550,35 @@ public class GravitinoEnv {
     this.lockManager = new LockManager(config);
 
     // Create and initialize metalake related modules, the operation chain is:
-    // MetalakeHookDispatcher -> MetalakeNormalizeDispatcher -> MetalakeEventDispatcher ->
+    // MetalakeHookDispatcher -> MetalakeEventDispatcher -> MetalakeNormalizeDispatcher ->
     // MetalakeManager
     this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
-    MetalakeEventDispatcher metalakeEventDispatcher =
-        new MetalakeEventDispatcher(eventBus, metalakeManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
-        new MetalakeNormalizeDispatcher(metalakeEventDispatcher);
-    this.metalakeDispatcher = new MetalakeHookDispatcher(metalakeNormalizeDispatcher);
+        new MetalakeNormalizeDispatcher(metalakeManager);
+    MetalakeEventDispatcher metalakeEventDispatcher =
+        new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
+    this.metalakeDispatcher = new MetalakeHookDispatcher(metalakeEventDispatcher);
 
     // Create and initialize Catalog related modules, the operation chain is:
-    // CatalogHookDispatcher -> CatalogNormalizeDispatcher -> CatalogEventDispatcher ->
+    // CatalogHookDispatcher -> CatalogEventDispatcher -> CatalogNormalizeDispatcher ->
     // CatalogManager
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
-    CatalogEventDispatcher catalogEventDispatcher =
-        new CatalogEventDispatcher(eventBus, catalogManager);
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
-        new CatalogNormalizeDispatcher(catalogEventDispatcher);
-    this.catalogDispatcher = new CatalogHookDispatcher(catalogNormalizeDispatcher);
+        new CatalogNormalizeDispatcher(catalogManager);
+    CatalogEventDispatcher catalogEventDispatcher =
+        new CatalogEventDispatcher(eventBus, catalogNormalizeDispatcher);
+    this.catalogDispatcher = new CatalogHookDispatcher(catalogEventDispatcher);
 
     this.credentialOperationDispatcher =
         new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
-    SchemaEventDispatcher schemaEventDispatcher =
-        new SchemaEventDispatcher(eventBus, schemaOperationDispatcher);
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
-        new SchemaNormalizeDispatcher(schemaEventDispatcher, catalogManager);
-    this.schemaDispatcher = new SchemaHookDispatcher(schemaNormalizeDispatcher);
+        new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
+    SchemaEventDispatcher schemaEventDispatcher =
+        new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
+    this.schemaDispatcher = new SchemaHookDispatcher(schemaEventDispatcher);
 
     TableOperationDispatcher tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator);

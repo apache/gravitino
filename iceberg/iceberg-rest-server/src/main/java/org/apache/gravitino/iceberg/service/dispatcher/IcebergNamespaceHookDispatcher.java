@@ -64,8 +64,12 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
     CreateNamespaceResponse response = dispatcher.createNamespace(context, createRequest);
 
+    // Import is intentionally NOT wrapped in try-catch: if it fails the namespace exists in
+    // Iceberg but not in Gravitino, and silently swallowing that would mislead callers into
+    // thinking the entity is registered. Surface the failure so the caller can react.
+    importSchema(context.catalogName(), createRequest.namespace());
+
     try {
-      importSchema(context.catalogName(), createRequest.namespace());
       IcebergOwnershipUtils.setSchemaOwner(
           metalake,
           context.catalogName(),
@@ -74,7 +78,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
           GravitinoEnv.getInstance().ownerDispatcher());
     } catch (Exception e) {
       LOG.warn(
-          "Fail to set owner for namespace {}, namespace exists without owner",
+          "Failed to set owner for namespace {}, namespace exists without owner",
           createRequest.namespace(),
           e);
     }
@@ -134,11 +138,12 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       RegisterTableRequest registerTableRequest) {
     LoadTableResponse response = dispatcher.registerTable(context, namespace, registerTableRequest);
 
-    try {
-      // Import the registered table into Gravitino's catalog so it exists as a metadata object
-      importTable(context.catalogName(), namespace, registerTableRequest.name());
+    // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
+    // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
+    // entity is registered. Surface the failure so the caller can react.
+    importTable(context.catalogName(), namespace, registerTableRequest.name());
 
-      // Set the owner of the registered table to the current user
+    try {
       IcebergOwnershipUtils.setTableOwner(
           metalake,
           context.catalogName(),
@@ -148,7 +153,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
           GravitinoEnv.getInstance().ownerDispatcher());
     } catch (Exception e) {
       LOG.warn(
-          "Fail to set owner for registered table {}, table exists without owner",
+          "Failed to set owner for registered table {}, table exists without owner",
           registerTableRequest.name(),
           e);
     }

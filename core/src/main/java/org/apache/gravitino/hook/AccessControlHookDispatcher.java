@@ -175,7 +175,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for role {}, role exists without owner", role, e);
+      LOG.warn("Failed to set owner for role {}, role exists without owner", role, e);
     }
     return createdRole;
   }

@@ -28,7 +28,9 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
@@ -86,14 +88,21 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
     try {
       OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
       if (ownerManager != null) {
+        // The inner NormalizeDispatcher case-folds the fileset name (and its schema namespace)
+        // based on catalog capabilities, so the entity is stored under the normalized identifier.
+        // Apply the same normalization here so the owner is attached to the same identifier the
+        // manager sees.
+        NameIdentifier normalizedIdent =
+            CapabilityHelpers.applyCapabilities(
+                ident, Capability.Scope.FILESET, GravitinoEnv.getInstance().catalogManager());
         ownerManager.setOwner(
-            ident.namespace().level(0),
-            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.FILESET),
+            normalizedIdent.namespace().level(0),
+            NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.FILESET),
             PrincipalUtils.getCurrentUserName(),
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for fileset {}, fileset exists without owner", ident, e);
+      LOG.warn("Failed to set owner for fileset {}, fileset exists without owner", ident, e);
     }
     return fileset;
   }

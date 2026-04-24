@@ -79,7 +79,9 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
           GravitinoEnv.getInstance().ownerDispatcher());
     } catch (Exception e) {
       LOG.warn(
-          "Fail to set owner for view {}, view exists without owner", createViewRequest.name(), e);
+          "Failed to set owner for view {}, view exists without owner",
+          createViewRequest.name(),
+          e);
     }
 
     return response;

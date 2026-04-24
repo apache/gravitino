@@ -74,7 +74,7 @@ public class TagHookDispatcher implements TagDispatcher {
             Owner.Type.USER);
       }
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for tag {}, tag exists without owner", name, e);
+      LOG.warn("Failed to set owner for tag {}, tag exists without owner", name, e);
     }
 
     return tag;

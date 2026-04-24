@@ -201,13 +201,17 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
 
   private void importTableAndSetOwner(
       IcebergRequestContext context, Namespace namespace, String tableName) {
+    // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
+    // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
+    // entity is registered. Surface the failure so the caller can react.
+    TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
+    if (tableDispatcher != null) {
+      tableDispatcher.loadTable(
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake, context.catalogName(), TableIdentifier.of(namespace, tableName)));
+    }
+
     try {
-      TableDispatcher tableDispatcher = GravitinoEnv.getInstance().tableDispatcher();
-      if (tableDispatcher != null) {
-        tableDispatcher.loadTable(
-            IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, context.catalogName(), TableIdentifier.of(namespace, tableName)));
-      }
       IcebergOwnershipUtils.setTableOwner(
           metalake,
           context.catalogName(),
@@ -216,7 +220,7 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
           context.userName(),
           GravitinoEnv.getInstance().ownerDispatcher());
     } catch (Exception e) {
-      LOG.warn("Fail to set owner for table {}, table exists without owner", tableName, e);
+      LOG.warn("Failed to set owner for table {}, table exists without owner", tableName, e);
     }
   }
 }
