@@ -297,6 +297,8 @@ Examples (Gravitino REST side):
   (including the current schema scope) has `USE_SCHEMA`; it is not required on every level.
 - Effective rule for `A:B:C`: check `A:B:C` -> `A:B` -> `A`, and pass on the first scope that has
   `USE_SCHEMA`.
+- Parent-chain walking overhead is mitigated by existing `EntityStore` cache behavior; no additional
+  authorization-layer cache is introduced in this phase.
 - UI privilege granting is one usage scenario of this overall nested namespace solution.
 - To prevent privilege escalation, auto-creating missing parent namespaces requires one of:
   - requester has `create_schema` on each missing parent scope, or
