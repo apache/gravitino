@@ -463,7 +463,7 @@ public class IcebergTableOperations {
    * @return Response containing the scan plan with tasks
    */
   @POST
-  @Path("{table}/scan")
+  @Path("{table}/plan")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Timed(name = "plan-table-scan." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
