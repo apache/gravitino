@@ -209,7 +209,9 @@ public class AuthorizationExpressionConverter {
    */
   public static String replaceAnyPrivilege(String expression) {
     expression = expression.replaceAll("SERVICE_ADMIN", "authorizer.isServiceAdmin()");
-    expression = expression.replaceAll("METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME)");
+    expression =
+        expression.replaceAll(
+            "METALAKE_USER", "authorizer.isMetalakeUser(METALAKE_NAME,authorizationContext)");
 
     // A single privilege (e.g., SELECT_TABLE) can be granted or denied at multiple namespace
     // levels: metalake, catalog, schema, and table.

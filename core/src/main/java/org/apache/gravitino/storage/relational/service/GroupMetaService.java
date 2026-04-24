@@ -259,6 +259,12 @@ public class GroupMetaService {
                 mapper ->
                     mapper.softDeleteGroupRoleRelByGroupAndRoles(
                         newEntity.id(), Lists.newArrayList(deleteRoleIds)));
+          },
+          () -> {
+            long now = System.currentTimeMillis();
+            SessionUtils.doWithoutCommit(
+                GroupMetaMapper.class,
+                mapper -> mapper.touchUpdatedAt(oldGroupPO.getGroupId(), now));
           });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(

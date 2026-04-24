@@ -20,10 +20,12 @@ package org.apache.gravitino.authorization;
 import java.security.Principal;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.storage.relational.po.auth.UserAuthInfo;
 
 public class AuthorizationRequestContext {
 
@@ -35,6 +37,15 @@ public class AuthorizationRequestContext {
 
   /** Used to determine whether the role has already been loaded. */
   private final AtomicBoolean hasLoadRole = new AtomicBoolean();
+
+  /** Per-request user identity cache. Key: {@code metalake::userName}. */
+  private final Map<String, Optional<UserAuthInfo>> userInfoCache = new ConcurrentHashMap<>();
+
+  /** Per-request name→id cache. Deduplicates resolveMetadataId within a single request. */
+  private final Map<String, Long> metadataIdCache = new ConcurrentHashMap<>();
+
+  /** Per-request metadataId→ownerId cache. Deduplicates isOwner within a single request. */
+  private final Map<Long, Optional<Long>> ownerCache = new ConcurrentHashMap<>();
 
   private volatile String originalAuthorizationExpression;
 
@@ -93,6 +104,29 @@ public class AuthorizationRequestContext {
         throw new RuntimeException("Failed to load role: ", e);
       }
     }
+  }
+
+  /**
+   * Per-request {@link UserAuthInfo} dedup. Loader may return {@link Optional#empty()} to cache the
+   * "user not found" outcome and avoid repeated DB lookups within a single request.
+   */
+  public Optional<UserAuthInfo> computeUserInfoIfAbsent(
+      String key, Function<String, Optional<UserAuthInfo>> loader) {
+    return userInfoCache.computeIfAbsent(key, loader);
+  }
+
+  /** Per-request name→id dedup. Loader must return a non-null id or throw. */
+  public Long computeMetadataIdIfAbsent(String key, Function<String, Long> loader) {
+    return metadataIdCache.computeIfAbsent(key, loader);
+  }
+
+  /**
+   * Per-request metadataId→ownerId dedup. Loader returns {@link Optional#empty()} when the object
+   * has no owner; the absent result is cached as well.
+   */
+  public Optional<Long> computeOwnerIfAbsent(
+      Long metadataId, Function<Long, Optional<Long>> loader) {
+    return ownerCache.computeIfAbsent(metadataId, loader);
   }
 
   public String getOriginalAuthorizationExpression() {

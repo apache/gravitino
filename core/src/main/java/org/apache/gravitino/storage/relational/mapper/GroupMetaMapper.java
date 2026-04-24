@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.gravitino.storage.relational.po.auth.GroupAuthInfo;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -88,4 +89,10 @@ public interface GroupMetaMapper {
       method = "deleteGroupMetasByLegacyTimeline")
   Integer deleteGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = GroupMetaSQLProviderFactory.class, method = "touchGroupUpdatedAt")
+  void touchUpdatedAt(@Param("groupId") long groupId, @Param("now") long now);
+
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "getGroupInfoByUserId")
+  List<GroupAuthInfo> getGroupInfoByUserId(@Param("userId") long userId);
 }

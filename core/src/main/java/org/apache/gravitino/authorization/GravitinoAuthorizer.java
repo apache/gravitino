@@ -92,12 +92,14 @@ public interface GravitinoAuthorizer extends Closeable {
   boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier);
 
   /**
-   * Determine whether the user is the metalake user
+   * Determine whether the user is the metalake user.
    *
    * @param metalake metalake
+   * @param requestContext authorization request context; enables per-request dedup with other
+   *     authorizer calls (e.g. {@code authorize}/{@code isOwner}) that look up the same user.
    * @return authorization result
    */
-  boolean isMetalakeUser(String metalake);
+  boolean isMetalakeUser(String metalake, AuthorizationRequestContext requestContext);
 
   /**
    * Determine whether the user can set owner
@@ -164,4 +166,18 @@ public interface GravitinoAuthorizer extends Closeable {
    */
   void handleMetadataOwnerChange(
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type);
+
+  /**
+   * Called when an entity undergoes a structural change (rename or drop) that invalidates cached
+   * name-to-id mappings in the metadataIdCache. The authorizer evicts the cache key for the given
+   * entity and all of its descendants (cascade invalidation).
+   *
+   * @param metalake the metalake name
+   * @param nameIdentifier the entity name identifier
+   * @param type the entity type
+   */
+  default void handleEntityStructuralChange(
+      String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
+    // default no-op for backward compatibility
+  }
 }

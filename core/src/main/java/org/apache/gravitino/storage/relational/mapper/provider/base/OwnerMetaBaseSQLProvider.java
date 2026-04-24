@@ -108,7 +108,7 @@ public class OwnerMetaBaseSQLProvider {
     return "INSERT INTO "
         + OWNER_TABLE_NAME
         + " (metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " audit_info, current_version, last_version, deleted_at, updated_at)"
         + " VALUES ("
         + " #{ownerRelPO.metalakeId},"
         + " #{ownerRelPO.metadataObjectId},"
@@ -118,7 +118,8 @@ public class OwnerMetaBaseSQLProvider {
         + " #{ownerRelPO.auditInfo},"
         + " #{ownerRelPO.currentVersion},"
         + " #{ownerRelPO.lastVersion},"
-        + " #{ownerRelPO.deletedAt}"
+        + " #{ownerRelPO.deletedAt},"
+        + " #{ownerRelPO.updatedAt}"
         + ")";
   }
 
@@ -235,5 +236,18 @@ public class OwnerMetaBaseSQLProvider {
     return "DELETE FROM "
         + OWNER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String selectOwnerByMetadataObjectId(@Param("metadataObjectId") long metadataObjectId) {
+    return "SELECT owner_id as ownerId, owner_type as ownerType FROM "
+        + OWNER_TABLE_NAME
+        + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0";
+  }
+
+  public String selectChangedOwners(@Param("updatedAtAfter") long updatedAtAfter) {
+    return "SELECT metadata_object_id as metadataObjectId, updated_at as updatedAt"
+        + " FROM "
+        + OWNER_TABLE_NAME
+        + " WHERE updated_at > #{updatedAtAfter} ORDER BY updated_at";
   }
 }
