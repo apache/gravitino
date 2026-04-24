@@ -31,8 +31,7 @@ import io.trino.spi.connector.SchemaTableName;
  * the table first via catalogConnectorMetadata, then delegates data writing to the internal
  * connector's insert path, avoiding double table creation.
  *
- * <p>Also stores the {@link SchemaTableName} so that {@code rollbackCreateTable} can drop the table
- * from the Gravitino catalog if the CTAS operation fails.
+ * <p>Also stores the {@link SchemaTableName} for table identification during the CTAS lifecycle.
  */
 public class GravitinoOutputTableHandle
     implements ConnectorOutputTableHandle, GravitinoHandle<ConnectorInsertTableHandle> {
@@ -64,7 +63,7 @@ public class GravitinoOutputTableHandle
    * Constructs a new GravitinoOutputTableHandle from a ConnectorInsertTableHandle.
    *
    * @param insertTableHandle the internal connector insert table handle
-   * @param tableName the schema-qualified table name for rollback support
+   * @param tableName the schema-qualified table name
    */
   public GravitinoOutputTableHandle(
       ConnectorInsertTableHandle insertTableHandle, SchemaTableName tableName) {
@@ -96,7 +95,7 @@ public class GravitinoOutputTableHandle
     return tableName;
   }
 
-  /** Returns the schema-qualified table name for rollback support. */
+  /** Returns the schema-qualified table name. */
   public SchemaTableName toSchemaTableName() {
     return new SchemaTableName(schemaName, tableName);
   }

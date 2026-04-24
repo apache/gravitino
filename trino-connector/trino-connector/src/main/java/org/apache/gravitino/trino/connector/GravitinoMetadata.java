@@ -232,18 +232,44 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     GravitinoTable table = metadataAdapter.createTable(tableMetadata);
     catalogConnectorMetadata.createTable(table, false);
 
-    // Get the table handle from the internal connector for the newly created table
     SchemaTableName tableName = tableMetadata.getTable();
-    ConnectorTableHandle internalTableHandle =
-        internalMetadata.getTableHandle(session, tableName, Optional.empty(), Optional.empty());
+    try {
+      // Get the table handle from the internal connector for the newly created table
+      ConnectorTableHandle internalTableHandle =
+          internalMetadata.getTableHandle(session, tableName, Optional.empty(), Optional.empty());
+      if (internalTableHandle == null) {
+        throw new TrinoException(
+            GRAVITINO_TABLE_NOT_EXISTS,
+            "Internal connector could not find newly created table: " + tableName);
+      }
 
-    // Delegate to the internal connector's insert path to write data,
-    // avoiding double table creation in the original connector
-    List<ColumnHandle> columns =
-        new ArrayList<>(internalMetadata.getColumnHandles(session, internalTableHandle).values());
-    ConnectorInsertTableHandle insertTableHandle =
-        internalMetadata.beginInsert(session, internalTableHandle, columns, retryMode);
-    return new GravitinoOutputTableHandle(insertTableHandle, tableName);
+      // Build column list in the same order as tableMetadata to preserve column ordering
+      Map<String, ColumnHandle> internalColumnHandles =
+          internalMetadata.getColumnHandles(session, internalTableHandle);
+      List<ColumnHandle> columns = new ArrayList<>(tableMetadata.getColumns().size());
+      for (ColumnMetadata columnMetadata : tableMetadata.getColumns()) {
+        ColumnHandle handle = internalColumnHandles.get(columnMetadata.getName());
+        if (handle == null) {
+          throw new TrinoException(
+              GRAVITINO_COLUMN_NOT_EXISTS,
+              "Column '"
+                  + columnMetadata.getName()
+                  + "' not found in internal connector for table: "
+                  + tableName);
+        }
+        columns.add(handle);
+      }
+
+      // Delegate to the internal connector's insert path to write data,
+      // avoiding double table creation in the original connector
+      ConnectorInsertTableHandle insertTableHandle =
+          internalMetadata.beginInsert(session, internalTableHandle, columns, retryMode);
+      return new GravitinoOutputTableHandle(insertTableHandle, tableName);
+    } catch (Exception e) {
+      // Clean up the table created in the Gravitino catalog on failure
+      catalogConnectorMetadata.dropTable(tableName);
+      throw e;
+    }
   }
 
   @Override
