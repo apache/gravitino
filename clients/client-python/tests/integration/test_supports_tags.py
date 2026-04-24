@@ -14,7 +14,6 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import logging
 import typing as tp
 from random import randint
 
@@ -34,8 +33,6 @@ from gravitino.exceptions.base import NoSuchTagException
 from gravitino.name_identifier import NameIdentifier
 from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.integration_test_env import IntegrationTestEnv
-
-logger = logging.getLogger(__name__)
 
 
 class TestSupportsTags(IntegrationTestEnv):
@@ -94,8 +91,6 @@ class TestSupportsTags(IntegrationTestEnv):
     def setUpClass(cls) -> None:
         super().setUpClass()
         cls._hdfs_container = HDFSContainer()
-
-        logger.info("Started Hive container with metastore URI: %s", hive_metastore_uri)
 
         cls._get_gravitino_home()
         cls.restart_server()
