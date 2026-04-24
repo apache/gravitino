@@ -60,6 +60,7 @@ dependencies {
   testImplementation(libs.mockserver.client.java)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  testImplementation(libs.sqlite.jdbc)
   testImplementation(libs.testcontainers)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -84,6 +85,10 @@ tasks.test {
     dependsOn(":catalogs:catalog-model:jar", ":catalogs:catalog-model:runtimeJars")
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
+    dependsOn(
+      ":catalogs:catalog-lakehouse-iceberg:jar",
+      ":catalogs:catalog-lakehouse-iceberg:runtimeJars"
+    )
   }
 }
 

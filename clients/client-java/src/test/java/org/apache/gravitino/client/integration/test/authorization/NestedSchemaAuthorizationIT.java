@@ -24,9 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
@@ -38,6 +38,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -81,10 +82,17 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     customConfigs.put(Configs.SCHEMA_NAMESPACE_SEPARATOR.getKey(), ":");
     super.startIntegrationTest();
 
-    // Create a Hadoop Fileset catalog (no Docker required).
+    // Create an Iceberg catalog because ':' hierarchical schema names are only supported there.
+    Map<String, String> catalogProperties = new HashMap<>();
+    catalogProperties.put("catalog-backend", "jdbc");
+    catalogProperties.put("warehouse", "/tmp/gravitino-it-nested-schema");
+    catalogProperties.put("uri", "jdbc:sqlite::memory:");
+    catalogProperties.put("jdbc-driver", "org.sqlite.JDBC");
+    catalogProperties.put("jdbc-initialize", "true");
     client
         .loadMetalake(METALAKE)
-        .createCatalog(CATALOG, Catalog.Type.FILESET, "hadoop", "comment", Collections.emptyMap());
+        .createCatalog(
+            CATALOG, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "comment", catalogProperties);
 
     // Grant the normal user a role with USE_CATALOG so it can interact with the catalog.
     GravitinoMetalake metalake = client.loadMetalake(METALAKE);
@@ -108,12 +116,21 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     // Creating "A:B:C" should auto-create "A" and "A:B".
     catalog.asSchemas().createSchema(SCHEMA_ABC, "nested schema", new HashMap<>());
 
+    // Default listing only returns top-level schemas.
     String[] schemas = catalog.asSchemas().listSchemas();
     List<String> schemaList = Arrays.asList(schemas);
 
     assertTrue(schemaList.contains(ROOT_A), "Parent 'A' should be auto-created");
-    assertTrue(schemaList.contains(SCHEMA_AB), "Parent 'A:B' should be auto-created");
-    assertTrue(schemaList.contains(SCHEMA_ABC), "Target 'A:B:C' should exist");
+    assertTrue(
+        !schemaList.contains(SCHEMA_AB),
+        "Default listSchemas() should not include nested schema A:B");
+    assertTrue(
+        !schemaList.contains(SCHEMA_ABC),
+        "Default listSchemas() should not include nested schema A:B:C");
+
+    // Verify nested schemas exist via direct load.
+    assertEquals(SCHEMA_AB, catalog.asSchemas().loadSchema(SCHEMA_AB).name());
+    assertEquals(SCHEMA_ABC, catalog.asSchemas().loadSchema(SCHEMA_ABC).name());
   }
 
   /**
@@ -150,8 +167,8 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     catalogByNormalUser.asSchemas().createSchema(SCHEMA_ABD, "child of A:B", new HashMap<>());
 
     // Verify "A:B:D" was created.
-    String[] schemas = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().listSchemas();
-    assertTrue(Arrays.asList(schemas).contains(SCHEMA_ABD));
+    Catalog catalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    assertEquals(SCHEMA_ABD, catalog.asSchemas().loadSchema(SCHEMA_ABD).name());
   }
 
   /**
@@ -175,8 +192,8 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     catalogByNormalUser.asSchemas().createSchema("A:B:E", "inherited from A", new HashMap<>());
 
     // Verify "A:B:E" was created.
-    String[] schemas = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().listSchemas();
-    assertTrue(Arrays.asList(schemas).contains("A:B:E"));
+    Catalog catalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    assertEquals("A:B:E", catalog.asSchemas().loadSchema("A:B:E").name());
   }
 
   /**
@@ -248,10 +265,9 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     catalogByNormalUser.asSchemas().dropSchema(SCHEMA_ABC, false);
 
     // Verify "A:B:C" is gone; parent "A:B" should still exist.
-    String[] schemas = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().listSchemas();
-    List<String> schemaList = Arrays.asList(schemas);
-    assertTrue(!schemaList.contains(SCHEMA_ABC), "A:B:C should be dropped");
-    assertTrue(schemaList.contains(ROOT_A), "A should still exist");
+    Catalog catalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    assertThrows(NoSuchSchemaException.class, () -> catalog.asSchemas().loadSchema(SCHEMA_ABC));
+    assertEquals(ROOT_A, catalog.asSchemas().loadSchema(ROOT_A).name());
   }
 
   /**
@@ -274,7 +290,7 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     Catalog catalogByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
     catalogByNormalUser.asSchemas().createSchema("A:F", "via schema-level grant", new HashMap<>());
 
-    String[] schemas = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asSchemas().listSchemas();
-    assertTrue(Arrays.asList(schemas).contains("A:F"));
+    Catalog catalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+    assertEquals("A:F", catalog.asSchemas().loadSchema("A:F").name());
   }
 }
