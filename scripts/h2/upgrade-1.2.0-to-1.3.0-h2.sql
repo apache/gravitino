@@ -17,8 +17,13 @@
 -- under the License.
 --
 
+-- using default '{}' to fill in the new column for compatibility
 ALTER TABLE `view_meta`
-    ADD COLUMN `audit_info` CLOB NOT NULL COMMENT 'view audit info' AFTER `schema_id`;
+    ADD COLUMN `audit_info` CLOB NOT NULL DEFAULT '{}' COMMENT 'view audit info';
+
+-- remove the default value for audit_info
+ALTER TABLE `view_meta`
+    ALTER COLUMN `audit_info` DROP DEFAULT;
 
 CREATE TABLE IF NOT EXISTS `view_version_info` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
