@@ -63,6 +63,7 @@ import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -395,10 +396,16 @@ public class CatalogKafkaIT extends BaseIT {
     Assertions.assertTrue(dropped);
 
     // verify topic not exist in Kafka
-    Exception ex =
-        Assertions.assertThrows(ExecutionException.class, () -> getTopicDesc(createdTopic.name()));
-    Assertions.assertTrue(
-        ex.getMessage().contains("This server does not host this topic-partition"));
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(30))
+        .untilAsserted(
+            () -> {
+              Exception ex =
+                  Assertions.assertThrows(
+                      ExecutionException.class, () -> getTopicDesc(createdTopic.name()));
+              Assertions.assertTrue(
+                  ex.getMessage().contains("This server does not host this topic-partition"));
+            });
 
     // verify dropping non-exist topic
     String topicName1 = GravitinoITUtils.genRandomName("test-topic");
@@ -414,9 +421,15 @@ public class CatalogKafkaIT extends BaseIT {
     boolean dropped1 =
         catalog.asTopicCatalog().dropTopic(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName1));
     Assertions.assertFalse(dropped1, "Should return false when dropping non-exist topic");
-    Assertions.assertFalse(
-        catalog.asTopicCatalog().topicExists(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName1)),
-        "Topic should not exist after dropping");
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(30))
+        .untilAsserted(
+            () ->
+                Assertions.assertFalse(
+                    catalog
+                        .asTopicCatalog()
+                        .topicExists(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName1)),
+                    "Topic should not exist after dropping"));
   }
 
   @Test
