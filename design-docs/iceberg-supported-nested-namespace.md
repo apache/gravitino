@@ -308,20 +308,20 @@ Examples (Gravitino REST side):
 
 ### Client API Surface (Java/Python)
 
-- The feature is not REST-only; Java/Python client APIs must expose hierarchy explicitly.
 - Java client:
   - Keep existing string-based methods for compatibility.
-  - Add overloads that accept namespace segments (`List<String>` or varargs) for schema APIs.
-  - Add utility type `SchemaPath` as typed wrapper to avoid ambiguous manual `:` concatenation.
-- Python client:
-  - Keep existing string-based APIs.
-  - Add tuple/list-based namespace path APIs for create/list/drop/update operations.
-- Serialization rule for both clients:
-  - typed path APIs always serialize by joining segments with `:`.
-  - string APIs are treated as already-serialized logical path.
-- Validation rule for both clients:
-  - reject empty segments and segments containing `:`.
-  - allow `.` in segment and rely on server reversible encoding.
+  - Only add `listSchemas(parentSchema)` support so callers can request direct children under a
+    specific parent namespace.
+  - For create/update/drop and other schema operations, continue using existing string-based schema
+    name parameters; users compose hierarchical schema names themselves (for example `A:B:C`).
+  - No new typed path wrapper (`SchemaPath`) or segment-based overloads are introduced in this
+    phase.
+
+Simple Java client examples:
+
+- `listSchemas()` -> returns top-level schemas, for example `A`, `B`.
+- `listSchemas("A:B")` -> returns direct children, for example `A:B:C`, `A:B:D`.
+- `createSchema("A:B:C", ...)` -> users pass composed schema name directly.
 
 ### Option P1 (Recommended): Extend `create_schema` semantics
 
