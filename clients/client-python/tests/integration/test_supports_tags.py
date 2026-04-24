@@ -94,41 +94,11 @@ class TestSupportsTags(IntegrationTestEnv):
     def setUpClass(cls) -> None:
         super().setUpClass()
         cls._hdfs_container = HDFSContainer()
-        hive_metastore_uri = f"thrift://{cls._hdfs_container.get_ip()}:9083"
+
         logger.info("Started Hive container with metastore URI: %s", hive_metastore_uri)
 
         cls._get_gravitino_home()
         cls.restart_server()
-
-        cls._gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
-        cls._gravitino_client = GravitinoClient(
-            uri="http://localhost:8090", metalake_name=cls._metalake_name
-        )
-        cls._metalake = cls._gravitino_admin_client.create_metalake(
-            cls._metalake_name, comment="test metalake", properties={}
-        )
-        cls._model_catalog = cls._gravitino_client.create_catalog(
-            name=cls._model_catalog_name,
-            catalog_type=Catalog.Type.MODEL,
-            provider="",
-            comment="comment",
-            properties={},
-        )
-        cls._fileset_catalog = cls._gravitino_client.create_catalog(
-            name=cls._fileset_catalog_name,
-            catalog_type=Catalog.Type.FILESET,
-            provider="",
-            comment="",
-            properties={cls.catalog_location_prop: "/tmp/test1"},
-        )
-        cls._relational_catalog = cls._gravitino_client.create_catalog(
-            name=cls._relational_catalog_name,
-            catalog_type=Catalog.Type.RELATIONAL,
-            provider=cls.relational_catalog_provider,
-            comment="Test relational catalog",
-            properties={"metastore.uris": hive_metastore_uri},
-        )
-        cls._table_catalog = cls._relational_catalog.as_table_catalog()
 
         cls._gravitino_client.create_tag(cls._tag_name1, "test tag1", {})
         cls._gravitino_client.create_tag(cls._tag_name2, "test tag2", {})
@@ -156,6 +126,36 @@ class TestSupportsTags(IntegrationTestEnv):
         cls._gravitino_admin_client.drop_metalake(name=cls._metalake_name, force=True)
 
     def setUp(self) -> None:
+        hive_metastore_uri = f"thrift://{self._hdfs_container.get_ip()}:9083"
+        self._gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
+        self._gravitino_client = GravitinoClient(
+            uri="http://localhost:8090", metalake_name=self._metalake_name
+        )
+        self._metalake = self._gravitino_admin_client.create_metalake(
+            self._metalake_name, comment="test metalake", properties={}
+        )
+        self._model_catalog = self._gravitino_client.create_catalog(
+            name=self._model_catalog_name,
+            catalog_type=Catalog.Type.MODEL,
+            provider="",
+            comment="comment",
+            properties={},
+        )
+        self._fileset_catalog = self._gravitino_client.create_catalog(
+            name=self._fileset_catalog_name,
+            catalog_type=Catalog.Type.FILESET,
+            provider="",
+            comment="",
+            properties={self.catalog_location_prop: "/tmp/test1"},
+        )
+        self._relational_catalog = self._gravitino_client.create_catalog(
+            name=self._relational_catalog_name,
+            catalog_type=Catalog.Type.RELATIONAL,
+            provider=self.relational_catalog_provider,
+            comment="Test relational catalog",
+            properties={"metastore.uris": hive_metastore_uri},
+        )
+        self._table_catalog = self._relational_catalog.as_table_catalog()
         self._model_catalog.as_schemas().create_schema(
             self._schema_name, "model schema comment", {}
         )
