@@ -73,11 +73,11 @@ Cons:
 
 - Requires explicit conversion rules between logical path and physical schema name.
 - Authorization matching and identifier serialization become more complex.
-#### Option B Separator (Fixed): Use `:` as logical separator
+#### Option B Separator: Configurable logical separator (default `:`)
 
 Examples:
 
-- `A:B:C` as logical `HierarchicalSchema` path.
+- `A:B:C` as logical `HierarchicalSchema` path when separator is `:`.
 - Physical schema name remains mapped through conversion layer.
 
 Pros:
@@ -88,24 +88,24 @@ Pros:
 
 Cons:
 
-- Needs clear validation rule to avoid ambiguity with existing schema names containing `:`.
+- Needs clear validation rule to avoid ambiguity with existing schema names containing configured
+  separator.
 
 ## Design
 
 ### Identifier Rules
 
 - Introduce logical identifier concept: `HierarchicalSchema`.
-- `HierarchicalSchema` uses a configurable external separator in logic/API layer.
-- The external separator comes from server configuration.
+- `HierarchicalSchema` uses a configurable logical separator (default `:`) in API/logic layer.
 - For Gravitino REST create/update schema APIs, `request.getName()` keeps the logical schema name
   and may contain `:` (for example `A:B` or `A:B:C`).
-- External schema name uses configured separator representation in this design.
 - Before persisting to `EntityStore`, schema path is normalized to `.`-separated physical schema
   name.
-- Escaping strategy: no encoding/escaping is used in this phase.
-- The configured external separator is reserved as hierarchy separator and is not allowed inside a
-  single namespace segment.
-- Parsing is direct split/join by configured separator at API boundary.
+- Escaping strategy: each path segment is encoded before physical flattening to avoid ambiguity.
+- Configured logical separator is reserved as hierarchy separator and is not allowed inside one
+  namespace segment.
+- `.` inside one segment is allowed and must not be treated as hierarchy separator.
+- Parsing is direct split/join by configured logical separator at API boundary.
 - Keep flat storage model and convert `HierarchicalSchema` path to physical schema name by mapping rules.
 - Identifier rendering rule:
   - Use encoded `HierarchicalSchema` path directly in schema position.
@@ -126,43 +126,34 @@ Examples:
   - `metalake.catalog.team:sales.table2`
 - In UI display and API transport, use logical path directly (for example `A:B:C`).
 
-### Separator Configuration
+### Physical Name Mapping and Reversibility
 
-- The delimiter exposed to users (API/UI/config) is configurable.
 - **Persisted schema name in `EntityStore` always uses `.` as the internal storage separator** for
   stable storage semantics.
-- External request/response handling uses the configured delimiter and converts at API boundary.
+- External request/response handling uses configured logical separator and converts at API boundary.
 - Connector-facing behavior remains Iceberg-compatible and does not require users to configure or
   input internal storage representation.
+- Mapping must be reversible:
+  - `logical path segments` -> `encode each segment` -> `join by '.'` for physical storage.
+  - physical schema name -> `split by '.'` -> `decode each segment` -> logical path segments.
+  - This avoids ambiguity when one segment contains `.` (for example `my.schema`).
 
-### Delimiter Validation Strategy
+### Existing Name Compatibility and Migration Guard
 
-For configurable schema delimiters, there are two possible strategies, '.' isn't allowed:
+- Before enabling nested namespace mode for a catalog, run a pre-check scan on existing schema names
+  against configured logical separator.
+- If existing schema names conflict with selected separator, enabling is rejected with actionable
+  error and user can choose another separator or rename conflicting schema names.
+- Once nested mode is enabled for a catalog, creating new schema names containing configured logical
+  separator as plain text is rejected.
 
-- **Option 1: Restrict to a limited set of delimiters**
-  - Delimiter values are validated against an allowlist (for example `:`, `;`, `$`).
-  - This reduces ambiguity and improves consistency across catalogs and engines.
+### Delimiter Configuration Policy
 
-- **Option 2: Do not restrict the delimiter; any delimiter can be used**
-  - Delimiter value is treated as an arbitrary string from configuration.
-  - This gives maximum flexibility but may introduce cross-catalog behavior differences.
+- Logical separator is configurable (for example `:`, `;`, `$`) and can be chosen to avoid conflict
+  with existing names.
+- Physical separator in storage remains fixed as `.`.
+- Recommended: keep logical separator stable after nested namespace is enabled for a catalog.
 
-These two options also lead to different behaviors when creating new tables (and auto-creating
-schema paths):
-
-- **Under Option 1**
-  - Only Iceberg path parsing can create nested schemas using the configured delimiter.
-  - Before persisting to `EntityStore`, parsed namespace path is normalized to `.`-separated schema
-    names.
-  - Hive schema names containing the configured delimiter are rejected as invalid schema names.
-  - This keeps delimiter semantics dedicated to nested namespace interpretation.
-
-- **Under Option 2**
-  - Hive can create a non-nested schema even if the schema name contains the configured delimiter.
-  - The delimiter inside a Hive schema name is treated as plain text rather than a hierarchy marker.
-  - Persisted schema representation is still normalized to `.` in `EntityStore`; conversion is
-    handled only at external boundary.
-  - This allows broader compatibility for existing Hive naming patterns.
 
 ### Parsing Sequence Diagram
 
@@ -189,12 +180,23 @@ sequenceDiagram
 ### Iceberg REST Side Behavior
 
 - **Create nested namespace**:
-  - Creating `A:B:C` will create (or ensure existence of) three schemas in Gravitino: `A`, `A.B`, and `A.B.C`.
-  - Set the created namespace owner as current user.
+  - Creating `A:B:C` creates (or ensures existence of) `A`, `A.B`, and `A.B.C` sequentially.
+  - Parent-chain creation is not atomic in current implementation; partial parents may remain if
+    request fails in middle steps.
+  - This is accepted as current behavior and can be improved in a future phase.
+  - Owner assignment rule for auto-created parents:
+    - If a parent is newly auto-created, owner is inherited from nearest existing ancestor; if no
+      ancestor exists, owner defaults to catalog owner/service principal, not leaf requester.
+    - Requester only becomes owner of the final target namespace unless explicit admin policy says
+      otherwise.
 - **Update nested namespace**:
   - Support updating namespace properties through mapped schema operations.
   - Property update is applied to the mapped target namespace scope.
-- **Drop nested namespace**: Will drop the schemas of the Gravitino 
+- **Drop nested namespace**:
+  - `cascade=false`: reject if target namespace subtree contains child namespaces, tables, or views.
+  - `cascade=true`: drop target namespace subtree and all child namespaces; table/view handling
+    follows existing catalog drop semantics (drop metadata and managed data according to current
+    table/view lifecycle policy).
 - **Rename nested namespace**: not needed because Iceberg REST does not support namespace rename.
 
 ### Gravitino Side Behavior
@@ -202,10 +204,12 @@ sequenceDiagram
 - `list schema` should express nested hierarchy semantics for users.
 - `list schema` REST API (GET `/metalakes/{metalake}/catalogs/{catalog}/schemas`) should support an
   optional query parameter `parentSchema`.
-  - When `parentSchema` is not provided, return only top-level schemas (first layer).
-  - When `parentSchema` is provided, return only the direct child schemas under the
+  - When `parentSchema` is absent, return top-level schemas only (first layer).
+  - When `parentSchema` is provided, return only the
+    direct child schemas under the
     given parent (next layer), instead of the full subtree.
-  - `parentSchema` value follows direct `HierarchicalSchema` path format (for example `A:B`).
+  - `parentSchema` value follows direct `HierarchicalSchema` path format with configured separator
+    (for example `A:B` when separator is `:`).
 - Gravitino does not provide a dedicated `list sub-schema` API; hierarchy is expressed via
   `list schema`/`list namespaces` results.
 - Example: for schemas `A`, `B`, `A:B`, `A:B:C`, hierarchy view is `A -> A:B -> A:B:C` and `B`;
@@ -255,6 +259,9 @@ Mitigations:
 - Enforce reasonable limits (pagination / maximum returned items) for list operations.
 - Add performance/regression tests with large schema counts to validate behavior.
 - Consider enhancing `EntityStore` to support prefix/index queries as a follow-up optimization.
+- For authorization hot paths, add a short-lived ancestor-scope cache keyed by
+  `(catalog, schemaPath, principal)` and invalidate on policy/schema mutations.
+- Add benchmark coverage for `USE_SCHEMA` checks on deep paths under high-QPS workloads.
 
 ## Privileges and Authorization
 
@@ -265,6 +272,28 @@ Mitigations:
 - Effective rule for `A:B:C`: check `A:B:C` -> `A:B` -> `A`, and pass on the first scope that has
   `USE_SCHEMA`.
 - UI privilege granting is one usage scenario of this overall nested namespace solution.
+- To prevent privilege escalation, auto-creating missing parent namespaces requires one of:
+  - requester has `create_schema` on each missing parent scope, or
+  - requester has dedicated admin capability for bootstrap parent creation.
+- If neither condition is met, create `A:B:C` must fail instead of implicitly creating unauthorized
+  parent scopes.
+
+### Client API Surface (Java/Python)
+
+- The feature is not REST-only; Java/Python client APIs must expose hierarchy explicitly.
+- Java client:
+  - Keep existing string-based methods for compatibility.
+  - Add overloads that accept namespace segments (`List<String>` or varargs) for schema APIs.
+  - Add utility type `SchemaPath` as typed wrapper to avoid ambiguous manual `:` concatenation.
+- Python client:
+  - Keep existing string-based APIs.
+  - Add tuple/list-based namespace path APIs for create/list/drop/update operations.
+- Serialization rule for both clients:
+  - typed path APIs always serialize by joining segments with `:`.
+  - string APIs are treated as already-serialized logical path.
+- Validation rule for both clients:
+  - reject empty segments and segments containing `:`.
+  - allow `.` in segment and rely on server reversible encoding.
 
 ### Option P1 (Recommended): Extend `create_schema` semantics
 
@@ -322,18 +351,19 @@ The following snippets are design-level examples to clarify how `HierarchicalSch
 // Example utility methods in IcebergRESTUtils (or a dedicated HierarchicalSchemaUtil)
 public static String serializeHierarchicalPath(String[] levels) {
   // ["team", "sales"] -> "team:sales"
-  // ':' is reserved separator and not allowed inside one level.
-  return String.join(":", levels);
+  // logical separator is configurable and not allowed inside one level.
+  return String.join(configuredSeparator, levels);
 }
 
 public static String[] parseHierarchicalPath(String path) {
   // "team:sales" -> ["team", "sales"]
-  return path.split(":", -1);
+  return path.split(Pattern.quote(configuredSeparator), -1);
 }
 
 public static String toPhysicalSchemaName(String hierarchicalPath) {
-  // Phase-1 mapping keeps flat schema storage: "A:B:C" -> "A.B.C"
-  return hierarchicalPath.replace(":", ".");
+  // Reversible mapping: encode each segment before join.
+  // Example: ["my.schema", "sales"] -> "my%2Eschema.sales"
+  return encodeAndJoinSegments(parseHierarchicalPath(hierarchicalPath));
 }
 ```
 
@@ -418,11 +448,12 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 ### 3) Namespace operation behavior
 
 - `createNamespace` should ensure parent schemas exist for each hierarchical level.
+- Parent-chain creation is sequential and non-atomic in current phase.
 - `updateNamespace` should support property updates for mapped namespace scope.
 - `dropNamespace` should target mapped physical schema and preserve existing non-nested behavior.
-- `listSchemas` should accept an optional query parameter `parentSchema`.
-  - When absent, return only top-level schemas (first layer).
-  - When present, return only direct children under the given parent (next layer).
+- `listSchemas` should accept optional query parameter `parentSchema`.
+  - Absent `parentSchema`: return top-level schemas only.
+  - Present `parentSchema`: return direct children only.
 - `listNamespaces` should return hierarchy-aware semantics (or equivalent parent-child expression)
   while keeping current flat storage model.
 - Catalog implementations must support namespace lifecycle APIs (create/list/alter/drop namespace)
@@ -444,6 +475,11 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
   conventions and should not require users to input Gravitino-internal `:` format directly.
 - Connector layer is responsible for translation between Iceberg-style namespace representation and
   Gravitino internal hierarchical schema representation.
+- Connector changes are mandatory in Spark/Flink/Trino integration layers; this is not a pure
+  server-only change.
+- Upgrade guard:
+  - validate selected logical separator against existing schema names before enabling nested mode.
+  - if conflict exists, users can pick another logical separator or rename conflicting schemas.
 
 Rationale:
 
