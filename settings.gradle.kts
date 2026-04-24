@@ -69,7 +69,9 @@ include("iceberg:iceberg-rest-server")
 include("lance:lance-common")
 include("lance:lance-rest-server")
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
-if (gradle.startParameter.projectProperties["skipTrinoConnector"]?.toBoolean() != true) {
+val skipTrinoConnector: Boolean =
+  gradle.startParameter.projectProperties["skipTrinoConnector"]?.toBoolean() ?: false
+if (!skipTrinoConnector) {
   include(
     "trino-connector:trino-connector",
     "trino-connector:trino-connector-435-439",
