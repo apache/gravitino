@@ -195,6 +195,119 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   @Test
+  void testUseNestedNamespace() {
+    String parentNamespace = "ns_nested_parent";
+    String nestedNamespaceInGravitino = parentNamespace + ":child";
+    String nestedNamespaceInIceberg = parentNamespace + ".child";
+
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(parentNamespace, "parent schema", new HashMap<>());
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(nestedNamespaceInGravitino, "nested schema", new HashMap<>());
+
+    Assertions.assertThrowsExactly(
+        org.apache.iceberg.exceptions.ForbiddenException.class,
+        () -> sql("USE %s", nestedNamespaceInIceberg));
+
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+    grantUseSchemaRole(nestedNamespaceInGravitino);
+    Assertions.assertDoesNotThrow(() -> sql("USE %s", nestedNamespaceInIceberg));
+  }
+
+  @Test
+  void testUseNestedNamespaceWithInheritedParentPrivilege() {
+    String parentNamespace = "ns_nested_inherit_parent";
+    String nestedNamespaceInGravitino = parentNamespace + ":child";
+    String nestedNamespaceInIceberg = parentNamespace + ".child";
+
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(parentNamespace, "parent schema", new HashMap<>());
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(nestedNamespaceInGravitino, "nested schema", new HashMap<>());
+
+    Assertions.assertThrowsExactly(
+        org.apache.iceberg.exceptions.ForbiddenException.class,
+        () -> sql("USE %s", nestedNamespaceInIceberg));
+
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+    grantUseSchemaRole(parentNamespace);
+    Assertions.assertDoesNotThrow(
+        () -> sql("USE %s", nestedNamespaceInIceberg),
+        "USE_SCHEMA on parent namespace should be inherited by child namespace");
+  }
+
+  @Test
+  void testUpdateNestedNamespace() {
+    String parentNamespace = "ns_nested_update_parent";
+    String nestedNamespaceInGravitino = parentNamespace + ":child";
+    String nestedNamespaceInIceberg = parentNamespace + ".child";
+
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(parentNamespace, "parent schema", new HashMap<>());
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(nestedNamespaceInGravitino, "nested schema", new HashMap<>());
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+
+    Assertions.assertThrowsExactly(
+        org.apache.iceberg.exceptions.ForbiddenException.class,
+        () ->
+            sql(
+                "ALTER DATABASE %s SET DBPROPERTIES ('nestedKey'='nestedValue')",
+                nestedNamespaceInIceberg));
+
+    metalakeClientWithAllPrivilege.setOwner(
+        MetadataObjects.of(
+            Arrays.asList(GRAVITINO_CATALOG_NAME, nestedNamespaceInGravitino),
+            MetadataObject.Type.SCHEMA),
+        NORMAL_USER,
+        Owner.Type.USER);
+    grantUseSchemaRole(nestedNamespaceInGravitino);
+    Assertions.assertDoesNotThrow(
+        () ->
+            sql(
+                "ALTER DATABASE %s SET DBPROPERTIES ('nestedKey'='nestedValue')",
+                nestedNamespaceInIceberg));
+  }
+
+  @Test
+  void testDropNestedNamespace() {
+    String parentNamespace = "ns_nested_drop_parent";
+    String nestedNamespaceInGravitino = parentNamespace + ":child";
+    String nestedNamespaceInIceberg = parentNamespace + ".child";
+
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(parentNamespace, "parent schema", new HashMap<>());
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(nestedNamespaceInGravitino, "nested schema", new HashMap<>());
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+
+    Assertions.assertThrowsExactly(
+        org.apache.iceberg.exceptions.ForbiddenException.class,
+        () -> sql("DROP DATABASE %s", nestedNamespaceInIceberg));
+
+    metalakeClientWithAllPrivilege.setOwner(
+        MetadataObjects.of(
+            Arrays.asList(GRAVITINO_CATALOG_NAME, nestedNamespaceInGravitino),
+            MetadataObject.Type.SCHEMA),
+        NORMAL_USER,
+        Owner.Type.USER);
+    grantUseSchemaRole(nestedNamespaceInGravitino);
+    Assertions.assertDoesNotThrow(() -> sql("DROP DATABASE %s", nestedNamespaceInIceberg));
+
+    boolean exists =
+        catalogClientWithAllPrivilege.asSchemas().schemaExists(nestedNamespaceInGravitino);
+    Assertions.assertFalse(exists, "Nested schema should be deleted");
+  }
+
+  @Test
   void testUpdateNamespace() {
     String namespace = "ns_modification";
 

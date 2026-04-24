@@ -51,6 +51,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -218,18 +219,34 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       AuthorizationRequestContext requestContext) {
-    Long userId;
-    boolean result;
+    boolean result = false;
+    if (metadataObject == null) {
+      return false;
+    }
+
     try {
-      Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      loadOwnerPolicy(metalake, metadataObject, metadataId);
       UserEntity userEntity = getUserEntity(principal.getName(), metalake);
-      userId = userEntity.id();
-      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
+      Long userId = userEntity.id();
+
+      if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
+        for (MetadataObject scopeObject : buildSchemaInheritanceChain(metadataObject)) {
+          Long metadataId = getMetadataIdQuietly(scopeObject, metalake);
+          if (metadataId == null) {
+            continue;
+          }
+          loadOwnerPolicy(metalake, scopeObject, metadataId);
+          if (Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId))) {
+            result = true;
+            break;
+          }
+        }
+      } else {
+        Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+        loadOwnerPolicy(metalake, metadataObject, metadataId);
+        result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
+      }
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);
-      result = false;
     }
     LOG.debug(
         "Authorization expression: {},privilege {},owner result {}\n,principal {},metalake {},metadata object {}",
@@ -422,6 +439,32 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
   }
 
+  /**
+   * Builds the logical schema inheritance chain for a SCHEMA MetadataObject. For a schema named
+   * {@code "catalog.A:B:C"} this returns MetadataObjects for {@code catalog.A:B:C}, {@code
+   * catalog.A:B}, and {@code catalog.A} in that order.
+   *
+   * <p>For flat (non-nested) schemas the list contains only the original object.
+   */
+  private List<MetadataObject> buildSchemaInheritanceChain(MetadataObject schemaObject) {
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
+
+    List<MetadataObject> chain = new ArrayList<>();
+    for (String scope : HierarchicalSchemaUtil.allScopes(schemaObject.name(), separator)) {
+      chain.add(MetadataObjects.of(schemaObject.parent(), scope, MetadataObject.Type.SCHEMA));
+    }
+    return ImmutableList.copyOf(chain);
+  }
+
+  private Long getMetadataIdQuietly(MetadataObject metadataObject, String metalake) {
+    try {
+      return MetadataIdConverter.getID(metadataObject, metalake);
+    } catch (Exception e) {
+      LOG.debug("Can not get entity id for {}", metadataObject, e);
+      return null;
+    }
+  }
+
   private class InternalAuthorizer {
 
     Enforcer enforcer;
@@ -446,17 +489,43 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         MetadataObject metadataObject,
         String privilege,
         AuthorizationRequestContext requestContext) {
-      Long metadataId;
       Long userId;
       try {
         UserEntity userEntity = getUserEntity(username, metalake);
         userId = userEntity.id();
-        metadataId = MetadataIdConverter.getID(metadataObject, metalake);
       } catch (Exception e) {
         LOG.debug("Can not get entity id", e);
         return false;
       }
       loadRolePrivilege(metalake, username, userId, requestContext);
+
+      // when checking CREATE SCHEMA, the metadata object may be null, we can just
+      // skip the check
+      if (metadataObject == null) {
+        return false;
+      }
+      // For SCHEMA objects with hierarchical names (e.g. "catalog.A:B:C"), walk the logical
+      // parent chain so that a privilege granted on an ancestor schema is inherited by all
+      // descendant schemas.
+      if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
+        List<MetadataObject> chain = buildSchemaInheritanceChain(metadataObject);
+        for (MetadataObject scopeObject : chain) {
+          Long metadataId = getMetadataIdQuietly(scopeObject, metalake);
+          if (metadataId != null
+              && authorizeByJcasbin(userId, scopeObject, metadataId, privilege)) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      Long metadataId;
+      try {
+        metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+      } catch (Exception e) {
+        LOG.debug("Can not get entity id", e);
+        return false;
+      }
       return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
     }
 

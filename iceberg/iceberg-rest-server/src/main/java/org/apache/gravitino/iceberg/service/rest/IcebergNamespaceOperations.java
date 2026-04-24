@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -44,6 +45,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -54,6 +56,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.iceberg.catalog.Namespace;
@@ -224,11 +227,13 @@ public class IcebergNamespaceOperations {
   @Timed(name = "create-namespace." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-namespace", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
-      accessMetadataType = MetadataObject.Type.CATALOG)
+      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createNamespace(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
-      CreateNamespaceRequest createNamespaceRequest) {
+      @IcebergAuthorizationMetadata(
+              type = IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE)
+          CreateNamespaceRequest createNamespaceRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(
         "Create Iceberg namespace, catalog: {}, createNamespaceRequest: {}",
@@ -326,13 +331,14 @@ public class IcebergNamespaceOperations {
 
   private NameIdentifier[] toNameIdentifiers(
       ListNamespacesResponse listNamespacesResponse, String metalake, String catalogName) {
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     List<Namespace> namespaces = listNamespacesResponse.namespaces();
     NameIdentifier[] nameIdentifiers = new NameIdentifier[namespaces.size()];
     for (int i = 0; i < namespaces.size(); i++) {
       Namespace namespace = namespaces.get(i);
-      // Convert Iceberg Namespace to Gravitino NameIdentifier
-      // Namespace should have at least one level for schema name
-      String schemaName = namespace.isEmpty() ? "" : namespace.level(0);
+      // Join namespace levels with the logical separator to form the Gravitino schema name,
+      // e.g. Namespace.of("A","B","C") -> "A:B:C" -> NameIdentifier(metalake, catalog, "A:B:C").
+      String schemaName = namespace.isEmpty() ? "" : String.join(separator, namespace.levels());
       nameIdentifiers[i] = NameIdentifier.of(metalake, catalogName, schemaName);
     }
     return nameIdentifiers;
@@ -340,6 +346,7 @@ public class IcebergNamespaceOperations {
 
   private ListNamespacesResponse filterListNamespacesResponse(
       ListNamespacesResponse listNamespacesResponse, String metalake, String catalogName) {
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     NameIdentifier[] idents =
         MetadataAuthzHelper.filterByExpression(
             metalake,
@@ -348,11 +355,9 @@ public class IcebergNamespaceOperations {
             toNameIdentifiers(listNamespacesResponse, metalake, catalogName));
     List<Namespace> filteredNamespaces = new ArrayList<>();
     for (NameIdentifier ident : idents) {
-      // Convert back from NameIdentifier to Iceberg Namespace
       if (ident.hasNamespace() && ident.namespace().levels().length >= 2) {
-        // Schema name is the last level in the namespace
-        String schemaName = ident.name();
-        filteredNamespaces.add(Namespace.of(schemaName));
+        // Convert the logical schema name (e.g. "A:B:C") back to a multi-level Iceberg Namespace.
+        filteredNamespaces.add(Namespace.of(ident.name().split(Pattern.quote(separator), -1)));
       }
     }
     return ListNamespacesResponse.builder().addAll(filteredNamespaces).build();

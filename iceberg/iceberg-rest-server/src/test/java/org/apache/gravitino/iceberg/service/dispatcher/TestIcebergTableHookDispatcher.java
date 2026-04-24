@@ -32,6 +32,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -87,6 +89,9 @@ public class TestIcebergTableHookDispatcher {
     mockTableDispatcher = mock(TableDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
 
+    Config mockConfig = mock(Config.class);
+    when(mockConfig.get(Configs.SCHEMA_NAMESPACE_SEPARATOR)).thenReturn(":");
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", mockEntityStore, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", mockTableDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
@@ -109,6 +114,7 @@ public class TestIcebergTableHookDispatcher {
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     // Clean up GravitinoEnv
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
@@ -139,7 +145,7 @@ public class TestIcebergTableHookDispatcher {
     // Verify table import was called
     NameIdentifier expectedIdentifier =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            TEST_METALAKE, TEST_CATALOG, TableIdentifier.of(namespace, "test_table"));
+            TEST_METALAKE, TEST_CATALOG, TableIdentifier.of(namespace, "test_table"), ":");
     verify(mockTableDispatcher).loadTable(expectedIdentifier);
 
     // Verify ownership was set
@@ -158,7 +164,8 @@ public class TestIcebergTableHookDispatcher {
     verify(mockDispatcher).dropTable(mockContext, tableId, false);
 
     NameIdentifier expectedIdentifier =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
     verify(mockEntityStore).delete(expectedIdentifier, Entity.EntityType.TABLE);
   }
 
@@ -167,7 +174,8 @@ public class TestIcebergTableHookDispatcher {
     TableIdentifier tableId = TableIdentifier.of("test_schema", "test_table");
 
     NameIdentifier expectedIdentifier =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
     doThrow(new NoSuchEntityException("Table not found"))
         .when(mockEntityStore)
         .delete(expectedIdentifier, Entity.EntityType.TABLE);
@@ -214,7 +222,7 @@ public class TestIcebergTableHookDispatcher {
     verify(mockDispatcher).renameTable(mockContext, request);
 
     NameIdentifier sourceIdentifier =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, source);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, source, ":");
     verify(mockEntityStore)
         .update(eq(sourceIdentifier), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
@@ -296,7 +304,8 @@ public class TestIcebergTableHookDispatcher {
 
     // Verify table import was called
     NameIdentifier gravitinoTableId =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(TEST_METALAKE, TEST_CATALOG, tableId);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            TEST_METALAKE, TEST_CATALOG, tableId, ":");
     verify(mockTableDispatcher).loadTable(gravitinoTableId);
 
     // Verify ownership was set

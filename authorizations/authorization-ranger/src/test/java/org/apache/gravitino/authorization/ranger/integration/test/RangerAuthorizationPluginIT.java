@@ -556,7 +556,7 @@ public class RangerAuthorizationPluginIT {
             String.format("catalog.schema"),
             MetadataObject.Type.SCHEMA,
             Lists.newArrayList(Privileges.CreateSchema.allow()));
-    Assertions.assertFalse(
+    Assertions.assertTrue(
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(createSchema1)));
     SecurableObject createSchema2 =
         SecurableObjects.parse(

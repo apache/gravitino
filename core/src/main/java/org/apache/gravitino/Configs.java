@@ -500,6 +500,20 @@ public class Configs {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
 
+  public static final ConfigEntry<String> SCHEMA_NAMESPACE_SEPARATOR =
+      new ConfigBuilder("gravitino.schema.namespaceSeparator")
+          .doc(
+              "The separator used to represent nested namespace hierarchy in schema names at the "
+                  + "API boundary (e.g. ':' for 'A:B:C'). Schema names are stored internally in "
+                  + "EntityStore using '.' as the physical separator. The configured separator is "
+                  + "only used at external API and catalog capability validation layer. "
+                  + "The '.' character is reserved as the internal physical separator and must "
+                  + "not be used as the external separator.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(":");
+
   public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS =
       new ConfigBuilder("gravitino.stats.partition.storageFactoryClass")
           .doc(

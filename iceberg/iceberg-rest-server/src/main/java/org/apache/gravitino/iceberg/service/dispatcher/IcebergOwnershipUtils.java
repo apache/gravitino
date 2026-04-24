@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
@@ -53,7 +54,8 @@ public class IcebergOwnershipUtils {
       ownerDispatcher.setOwner(
           metalake,
           NameIdentifierUtil.toMetadataObject(
-              IcebergIdentifierUtils.toGravitinoSchemaIdentifier(metalake, catalogName, namespace),
+              IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+                  metalake, catalogName, namespace, HierarchicalSchemaUtil.namespaceSeparator()),
               Entity.EntityType.SCHEMA),
           user,
           Owner.Type.USER);
@@ -82,7 +84,10 @@ public class IcebergOwnershipUtils {
           metalake,
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, tableName)),
+                  metalake,
+                  catalogName,
+                  TableIdentifier.of(namespace, tableName),
+                  HierarchicalSchemaUtil.namespaceSeparator()),
               Entity.EntityType.TABLE),
           user,
           Owner.Type.USER);
@@ -111,7 +116,10 @@ public class IcebergOwnershipUtils {
           metalake,
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, viewName)),
+                  metalake,
+                  catalogName,
+                  TableIdentifier.of(namespace, viewName),
+                  HierarchicalSchemaUtil.namespaceSeparator()),
               Entity.EntityType.VIEW),
           user,
           Owner.Type.USER);

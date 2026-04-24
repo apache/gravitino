@@ -23,6 +23,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -103,7 +104,10 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
       if (store != null) {
         store.delete(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, context.catalogName(), viewIdentifier),
+                metalake,
+                context.catalogName(),
+                viewIdentifier,
+                HierarchicalSchemaUtil.namespaceSeparator()),
             Entity.EntityType.VIEW);
         LOG.info(
             "Successfully removed view from Gravitino entity store: {}.{}.{}.{}",
@@ -147,12 +151,13 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     dispatcher.renameView(context, renameViewRequest);
 
     // Update view in Gravitino entity store with new name
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     NameIdentifier sourceIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), renameViewRequest.source());
+            metalake, context.catalogName(), renameViewRequest.source(), separator);
     NameIdentifier destIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), renameViewRequest.destination());
+            metalake, context.catalogName(), renameViewRequest.destination(), separator);
 
     EntityStore store = GravitinoEnv.getInstance().entityStore();
     try {
@@ -202,7 +207,10 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
       try {
         viewDispatcher.loadView(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, catalogName, TableIdentifier.of(namespace, viewName)));
+                metalake,
+                catalogName,
+                TableIdentifier.of(namespace, viewName),
+                HierarchicalSchemaUtil.namespaceSeparator()));
         LOG.info(
             "Successfully imported view into Gravitino: {}.{}.{}.{}",
             metalake,

@@ -19,9 +19,14 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -57,17 +62,50 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
   @Override
   public CreateNamespaceResponse createNamespace(
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
+    // Collect missing ancestors BEFORE the underlying call so Iceberg auto-creates them.
+    List<Namespace> missingAncestors = getMissingAncestors(context, createRequest.namespace());
     CreateNamespaceResponse response = dispatcher.createNamespace(context, createRequest);
 
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    // Set owner for every auto-created ancestor namespace (only if it actually exists now).
+    for (Namespace ancestor : missingAncestors) {
+      if (dispatcher.namespaceExists(context, ancestor)) {
+        importSchema(context.catalogName(), ancestor);
+        IcebergOwnershipUtils.setSchemaOwner(
+            metalake, context.catalogName(), ancestor, context.userName(), ownerDispatcher);
+      }
+    }
+    // Set owner for the explicitly requested namespace.
     importSchema(context.catalogName(), createRequest.namespace());
     IcebergOwnershipUtils.setSchemaOwner(
         metalake,
         context.catalogName(),
         createRequest.namespace(),
         context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+        ownerDispatcher);
 
     return response;
+  }
+
+  /**
+   * Returns all ancestor namespaces of {@code namespace} that do not currently exist in the
+   * catalog. Uses {@link HierarchicalSchemaUtil#getAncestorNames} (the same utility as the
+   * Gravitino REST API side) so the prefix-enumeration algorithm is shared.
+   *
+   * <p>For example, if {@code namespace} is {@code Namespace.of("A","B","C")} and only {@code
+   * Namespace.of("A")} already exists, this returns {@code [Namespace.of("A","B")]}.
+   */
+  private List<Namespace> getMissingAncestors(IcebergRequestContext context, Namespace namespace) {
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
+    String namespaceName = String.join(separator, namespace.levels());
+    List<Namespace> missing = new ArrayList<>();
+    for (String ancestorName : HierarchicalSchemaUtil.getAncestorNames(namespaceName, separator)) {
+      Namespace ancestor = Namespace.of(ancestorName.split(Pattern.quote(separator)));
+      if (!dispatcher.namespaceExists(context, ancestor)) {
+        missing.add(ancestor);
+      }
+    }
+    return missing;
   }
 
   @Override
@@ -89,7 +127,10 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         // Delete the entity for the dropped namespace (schema).
         store.delete(
             IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                metalake, context.catalogName(), namespace),
+                metalake,
+                context.catalogName(),
+                namespace,
+                HierarchicalSchemaUtil.namespaceSeparator()),
             Entity.EntityType.SCHEMA);
       }
     } catch (NoSuchEntityException ignore) {
@@ -142,7 +183,10 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake, catalogName, TableIdentifier.of(namespace, tableName)));
+              metalake,
+              catalogName,
+              TableIdentifier.of(namespace, tableName),
+              HierarchicalSchemaUtil.namespaceSeparator()));
     }
   }
 
@@ -150,7 +194,8 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
     if (schemaDispatcher != null) {
       schemaDispatcher.loadSchema(
-          IcebergIdentifierUtils.toGravitinoSchemaIdentifier(metalake, catalogName, namespace));
+          IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+              metalake, catalogName, namespace, HierarchicalSchemaUtil.namespaceSeparator()));
     }
   }
 }

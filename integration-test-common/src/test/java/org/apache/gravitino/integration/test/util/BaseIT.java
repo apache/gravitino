@@ -119,11 +119,15 @@ public class BaseIT {
   public static final String DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/clickhouse-jdbc-0.7.1-all.jar";
 
+  public static final String DOWNLOAD_SQLITE_JDBC_DRIVER_URL =
+      "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/sqlite-jdbc-3.42.0.0.jar";
+
   public static final Map<String, Pattern> SUPPORTED_CLEAN_CONFLICTS_DRIVER_TYPES =
       ImmutableMap.of(
           "mysql", Pattern.compile("mysql-connector-java-([\\d.]+)\\.jar"),
           "postgresql", Pattern.compile("postgresql-([\\d.]+)\\.jar"),
-          "clickhouse", Pattern.compile("clickhouse-jdbc-([\\d.]+)(-all)?\\.jar"));
+          "clickhouse", Pattern.compile("clickhouse-jdbc-([\\d.]+)(-all)?\\.jar"),
+          "sqlite", Pattern.compile("sqlite-jdbc-([\\d.]+)\\.jar"));
 
   private TestDatabaseName META_DATA;
   private MySQLContainer MYSQL_CONTAINER;
@@ -201,7 +205,8 @@ public class BaseIT {
     String[] driverUrls = {
       DOWNLOAD_MYSQL_JDBC_DRIVER_URL,
       DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL,
-      DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL
+      DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL,
+      DOWNLOAD_SQLITE_JDBC_DRIVER_URL
     };
     String[] dirs = getJdbcDriverDownloadDirs();
     downloadJdbcDrivers(driverUrls, dirs);
@@ -570,7 +575,7 @@ public class BaseIT {
     // expectedVersion and driverType can be null when the driver type is not currently supported
     if (expectedVersion == null || driverType == null) {
       LOG.warn(
-          "Unable to extract driver version or type from URL: {}. Only mysql and postgresql drivers are currently supported.",
+          "Unable to extract driver version or type from URL: {}. Only configured JDBC driver types are currently supported.",
           targetUrl);
       return;
     }

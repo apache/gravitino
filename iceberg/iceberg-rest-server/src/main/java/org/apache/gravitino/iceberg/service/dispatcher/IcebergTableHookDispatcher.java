@@ -25,6 +25,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
@@ -97,7 +98,10 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
         // Delete the entity for the dropped table.
         store.delete(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, context.catalogName(), tableIdentifier),
+                metalake,
+                context.catalogName(),
+                tableIdentifier,
+                HierarchicalSchemaUtil.namespaceSeparator()),
             Entity.EntityType.TABLE);
       }
     } catch (NoSuchEntityException ignore) {
@@ -126,12 +130,13 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
     dispatcher.renameTable(context, renameTableRequest);
+    String separator = HierarchicalSchemaUtil.namespaceSeparator();
     NameIdentifier tableSource =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), renameTableRequest.source());
+            metalake, context.catalogName(), renameTableRequest.source(), separator);
     NameIdentifier tableDest =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), renameTableRequest.destination());
+            metalake, context.catalogName(), renameTableRequest.destination(), separator);
     EntityStore store = GravitinoEnv.getInstance().entityStore();
     try {
       if (store != null) {
@@ -201,7 +206,10 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake, context.catalogName(), TableIdentifier.of(namespace, tableName)));
+              metalake,
+              context.catalogName(),
+              TableIdentifier.of(namespace, tableName),
+              HierarchicalSchemaUtil.namespaceSeparator()));
     }
     IcebergOwnershipUtils.setTableOwner(
         metalake,

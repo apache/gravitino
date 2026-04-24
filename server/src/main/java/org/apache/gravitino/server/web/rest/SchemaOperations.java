@@ -35,6 +35,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -53,6 +54,7 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -86,14 +88,21 @@ public class SchemaOperations {
   public Response listSchemas(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
-          String catalog) {
-    LOG.info("Received list schema request for catalog: {}.{}", metalake, catalog);
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @DefaultValue("") @QueryParam("parentSchema") String parentSchema) {
+    LOG.info(
+        "Received list schema request for catalog: {}.{}, parentSchema: {}",
+        metalake,
+        catalog,
+        parentSchema);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
+            Namespace schemaNS =
+                StringUtils.isBlank(parentSchema)
+                    ? NamespaceUtil.ofSchema(metalake, catalog)
+                    : Namespace.of(metalake, catalog, parentSchema);
             NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
             idents =
                 MetadataAuthzHelper.filterByExpression(
@@ -102,7 +111,12 @@ public class SchemaOperations {
                     Entity.EntityType.SCHEMA,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
-            LOG.info("List {} schemas in catalog {}.{}", idents.length, metalake, catalog);
+            LOG.info(
+                "List {} schemas in catalog {}.{} (parentSchema='{}')",
+                idents.length,
+                metalake,
+                catalog,
+                parentSchema);
             return response;
           });
     } catch (Exception e) {
@@ -115,13 +129,14 @@ public class SchemaOperations {
   @Timed(name = "create-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-schema", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
-      accessMetadataType = MetadataObject.Type.CATALOG)
+      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createSchema(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      SchemaCreateRequest request) {
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.CREATE_SCHEMA)
+          SchemaCreateRequest request) {
     LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
     try {
       return Utils.doAs(

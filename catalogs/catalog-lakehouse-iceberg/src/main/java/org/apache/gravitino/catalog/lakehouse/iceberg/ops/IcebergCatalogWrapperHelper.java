@@ -30,6 +30,7 @@ import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.AddColumn;
 import org.apache.gravitino.rel.TableChange.After;
@@ -280,45 +281,42 @@ public class IcebergCatalogWrapperHelper {
     return icebergTableChange;
   }
 
-  /**
-   * Gravitino only supports single-level namespace storage management, which differs from Iceberg.
-   * Therefore, we need to handle this difference here.
-   *
-   * @param namespace GravitinoNamespace
-   * @return Iceberg Namespace
-   */
-  public static Namespace getIcebergNamespace(org.apache.gravitino.Namespace namespace) {
-    return getIcebergNamespace(namespace.level(namespace.length() - 1));
-  }
-
   public static Namespace getIcebergNamespace(String... level) {
     return Namespace.of(level);
   }
 
   /**
-   * Gravitino only supports tables managed with a single level hierarchy, such as
-   * `{namespace}.{table}`, so we need to perform truncation here.
+   * Builds an Iceberg {@link TableIdentifier} from a Gravitino namespace and table name, using the
+   * given external separator to parse logical schema names (e.g. {@code "A:B:C"}).
    *
-   * @param namespace The Gravitino name space
+   * @param namespace The Gravitino namespace whose last level is the logical schema name
    * @param name The table name
+   * @param separator the external namespace separator
    * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(
-      org.apache.gravitino.Namespace namespace, String name) {
+      org.apache.gravitino.Namespace namespace, String name, String separator) {
     String[] levels = namespace.levels();
-    return TableIdentifier.of(levels[levels.length - 1], name);
+    String schemaName = levels[levels.length - 1];
+    return TableIdentifier.of(
+        IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(schemaName, separator), name);
   }
 
   /**
-   * Gravitino only supports tables managed with a single level hierarchy, such as
-   * `{namespace}.{table}`, so we need to perform truncation here.
+   * Builds an Iceberg {@link TableIdentifier} from a Gravitino {@link NameIdentifier}, using the
+   * given external separator to parse logical schema names (e.g. {@code "A:B:C"}).
    *
    * @param nameIdentifier GravitinoNameIdentifier
+   * @param separator the external namespace separator
    * @return Iceberg TableIdentifier
    */
-  public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
+  public static TableIdentifier buildIcebergTableIdentifier(
+      NameIdentifier nameIdentifier, String separator) {
     String[] levels = nameIdentifier.namespace().levels();
-    return TableIdentifier.of(levels[levels.length - 1], nameIdentifier.name());
+    String schemaName = levels[levels.length - 1];
+    return TableIdentifier.of(
+        IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(schemaName, separator),
+        nameIdentifier.name());
   }
 
   @VisibleForTesting

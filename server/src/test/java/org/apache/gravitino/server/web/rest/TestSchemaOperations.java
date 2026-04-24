@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.SCHEMA_NAMESPACE_SEPARATOR;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
@@ -27,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -43,6 +45,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
@@ -94,6 +97,7 @@ public class TestSchemaOperations extends BaseOperationsTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
+    Mockito.doReturn(":").when(config).get(SCHEMA_NAMESPACE_SEPARATOR);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
   }
@@ -175,6 +179,27 @@ public class TestSchemaOperations extends BaseOperationsTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testListSchemasWithParentSchemaPassToDispatcher() {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "A:sales");
+    when(dispatcher.listSchemas(any())).thenReturn(new NameIdentifier[] {ident});
+
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .queryParam("parentSchema", "A")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    EntityListResponse listResp = resp.readEntity(EntityListResponse.class);
+    Assertions.assertEquals(0, listResp.getCode());
+    Assertions.assertEquals(1, listResp.identifiers().length);
+    Assertions.assertEquals("A:sales", listResp.identifiers()[0].name());
+
+    verify(dispatcher).listSchemas(eq(Namespace.of(metalake, catalog, "A")));
   }
 
   @Test
