@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -152,6 +153,10 @@ public class TestGravitinoConnectorProcedures {
     when(mockContext.getCatalog()).thenReturn(mockCatalog);
     when(mockContext.getMetalake()).thenReturn(metalake);
     when(mockContext.getInternalConnector()).thenReturn(internalConnector);
+    // Stub getConfig() to support the forward-user logic added in GravitinoConnector
+    // (see apache/gravitino PR #10730). Uses lenient() so tests still pass on branches
+    // where the constructor does not yet call getConfig().
+    lenient().when(mockContext.getConfig()).thenReturn(mock(GravitinoConfig.class));
 
     return new GravitinoConnector(mockContext);
   }
