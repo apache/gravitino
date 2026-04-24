@@ -872,7 +872,8 @@ CREATE TABLE IF NOT EXISTS view_version_info (
     view_comment TEXT,
     columns TEXT NOT NULL,
     properties TEXT,
-    security_mode VARCHAR(32) NOT NULL DEFAULT 'DEFINER',
+    default_catalog VARCHAR(128),
+    default_schema VARCHAR(128),
     representations TEXT NOT NULL,
     audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -894,7 +895,8 @@ COMMENT ON COLUMN view_version_info.version IS 'view version';
 COMMENT ON COLUMN view_version_info.view_comment IS 'view version comment';
 COMMENT ON COLUMN view_version_info.columns IS 'view columns snapshot (JSON)';
 COMMENT ON COLUMN view_version_info.properties IS 'view properties (JSON)';
-COMMENT ON COLUMN view_version_info.security_mode IS 'DEFINER or INVOKER';
+COMMENT ON COLUMN view_version_info.default_catalog IS 'default catalog for view SQL resolution';
+COMMENT ON COLUMN view_version_info.default_schema IS 'default schema for view SQL resolution';
 COMMENT ON COLUMN view_version_info.representations IS 'view representations (JSON array)';
 COMMENT ON COLUMN view_version_info.audit_info IS 'view version audit info';
 COMMENT ON COLUMN view_version_info.deleted_at IS 'view version deleted at';
