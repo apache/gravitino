@@ -257,13 +257,13 @@ public class MetalakeOperations {
           () -> {
             NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
             boolean dropped = metalakeDispatcher.dropMetalake(identifier, force);
-            if (!dropped) {
+            if (dropped) {
+              LOG.info("Metalake dropped: {}", metalakeName);
+            } else {
               LOG.warn("Failed to drop metalake by name {}", metalakeName);
             }
 
-            Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("Metalake dropped: {}", metalakeName);
-            return response;
+            return Utils.ok(new DropResponse(dropped));
           });
 
     } catch (Exception e) {
