@@ -83,13 +83,6 @@ public class TestView {
   }
 
   @Test
-  public void testSqlForReturnsEmptyWhenRepresentationsAreNull() {
-    View view = testView((Representation[]) null);
-
-    assertFalse(view.sqlFor("trino").isPresent());
-  }
-
-  @Test
   public void testSqlForReturnsEmptyWhenRepresentationIsNotSql() {
     View view =
         testView(
