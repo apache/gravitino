@@ -104,9 +104,6 @@ public interface View extends Auditable {
       return Optional.empty();
     }
     Representation[] reps = representations();
-    if (reps == null) {
-      return Optional.empty();
-    }
     for (Representation rep : reps) {
       if (rep instanceof SQLRepresentation) {
         SQLRepresentation sqlRep = (SQLRepresentation) rep;
