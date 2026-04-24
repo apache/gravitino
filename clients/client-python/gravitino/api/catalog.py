@@ -21,6 +21,7 @@ from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.supports_schemas import SupportsSchemas
+from gravitino.api.tag.supports_tags import SupportsTags
 
 
 class Catalog(Auditable):
@@ -179,7 +180,7 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support topic operations")
 
-    def as_model_catalog(self) -> "ModelCatalog":  # noqa: F821
+    def as_model_catalog(self) -> "GenericModelCatalog":
         """
         Returns:
             the {@link ModelCatalog} if the catalog supports model operations.
@@ -189,7 +190,7 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support model operations")
 
-    def as_function_catalog(self) -> "FunctionCatalog":  # noqa: F821
+    def as_function_catalog(self) -> "FunctionCatalog":
         """
         Returns:
             the {@link FunctionCatalog} if the catalog supports function operations.
@@ -200,6 +201,18 @@ class Catalog(Auditable):
         raise UnsupportedOperationException(
             "Catalog does not support function operations"
         )
+
+    def supports_tags(self) -> SupportsTags:
+        """
+        Return the {@link SupportsTags} if the catalog supports tag operations.
+
+        Raises:
+            UnsupportedOperationException: if the catalog does not support tag operations.
+
+        Returns:
+            SupportsTags: the {@link SupportsTags} instance
+        """
+        raise UnsupportedOperationException("Catalog does not support tag operations")
 
 
 class UnsupportedOperationException(Exception):
