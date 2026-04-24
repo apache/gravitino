@@ -238,10 +238,10 @@ sequenceDiagram
   - Support updating namespace properties through mapped schema operations.
   - Property update is applied to the mapped target namespace scope.
 - **Drop nested namespace**:
-  - `cascade=false`: reject if target namespace subtree contains child namespaces, tables, or views.
-  - `cascade=true`: drop target namespace subtree and all child namespaces; table/view handling
-    follows existing catalog drop semantics (drop metadata and managed data according to current
-    table/view lifecycle policy).
+  - Iceberg REST side does not support cascade delete for namespace.
+  - If cascade parameter is provided, return unsupported-parameter error directly.
+  - Drop must fail when target namespace still contains child namespaces, tables, or views.
+  - Users must delete children objects explicitly before dropping parent namespace.
 - **Rename nested namespace**: not needed because Iceberg REST does not support namespace rename.
 
 ### Gravitino Side Behavior
@@ -283,10 +283,11 @@ Examples (Gravitino REST side):
     (for example set/remove properties).
   - Behavior: update properties on target schema `A:B:C` only; parent scopes are not modified.
 - **Delete from Gravitino side**
-  - Request: `DELETE /metalakes/m1/catalogs/c1/schemas/A:B?cascade=false`
+  - Request: `DELETE /metalakes/m1/catalogs/c1/schemas/A:B`
   - Behavior: fail if `A:B` still contains child namespace/table.
-  - Request: `DELETE /metalakes/m1/catalogs/c1/schemas/A:B?cascade=true`
-  - Behavior: delete `A:B` and all descendants/tables under that subtree.
+  - Behavior: no cascade mode; children must be removed first, then delete `A:B`.
+  - Request with cascade parameter (for example `?cascade=true`): reject with unsupported-parameter
+    error.
 
 ## Privileges and Authorization
 
