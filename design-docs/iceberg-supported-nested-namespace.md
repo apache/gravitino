@@ -169,7 +169,7 @@ sequenceDiagram
   Config-->>Client: separator (for example ':')
   Client->>API: GET /schemas?parentSchema=A:B
   API->>Mapper: Parse parentSchema by separator ':'
-  Mapper->>Store: list all schemas (no prefix index)
+  Mapper->>Store: list all schemas
   Store-->>Mapper: all schemas
   Mapper->>Mapper: filter direct children under A:B
   Mapper-->>API: hierarchy-aware result
@@ -185,10 +185,10 @@ sequenceDiagram
   - Parent-chain creation is transactional: if any step fails, all created parents in this request
     are rolled back and no partial parent namespaces remain.
   - Owner assignment rule for auto-created parents:
-    - If a parent is newly auto-created, owner is inherited from nearest existing ancestor; if no
-      ancestor exists, owner defaults to catalog owner/service principal, not leaf requester.
-    - Requester only becomes owner of the final target namespace unless explicit admin policy says
-      otherwise.
+    - If a parent is newly auto-created, owner must be the same as the owner assigned to the final
+      target namespace in the same create request.
+    - The full auto-created parent chain and the final target namespace must share a consistent owner
+      value for that operation.
 - **Update nested namespace**:
   - Support updating namespace properties through mapped schema operations.
   - Property update is applied to the mapped target namespace scope.
@@ -242,26 +242,6 @@ Examples (Gravitino REST side):
   - Behavior: fail if `A:B` still contains child namespace/table.
   - Request: `DELETE /metalakes/m1/catalogs/c1/schemas/A:B?cascade=true`
   - Behavior: delete `A:B` and all descendants/tables under that subtree.
-
-### Performance Considerations
-
-- Current `EntityStore` does not support prefix matching on schema names.
-- As a result, `list schema` with `parentSchema` cannot be implemented as an
-  efficient prefix query at storage layer. The server must list all schemas in the catalog and
-  then compute the top-level / direct-children view in memory.
-- This may introduce higher-than-expected latency and load for catalogs with a large number of
-  schemas.
-
-Mitigations:
-
-- Cache computed hierarchy results per catalog with a short TTL and invalidate on schema
-  create/update/drop.
-- Enforce reasonable limits (pagination / maximum returned items) for list operations.
-- Add performance/regression tests with large schema counts to validate behavior.
-- Consider enhancing `EntityStore` to support prefix/index queries as a follow-up optimization.
-- For authorization hot paths, add a short-lived ancestor-scope cache keyed by
-  `(catalog, schemaPath, principal)` and invalidate on policy/schema mutations.
-- Add benchmark coverage for `USE_SCHEMA` checks on deep paths under high-QPS workloads.
 
 ## Privileges and Authorization
 
