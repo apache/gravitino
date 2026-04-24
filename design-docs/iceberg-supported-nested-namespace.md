@@ -180,10 +180,10 @@ sequenceDiagram
 ### Iceberg REST Side Behavior
 
 - **Create nested namespace**:
-  - Creating `A:B:C` creates (or ensures existence of) `A`, `A.B`, and `A.B.C` sequentially.
-  - Parent-chain creation is not atomic in current implementation; partial parents may remain if
-    request fails in middle steps.
-  - This is accepted as current behavior and can be improved in a future phase.
+  - Creating `A:B:C` creates (or ensures existence of) `A`, `A.B`, and `A.B.C` in one atomic
+    operation.
+  - Parent-chain creation is transactional: if any step fails, all created parents in this request
+    are rolled back and no partial parent namespaces remain.
   - Owner assignment rule for auto-created parents:
     - If a parent is newly auto-created, owner is inherited from nearest existing ancestor; if no
       ancestor exists, owner defaults to catalog owner/service principal, not leaf requester.
@@ -448,7 +448,7 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 ### 3) Namespace operation behavior
 
 - `createNamespace` should ensure parent schemas exist for each hierarchical level.
-- Parent-chain creation is sequential and non-atomic in current phase.
+- Parent-chain creation must be atomic as one transaction; failures must not leave partial parents.
 - `updateNamespace` should support property updates for mapped namespace scope.
 - `dropNamespace` should target mapped physical schema and preserve existing non-nested behavior.
 - `listSchemas` should accept optional query parameter `parentSchema`.
