@@ -49,12 +49,6 @@ def _create_mock_fileset(credentials_list):
     return mock_fileset
 
 
-class _ConcreteGVFSOperations:
-    """Minimal concrete subclass to test BaseGVFSOperations credential cache logic."""
-
-    pass
-
-
 class TestGVFSCredentialCache(unittest.TestCase):
     """Tests for credential-level lazy caching in BaseGVFSOperations."""
 
@@ -267,6 +261,42 @@ class TestGVFSCredentialCache(unittest.TestCase):
 
         result = ops._calculate_credential_expire_time(-1)
         self.assertEqual(result, sys.maxsize)
+
+    def test_mixed_credentials_cache_expiry_based_on_expiring_one(self):
+        """Mixed credentials (never-expire + expiring) should use the expiring one for cache TTL."""
+        from gravitino.client.generic_fileset import GenericFileset
+
+        # S3TokenCredential requires expire_time_in_ms > 0, so use MagicMock for never-expire
+        never_expire_credential = MagicMock()
+        never_expire_credential.expire_time_in_ms.return_value = 0
+        expired_credential = _create_mock_credential(
+            int(time.time() * 1000) - 1000
+        )  # already expired
+        fresh_credential = _create_mock_credential(int(time.time() * 1000) + 3600_000)
+
+        # First call returns mixed list with expired credential, second returns fresh
+        mock_support = MagicMock()
+        mock_support.get_credentials.side_effect = [
+            [never_expire_credential, expired_credential],
+            [never_expire_credential, fresh_credential],
+        ]
+        fileset = MagicMock(spec=GenericFileset)
+        fileset.support_credentials.return_value = mock_support
+
+        ops = self._create_operations(
+            {GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING: True}
+        )
+        fileset_ident = NameIdentifier.of("metalake", "catalog", "schema", "fileset")
+
+        # First call - caches mixed credentials
+        result1 = ops._get_credentials_with_cache(fileset_ident, fileset, "default")
+        self.assertEqual(result1, [never_expire_credential, expired_credential])
+
+        # Second call - cache expired due to expiring credential, triggers refresh
+        result2 = ops._get_credentials_with_cache(fileset_ident, fileset, "default")
+        self.assertEqual(result2, [never_expire_credential, fresh_credential])
+
+        self.assertEqual(mock_support.get_credentials.call_count, 2)
 
     def test_thread_safety_concurrent_access(self):
         """Multiple threads accessing cache simultaneously should be safe and deduplicated."""
