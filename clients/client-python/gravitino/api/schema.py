@@ -16,9 +16,11 @@
 # under the License.
 
 from abc import abstractmethod
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class Schema(Auditable):
@@ -43,3 +45,6 @@ class Schema(Auditable):
     def properties(self) -> Dict[str, str]:
         """Returns the properties of the Schema. An empty dictionary is returned if no properties are set."""
         return {}
+
+    def supports_tags(self) -> SupportsTags:
+        raise UnsupportedOperationException("Table does not support tag operations.")

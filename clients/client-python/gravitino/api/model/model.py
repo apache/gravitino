@@ -15,10 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Dict, Optional
 from abc import abstractmethod
+from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class Model(Auditable):
@@ -72,3 +74,6 @@ class Model(Auditable):
             The latest version of the model object.
         """
         pass
+
+    def supports_tags(self) -> SupportsTags:
+        raise UnsupportedOperationException("Table does not support tag operations.")

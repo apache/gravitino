@@ -80,6 +80,9 @@ class GenericFileset(
     def support_credentials(self) -> SupportsCredentials:
         return self
 
+    def supports_tags(self) -> SupportsTags:
+        return self
+
     def get_credentials(self) -> List[Credential]:
         return self._object_credential_operations.get_credentials()
 

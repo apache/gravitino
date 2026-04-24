@@ -217,9 +217,9 @@ class RelationalTable(
                 if the partition already exists, throws this exception.
         """
 
-        req = AddPartitionsRequest(
-            [cast(PartitionDTO, DTOConverters.to_dto(partition))]
-        )
+        req = AddPartitionsRequest([
+            cast(PartitionDTO, DTOConverters.to_dto(partition))
+        ])
         req.validate()
 
         resp = self._rest_client.post(
@@ -246,3 +246,6 @@ class RelationalTable(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
         return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
+
+    def supports_tags(self) -> SupportsTags:
+        return self

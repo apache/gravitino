@@ -20,18 +20,17 @@ from random import randint
 
 from gravitino import Catalog, GravitinoAdminClient, GravitinoClient, GravitinoMetalake
 from gravitino.api.file.fileset import Fileset
+from gravitino.api.model.model import Model
+from gravitino.api.rel.table import Table
 from gravitino.api.rel.table_catalog import TableCatalog
 from gravitino.api.rel.types.types import Types
 from gravitino.api.tag import Tag
 from gravitino.api.tag.supports_tags import SupportsTags
-from gravitino.client.generic_model import GenericModel
-from gravitino.client.generic_schema import GenericSchema
-from gravitino.client.generic_tag import GenericTag
-from gravitino.client.relational_table import RelationalTable
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
     IdentityPartitioningDTO,
 )
+from gravitino.exceptions.base import NoSuchTagException
 from gravitino.name_identifier import NameIdentifier
 from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.integration_test_env import IntegrationTestEnv
@@ -39,15 +38,12 @@ from tests.integration.integration_test_env import IntegrationTestEnv
 logger = logging.getLogger(__name__)
 
 
-class TestSupportsJobs(IntegrationTestEnv):
+class TestSupportsTags(IntegrationTestEnv):
     relational_catalog_provider: str = "hive"
-    fileset_name: str = "fileset"
-    multiple_locations_fileset_name: str = "multiple_locations_fileset"
     fileset_comment: str = "fileset_comment"
     catalog_location_prop: str = "location"
 
     fileset_location: str = "/tmp/TestFilesetCatalog"
-    fileset_location2: str = "/tmp/TestFilesetCatalog2"
     fileset_properties_key1: str = "fileset_properties_key1"
     fileset_properties_value1: str = "fileset_properties_value1"
     fileset_properties_key2: str = "fileset_properties_key2"
@@ -62,30 +58,36 @@ class TestSupportsJobs(IntegrationTestEnv):
     }
 
     _metalake_name: str = "tag_it_metalake" + str(randint(0, 1000))
-    _relational_catalog_name = "relational_catalog" + str(randint(0, 1000))
-    _model_catalog_name = "model_catalog" + str(randint(0, 1000))
+    _relational_catalog_name: str = "relational_catalog" + str(randint(0, 1000))
+    _model_catalog_name: str = "model_catalog" + str(randint(0, 1000))
     _fileset_catalog_name: str = "fileset_catalog" + str(randint(0, 1000))
     # SCHEMA
     _schema_name = "tag_it_schema" + str(randint(0, 1000))
     # OTHER
-    _table_name = "tag_it_table" + str(randint(0, 1000))
+    _table_name: str = "tag_it_table" + str(randint(0, 1000))
+    _fileset_name: str = "tag_it_fileset" + str(randint(0, 1000))
+    _model_name: str = "tag_it_model" + str(randint(0, 1000))
 
     _tag_name1: str = "tag_it_tag1" + str(randint(0, 1000))
     _tag_name2: str = "tag_it_tag2" + str(randint(0, 1000))
+    _tag_name3: str = "tag_it_tag3" + str(randint(0, 1000))
+    _tag_name4: str = "tag_it_tag4" + str(randint(0, 1000))
 
     _gravitino_admin_client: GravitinoAdminClient
     _gravitino_client: GravitinoClient
     _metalake: GravitinoMetalake
     _model_catalog: Catalog
     _table_catalog: TableCatalog
-    _relation_catalog: Catalog
+    _relational_catalog: Catalog
     _fileset_catalog: Catalog
-    _tag1: GenericTag
-    _tag2: GenericTag
+    _tag1: Tag
+    _tag2: Tag
+    _tag3: Tag
+    _tag4: Tag
 
-    _table_ident: NameIdentifier = NameIdentifier.of(
-        _metalake_name, _relational_catalog_name, _schema_name, _table_name
-    )
+    _table_ident: NameIdentifier
+    _fileset_ident: NameIdentifier
+    _model_ident: NameIdentifier
     _hdfs_container: HDFSContainer
 
     @classmethod
@@ -116,20 +118,24 @@ class TestSupportsJobs(IntegrationTestEnv):
             comment="",
             properties={cls.catalog_location_prop: "/tmp/test1"},
         )
-        cls._relation_catalog = cls._gravitino_client.create_catalog(
+        cls._relational_catalog = cls._gravitino_client.create_catalog(
             name=cls._relational_catalog_name,
             catalog_type=Catalog.Type.RELATIONAL,
             provider=cls.relational_catalog_provider,
             comment="Test relational catalog",
             properties={"metastore.uris": hive_metastore_uri},
         )
-        cls._table_catalog = cls._relation_catalog.as_table_catalog()
+        cls._table_catalog = cls._relational_catalog.as_table_catalog()
 
         cls._gravitino_client.create_tag(cls._tag_name1, "test tag1", {})
         cls._gravitino_client.create_tag(cls._tag_name2, "test tag2", {})
+        cls._gravitino_client.create_tag(cls._tag_name3, "test tag3", {})
+        cls._gravitino_client.create_tag(cls._tag_name4, "test tag4", {})
 
-        cls._tag1 = cls._gravitino_client.get_tag(cls._tag_name1)  # type: ignore
-        cls._tag2 = cls._gravitino_client.get_tag(cls._tag_name2)  # type: ignore
+        cls._tag1 = cls._gravitino_client.get_tag(cls._tag_name1)
+        cls._tag2 = cls._gravitino_client.get_tag(cls._tag_name2)
+        cls._tag3 = cls._gravitino_client.get_tag(cls._tag_name3)
+        cls._tag4 = cls._gravitino_client.get_tag(cls._tag_name4)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -141,82 +147,230 @@ class TestSupportsJobs(IntegrationTestEnv):
 
         cls._gravitino_client.delete_tag(cls._tag_name1)
         cls._gravitino_client.delete_tag(cls._tag_name2)
+        cls._gravitino_client.delete_tag(cls._tag_name3)
+        cls._gravitino_client.delete_tag(cls._tag_name4)
+
         cls._gravitino_admin_client.drop_metalake(name=cls._metalake_name, force=True)
 
     def setUp(self) -> None:
-        self._model_catalog.as_schemas().create_schema(self._schema_name, "comment", {})
-        self._relation_catalog.as_schemas().create_schema(
-            self._schema_name, "relational schema comment", {}
-        )
-        self._model_catalog.as_model_catalog().create_schema(
+        self._model_catalog.as_schemas().create_schema(
             self._schema_name, "model schema comment", {}
+        )
+        self._relational_catalog.as_schemas().create_schema(
+            self._schema_name, "relational schema comment", {}
         )
         self._fileset_catalog.as_schemas().create_schema(
             self._schema_name, "fileset schema comment", {}
         )
+        self._table_ident: NameIdentifier = NameIdentifier.of(
+            self._metalake_name,
+            self._relational_catalog_name,
+            self._schema_name,
+            self._table_name,
+        )
+        self._fileset_ident: NameIdentifier = NameIdentifier.of(
+            self._metalake_name,
+            self._fileset_catalog_name,
+            self._schema_name,
+            self._fileset_name,
+        )
+        self._model_ident = NameIdentifier.of(
+            self._metalake_name,
+            self._model_catalog_name,
+            self._schema_name,
+            self._model_name,
+        )
 
     def tearDown(self) -> None:
         self._model_catalog.as_schemas().drop_schema(self._schema_name, True)
-        self._relation_catalog.as_schemas().drop_schema(self._schema_name, True)
+        self._relational_catalog.as_schemas().drop_schema(self._schema_name, True)
         self._fileset_catalog.as_schemas().drop_schema(self._schema_name, True)
 
-    def test_list_tag_info(self) -> None:
-        schema: GenericSchema = self._model_catalog.as_schemas().load_schema(
-            self._schema_name  # type: ignore
+    def test_catalog_tag_operations(self) -> None:
+        """
+        Test tag operations (associate, list, get, dissociate) on catalog.
+        """
+        model_catalog = self._model_catalog.supports_tags()
+
+        model_catalog.associate_tags(
+            tags_to_add=[self._tag_name3, self._tag_name4],
+            tags_to_remove=[],
         )
-        schema.associate_tags([self._tag_name1, self._tag_name2], [])
-        infos = schema.list_tags_info()
+        model_catalog.associate_tags(
+            tags_to_add=[self._tag_name1, self._tag_name2],
+            tags_to_remove=[self._tag_name3, self._tag_name4],
+        )
+        self.test_list_tags(model_catalog)
+        self.test_list_tags_info(model_catalog)
+        self.test_get_tag(model_catalog)
+        model_catalog.associate_tags(
+            tags_to_add=[],
+            tags_to_remove=[self._tag_name1, self._tag_name2],
+        )
+        self._check_no_tag_associated(model_catalog)
 
-        self.assertEqual(2, len(infos))
-        for info in infos:
-            self.assertTrue(info.name() in [self._tag_name1, self._tag_name2])
-            self.assertTrue(info.comment() in [self, "test tag1", "test tag2"])
-            self.assertEqual(info.properties(), {})
+    def test_schema_tag_operations(self) -> None:
+        """
+        Test tag operations (associate, list, get, dissociate) on schema.
+        """
+        schema = self._model_catalog.as_schemas().load_schema(self._schema_name)
 
-    def test_associate_tag_to_schema_and_get(self) -> None:
-        schema: GenericSchema = self._model_catalog.as_schemas().load_schema(
-            self._schema_name  # type: ignore
+        schema_supports_tags = schema.supports_tags()
+        schema_supports_tags.associate_tags(
+            tags_to_add=[self._tag_name3, self._tag_name4],
+            tags_to_remove=[],
+        )
+        schema_supports_tags.associate_tags(
+            tags_to_add=[self._tag_name1, self._tag_name2],
+            tags_to_remove=[self._tag_name3, self._tag_name4],
+        )
+        self.test_list_tags(schema_supports_tags)
+        self.test_list_tags_info(schema_supports_tags)
+        self.test_get_tag(schema_supports_tags)
+
+        schema.supports_tags().associate_tags(
+            tags_to_add=[],
+            tags_to_remove=[self._tag_name1, self._tag_name2],
+        )
+        self._check_no_tag_associated(schema.supports_tags())
+
+    def test_fileset_tag_operations(self) -> None:
+        """
+        Test tag operations (associate, list, get, dissociate) on fileset.
+        """
+        fileset: Fileset = self._fileset_catalog.as_fileset_catalog().create_fileset(
+            ident=self._fileset_ident,
+            fileset_type=Fileset.Type.MANAGED,
+            comment=self.fileset_comment,
+            storage_location=self.fileset_location,
+            properties=self.fileset_properties,
+        )
+        fileset.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name3, self._tag_name4],
+            tags_to_remove=[],
+        )
+        fileset.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name1, self._tag_name2],
+            tags_to_remove=[self._tag_name3, self._tag_name4],
+        )
+        self.test_list_tags(fileset.supports_tags())
+        self.test_list_tags_info(fileset.supports_tags())
+        self.test_get_tag(fileset.supports_tags())
+
+        fileset.supports_tags().associate_tags(
+            tags_to_add=[],
+            tags_to_remove=[self._tag_name1, self._tag_name2],
+        )
+        self._check_no_tag_associated(fileset.supports_tags())
+
+    def test_model_tag_operations(self) -> None:
+        """
+        Test tag operations (associate, list, get, dissociate) on model.
+        """
+
+        model: Model = self._model_catalog.as_model_catalog().register_model(
+            self._model_ident, "test_model", {}
         )
 
-        expected_tags = schema.associate_tags([self._tag_name1, self._tag_name2], [])
-        real_associated_tags = schema.list_tags()
-        self.assertEqual(expected_tags, real_associated_tags)
+        model.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name3, self._tag_name4],
+            tags_to_remove=[],
+        )
+        model.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name1, self._tag_name2],
+            tags_to_remove=[self._tag_name3, self._tag_name4],
+        )
+        self.test_list_tags(model.supports_tags())
+        self.test_list_tags_info(model.supports_tags())
+        self.test_get_tag(model.supports_tags())
+        model.supports_tags().associate_tags(
+            tags_to_add=[],
+            tags_to_remove=[self._tag_name1, self._tag_name2],
+        )
+        self._check_no_tag_associated(model.supports_tags())
 
-        retrieved_tag1: Tag = schema.get_tag(self._tag_name1)
-        self._check_tag(self._tag1, retrieved_tag1)
+    def test_table_tag_operations(self) -> None:
+        """Test tag operations (associate, list, get, dissociate) on table."""
+        relational_table = self.create_test_table()
 
-        retrieved_tag2: Tag = schema.get_tag(self._tag_name2)
-        self._check_tag(self._tag2, retrieved_tag2)
+        relational_table.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name3, self._tag_name4],
+            tags_to_remove=[],
+        )
+        relational_table.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name1, self._tag_name2],
+            tags_to_remove=[self._tag_name3, self._tag_name4],
+        )
+        self.test_list_tags(relational_table.supports_tags())
+        self.test_list_tags_info(relational_table.supports_tags())
+        self.test_get_tag(relational_table.supports_tags())
 
-    def test_associate_tag_to_catalog_and_get(self) -> None:
-        model_supports_tags_catalog = self._model_catalog.supports_tags()
-        model_supports_tags_catalog.associate_tags(
-            [self._tag_name1, self._tag_name2], []
+        relational_table.supports_tags().associate_tags(
+            tags_to_add=[],
+            tags_to_remove=[self._tag_name1, self._tag_name2],
+        )
+        self._check_no_tag_associated(relational_table.supports_tags())
+
+    def test_column_tag_operations(self) -> None:
+        """Test tag operations (associate, list, get, dissociate) on column."""
+        relational_table = self.create_test_table()
+        for column in relational_table.columns():
+            column.supports_tags().associate_tags(
+                tags_to_add=[self._tag_name3, self._tag_name4],
+                tags_to_remove=[],
+            )
+            column.supports_tags().associate_tags(
+                tags_to_add=[self._tag_name1, self._tag_name2],
+                tags_to_remove=[self._tag_name3, self._tag_name4],
+            )
+            self.test_list_tags(column.supports_tags())
+            self.test_list_tags_info(column.supports_tags())
+            self.test_get_tag(column.supports_tags())
+
+            column.supports_tags().associate_tags(
+                tags_to_add=[],
+                tags_to_remove=[self._tag_name1, self._tag_name2],
+            )
+            self._check_no_tag_associated(column.supports_tags())
+
+    def test_get_non_existent_tag_raises_exception(self) -> None:
+        """
+        Test get tag on non-existent tag.
+        """
+        self._model_catalog.supports_tags().associate_tags(
+            tags_to_add=[self._tag_name3, self._tag_name4],
+            tags_to_remove=[],
         )
 
-        self._test_get_tag(model_supports_tags_catalog)
+        with self.assertRaises(NoSuchTagException):
+            self._model_catalog.supports_tags().get_tag(self._tag_name1)
 
-    def test_associate_tag_to_column_and_get(self) -> None:
-        pass
+    def test_get_tag(self, supports_tags: SupportsTags) -> None:
+        tag1: Tag = supports_tags.get_tag(self._tag_name1)
+        self._check_tag(self._tag1, tag1)
 
-    def test_associate_tag_fileset_and_get(self) -> None:
-        pass
+        tag2: Tag = supports_tags.get_tag(self._tag_name2)
+        self._check_tag(self._tag2, tag2)
 
-    def test_associate_tag_to_model_and_get(self) -> None:
-        model_ident = NameIdentifier.of(
-            self._metalake_name, self._model_catalog_name, self._schema_name
-        )
-        model: GenericModel = self._model_catalog.as_model_catalog().register_model(  # type: ignore
-            model_ident, "test_model", {}
-        )
-        expected_tags = model.associate_tags([self._tag_name1, self._tag_name2], [])
-        real_associated_tags = model.list_tags()
-        self.assertEqual(expected_tags, real_associated_tags)
+    def test_list_tags(self, supports_tags: SupportsTags) -> None:
+        tags = supports_tags.list_tags()
+        self.assertEqual(2, len(tags))
+        self.assertIn(self._tag_name1, tags)
+        self.assertIn(self._tag_name2, tags)
 
-        self._test_get_tag(model)
+    def test_list_tags_info(self, supports_tags: SupportsTags) -> None:
+        tags: list[Tag] = supports_tags.list_tags_info()
+        self.assertEqual(2, len(tags))
+        for tag in tags:
+            if tag.name() == self._tag_name1:
+                self._check_tag(self._tag1, tag)
+            elif tag.name() == self._tag_name2:
+                self._check_tag(self._tag2, tag)
+            else:
+                self.fail("Unknown tag name")
 
-    def test_associate_tag_to_table_and_get(self) -> None:
-        relational_table: RelationalTable = self._table_catalog.create_table(  # type: ignore
+    def create_test_table(self) -> Table:
+        return self._table_catalog.create_table(
             identifier=self._table_ident,
             columns=[
                 ColumnDTO.builder()
@@ -234,29 +388,9 @@ class TestSupportsJobs(IntegrationTestEnv):
             ],
         )
 
-        relational_table.associate_tags([self._tag_name1, self._tag_name2], [])
-        self._test_list_tags(relational_table)
-        self._test_get_tag(relational_table)
-
-    def _test_get_tag(self, supports_tags: SupportsTags) -> None:
-        tag1: Tag = supports_tags.get_tag(self._tag_name1)
-        self._check_tag(self._tag1, tag1)
-
-        tag2: Tag = supports_tags.get_tag(self._tag_name2)
-        self._check_tag(self._tag2, tag2)
-
-    def _test_list_tags(self, supports_tags: SupportsTags) -> None:
-        tags = supports_tags.list_tags()
-        self.assertEqual(2, len(tags))
-        self.assertIn(self._tag_name1, tags)
-        self.assertIn(self._tag_name2, tags)
-
-    def _test_list_tags_info(self, supports_tags: SupportsTags) -> None:
-        # todo
-        tags: list[Tag] = supports_tags.list_tags_info()
-        self.assertEqual(2, len(tags))
-        self.assertIn(self._tag_name1, tags)
-        self.assertIn(self._tag_name2, tags)
+    def _check_no_tag_associated(self, supports_tags: SupportsTags) -> None:
+        self.assertEqual(0, len(supports_tags.list_tags()))
+        self.assertListEqual([], supports_tags.list_tags_info())
 
     def _check_tag(self, expected_tag: Tag, real_tag: Tag) -> None:
         self.assertEqual(expected_tag.name(), real_tag.name())
