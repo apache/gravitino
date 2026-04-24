@@ -38,8 +38,8 @@ import org.slf4j.LoggerFactory;
 /**
  * {@code ViewOperationDispatcher} is the operation dispatcher for view operations.
  *
- * <p>Currently only supports loadView(). Full CRUD operations (create, alter, drop) needs to be
- * added when Gravitino APIs support view management.
+ * <p>Currently only supports loadView() with EntityStore auto-import. Full CRUD operations
+ * (listViews, createView, alterView, dropView) will be implemented in a follow-up PR.
  */
 public class ViewOperationDispatcher extends OperationDispatcher implements ViewDispatcher {
 
