@@ -35,6 +35,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
@@ -635,23 +636,23 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
     } else if (owner.type == Entity.EntityType.GROUP) {
       if (principal instanceof UserPrincipal) {
-        for (UserGroup group : ((UserPrincipal) principal).getGroups()) {
-          if (group.getGroupname().equals(owner.name)) {
-            try {
-              GroupEntity groupEntity =
-                  GravitinoEnv.getInstance()
-                      .entityStore()
-                      .get(
-                          NameIdentifierUtil.ofGroup(metalake, group.getGroupname()),
-                          Entity.EntityType.GROUP,
-                          GroupEntity.class);
-              return Objects.equals(groupEntity.id(), owner.id);
-            } catch (Exception e) {
-              LOG.debug(
-                  "Can not get group entity for ownership check: {}", group.getGroupname(), e);
-              return false;
-            }
-          }
+        List<UserGroup> groups = ((UserPrincipal) principal).getGroups();
+        if (groups.isEmpty()) {
+          return false;
+        }
+        try {
+          List<NameIdentifier> groupIdents =
+              groups.stream()
+                  .map(g -> NameIdentifierUtil.ofGroup(metalake, g.getGroupname()))
+                  .collect(Collectors.toList());
+          List<GroupEntity> groupEntities =
+              GravitinoEnv.getInstance()
+                  .entityStore()
+                  .batchGet(groupIdents, Entity.EntityType.GROUP, GroupEntity.class);
+          return groupEntities.stream().anyMatch(ge -> Objects.equals(ge.id(), owner.id));
+        } catch (Exception e) {
+          LOG.debug("Can not get group entities for ownership check", e);
+          return false;
         }
       }
       return false;

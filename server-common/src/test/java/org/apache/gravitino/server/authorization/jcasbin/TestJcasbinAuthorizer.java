@@ -275,12 +275,27 @@ public class TestJcasbinAuthorizer {
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
 
-    // Mock entityStore.get for group entity lookup (needed for ID-based ownership verification)
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME)),
+    // Mock entityStore.batchGet for group entity lookup (needed for ID-based ownership
+    // verification)
+    when(entityStore.batchGet(
+            eq(ImmutableList.of(NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME))),
             eq(Entity.EntityType.GROUP),
             eq(GroupEntity.class)))
-        .thenReturn(getGroupEntity());
+        .thenReturn(ImmutableList.of(getGroupEntity()));
+
+    // For non-member principal, mock batchGet for "otherGroup"
+    when(entityStore.batchGet(
+            eq(ImmutableList.of(NameIdentifierUtil.ofGroup(METALAKE, "otherGroup"))),
+            eq(Entity.EntityType.GROUP),
+            eq(GroupEntity.class)))
+        .thenReturn(
+            ImmutableList.of(
+                GroupEntity.builder()
+                    .withId(99L)
+                    .withName("otherGroup")
+                    .withNamespace(Namespace.of(METALAKE, "group"))
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build()));
 
     // Mock owner relation returning a GroupEntity
     List<GroupEntity> owners = ImmutableList.of(getGroupEntity());
