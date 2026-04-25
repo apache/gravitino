@@ -105,6 +105,9 @@ public class IcebergCatalogUtil {
         new JdbcCatalogWithMetadataLocationSupport(
             icebergConfig.get(IcebergConfig.JDBC_INIT_TABLES));
 
+    // Default to V1 schema to support view operations; can be overridden by explicit config.
+    properties.putIfAbsent(IcebergConstants.ICEBERG_JDBC_SCHEMA_VERSION, "V1");
+
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
     jdbcCatalog.setConf(hdfsConfiguration);
