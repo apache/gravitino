@@ -29,6 +29,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
+import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -66,7 +67,7 @@ public class TestIcebergCatalogUtil {
     properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
     properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
     properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
-    properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "false");
+    properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
     catalog =
         IcebergCatalogUtil.loadCatalogBackend(
             IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
@@ -77,6 +78,43 @@ public class TestIcebergCatalogUtil {
         () -> {
           IcebergCatalogUtil.loadCatalogBackend("other");
         });
+  }
+
+  @Test
+  void testJdbcCatalogDefaultSchemaVersionIsV1() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    // jdbc.schema-version is intentionally not set; default should be V1
+    Catalog catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+    Assertions.assertInstanceOf(JdbcCatalogWithMetadataLocationSupport.class, catalog);
+    Assertions.assertTrue(
+        ((JdbcCatalogWithMetadataLocationSupport) catalog).supportsViewsWithSchemaVersion(),
+        "JDBC catalog should default to V1 schema and support view operations");
+  }
+
+  @Test
+  void testJdbcCatalogExplicitSchemaVersionNotOverridden() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    // Explicitly set V0; loadJdbcCatalog must not override it with V1
+    properties.put(IcebergConstants.ICEBERG_JDBC_SCHEMA_VERSION, "V0");
+    Catalog catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+    Assertions.assertInstanceOf(JdbcCatalogWithMetadataLocationSupport.class, catalog);
+    Assertions.assertFalse(
+        ((JdbcCatalogWithMetadataLocationSupport) catalog).supportsViewsWithSchemaVersion(),
+        "Explicitly configured V0 schema should not be overridden to V1");
   }
 
   @Test
