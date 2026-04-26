@@ -327,6 +327,23 @@ public class TestJobOperations extends JerseyTest {
   }
 
   @Test
+  public void testRegisterJobTemplateWithNullRequest() {
+    Response resp =
+        target(jobTemplatePath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertNotNull(
+        errorResponse, "Null request should return a structured error, not crash the handler");
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
+  }
+
+  @Test
   public void testGetJobTemplate() {
     JobTemplateEntity template =
         newShellJobTemplateEntity("shell_template_1", "Test Shell Template 1");

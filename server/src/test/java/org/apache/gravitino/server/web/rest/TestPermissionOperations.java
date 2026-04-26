@@ -138,6 +138,23 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testGrantRolesToUserWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/users/user1/grant/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertNotNull(
+        errorResponse, "Null request should return a structured error, not crash the handler");
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
+  }
+
+  @Test
   public void testGrantRolesToUser() throws IOException {
     UserEntity userEntity =
         UserEntity.builder()

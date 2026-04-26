@@ -201,9 +201,10 @@ public class MetalakeOperations {
           });
 
     } catch (Exception e) {
-      LOG.info("Failed to {} metalake: {}", request.isInUse() ? "enable" : "disable", metalakeName);
+      boolean inUse = request != null && request.isInUse();
+      LOG.info("Failed to {} metalake: {}", inUse ? "enable" : "disable", metalakeName);
       return ExceptionHandlers.handleMetalakeException(
-          request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE, metalakeName, e);
+          inUse ? OperationType.ENABLE : OperationType.DISABLE, metalakeName, e);
     }
   }
 

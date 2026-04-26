@@ -161,8 +161,9 @@ public class CatalogOperations {
           });
 
     } catch (Exception e) {
+      String catalogName = request != null ? request.getName() : "";
       return ExceptionHandlers.handleCatalogException(
-          OperationType.CREATE, request.getName(), metalake, e);
+          OperationType.CREATE, catalogName, metalake, e);
     }
   }
 
@@ -198,7 +199,8 @@ public class CatalogOperations {
           });
 
     } catch (Exception e) {
-      LOG.info("Failed to test connection for catalog: {}.{}", metalake, request.getName());
+      String catalogName = request != null ? request.getName() : "";
+      LOG.info("Failed to test connection for catalog: {}.{}", metalake, catalogName);
       return ExceptionHandlers.handleTestConnectionException(e);
     }
   }
@@ -219,7 +221,8 @@ public class CatalogOperations {
       CatalogSetRequest request) {
     LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
 
-    OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
+    OperationType op =
+        request != null && request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
 
     try {
       return Utils.doAs(
@@ -235,18 +238,15 @@ public class CatalogOperations {
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
                 "Successfully {} catalog: {}.{}",
-                request.isInUse() ? "enable" : "disable",
+                op == OperationType.ENABLE ? "enable" : "disable",
                 metalake,
                 catalogName);
             return response;
           });
 
     } catch (Exception e) {
-      LOG.info(
-          "Failed to {} catalog: {}.{}",
-          request.isInUse() ? "enable" : "disable",
-          metalake,
-          catalogName);
+      String action = op == OperationType.ENABLE ? "enable" : "disable";
+      LOG.info("Failed to {} catalog: {}.{}", action, metalake, catalogName);
       return ExceptionHandlers.handleCatalogException(op, catalogName, metalake, e);
     }
   }

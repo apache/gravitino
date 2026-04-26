@@ -138,8 +138,8 @@ public class SchemaOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleSchemaException(
-          OperationType.CREATE, request.getName(), catalog, e);
+      String schemaName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleSchemaException(OperationType.CREATE, schemaName, catalog, e);
     }
   }
 

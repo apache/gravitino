@@ -115,8 +115,8 @@ public class GroupOperations {
                         accessControlManager.addGroup(metalake, request.getName()))));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(
-          OperationType.ADD, request.getName(), metalake, e);
+      String groupName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleGroupException(OperationType.ADD, groupName, metalake, e);
     }
   }
 

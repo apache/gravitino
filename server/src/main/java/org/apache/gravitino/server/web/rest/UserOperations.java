@@ -165,8 +165,8 @@ public class UserOperations {
                         accessControlManager.addUser(metalake, request.getName()))));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(
-          OperationType.ADD, request.getName(), metalake, e);
+      String userName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleUserException(OperationType.ADD, userName, metalake, e);
     }
   }
 

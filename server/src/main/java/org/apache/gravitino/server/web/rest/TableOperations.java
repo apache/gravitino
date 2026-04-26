@@ -154,8 +154,8 @@ public class TableOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleTableException(
-          OperationType.CREATE, request.getName(), schema, e);
+      String tableName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleTableException(OperationType.CREATE, tableName, schema, e);
     }
   }
 

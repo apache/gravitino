@@ -163,8 +163,8 @@ public class TagOperations {
             return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleTagException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      String tagName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleTagException(OperationType.CREATE, tagName, metalake, e);
     }
   }
 

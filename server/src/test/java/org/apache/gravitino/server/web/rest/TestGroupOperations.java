@@ -481,6 +481,23 @@ public class TestGroupOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
   }
 
+  @Test
+  public void testAddGroupWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/groups")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(
+        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertNotNull(
+        errorResponse, "Null request should return a structured error, not crash the handler");
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
+  }
+
   private Group buildGroup(String group) {
     return GroupEntity.builder()
         .withId(1L)

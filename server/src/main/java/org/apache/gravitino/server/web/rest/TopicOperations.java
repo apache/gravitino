@@ -150,8 +150,8 @@ public class TopicOperations {
             return response;
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleTopicException(
-          OperationType.CREATE, request.getName(), schema, e);
+      String topicName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleTopicException(OperationType.CREATE, topicName, schema, e);
     }
   }
 

@@ -180,8 +180,8 @@ public class FilesetOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleFilesetException(
-          OperationType.CREATE, request.getName(), schema, e);
+      String filesetName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleFilesetException(OperationType.CREATE, filesetName, schema, e);
     }
   }
 

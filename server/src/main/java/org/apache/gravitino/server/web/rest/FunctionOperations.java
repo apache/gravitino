@@ -160,8 +160,9 @@ public class FunctionOperations {
             return response;
           });
     } catch (Exception e) {
+      String functionName = request != null ? request.getName() : "";
       return ExceptionHandlers.handleFunctionException(
-          OperationType.REGISTER, request.getName(), schema, e);
+          OperationType.REGISTER, functionName, schema, e);
     }
   }
 

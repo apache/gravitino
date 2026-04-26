@@ -194,8 +194,8 @@ public class ModelOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleModelException(
-          OperationType.REGISTER, request.getName(), schema, e);
+      String modelName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleModelException(OperationType.REGISTER, modelName, schema, e);
     }
   }
 

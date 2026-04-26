@@ -162,8 +162,8 @@ public class PolicyOperations {
             return Utils.ok(new PolicyResponse(toDTO(policy, Optional.empty())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handlePolicyException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      String policyName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handlePolicyException(OperationType.CREATE, policyName, metalake, e);
     }
   }
 
@@ -239,7 +239,8 @@ public class PolicyOperations {
       PolicySetRequest request) {
     LOG.info("Received set policy request for policy: {} under metalake: {}", name, metalake);
 
-    OperationType op = request.isEnable() ? OperationType.ENABLE : OperationType.DISABLE;
+    OperationType op =
+        request != null && request.isEnable() ? OperationType.ENABLE : OperationType.DISABLE;
 
     try {
       return Utils.doAs(
@@ -254,7 +255,7 @@ public class PolicyOperations {
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
                 "Successfully {} policy: {} under metalake: {}",
-                request.isEnable() ? "enabled" : "disabled",
+                op == OperationType.ENABLE ? "enabled" : "disabled",
                 name,
                 metalake);
             return response;

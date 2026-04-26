@@ -241,8 +241,8 @@ public class StatisticOperations {
             return Utils.ok(new DropResponse(dropped));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleStatisticException(
-          OperationType.DROP, StringUtils.join(request.getNames(), ","), fullName, e);
+      String names = request != null ? StringUtils.join(request.getNames(), ",") : "";
+      return ExceptionHandlers.handleStatisticException(OperationType.DROP, names, fullName, e);
     }
   }
 

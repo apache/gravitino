@@ -197,8 +197,8 @@ public class RoleOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleRoleException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      String roleName = request != null ? request.getName() : "";
+      return ExceptionHandlers.handleRoleException(OperationType.CREATE, roleName, metalake, e);
     }
   }
 
