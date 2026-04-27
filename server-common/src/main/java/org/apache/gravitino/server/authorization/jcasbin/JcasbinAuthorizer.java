@@ -228,30 +228,26 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return false;
     }
 
-    try {
-      UserEntity userEntity = getUserEntity(principal.getName(), metalake);
-      Long userId = userEntity.id();
-
-      if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
-        for (MetadataObject scopeObject : buildSchemaInheritanceChain(metadataObject)) {
-          Long metadataId = getMetadataIdQuietly(scopeObject, metalake);
-          if (metadataId == null) {
-            continue;
-          }
-          loadOwnerPolicy(metalake, scopeObject, metadataId);
-          if (checkOwnership(principal, metalake, metadataId)) {
-            result = true;
-            break;
-          }
+    if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
+      for (MetadataObject scopeObject : buildSchemaInheritanceChain(metadataObject)) {
+        Long metadataId = MetadataIdConverter.getID(scopeObject, metalake);
+        if (metadataId == null) {
+          continue;
         }
-      } else {
-        Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+        loadOwnerPolicy(metalake, scopeObject, metadataId);
+        if (checkOwnership(principal, metalake, metadataId)) {
+          result = true;
+          break;
+        }
+      }
+    } else {
+      Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+      if (metadataId != null) {
         loadOwnerPolicy(metalake, metadataObject, metadataId);
         result = checkOwnership(principal, metalake, metadataId);
       }
-    } catch (Exception e) {
-      LOG.debug("Can not get entity id", e);
     }
+
     LOG.debug(
         "Authorization expression: {},privilege {},owner result {}\n,principal {},metalake {},metadata object {}",
         requestContext.getOriginalAuthorizationExpression(),
@@ -460,15 +456,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     return ImmutableList.copyOf(chain);
   }
 
-  private Long getMetadataIdQuietly(MetadataObject metadataObject, String metalake) {
-    try {
-      return MetadataIdConverter.getID(metadataObject, metalake);
-    } catch (Exception e) {
-      LOG.debug("Can not get entity id for {}", metadataObject, e);
-      return null;
-    }
-  }
-
   private class InternalAuthorizer {
 
     Enforcer enforcer;
@@ -514,7 +501,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
         List<MetadataObject> chain = buildSchemaInheritanceChain(metadataObject);
         for (MetadataObject scopeObject : chain) {
-          Long metadataId = getMetadataIdQuietly(scopeObject, metalake);
+          Long metadataId = MetadataIdConverter.getID(scopeObject, metalake);
           if (metadataId != null
               && authorizeByJcasbin(userId, metalake, scopeObject, metadataId, privilege)) {
             return true;
