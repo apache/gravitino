@@ -247,20 +247,16 @@ podSecurityContext: {}
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 ##
 securityContext:
-  runAsNonRoot: false
-  runAsUser: 0
+  runAsNonRoot: true
+  runAsUser: 1000
   # capabilities:
   #   drop:
   #   - ALL
   # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
 
 ## Container Environment
 ##
 env:
-  - name: GRAVITINO_HOME
-    value: /root/gravitino-iceberg-rest-server
   - name: GRAVITINO_MEM
     value: "-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m"
 
@@ -281,7 +277,7 @@ initScript: |
   echo "Override config."
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
   echo "Start the Gravitino Iceberg Rest Catalog Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/gravitino-iceberg-rest-server.sh run
+  /bin/bash ${GRAVITINO_HOME}/bin/start-iceberg-rest-server.sh
 
 ## Readiness probe for the Gravitino deployment
 ##
@@ -323,7 +319,7 @@ extraVolumes:
 ##
 extraVolumeMounts:
   - name: gravitino-rest-catalog-server-log
-    mountPath: /root/gravitino-iceberg-rest-server/logs
+    mountPath: /opt/gravitino-iceberg-rest-server/logs
 
 ingress:
   enabled: false

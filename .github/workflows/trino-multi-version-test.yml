@@ -12,11 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
-        with:
-          java-version: 17
-          distribution: 'temurin'
-          cache: 'gradle'
+      - uses: ./.github/actions/setup-java-toolchains
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -26,7 +22,7 @@ jobs:
 
       - name: Build Gravitino
         run: |
-          ./gradlew build -x test \
+          ./gradlew build -PskipWeb=true -x test \
             -x :web:web:build -x :web:integration-test:build \
             -x :web-v2:web:build -x :web-v2:integration-test:build \
             -x :clients:client-python:build \
@@ -84,7 +80,7 @@ jobs:
             --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-435-439/build/libs
 
       - name: Upload test reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: trino-multi-version-test-reports

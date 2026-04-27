@@ -87,12 +87,20 @@ public class UserRoleRelBaseSQLProvider {
         + USER_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE user_id = #{userId} AND role_id IN ("
+        + " WHERE user_id = #{userId} "
+        + "<choose>"
+        + "<when test='roleIds != null and roleIds.size() > 0'>"
+        + "AND role_id IN ("
         + "<foreach collection='roleIds' item='roleId' separator=','>"
         + "#{roleId}"
         + "</foreach>"
-        + " )"
-        + " AND deleted_at = 0"
+        + ") "
+        + "</when>"
+        + "<otherwise>"
+        + "AND 1 = 0 "
+        + "</otherwise>"
+        + "</choose>"
+        + "AND deleted_at = 0"
         + "</script>";
   }
 

@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog;
 import java.util.Map;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 
 /**
@@ -55,6 +57,26 @@ public final class EntityCombinedView implements View {
   public EntityCombinedView withImported(boolean imported) {
     this.imported = imported;
     return this;
+  }
+
+  @Override
+  public Column[] columns() {
+    return view.columns();
+  }
+
+  @Override
+  public Representation[] representations() {
+    return view.representations();
+  }
+
+  @Override
+  public String defaultCatalog() {
+    return view.defaultCatalog();
+  }
+
+  @Override
+  public String defaultSchema() {
+    return view.defaultSchema();
   }
 
   @Override

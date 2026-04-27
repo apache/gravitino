@@ -49,6 +49,8 @@ import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -98,6 +100,16 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
       @Override
       public String name() {
         return name;
+      }
+
+      @Override
+      public Column[] columns() {
+        return new Column[0];
+      }
+
+      @Override
+      public Representation[] representations() {
+        return new Representation[0];
       }
 
       @Override

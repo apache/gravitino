@@ -19,12 +19,22 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestCatalogWrapperForREST {
+
+  private static final AtomicBoolean CONSTRUCTION_IN_PROGRESS = new AtomicBoolean(false);
 
   @Test
   void testCheckPropertiesForCompatibility() {
@@ -73,5 +83,110 @@ public class TestCatalogWrapperForREST {
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class,
         () -> CatalogWrapperForREST.validateCredentialLocation("   "));
+  }
+
+  @Test
+  void testCatalogConfigToClientsForRestBackendUsesMergedRemoteProperties() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.URI,
+                "http://client-config-only:8181"));
+
+    RESTCatalog restCatalog = mock(RESTCatalog.class);
+    when(restCatalog.properties())
+        .thenReturn(
+            ImmutableMap.of(
+                IcebergConstants.URI,
+                "http://merged-from-remote-config:9999",
+                IcebergConstants.IO_IMPL,
+                "org.apache.iceberg.aws.s3.S3FileIO",
+                IcebergConstants.ICEBERG_S3_ENDPOINT,
+                "http://localhost:9000",
+                IcebergConstants.ICEBERG_ACCESS_DELEGATION,
+                "vended-credentials",
+                IcebergConstants.WAREHOUSE,
+                "/remote/warehouse"));
+
+    Map<String, String> configToClients =
+        CatalogWrapperForREST.buildCatalogConfigToClients(config, restCatalog);
+
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", configToClients.get(IcebergConstants.IO_IMPL));
+    Assertions.assertEquals(
+        "http://localhost:9000", configToClients.get(IcebergConstants.ICEBERG_S3_ENDPOINT));
+    Assertions.assertEquals(
+        "vended-credentials", configToClients.get(IcebergConstants.ICEBERG_ACCESS_DELEGATION));
+  }
+
+  @Test
+  void testCatalogConfigToClientsForNonRestBackend() {
+    Catalog catalog = mock(Catalog.class);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "hive",
+                IcebergConstants.URI,
+                "thrift://hive-metastore:9083",
+                IcebergConstants.IO_IMPL,
+                "org.apache.iceberg.aws.s3.S3FileIO"));
+    Map<String, String> configToClients =
+        CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog);
+    Assertions.assertFalse(configToClients.containsKey(IcebergConstants.URI));
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", configToClients.get(IcebergConstants.IO_IMPL));
+    Assertions.assertFalse(configToClients.containsKey(IcebergConstants.DATA_ACCESS));
+  }
+
+  @Test
+  void testCatalogConfigToClientsRejectsInvalidDataAccessValue() {
+    Catalog catalog = mock(Catalog.class);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "hive",
+                IcebergConstants.ICEBERG_ACCESS_DELEGATION,
+                "invalid-mode"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog));
+  }
+
+  @Test
+  void testConstructorDoesNotLoadCatalogEagerly() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+
+    CONSTRUCTION_IN_PROGRESS.set(true);
+    try {
+      Assertions.assertDoesNotThrow(() -> new LazyCheckCatalogWrapperForREST("test", config));
+    } finally {
+      CONSTRUCTION_IN_PROGRESS.set(false);
+    }
+  }
+
+  private static class LazyCheckCatalogWrapperForREST extends CatalogWrapperForREST {
+
+    LazyCheckCatalogWrapperForREST(String catalogName, IcebergConfig config) {
+      super(catalogName, config);
+    }
+
+    @Override
+    public Catalog getCatalog() {
+      if (CONSTRUCTION_IN_PROGRESS.get()) {
+        throw new AssertionError("Catalog should not be loaded during wrapper construction");
+      }
+      return super.getCatalog();
+    }
   }
 }

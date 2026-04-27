@@ -25,12 +25,19 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import javax.annotation.Nullable;
 
-/** A simple implementation of Principal that holds a username and group membership. */
+/**
+ * A simple implementation of Principal that holds a username, optional group membership, and
+ * optionally the raw {@code Authorization} header value for forwarding to downstream Iceberg REST
+ * catalogs.
+ */
 public class UserPrincipal implements Principal {
 
   private final String username;
   private final List<UserGroup> groups;
+  @Nullable private final String accessToken;
 
   /**
    * Constructs a UserPrincipal with the given username.
@@ -38,7 +45,18 @@ public class UserPrincipal implements Principal {
    * @param username the username of the principal
    */
   public UserPrincipal(final String username) {
-    this(username, Collections.emptyList());
+    this(username, Collections.emptyList(), null);
+  }
+
+  /**
+   * Constructs a UserPrincipal with the given username and optional raw {@code Authorization}
+   * header value.
+   *
+   * @param accessToken authorization header value (for example, {@code Bearer <jwt>} or {@code
+   *     Basic <base64>})
+   */
+  public UserPrincipal(final String username, @Nullable final String accessToken) {
+    this(username, Collections.emptyList(), accessToken);
   }
 
   /**
@@ -48,12 +66,27 @@ public class UserPrincipal implements Principal {
    * @param groups the groups of the principal
    */
   public UserPrincipal(final String username, final List<UserGroup> groups) {
+    this(username, groups, null);
+  }
+
+  /**
+   * Constructs a UserPrincipal with the given username, groups and optional raw {@code
+   * Authorization} header value.
+   *
+   * @param username the username of the principal
+   * @param groups the groups of the principal
+   * @param accessToken authorization header value (for example, {@code Bearer <jwt>} or {@code
+   *     Basic <base64>})
+   */
+  public UserPrincipal(
+      final String username, final List<UserGroup> groups, @Nullable final String accessToken) {
     Preconditions.checkArgument(username != null, "UserPrincipal must have the username");
     this.username = username;
     this.groups =
         groups != null
             ? Collections.unmodifiableList(new ArrayList<>(groups))
             : Collections.emptyList();
+    this.accessToken = accessToken;
   }
 
   /**
@@ -64,6 +97,11 @@ public class UserPrincipal implements Principal {
   @Override
   public String getName() {
     return username;
+  }
+
+  /** Returns the raw {@code Authorization} header value when the authenticator recorded it. */
+  public Optional<String> getAccessToken() {
+    return Optional.ofNullable(accessToken);
   }
 
   /**
@@ -94,6 +132,11 @@ public class UserPrincipal implements Principal {
 
   @Override
   public String toString() {
-    return "[principal: " + this.username + ", groups: " + this.groups + "]";
+    return "[principal: "
+        + this.username
+        + ", groups: "
+        + this.groups
+        + (accessToken != null ? ", token=***" : "")
+        + "]";
   }
 }

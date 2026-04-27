@@ -41,6 +41,7 @@ from gravitino.dto.requests.job_template_updates_request import (
     JobTemplateUpdatesRequest,
 )
 from gravitino.dto.requests.tag_create_request import TagCreateRequest
+from gravitino.dto.requests.tag_updates_request import TagUpdatesRequest
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
@@ -49,13 +50,18 @@ from gravitino.dto.responses.job_list_response import JobListResponse
 from gravitino.dto.responses.job_response import JobResponse
 from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
 from gravitino.dto.responses.job_template_response import JobTemplateResponse
-from gravitino.dto.responses.tag_response import TagNamesListResponse, TagResponse
+from gravitino.dto.responses.tag_response import (
+    TagListResponse,
+    TagNamesListResponse,
+    TagResponse,
+)
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
+from gravitino.utils.string_utils import StringUtils
 
 logger = logging.getLogger(__name__)
 
@@ -544,8 +550,24 @@ class GravitinoMetalake(
         Raises:
             NoSuchMetalakeException: If the metalake does not exist.
         """
-        # TODO implement list_tags_info
-        raise NotImplementedError()
+        url = self.API_METALAKES_TAGS_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.get(
+            url,
+            params={"details": "true"},
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        list_info_resp = TagListResponse.from_json(response.body, infer_missing=True)
+        list_info_resp.validate()
+
+        return [
+            GenericTag(
+                self.name(),
+                tag_dto,
+                self.rest_client,
+            )
+            for tag_dto in list_info_resp.tags()
+        ]
 
     def get_tag(self, tag_name) -> Tag:
         """
@@ -622,9 +644,37 @@ class GravitinoMetalake(
         Raises:
             NoSuchTagException: If the tag does not exist.
             NoSuchMetalakeException: If the metalake does not exist.
+            IllegalArgumentException: If the changes cannot be applied to the tag.
+            TagAlreadyExistsException: If a tag with the new name already exists.
         """
-        # TODO implement alter_tag
-        raise NotImplementedError()
+        Precondition.check_argument(
+            StringUtils.is_not_blank(tag_name),
+            "tag name must not be null or empty",
+        )
+        Precondition.check_argument(
+            changes is not None and len(changes) > 0,
+            "at least one change is required",
+        )
+        updates = [DTOConverters.to_tag_update_request(change) for change in changes]
+        update_req = TagUpdatesRequest(updates)
+        update_req.validate()
+
+        url = self.API_METALAKES_TAG_PATH.format(
+            encode_string(self.name()), encode_string(tag_name)
+        )
+        response = self.rest_client.put(
+            url,
+            json=update_req,
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        tag_resp: TagResponse = TagResponse.from_json(response.body, infer_missing=True)
+
+        tag_resp.validate()
+        return GenericTag(
+            self.name(),
+            tag_resp.tag(),
+            self.rest_client,
+        )
 
     def delete_tag(self, tag_name) -> bool:
         """
@@ -640,5 +690,19 @@ class GravitinoMetalake(
             NoSuchTagException: If the tag does not exist.
             NoSuchMetalakeException: If the metalake does not exist.
         """
-        # TODO implement delete_tag
-        raise NotImplementedError()
+        Precondition.check_argument(
+            StringUtils.is_not_blank(tag_name),
+            "tag name must not be null or empty",
+        )
+
+        url = self.API_METALAKES_TAG_PATH.format(
+            encode_string(self.name()), encode_string(tag_name)
+        )
+        response = self.rest_client.delete(
+            url,
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        drop_response = DropResponse.from_json(response.body, infer_missing=True)
+        drop_response.validate()
+
+        return drop_response.dropped()

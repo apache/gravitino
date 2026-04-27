@@ -27,6 +27,7 @@ val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion
 
 include("api", "common", "core", "server", "server-common")
 include("catalogs:catalog-common")
+include("catalogs:catalog-glue")
 include("catalogs:catalog-hive")
 include("catalogs:hive-metastore-common")
 include("catalogs:hive-metastore2-libs", "catalogs:hive-metastore3-libs")
@@ -68,16 +69,22 @@ include("iceberg:iceberg-rest-server")
 include("lance:lance-common")
 include("lance:lance-rest-server")
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
-include(
-  "trino-connector:trino-connector",
-  "trino-connector:trino-connector-435-439",
-  "trino-connector:trino-connector-440-445",
-  "trino-connector:trino-connector-446-451",
-  "trino-connector:trino-connector-452-468",
-  "trino-connector:trino-connector-469-472",
-  "trino-connector:trino-connector-473-478",
-  "trino-connector:integration-test"
-)
+val skipTrinoConnector: Boolean =
+  gradle.startParameter.projectProperties["skipTrinoConnector"]?.toBoolean() ?: false
+if (!skipTrinoConnector) {
+  include(
+    "trino-connector:trino-connector",
+    "trino-connector:trino-connector-435-439",
+    "trino-connector:trino-connector-440-445",
+    "trino-connector:trino-connector-446-451",
+    "trino-connector:trino-connector-452-468",
+    "trino-connector:trino-connector-469-472",
+    "trino-connector:trino-connector-473-478",
+    "trino-connector:integration-test"
+  )
+} else {
+  println("Skipping trino-connector modules since skipTrinoConnector is set to true")
+}
 include("spark-connector:spark-common")
 if (scalaVersion == "2.12") {
   // flink only support scala 2.12

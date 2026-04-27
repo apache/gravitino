@@ -24,6 +24,8 @@ import java.util.Map;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
 
@@ -66,6 +68,16 @@ public class IcebergView implements View {
   @Override
   public Map<String, String> properties() {
     return properties != null ? properties : Collections.emptyMap();
+  }
+
+  @Override
+  public Column[] columns() {
+    return new Column[0];
+  }
+
+  @Override
+  public Representation[] representations() {
+    return new Representation[0];
   }
 
   @Override
