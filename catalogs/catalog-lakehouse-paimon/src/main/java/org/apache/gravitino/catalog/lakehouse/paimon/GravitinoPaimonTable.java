@@ -116,7 +116,7 @@ public class GravitinoPaimonTable extends BaseTable {
             GravitinoPaimonColumn.fromPaimonRowType(table.rowType())
                 .toArray(new GravitinoPaimonColumn[0]))
         .withPartitioning(toGravitinoPartitioning(table.partitionKeys()))
-        .withDistribution(getDistribution(table.options(), table.primaryKeys()))
+        .withDistribution(getDistribution(table.options()))
         .withComment(table.comment().orElse(null))
         .withProperties(table.options())
         .withIndexes(constructIndexesFromPrimaryKeys(table))
@@ -204,17 +204,12 @@ public class GravitinoPaimonTable extends BaseTable {
       return;
     }
 
-    int number = distribution.number();
-    // Paimon does not allow 'bucket-key' with bucket=-1 (dynamic mode).
-    // In dynamic mode, Paimon uses the primary key as the bucket key automatically.
-    if (number != Distributions.AUTO) {
-      List<String> bucketKeys = getBucketKeys(distribution);
-      if (!bucketKeys.isEmpty()) {
-        properties.put(BUCKET_KEY, String.join(",", bucketKeys));
-      }
+    List<String> bucketKeys = getBucketKeys(distribution);
+    if (!bucketKeys.isEmpty()) {
+      properties.put(BUCKET_KEY, String.join(",", bucketKeys));
     }
 
-    properties.put(BUCKET_NUM, String.valueOf(number == Distributions.AUTO ? -1 : number));
+    properties.put(BUCKET_NUM, String.valueOf(distribution.number()));
   }
 
   private static List<String> getBucketKeys(Distribution distribution) {
@@ -233,52 +228,45 @@ public class GravitinoPaimonTable extends BaseTable {
         .collect(Collectors.toList());
   }
 
-  static Distribution getDistribution(Map<String, String> properties, List<String> primaryKeys) {
+  static Distribution getDistribution(Map<String, String> properties) {
     if (properties == null) {
       return Distributions.NONE;
     }
 
-    // Resolve bucket key columns: explicit bucket-key, else fall back to PK
-    String bucketKeys = properties.get(BUCKET_KEY);
-    List<String> bucketKeyList;
-    if (StringUtils.isNotBlank(bucketKeys)) {
-      bucketKeyList =
-          Arrays.stream(bucketKeys.split(","))
-              .map(String::trim)
-              .filter(StringUtils::isNotBlank)
-              .collect(Collectors.toList());
-    } else {
-      bucketKeyList = (primaryKeys != null) ? primaryKeys : Collections.emptyList();
-    }
+    String bucketKeyStr = properties.get(BUCKET_KEY);
+    String bucketNumStr = properties.get(BUCKET_NUM);
 
-    String bucketNum = properties.get(BUCKET_NUM);
+    boolean hasBucketKey = StringUtils.isNotBlank(bucketKeyStr);
+    boolean hasBucket = StringUtils.isNotBlank(bucketNumStr);
 
-    if (bucketKeyList.isEmpty()) {
+    if (!hasBucketKey && !hasBucket) {
       return Distributions.NONE;
     }
 
-    Expression[] expressions =
-        bucketKeyList.stream().map(NamedReference::field).toArray(Expression[]::new);
+    Expression[] expressions = new Expression[0];
+    if (hasBucketKey) {
+      expressions =
+          Arrays.stream(bucketKeyStr.split(","))
+              .map(String::trim)
+              .filter(StringUtils::isNotBlank)
+              .map(NamedReference::field)
+              .toArray(Expression[]::new);
+    }
 
-    if (StringUtils.isBlank(bucketNum)) {
+    if (!hasBucket) {
       return Distributions.auto(Strategy.HASH, expressions);
     }
 
     try {
-      int parsedBucket = Integer.parseInt(bucketNum.trim());
+      int parsedBucket = Integer.parseInt(bucketNumStr.trim());
       if (parsedBucket == -1) {
         return Distributions.auto(Strategy.HASH, expressions);
-      }
-      if (parsedBucket <= 0) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Paimon bucket number must be a positive integer or -1 (dynamic mode), but was '%s'.",
-                bucketNum));
       }
       return Distributions.hash(parsedBucket, expressions);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(
-          String.format("Paimon bucket number must be a valid integer, but was '%s'.", bucketNum),
+          String.format(
+              "Paimon bucket number must be a valid integer, but was '%s'.", bucketNumStr),
           e);
     }
   }

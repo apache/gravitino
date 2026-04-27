@@ -297,12 +297,6 @@ public abstract class BaseCatalog extends AbstractCatalog {
     Transform[] partitions =
         partitionConverter.toGravitinoPartitions(((CatalogTable) table).getPartitionKeys());
     Index[] indices = getGrivatinoIndices(resolvedTable);
-    List<String> primaryKeys =
-        resolvedTable
-            .getResolvedSchema()
-            .getPrimaryKey()
-            .map(UniqueConstraint::getColumns)
-            .orElse(Collections.emptyList());
 
     try {
       catalog()
@@ -313,7 +307,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
               comment,
               properties,
               partitions,
-              toGravitinoDistribution(flinkOptions, primaryKeys),
+              toGravitinoDistribution(flinkOptions),
               new SortOrder[0],
               indices);
     } catch (NoSuchSchemaException e) {
@@ -746,8 +740,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return getName();
   }
 
-  protected Distribution toGravitinoDistribution(
-      Map<String, String> properties, List<String> primaryKeys) {
+  protected Distribution toGravitinoDistribution(Map<String, String> properties) {
     return Distributions.NONE;
   }
 

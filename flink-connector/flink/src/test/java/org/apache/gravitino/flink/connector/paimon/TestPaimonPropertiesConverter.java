@@ -19,10 +19,7 @@
 package org.apache.gravitino.flink.connector.paimon;
 
 import com.google.common.collect.ImmutableMap;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
@@ -135,32 +132,28 @@ public class TestPaimonPropertiesConverter {
   @Test
   public void testGetDistributionWithBlankBucketKey() {
     Map<String, String> options = ImmutableMap.of(PaimonConstants.BUCKET_KEY, "  ");
-    Distribution distribution =
-        GravitinoPaimonCatalog.getDistribution(options, Collections.emptyList());
+    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options);
     Assertions.assertEquals(Distributions.NONE, distribution);
   }
 
   @Test
   public void testGetDistributionWithNullProperties() {
-    Distribution distribution =
-        GravitinoPaimonCatalog.getDistribution(null, Collections.emptyList());
+    Distribution distribution = GravitinoPaimonCatalog.getDistribution(null);
     Assertions.assertEquals(Distributions.NONE, distribution);
   }
 
   @Test
-  public void testGetDistributionWithNoBucketKey() {
+  public void testGetDistributionWithNoBucketKeyOrBucket() {
     Map<String, String> options = ImmutableMap.of();
-    Distribution distribution =
-        GravitinoPaimonCatalog.getDistribution(options, Collections.emptyList());
+    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options);
     Assertions.assertEquals(Distributions.NONE, distribution);
   }
 
   @Test
-  public void testGetDistributionWithMultipleBucketKeys() {
+  public void testGetDistributionWithBothBucketKeyAndBucket() {
     Map<String, String> options =
         ImmutableMap.of(PaimonConstants.BUCKET_KEY, "col_1,col_2", PaimonConstants.BUCKET_NUM, "4");
-    Distribution distribution =
-        GravitinoPaimonCatalog.getDistribution(options, Collections.emptyList());
+    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options);
     Assertions.assertEquals(Strategy.HASH, distribution.strategy());
     Assertions.assertEquals(4, distribution.number());
     Assertions.assertEquals(2, distribution.expressions().length);
@@ -171,66 +164,66 @@ public class TestPaimonPropertiesConverter {
   }
 
   @Test
+  public void testGetDistributionWithOnlyBucketKey() {
+    Map<String, String> options = ImmutableMap.of(PaimonConstants.BUCKET_KEY, "col_a");
+    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options);
+    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
+    Assertions.assertEquals(Distributions.AUTO, distribution.number());
+    Assertions.assertEquals(1, distribution.expressions().length);
+    Assertions.assertEquals(
+        "col_a", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
+  }
+
+  @Test
+  public void testGetDistributionWithOnlyBucket() {
+    Map<String, String> options = ImmutableMap.of(PaimonConstants.BUCKET_NUM, "8");
+    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options);
+    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
+    Assertions.assertEquals(8, distribution.number());
+    Assertions.assertEquals(0, distribution.expressions().length);
+  }
+
+  @Test
+  public void testGetDistributionWithOnlyBucketMinusOne() {
+    Map<String, String> options = ImmutableMap.of(PaimonConstants.BUCKET_NUM, "-1");
+    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options);
+    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
+    Assertions.assertEquals(Distributions.AUTO, distribution.number());
+    Assertions.assertEquals(0, distribution.expressions().length);
+  }
+
+  @Test
+  public void testGetDistributionWithBucketKeyAndExplicitMinusOne() {
+    Map<String, String> options =
+        ImmutableMap.of(PaimonConstants.BUCKET_KEY, "col_a", PaimonConstants.BUCKET_NUM, "-1");
+    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options);
+    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
+    Assertions.assertEquals(Distributions.AUTO, distribution.number());
+    Assertions.assertEquals(1, distribution.expressions().length);
+    Assertions.assertEquals(
+        "col_a", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
+  }
+
+  @Test
   public void testGetDistributionWithInvalidBucketNumber() {
     Map<String, String> options =
         ImmutableMap.of(
             PaimonConstants.BUCKET_KEY, "col_1", PaimonConstants.BUCKET_NUM, "not_a_number");
     IllegalArgumentException exception =
         Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> GravitinoPaimonCatalog.getDistribution(options, Collections.emptyList()));
+            IllegalArgumentException.class, () -> GravitinoPaimonCatalog.getDistribution(options));
     Assertions.assertTrue(
         exception.getMessage().contains("Paimon bucket number must be a valid integer"));
   }
 
   @Test
-  public void testGetDistributionWithNegativeBucketNumber() {
+  public void testGetDistributionWithNegativeBucketNumberPassesThrough() {
     Map<String, String> options =
         ImmutableMap.of(PaimonConstants.BUCKET_KEY, "col_1", PaimonConstants.BUCKET_NUM, "-4");
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> GravitinoPaimonCatalog.getDistribution(options, Collections.emptyList()));
-  }
-
-  @Test
-  public void testGetDistributionWithPKAndOnlyBucket() {
-    Map<String, String> options = ImmutableMap.of(PaimonConstants.BUCKET_NUM, "8");
-    List<String> pkColumns = Arrays.asList("id");
-    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options, pkColumns);
+    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options);
     Assertions.assertEquals(Strategy.HASH, distribution.strategy());
-    Assertions.assertEquals(8, distribution.number());
+    Assertions.assertEquals(-4, distribution.number());
     Assertions.assertEquals(1, distribution.expressions().length);
-    Assertions.assertEquals("id", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
-  }
-
-  @Test
-  public void testGetDistributionWithPKAndExplicitBucketKeyOverridesPK() {
-    Map<String, String> options =
-        ImmutableMap.of(
-            PaimonConstants.BUCKET_KEY, "col_x",
-            PaimonConstants.BUCKET_NUM, "4");
-    List<String> pkColumns = Arrays.asList("id");
-    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options, pkColumns);
-    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
-    Assertions.assertEquals(4, distribution.number());
-    Assertions.assertEquals(1, distribution.expressions().length);
-    Assertions.assertEquals(
-        "col_x", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
-  }
-
-  @Test
-  public void testGetDistributionWithNoPKButBucketKeyAndBucket() {
-    Map<String, String> options =
-        ImmutableMap.of(
-            PaimonConstants.BUCKET_KEY, "col_a",
-            PaimonConstants.BUCKET_NUM, "6");
-    List<String> pkColumns = Collections.emptyList();
-    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options, pkColumns);
-    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
-    Assertions.assertEquals(6, distribution.number());
-    Assertions.assertEquals(1, distribution.expressions().length);
-    Assertions.assertEquals(
-        "col_a", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
   }
 
   @Test
@@ -256,58 +249,21 @@ public class TestPaimonPropertiesConverter {
   }
 
   @Test
-  public void testGetDistributionWithPKButNoBucketConfigReturnsAuto() {
-    Map<String, String> options = ImmutableMap.of();
-    List<String> pkColumns = Arrays.asList("aa", "bb");
-    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options, pkColumns);
-    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
-    Assertions.assertEquals(Distributions.AUTO, distribution.number());
-    Assertions.assertEquals(2, distribution.expressions().length);
-  }
-
-  @Test
-  public void testGetDistributionWithBucketKeyAndBlankBucketNum() {
-    Map<String, String> options = ImmutableMap.of(PaimonConstants.BUCKET_KEY, "col_a");
-    Distribution distribution =
-        GravitinoPaimonCatalog.getDistribution(options, Collections.emptyList());
-    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
-    Assertions.assertEquals(Distributions.AUTO, distribution.number());
-    Assertions.assertEquals(1, distribution.expressions().length);
-    Assertions.assertEquals(
-        "col_a", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
-  }
-
-  @Test
-  public void testGetDistributionWithBucketKeyAndExplicitMinusOne() {
-    Map<String, String> options =
-        ImmutableMap.of(PaimonConstants.BUCKET_KEY, "col_a", PaimonConstants.BUCKET_NUM, "-1");
-    Distribution distribution =
-        GravitinoPaimonCatalog.getDistribution(options, Collections.emptyList());
-    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
-    Assertions.assertEquals(Distributions.AUTO, distribution.number());
-    Assertions.assertEquals(1, distribution.expressions().length);
-    Assertions.assertEquals(
-        "col_a", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
-  }
-
-  @Test
-  public void testGetDistributionWithPKFallbackAndExplicitMinusOne() {
-    Map<String, String> options = ImmutableMap.of(PaimonConstants.BUCKET_NUM, "-1");
-    List<String> pkColumns = Arrays.asList("id");
-    Distribution distribution = GravitinoPaimonCatalog.getDistribution(options, pkColumns);
-    Assertions.assertEquals(Strategy.HASH, distribution.strategy());
-    Assertions.assertEquals(Distributions.AUTO, distribution.number());
-    Assertions.assertEquals(1, distribution.expressions().length);
-    Assertions.assertEquals("id", ((NamedReference) distribution.expressions()[0]).fieldName()[0]);
-  }
-
-  @Test
   public void testDistributionToPropertiesWithAutoDistribution() {
+    // Paimon does not allow 'bucket-key' with bucket=-1, so it is suppressed.
     Distribution distribution = Distributions.auto(Strategy.HASH, NamedReference.field("col_a"));
     Map<String, String> properties = GravitinoPaimonCatalog.distributionToProperties(distribution);
     Assertions.assertFalse(properties.containsKey(PaimonConstants.BUCKET_KEY));
     Assertions.assertEquals("-1", properties.get(PaimonConstants.BUCKET_NUM));
     Assertions.assertEquals(1, properties.size());
+  }
+
+  @Test
+  public void testDistributionToPropertiesWithAutoNoExpressions() {
+    // AUTO with no expressions is Paimon's default — nothing to output.
+    Distribution distribution = Distributions.auto(Strategy.HASH);
+    Map<String, String> properties = GravitinoPaimonCatalog.distributionToProperties(distribution);
+    Assertions.assertTrue(properties.isEmpty());
   }
 
   @Test
@@ -317,22 +273,10 @@ public class TestPaimonPropertiesConverter {
         ImmutableMap.of(PaimonConstants.BUCKET_KEY, "col_a", PaimonConstants.BUCKET_NUM, "-1");
     Map<String, String> fromBlank =
         GravitinoPaimonCatalog.distributionToProperties(
-            GravitinoPaimonCatalog.getDistribution(optionsBlank, Collections.emptyList()));
+            GravitinoPaimonCatalog.getDistribution(optionsBlank));
     Map<String, String> fromExplicit =
         GravitinoPaimonCatalog.distributionToProperties(
-            GravitinoPaimonCatalog.getDistribution(optionsExplicit, Collections.emptyList()));
+            GravitinoPaimonCatalog.getDistribution(optionsExplicit));
     Assertions.assertEquals(fromBlank, fromExplicit);
-  }
-
-  @Test
-  public void testGetDistributionWithNoPKAndOnlyBucketFail() {
-    Map<String, String> options = ImmutableMap.of(PaimonConstants.BUCKET_NUM, "8");
-    List<String> pkColumns = Collections.emptyList();
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> GravitinoPaimonCatalog.getDistribution(options, pkColumns));
-    Assertions.assertTrue(
-        exception.getMessage().contains("no 'bucket-key' or primary key is defined"));
   }
 }

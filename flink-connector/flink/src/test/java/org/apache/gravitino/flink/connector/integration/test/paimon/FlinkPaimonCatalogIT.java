@@ -142,16 +142,66 @@ public abstract class FlinkPaimonCatalogIT extends FlinkCommonIT {
               catalog.asTableCatalog().loadTable(NameIdentifier.of(databaseName, tableName));
           Assertions.assertEquals(Strategy.HASH, table.distribution().strategy());
           Assertions.assertEquals(Distributions.AUTO, table.distribution().number());
-          Assertions.assertEquals(1, table.distribution().expressions().length);
-          Assertions.assertEquals("id", table.distribution().expressions()[0].toString());
+          Assertions.assertEquals(0, table.distribution().expressions().length);
+        },
+        true,
+        supportDropCascade());
+  }
 
-          TableResult showResult = sql("SHOW CREATE TABLE %s", tableName);
-          List<Row> rows = Lists.newArrayList(showResult.collect());
-          Assertions.assertEquals(1, rows.size());
-          String createTableDDL = rows.get(0).getField(0).toString();
+  @Test
+  public void testBucketKeyWithDynamicBucketNumRejected() {
+    String databaseName = "test_bucket_key_dynamic_rejected_db";
+    String tableName = "test_rejected_table";
+
+    // Dynamic bucket mode ('-1') does not accept bucket-ley statement
+    // ref:
+    // https://github.com/apache/paimon/blob/dd2273f70d2f5298a3a35a557c6b462f961e3647/paimon-core/src/main/java/org/apache/paimon/schema/SchemaValidation.java#L568-L572
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          Exception exception =
+              Assertions.assertThrows(
+                  Exception.class,
+                  () ->
+                      sql(
+                          "CREATE TABLE %s (id BIGINT, name STRING) "
+                              + "WITH ('bucket' = '-1', 'bucket-key' = 'id')",
+                          tableName));
           Assertions.assertTrue(
-              createTableDDL.contains("'bucket' = '-1'"),
-              "SHOW CREATE TABLE should contain bucket=-1, but was: " + createTableDDL);
+              exception.getMessage().contains("bucket-key")
+                  || exception.getCause().getMessage().contains("bucket-key"),
+              "Error should mention bucket-key, but was: " + exception.getMessage());
+        },
+        true,
+        supportDropCascade());
+  }
+
+  @Test
+  public void testOnlyBucketKeyWithoutNoBucketNumRejected() {
+    String databaseName = "test_only_bucket_key_rejected_db";
+    String tableName = "test_rejected_table";
+
+    doWithSchema(
+        currentCatalog(),
+        databaseName,
+        catalog -> {
+          // Only bucket-key without bucket maps to auto(HASH, [id]) which sets
+          // bucket=-1 and bucket-key=id in Paimon options. Paimon rejects this.
+          // ref:
+          // https://github.com/apache/paimon/blob/dd2273f70d2f5298a3a35a557c6b462f961e3647/paimon-core/src/main/java/org/apache/paimon/schema/SchemaValidation.java#L568-L572
+          Exception exception =
+              Assertions.assertThrows(
+                  Exception.class,
+                  () ->
+                      sql(
+                          "CREATE TABLE %s (id BIGINT, name STRING) "
+                              + "WITH ('bucket-key' = 'id')",
+                          tableName));
+          Assertions.assertTrue(
+              exception.getMessage().contains("bucket-key")
+                  || exception.getCause().getMessage().contains("bucket-key"),
+              "Error should mention bucket-key, but was: " + exception.getMessage());
         },
         true,
         supportDropCascade());
