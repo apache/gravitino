@@ -55,6 +55,7 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -628,6 +629,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           }
         }
       }
+    } catch (NoSuchEntityException nse) {
+      LOG.debug("No owner entity found for metalake {}", metalake);
     } catch (IOException e) {
       LOG.warn("Can not load metadata owner", e);
     }
