@@ -100,7 +100,7 @@ public class TestIcebergCatalogWrapper {
     config.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
     config.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
     config.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
-    config.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "false");
+    config.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
     config.put(
         IcebergConstants.TABLE_METADATA_CACHE_IMPL, TrackingTableMetadataCache.class.getName());
     return config;
