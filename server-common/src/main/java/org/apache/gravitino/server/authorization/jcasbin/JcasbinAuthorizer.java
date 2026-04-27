@@ -223,13 +223,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       AuthorizationRequestContext requestContext) {
-<<<<<<< HEAD
-    boolean result;
-    try {
-      Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      loadOwnerPolicy(metalake, metadataObject, metadataId);
-      result = checkOwnership(principal, metalake, metadataId);
-=======
     boolean result = false;
     if (metadataObject == null) {
       return false;
@@ -246,7 +239,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             continue;
           }
           loadOwnerPolicy(metalake, scopeObject, metadataId);
-          if (Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId))) {
+          if (checkOwnership(principal, metalake, metadataId)) {
             result = true;
             break;
           }
@@ -254,9 +247,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       } else {
         Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
         loadOwnerPolicy(metalake, metadataObject, metadataId);
-        result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
+        result = checkOwnership(principal, metalake, metadataId);
       }
->>>>>>> 9c3832e15 (Add foundational classes for nested namespace authorization.)
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);
     }
@@ -510,9 +502,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return false;
       }
       loadRolePrivilege(metalake, username, userId, requestContext);
-<<<<<<< HEAD
-      return authorizeByJcasbin(userId, metalake, metadataObject, metadataId, privilege);
-=======
 
       // when checking CREATE SCHEMA, the metadata object may be null, we can just
       // skip the check
@@ -527,7 +516,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         for (MetadataObject scopeObject : chain) {
           Long metadataId = getMetadataIdQuietly(scopeObject, metalake);
           if (metadataId != null
-              && authorizeByJcasbin(userId, scopeObject, metadataId, privilege)) {
+              && authorizeByJcasbin(userId, metalake, scopeObject, metadataId, privilege)) {
             return true;
           }
         }
@@ -541,8 +530,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         LOG.debug("Can not get entity id", e);
         return false;
       }
-      return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
->>>>>>> 9c3832e15 (Add foundational classes for nested namespace authorization.)
+      return authorizeByJcasbin(userId, metalake, metadataObject, metadataId, privilege);
     }
 
     private boolean authorizeByJcasbin(
