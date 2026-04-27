@@ -217,9 +217,9 @@ class RelationalTable(
                 if the partition already exists, throws this exception.
         """
 
-        req = AddPartitionsRequest([
-            cast(PartitionDTO, DTOConverters.to_dto(partition))
-        ])
+        req = AddPartitionsRequest(
+            [cast(PartitionDTO, DTOConverters.to_dto(partition))]
+        )
         req.validate()
 
         resp = self._rest_client.post(

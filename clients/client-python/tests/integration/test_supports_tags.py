@@ -34,6 +34,8 @@ from gravitino.name_identifier import NameIdentifier
 from tests.integration.containers.hdfs_container import HDFSContainer
 from tests.integration.integration_test_env import IntegrationTestEnv
 
+# pylint: disable=too-many-instance-attributes
+
 
 class TestSupportsTags(IntegrationTestEnv):
     relational_catalog_provider: str = "hive"
