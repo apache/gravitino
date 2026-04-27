@@ -60,6 +60,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
@@ -211,6 +212,8 @@ public class JDBCBackend implements RelationalBackend {
       JobTemplateMetaService.getInstance().insertJobTemplate((JobTemplateEntity) e, overwritten);
     } else if (e instanceof JobEntity) {
       JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
+    } else if (e instanceof ViewEntity) {
+      ViewMetaService.getInstance().insertView((ViewEntity) e, overwritten);
     } else if (e instanceof GenericEntity) {
       GenericEntity genericEntity = (GenericEntity) e;
       if (genericEntity.type() == Entity.EntityType.VIEW) {

@@ -29,7 +29,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
-import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.storage.IdGenerator;
 import org.slf4j.Logger;
@@ -106,7 +107,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     // Check if view exists in entity store
     try {
-      GenericEntity viewEntity = store.get(ident, Entity.EntityType.VIEW, GenericEntity.class);
+      ViewEntity viewEntity = store.get(ident, Entity.EntityType.VIEW, ViewEntity.class);
       return EntityCombinedView.of(catalogView, viewEntity).withImported(true);
     } catch (NoSuchEntityException e) {
       // View not in store yet
@@ -135,12 +136,26 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     LOG.info("Auto-importing view {} into Gravitino entity store", ident);
     long uid = idGenerator.nextId();
-    GenericEntity newViewEntity =
-        GenericEntity.builder()
+    View catalogView = entityCombinedView.viewFromCatalog();
+    AuditInfo auditInfo =
+        AuditInfo.builder()
+            .withCreator(catalogView.auditInfo().creator())
+            .withCreateTime(catalogView.auditInfo().createTime())
+            .withLastModifier(catalogView.auditInfo().lastModifier())
+            .withLastModifiedTime(catalogView.auditInfo().lastModifiedTime())
+            .build();
+    ViewEntity newViewEntity =
+        ViewEntity.builder()
             .withId(uid)
             .withName(ident.name())
             .withNamespace(ident.namespace())
-            .withEntityType(Entity.EntityType.VIEW)
+            .withComment(catalogView.comment())
+            .withColumns(catalogView.columns())
+            .withRepresentations(catalogView.representations())
+            .withDefaultCatalog(catalogView.defaultCatalog())
+            .withDefaultSchema(catalogView.defaultSchema())
+            .withProperties(catalogView.properties())
+            .withAuditInfo(auditInfo)
             .build();
     try {
       store.put(newViewEntity, false /* overwrite */);

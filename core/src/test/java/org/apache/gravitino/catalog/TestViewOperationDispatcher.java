@@ -48,9 +48,10 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -109,7 +110,9 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
 
       @Override
       public Representation[] representations() {
-        return new Representation[0];
+        return new Representation[] {
+          SQLRepresentation.builder().withDialect("unknown").withSql("SELECT 1").build()
+        };
       }
 
       @Override
@@ -122,6 +125,22 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         return auditInfo;
       }
     };
+  }
+
+  private static ViewEntity createViewEntity(
+      long id, NameIdentifier ident, View view, AuditInfo auditInfo) {
+    return ViewEntity.builder()
+        .withId(id)
+        .withName(ident.name())
+        .withNamespace(ident.namespace())
+        .withComment(view.comment())
+        .withColumns(view.columns())
+        .withRepresentations(view.representations())
+        .withDefaultCatalog(view.defaultCatalog())
+        .withDefaultSchema(view.defaultSchema())
+        .withProperties(view.properties())
+        .withAuditInfo(auditInfo)
+        .build();
   }
 
   @Test
@@ -210,14 +229,14 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
 
     // Verify view is not in entity store initially
     Assertions.assertThrows(
-        NoSuchEntityException.class, () -> entityStore.get(viewIdent, VIEW, GenericEntity.class));
+        NoSuchEntityException.class, () -> entityStore.get(viewIdent, VIEW, ViewEntity.class));
 
     // Load view - should auto-import
     View loadedView = viewOperationDispatcher.loadView(viewIdent);
     Assertions.assertEquals("auto_import_view", loadedView.name());
 
     // Verify view was auto-imported into entity store
-    GenericEntity viewEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
+    ViewEntity viewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
     Assertions.assertNotNull(viewEntity);
     Assertions.assertEquals(viewIdent.name(), viewEntity.name());
     Assertions.assertEquals(viewIdent.namespace(), viewEntity.namespace());
@@ -233,27 +252,20 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier viewIdent = NameIdentifier.of(viewNs, "already_imported_view");
 
     // Pre-populate entity store with view entity
-    GenericEntity viewEntity =
-        GenericEntity.builder()
-            .withId(1L)
-            .withName(viewIdent.name())
-            .withNamespace(viewIdent.namespace())
-            .withEntityType(Entity.EntityType.VIEW)
-            .build();
-    entityStore.put(viewEntity, false);
-
-    // Create a mock view through the catalog operations
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     View mockView = createMockView("already_imported_view", props, auditInfo);
+    ViewEntity viewEntity = createViewEntity(1L, viewIdent, mockView, auditInfo);
+    entityStore.put(viewEntity, false);
 
+    // Create a mock view through the catalog operations
     TestCatalog testCatalog =
         (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.views.put(viewIdent, mockView);
 
     // Record the initial entity state
-    GenericEntity initialEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
+    ViewEntity initialEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
     long initialId = initialEntity.id();
 
     // Load view - should load from catalog but skip import since already in entity store
@@ -262,7 +274,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
 
     // Verify entity is still in store with same ID (no duplicate import)
     // If import was called, a new entity would be created with a different ID
-    GenericEntity retrievedEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
+    ViewEntity retrievedEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
     Assertions.assertNotNull(retrievedEntity);
     Assertions.assertEquals(initialId, retrievedEntity.id(), "Entity ID should not change");
     Assertions.assertEquals(1L, retrievedEntity.id(), "Entity ID should remain 1L (no new import)");
@@ -361,7 +373,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("deleted_view", loadedView2.name());
 
     // Verify view was re-imported
-    GenericEntity viewEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
+    ViewEntity viewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
     Assertions.assertNotNull(viewEntity);
   }
 }
