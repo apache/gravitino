@@ -511,13 +511,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
 
       Long metadataId;
-      try {
-        metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      } catch (Exception e) {
-        LOG.debug("Can not get entity id", e);
-        return false;
-      }
-      return authorizeByJcasbin(userId, metalake, metadataObject, metadataId, privilege);
+
+      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+
+      return metadataId != null
+          && authorizeByJcasbin(userId, metalake, metadataObject, metadataId, privilege);
     }
 
     private boolean authorizeByJcasbin(
