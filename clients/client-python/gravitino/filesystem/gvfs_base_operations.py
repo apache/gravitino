@@ -215,6 +215,9 @@ class BaseGVFSOperations(ABC):
         self._filesystem_cache = TTLCache(maxsize=cache_size, ttl=cache_expired_time)
         self._cache_lock = rwlock.RWLockFair()
 
+        self._credential_cache: LRUCache = LRUCache(maxsize=cache_size)
+        self._credential_cache_lock = rwlock.RWLockFair()
+
         self._enable_fileset_metadata_cache = (
             self.ENABLE_FILESET_METADATA_CACHE_DEFAULT
             if options is None
@@ -563,11 +566,9 @@ class BaseGVFSOperations(ABC):
             CallerContextHolder.set(caller_context)
 
         try:
-            # Get credentials if credential vending is enabled
-            credentials = (
-                fileset.support_credentials().get_credentials()
-                if self._enable_credential_vending
-                else None
+            # Get credentials with client-side caching to avoid redundant REST calls
+            credentials = self._get_credentials_with_cache(
+                fileset_ident, fileset, target_location_name
             )
 
             # Get the filesystem using the new path-based caching approach
@@ -643,6 +644,97 @@ class BaseGVFSOperations(ABC):
 
     def _file_system_expired(self, expire_time: int):
         return expire_time <= time.time() * 1000
+
+    def _calculate_credential_expire_time(self, credential_expire_time_ms: int) -> int:
+        """Calculate the local cache expiration time for a credential.
+
+        Uses the same ratio-based calculation as the filesystem cache:
+        current_time + (credential_remaining_time * ratio)
+
+        :param credential_expire_time_ms: The credential's expiry time in epoch ms
+        :return: The local cache expiration time in epoch ms
+        """
+        if credential_expire_time_ms <= 0:
+            return TIME_WITHOUT_EXPIRATION
+
+        ratio = float(
+            self._options.get(
+                GVFSConfig.GVFS_FILESYSTEM_CREDENTIAL_EXPIRED_TIME_RATIO,
+                GVFSConfig.DEFAULT_CREDENTIAL_EXPIRED_TIME_RATIO,
+            )
+            if self._options
+            else GVFSConfig.DEFAULT_CREDENTIAL_EXPIRED_TIME_RATIO
+        )
+        now_ms = time.time() * 1000
+        return int(now_ms + (credential_expire_time_ms - now_ms) * ratio)
+
+    def _get_credentials_with_cache(
+        self,
+        fileset_ident: NameIdentifier,
+        fileset: Fileset,
+        target_location_name: str,
+    ) -> Optional[List[Credential]]:
+        """Get credentials with client-side caching to avoid redundant REST calls.
+
+        Implements lazy refresh: returns cached credentials if not expired,
+        otherwise fetches new credentials from the server.
+
+        :param fileset_ident: The fileset identifier
+        :param fileset: The fileset object
+        :param target_location_name: The resolved location name
+        :return: List of credentials, or None if credential vending is disabled
+        """
+        if not self._enable_credential_vending:
+            return None
+
+        cache_key = (fileset_ident, target_location_name)
+
+        # Fast path: read lock, check cache
+        read_lock = self._credential_cache_lock.gen_rlock()
+        try:
+            read_lock.acquire()
+            cache_value = self._credential_cache.get(cache_key)
+            if cache_value is not None:
+                expire_time, cached_credentials = cache_value
+                if not self._file_system_expired(expire_time):
+                    return cached_credentials
+        finally:
+            read_lock.release()
+
+        # Slow path: write lock, double-check, then fetch
+        write_lock = self._credential_cache_lock.gen_wlock()
+        try:
+            write_lock.acquire()
+            # Double-check after acquiring write lock
+            cache_value = self._credential_cache.get(cache_key)
+            if cache_value is not None:
+                expire_time, cached_credentials = cache_value
+                if not self._file_system_expired(expire_time):
+                    return cached_credentials
+
+            # Fetch fresh credentials from server
+            fresh_credentials = fileset.support_credentials().get_credentials()
+
+            if fresh_credentials:
+                expirable = [
+                    c.expire_time_in_ms()
+                    for c in fresh_credentials
+                    if c.expire_time_in_ms() > 0
+                ]
+                if expirable:
+                    earliest_expire_ms = min(expirable)
+                    expire_time = self._calculate_credential_expire_time(
+                        earliest_expire_ms
+                    )
+                else:
+                    expire_time = TIME_WITHOUT_EXPIRATION
+            else:
+                expire_time = TIME_WITHOUT_EXPIRATION
+
+            self._credential_cache[cache_key] = (expire_time, fresh_credentials)
+            return fresh_credentials
+        finally:
+            write_lock.release()
 
     def _get_filesystem(
         self,

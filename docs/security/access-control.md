@@ -132,10 +132,7 @@ Every securable object in Gravitino has an owner - the user with administrative 
 - **Automatic assignment**: The creator of an object automatically becomes its owner
 - **Administrative privileges**: Owners have implicit management privileges (e.g., drop, alter)
 - **Exclusive control**: Only the owner can fully manage the object
-
-:::info
-Group ownership is not currently supported. Only user ownership is available.
-:::
+- **Group ownership**: Ownership can be assigned to a group, granting all members of that group owner privileges
 
 **Supported Objects:**
 
@@ -172,10 +169,6 @@ A group is a collection of users that simplifies permission management by allowi
 - Assign roles that all group members will inherit
 
 All users in a group inherit the roles and privileges granted to that group.
-
-:::info
-Groups can be granted roles and privileges, but they cannot be owners of securable objects. Only users can be owners.
-:::
 
 ### Metadata Objects
 
