@@ -25,6 +25,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -32,6 +34,7 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -44,6 +47,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.iceberg.service.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -74,12 +78,16 @@ public class IcebergViewOperations {
 
   private ObjectMapper icebergObjectMapper;
   private IcebergViewOperationDispatcher viewOperationDispatcher;
+  private IcebergIdempotencyManager idempotencyManager;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public IcebergViewOperations(IcebergViewOperationDispatcher viewOperationDispatcher) {
+  public IcebergViewOperations(
+      IcebergViewOperationDispatcher viewOperationDispatcher,
+      IcebergIdempotencyManager idempotencyManager) {
     this.viewOperationDispatcher = viewOperationDispatcher;
+    this.idempotencyManager = idempotencyManager;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
   }
 
@@ -133,7 +141,8 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      CreateViewRequest createViewRequest) {
+      CreateViewRequest createViewRequest,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY_HEADER) String idempotencyKey) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
@@ -144,13 +153,16 @@ public class IcebergViewOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () -> {
-            IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
-            LoadViewResponse loadViewResponse =
-                viewOperationDispatcher.createView(context, icebergNS, createViewRequest);
-            return IcebergRESTUtils.ok(loadViewResponse);
-          });
+          () ->
+              replayIfNeeded(
+                  idempotencyKey,
+                  () -> {
+                    IcebergRequestContext context =
+                        new IcebergRequestContext(httpServletRequest(), catalogName);
+                    LoadViewResponse loadViewResponse =
+                        viewOperationDispatcher.createView(context, icebergNS, createViewRequest);
+                    return IcebergRESTUtils.ok(loadViewResponse);
+                  }));
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
     }
@@ -209,7 +221,8 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
       @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view,
-      UpdateTableRequest replaceViewRequest) {
+      UpdateTableRequest replaceViewRequest,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY_HEADER) String idempotencyKey) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     String viewName = RESTUtil.decodeString(view);
@@ -222,14 +235,18 @@ public class IcebergViewOperations {
     try {
       return Utils.doAs(
           httpRequest,
-          () -> {
-            IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
-            TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
-            LoadViewResponse loadViewResponse =
-                viewOperationDispatcher.replaceView(context, viewIdentifier, replaceViewRequest);
-            return IcebergRESTUtils.ok(loadViewResponse);
-          });
+          () ->
+              replayIfNeeded(
+                  idempotencyKey,
+                  () -> {
+                    IcebergRequestContext context =
+                        new IcebergRequestContext(httpServletRequest(), catalogName);
+                    TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
+                    LoadViewResponse loadViewResponse =
+                        viewOperationDispatcher.replaceView(
+                            context, viewIdentifier, replaceViewRequest);
+                    return IcebergRESTUtils.ok(loadViewResponse);
+                  }));
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
     }
@@ -250,7 +267,8 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
+      @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY_HEADER) String idempotencyKey) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     String viewName = RESTUtil.decodeString(view);
@@ -263,11 +281,15 @@ public class IcebergViewOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
-            IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
-            viewOperationDispatcher.dropView(context, viewIdentifier);
-            return IcebergRESTUtils.noContent();
+            return replayIfNeeded(
+                idempotencyKey,
+                () -> {
+                  TableIdentifier viewIdentifier = TableIdentifier.of(icebergNS, viewName);
+                  IcebergRequestContext context =
+                      new IcebergRequestContext(httpServletRequest(), catalogName);
+                  viewOperationDispatcher.dropView(context, viewIdentifier);
+                  return IcebergRESTUtils.noContent();
+                });
           });
     } catch (Exception e) {
       return IcebergExceptionMapper.toRESTResponse(e);
@@ -359,5 +381,16 @@ public class IcebergViewOperations {
         .addAll(filteredIdentifiers)
         .nextPageToken(listTablesResponse.nextPageToken())
         .build();
+  }
+
+  private Response replayIfNeeded(String idempotencyKey, Supplier<Response> operation) {
+    Optional<String> validatedIdempotencyKey =
+        idempotencyManager.getValidatedIdempotencyKey(idempotencyKey);
+    if (!validatedIdempotencyKey.isPresent()) {
+      return operation.get();
+    }
+
+    return idempotencyManager.replayOrExecute(
+        validatedIdempotencyKey.get(), httpServletRequest(), operation);
   }
 }

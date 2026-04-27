@@ -316,6 +316,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
 
+  public static final ConfigEntry<Integer> IDEMPOTENCY_KEY_LIFETIME_MINUTES =
+      new ConfigBuilder(IcebergConstants.IDEMPOTENCY_KEY_LIFETIME_MINUTES)
+          .doc("Time in minutes to retain completed idempotent mutation responses.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(30);
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }

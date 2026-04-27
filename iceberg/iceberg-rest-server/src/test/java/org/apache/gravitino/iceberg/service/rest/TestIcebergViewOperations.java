@@ -29,6 +29,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.iceberg.service.IcebergIdempotencyManager;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewFailureEvent;
@@ -68,6 +69,7 @@ import org.apache.iceberg.view.ViewMetadata;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
@@ -143,6 +145,30 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
 
     verifyCreateViewFail(namespace, "create_foo1", 409);
     verifyCreateViewFail(namespace, "", 400);
+  }
+
+  @Test
+  void testCreateViewWithIdempotencyKey() {
+    Namespace namespace = Namespace.of("idempotent_view_ns");
+    verifyCreateNamespaceSucc(namespace);
+
+    dummyEventListener.clearEvent();
+    String idempotencyKey = "018f4f74-7e58-7cc2-a2f0-6f53123abcde";
+
+    Response first =
+        doCreateViewWithIdempotencyKey(namespace, "idempotent_view_foo1", idempotencyKey);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), first.getStatus());
+
+    Response second =
+        doCreateViewWithIdempotencyKey(namespace, "idempotent_view_foo1", idempotencyKey);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), second.getStatus());
+
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergCreateViewPreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergCreateViewEvent);
+    Assertions.assertThrows(AssertionError.class, () -> dummyEventListener.popPreEvent());
+    Assertions.assertThrows(AssertionError.class, () -> dummyEventListener.popPostEvent());
+
+    verifyLoadViewSucc(namespace, "idempotent_view_foo1");
   }
 
   @ParameterizedTest
@@ -314,6 +340,30 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
                     .build())
             .build();
     return getViewClientBuilder(ns)
+        .post(Entity.entity(createViewRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response doCreateViewWithIdempotencyKey(
+      Namespace ns, String name, String idempotencyKey) {
+    CreateViewRequest createViewRequest =
+        ImmutableCreateViewRequest.builder()
+            .name(name)
+            .schema(viewSchema)
+            .viewVersion(
+                ImmutableViewVersion.builder()
+                    .versionId(1)
+                    .timestampMillis(System.currentTimeMillis())
+                    .schemaId(1)
+                    .defaultNamespace(IcebergRestTestUtil.TEST_NAMESPACE_NAME)
+                    .addRepresentations(
+                        ImmutableSQLViewRepresentation.builder()
+                            .sql(VIEW_QUERY)
+                            .dialect("spark")
+                            .build())
+                    .build())
+            .build();
+    return getViewClientBuilder(ns)
+        .header(IcebergIdempotencyManager.IDEMPOTENCY_KEY_HEADER, idempotencyKey)
         .post(Entity.entity(createViewRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
