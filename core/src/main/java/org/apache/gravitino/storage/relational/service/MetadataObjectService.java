@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -572,7 +573,11 @@ public class MetadataObjectService {
             return;
           }
 
-          String fullName = DOT_JOINER.join(catalogName, schemaPO.getSchemaName());
+          String fullName =
+              DOT_JOINER.join(
+                  catalogName,
+                  HierarchicalSchemaUtil.physicalToLogical(
+                      schemaPO.getSchemaName(), HierarchicalSchemaUtil.namespaceSeparator()));
 
           schemaIdAndNameMap.put(schemaPO.getSchemaId(), fullName);
         });

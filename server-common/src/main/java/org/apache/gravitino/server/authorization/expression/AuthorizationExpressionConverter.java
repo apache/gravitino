@@ -238,8 +238,8 @@ public class AuthorizationExpressionConverter {
     expression =
         expression.replaceAll(
             "ANY_CREATE_SCHEMA",
-            "((ANY(CREATE_SCHEMA, METALAKE, CATALOG)) "
-                + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG)))");
+            "((ANY(CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)))");
     expression =
         expression.replaceAll(
             "ANY_SELECT_TABLE",

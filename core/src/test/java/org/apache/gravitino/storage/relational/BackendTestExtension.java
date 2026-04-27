@@ -176,6 +176,7 @@ public class BackendTestExtension
           .thenReturn(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS);
 
       Mockito.when(config.get(CACHE_ENABLED)).thenReturn(true);
+      Mockito.when(config.get(Configs.SCHEMA_NAMESPACE_SEPARATOR)).thenReturn(":");
 
       FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
