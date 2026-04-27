@@ -136,12 +136,11 @@ Examples:
 - Mapping must be reversible:
   - `logical path segments` -> `encode each segment` -> `join by '.'` for physical storage.
   - physical schema name -> `split by '.'` -> `decode each segment` -> logical path segments.
-  - This avoids ambiguity when one segment contains `.` (for example `my.schema`).
+  - physical schema name -> "A.B.C"
 
 ### Existing Name Compatibility and Migration Guard
 
-- Before enabling nested namespace mode for a catalog, run a pre-check scan on existing schema names
-  against configured logical separator.
+- Before upgrading the new version, select all the Iceberg namespaces to check whether contains the logical delimiter.
 - If existing schema names conflict with selected separator, enabling is rejected with actionable
   error and user can choose another separator or rename conflicting schema names.
 - Once nested mode is enabled for a catalog, creating new schema names containing configured logical
@@ -149,7 +148,7 @@ Examples:
 
 ### Delimiter Configuration Policy
 
-- Logical separator is configurable (for example `:`, `;`, `$`) and can be chosen to avoid conflict
+- Logical separator is configurable in the server configuration (for example `:`, `;`, `$`) and can be chosen to avoid conflict
   with existing names.
 - Physical separator in storage remains fixed as `.`.
 - Recommended: keep logical separator stable after nested namespace is enabled for a catalog.
@@ -178,7 +177,7 @@ Two delimiter-governance options are under evaluation:
 Delimiter validity should be explicit and observable, not implicit.
 
 - Validation checkpoints:
-  - Validate delimiter when server starts or when delimiter configuration is updated.
+  - Validate delimiter when server starts.
   - Re-validate against existing catalog schema names before enabling nested mode for a catalog.
   - Reject invalid delimiter configuration early before request-time namespace operations.
 - Validation rules:
@@ -317,7 +316,7 @@ Examples (Gravitino REST side):
   - No new typed path wrapper (`SchemaPath`) or segment-based overloads are introduced in this
     phase.
 
-Simple Java client examples:
+Simple Java client examples: (Users can know the delimiter)
 
 - `listSchemas()` -> returns top-level schemas, for example `A`, `B`.
 - `listSchemas("A:B")` -> returns direct children, for example `A:B:C`, `A:B:D`.
@@ -563,6 +562,16 @@ Trino-specific example:
 - Connector converts to Gravitino internal schema: `a:b:c`
 - Gravitino returns schema: `a:b:c`
 - Connector renders back to Trino quoted style: `"a.b.c"`
+
+## Plans
+-  Add foundational classes for nested namespace authorization
+-  Add nested namespace support to Iceberg REST API
+-  Add nested namespace support to Gravitino REST AP
+
+## No Plan
+- Trino connector supports nested namespace
+- Spark connector supports nested namespace
+- Flink connector supports nested namespace
 
 ## Test Plan
 
