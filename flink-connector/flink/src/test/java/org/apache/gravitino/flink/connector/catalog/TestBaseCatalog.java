@@ -129,13 +129,10 @@ public class TestBaseCatalog {
 
     Assertions.assertEquals(
         Distributions.NONE,
-        catalog.toGravitinoDistribution(
-            ImmutableMap.of("bucket-key", "id", "bucket", "4"), Collections.emptyList()));
+        catalog.toGravitinoDistribution(ImmutableMap.of("bucket-key", "id", "bucket", "4")));
     Assertions.assertEquals(
-        Distributions.NONE,
-        catalog.toGravitinoDistribution(Collections.emptyMap(), Collections.emptyList()));
-    Assertions.assertEquals(
-        Distributions.NONE, catalog.toGravitinoDistribution(null, Collections.emptyList()));
+        Distributions.NONE, catalog.toGravitinoDistribution(Collections.emptyMap()));
+    Assertions.assertEquals(Distributions.NONE, catalog.toGravitinoDistribution(null));
   }
 
   @Test

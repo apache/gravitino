@@ -22,9 +22,7 @@ package org.apache.gravitino.flink.connector.paimon;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -94,9 +92,8 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
   }
 
   @Override
-  protected Distribution toGravitinoDistribution(
-      Map<String, String> properties, List<String> primaryKeys) {
-    return getDistribution(properties, primaryKeys);
+  protected Distribution toGravitinoDistribution(Map<String, String> properties) {
+    return getDistribution(properties);
   }
 
   @Override
@@ -106,89 +103,79 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
 
   @VisibleForTesting
   static Map<String, String> distributionToProperties(Distribution distribution) {
-    if (distribution == null
-        || distribution.strategy() == Strategy.NONE
-        || distribution.expressions().length == 0) {
+    if (distribution == null || distribution.strategy() == Strategy.NONE) {
       return new HashMap<>();
     }
     Map<String, String> properties = new HashMap<>();
-    Arrays.stream(distribution.expressions())
-        .forEach(
-            e ->
-                Preconditions.checkArgument(
-                    e instanceof NamedReference,
-                    "Paimon bucket-key expressions must be NamedReference, but got: %s",
-                    e.getClass().getSimpleName()));
     int number = distribution.number();
+    Expression[] expressions = distribution.expressions();
+    boolean hasExpressions = expressions != null && expressions.length > 0;
+
+    if (number == Distributions.AUTO && !hasExpressions) {
+      return properties;
+    }
+
     // Paimon does not allow 'bucket-key' with bucket=-1 (dynamic mode).
-    // In dynamic mode, Paimon uses the primary key as the bucket key automatically.
-    if (number != Distributions.AUTO) {
+    if (number != Distributions.AUTO && hasExpressions) {
       String bucketKey =
-          Arrays.stream(distribution.expressions())
-              .map(e -> ((NamedReference) e).fieldName()[0])
+          Arrays.stream(expressions)
+              .map(
+                  e -> {
+                    Preconditions.checkArgument(
+                        e instanceof NamedReference,
+                        "Paimon bucket-key expressions must be NamedReference, but got: %s",
+                        e.getClass().getSimpleName());
+                    return ((NamedReference) e).fieldName()[0];
+                  })
               .collect(Collectors.joining(","));
       if (StringUtils.isNotBlank(bucketKey)) {
         properties.put(PaimonConstants.BUCKET_KEY, bucketKey);
       }
     }
-    properties.put(
-        PaimonConstants.BUCKET_NUM, String.valueOf(number == Distributions.AUTO ? -1 : number));
+    properties.put(PaimonConstants.BUCKET_NUM, String.valueOf(number));
     return properties;
   }
 
   @VisibleForTesting
-  static Distribution getDistribution(Map<String, String> properties, List<String> primaryKeys) {
+  static Distribution getDistribution(Map<String, String> properties) {
     if (properties == null) {
       return Distributions.NONE;
     }
 
-    // Resolve bucket key columns: explicit bucket-key, else fall back to PK
-    String bucketKeys = properties.get(PaimonConstants.BUCKET_KEY);
-    List<String> bucketKeyList;
-    if (StringUtils.isNotBlank(bucketKeys)) {
-      bucketKeyList =
-          Arrays.stream(bucketKeys.split(","))
-              .map(String::trim)
-              .filter(StringUtils::isNotBlank)
-              .collect(Collectors.toList());
-    } else {
-      bucketKeyList = (primaryKeys != null) ? primaryKeys : Collections.emptyList();
-    }
+    String bucketKeyStr = properties.get(PaimonConstants.BUCKET_KEY);
+    String bucketNumStr = properties.get(PaimonConstants.BUCKET_NUM);
 
-    String bucketNum = properties.get(PaimonConstants.BUCKET_NUM);
+    boolean hasBucketKey = StringUtils.isNotBlank(bucketKeyStr);
+    boolean hasBucket = StringUtils.isNotBlank(bucketNumStr);
 
-    if (bucketKeyList.isEmpty()) {
-      if (StringUtils.isNotBlank(bucketNum)) {
-        throw new IllegalArgumentException(
-            "Paimon 'bucket' is set but no 'bucket-key' or primary key is defined. "
-                + "Please specify 'bucket-key' or define a primary key.");
-      }
+    if (!hasBucketKey && !hasBucket) {
       return Distributions.NONE;
     }
 
-    Expression[] expressions =
-        bucketKeyList.stream().map(NamedReference::field).toArray(Expression[]::new);
+    Expression[] expressions = new Expression[0];
+    if (hasBucketKey) {
+      expressions =
+          Arrays.stream(bucketKeyStr.split(","))
+              .map(String::trim)
+              .filter(StringUtils::isNotBlank)
+              .map(NamedReference::field)
+              .toArray(Expression[]::new);
+    }
 
-    if (StringUtils.isBlank(bucketNum)) {
+    if (!hasBucket) {
       return Distributions.auto(Strategy.HASH, expressions);
     }
 
-    String trimmedBucketValue = bucketNum.trim();
     try {
-      int parsedBucket = Integer.parseInt(trimmedBucketValue);
+      int parsedBucket = Integer.parseInt(bucketNumStr.trim());
       if (parsedBucket == -1) {
         return Distributions.auto(Strategy.HASH, expressions);
-      }
-      if (parsedBucket <= 0) {
-        throw new IllegalArgumentException(
-            String.format(
-                "Paimon bucket number must be a positive integer or -1 (dynamic mode), but was '%s'.",
-                bucketNum));
       }
       return Distributions.hash(parsedBucket, expressions);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(
-          String.format("Paimon bucket number must be a valid integer, but was '%s'.", bucketNum),
+          String.format(
+              "Paimon bucket number must be a valid integer, but was '%s'.", bucketNumStr),
           e);
     }
   }
