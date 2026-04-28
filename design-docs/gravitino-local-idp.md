@@ -345,7 +345,7 @@ bootstrap password.
    curl -X PUT \
      -u 'adminUser:123456' \
      -H 'Content-Type: application/json' \
-     https://<gravitino-host>/api/auth/basic/users/adminUser \
+     https://<gravitino-host>/api/idp/users/adminUser \
      -d '{
        "password": "ChangeMeToAStrongPassword"
      }'
@@ -359,7 +359,7 @@ bootstrap password.
 
    ```bash
    curl -u 'adminUser:ChangeMeToAStrongPassword' \
-     https://<gravitino-host>/api/auth/basic/users/adminUser
+     https://<gravitino-host>/api/idp/users/adminUser
    ```
 
 This flow makes the first-use experience explicit: deployment enables the feature, the
@@ -507,7 +507,7 @@ At a high level:
 The following APIs are intended for local user, local group, and group-membership management.
 
 Because local IdP identities are global rather than metalake-scoped, these management interfaces do
-not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
+not include `{metalake}` in their paths and use the `/api/idp` prefix.
 
 These APIs are available only when the `basic` authenticator is enabled. If `basic` is not enabled,
 requests to these Local IdP management endpoints should be rejected rather than treated as available
@@ -518,7 +518,7 @@ server APIs.
 | Item | Value |
 |---|---|
 | Method | `GET` |
-| Path | `/api/auth/basic/users/{user}` |
+| Path | `/api/idp/users/{user}` |
 | Permission | Only service admin / owner can execute |
 
 **Path parameters**
@@ -539,7 +539,7 @@ server APIs.
 | Item | Value |
 |---|---|
 | Method | `POST` |
-| Path | `/api/auth/basic/users` |
+| Path | `/api/idp/users` |
 | Permission | Only service admin can execute |
 
 **Parameters**
@@ -554,7 +554,7 @@ server APIs.
 | Item | Value |
 |---|---|
 | Method | `DELETE` |
-| Path | `/api/auth/basic/users/{user}` |
+| Path | `/api/idp/users/{user}` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
@@ -568,7 +568,7 @@ server APIs.
 | Item | Value                          |
 |---|--------------------------------|
 | Method | `PUT`                          |
-| Path | `/api/auth/basic/users/{user}` |
+| Path | `/api/idp/users/{user}` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
@@ -605,7 +605,7 @@ server APIs.
 | Item | Value |
 |---|---|
 | Method | `GET` |
-| Path | `/api/auth/basic/groups/{group}` |
+| Path | `/api/idp/groups/{group}` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
@@ -626,7 +626,7 @@ server APIs.
 | Item | Value |
 |---|---|
 | Method | `POST` |
-| Path | `/api/auth/basic/groups` |
+| Path | `/api/idp/groups` |
 | Permission | Only service admin can execute |
 
 **Request body**
@@ -640,7 +640,7 @@ server APIs.
 | Item | Value |
 |---|---|
 | Method | `DELETE` |
-| Path | `/api/auth/basic/groups/{group}` |
+| Path | `/api/idp/groups/{group}` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
@@ -654,7 +654,7 @@ server APIs.
 | Item | Value |
 |---|---|
 | Method | `PUT` |
-| Path | `/api/auth/basic/groups/{group}/users` |
+| Path | `/api/idp/groups/{group}/users` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
@@ -674,7 +674,7 @@ server APIs.
 | Item | Value |
 |---|---|
 | Method | `DELETE` |
-| Path | `/api/auth/basic/groups/{group}/users` |
+| Path | `/api/idp/groups/{group}/users` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
