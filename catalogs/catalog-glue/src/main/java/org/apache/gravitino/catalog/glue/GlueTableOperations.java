@@ -51,8 +51,9 @@ import software.amazon.awssdk.services.glue.model.StorageDescriptor;
  * <p>Implements {@link SupportsPartitions} for Hive-format identity-partitioned tables. Partition
  * names follow the Hive convention: {@code col=val/col2=val2}.
  *
- * <p>Only {@link IdentityPartition} is supported; other partition types throw {@link
- * IllegalArgumentException}.
+ * <p>Only {@link IdentityPartition} is supported because the Glue partition model is Hive-style
+ * key=value, which maps directly to identity partitions. Other partition types (bucket, truncate,
+ * etc.) have no equivalent representation in the Glue partition API.
  */
 class GlueTableOperations implements TableOperations, SupportsPartitions {
 
@@ -88,7 +89,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
       do {
         GetPartitionsRequest.Builder req =
             GetPartitionsRequest.builder().databaseName(dbName).tableName(tableName);
-        if (catalogId != null) req.catalogId(catalogId);
+        GlueCatalogOperations.applyCatalogId(catalogId, req::catalogId);
         if (nextToken != null) req.nextToken(nextToken);
         GetPartitionsResponse resp = glueClient.getPartitions(req.build());
         for (software.amazon.awssdk.services.glue.model.Partition p : resp.partitions()) {
@@ -110,7 +111,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
       do {
         GetPartitionsRequest.Builder req =
             GetPartitionsRequest.builder().databaseName(dbName).tableName(tableName);
-        if (catalogId != null) req.catalogId(catalogId);
+        GlueCatalogOperations.applyCatalogId(catalogId, req::catalogId);
         if (nextToken != null) req.nextToken(nextToken);
         GetPartitionsResponse resp = glueClient.getPartitions(req.build());
         for (software.amazon.awssdk.services.glue.model.Partition p : resp.partitions()) {
@@ -132,7 +133,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
             .databaseName(dbName)
             .tableName(tableName)
             .partitionValues(values);
-    if (catalogId != null) req.catalogId(catalogId);
+    GlueCatalogOperations.applyCatalogId(catalogId, req::catalogId);
     try {
       return toGravitinoPartition(glueClient.getPartition(req.build()).partition());
     } catch (EntityNotFoundException e) {
@@ -170,7 +171,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
             .databaseName(dbName)
             .tableName(tableName)
             .partitionInput(input);
-    if (catalogId != null) req.catalogId(catalogId);
+    GlueCatalogOperations.applyCatalogId(catalogId, req::catalogId);
 
     try {
       glueClient.createPartition(req.build());
@@ -199,7 +200,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
             .databaseName(dbName)
             .tableName(tableName)
             .partitionValues(values);
-    if (catalogId != null) req.catalogId(catalogId);
+    GlueCatalogOperations.applyCatalogId(catalogId, req::catalogId);
     try {
       glueClient.deletePartition(req.build());
       LOG.info("Dropped partition {} from {}.{}", partitionName, dbName, tableName);

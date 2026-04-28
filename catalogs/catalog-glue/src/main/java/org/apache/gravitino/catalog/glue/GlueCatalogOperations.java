@@ -147,7 +147,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       throws Exception {
     try {
       GetDatabasesRequest.Builder req = GetDatabasesRequest.builder().maxResults(1);
-      applyCatalogId(req::catalogId);
+      applyCatalogId(catalogId, req::catalogId);
       glueClient.getDatabases(req.build());
     } catch (GlueException e) {
       throw new ConnectionFailedException(e, "Failed to connect to AWS Glue: %s", e.getMessage());
@@ -169,7 +169,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       do {
         GetDatabasesRequest.Builder req = GetDatabasesRequest.builder();
-        applyCatalogId(req::catalogId);
+        applyCatalogId(catalogId, req::catalogId);
         if (nextToken != null) req.nextToken(nextToken);
         GetDatabasesResponse resp = glueClient.getDatabases(req.build());
         resp.databaseList().stream()
@@ -194,7 +194,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         DatabaseInput.builder().name(ident.name()).description(comment).parameters(params).build();
 
     CreateDatabaseRequest.Builder req = CreateDatabaseRequest.builder().databaseInput(input);
-    applyCatalogId(req::catalogId);
+    applyCatalogId(catalogId, req::catalogId);
 
     try {
       glueClient.createDatabase(req.build());
@@ -219,7 +219,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public GlueSchema loadSchema(NameIdentifier ident) throws NoSuchSchemaException {
     GetDatabaseRequest.Builder req = GetDatabaseRequest.builder().name(ident.name());
-    applyCatalogId(req::catalogId);
+    applyCatalogId(catalogId, req::catalogId);
     try {
       GlueSchema schema =
           GlueSchema.fromGlueDatabase(glueClient.getDatabase(req.build()).database());
@@ -259,7 +259,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     UpdateDatabaseRequest.Builder req =
         UpdateDatabaseRequest.builder().name(ident.name()).databaseInput(input);
-    applyCatalogId(req::catalogId);
+    applyCatalogId(catalogId, req::catalogId);
 
     try {
       glueClient.updateDatabase(req.build());
@@ -282,14 +282,12 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     if (!cascade) {
       GetTablesRequest.Builder tabReq =
           GetTablesRequest.builder().databaseName(ident.name()).maxResults(1);
-      applyCatalogId(tabReq::catalogId);
+      applyCatalogId(catalogId, tabReq::catalogId);
       try {
         if (!glueClient.getTables(tabReq.build()).tableList().isEmpty()) {
           throw new NonEmptySchemaException(
               "Schema %s is not empty. Use cascade=true to drop it with its tables.", ident.name());
         }
-      } catch (NonEmptySchemaException e) {
-        throw e;
       } catch (GlueException e) {
         throw GlueExceptionConverter.toSchemaException(
             e, "checking tables in schema " + ident.name());
@@ -297,7 +295,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     DeleteDatabaseRequest.Builder req = DeleteDatabaseRequest.builder().name(ident.name());
-    applyCatalogId(req::catalogId);
+    applyCatalogId(catalogId, req::catalogId);
     try {
       glueClient.deleteDatabase(req.build());
       LOG.info("Dropped Glue schema (database) {}", ident.name());
@@ -317,7 +315,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     try {
       do {
         GetTablesRequest.Builder req = GetTablesRequest.builder().databaseName(dbName);
-        applyCatalogId(req::catalogId);
+        applyCatalogId(catalogId, req::catalogId);
         if (nextToken != null) req.nextToken(nextToken);
         GetTablesResponse resp = glueClient.getTables(req.build());
         resp.tableList().stream()
@@ -338,7 +336,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   public GlueTable loadTable(NameIdentifier ident) throws NoSuchTableException {
     String dbName = schemaName(ident.namespace());
     GetTableRequest.Builder req = GetTableRequest.builder().databaseName(dbName).name(ident.name());
-    applyCatalogId(req::catalogId);
+    applyCatalogId(catalogId, req::catalogId);
     try {
       GlueTable table =
           GlueTable.fromGlueTable(glueClient.getTable(req.build()).table(), typeConverter);
@@ -383,7 +381,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     CreateTableRequest.Builder req =
         CreateTableRequest.builder().databaseName(dbName).tableInput(input);
-    applyCatalogId(req::catalogId);
+    applyCatalogId(catalogId, req::catalogId);
 
     try {
       glueClient.createTable(req.build());
@@ -464,7 +462,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     UpdateTableRequest.Builder req =
         UpdateTableRequest.builder().databaseName(dbName).tableInput(input);
-    applyCatalogId(req::catalogId);
+    applyCatalogId(catalogId, req::catalogId);
 
     try {
       glueClient.updateTable(req.build());
@@ -494,7 +492,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     String dbName = schemaName(ident.namespace());
     DeleteTableRequest.Builder req =
         DeleteTableRequest.builder().databaseName(dbName).name(ident.name());
-    applyCatalogId(req::catalogId);
+    applyCatalogId(catalogId, req::catalogId);
     try {
       glueClient.deleteTable(req.build());
       LOG.info("Dropped Glue table {}.{}", dbName, ident.name());
@@ -573,7 +571,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     List<String> bucketCols = Collections.emptyList();
     int numBuckets = 0;
-    if (distribution != null && distribution != Distributions.NONE && distribution.number() > 0) {
+    if (distribution != null && distribution != Distributions.NONE) {
       numBuckets = distribution.number();
       bucketCols =
           Arrays.stream(distribution.expressions())
@@ -673,8 +671,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  /** Passes {@link #catalogId} to {@code setter} when it is non-null. */
-  private void applyCatalogId(Consumer<String> setter) {
+  /** Passes {@code catalogId} to {@code setter} when it is non-null. */
+  static void applyCatalogId(String catalogId, Consumer<String> setter) {
     if (catalogId != null) setter.accept(catalogId);
   }
 
