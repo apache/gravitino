@@ -259,7 +259,7 @@ administrator account on first startup.
 
 - only one bootstrap account is created by default: **service admin**
 - the default password is **123456**
-- after initial login, the administrator is expected to change the password immediately
+- after initial login, the service admin is expected to reset the bootstrap password immediately
 
 This design favors usability for POC scenarios. The default password is intentionally simple so that
 users can access the system instantly, but it must be treated as a bootstrap credential rather than
@@ -371,7 +371,8 @@ At a high level:
 1. **Get user**: read the local user information and its current group memberships.
 2. **Add user**: create a new local user with a hashed password.
 3. **Remove user**: soft-delete the user record.
-4. **Change user password**: replace the stored password hash for an existing local user.
+4. **Change user password**: reset the password hash for an existing local user through an
+   administrator-managed operation.
 5. **Get group**: read the local group information and its current user memberships.
 6. **Add group**: create a new local group.
 7. **Remove group**: soft-delete the group record.
@@ -453,6 +454,9 @@ not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
 
 **Spec**
 
+- This API is an administrator-managed password reset API.
+- It does not support end-user self-service password changes.
+- It does not accept `oldPassword`.
 - Only service admin can change any account password.
 - The password cannot contain a colon (`:`). (RFC 7617)
 - The password must be at least 12 characters long and at most 64 characters long.
