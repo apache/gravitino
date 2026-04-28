@@ -76,6 +76,8 @@ import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** LancePartitionStatisticStorage is based on Lance format files. */
 public class LancePartitionStatisticStorage implements PartitionStatisticStorage {
@@ -130,6 +132,8 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   private final ScheduledThreadPoolExecutor scheduler;
 
   private final EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+
+  private static final Logger LOG = LoggerFactory.getLogger(LancePartitionStatisticStorage.class);
 
   public LancePartitionStatisticStorage(Map<String, String> properties) {
     this.allocator = new RootAllocator();
@@ -350,11 +354,21 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
   @Override
   public void close() throws IOException {
+    if (datasetCache.isPresent()) {
+      Cache<Long, Dataset> cache = datasetCache.get();
+      for (Dataset dataset : cache.asMap().values()) {
+        try {
+          dataset.close();
+        } catch (Exception e) {
+          LOG.warn("Failed to close cached Lance dataset", e);
+        }
+      }
+      cache.invalidateAll();
+    }
+
     if (allocator != null) {
       allocator.close();
     }
-
-    datasetCache.ifPresent(Cache::invalidateAll);
 
     if (scheduler != null) {
       scheduler.shutdown();

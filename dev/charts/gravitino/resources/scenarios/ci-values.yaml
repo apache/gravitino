@@ -33,7 +33,7 @@ additionalConfigItems:
 
 extraVolumeMounts:
   - name: gravitino-log
-    mountPath: /root/gravitino/logs
+    mountPath: /opt/gravitino/logs
   - name: extra-volume
     mountPath: /extra-volume-path
   - name: another-extra-volume
@@ -50,8 +50,6 @@ extraVolumes:
 replicas: 2
 
 env:
-  - name: GRAVITINO_HOME
-    value: /root/gravitino
   - name: HADOOP_USER_NAME
     value: hdfs
 

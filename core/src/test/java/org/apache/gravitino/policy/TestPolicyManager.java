@@ -105,13 +105,14 @@ public class TestPolicyManager {
       ImmutableSet.of(
           MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA, MetadataObject.Type.TABLE);
 
+  private static EntityStore entityStore;
   private static PolicyManager policyManager;
 
   @BeforeAll
   public static void setUp() throws IllegalAccessException, IOException {
     IdGenerator idGenerator = new RandomIdGenerator();
     Config config = mockConfig();
-    EntityStore entityStore = EntityStoreFactory.createEntityStore(config);
+    entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
     policyManager = new PolicyManager(idGenerator, entityStore);
 
@@ -212,6 +213,10 @@ public class TestPolicyManager {
 
   @AfterAll
   public static void tearDown() throws IOException {
+    if (entityStore != null) {
+      entityStore.close();
+      entityStore = null;
+    }
     FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
   }
 

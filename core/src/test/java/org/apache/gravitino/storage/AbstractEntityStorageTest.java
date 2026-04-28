@@ -202,14 +202,15 @@ abstract class AbstractEntityStorageTest {
             new PostgreSQLExceptionConverter(),
             true);
 
-        RelationalEntityStore store =
-            (RelationalEntityStore) EntityStoreFactory.createEntityStore(config);
-        store.initialize(config);
-        Field f = FieldUtils.getField(RelationalEntityStore.class, "backend", true);
-        RelationalBackend backend = (RelationalBackend) f.get(store);
-        RelationalGarbageCollector garbageCollector =
-            new RelationalGarbageCollector(backend, config);
-        garbageCollector.collectAndClean();
+        try (RelationalEntityStore store =
+            (RelationalEntityStore) EntityStoreFactory.createEntityStore(config)) {
+          store.initialize(config);
+          Field f = FieldUtils.getField(RelationalEntityStore.class, "backend", true);
+          RelationalBackend backend = (RelationalBackend) f.get(store);
+          RelationalGarbageCollector garbageCollector =
+              new RelationalGarbageCollector(backend, config);
+          garbageCollector.collectAndClean();
+        }
 
       } else {
         throw new UnsupportedOperationException("Unsupported entity store type: " + type);

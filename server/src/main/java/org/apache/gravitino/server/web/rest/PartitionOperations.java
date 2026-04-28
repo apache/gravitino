@@ -181,24 +181,24 @@ public class PartitionOperations {
       @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       AddPartitionsRequest request) {
     try {
-      if (request == null || request.getPartitions() == null) {
-        throw new IllegalArgumentException("partitions must not be null");
-      }
-      LOG.info(
-          "Received add {} partition(s) request for table {}.{}.{}.{} ",
-          request.getPartitions().length,
-          metalake,
-          catalog,
-          schema,
-          table);
-      Preconditions.checkArgument(
-          request.getPartitions().length == 1, "Only one partition is supported");
-
-      request.validate();
-
       return Utils.doAs(
           httpRequest,
           () -> {
+            if (request == null || request.getPartitions() == null) {
+              throw new IllegalArgumentException("partitions must not be null");
+            }
+            LOG.info(
+                "Received add {} partition(s) request for table {}.{}.{}.{} ",
+                request.getPartitions().length,
+                metalake,
+                catalog,
+                schema,
+                table);
+            Preconditions.checkArgument(
+                request.getPartitions().length == 1, "Only one partition is supported");
+
+            request.validate();
+
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
             Partition p = dispatcher.addPartition(tableIdent, fromDTO(request.getPartitions()[0]));
             Response response =
@@ -245,23 +245,24 @@ public class PartitionOperations {
                 purge
                     ? dispatcher.purgePartition(tableIdent, partition)
                     : dispatcher.dropPartition(tableIdent, partition);
-            if (!dropped) {
+            if (dropped) {
+              LOG.info(
+                  "Partition {} {} in table {}.{}.{}.{}",
+                  partition,
+                  purge ? "purged" : "dropped",
+                  metalake,
+                  catalog,
+                  schema,
+                  table);
+            } else {
               LOG.warn(
                   "Failed to drop partition {} under table {} under schema {}",
                   partition,
                   table,
                   schema);
             }
-            Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info(
-                "Partition {} {} in table {}.{}.{}.{}",
-                partition,
-                purge ? "purged" : "dropped",
-                metalake,
-                catalog,
-                schema,
-                table);
-            return response;
+
+            return Utils.ok(new DropResponse(dropped));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.DROP, "", table, e);

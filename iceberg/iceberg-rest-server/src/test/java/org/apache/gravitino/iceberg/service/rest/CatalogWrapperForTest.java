@@ -31,6 +31,7 @@ import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
@@ -66,9 +67,12 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
     }
 
     Schema mockSchema = new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
-    TableMetadata tableMetadata =
+    TableMetadata baseMetadata =
         TableMetadata.newTableMetadata(
             mockSchema, PartitionSpec.unpartitioned(), "/mock", ImmutableMap.of());
+    String json = TableMetadataParser.toJson(baseMetadata);
+    TableMetadata tableMetadata =
+        TableMetadataParser.fromJson("/mock/metadata/v1.metadata.json", json);
     LoadTableResponse loadTableResponse =
         LoadTableResponse.builder()
             .withTableMetadata(tableMetadata)
@@ -87,7 +91,7 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
 
   private void appendSampleData(Namespace namespace, String tableName) {
     try {
-      Table table = catalog.loadTable(TableIdentifier.of(namespace, tableName));
+      Table table = getCatalog().loadTable(TableIdentifier.of(namespace, tableName));
       // Append multiple times to create multiple snapshots for incremental scan testing
       for (int i = 0; i < 3; i++) {
         Path tempFile = Files.createTempFile("plan-scan-" + i, ".parquet");

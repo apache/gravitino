@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.time.Instant;
@@ -1305,6 +1306,11 @@ public class POConverters {
               .readValue(securableObjectPO.getPrivilegeConditions(), List.class);
 
       List<Privilege> privileges = Lists.newArrayList();
+      Preconditions.checkArgument(
+          privilegeNames.size() == privilegeConditions.size(),
+          "Privilege names and conditions must have the same size, but got %s names and %s conditions",
+          privilegeNames.size(),
+          privilegeConditions.size());
       for (int index = 0; index < privilegeNames.size(); index++) {
         if (Privilege.Condition.ALLOW.name().equals(privilegeConditions.get(index))) {
           privileges.add(Privileges.allow(privilegeNames.get(index)));

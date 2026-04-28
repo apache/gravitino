@@ -135,7 +135,8 @@ public class IcebergRestTestUtil {
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
           new IcebergCatalogWrapperManagerForTest(
               catalogConf, configProvider, false, configProvider.getMetalakeName());
-      IcebergRESTServerContext.create(configProvider, false, false, icebergCatalogWrapperManager);
+      IcebergRESTServerContext.create(
+          configProvider, false, false, true, icebergCatalogWrapperManager);
 
       EventBus eventBus = new EventBus(eventListenerPlugins);
 

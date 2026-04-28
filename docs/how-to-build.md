@@ -65,6 +65,12 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew build -PpythonVersion=3.12
    ```
 
+  If you don't need to build the Trino connector (for example, when building on a machine without JDK 24), you can skip it with:
+
+   ```shell
+   ./gradlew build -PskipTrinoConnector=true
+   ```
+
   If you want to build a module on its own, like the Spark connector, you can use Gradle to build a module with a specific name, like so:
 
    ```shell
@@ -91,6 +97,12 @@ license: "This software is licensed under the Apache License version 2."
 
    ```shell
    ./gradlew compileDistribution
+   ```
+
+   To skip compiling and packaging the Web UI artifacts, use:
+
+   ```shell
+   ./gradlew compileDistribution -PskipWebBuild=true
    ```
 
   The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory. It contains two subdirectories: `package` and `package-all`. The difference between these two subdirectories is that `package` is the **Gravitino server distribution package**, while `package-all` contains extra catalogs in `catalogs-contrib` and all contents in `package`.

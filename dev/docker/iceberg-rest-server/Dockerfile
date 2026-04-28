@@ -23,10 +23,16 @@ LABEL maintainer="dev@gravitino.apache.org"
 RUN apt-get update && apt-get install -y \
     python-is-python3
 
-WORKDIR /root/gravitino-iceberg-rest-server
+WORKDIR /opt/gravitino-iceberg-rest-server
 
-COPY packages/gravitino-iceberg-rest-server /root/gravitino-iceberg-rest-server
+COPY packages/gravitino-iceberg-rest-server /opt/gravitino-iceberg-rest-server
+
+RUN chmod -R g+rwX /opt/gravitino-iceberg-rest-server \
+    && chmod +x /opt/gravitino-iceberg-rest-server/bin/start-iceberg-rest-server.sh \
+    && useradd -u 1000 -g 0 -M -s /sbin/nologin gravitino
 
 EXPOSE 9001
 
-ENTRYPOINT ["/bin/bash", "/root/gravitino-iceberg-rest-server/bin/start-iceberg-rest-server.sh"]
+USER 1000
+
+ENTRYPOINT ["/bin/bash", "/opt/gravitino-iceberg-rest-server/bin/start-iceberg-rest-server.sh"]
