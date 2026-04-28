@@ -103,6 +103,34 @@ files:
 
 Database-backed storage is the most practical choice for a built-in local IdP.
 
+### 3.4 Module Layout
+
+The local IdP feature should be implemented as an independent Gravitino module rather than being
+scattered directly across the existing `server-common`, `server`, and `core` modules.
+
+The recommended module name is:
+
+- `authenticators:authenticator-local-idp`
+
+This naming keeps the capability grouping explicit and avoids tying the module name to the HTTP
+Basic transport syntax alone. Although the initial login flow uses Basic authentication, the module
+itself is responsible for the broader local IdP capability set, including:
+
+- local user and local group management,
+- password hashing and verification,
+- bootstrap credential handling,
+- and the local IdP management API wiring.
+
+At a high level, the implementation can still integrate with existing Gravitino modules as needed:
+
+- `core` for relational storage integration,
+- `server-common` for authenticator/filter extension points,
+- and `server` for REST resource exposure.
+
+However, the Local IdP-specific logic should be owned primarily by
+`authenticators:authenticator-local-idp` so that the feature has a clear packaging boundary and can
+evolve independently from the generic server authentication framework.
+
 ---
 
 ## 4. Password Hashing
@@ -153,6 +181,12 @@ These tables follow Gravitino's existing metadata table conventions:
 - `audit_info`,
 - optimistic version fields,
 - and `deleted_at` for soft deletion.
+
+Soft-deleted rows in `local_user_meta` and `local_group_meta` should be cleaned asynchronously by
+Gravitino's GC thread, following the same lifecycle management pattern used by other metadata
+tables. When a local user or local group is physically removed by the GC thread, the implementation
+should also clean the corresponding soft-deleted rows in `local_group_user_rel` to avoid leaving
+orphaned membership records.
 
 Unlike Gravitino's existing `user_meta` and `group_meta` tables, `local_user_meta` and
 `local_group_meta` are intentionally designed as **global identity tables** and therefore **do not
