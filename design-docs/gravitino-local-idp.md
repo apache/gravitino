@@ -556,12 +556,12 @@ not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
 |---|---|---|---|
 | `group` | `String` | Yes | Group name |
 
-#### 9.1.8 Group Add User
+#### 9.1.8 Group Add Users
 
 | Item | Value |
 |---|---|
 | Method | `PUT` |
-| Path | `/api/auth/basic/groups/{group}/users/add` |
+| Path | `/api/auth/basic/groups/{group}/users` |
 | Permission | Only service admin can execute |
 
 **Parameters**
@@ -571,12 +571,12 @@ not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
 | `group` | `String` | Yes | Group name |
 | `userNames` | `Array<String>` | Yes | User names. Must not be null or empty |
 
-#### 9.1.9 Group Remove User
+#### 9.1.9 Group Remove Users
 
 | Item | Value |
 |---|---|
 | Method | `DELETE` |
-| Path | `/api/auth/basic/groups/{group}/users/remove` |
+| Path | `/api/auth/basic/groups/{group}/users` |
 | Permission | Only service admin can execute |
 
 **Parameters**
