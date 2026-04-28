@@ -45,10 +45,18 @@ import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.EntityCacheRelationKey;
 import org.apache.gravitino.cache.ReverseIndexCache;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionParams;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -57,6 +65,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -776,6 +785,130 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
+  void testFunctionTagRelationCacheInvalidation(String type, boolean enableCache) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      store.initialize(config);
+
+      BaseMetalake metalake =
+          createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+      store.put(metalake, false);
+
+      CatalogEntity catalog =
+          createCatalog(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofCatalog("metalake"),
+              "catalog",
+              auditInfo);
+      store.put(catalog, false);
+
+      SchemaEntity schema =
+          createSchemaEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              Namespace.of("metalake", "catalog"),
+              "schema",
+              auditInfo);
+      store.put(schema, false);
+
+      TagEntity tag =
+          TagEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withNamespace(NameIdentifierUtil.ofTag("metalake", "tag1").namespace())
+              .withName("tag1")
+              .withAuditInfo(auditInfo)
+              .withProperties(Collections.emptyMap())
+              .build();
+      store.put(tag, false);
+
+      FunctionEntity function =
+          createFunctionEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              Namespace.of("metalake", "catalog", "schema"),
+              "function_old",
+              auditInfo);
+      store.put(function, false);
+
+      SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+      relationOperations.updateEntityRelations(
+          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+          function.nameIdentifier(),
+          Entity.EntityType.FUNCTION,
+          new NameIdentifier[] {tag.nameIdentifier()},
+          new NameIdentifier[] {});
+
+      List<TagEntity> tags =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              function.nameIdentifier(),
+              Entity.EntityType.FUNCTION,
+              true);
+      Assertions.assertEquals(1, tags.size());
+      Assertions.assertEquals(tag.name(), tags.get(0).name());
+
+      List<GenericEntity> taggedObjects =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag.nameIdentifier(),
+              Entity.EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, taggedObjects.size());
+      Assertions.assertEquals(function.id(), taggedObjects.get(0).id());
+      Assertions.assertEquals("catalog.schema.function_old", taggedObjects.get(0).name());
+
+      FunctionEntity renamedFunction =
+          createFunctionEntity(
+              function.id(),
+              Namespace.of("metalake", "catalog", "schema"),
+              "function_new",
+              auditInfo);
+      store.update(
+          function.nameIdentifier(),
+          FunctionEntity.class,
+          Entity.EntityType.FUNCTION,
+          e -> renamedFunction);
+
+      if (enableCache && store instanceof RelationalEntityStore) {
+        RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+        if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+          CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+          ReverseIndexCache reverseIndexCache = cache.getReverseIndex();
+          Assertions.assertNull(
+              reverseIndexCache.get(function.nameIdentifier(), Entity.EntityType.FUNCTION));
+        }
+      }
+
+      List<TagEntity> tagsAfterRename =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              renamedFunction.nameIdentifier(),
+              Entity.EntityType.FUNCTION,
+              true);
+      Assertions.assertEquals(1, tagsAfterRename.size());
+      Assertions.assertEquals(tag.name(), tagsAfterRename.get(0).name());
+
+      List<GenericEntity> taggedObjectsAfterRename =
+          relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              tag.nameIdentifier(),
+              Entity.EntityType.TAG,
+              true);
+      Assertions.assertEquals(1, taggedObjectsAfterRename.size());
+      Assertions.assertEquals(renamedFunction.id(), taggedObjectsAfterRename.get(0).id());
+      Assertions.assertEquals(
+          "catalog.schema.function_new", taggedObjectsAfterRename.get(0).name());
+
+      destroy(type);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
   void testViewNotIndexedInReverseCache(String type, boolean enableCache) throws Exception {
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
@@ -1067,5 +1200,286 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
 
       destroy(type);
     }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testRoleCacheEvictedOnFunctionDeletion(String type, boolean enableCache) throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        CatalogEntity catalog =
+            createCatalog(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofCatalog("metalake"),
+                "catalog",
+                auditInfo);
+        store.put(catalog, false);
+
+        SchemaEntity schema =
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog"),
+                "schema",
+                auditInfo);
+        store.put(schema, false);
+
+        FunctionEntity function =
+            createFunctionEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog", "schema"),
+                "function1",
+                auditInfo);
+        store.put(function, false);
+
+        SecurableObject catalogObject =
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+        SecurableObject schemaObject =
+            SecurableObjects.ofSchema(
+                catalogObject, "schema", Lists.newArrayList(Privileges.UseSchema.allow()));
+        SecurableObject functionObject =
+            SecurableObjects.ofFunction(
+                schemaObject, "function1", Lists.newArrayList(Privileges.ExecuteFunction.allow()));
+
+        RoleEntity role =
+            RoleEntity.builder()
+                .withId(RandomIdGenerator.INSTANCE.nextId())
+                .withName("functionRole")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace("metalake"))
+                .withProperties(null)
+                .withAuditInfo(auditInfo)
+                .withSecurableObjects(
+                    Lists.newArrayList(catalogObject, schemaObject, functionObject))
+                .build();
+        store.put(role, false);
+
+        // Read role to populate cache; ROLE_SECURABLE_OBJECT_REVERSE_RULE writes:
+        // funcIdent:FUNCTION -> [roleIdent:ROLE] into the reverse index.
+        RoleEntity cachedRole =
+            store.get(role.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+        Assertions.assertEquals(3, cachedRole.securableObjects().size());
+
+        if (enableCache && store instanceof RelationalEntityStore) {
+          RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+          if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+            ReverseIndexCache reverseIndex =
+                ((CaffeineEntityCache) relationalEntityStore.getCache()).getReverseIndex();
+            List<EntityCacheKey> reverseKeys =
+                reverseIndex.get(function.nameIdentifier(), Entity.EntityType.FUNCTION);
+            Assertions.assertNotNull(reverseKeys);
+            Assertions.assertTrue(
+                reverseKeys.stream().anyMatch(k -> k.identifier().equals(role.nameIdentifier())));
+          }
+        }
+
+        // Delete the function; BFS invalidation should evict the role from cache via reverse index.
+        store.delete(function.nameIdentifier(), Entity.EntityType.FUNCTION, false);
+
+        if (enableCache && store instanceof RelationalEntityStore) {
+          RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+          if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+            CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+            Assertions.assertNull(
+                cache
+                    .getCacheData()
+                    .getIfPresent(
+                        EntityCacheRelationKey.of(role.nameIdentifier(), Entity.EntityType.ROLE)));
+          }
+        }
+
+        // Re-read role; the function securable object should have been removed from DB via cascade.
+        RoleEntity reloadedRole =
+            store.get(role.nameIdentifier(), Entity.EntityType.ROLE, RoleEntity.class);
+        long functionSecurableObjects =
+            reloadedRole.securableObjects().stream()
+                .filter(so -> so.type() == MetadataObject.Type.FUNCTION)
+                .count();
+        Assertions.assertEquals(0, functionSecurableObjects);
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testFunctionOwnerRelationCacheInvalidation(String type, boolean enableCache)
+      throws Exception {
+    Config config = Mockito.mock(Config.class);
+    Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(enableCache);
+    init(type, config);
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    try (EntityStore store = EntityStoreFactory.createEntityStore(config)) {
+      try {
+        store.initialize(config);
+
+        BaseMetalake metalake =
+            createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), "metalake", auditInfo);
+        store.put(metalake, false);
+
+        CatalogEntity catalog =
+            createCatalog(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofCatalog("metalake"),
+                "catalog",
+                auditInfo);
+        store.put(catalog, false);
+
+        SchemaEntity schema =
+            createSchemaEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog"),
+                "schema",
+                auditInfo);
+        store.put(schema, false);
+
+        FunctionEntity function =
+            createFunctionEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                Namespace.of("metalake", "catalog", "schema"),
+                "function1",
+                auditInfo);
+        store.put(function, false);
+
+        SupportsRelationOperations relationOperations = (SupportsRelationOperations) store;
+
+        // 1. Query owner of function - should be empty initially and result is cached
+        List<UserEntity> owners =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.OWNER_REL,
+                function.nameIdentifier(),
+                Entity.EntityType.FUNCTION,
+                true);
+        Assertions.assertTrue(owners.isEmpty());
+
+        if (enableCache && store instanceof RelationalEntityStore) {
+          RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+          if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+            CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+            List<Entity> cachedOwners =
+                cache
+                    .getCacheData()
+                    .getIfPresent(
+                        EntityCacheRelationKey.of(
+                            function.nameIdentifier(),
+                            Entity.EntityType.FUNCTION,
+                            SupportsRelationOperations.Type.OWNER_REL));
+            Assertions.assertNotNull(cachedOwners);
+            Assertions.assertTrue(cachedOwners.isEmpty());
+          }
+        }
+
+        // 2. Set an owner; cache for OWNER_REL should be invalidated
+        UserEntity ownerUser =
+            createUserEntity(
+                RandomIdGenerator.INSTANCE.nextId(),
+                AuthorizationUtils.ofUserNamespace("metalake"),
+                "ownerUser",
+                auditInfo);
+        store.put(ownerUser, false);
+
+        relationOperations.insertRelation(
+            SupportsRelationOperations.Type.OWNER_REL,
+            function.nameIdentifier(),
+            Entity.EntityType.FUNCTION,
+            ownerUser.nameIdentifier(),
+            Entity.EntityType.USER,
+            true);
+
+        // 3. Query owner again - should return the owner and be re-cached
+        owners =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.OWNER_REL,
+                function.nameIdentifier(),
+                Entity.EntityType.FUNCTION,
+                true);
+        Assertions.assertEquals(1, owners.size());
+        Assertions.assertEquals(ownerUser.name(), owners.get(0).name());
+
+        // 4. Rename the function; old OWNER_REL cache entry should be evicted via BFS invalidation
+        FunctionEntity renamedFunction =
+            createFunctionEntity(
+                function.id(),
+                Namespace.of("metalake", "catalog", "schema"),
+                "function_renamed",
+                auditInfo);
+        store.update(
+            function.nameIdentifier(),
+            FunctionEntity.class,
+            Entity.EntityType.FUNCTION,
+            e -> renamedFunction);
+
+        if (enableCache && store instanceof RelationalEntityStore) {
+          RelationalEntityStore relationalEntityStore = (RelationalEntityStore) store;
+          if (relationalEntityStore.getCache() instanceof CaffeineEntityCache) {
+            CaffeineEntityCache cache = (CaffeineEntityCache) relationalEntityStore.getCache();
+            // The old function's OWNER_REL cache should have been evicted by BFS invalidation
+            List<Entity> cachedOwners =
+                cache
+                    .getCacheData()
+                    .getIfPresent(
+                        EntityCacheRelationKey.of(
+                            function.nameIdentifier(),
+                            Entity.EntityType.FUNCTION,
+                            SupportsRelationOperations.Type.OWNER_REL));
+            Assertions.assertNull(cachedOwners);
+          }
+        }
+
+        // 5. Query owner via new name - should still return the correct owner
+        owners =
+            relationOperations.listEntitiesByRelation(
+                SupportsRelationOperations.Type.OWNER_REL,
+                renamedFunction.nameIdentifier(),
+                Entity.EntityType.FUNCTION,
+                true);
+        Assertions.assertEquals(1, owners.size());
+        Assertions.assertEquals(ownerUser.name(), owners.get(0).name());
+
+      } finally {
+        destroy(type);
+      }
+    }
+  }
+
+  private FunctionEntity createFunctionEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    FunctionParam param1 = FunctionParams.of("param1", Types.IntegerType.get());
+    FunctionParam param2 = FunctionParams.of("param2", Types.StringType.get());
+    FunctionImpl functionImpl =
+        FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT param1 + 1");
+    FunctionDefinition definition =
+        FunctionDefinitions.of(
+            new FunctionParam[] {param1, param2},
+            Types.IntegerType.get(),
+            new FunctionImpl[] {functionImpl});
+
+    return FunctionEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment("test function comment")
+        .withFunctionType(FunctionType.SCALAR)
+        .withDeterministic(false)
+        .withDefinitions(new FunctionDefinition[] {definition})
+        .withAuditInfo(auditInfo)
+        .build();
   }
 }

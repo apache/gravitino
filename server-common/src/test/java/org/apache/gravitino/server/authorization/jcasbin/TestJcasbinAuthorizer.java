@@ -51,17 +51,20 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -90,6 +93,10 @@ public class TestJcasbinAuthorizer {
   private static final String USERNAME = "tester";
 
   private static final String METALAKE = "testMetalake";
+
+  private static final Long GROUP_ID = 6L;
+
+  private static final String GROUP_NAME = "testGroup";
 
   private static EntityStore entityStore = mock(EntityStore.class);
 
@@ -261,6 +268,84 @@ public class TestJcasbinAuthorizer {
     assertFalse(doAuthorizeOwner(currentPrincipal));
   }
 
+  @Test
+  public void testAuthorizeByGroupOwner() throws Exception {
+    // Set up a UserPrincipal whose groups include GROUP_NAME
+    UserPrincipal groupPrincipal =
+        new UserPrincipal(USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), GROUP_NAME)));
+    principalUtilsMockedStatic.when(PrincipalUtils::getCurrentPrincipal).thenReturn(groupPrincipal);
+
+    NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
+
+    // Mock entityStore.batchGet for group entity lookup (needed for ID-based ownership
+    // verification)
+    when(entityStore.batchGet(
+            eq(ImmutableList.of(NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME))),
+            eq(Entity.EntityType.GROUP),
+            eq(GroupEntity.class)))
+        .thenReturn(ImmutableList.of(getGroupEntity()));
+
+    // For non-member principal, mock batchGet for "otherGroup"
+    when(entityStore.batchGet(
+            eq(ImmutableList.of(NameIdentifierUtil.ofGroup(METALAKE, "otherGroup"))),
+            eq(Entity.EntityType.GROUP),
+            eq(GroupEntity.class)))
+        .thenReturn(
+            ImmutableList.of(
+                GroupEntity.builder()
+                    .withId(99L)
+                    .withName("otherGroup")
+                    .withNamespace(Namespace.of(METALAKE, "group"))
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build()));
+
+    // Mock owner relation returning a GroupEntity
+    List<GroupEntity> owners = ImmutableList.of(getGroupEntity());
+    doReturn(owners)
+        .when(supportsRelationOperations)
+        .listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.OWNER_REL),
+            eq(catalogIdent),
+            eq(Entity.EntityType.CATALOG));
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    // The principal belongs to the owning group, so isOwner should return true
+    assertTrue(doAuthorizeOwner(groupPrincipal));
+
+    // Clear owner and verify it returns false
+    doReturn(new ArrayList<>())
+        .when(supportsRelationOperations)
+        .listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.OWNER_REL),
+            eq(catalogIdent),
+            eq(Entity.EntityType.CATALOG));
+    jcasbinAuthorizer.handleMetadataOwnerChange(
+        METALAKE, GROUP_ID, catalogIdent, Entity.EntityType.CATALOG);
+    assertFalse(doAuthorizeOwner(groupPrincipal));
+
+    // Verify a principal whose groups do NOT include the owner group gets denied
+    UserPrincipal nonMemberPrincipal =
+        new UserPrincipal(
+            USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), "otherGroup")));
+    principalUtilsMockedStatic
+        .when(PrincipalUtils::getCurrentPrincipal)
+        .thenReturn(nonMemberPrincipal);
+    // Re-populate the owner cache with the group owner
+    doReturn(ImmutableList.of(getGroupEntity()))
+        .when(supportsRelationOperations)
+        .listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.OWNER_REL),
+            eq(catalogIdent),
+            eq(Entity.EntityType.CATALOG));
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+    assertFalse(doAuthorizeOwner(nonMemberPrincipal));
+
+    // Restore the original principal mock
+    principalUtilsMockedStatic
+        .when(PrincipalUtils::getCurrentPrincipal)
+        .thenReturn(new UserPrincipal(USERNAME));
+  }
+
   private Boolean doAuthorize(Principal currentPrincipal) {
     return jcasbinAuthorizer.authorize(
         currentPrincipal,
@@ -283,6 +368,15 @@ public class TestJcasbinAuthorizer {
     return UserEntity.builder()
         .withId(USER_ID)
         .withName(USERNAME)
+        .withAuditInfo(AuditInfo.EMPTY)
+        .build();
+  }
+
+  private static GroupEntity getGroupEntity() {
+    return GroupEntity.builder()
+        .withId(GROUP_ID)
+        .withName(GROUP_NAME)
+        .withNamespace(Namespace.of(METALAKE, "group"))
         .withAuditInfo(AuditInfo.EMPTY)
         .build();
   }
@@ -385,10 +479,10 @@ public class TestJcasbinAuthorizer {
   @Test
   public void testOwnerCacheInvalidation() throws Exception {
     // Get the ownerRel cache via reflection
-    Cache<Long, Optional<Long>> ownerRel = getOwnerRelCache(jcasbinAuthorizer);
+    Cache<Long, Optional<OwnerInfo>> ownerRel = getOwnerRelCache(jcasbinAuthorizer);
 
     // Manually add an owner relation to the cache
-    ownerRel.put(CATALOG_ID, Optional.of(USER_ID));
+    ownerRel.put(CATALOG_ID, Optional.of(new OwnerInfo(USER_ID, Entity.EntityType.USER, USERNAME)));
 
     // Verify it's in the cache
     assertNotNull(ownerRel.getIfPresent(CATALOG_ID));
@@ -443,7 +537,7 @@ public class TestJcasbinAuthorizer {
   public void testCacheInitialization() throws Exception {
     // Verify that caches are initialized
     Cache<Long, Boolean> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
-    Cache<Long, Optional<Long>> ownerRel = getOwnerRelCache(jcasbinAuthorizer);
+    Cache<Long, Optional<OwnerInfo>> ownerRel = getOwnerRelCache(jcasbinAuthorizer);
 
     assertNotNull(loadedRoles, "loadedRoles cache should be initialized");
     assertNotNull(ownerRel, "ownerRel cache should be initialized");
@@ -599,11 +693,11 @@ public class TestJcasbinAuthorizer {
   }
 
   @SuppressWarnings("unchecked")
-  private static Cache<Long, Optional<Long>> getOwnerRelCache(JcasbinAuthorizer authorizer)
+  private static Cache<Long, Optional<OwnerInfo>> getOwnerRelCache(JcasbinAuthorizer authorizer)
       throws Exception {
     Field field = JcasbinAuthorizer.class.getDeclaredField("ownerRel");
     field.setAccessible(true);
-    return (Cache<Long, Optional<Long>>) field.get(authorizer);
+    return (Cache<Long, Optional<OwnerInfo>>) field.get(authorizer);
   }
 
   private static Enforcer getAllowEnforcer(JcasbinAuthorizer authorizer) throws Exception {
