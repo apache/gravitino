@@ -352,8 +352,11 @@ keeps the design extensible and makes the hashing choice visible in configuratio
 
 The local IdP must support the following administrator-managed operations:
 
+- get user
 - add user
 - remove user
+- change user password
+- get group
 - add group
 - remove group
 - add user to group
@@ -365,12 +368,15 @@ result.
 
 At a high level:
 
-1. **Add user**: create a new local user with a hashed password.
-2. **Remove user**: soft-delete the user record.
-3. **Add group**: create a new local group.
-4. **Remove group**: soft-delete the group record.
-5. **Add user to group**: create a row in `local_group_user_rel`.
-6. **Remove user from group**: soft-delete the corresponding relation row.
+1. **Get user**: read the local user information and its current group memberships.
+2. **Add user**: create a new local user with a hashed password.
+3. **Remove user**: soft-delete the user record.
+4. **Change user password**: replace the stored password hash for an existing local user.
+5. **Get group**: read the local group information and its current user memberships.
+6. **Add group**: create a new local group.
+7. **Remove group**: soft-delete the group record.
+8. **Add user to group**: create a row in `local_group_user_rel`.
+9. **Remove user from group**: soft-delete the corresponding relation row.
 
 ### 9.1 HTTP Interface Design
 
