@@ -513,181 +513,142 @@ These APIs are available only when the `basic` authenticator is enabled. If `bas
 requests to these Local IdP management endpoints should be rejected rather than treated as available
 server APIs.
 
-#### 9.1.1 Get Local User Info
+All of the following operations are administrator-managed operations. They are intended to be called
+by the configured service admin rather than by end users.
 
-| Item | Value |
-|---|---|
-| Method | `GET` |
-| Path | `/api/idp/users/{user}` |
-| Permission | Only service admin / owner can execute |
+#### 9.1.1 Get a local user
 
-**Path parameters**
+You can get a local user by its name. The response should include the user name and current group
+memberships.
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `user` | `String` | Yes | User name |
+The request path for REST API is `/api/idp/users/{user}`.
 
-**Response**
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+http://localhost:8090/api/idp/users/alice
+```
 
-| Field | Type | Description |
-|---|---|---|
-| `name` | `String` | User name |
-| `groups` | `Array<String>` | Groups to which the user belongs |
+#### 9.1.2 Create a local user
 
-#### 9.1.2 Add Local User
+You can create a local user by providing a user name and password. The password must be stored as a
+hash rather than plaintext.
 
-| Item | Value |
-|---|---|
-| Method | `POST` |
-| Path | `/api/idp/users` |
-| Permission | Only service admin can execute |
+The request path for REST API is `/api/idp/users`.
 
-**Parameters**
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "user": "alice",
+  "password": "Passw0rd-For-Alice"
+}' http://localhost:8090/api/idp/users
+```
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `user` | `String` | Yes | User name |
-| `password` | `String` | Yes | Password |
+#### 9.1.3 Remove a local user
 
-#### 9.1.3 Remove Local User
+You can remove a local user by its name. This operation should soft-delete the user record rather
+than physically remove it immediately.
 
-| Item | Value |
-|---|---|
-| Method | `DELETE` |
-| Path | `/api/idp/users/{user}` |
-| Permission | Only service admin can execute |
+The request path for REST API is `/api/idp/users/{user}`.
 
-**Path parameters**
+```shell
+curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
+http://localhost:8090/api/idp/users/alice
+```
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `user` | `String` | Yes | User name |
+#### 9.1.4 Reset a local user password
 
-#### 9.1.4 Change Password
+You can reset the password of an existing local user by providing a new password. This API is an
+administrator-managed password reset API rather than an end-user self-service password change API.
 
-| Item | Value                          |
-|---|--------------------------------|
-| Method | `PUT`                          |
-| Path | `/api/idp/users/{user}` |
-| Permission | Only service admin can execute |
+The request path for REST API is `/api/idp/users/{user}`.
 
-**Path parameters**
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "password": "Passw0rd-For-Alice-V2"
+}' http://localhost:8090/api/idp/users/alice
+```
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `user` | `String` | Yes | User name |
+The password reset API follows these rules:
 
-**Request body**
+- it does not support end-user self-service password changes
+- it does not accept `oldPassword`
+- only the service admin can reset account passwords
+- the user name cannot contain a colon (`:`); the Basic credential should be parsed by splitting on
+  the first colon, so the password may contain additional colons (RFC 7617)
+- the password must be at least 12 characters long and at most 64 characters long
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `password` | `String` | Yes | New password |
-
-**Spec**
-
-- This API is an administrator-managed password reset API.
-- It does not support end-user self-service password changes.
-- It does not accept `oldPassword`.
-- Only service admin can change any account password.
-- The user name cannot contain a colon (`:`). Parse the Basic credential by splitting on the first
-  colon, so the password may contain additional colons. (RFC 7617)
-- The password must be at least 12 characters long and at most 64 characters long.
-
-**Error codes**
+The password reset API should return:
 
 | Error case | HTTP status |
 |---|---|
 | Account doesn't exist | `404` |
 | Password same with old | `422` |
 
-#### 9.1.5 Get Local Group Info
+#### 9.1.5 Get a local group
 
-| Item | Value |
-|---|---|
-| Method | `GET` |
-| Path | `/api/idp/groups/{group}` |
-| Permission | Only service admin can execute |
+You can get a local group by its name. The response should include the group name and current user
+memberships.
 
-**Path parameters**
+The request path for REST API is `/api/idp/groups/{group}`.
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `group` | `String` | Yes | Group name |
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+http://localhost:8090/api/idp/groups/engineering
+```
 
-**Response**
+#### 9.1.6 Create a local group
 
-| Field | Type | Description |
-|---|---|---|
-| `name` | `String` | Group name |
-| `users` | `Array<String>` | All users in the group |
+You can create a local group by providing a group name.
 
-#### 9.1.6 Add Local Group
+The request path for REST API is `/api/idp/groups`.
 
-| Item | Value |
-|---|---|
-| Method | `POST` |
-| Path | `/api/idp/groups` |
-| Permission | Only service admin can execute |
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "group": "engineering"
+}' http://localhost:8090/api/idp/groups
+```
 
-**Request body**
+#### 9.1.7 Remove a local group
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `group` | `String` | Yes | Group name |
+You can remove a local group by its name. This operation should soft-delete the group record rather
+than physically remove it immediately.
 
-#### 9.1.7 Remove Local Group
+The request path for REST API is `/api/idp/groups/{group}`.
 
-| Item | Value |
-|---|---|
-| Method | `DELETE` |
-| Path | `/api/idp/groups/{group}` |
-| Permission | Only service admin can execute |
+```shell
+curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
+http://localhost:8090/api/idp/groups/engineering
+```
 
-**Path parameters**
+#### 9.1.8 Add users to a local group
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `group` | `String` | Yes | Group name |
+You can add users to a local group by providing the group name in the path and the target user
+names in the request body.
 
-#### 9.1.8 Group Add Users
+The request path for REST API is `/api/idp/groups/{group}/users`.
 
-| Item | Value |
-|---|---|
-| Method | `PUT` |
-| Path | `/api/idp/groups/{group}/users` |
-| Permission | Only service admin can execute |
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "userNames": ["alice", "bob"]
+}' http://localhost:8090/api/idp/groups/engineering/users
+```
 
-**Path parameters**
+#### 9.1.9 Remove users from a local group
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `group` | `String` | Yes | Group name |
+You can remove users from a local group by providing the group name in the path and the target
+user names in the request body.
 
-**Request body**
+The request path for REST API is `/api/idp/groups/{group}/users`.
 
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `userNames` | `Array<String>` | Yes | User names. Must not be null or empty |
-
-#### 9.1.9 Group Remove Users
-
-| Item | Value |
-|---|---|
-| Method | `DELETE` |
-| Path | `/api/idp/groups/{group}/users` |
-| Permission | Only service admin can execute |
-
-**Path parameters**
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `group` | `String` | Yes | Group name |
-
-**Request body**
-
-| Parameter | Type | Required | Description |
-|---|---|---|---|
-| `userNames` | `Array<String>` | Yes | User names. Must not be null or empty |
+```shell
+curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "userNames": ["alice"]
+}' http://localhost:8090/api/idp/groups/engineering/users
+```
 ---
 
 ## 10. Security Considerations
