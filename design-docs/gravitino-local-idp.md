@@ -166,7 +166,7 @@ metalake.
 CREATE TABLE IF NOT EXISTS `local_user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'username',
-    `password_hash` VARCHAR(256) NOT NULL COMMENT 'hashed password',
+    `password_hash` VARCHAR(1024) NOT NULL COMMENT 'hashed password',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'user audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
