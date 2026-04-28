@@ -449,7 +449,7 @@ not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
 | Item | Value |
 |---|---|
 | Method | `POST` |
-| Path | `/api/auth/basic/users/{user}` |
+| Path | `/api/auth/basic/users` |
 | Permission | Only service admin can execute |
 
 **Parameters**
@@ -533,7 +533,7 @@ not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
 | Item | Value |
 |---|---|
 | Method | `POST` |
-| Path | `/api/auth/basic/groups/{group}` |
+| Path | `/api/auth/basic/groups` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
