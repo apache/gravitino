@@ -329,7 +329,7 @@ bootstrap password.
 
    ```properties
    gravitino.authenticators=basic
-   gravitino.authenticator.basic.password-hashing.algorithm=Argon2id
+   gravitino.authenticator.basic.passwordHasher=Argon2id
    gravitino.authorization.serviceAdmins=adminUser
    ```
 
@@ -464,7 +464,7 @@ should use the `gravitino.authenticator.<mode>.*` prefix rather than
 
 | Key | Default | Optional Values |
 |---|---|---|
-| `gravitino.authenticator.basic.password-hashing.algorithm` | `Argon2id` | `Argon2id` |
+| `gravitino.authenticator.basic.passwordHasher` | `Argon2id` | `Argon2id` |
 
 Even though the initial implementation supports only one algorithm, an explicit configuration key
 keeps the design extensible and makes the hashing choice visible in configuration.
