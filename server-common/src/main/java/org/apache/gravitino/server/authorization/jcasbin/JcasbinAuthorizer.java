@@ -448,7 +448,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * <p>For flat (non-nested) schemas the list contains only the original object.
    */
   private List<MetadataObject> buildSchemaInheritanceChain(MetadataObject schemaObject) {
-    String separator = HierarchicalSchemaUtil.namespaceSeparator();
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
 
     List<MetadataObject> chain = new ArrayList<>();
     for (String scope : HierarchicalSchemaUtil.allScopes(schemaObject.name(), separator)) {

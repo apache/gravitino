@@ -92,7 +92,7 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
    * ownership after the fact.
    */
   private List<NameIdentifier> findMissingParents(NameIdentifier ident) {
-    String separator = HierarchicalSchemaUtil.namespaceSeparator();
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
     List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(ident.name(), separator);
     List<NameIdentifier> missing = new ArrayList<>();
     for (String ancestorName : ancestorNames) {

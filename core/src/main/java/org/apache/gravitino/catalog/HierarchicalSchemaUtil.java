@@ -45,19 +45,18 @@ public final class HierarchicalSchemaUtil {
   private HierarchicalSchemaUtil() {}
 
   /**
-   * Returns the configured external namespace separator from the server configuration. All code
-   * that needs the separator should use this method instead of reading the config directly.
+   * Returns the configured external schema separator from the server configuration. All code that
+   * needs the separator should use this method instead of reading the config directly.
    *
    * @return the configured separator string (default {@code ":"})
    */
-  public static String namespaceSeparator() {
+  public static String schemaSeparator() {
     Config config = GravitinoEnv.getInstance().config();
     if (config == null) {
-      return Configs.SCHEMA_NAMESPACE_SEPARATOR.getDefaultValue();
+      return Configs.SCHEMA_SEPARATOR.getDefaultValue();
     }
-    String separator = config.get(Configs.SCHEMA_NAMESPACE_SEPARATOR);
-    return StringUtils.defaultIfBlank(
-        separator, Configs.SCHEMA_NAMESPACE_SEPARATOR.getDefaultValue());
+    String separator = config.get(Configs.SCHEMA_SEPARATOR);
+    return StringUtils.defaultIfBlank(separator, Configs.SCHEMA_SEPARATOR.getDefaultValue());
   }
 
   /**

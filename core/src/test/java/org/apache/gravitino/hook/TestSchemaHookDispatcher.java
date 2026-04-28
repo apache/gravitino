@@ -59,7 +59,7 @@ public class TestSchemaHookDispatcher {
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
 
     Config mockConfig = mock(Config.class);
-    when(mockConfig.get(Configs.SCHEMA_NAMESPACE_SEPARATOR)).thenReturn(SEPARATOR);
+    when(mockConfig.get(Configs.SCHEMA_SEPARATOR)).thenReturn(SEPARATOR);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);

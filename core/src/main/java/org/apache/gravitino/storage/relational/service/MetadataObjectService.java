@@ -577,7 +577,7 @@ public class MetadataObjectService {
               DOT_JOINER.join(
                   catalogName,
                   HierarchicalSchemaUtil.physicalToLogical(
-                      schemaPO.getSchemaName(), HierarchicalSchemaUtil.namespaceSeparator()));
+                      schemaPO.getSchemaName(), HierarchicalSchemaUtil.schemaSeparator()));
 
           schemaIdAndNameMap.put(schemaPO.getSchemaId(), fullName);
         });

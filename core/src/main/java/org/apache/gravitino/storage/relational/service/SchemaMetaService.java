@@ -544,7 +544,7 @@ public class SchemaMetaService {
    */
   private String toPhysicalSchemaName(String logicalName) {
     return HierarchicalSchemaUtil.logicalToPhysical(
-        logicalName, HierarchicalSchemaUtil.namespaceSeparator());
+        logicalName, HierarchicalSchemaUtil.schemaSeparator());
   }
 
   /**
@@ -553,7 +553,7 @@ public class SchemaMetaService {
    */
   private String toLogicalSchemaName(String physicalName) {
     return HierarchicalSchemaUtil.physicalToLogical(
-        physicalName, HierarchicalSchemaUtil.namespaceSeparator());
+        physicalName, HierarchicalSchemaUtil.schemaSeparator());
   }
 
   /**
@@ -594,7 +594,7 @@ public class SchemaMetaService {
    * physical dot-separated form. Otherwise the original entity is returned unchanged.
    */
   private SchemaEntity toPhysicalEntity(SchemaEntity entity) {
-    String separator = HierarchicalSchemaUtil.namespaceSeparator();
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
     if (!HierarchicalSchemaUtil.isNested(entity.name(), separator)) {
       return entity;
     }
