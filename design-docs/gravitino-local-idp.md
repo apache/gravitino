@@ -438,10 +438,10 @@ not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
 
 #### 9.1.4 Change Password
 
-| Item | Value |
-|---|---|
-| Method | `PUT` |
-| Path | `/api/auth/basic/users/{user}/password` |
+| Item | Value                          |
+|---|--------------------------------|
+| Method | `PUT`                          |
+| Path | `/api/auth/basic/users/{user}` |
 | Permission | Only service admin can execute |
 
 **Parameters**
