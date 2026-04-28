@@ -282,6 +282,9 @@ public class TestGravitinoInterceptionService {
         MetadataObject metadataObject,
         Privilege.Name privilege,
         AuthorizationRequestContext requestContext) {
+      assertEquals(
+          "METALAKE::USE_CATALOG || METALAKE::OWNER",
+          requestContext.getOriginalAuthorizationExpression());
       return "tester".equals(principal.getName())
           && "testMetalake".equals(metalake)
           && metadataObject.type() == MetadataObject.Type.METALAKE

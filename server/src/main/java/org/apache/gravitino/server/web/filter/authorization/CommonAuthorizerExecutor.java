@@ -49,6 +49,6 @@ public class CommonAuthorizerExecutor implements AuthorizationExecutor {
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
     authorizationRequestContext.setOriginalAuthorizationExpression(expression);
     return authorizationExpressionEvaluator.evaluate(
-        metadataContext, pathParams, new AuthorizationRequestContext(), entityType);
+        metadataContext, pathParams, authorizationRequestContext, entityType);
   }
 }
