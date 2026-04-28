@@ -269,11 +269,41 @@ the service admin can complete the bootstrap flow immediately, but it must be tr
 bootstrap-only credential rather than as a secure long-term password or a general-purpose access
 credential for other APIs.
 
+### 6.2 Bootstrap Process
+
+The bootstrap process should be:
+
+1. When the `basic` authenticator is enabled for the first time, check whether the bootstrap
+   **service admin** already exists in `local_user_meta`.
+2. If the bootstrap account does not exist, create it with the default password **123456**.
+3. Hash the initial password with the configured password hashing algorithm before storing it in
+   `password_hash`.
+4. Allow the bootstrap credential to be used only for the initial login and the immediate password
+   reset flow.
+5. Reject other management operations until the bootstrap password has been reset successfully.
+6. After the password reset succeeds, treat the account as a normal service admin account for later
+   authentication and authorization.
+
 ---
 
 ## 7. Authentication Flow
 
-### 7.1 Password Verification
+### 7.1 User Verification
+
+The user verification flow is:
+
+1. Read the `Authorization` header and verify that it uses the `Basic` scheme.
+2. Decode the Base64 payload and split the decoded credential on the first colon to get `username`
+   and `password`.
+3. Query `local_user_meta` by `user_name` and `deleted_at = 0`.
+4. If no active user is found, reject the request with **401**.
+5. If the user is the bootstrap service admin and the initial password is still in use, allow only
+   the bootstrap login and password reset flow.
+6. If the request targets another management operation while the bootstrap password is still active,
+   reject the request.
+7. If the user passes these checks, continue to password verification.
+
+### 7.2 Password Verification
 
 The password verification flow is:
 
@@ -282,7 +312,7 @@ The password verification flow is:
 3. Verify the submitted password against `password_hash` using the configured hashing algorithm.
 4. If verification succeeds, authenticate the request; otherwise reject it.
 
-### 7.2 Group Resolution
+### 7.3 Group Resolution
 
 The local user's groups are resolved by:
 
@@ -293,7 +323,7 @@ The local user's groups are resolved by:
 This keeps the model aligned with Gravitino's existing authorization architecture, where user-group
 relationships are an input to later privilege evaluation.
 
-### 7.3 Web Filter Behavior
+### 7.4 Web Filter Behavior
 
 The local authenticator is implemented as a web filter in the request pipeline.
 
@@ -312,7 +342,7 @@ The proposed behavior is:
 > exception handling conventions during implementation. A better default is:
 > malformed Basic header → `400`; missing user or invalid password → `401`.
 
-### 7.4 Transport Security
+### 7.5 Transport Security
 
 HTTP Basic authentication should be used over **HTTPS**.
 
