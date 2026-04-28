@@ -450,6 +450,10 @@ This should follow Gravitino's existing multi-authenticator behavior: multiple a
 comma-separated, and if a request is supported by multiple authenticators simultaneously, the first
 matching authenticator wins.
 
+The Local IdP management capability is enabled only when `basic` is included in
+`gravitino.authenticators`. If `basic` is not enabled, Gravitino should not allow Local IdP-related
+management APIs to be used.
+
 ### 8.2 Password Algorithm Configuration
 
 Add a dedicated configuration for password hashing.
@@ -504,6 +508,10 @@ The following APIs are intended for local user, local group, and group-membershi
 
 Because local IdP identities are global rather than metalake-scoped, these management interfaces do
 not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
+
+These APIs are available only when the `basic` authenticator is enabled. If `basic` is not enabled,
+requests to these Local IdP management endpoints should be rejected rather than treated as available
+server APIs.
 
 #### 9.1.1 Get Local User Info
 
