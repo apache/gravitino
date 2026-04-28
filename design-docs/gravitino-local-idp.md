@@ -411,7 +411,7 @@ should use the `gravitino.authenticator.<mode>.*` prefix rather than
 
 | Key | Default | Optional Values |
 |---|---|---|
-| `gravitino.authenticator.basic.algorithm` | `Argon2id` | `Argon2id` |
+| `gravitino.authenticator.basic.password-hash-algorithm` | `Argon2id` | `Argon2id` |
 
 Even though the initial implementation supports only one algorithm, an explicit configuration key
 keeps the design extensible and makes the hashing choice visible in configuration.
