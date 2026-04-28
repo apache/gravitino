@@ -93,7 +93,7 @@ public class TestModelHookDispatcher {
     when(mockCatalogWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
 
     NameIdentifier ident =
-        NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "MY_MODEL");
+        NameIdentifier.of("test_metalake", "test_catalog", "TEST_SCHEMA", "MY_MODEL");
     Model mockModel = mock(Model.class);
     when(mockDispatcher.registerModel(any(NameIdentifier.class), any(String.class), any()))
         .thenReturn(mockModel);
@@ -103,7 +103,20 @@ public class TestModelHookDispatcher {
     ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
     verify(mockOwnerDispatcher)
         .setOwner(eq("test_metalake"), captor.capture(), any(), eq(Owner.Type.USER));
-    Assertions.assertEquals("my_model", captor.getValue().name());
+    Assertions.assertEquals(
+        "my_model",
+        captor.getValue().name(),
+        "Model name passed to setOwner must be lowercased by Capability.Scope.MODEL normalization");
+    // MODEL scope is intentionally excluded from CapabilityHelpers.applyCapabilities(Namespace,
+    // Scope, Capability), so the schema component in the namespace is NOT lowercased -- the
+    // captured parent reflects exactly what ModelNormalizeDispatcher would also pass to the
+    // manager. This assertion locks that behavior in.
+    Assertions.assertEquals(
+        "test_catalog.TEST_SCHEMA",
+        captor.getValue().parent(),
+        "Model parent must keep its schema component as-is: Capability.Scope.MODEL is excluded"
+            + " from namespace normalization in CapabilityHelpers; if this changes, ownership"
+            + " attachment will diverge from what ModelNormalizeDispatcher passes to the manager");
   }
 
   @Test
@@ -124,7 +137,20 @@ public class TestModelHookDispatcher {
 
     // Verify setOwner is called with the metalake name (level(0) of namespace), not the model
     // name. Previously this method incorrectly passed ident.name() as the first argument.
-    verify(mockOwnerDispatcher).setOwner(eq("test_metalake"), any(), any(), eq(Owner.Type.USER));
+    ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
+    verify(mockOwnerDispatcher)
+        .setOwner(eq("test_metalake"), captor.capture(), any(), eq(Owner.Type.USER));
+    Assertions.assertEquals(
+        "test_model",
+        captor.getValue().name(),
+        "5-arg registerModel must pass the model name to setOwner unchanged when input is already"
+            + " lowercase");
+    Assertions.assertEquals(
+        "test_catalog.test_schema",
+        captor.getValue().parent(),
+        "5-arg registerModel must build parent as <catalog>.<schema> (level(1).level(2)), not"
+            + " level(0) or the model name; this regression test guards the previous bug where"
+            + " ident.name() was used as the metalake arg");
   }
 
   private static class CaseInsensitiveCapability implements Capability {

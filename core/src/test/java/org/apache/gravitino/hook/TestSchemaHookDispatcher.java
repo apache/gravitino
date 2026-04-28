@@ -101,7 +101,19 @@ public class TestSchemaHookDispatcher {
     ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
     verify(mockOwnerDispatcher)
         .setOwner(eq("test_metalake"), captor.capture(), any(), eq(Owner.Type.USER));
-    Assertions.assertEquals("my_schema", captor.getValue().name());
+    Assertions.assertEquals(
+        "my_schema",
+        captor.getValue().name(),
+        "Schema name passed to setOwner must be lowercased by Capability.Scope.SCHEMA"
+            + " normalization");
+    // Schema's namespace is [metalake, catalog]; NameIdentifierUtil.toMetadataObject uses
+    // level(1) as parent. Catalog is not subject to per-scope name normalization here, so
+    // parent is just the catalog name -- there is no schema component to normalize.
+    Assertions.assertEquals(
+        "test_catalog",
+        captor.getValue().parent(),
+        "Schema parent must be the catalog name (level(1) of the namespace); SCHEMA's namespace"
+            + " has no schema component to normalize");
   }
 
   private static class CaseInsensitiveCapability implements Capability {

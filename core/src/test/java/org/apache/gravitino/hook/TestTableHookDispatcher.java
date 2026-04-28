@@ -212,7 +212,7 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
 
     try {
       TableHookDispatcher localHook = new TableHookDispatcher(mockTableDispatcher);
-      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_norm", "MY_TABLE");
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "SCHEMA_NORM", "MY_TABLE");
       localHook.createTable(
           ident,
           new Column[0],
@@ -226,7 +226,15 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
       ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
       Mockito.verify(mockOwnerDispatcher)
           .setOwner(eq(metalake), captor.capture(), any(), eq(Owner.Type.USER));
-      Assertions.assertEquals("my_table", captor.getValue().name());
+      Assertions.assertEquals(
+          "my_table",
+          captor.getValue().name(),
+          "Table name passed to setOwner must be lowercased by Capability.Scope.TABLE normalization");
+      Assertions.assertEquals(
+          catalog + ".schema_norm",
+          captor.getValue().parent(),
+          "Table parent (catalog.schema) must have its schema component lowercased by"
+              + " Capability.Scope.TABLE namespace normalization");
     } finally {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);

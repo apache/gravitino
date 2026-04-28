@@ -122,7 +122,7 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
 
     try {
       FilesetHookDispatcher localHook = new FilesetHookDispatcher(mockFilesetDispatcher);
-      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_norm", "MY_FILESET");
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "SCHEMA_NORM", "MY_FILESET");
       localHook.createMultipleLocationFileset(
           ident,
           "comment",
@@ -133,7 +133,16 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
       ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
       Mockito.verify(mockOwnerDispatcher)
           .setOwner(eq(metalake), captor.capture(), any(), eq(Owner.Type.USER));
-      Assertions.assertEquals("my_fileset", captor.getValue().name());
+      Assertions.assertEquals(
+          "my_fileset",
+          captor.getValue().name(),
+          "Fileset name passed to setOwner must be lowercased by Capability.Scope.FILESET"
+              + " normalization");
+      Assertions.assertEquals(
+          catalog + ".schema_norm",
+          captor.getValue().parent(),
+          "Fileset parent (catalog.schema) must have its schema component lowercased by"
+              + " Capability.Scope.FILESET namespace normalization");
     } finally {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);

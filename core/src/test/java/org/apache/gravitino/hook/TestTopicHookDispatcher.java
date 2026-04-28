@@ -100,13 +100,21 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
 
     try {
       TopicHookDispatcher localHook = new TopicHookDispatcher(mockTopicDispatcher);
-      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_norm", "MY_TOPIC");
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "SCHEMA_NORM", "MY_TOPIC");
       localHook.createTopic(ident, "comment", null, ImmutableMap.of());
 
       ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
       Mockito.verify(mockOwnerDispatcher)
           .setOwner(eq(metalake), captor.capture(), any(), eq(Owner.Type.USER));
-      Assertions.assertEquals("my_topic", captor.getValue().name());
+      Assertions.assertEquals(
+          "my_topic",
+          captor.getValue().name(),
+          "Topic name passed to setOwner must be lowercased by Capability.Scope.TOPIC normalization");
+      Assertions.assertEquals(
+          catalog + ".schema_norm",
+          captor.getValue().parent(),
+          "Topic parent (catalog.schema) must have its schema component lowercased by"
+              + " Capability.Scope.TOPIC namespace normalization");
     } finally {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
