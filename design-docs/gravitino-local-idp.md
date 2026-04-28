@@ -259,11 +259,15 @@ administrator account on first startup.
 
 - only one bootstrap account is created by default: **service admin**
 - the default password is **123456**
-- after initial login, the service admin is expected to reset the bootstrap password immediately
+- the default password **123456** is intended only for the initial bootstrap login and the immediate
+  password reset flow
+- other management operations must not rely on the bootstrap password
+- after the first login, the service admin is expected to reset the bootstrap password immediately
 
 This design favors usability for POC scenarios. The default password is intentionally simple so that
-users can access the system instantly, but it must be treated as a bootstrap credential rather than
-as a secure long-term password.
+the service admin can complete the bootstrap flow immediately, but it must be treated as a
+bootstrap-only credential rather than as a secure long-term password or a general-purpose access
+credential for other APIs.
 
 ---
 
