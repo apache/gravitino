@@ -524,7 +524,6 @@ not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
 | Field | Type | Description |
 |---|---|---|
 | `name` | `String` | User name |
-| `audit` | `AuditDTO` | Audit information |
 | `groups` | `Array<String>` | Groups to which the user belongs |
 
 #### 9.1.2 Add Local User
@@ -608,7 +607,6 @@ not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
 | Field | Type | Description |
 |---|---|---|
 | `name` | `String` | Group name |
-| `audit` | `AuditDTO` | Audit information |
 | `users` | `Array<String>` | All users in the group |
 
 #### 9.1.6 Add Local Group
