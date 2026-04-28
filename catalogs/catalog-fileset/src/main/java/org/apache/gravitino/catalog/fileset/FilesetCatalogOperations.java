@@ -45,7 +45,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils.FileSystemCacheKey;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -59,7 +59,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -170,48 +169,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   FilesetCatalogOperations(EntityStore store) {
     this.store = store;
-  }
-
-  static class FileSystemCacheKey {
-    /**
-     * When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
-     * authority are both null
-     *
-     * <p>NOTE: The filesystem cache key includes the schema, authority, and current user. Changes
-     * to the configuration of the fileset will not affect the cached filesystem.
-     */
-    @Nullable private final String scheme;
-
-    @Nullable private final String authority;
-    private final String currentUser;
-
-    FileSystemCacheKey(String scheme, String authority) {
-      this.scheme = scheme;
-      this.authority = authority;
-      this.currentUser = PrincipalUtils.getCurrentUserName();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (this == o) {
-        return true;
-      }
-      if (!(o instanceof FileSystemCacheKey)) {
-        return false;
-      }
-      FileSystemCacheKey that = (FileSystemCacheKey) o;
-      return Objects.equals(scheme, that.scheme)
-          && Objects.equals(authority, that.authority)
-          && Objects.equals(currentUser, that.currentUser);
-    }
-
-    @Override
-    public int hashCode() {
-      int result = 31 * (scheme == null ? 0 : scheme.hashCode());
-      result = 31 * result + (authority == null ? 0 : authority.hashCode());
-      result = 31 * result + currentUser.hashCode();
-      return result;
-    }
   }
 
   public FilesetCatalogOperations() {
@@ -1333,8 +1290,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     String authority =
         provider != null ? provider.getFullAuthority(path, conf) : path.toUri().getAuthority();
+
     return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, authority),
+                  new FileSystemCacheKey(scheme, authority, null),
         cacheKey -> {
           try {
             return getFileSystem(path, conf);
