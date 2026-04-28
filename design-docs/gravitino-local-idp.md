@@ -298,7 +298,7 @@ The proposed behavior is:
 1. Read the `Authorization` header.
 2. Verify that it uses the `Basic` scheme.
 3. Decode the Base64 payload. If decoding fails, return **400**.
-4. Extract `username:password`.
+4. Split the decoded credential on the first colon to extract `username` and `password`.
 5. Look up the local user.
 6. If the user does not exist or the password verification fails, return **401**.
 7. If authentication is challenged, include a `WWW-Authenticate: Basic` response header.
@@ -458,7 +458,8 @@ not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
 - It does not support end-user self-service password changes.
 - It does not accept `oldPassword`.
 - Only service admin can change any account password.
-- The password cannot contain a colon (`:`). (RFC 7617)
+- The user name cannot contain a colon (`:`). Parse the Basic credential by splitting on the first
+  colon, so the password may contain additional colons. (RFC 7617)
 - The password must be at least 12 characters long and at most 64 characters long.
 
 **Error codes**
