@@ -571,11 +571,16 @@ server APIs.
 | Path | `/api/auth/basic/users/{user}` |
 | Permission | Only service admin can execute |
 
-**Parameters**
+**Path parameters**
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `user` | `String` | Yes | User name |
+
+**Request body**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
 | `password` | `String` | Yes | New password |
 
 **Spec**
@@ -592,7 +597,6 @@ server APIs.
 
 | Error case | HTTP status |
 |---|---|
-| Password verification failed | `401` |
 | Account doesn't exist | `404` |
 | Password same with old | `422` |
 
@@ -625,7 +629,7 @@ server APIs.
 | Path | `/api/auth/basic/groups` |
 | Permission | Only service admin can execute |
 
-**Path parameters**
+**Request body**
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -653,11 +657,16 @@ server APIs.
 | Path | `/api/auth/basic/groups/{group}/users` |
 | Permission | Only service admin can execute |
 
-**Parameters**
+**Path parameters**
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `group` | `String` | Yes | Group name |
+
+**Request body**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
 | `userNames` | `Array<String>` | Yes | User names. Must not be null or empty |
 
 #### 9.1.9 Group Remove Users
@@ -668,11 +677,16 @@ server APIs.
 | Path | `/api/auth/basic/groups/{group}/users` |
 | Permission | Only service admin can execute |
 
-**Parameters**
+**Path parameters**
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `group` | `String` | Yes | Group name |
+
+**Request body**
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
 | `userNames` | `Array<String>` | Yes | User names. Must not be null or empty |
 ---
 
