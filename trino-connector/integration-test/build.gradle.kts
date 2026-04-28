@@ -54,9 +54,6 @@ dependencies {
   testImplementation(libs.hadoop3.shaded.protobuf)
   testImplementation(libs.commons.configuration2)
   testImplementation(libs.re2j)
-  testImplementation(libs.hadoop3.mapreduce.client.core) {
-    exclude("*")
-  }
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
