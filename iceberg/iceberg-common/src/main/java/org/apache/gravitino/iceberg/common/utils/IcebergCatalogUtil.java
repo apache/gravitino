@@ -110,6 +110,19 @@ public class IcebergCatalogUtil {
 
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     properties.forEach(hdfsConfiguration::set);
+    if (properties.containsKey("gcs-service-account-file")) {
+      hdfsConfiguration.set("fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem");
+      hdfsConfiguration.set(
+          "fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS");
+      hdfsConfiguration.set("google.cloud.auth.service.account.enable", "true");
+      hdfsConfiguration.set(
+          "google.cloud.auth.service.account.json.keyfile",
+          properties.get("gcs-service-account-file"));
+    }
+    if (properties.containsKey("gcs-service-account-file")) {
+      properties.put("io-impl", "org.apache.gravitino.iceberg.common.utils.MultiSchemeFileIO");
+      LOG.info("MultiSchemeFileIO: setting io-impl for multi-backend catalog");
+    }
     jdbcCatalog.setConf(hdfsConfiguration);
     try {
       jdbcCatalog.initialize(icebergCatalogName, properties);

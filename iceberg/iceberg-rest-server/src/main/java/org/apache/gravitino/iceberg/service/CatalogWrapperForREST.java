@@ -100,7 +100,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
-          IcebergConstants.IO_IMPL,
           IcebergConstants.AWS_S3_REGION,
           IcebergConstants.ICEBERG_S3_ENDPOINT,
           IcebergConstants.ICEBERG_OSS_ENDPOINT,
