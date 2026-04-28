@@ -186,9 +186,10 @@ public class TestJcasbinAuthorizer {
             eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of(allowRole));
     assertTrue(doAuthorize(currentPrincipal));
-    // Test role cache.
-    // When permissions are changed but handleRolePrivilegeChange is not executed, the system will
-    // use the cached permissions in JCasbin, so authorize can succeed.
+    // After re-assigning the user from allowRole to a role with no privileges, authorize must
+    // return false even though allowRole's policies are still cached in the enforcer. Each
+    // request iterates the user's fresh role list, so removed role assignments take effect
+    // immediately without waiting for a handleRolePrivilegeChange call.
     Long newRoleId = -1L;
     RoleEntity tempNewRole = getRoleEntity(newRoleId, "tempNewRole", ImmutableList.of());
     when(entityStore.get(
@@ -201,10 +202,11 @@ public class TestJcasbinAuthorizer {
             eq(userNameIdentifier),
             eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of(tempNewRole));
-    assertTrue(doAuthorize(currentPrincipal));
-    // After clearing the cache, authorize will fail
+    assertFalse(doAuthorize(currentPrincipal));
+    // Invalidating the role cache is still a no-op in this scenario; we left it in to exercise
+    // the invalidation path.
     jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
-    //    assertFalse(doAuthorize(currentPrincipal));
+    assertFalse(doAuthorize(currentPrincipal));
     // When the user is re-assigned the correct role, the authorization will succeed.
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
