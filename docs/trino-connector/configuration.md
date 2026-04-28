@@ -16,7 +16,14 @@ license: "This software is licensed under the Apache License version 2."
 | gravitino.trino.skip-version-validation     | boolean | false                 | The `gravitino.trino.skip-version-validation` defines whether to skip Trino version validation. Gravitino supports Trino versions between 435 and 478. If this option is `true`, unsupported Trino versions can still be used, but compatibility is not guaranteed.                                                 | No       | 1.0.0         |
 | gravitino.client.                           | string  | (none)                | The configuration key prefix for the Gravitino client config.                                                                                                                                                                                                                                                       | No       | 1.0.0         |
 | gravitino.trino.skip-catalog-patterns       | string  | (none)                | The `gravitino.trino.skip-catalog-patterns` defines a comma-separated list of catalog name regex patterns that should be excluded from loading. For example, `test_.*, .*_tmp` excludes all catalogs starting with `test_` or ending with `_tmp`.                                                                   | No       | 1.2.0         |
+| gravitino.use-single-metalake               | boolean | true                  | If `true`, only one metalake is used and catalogs are identified by `<catalog_name>`. If `false`, multi-metalake mode is enabled and catalogs are identified by `<metalake_name>.<catalog_name>`. | No       | 1.2.0         |
 
 To configure the Gravitino client, use properties prefixed with `gravitino.client.`. These properties will directly passed to the Gravitino client.
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#gravitino-java-client-configuration) for more support client configuration.
+
+Multi-metalake mode (`gravitino.use-single-metalake=false`) is supported on Trino connector versions 435-445 and 469-478. On versions 446-468, a warning is logged and the connector initializes, but the mode is not fully supported and some operations may fail.
+
+## Authentication
+
+The Gravitino Trino connector supports authenticating to the Gravitino server using Simple, OAuth, and Kerberos authentication. For detailed authentication configuration, please refer to [Trino Connector Authentication](./authentication.md).

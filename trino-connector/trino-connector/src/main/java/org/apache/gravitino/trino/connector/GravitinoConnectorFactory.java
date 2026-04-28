@@ -161,11 +161,11 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
     // check catalog name with metalake are supported in this trino version
     if (!config.singleMetalakeMode() && !supportCatalogNameWithMetalake()) {
-      String errmsg =
-          String.format(
-              "The trino-connector-%s-%s does not support catalog name with metalake.",
-              getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
-      throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+      LOG.warn(
+          "The trino-connector-{}-{} does not fully support catalog name with metalake. "
+              + "The DROP CATALOG operation may not work correctly in multi-metalake mode.",
+          getMinSupportTrinoSpiVersion(),
+          getMaxSupportTrinoSpiVersion());
     }
 
     // skip version validation
