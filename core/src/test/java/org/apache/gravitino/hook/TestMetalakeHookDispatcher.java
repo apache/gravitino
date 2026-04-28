@@ -45,12 +45,18 @@ public class TestMetalakeHookDispatcher {
   private MetalakeDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
   private AccessControlDispatcher mockAccessControlDispatcher;
+  // Save the originals before each test and restore them in tearDown so we do not leak null
+  // state into the GravitinoEnv singleton across tests.
+  private OwnerDispatcher savedOwnerDispatcher;
+  private AccessControlDispatcher savedAccessControlDispatcher;
 
   @BeforeEach
   public void setUp() throws IllegalAccessException {
     mockDispatcher = mock(MetalakeDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockAccessControlDispatcher = mock(AccessControlDispatcher.class);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    savedAccessControlDispatcher = GravitinoEnv.getInstance().accessControlDispatcher();
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "accessControlDispatcher", mockAccessControlDispatcher, true);
@@ -59,8 +65,10 @@ public class TestMetalakeHookDispatcher {
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", null, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "accessControlDispatcher", savedAccessControlDispatcher, true);
   }
 
   @Test

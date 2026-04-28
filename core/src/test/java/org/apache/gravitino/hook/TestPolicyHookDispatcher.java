@@ -40,18 +40,23 @@ public class TestPolicyHookDispatcher {
   private PolicyHookDispatcher hookDispatcher;
   private PolicyDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
+  // Save the original ownerDispatcher before each test and restore it in tearDown so we do not
+  // leak null state into the GravitinoEnv singleton across tests.
+  private OwnerDispatcher savedOwnerDispatcher;
 
   @BeforeEach
   public void setUp() throws IllegalAccessException {
     mockDispatcher = mock(PolicyDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
     hookDispatcher = new PolicyHookDispatcher(mockDispatcher);
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
   }
 
   @Test

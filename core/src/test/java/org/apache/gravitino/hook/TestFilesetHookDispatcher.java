@@ -153,6 +153,9 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
 
   @Test
   public void testCreateFilesetSucceedsEvenIfSetOwnerFails() throws IllegalAccessException {
+    // Save the original ownerDispatcher so we can restore it in the finally block instead of
+    // wiping it to null and leaking that into other tests in the suite.
+    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
     Mockito.doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
@@ -168,7 +171,8 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
       filesetHookDispatcher.createFileset(
           filesetIdent, "comment", Fileset.Type.MANAGED, "fileset_owner", props);
     } finally {
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
     }
   }
 

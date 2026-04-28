@@ -245,6 +245,9 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
 
   @Test
   public void testCreateTableSucceedsEvenIfSetOwnerFails() throws IllegalAccessException {
+    // Save the original ownerDispatcher so we can restore it in the finally block instead of
+    // wiping it to null and leaking that into other tests in the suite.
+    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
     Mockito.doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
@@ -275,7 +278,8 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
           new SortOrder[0],
           new Index[0]);
     } finally {
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
     }
   }
 

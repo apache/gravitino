@@ -50,6 +50,10 @@ public class TestSchemaHookDispatcher {
   private OwnerDispatcher mockOwnerDispatcher;
   private CatalogManager mockCatalogManager;
   private CatalogManager.CatalogWrapper mockCatalogWrapper;
+  // Save the originals before each test and restore them in tearDown so we do not leak null
+  // state into the GravitinoEnv singleton across tests.
+  private OwnerDispatcher savedOwnerDispatcher;
+  private CatalogManager savedCatalogManager;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -59,6 +63,13 @@ public class TestSchemaHookDispatcher {
     mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
     when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockCatalogWrapper);
     when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    // Tests in this class that rely on the singleton catalogManager always go through
+    // GravitinoEnv.getInstance().catalogManager(), but we cannot call the public accessor here
+    // because it Preconditions-checks for non-null and would fail when GravitinoEnv has not been
+    // initialized. Read the field directly via reflection to capture the current value safely.
+    savedCatalogManager =
+        (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
     hookDispatcher = new SchemaHookDispatcher(mockDispatcher);
@@ -66,8 +77,9 @@ public class TestSchemaHookDispatcher {
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", null, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
   }
 
   @Test
