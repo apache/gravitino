@@ -36,8 +36,6 @@ Keycloak already exists. However, it introduces friction in several important sc
   managed by an external service.
 - **Operational simplicity**: small deployments may not want the cost and maintenance burden of a
   separate OAuth server.
-- **Emergency fallback**: a local authenticator can serve as a backup path if the external IdP is
-  temporarily unavailable.
 
 To address these cases, Gravitino should provide an optional built-in local IdP mode with a simple
 username/password authentication flow.
@@ -57,9 +55,6 @@ username/password authentication flow.
 
 4. **Avoid vendor lock-in**: let users run Gravitino in environments where third-party IdPs are
    impractical, undesirable, or cost-prohibitive.
-
-5. **Provide an operational fallback**: allow local authentication to be used as an emergency
-   access path when external authentication is unavailable.
 
 ---
 
@@ -95,7 +90,7 @@ For these reasons, the initial local IdP implementation uses:
 | Credential type | Username / password |
 | Password storage | Database |
 | Local token support | No |
-| Recommended deployment scope | POC, offline, isolated, and emergency fallback scenarios |
+| Recommended deployment scope | POC, offline, and isolated scenarios |
 
 ### 3.3 Why Database Storage
 
