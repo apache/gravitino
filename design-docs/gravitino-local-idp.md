@@ -383,14 +383,14 @@ At a high level:
 The following APIs are intended for local user, local group, and group-membership management.
 
 Because local IdP identities are global rather than metalake-scoped, these management interfaces do
-not include `{metalake}` in their paths.
+not include `{metalake}` in their paths and use the `/api/auth/basic` prefix.
 
 #### 9.1.1 Get Local User Info
 
 | Item | Value |
 |---|---|
 | Method | `GET` |
-| Path | `/api/users/{user}` |
+| Path | `/api/auth/basic/users/{user}` |
 | Permission | Only service admin / owner can execute |
 
 **Path parameters**
@@ -412,7 +412,7 @@ not include `{metalake}` in their paths.
 | Item | Value |
 |---|---|
 | Method | `POST` |
-| Path | `/api/users/{user}` |
+| Path | `/api/auth/basic/users/{user}` |
 | Permission | Only service admin can execute |
 
 **Parameters**
@@ -427,7 +427,7 @@ not include `{metalake}` in their paths.
 | Item | Value |
 |---|---|
 | Method | `DELETE` |
-| Path | `/api/users/{user}` |
+| Path | `/api/auth/basic/users/{user}` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
@@ -441,7 +441,7 @@ not include `{metalake}` in their paths.
 | Item | Value |
 |---|---|
 | Method | `PUT` |
-| Path | `/api/users/{user}/password` |
+| Path | `/api/auth/basic/users/{user}/password` |
 | Permission | Only service admin can execute |
 
 **Parameters**
@@ -455,7 +455,7 @@ not include `{metalake}` in their paths.
 
 - Only service admin can change any account password.
 - The password cannot contain a colon (`:`). (RFC 7617)
-- The password must be at least 12 characters long and at most 64 characters long. (OWASP)
+- The password must be at least 12 characters long and at most 64 characters long.
 
 **Error codes**
 
@@ -470,7 +470,7 @@ not include `{metalake}` in their paths.
 | Item | Value |
 |---|---|
 | Method | `GET` |
-| Path | `/api/groups/{group}` |
+| Path | `/api/auth/basic/groups/{group}` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
@@ -492,7 +492,7 @@ not include `{metalake}` in their paths.
 | Item | Value |
 |---|---|
 | Method | `POST` |
-| Path | `/api/groups/{group}` |
+| Path | `/api/auth/basic/groups/{group}` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
@@ -506,7 +506,7 @@ not include `{metalake}` in their paths.
 | Item | Value |
 |---|---|
 | Method | `DELETE` |
-| Path | `/api/groups/{group}` |
+| Path | `/api/auth/basic/groups/{group}` |
 | Permission | Only service admin can execute |
 
 **Path parameters**
@@ -520,7 +520,7 @@ not include `{metalake}` in their paths.
 | Item | Value |
 |---|---|
 | Method | `PUT` |
-| Path | `/api/permissions/groups/{group}/users/add` |
+| Path | `/api/auth/basic/groups/{group}/users/add` |
 | Permission | Only service admin can execute |
 
 **Parameters**
@@ -535,7 +535,7 @@ not include `{metalake}` in their paths.
 | Item | Value |
 |---|---|
 | Method | `DELETE` |
-| Path | `/api/permissions/groups/{group}/users/remove` |
+| Path | `/api/auth/basic/groups/{group}/users/remove` |
 | Permission | Only service admin can execute |
 
 **Parameters**
