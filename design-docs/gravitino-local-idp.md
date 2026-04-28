@@ -291,7 +291,8 @@ administrator account on first startup.
 
 ### 6.1 Initial Administrator
 
-- only one bootstrap account is created by default: **service admin**
+- only one bootstrap account is created by default: the configured **service admin** account (for
+  example, **adminUser**)
 - the default password is **123456**
 - the default password **123456** is intended only for the initial bootstrap login and the immediate
   password reset flow
@@ -307,16 +308,63 @@ credential for other APIs.
 
 The bootstrap process should be:
 
-1. When the `basic` authenticator is enabled for the first time, check whether the bootstrap
-   **service admin** already exists in `local_user_meta`.
-2. If the bootstrap account does not exist, the web filter allows **service admin** with password
-   **123456** to pass Basic verification only for the bootstrap login and immediate password reset
-   flow.
+1. When the `basic` authenticator is enabled for the first time, check whether the configured
+   bootstrap **service admin** account already exists in `local_user_meta`.
+2. If the bootstrap account does not exist, the web filter allows the configured bootstrap service
+   admin account (for example, **adminUser**) with password **123456** to pass Basic verification
+   only for the bootstrap login and immediate password reset flow.
 3. Reject other management operations until the bootstrap password has been reset successfully.
 4. During the first successful password reset, create the bootstrap service admin record and store
    the new password hash in `password_hash`.
 5. After the password reset succeeds, treat the account as a normal service admin account for later
    authentication and authorization.
+
+### 6.3 Example Basic Authentication Bootstrap Flow
+
+The following end-to-end flow shows how a user can start from a fresh Gravitino deployment, enable
+Basic authentication, configure the bootstrap service admin identity, and immediately rotate the
+bootstrap password.
+
+1. Deploy Gravitino with the `basic` authenticator enabled:
+
+   ```properties
+   gravitino.authenticators=basic
+   gravitino.authenticator.basic.password-hash-algorithm=Argon2id
+   gravitino.authorization.serviceAdmins=adminUser
+   ```
+
+2. Start Gravitino.
+
+3. On first startup, no active `adminUser` record exists yet in `local_user_meta`, so Gravitino
+   accepts the bootstrap credential `adminUser:123456` only for the bootstrap login and immediate
+   password reset flow.
+
+4. Call the password reset API with HTTP Basic authentication:
+
+   ```bash
+   curl -X PUT \
+     -u 'adminUser:123456' \
+     -H 'Content-Type: application/json' \
+     https://<gravitino-host>/api/auth/basic/users/adminUser \
+     -d '{
+       "password": "ChangeMeToAStrongPassword"
+     }'
+   ```
+
+5. If the request succeeds, Gravitino creates the bootstrap `adminUser` record in
+   `local_user_meta` and stores the new Argon2id password hash.
+
+6. After that point, the bootstrap password `123456` is no longer accepted, and the service admin
+   must use the new password for later management APIs:
+
+   ```bash
+   curl -u 'adminUser:ChangeMeToAStrongPassword' \
+     https://<gravitino-host>/api/auth/basic/users/adminUser
+   ```
+
+This flow makes the first-use experience explicit: deployment enables the feature, the
+`adminUser` identity is recognized through `gravitino.authorization.serviceAdmins`, and the
+default bootstrap password is usable only once to complete the initial password rotation.
 
 ---
 
@@ -330,7 +378,8 @@ The user verification flow is:
 2. Decode the Base64 payload and split the decoded credential on the first colon to get `username`
    and `password`.
 3. Query `local_user_meta` by `user_name` and `deleted_at = 0`.
-4. If no active user is found and the credential is **service admin:123456**, allow only the
+4. If no active user is found and the credential is the configured bootstrap service admin account
+   with the default password (for example, **adminUser:123456**), allow only the
    bootstrap login and immediate password reset flow.
 5. If no active user is found for any other credential, reject the request with **401**.
 6. If the user is the bootstrap service admin and the bootstrap password is still in use, allow only
