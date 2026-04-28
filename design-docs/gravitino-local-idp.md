@@ -37,7 +37,7 @@ Keycloak already exists. However, it introduces friction in several important sc
 - **Operational simplicity**: small deployments may not want the cost and maintenance burden of a
   separate OAuth server.
 
-To address these cases, Gravitino should provide an optional built-in local IdP mode with a simple
+To address these cases, Gravitino should provide an optional built-in IdP mode with a simple
 username/password authentication flow.
 
 ---
@@ -62,7 +62,7 @@ username/password authentication flow.
 
 ### 3.1 Authentication Model
 
-The local IdP is introduced as a new Gravitino authenticator mode: **basic**.
+The built-in IdP is introduced as a new Gravitino authenticator mode: **basic**.
 
 When enabled, Gravitino authenticates incoming requests through HTTP Basic authentication:
 
@@ -83,7 +83,7 @@ username/password-based flows. For Gravitino, simplicity matters more than proto
 - it fits POC and offline scenarios well,
 - and it avoids introducing token lifecycle complexity into the server.
 
-For these reasons, the initial local IdP implementation uses:
+For these reasons, the initial built-in IdP implementation uses:
 
 | Item | Decision |
 |---|---|
@@ -101,12 +101,11 @@ files:
 - **Database storage** supports normal metadata-style CRUD operations and matches Gravitino's
   existing persistence model.
 
-Database-backed storage is the most practical choice for a built-in local IdP.
+Database-backed storage is the most practical choice for a built-in IdP.
 
 ### 3.4 Module Layout
 
-The local IdP feature should be implemented as an independent Gravitino module rather than being
-scattered directly across the existing `server-common`, `server`, and `core` modules.
+The built-in IdP feature should be implemented as an independent Gravitino module.
 
 The recommended module name is:
 
@@ -114,22 +113,17 @@ The recommended module name is:
 
 This naming keeps the capability grouping explicit and avoids tying the module name to the HTTP
 Basic transport syntax alone. Although the initial login flow uses Basic authentication, the module
-itself is responsible for the broader local IdP capability set, including:
+itself is responsible for the broader built-in IdP capability set, including:
 
 - local user and local group management,
 - password hashing and verification,
 - bootstrap credential handling,
-- and the local IdP management API wiring.
+- and the built-in IdP management API wiring.
 
-At a high level, the implementation can still integrate with existing Gravitino modules as needed:
-
-- `core` for relational storage integration,
-- `server-common` for authenticator/filter extension points,
-- and `server` for REST resource exposure.
-
-However, the Local IdP-specific logic should be owned primarily by
-`authenticators:authenticator-local-idp` so that the feature has a clear packaging boundary and can
-evolve independently from the generic server authentication framework.
+The built-in IdP-specific logic should be owned by
+`authenticators:authenticator-local-idp`, including storage access, authenticator logic, bootstrap
+handling, password hashing, and management API exposure, so that the feature has a clear packaging
+boundary and can evolve independently.
 
 ---
 
@@ -169,7 +163,7 @@ introducing additional columns.
 
 ## 5. Data Model
 
-The local IdP requires three new tables:
+The built-in IdP requires three new tables:
 
 1. `local_user_meta` — local user records
 2. `local_group_meta` — local group records
@@ -251,7 +245,7 @@ local_user_meta
     └──< local_group_user_rel >── local_group_meta
 ```
 
-For integration with Gravitino's existing access control model, the local IdP tables are also
+For integration with Gravitino's existing access control model, the built-in IdP tables are also
 logically associated with the existing metadata tables:
 
 - `local_user_meta` is associated with `user_meta` through `user_name`
@@ -279,14 +273,14 @@ local_user_meta
 ```
 
 This supports direct username lookup for authentication, group resolution for authorization, and a
-clear mapping from local IdP identities to Gravitino's existing user/group metadata model while
+clear mapping from built-in IdP identities to Gravitino's existing user/group metadata model while
 preserving the requirement that local identity tables remain global and metalake-agnostic.
 
 ---
 
 ## 6. Bootstrap Experience
 
-To keep local IdP mode usable immediately after installation, Gravitino should provision a default
+To keep built-in IdP mode usable immediately after installation, Gravitino should provision a default
 administrator account on first startup.
 
 ### 6.1 Initial Administrator
@@ -450,8 +444,8 @@ This should follow Gravitino's existing multi-authenticator behavior: multiple a
 comma-separated, and if a request is supported by multiple authenticators simultaneously, the first
 matching authenticator wins.
 
-The Local IdP management capability is enabled only when `basic` is included in
-`gravitino.authenticators`. If `basic` is not enabled, Gravitino should not allow Local IdP-related
+The built-in IdP management capability is enabled only when `basic` is included in
+`gravitino.authenticators`. If `basic` is not enabled, Gravitino should not allow built-in IdP-related
 management APIs to be used.
 
 ### 8.2 Password Algorithm Configuration
@@ -473,7 +467,7 @@ keeps the design extensible and makes the hashing choice visible in configuratio
 
 ## 9. Administrative Operations
 
-The local IdP must support the following administrator-managed operations:
+The built-in IdP must support the following administrator-managed operations:
 
 - get user
 - add user
@@ -506,11 +500,11 @@ At a high level:
 
 The following APIs are intended for local user, local group, and group-membership management.
 
-Because local IdP identities are global rather than metalake-scoped, these management interfaces do
+Because built-in IdP identities are global rather than metalake-scoped, these management interfaces do
 not include `{metalake}` in their paths and use the `/api/idp` prefix.
 
 These APIs are available only when the `basic` authenticator is enabled. If `basic` is not enabled,
-requests to these Local IdP management endpoints should be rejected rather than treated as available
+requests to these built-in IdP management endpoints should be rejected rather than treated as available
 server APIs.
 
 All of the following operations are administrator-managed operations. They are intended to be called
@@ -653,20 +647,20 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ## 10. Security Considerations
 
-The local IdP is intentionally lightweight, but the following constraints remain important:
+The built-in IdP is intentionally lightweight, but the following constraints remain important:
 
 - passwords are stored as hashes, never plaintext
 - Basic authentication should be used only over HTTPS
 - bootstrap credentials must be rotated after installation
 - all metadata tables use soft deletion for traceability and operational safety
-- local IdP mode is recommended for POC, offline rather than as a
+- built-in IdP mode is recommended for POC, offline rather than as a
   replacement for enterprise-grade external identity systems
 
 ---
 
 ## 11. Summary
 
-This design adds a minimal local IdP to Gravitino for environments where an external IdP is either
+This design adds a minimal built-in IdP to Gravitino for environments where an external IdP is either
 unavailable or unnecessarily heavy. The key design choices are:
 
 - **HTTP Basic authentication**
