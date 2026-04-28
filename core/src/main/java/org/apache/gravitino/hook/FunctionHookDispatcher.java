@@ -25,7 +25,9 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.FunctionAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFunctionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -35,6 +37,8 @@ import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code FunctionHookDispatcher} is a decorator for {@link FunctionDispatcher} that not only
@@ -42,7 +46,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * operations before or after the underlying operations.
  */
 public class FunctionHookDispatcher implements FunctionDispatcher {
-
+  private static final Logger LOG = LoggerFactory.getLogger(FunctionHookDispatcher.class);
   private final FunctionDispatcher dispatcher;
 
   public FunctionHookDispatcher(FunctionDispatcher dispatcher) {
@@ -80,14 +84,25 @@ public class FunctionHookDispatcher implements FunctionDispatcher {
     Function function =
         dispatcher.registerFunction(ident, comment, functionType, deterministic, definitions);
 
-    // Set the creator as owner of the function.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      ownerManager.setOwner(
-          ident.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.FUNCTION),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+    // Set the creator as the owner of the function.
+    try {
+      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+      if (ownerManager != null) {
+        // The inner NormalizeDispatcher case-folds the function name (and its schema namespace)
+        // based on catalog capabilities, so the entity is stored under the normalized identifier.
+        // Apply the same normalization here so the owner is attached to the same identifier the
+        // manager sees.
+        NameIdentifier normalizedIdent =
+            CapabilityHelpers.applyCapabilities(
+                ident, Capability.Scope.FUNCTION, GravitinoEnv.getInstance().catalogManager());
+        ownerManager.setOwner(
+            normalizedIdent.namespace().level(0),
+            NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.FUNCTION),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      }
+    } catch (Exception e) {
+      LOG.warn("Failed to set owner for function {}, function exists without owner", ident, e);
     }
     return function;
   }
