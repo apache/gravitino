@@ -31,25 +31,33 @@ plugins {
 dependencies {
   implementation(libs.hadoop3.common) {
     exclude(group = "ch.qos.logback")
+    exclude(group = "ch.qos.reload4j")
     exclude(group = "com.fasterxml.jackson.core")
+    exclude(group = "com.github.pjfanning", module = "jersey-json")
     exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
+    exclude(group = "com.sun.jersey")
     exclude(group = "log4j")
     exclude(group = "net.java.dev.jets3t")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
+    exclude(group = "org.eclipse.jetty")
     exclude(group = "org.eclipse.jetty.aggregate", module = "jetty-all")
     exclude(group = "org.eclipse.jetty.orbit", module = "javax.servlet")
     exclude(group = "org.slf4j")
   }
   implementation(libs.hadoop3.mapreduce.client.core) {
+    exclude(group = "ch.qos.reload4j")
+    exclude(group = "com.github.pjfanning", module = "jersey-json")
     exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
+    exclude(group = "com.sun.jersey")
     exclude(group = "log4j")
     exclude(group = "org.apache.avro")
     exclude(group = "org.apache.logging.log4j")
+    exclude(group = "org.eclipse.jetty")
     exclude(group = "org.slf4j")
   }
   implementation(libs.hive2.metastore) {
