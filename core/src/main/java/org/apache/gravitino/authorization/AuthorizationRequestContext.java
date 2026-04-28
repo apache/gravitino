@@ -18,11 +18,14 @@
 package org.apache.gravitino.authorization;
 
 import java.security.Principal;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 
 public class AuthorizationRequestContext {
@@ -35,6 +38,13 @@ public class AuthorizationRequestContext {
 
   /** Used to determine whether the role has already been loaded. */
   private final AtomicBoolean hasLoadRole = new AtomicBoolean();
+
+  /**
+   * Role IDs of the current principal in the metalake under check. Populated once per request from
+   * {@code loadRole} and reused by every {@code authorize}/{@code deny} call so we don't re-derive
+   * the user→role linkage on each enforcer probe.
+   */
+  private volatile Set<Long> userRoleIds = Collections.emptySet();
 
   private volatile String originalAuthorizationExpression;
 
@@ -101,6 +111,14 @@ public class AuthorizationRequestContext {
 
   public void setOriginalAuthorizationExpression(String originalAuthorizationExpression) {
     this.originalAuthorizationExpression = originalAuthorizationExpression;
+  }
+
+  public Set<Long> getUserRoleIds() {
+    return userRoleIds;
+  }
+
+  public void setUserRoleIds(@Nullable Set<Long> userRoleIds) {
+    this.userRoleIds = userRoleIds == null ? Collections.emptySet() : userRoleIds;
   }
 
   public static class AuthorizationKey {

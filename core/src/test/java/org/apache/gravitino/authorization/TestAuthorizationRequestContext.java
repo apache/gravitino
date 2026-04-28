@@ -19,8 +19,12 @@ package org.apache.gravitino.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableSet;
+import java.util.Collections;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -100,5 +104,29 @@ public class TestAuthorizationRequestContext {
     assertEquals(2, counter.get(), "Flag should remain false after failure so next call runs.");
     context.loadRole(counter::incrementAndGet);
     assertEquals(2, counter.get(), "After a successful loadRole, further calls must be ignored.");
+  }
+
+  @Test
+  public void testUserRoleIdsDefaultsToEmptySet() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    assertEquals(Collections.emptySet(), context.getUserRoleIds());
+    assertTrue(context.getUserRoleIds().isEmpty());
+  }
+
+  @Test
+  public void testSetUserRoleIdsWithNullNormalizesToEmptySet() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    context.setUserRoleIds(ImmutableSet.of(1L, 2L));
+    context.setUserRoleIds(null);
+    // Null must not propagate; downstream callers iterate the set without a null check.
+    assertSame(Collections.emptySet(), context.getUserRoleIds());
+  }
+
+  @Test
+  public void testSetUserRoleIdsRoundTrip() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    Set<Long> roles = ImmutableSet.of(7L, 11L, 13L);
+    context.setUserRoleIds(roles);
+    assertEquals(roles, context.getUserRoleIds());
   }
 }
