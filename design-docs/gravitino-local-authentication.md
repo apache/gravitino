@@ -676,6 +676,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 You can remove a local group by its name. This operation should soft-delete the group record rather
 than physically remove it immediately.
 
+Note that removing a local group will also remove all relationships between that group and its
+users.
+
 The request path for REST API is `/api/idp/groups/{group}`.
 
 ```shell
