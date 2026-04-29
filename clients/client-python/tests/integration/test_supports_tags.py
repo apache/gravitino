@@ -112,20 +112,6 @@ class TestSupportsTags(IntegrationTestEnv):
         cls._tag3 = cls._gravitino_client.get_tag(cls._tag_name3)
         cls._tag4 = cls._gravitino_client.get_tag(cls._tag_name4)
 
-    @classmethod
-    def tearDownClass(cls) -> None:
-        cls._gravitino_client.drop_catalog(name=cls._model_catalog_name, force=True)
-        cls._gravitino_client.drop_catalog(
-            name=cls._relational_catalog_name, force=True
-        )
-        cls._gravitino_client.drop_catalog(name=cls._fileset_catalog_name, force=True)
-
-        cls._gravitino_client.delete_tag(cls._tag_name1)
-        cls._gravitino_client.delete_tag(cls._tag_name2)
-        cls._gravitino_client.delete_tag(cls._tag_name3)
-        cls._gravitino_client.delete_tag(cls._tag_name4)
-
-        cls._gravitino_admin_client.drop_metalake(name=cls._metalake_name, force=True)
         hive_metastore_uri = f"thrift://{cls._hdfs_container.get_ip()}:9083"
 
         cls._model_catalog = cls._gravitino_client.create_catalog(
@@ -159,6 +145,21 @@ class TestSupportsTags(IntegrationTestEnv):
         cls._fileset_catalog.as_schemas().create_schema(
             cls._schema_name, "fileset schema comment", {}
         )
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        cls._gravitino_client.drop_catalog(name=cls._model_catalog_name, force=True)
+        cls._gravitino_client.drop_catalog(
+            name=cls._relational_catalog_name, force=True
+        )
+        cls._gravitino_client.drop_catalog(name=cls._fileset_catalog_name, force=True)
+
+        cls._gravitino_client.delete_tag(cls._tag_name1)
+        cls._gravitino_client.delete_tag(cls._tag_name2)
+        cls._gravitino_client.delete_tag(cls._tag_name3)
+        cls._gravitino_client.delete_tag(cls._tag_name4)
+
+        cls._gravitino_admin_client.drop_metalake(name=cls._metalake_name, force=True)
 
     def setUp(self) -> None:
         self._table_ident: NameIdentifier = NameIdentifier.of(
