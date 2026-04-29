@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper.OWN
 
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -96,6 +97,11 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
         + ViewMetaMapper.TABLE_NAME
         + " vt WHERE vt.catalog_id = #{catalogId} AND"
         + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.catalog_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
+        + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 
@@ -134,6 +140,11 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
         + ViewMetaMapper.TABLE_NAME
         + " vt WHERE vt.schema_id = #{schemaId} AND"
         + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.schema_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.schema_id = #{schemaId} AND"
+        + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 

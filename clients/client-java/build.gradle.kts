@@ -50,6 +50,7 @@ dependencies {
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
+  testImplementation(libs.nimbus.jose.jwt)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.hadoop3.client)
   testImplementation(libs.junit.jupiter.api)
