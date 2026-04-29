@@ -28,8 +28,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.ToString;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -43,6 +45,9 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 
+@Getter
+@EqualsAndHashCode(exclude = "viewVersionInfoPO")
+@ToString
 public class ViewPO {
 
   public static final Long INITIAL_VERSION = 1L;
@@ -58,162 +63,44 @@ public class ViewPO {
   private Long deletedAt;
   private ViewVersionInfoPO viewVersionInfoPO;
 
-  public Long getViewId() {
-    return viewId;
+  public ViewPO() {}
+
+  public static class ViewPOBuilder {
+    // Lombok will generate builder methods.
   }
 
-  public String getViewName() {
-    return viewName;
-  }
+  @lombok.Builder(setterPrefix = "with")
+  private ViewPO(
+      Long viewId,
+      String viewName,
+      Long metalakeId,
+      Long catalogId,
+      Long schemaId,
+      String auditInfo,
+      Long currentVersion,
+      Long lastVersion,
+      Long deletedAt,
+      ViewVersionInfoPO viewVersionInfoPO) {
+    Preconditions.checkArgument(viewId != null, "View id is required");
+    Preconditions.checkArgument(viewName != null, "View name is required");
+    Preconditions.checkArgument(metalakeId != null, "Metalake id is required");
+    Preconditions.checkArgument(catalogId != null, "Catalog id is required");
+    Preconditions.checkArgument(schemaId != null, "Schema id is required");
+    Preconditions.checkArgument(auditInfo != null, "Audit info is required");
+    Preconditions.checkArgument(currentVersion != null, "Current version is required");
+    Preconditions.checkArgument(lastVersion != null, "Last version is required");
+    Preconditions.checkArgument(deletedAt != null, "Deleted at is required");
 
-  public Long getMetalakeId() {
-    return metalakeId;
-  }
-
-  public Long getCatalogId() {
-    return catalogId;
-  }
-
-  public Long getSchemaId() {
-    return schemaId;
-  }
-
-  public String getAuditInfo() {
-    return auditInfo;
-  }
-
-  public Long getCurrentVersion() {
-    return currentVersion;
-  }
-
-  public Long getLastVersion() {
-    return lastVersion;
-  }
-
-  public Long getDeletedAt() {
-    return deletedAt;
-  }
-
-  public ViewVersionInfoPO getViewVersionInfoPO() {
-    return viewVersionInfoPO;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof ViewPO)) {
-      return false;
-    }
-    ViewPO other = (ViewPO) o;
-    return Objects.equals(viewId, other.viewId)
-        && Objects.equals(viewName, other.viewName)
-        && Objects.equals(metalakeId, other.metalakeId)
-        && Objects.equals(catalogId, other.catalogId)
-        && Objects.equals(schemaId, other.schemaId)
-        && Objects.equals(auditInfo, other.auditInfo)
-        && Objects.equals(currentVersion, other.currentVersion)
-        && Objects.equals(lastVersion, other.lastVersion)
-        && Objects.equals(deletedAt, other.deletedAt);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(
-        viewId,
-        viewName,
-        metalakeId,
-        catalogId,
-        schemaId,
-        auditInfo,
-        currentVersion,
-        lastVersion,
-        deletedAt);
-  }
-
-  public static class Builder {
-    private final ViewPO viewPO;
-
-    private Builder() {
-      viewPO = new ViewPO();
-    }
-
-    public Builder withViewId(Long viewId) {
-      viewPO.viewId = viewId;
-      return this;
-    }
-
-    public Builder withViewName(String viewName) {
-      viewPO.viewName = viewName;
-      return this;
-    }
-
-    public Builder withMetalakeId(Long metalakeId) {
-      viewPO.metalakeId = metalakeId;
-      return this;
-    }
-
-    public Builder withCatalogId(Long catalogId) {
-      viewPO.catalogId = catalogId;
-      return this;
-    }
-
-    public Builder withSchemaId(Long schemaId) {
-      viewPO.schemaId = schemaId;
-      return this;
-    }
-
-    public Builder withAuditInfo(String auditInfo) {
-      viewPO.auditInfo = auditInfo;
-      return this;
-    }
-
-    public Builder withCurrentVersion(Long currentVersion) {
-      viewPO.currentVersion = currentVersion;
-      return this;
-    }
-
-    public Builder withLastVersion(Long lastVersion) {
-      viewPO.lastVersion = lastVersion;
-      return this;
-    }
-
-    public Builder withDeletedAt(Long deletedAt) {
-      viewPO.deletedAt = deletedAt;
-      return this;
-    }
-
-    public Builder withViewVersionInfoPO(ViewVersionInfoPO viewVersionInfoPO) {
-      viewPO.viewVersionInfoPO = viewVersionInfoPO;
-      return this;
-    }
-
-    private void validate() {
-      Preconditions.checkArgument(viewPO.viewId != null, "View id is required");
-      Preconditions.checkArgument(viewPO.viewName != null, "View name is required");
-      Preconditions.checkArgument(viewPO.metalakeId != null, "Metalake id is required");
-      Preconditions.checkArgument(viewPO.catalogId != null, "Catalog id is required");
-      Preconditions.checkArgument(viewPO.schemaId != null, "Schema id is required");
-      Preconditions.checkArgument(viewPO.auditInfo != null, "Audit info is required");
-      Preconditions.checkArgument(viewPO.currentVersion != null, "Current version is required");
-      Preconditions.checkArgument(viewPO.lastVersion != null, "Last version is required");
-      Preconditions.checkArgument(viewPO.deletedAt != null, "Deleted at is required");
-    }
-
-    public ViewPO build() {
-      validate();
-      return viewPO;
-    }
-  }
-
-  /**
-   * Creates a new instance of {@link Builder}.
-   *
-   * @return The new instance.
-   */
-  public static Builder builder() {
-    return new Builder();
+    this.viewId = viewId;
+    this.viewName = viewName;
+    this.metalakeId = metalakeId;
+    this.catalogId = catalogId;
+    this.schemaId = schemaId;
+    this.auditInfo = auditInfo;
+    this.currentVersion = currentVersion;
+    this.lastVersion = lastVersion;
+    this.deletedAt = deletedAt;
+    this.viewVersionInfoPO = viewVersionInfoPO;
   }
 
   // ============================ PO Converters ============================
@@ -260,7 +147,7 @@ public class ViewPO {
     }
   }
 
-  public static ViewPO initializeViewPO(ViewEntity viewEntity, Builder builder) {
+  public static ViewPO initializeViewPO(ViewEntity viewEntity, ViewPOBuilder builder) {
     builder.withCurrentVersion(INITIAL_VERSION).withLastVersion(INITIAL_VERSION);
     return buildViewPO(viewEntity, builder, INITIAL_VERSION.intValue());
   }
@@ -297,7 +184,7 @@ public class ViewPO {
     }
   }
 
-  public static ViewPO buildViewPO(ViewEntity viewEntity, Builder builder, Integer version) {
+  public static ViewPO buildViewPO(ViewEntity viewEntity, ViewPOBuilder builder, Integer version) {
     try {
       NamespacedEntityId namespacedEntityId =
           EntityIdService.getEntityIds(

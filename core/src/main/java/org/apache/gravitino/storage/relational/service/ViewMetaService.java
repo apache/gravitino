@@ -102,7 +102,7 @@ public class ViewMetaService {
   public void insertView(ViewEntity viewEntity, boolean overwrite) throws IOException {
     NameIdentifierUtil.checkView(viewEntity.nameIdentifier());
 
-    ViewPO.Builder builder = ViewPO.builder();
+    ViewPO.ViewPOBuilder builder = ViewPO.builder();
     try {
       ViewPO po = initializeViewPO(viewEntity, builder);
 
@@ -237,7 +237,7 @@ public class ViewMetaService {
 
   private ViewPO updateViewPO(ViewPO oldViewPO, ViewEntity newEntity) {
     Long newVersion = oldViewPO.getLastVersion() + 1;
-    ViewPO.Builder builder =
+    ViewPO.ViewPOBuilder builder =
         ViewPO.builder()
             .withMetalakeId(oldViewPO.getMetalakeId())
             .withCatalogId(oldViewPO.getCatalogId())
