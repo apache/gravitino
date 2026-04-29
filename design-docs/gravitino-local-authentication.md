@@ -620,13 +620,13 @@ http://localhost:8090/api/idp/groups/engineering
 You can add users to a local group by providing the group name in the path and the target user
 names in the request body.
 
-The request path for REST API is `/api/idp/groups/{group}/users`.
+The request path for REST API is `/api/idp/groups/{group}/users/add`.
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "userNames": ["alice", "bob"]
-}' http://localhost:8090/api/idp/groups/engineering/users
+}' http://localhost:8090/api/idp/groups/engineering/users/add
 ```
 
 #### 9.1.9 Remove users from a local group
@@ -634,13 +634,13 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 You can remove users from a local group by providing the group name in the path and the target
 user names in the request body.
 
-The request path for REST API is `/api/idp/groups/{group}/users`.
+The request path for REST API is `/api/idp/groups/{group}/users/remove`.
 
 ```shell
-curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "userNames": ["alice"]
-}' http://localhost:8090/api/idp/groups/engineering/users
+}' http://localhost:8090/api/idp/groups/engineering/users/remove
 ```
 ---
 
