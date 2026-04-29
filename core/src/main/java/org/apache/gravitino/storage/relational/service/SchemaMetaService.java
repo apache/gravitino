@@ -200,9 +200,9 @@ public class SchemaMetaService {
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     // Use physical identifier for DB lookup; expose logical entity to the updater.
     SchemaPO oldSchemaPO = getSchemaPOByIdentifier(toPhysicalIdentifier(identifier));
-
-    SchemaEntity oldSchemaEntity = POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace());
-    SchemaEntity newEntity = (SchemaEntity) updater.apply((E) oldSchemaEntity);
+    SchemaEntity oldSchemaEntity =
+        toLogicalEntity(POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace()));
+    SchemaEntity newEntity = toLogicalEntity((SchemaEntity) updater.apply((E) oldSchemaEntity));
     Preconditions.checkArgument(
         Objects.equals(oldSchemaEntity.id(), newEntity.id()),
         "The updated schema entity id: %s should be same with the schema entity id before: %s",

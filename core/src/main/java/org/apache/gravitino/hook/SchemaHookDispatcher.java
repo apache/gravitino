@@ -21,6 +21,7 @@ package org.apache.gravitino.hook;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -70,11 +71,15 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
       String creator = PrincipalUtils.getCurrentUserName();
       for (NameIdentifier parent : missingParents) {
         if (dispatcher.schemaExists(parent)) {
-          ownerManager.setOwner(
-              metalake,
-              NameIdentifierUtil.toMetadataObject(parent, Entity.EntityType.SCHEMA),
-              creator,
-              Owner.Type.USER);
+          // Parent schemas can be concurrently created by another request between the pre-check and
+          // this point. Only assign owner when there is no owner to avoid overwriting ownership.
+          if (canSetOwner(ownerManager, metalake, parent)) {
+            ownerManager.setOwner(
+                metalake,
+                NameIdentifierUtil.toMetadataObject(parent, Entity.EntityType.SCHEMA),
+                creator,
+                Owner.Type.USER);
+          }
         }
       }
       ownerManager.setOwner(
@@ -102,6 +107,13 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
       }
     }
     return missing;
+  }
+
+  private boolean canSetOwner(OwnerDispatcher ownerManager, String metalake, NameIdentifier ident) {
+    Optional<Owner> owner =
+        ownerManager.getOwner(
+            metalake, NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA));
+    return !owner.isPresent();
   }
 
   @Override

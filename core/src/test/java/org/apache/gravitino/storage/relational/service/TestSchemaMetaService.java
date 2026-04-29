@@ -29,6 +29,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
@@ -259,8 +261,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     List<SchemaEntity> listed =
         schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName));
 
-    List<String> names =
-        listed.stream().map(SchemaEntity::name).collect(java.util.stream.Collectors.toList());
+    List<String> names = listed.stream().map(SchemaEntity::name).collect(Collectors.toList());
     Assertions.assertTrue(names.contains("flat"), "flat name must be present");
     Assertions.assertTrue(names.contains("A:B"), "2-level logical name must be present");
     Assertions.assertTrue(names.contains("A:B:C"), "3-level logical name must be present");
@@ -285,21 +286,28 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     schemaMetaService.insertSchema(schema, false);
 
     NameIdentifier ident = NameIdentifierUtil.ofSchema(metalakeName, catalogName, logicalName);
-    schemaMetaService.updateSchema(
-        ident,
-        entity -> {
-          SchemaEntity s = (SchemaEntity) entity;
-          return SchemaEntity.builder()
-              .withId(s.id())
-              .withName(s.name())
-              .withNamespace(s.namespace())
-              .withComment("updated comment")
-              .withProperties(s.properties())
-              .withAuditInfo(s.auditInfo())
-              .build();
-        });
+    AtomicReference<String> updaterInputName = new AtomicReference<>();
+    SchemaEntity returned =
+        schemaMetaService.updateSchema(
+            ident,
+            entity -> {
+              SchemaEntity s = (SchemaEntity) entity;
+              updaterInputName.set(s.name());
+              return SchemaEntity.builder()
+                  .withId(s.id())
+                  .withName(s.name())
+                  .withNamespace(s.namespace())
+                  .withComment("updated comment")
+                  .withProperties(s.properties())
+                  .withAuditInfo(s.auditInfo())
+                  .build();
+            });
 
     SchemaEntity updated = schemaMetaService.getSchemaByIdentifier(ident);
+    Assertions.assertEquals(
+        logicalName, updaterInputName.get(), "updater should receive logical schema name");
+    Assertions.assertEquals(
+        logicalName, returned.name(), "updateSchema should return logical name");
     // Name must still be logical after update.
     Assertions.assertEquals(logicalName, updated.name());
     Assertions.assertEquals("updated comment", updated.comment());

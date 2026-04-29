@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -65,6 +66,7 @@ public class TestSchemaHookDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
 
     hookDispatcher = new SchemaHookDispatcher(mockDispatcher);
+    when(mockOwnerDispatcher.getOwner(any(), any())).thenReturn(Optional.empty());
   }
 
   @AfterEach
@@ -101,8 +103,8 @@ public class TestSchemaHookDispatcher {
     NameIdentifier parentAB = NameIdentifier.of(METALAKE, CATALOG, "A:B");
     Schema mockSchema = mock(Schema.class);
 
-    when(mockDispatcher.schemaExists(parentA)).thenReturn(false);
-    when(mockDispatcher.schemaExists(parentAB)).thenReturn(false);
+    when(mockDispatcher.schemaExists(parentA)).thenReturn(false, true);
+    when(mockDispatcher.schemaExists(parentAB)).thenReturn(false, true);
     when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
 
     hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
@@ -112,8 +114,20 @@ public class TestSchemaHookDispatcher {
     verify(mockDispatcher, never()).createSchema(eq(parentAB), any(), any());
     verify(mockDispatcher, times(1)).createSchema(eq(ident), any(), any());
 
-    // Verify owner is set for the requested schema.
-    verify(mockOwnerDispatcher, times(1)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
+    // Verify owner is set for both auto-created parents and the requested schema.
+    verify(mockOwnerDispatcher, times(3)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
+    verify(mockOwnerDispatcher, times(1))
+        .setOwner(
+            eq(METALAKE),
+            eq(NameIdentifierUtil.toMetadataObject(parentA, Entity.EntityType.SCHEMA)),
+            any(),
+            eq(Owner.Type.USER));
+    verify(mockOwnerDispatcher, times(1))
+        .setOwner(
+            eq(METALAKE),
+            eq(NameIdentifierUtil.toMetadataObject(parentAB, Entity.EntityType.SCHEMA)),
+            any(),
+            eq(Owner.Type.USER));
     verify(mockOwnerDispatcher, times(1))
         .setOwner(
             eq(METALAKE),
@@ -131,7 +145,7 @@ public class TestSchemaHookDispatcher {
 
     // A already exists, A:B does not
     when(mockDispatcher.schemaExists(parentA)).thenReturn(true);
-    when(mockDispatcher.schemaExists(parentAB)).thenReturn(false);
+    when(mockDispatcher.schemaExists(parentAB)).thenReturn(false, true);
     when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
 
     hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
@@ -141,8 +155,26 @@ public class TestSchemaHookDispatcher {
     verify(mockDispatcher, never()).createSchema(eq(parentAB), any(), any());
     verify(mockDispatcher, times(1)).createSchema(eq(ident), any(), any());
 
-    // Verify owner is set for the requested schema.
-    verify(mockOwnerDispatcher, times(1)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
+    // Verify owner is set for the requested schema and the newly created parent A:B.
+    verify(mockOwnerDispatcher, times(2)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
+    verify(mockOwnerDispatcher, never())
+        .setOwner(
+            eq(METALAKE),
+            eq(NameIdentifierUtil.toMetadataObject(parentA, Entity.EntityType.SCHEMA)),
+            any(),
+            eq(Owner.Type.USER));
+    verify(mockOwnerDispatcher, times(1))
+        .setOwner(
+            eq(METALAKE),
+            eq(NameIdentifierUtil.toMetadataObject(parentAB, Entity.EntityType.SCHEMA)),
+            any(),
+            eq(Owner.Type.USER));
+    verify(mockOwnerDispatcher, times(1))
+        .setOwner(
+            eq(METALAKE),
+            eq(NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA)),
+            any(),
+            eq(Owner.Type.USER));
   }
 
   @Test
@@ -161,6 +193,47 @@ public class TestSchemaHookDispatcher {
 
     // Only A:B gets owner set
     verify(mockOwnerDispatcher, times(1)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
+  }
+
+  @Test
+  public void testCreateNestedSchemaDoesNotOverwriteOwnerOnConcurrentParentCreate() {
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B:C");
+    NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
+    NameIdentifier parentAB = NameIdentifier.of(METALAKE, CATALOG, "A:B");
+    Schema mockSchema = mock(Schema.class);
+
+    when(mockDispatcher.schemaExists(parentA)).thenReturn(false, true);
+    when(mockDispatcher.schemaExists(parentAB)).thenReturn(false, true);
+    when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
+    when(mockOwnerDispatcher.getOwner(
+            eq(METALAKE),
+            eq(NameIdentifierUtil.toMetadataObject(parentA, Entity.EntityType.SCHEMA))))
+        .thenReturn(Optional.of(mock(Owner.class)));
+    when(mockOwnerDispatcher.getOwner(
+            eq(METALAKE),
+            eq(NameIdentifierUtil.toMetadataObject(parentAB, Entity.EntityType.SCHEMA))))
+        .thenReturn(Optional.empty());
+
+    hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
+
+    verify(mockOwnerDispatcher, never())
+        .setOwner(
+            eq(METALAKE),
+            eq(NameIdentifierUtil.toMetadataObject(parentA, Entity.EntityType.SCHEMA)),
+            any(),
+            eq(Owner.Type.USER));
+    verify(mockOwnerDispatcher, times(1))
+        .setOwner(
+            eq(METALAKE),
+            eq(NameIdentifierUtil.toMetadataObject(parentAB, Entity.EntityType.SCHEMA)),
+            any(),
+            eq(Owner.Type.USER));
+    verify(mockOwnerDispatcher, times(1))
+        .setOwner(
+            eq(METALAKE),
+            eq(NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA)),
+            any(),
+            eq(Owner.Type.USER));
   }
 
   @Test

@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -120,7 +121,7 @@ public final class HierarchicalSchemaUtil {
     String[] parts = schemaName.split(Pattern.quote(separator), -1);
     List<String> ancestors = new ArrayList<>();
     for (int i = 1; i < parts.length; i++) {
-      ancestors.add(String.join(separator, java.util.Arrays.copyOf(parts, i)));
+      ancestors.add(String.join(separator, Arrays.copyOf(parts, i)));
     }
     return ancestors;
   }
