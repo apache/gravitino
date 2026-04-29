@@ -17,16 +17,31 @@
 
 from __future__ import annotations
 
-from gravitino.api.authorization.group import Group
-from gravitino.api.authorization.privileges import Privileges
-from gravitino.api.authorization.role import Role
-from gravitino.api.authorization.securable_objects import SecurableObjects
-from gravitino.api.authorization.user import User
+from abc import abstractmethod
 
-__all__ = [
-    "Group",
-    "Role",
-    "SecurableObjects",
-    "Privileges",
-    "User",
-]
+from gravitino.api.auditable import Auditable
+
+
+class User(Auditable):
+    """The interface of a user. The user is a basic entity in the authorization system."""
+
+    @abstractmethod
+    def name(self) -> str:
+        """
+        The name of the user.
+
+        Returns:
+            str: The name of the user.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def roles(self) -> list[str]:
+        """
+        The roles of the user. A user can have multiple roles.
+        Every role binds several privileges.
+
+        Returns:
+            list[str]: The role names of the user.
+        """
+        raise NotImplementedError()
