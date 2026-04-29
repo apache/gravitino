@@ -38,13 +38,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.Representation;
-import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
@@ -137,35 +132,6 @@ public class ViewMetaService {
           re, Entity.EntityType.VIEW, viewEntity.nameIdentifier().toString());
       throw re;
     }
-  }
-
-  /**
-   * Insert a view from GenericEntity. Synthesizes a minimal ViewEntity so that callers which only
-   * know about GenericEntity (e.g. tests) can still register a view row.
-   *
-   * @param entity The GenericEntity representing the view.
-   * @param overwrite Whether to overwrite an existing view.
-   * @throws IOException If an I/O error occurs.
-   */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "insertViewFromEntity")
-  public void insertView(GenericEntity entity, boolean overwrite) throws IOException {
-    NamespaceUtil.checkView(entity.namespace());
-
-    ViewEntity viewEntity =
-        ViewEntity.builder()
-            .withId(entity.id())
-            .withName(entity.name())
-            .withNamespace(entity.namespace())
-            .withColumns(new Column[0])
-            .withRepresentations(
-                new Representation[] {
-                  SQLRepresentation.builder().withDialect("unknown").withSql("placeholder").build()
-                })
-            .withAuditInfo(AuditInfo.EMPTY)
-            .build();
-    insertView(viewEntity, overwrite);
   }
 
   @Monitored(
