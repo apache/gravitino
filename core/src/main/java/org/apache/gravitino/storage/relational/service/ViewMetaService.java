@@ -150,6 +150,7 @@ public class ViewMetaService {
         newEntity.id(),
         oldViewEntity.id());
 
+    AtomicInteger updateResult = new AtomicInteger(0);
     try {
       ViewPO newViewPO = updateViewPO(oldViewPO, newEntity);
       SessionUtils.doMultipleWithCommit(
@@ -157,11 +158,19 @@ public class ViewMetaService {
               SessionUtils.doWithoutCommit(
                   ViewVersionInfoMapper.class,
                   mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ViewMetaMapper.class, mapper -> mapper.updateViewMeta(newViewPO, oldViewPO)));
+          () -> {
+            updateResult.set(
+                SessionUtils.getWithoutCommit(
+                    ViewMetaMapper.class, mapper -> mapper.updateViewMeta(newViewPO, oldViewPO)));
+            if (updateResult.get() == 0) {
+              throw new RuntimeException("Failed to update the entity: " + ident);
+            }
+          });
       return newEntity;
     } catch (RuntimeException re) {
+      if (updateResult.get() == 0) {
+        throw new IOException("Failed to update the entity: " + ident);
+      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.VIEW, newEntity.nameIdentifier().toString());
       throw re;

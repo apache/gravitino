@@ -160,6 +160,46 @@ public class TestViewMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testUpdateViewRollbackWhenMetaUpdateAffectsZeroRows() throws IOException {
+    String viewName = GravitinoITUtils.genRandomName("test_view");
+    Namespace ns = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewEntity view =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), ns, viewName, AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(view, false);
+
+    NameIdentifier viewIdent = NameIdentifier.of(metalakeName, catalogName, schemaName, viewName);
+    ViewEntity updated =
+        ViewEntity.builder()
+            .withId(view.id())
+            .withName(view.name())
+            .withNamespace(ns)
+            .withComment("updated comment")
+            .withColumns(view.columns())
+            .withRepresentations(view.representations())
+            .withDefaultCatalog("updated_catalog")
+            .withDefaultSchema("updated_schema")
+            .withProperties(view.properties())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    assertThrows(
+        IOException.class,
+        () ->
+            ViewMetaService.getInstance()
+                .updateView(
+                    viewIdent,
+                    e -> {
+                      ViewMetaService.getInstance().deleteView(viewIdent);
+                      return updated;
+                    }));
+
+    Map<Integer, Long> versions = listViewVersions(view.id());
+    assertEquals(1, versions.size());
+    assertTrue(versions.containsKey(1));
+    assertTrue(versions.get(1) > 0L);
+  }
+
+  @TestTemplate
   public void testDeleteView() throws IOException {
     String viewName = GravitinoITUtils.genRandomName("test_view");
     Namespace ns = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
