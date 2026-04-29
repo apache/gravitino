@@ -47,6 +47,7 @@ import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
+import org.apache.gravitino.lance.service.extension.LanceDummyCredentialProvider;
 import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -936,6 +937,58 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(anotherLocation, anotherResponse.getLocation());
     // Will not touch storage, so the path should not be created.
     Assertions.assertFalse(new File(anotherLocation).exists());
+  }
+
+  @Test
+  void testDescribeTableWithCredentialVending() {
+    // Create a catalog with credential-providers configured to use the dummy provider
+    String credCatalogName = GravitinoITUtils.genRandomName("lance_cred_catalog");
+    Map<String, String> credCatalogProps =
+        new HashMap<>() {
+          {
+            put("credential-providers", LanceDummyCredentialProvider.CREDENTIAL_TYPE);
+          }
+        };
+    Catalog credCatalog =
+        metalake.createCatalog(
+            credCatalogName,
+            Catalog.Type.RELATIONAL,
+            "lakehouse-generic",
+            "catalog for credential vending test",
+            credCatalogProps);
+
+    // Create schema
+    String credSchemaName = GravitinoITUtils.genRandomName("lance_cred_schema");
+    credCatalog.asSchemas().createSchema(credSchemaName, null, null);
+
+    // Create an empty table with a location
+    String tableName = GravitinoITUtils.genRandomName("lance_cred_table");
+    String tableLocation = tempDir + "/" + tableName + "/";
+    List<String> ids = List.of(credCatalogName, credSchemaName, tableName);
+
+    CreateEmptyTableRequest createRequest = new CreateEmptyTableRequest();
+    createRequest.setId(ids);
+    createRequest.setLocation(tableLocation);
+    CreateEmptyTableResponse createResponse = ns.createEmptyTable(createRequest);
+    Assertions.assertNotNull(createResponse);
+    Assertions.assertEquals(tableLocation, createResponse.getLocation());
+
+    // Describe table with vendCredentials = true (explicit)
+    DescribeTableRequest describeRequest = new DescribeTableRequest();
+    describeRequest.setId(ids);
+    describeRequest.setVendCredentials(true);
+
+    DescribeTableResponse response = ns.describeTable(describeRequest);
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(tableLocation, response.getLocation());
+
+    // Verify vended credentials are present in storage options
+    Map<String, String> storageOptions = response.getStorageOptions();
+    Assertions.assertNotNull(storageOptions);
+    Assertions.assertEquals("test-access-key-id", storageOptions.get("aws_access_key_id"));
+    Assertions.assertEquals("test-secret-access-key", storageOptions.get("aws_secret_access_key"));
+    Assertions.assertEquals("test-session-token", storageOptions.get("aws_session_token"));
+    Assertions.assertEquals("3600000", storageOptions.get("expires_at_millis"));
   }
 
   private CreateTableResponse createTable(

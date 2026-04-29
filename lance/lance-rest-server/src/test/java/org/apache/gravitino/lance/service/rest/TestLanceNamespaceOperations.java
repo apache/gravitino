@@ -122,6 +122,10 @@ public class TestLanceNamespaceOperations extends JerseyTest {
   public static void setup() {
     when(namespaceWrapper.asNamespaceOps()).thenReturn(namespaceOps);
     when(namespaceWrapper.asTableOps()).thenReturn(tableOps);
+    org.apache.gravitino.lance.common.config.LanceConfig lanceConfig =
+        mock(org.apache.gravitino.lance.common.config.LanceConfig.class);
+    when(namespaceWrapper.config()).thenReturn(lanceConfig);
+    when(lanceConfig.getGravitinoMetalake()).thenReturn("test-metalake");
   }
 
   @Test
@@ -730,7 +734,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     DescribeTableResponse createTableResponse = new DescribeTableResponse();
     createTableResponse.setLocation("/path/to/describe_table");
     createTableResponse.setMetadata(ImmutableMap.of("key", "value"));
-    when(tableOps.describeTable(any(), any(), any())).thenReturn(createTableResponse);
+    when(tableOps.describeTable(any(), any(), any(), any())).thenReturn(createTableResponse);
 
     DescribeTableRequest tableRequest = new DescribeTableRequest();
     Response resp =
@@ -747,7 +751,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     // Test not found exception
     Mockito.reset(tableOps);
-    when(tableOps.describeTable(any(), any(), any()))
+    when(tableOps.describeTable(any(), any(), any(), any()))
         .thenThrow(new TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/describe", tableIds))
@@ -758,7 +762,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     // Test runtime exception
     Mockito.reset(tableOps);
-    when(tableOps.describeTable(any(), any(), any()))
+    when(tableOps.describeTable(any(), any(), any(), any()))
         .thenThrow(new RuntimeException("Runtime exception"));
     resp =
         target(String.format("/v1/table/%s/describe", tableIds))
@@ -1087,5 +1091,84 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals("Runtime exception", errorResp.getError());
+  }
+
+  @Test
+  void testDescribeTableVendCredentialsDefaultTrue() {
+    String tableIds = "catalog.scheme.vend_table";
+    String delimiter = ".";
+
+    DescribeTableResponse expectedResponse = new DescribeTableResponse();
+    expectedResponse.setLocation("/path/to/vend_table");
+    expectedResponse.setStorageOptions(
+        ImmutableMap.of(
+            "aws_access_key_id",
+            "temp_key",
+            "aws_secret_access_key",
+            "temp_secret",
+            "aws_session_token",
+            "temp_token",
+            "expires_at_millis",
+            "1234567890"));
+    when(tableOps.describeTable(any(), any(), any(), any())).thenReturn(expectedResponse);
+
+    DescribeTableRequest request = new DescribeTableRequest();
+    Response resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    DescribeTableResponse response = resp.readEntity(DescribeTableResponse.class);
+    Assertions.assertNotNull(response.getStorageOptions());
+    Assertions.assertTrue(response.getStorageOptions().containsKey("expires_at_millis"));
+
+    Mockito.verify(tableOps).describeTable(any(), any(), any(), any());
+  }
+
+  @Test
+  void testDescribeTableVendCredentialsExplicitFalse() {
+    Mockito.reset(tableOps);
+    String tableIds = "catalog.scheme.no_vend";
+    String delimiter = ".";
+
+    DescribeTableResponse expectedResponse = new DescribeTableResponse();
+    expectedResponse.setLocation("/path/to/no_vend");
+    expectedResponse.setStorageOptions(ImmutableMap.of("aws_region", "us-east-1"));
+    when(tableOps.describeTable(any(), any(), any(), eq(null))).thenReturn(expectedResponse);
+
+    DescribeTableRequest request = new DescribeTableRequest();
+    request.setVendCredentials(false);
+    Response resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Mockito.verify(tableOps).describeTable(any(), any(), any(), eq(null));
+  }
+
+  @Test
+  void testDescribeTableVendCredentialsExplicitTrue() {
+    Mockito.reset(tableOps);
+    String tableIds = "catalog.scheme.explicit_vend";
+    String delimiter = ".";
+
+    DescribeTableResponse expectedResponse = new DescribeTableResponse();
+    expectedResponse.setLocation("/path/to/explicit_vend");
+    when(tableOps.describeTable(any(), any(), any(), any())).thenReturn(expectedResponse);
+
+    DescribeTableRequest request = new DescribeTableRequest();
+    request.setVendCredentials(true);
+    Response resp =
+        target(String.format("/v1/table/%s/describe", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Mockito.verify(tableOps).describeTable(any(), any(), any(), any());
   }
 }

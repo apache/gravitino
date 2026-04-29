@@ -29,6 +29,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
@@ -43,11 +44,16 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
@@ -90,14 +96,35 @@ public class LanceTableOperations {
       DescribeTableRequest request) {
     try {
       validateDescribeTableRequest(request);
+      boolean vendCredentials =
+          request.getVendCredentials() == null || Boolean.TRUE.equals(request.getVendCredentials());
+      CredentialPrivilege privilege =
+          vendCredentials ? getCredentialPrivilege(tableId, delimiter) : null;
       DescribeTableResponse response =
           lanceNamespace
               .asTableOps()
-              .describeTable(tableId, delimiter, Optional.ofNullable(request.getVersion()));
+              .describeTable(
+                  tableId, delimiter, Optional.ofNullable(request.getVersion()), privilege);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
     }
+  }
+
+  private CredentialPrivilege getCredentialPrivilege(String tableId, String delimiter) {
+    String[] parts = tableId.split(Pattern.quote(delimiter));
+    if (parts.length != 3) {
+      return CredentialPrivilege.READ;
+    }
+
+    String metalake = lanceNamespace.config().getGravitinoMetalake();
+    NameIdentifier identifier = NameIdentifier.of(metalake, parts[0], parts[1], parts[2]);
+    boolean writable =
+        MetadataAuthzHelper.checkAccess(
+            identifier,
+            Entity.EntityType.TABLE,
+            AuthorizationExpressionConstants.FILTER_MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
+    return writable ? CredentialPrivilege.WRITE : CredentialPrivilege.READ;
   }
 
   @POST

@@ -46,6 +46,24 @@ public class CredentialPropertyUtils {
   @VisibleForTesting
   static final String ICEBERG_ADLS_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
 
+  // Lance storage_options key constants
+  @VisibleForTesting static final String LANCE_S3_ACCESS_KEY_ID = "aws_access_key_id";
+  @VisibleForTesting static final String LANCE_S3_SECRET_ACCESS_KEY = "aws_secret_access_key";
+  @VisibleForTesting static final String LANCE_S3_SESSION_TOKEN = "aws_session_token";
+  @VisibleForTesting static final String LANCE_OSS_ACCESS_KEY_ID = "oss_access_key_id";
+  @VisibleForTesting static final String LANCE_OSS_SECRET_ACCESS_KEY = "oss_secret_access_key";
+  @VisibleForTesting static final String LANCE_OSS_SECURITY_TOKEN = "oss_security_token";
+  @VisibleForTesting static final String LANCE_GCS_TOKEN = "google_storage_token";
+  @VisibleForTesting static final String LANCE_AZURE_SAS_TOKEN = "azure_storage_sas_token";
+
+  @VisibleForTesting
+  static final String LANCE_AZURE_STORAGE_ACCOUNT_NAME = "azure_storage_account_name";
+
+  @VisibleForTesting
+  static final String LANCE_AZURE_STORAGE_ACCOUNT_KEY = "azure_storage_account_key";
+
+  @VisibleForTesting static final String LANCE_EXPIRES_AT_MILLIS = "expires_at_millis";
+
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
           .put(GCSTokenCredential.GCS_TOKEN_NAME, ICEBERG_GCS_TOKEN)
@@ -68,6 +86,31 @@ public class CredentialPropertyUtils {
           .put(AwsIrsaCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
           .put(AwsIrsaCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
           .put(AwsIrsaCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
+          .build();
+
+  private static Map<String, String> lanceCredentialPropertyMap =
+      ImmutableMap.<String, String>builder()
+          .put(S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID, LANCE_S3_ACCESS_KEY_ID)
+          .put(
+              S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
+              LANCE_S3_SECRET_ACCESS_KEY)
+          .put(S3TokenCredential.GRAVITINO_S3_TOKEN, LANCE_S3_SESSION_TOKEN)
+          .put(OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID, LANCE_OSS_ACCESS_KEY_ID)
+          .put(
+              OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY,
+              LANCE_OSS_SECRET_ACCESS_KEY)
+          .put(OSSTokenCredential.GRAVITINO_OSS_TOKEN, LANCE_OSS_SECURITY_TOKEN)
+          .put(GCSTokenCredential.GCS_TOKEN_NAME, LANCE_GCS_TOKEN)
+          .put(ADLSTokenCredential.GRAVITINO_ADLS_SAS_TOKEN, LANCE_AZURE_SAS_TOKEN)
+          .put(
+              ADLSTokenCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+              LANCE_AZURE_STORAGE_ACCOUNT_NAME)
+          .put(
+              AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+              LANCE_AZURE_STORAGE_ACCOUNT_KEY)
+          .put(AwsIrsaCredential.ACCESS_KEY_ID, LANCE_S3_ACCESS_KEY_ID)
+          .put(AwsIrsaCredential.SECRET_ACCESS_KEY, LANCE_S3_SECRET_ACCESS_KEY)
+          .put(AwsIrsaCredential.SESSION_TOKEN, LANCE_S3_SESSION_TOKEN)
           .build();
 
   /**
@@ -107,6 +150,24 @@ public class CredentialPropertyUtils {
     }
 
     return credential.toProperties();
+  }
+
+  /**
+   * Transforms a specific credential into a map of Lance storage_options properties.
+   *
+   * @param credential the credential to be transformed into Lance storage_options properties
+   * @return a map of Lance storage_options properties derived from the credential
+   */
+  public static Map<String, String> toLanceProperties(Credential credential) {
+    Map<String, String> properties =
+        new HashMap<>(transformProperties(credential.credentialInfo(), lanceCredentialPropertyMap));
+
+    long expireTimeInMs = credential.expireTimeInMs();
+    if (expireTimeInMs > 0) {
+      properties.put(LANCE_EXPIRES_AT_MILLIS, String.valueOf(expireTimeInMs));
+    }
+
+    return properties;
   }
 
   private static Map<String, String> transformProperties(
