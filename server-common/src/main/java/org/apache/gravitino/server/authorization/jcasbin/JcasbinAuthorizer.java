@@ -578,7 +578,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /**
    * Adds a role mapping for the given user in both enforcers and asynchronously loads the role's
-   * policies if they are not already cached.
+   * policies if they are not already cached. When a role needs loading, the resulting {@link
+   * CompletableFuture} is appended to {@code loadRoleFutures} so the caller can join all futures
+   * after processing both direct and group-inherited roles.
    */
   private void addRoleForUserAndLoadPolicies(
       Long userId,
