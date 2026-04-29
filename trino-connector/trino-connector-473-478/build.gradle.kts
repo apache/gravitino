@@ -31,6 +31,7 @@ plugins {
 val minTrinoVersion = 473
 val maxTrinoVersion = 478
 val otelSemconvVersion = "1.32.0"
+val starburstVersion: String = project.properties["starburstVersion"]
 
 val trinoVersion = providers.gradleProperty("trinoVersion")
   .map { it.trim().toInt() }
@@ -58,9 +59,8 @@ dependencies {
   implementation("io.trino:trino-jdbc:$trinoVersion")
   runtimeOnly("io.opentelemetry.semconv:opentelemetry-semconv:$otelSemconvVersion")
   compileOnly(libs.airlift.resolver)
-  compileOnly("io.trino:trino-spi:$trinoVersion") {
-    exclude("org.apache.logging.log4j")
-  }
+  compileOnly(files("../starburst-libs/io.trino_trino-spi-$starburstVersion.jar"))
+  compileOnly("io.airlift:slice:0.46")
   testImplementation(libs.awaitility)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
