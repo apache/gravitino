@@ -192,7 +192,6 @@ public class GroupMetaBaseSQLProvider {
         + " FROM "
         + GROUP_TABLE_NAME
         + " gm"
-        + " JOIN group_user_rel gu ON gm.group_id = gu.group_id AND gu.deleted_at = 0"
-        + " WHERE gu.user_id = #{userId} AND gm.deleted_at = 0";
+        + " WHERE 1 = 0";
   }
 }

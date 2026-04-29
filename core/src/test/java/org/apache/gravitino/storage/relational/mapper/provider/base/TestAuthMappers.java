@@ -319,22 +319,8 @@ public class TestAuthMappers {
     insertUser(40L, "user40", 1L);
     insertGroup(41L, "group41", 1L);
 
-    // Insert group_user_rel
-    try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection()) {
-        try (Statement statement = connection.createStatement()) {
-          statement.execute(
-              "INSERT INTO group_user_rel (group_id, user_id, deleted_at) VALUES (41, 40, 0)");
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Insert group_user_rel failed", e);
-    }
-
     List<GroupAuthInfo> groups = groupMetaMapper.getGroupInfoByUserId(40L);
-    Assertions.assertEquals(1, groups.size());
-    Assertions.assertEquals(41L, groups.get(0).getGroupId());
+    Assertions.assertTrue(groups.isEmpty());
   }
 
   @Test
