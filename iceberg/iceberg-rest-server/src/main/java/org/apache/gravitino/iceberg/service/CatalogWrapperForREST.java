@@ -686,32 +686,32 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     properties.putAll(request.properties());
 
     Map<String, String> config = Maps.newHashMap();
-    String location;
+    Catalog.TableBuilder tableBuilder =
+        loadedCatalog
+            .buildTable(ident, request.schema())
+            .withPartitionSpec(request.spec())
+            .withSortOrder(request.writeOrder())
+            .withProperties(properties);
+
+    Table table;
     if (request.location() != null) {
-      location = request.location();
+      table = tableBuilder.withLocation(request.location()).createTransaction().table();
     } else {
-      Table table =
-          loadedCatalog
-              .buildTable(ident, request.schema())
-              .withPartitionSpec(request.spec())
-              .withSortOrder(request.writeOrder())
-              .withProperties(properties)
-              .createTransaction()
-              .table();
-      Map<String, String> tableProperties = retrieveFileIOProperties(table.io());
-      config.putAll(
-          MapUtils.getFilteredMap(
-              tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
-      config.putAll(CredentialPropertyUtils.filterCredentialProperties(tableProperties));
-      location = table.location();
+      table = tableBuilder.createTransaction().table();
     }
+
+    Map<String, String> tableProperties = retrieveFileIOProperties(table.io());
+    config.putAll(
+        MapUtils.getFilteredMap(
+            tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
+    config.putAll(CredentialPropertyUtils.filterCredentialProperties(tableProperties));
 
     TableMetadata metadata =
         TableMetadata.newTableMetadata(
             request.schema(),
             request.spec() != null ? request.spec() : PartitionSpec.unpartitioned(),
             request.writeOrder() != null ? request.writeOrder() : SortOrder.unsorted(),
-            location,
+            table.location(),
             properties);
 
     return LoadTableResponse.builder().withTableMetadata(metadata).addAllConfig(config).build();
