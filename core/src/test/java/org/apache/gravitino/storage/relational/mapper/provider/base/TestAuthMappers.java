@@ -48,7 +48,6 @@ import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.EntityChangeRecord;
-import org.apache.gravitino.storage.relational.po.auth.GroupAuthInfo;
 import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
@@ -314,16 +313,6 @@ public class TestAuthMappers {
   }
 
   @Test
-  void testGroupMetaGetGroupInfoByUserId() {
-    insertMetalake(1L, "metalake1");
-    insertUser(40L, "user40", 1L);
-    insertGroup(41L, "group41", 1L);
-
-    List<GroupAuthInfo> groups = groupMetaMapper.getGroupInfoByUserId(40L);
-    Assertions.assertTrue(groups.isEmpty());
-  }
-
-  @Test
   void testOwnerMetaSelectOwnerByMetadataObjectId() {
     insertMetalake(1L, "metalake1");
     insertUser(50L, "user50", 1L);
@@ -384,13 +373,15 @@ public class TestAuthMappers {
       throw new RuntimeException("Update failed", e);
     }
 
-    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(50L);
+    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(50L, 0L);
     Assertions.assertEquals(1, changed.size());
+    Assertions.assertTrue(changed.get(0).getId() > 0);
     Assertions.assertEquals(200L, changed.get(0).getMetadataObjectId());
     Assertions.assertEquals(100L, changed.get(0).getUpdatedAt());
 
-    // With a higher threshold, should find nothing
-    List<ChangedOwnerInfo> empty = ownerMetaMapper.selectChangedOwners(100L);
+    // With the same timestamp and the last seen id, should find nothing.
+    List<ChangedOwnerInfo> empty =
+        ownerMetaMapper.selectChangedOwners(100L, changed.get(0).getId());
     Assertions.assertTrue(empty.isEmpty());
   }
 
@@ -400,9 +391,10 @@ public class TestAuthMappers {
     entityChangeLogMapper.insertChange(
         "metalake1", "TABLE", "cat.schema.tbl", OperateType.RENAME, now);
 
-    List<EntityChangeRecord> records = entityChangeLogMapper.selectChanges(now - 1, 10);
+    List<EntityChangeRecord> records = entityChangeLogMapper.selectChanges(now - 1, 0L, 10);
     Assertions.assertEquals(1, records.size());
     EntityChangeRecord r = records.get(0);
+    Assertions.assertTrue(r.getId() > 0);
     Assertions.assertEquals("metalake1", r.getMetalakeName());
     Assertions.assertEquals("TABLE", r.getEntityType());
     Assertions.assertEquals("cat.schema.tbl", r.getFullName());
@@ -422,7 +414,7 @@ public class TestAuthMappers {
     // Prune entries before (old + 1)
     entityChangeLogMapper.pruneOldEntries(old + 1);
 
-    List<EntityChangeRecord> after = entityChangeLogMapper.selectChanges(0L, 100);
+    List<EntityChangeRecord> after = entityChangeLogMapper.selectChanges(0L, 0L, 100);
     Assertions.assertEquals(1, after.size());
     Assertions.assertEquals(recent, after.get(0).getCreatedAt());
   }

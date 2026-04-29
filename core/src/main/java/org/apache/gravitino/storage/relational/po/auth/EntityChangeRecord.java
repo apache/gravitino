@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.po.auth;
 
 /** Entity change poller result -- one row per entity_change_log entry. */
 public class EntityChangeRecord {
+  private long id;
   private String metalakeName;
   private String entityType;
   private String fullName;
@@ -30,16 +31,26 @@ public class EntityChangeRecord {
   public EntityChangeRecord() {}
 
   public EntityChangeRecord(
+      long id,
       String metalakeName,
       String entityType,
       String fullName,
       OperateType operateType,
       long createdAt) {
+    this.id = id;
     this.metalakeName = metalakeName;
     this.entityType = entityType;
     this.fullName = fullName;
     this.operateType = operateType;
     this.createdAt = createdAt;
+  }
+
+  public long getId() {
+    return id;
+  }
+
+  public void setId(long id) {
+    this.id = id;
   }
 
   public String getMetalakeName() {

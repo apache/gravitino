@@ -186,12 +186,4 @@ public class GroupMetaBaseSQLProvider {
   public String modifyGroupUpdatedAt(@Param("groupId") long groupId, @Param("now") long now) {
     return "UPDATE " + GROUP_TABLE_NAME + " SET updated_at = #{now} WHERE group_id = #{groupId}";
   }
-
-  public String getGroupInfoByUserId(@Param("userId") long userId) {
-    return "SELECT gm.group_id as groupId, gm.updated_at as updatedAt"
-        + " FROM "
-        + GROUP_TABLE_NAME
-        + " gm"
-        + " WHERE 1 = 0";
-  }
 }

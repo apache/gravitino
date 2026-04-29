@@ -25,8 +25,8 @@ ALTER TABLE `owner_meta` ADD COLUMN `updated_at` BIGINT NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS `idx_user_meta_name_del_upd` ON `user_meta`(`metalake_id`, `user_name`, `deleted_at`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_group_meta_del_upd` ON `group_meta`(`group_id`, `deleted_at`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_role_meta_del_upd` ON `role_meta`(`role_id`, `deleted_at`, `updated_at`);
-CREATE INDEX IF NOT EXISTS `idx_owner_meta_obj_del_upd` ON `owner_meta`(`metadata_object_id`, `deleted_at`, `updated_at`);
-CREATE INDEX IF NOT EXISTS `idx_owner_meta_del_upd_obj` ON `owner_meta`(`deleted_at`, `updated_at`, `metadata_object_id`);
+CREATE INDEX IF NOT EXISTS `idx_owner_meta_obj_del_upd_id` ON `owner_meta`(`metadata_object_id`, `deleted_at`, `updated_at`, `id`);
+CREATE INDEX IF NOT EXISTS `idx_owner_meta_del_upd_id_obj` ON `owner_meta`(`deleted_at`, `updated_at`, `id`, `metadata_object_id`);
 
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -38,4 +38,4 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `created_at`    BIGINT          NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB;
-CREATE INDEX IF NOT EXISTS `idx_ecl_created_at` ON `entity_change_log`(`created_at`);
+CREATE INDEX IF NOT EXISTS `idx_ecl_created_at_id` ON `entity_change_log`(`created_at`, `id`);
