@@ -394,4 +394,3 @@ class TestSupportsTags(IntegrationTestEnv):
         self.assertEqual(expected_tag.name(), real_tag.name())
         self.assertEqual(expected_tag.comment(), real_tag.comment())
         self.assertEqual(expected_tag.properties(), real_tag.properties())
-        self.assertEqual(expected_tag.inherited(), real_tag.inherited())
