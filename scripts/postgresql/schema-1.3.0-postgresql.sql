@@ -930,20 +930,12 @@ COMMENT ON COLUMN job_metrics.metric_name IS 'metric name';
 COMMENT ON COLUMN job_metrics.metric_ts IS 'metric timestamp in epoch seconds';
 COMMENT ON COLUMN job_metrics.metric_value IS 'metric value payload';
 
-CREATE TABLE IF NOT EXISTS group_user_rel (
-    id BIGSERIAL PRIMARY KEY,
-    group_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    deleted_at BIGINT NOT NULL DEFAULT 0,
-    UNIQUE (group_id, user_id, deleted_at)
-);
-
 CREATE TABLE IF NOT EXISTS entity_change_log (
     id BIGSERIAL PRIMARY KEY,
     metalake_name VARCHAR(128) NOT NULL,
     entity_type VARCHAR(32) NOT NULL,
     full_name VARCHAR(512) NOT NULL,
-    operate_type VARCHAR(16) NOT NULL,
+    operate_type SMALLINT NOT NULL,
     created_at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ecl_created_at ON entity_change_log(created_at);
@@ -952,5 +944,5 @@ COMMENT ON COLUMN entity_change_log.id IS 'auto increment id';
 COMMENT ON COLUMN entity_change_log.metalake_name IS 'metalake name';
 COMMENT ON COLUMN entity_change_log.entity_type IS 'entity type';
 COMMENT ON COLUMN entity_change_log.full_name IS 'dot-separated full name';
-COMMENT ON COLUMN entity_change_log.operate_type IS 'DROP | CREATE | ALTER';
+COMMENT ON COLUMN entity_change_log.operate_type IS 'Operate type code: 1=RENAME, 2=DROP, 3=INSERT. Codes are stable and never re-used.';
 COMMENT ON COLUMN entity_change_log.created_at IS 'change timestamp in millis';

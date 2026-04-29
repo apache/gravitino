@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.auth.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -45,7 +46,7 @@ public interface EntityChangeLogMapper {
       @Param("metalakeName") String metalakeName,
       @Param("entityType") String entityType,
       @Param("fullName") String fullName,
-      @Param("operateType") String operateType,
+      @Param("operateType") OperateType operateType,
       @Param("createdAt") long createdAt);
 
   @DeleteProvider(type = EntityChangeLogSQLProviderFactory.class, method = "pruneOldEntityChanges")

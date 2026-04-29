@@ -57,29 +57,13 @@ CREATE INDEX idx_owner_meta_obj_del_upd
 CREATE INDEX idx_owner_meta_del_upd_obj
     ON owner_meta (deleted_at, updated_at, metadata_object_id);
 
--- Backfill: set updated_at = audit_info-extracted time (use 1 as safe default for existing rows)
-UPDATE `role_meta`  SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;
-UPDATE `user_meta`  SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;
-UPDATE `group_meta` SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;
-UPDATE `owner_meta` SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;
-
--- Group-user membership table
-CREATE TABLE IF NOT EXISTS `group_user_rel` (
-  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-  `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
-  `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
-  `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'deleted at',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_gid_uid_del` (`group_id`, `user_id`, `deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group user relation';
-
 -- Entity name->id mutation tracking (eventual consistency -- entity change poller)
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `metalake_name` VARCHAR(128)    NOT NULL,
   `entity_type`   VARCHAR(32)     NOT NULL COMMENT 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW',
   `full_name`     VARCHAR(512)    NOT NULL COMMENT 'Dot-separated full name of the affected entity. For RENAME, stores the OLD name (the stale key to invalidate). For DROP/ALTER, the entity name.',
-  `operate_type`  VARCHAR(16)     NOT NULL COMMENT 'DROP | CREATE | ALTER (ALTER covers rename and other structural changes)',
+  `operate_type`  TINYINT UNSIGNED NOT NULL COMMENT 'Operate type code: 1=RENAME, 2=DROP, 3=INSERT. Codes are stable and never re-used.',
   `created_at`    BIGINT          NOT NULL,
   PRIMARY KEY (`id`),
   INDEX `idx_ecl_created_at` (`created_at`)

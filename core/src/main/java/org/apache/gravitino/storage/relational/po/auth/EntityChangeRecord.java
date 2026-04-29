@@ -23,14 +23,18 @@ public class EntityChangeRecord {
   private String metalakeName;
   private String entityType;
   private String fullName;
-  private String operateType;
+  private OperateType operateType;
   private long createdAt;
 
   /** Required by MyBatis for result mapping. */
   public EntityChangeRecord() {}
 
   public EntityChangeRecord(
-      String metalakeName, String entityType, String fullName, String operateType, long createdAt) {
+      String metalakeName,
+      String entityType,
+      String fullName,
+      OperateType operateType,
+      long createdAt) {
     this.metalakeName = metalakeName;
     this.entityType = entityType;
     this.fullName = fullName;
@@ -62,11 +66,11 @@ public class EntityChangeRecord {
     this.fullName = fullName;
   }
 
-  public String getOperateType() {
+  public OperateType getOperateType() {
     return operateType;
   }
 
-  public void setOperateType(String operateType) {
+  public void setOperateType(OperateType operateType) {
     this.operateType = operateType;
   }
 

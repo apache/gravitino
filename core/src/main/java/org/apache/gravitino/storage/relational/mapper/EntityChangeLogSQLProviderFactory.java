@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.EntityChangeLogBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
@@ -70,7 +71,7 @@ public class EntityChangeLogSQLProviderFactory {
       @Param("metalakeName") String metalakeName,
       @Param("entityType") String entityType,
       @Param("fullName") String fullName,
-      @Param("operateType") String operateType,
+      @Param("operateType") OperateType operateType,
       @Param("createdAt") long createdAt) {
     return getProvider()
         .insertEntityChange(metalakeName, entityType, fullName, operateType, createdAt);

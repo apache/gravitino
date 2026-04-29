@@ -90,8 +90,8 @@ public interface GroupMetaMapper {
   Integer deleteGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
-  @UpdateProvider(type = GroupMetaSQLProviderFactory.class, method = "touchGroupUpdatedAt")
-  void touchUpdatedAt(@Param("groupId") long groupId, @Param("now") long now);
+  @UpdateProvider(type = GroupMetaSQLProviderFactory.class, method = "modifyGroupUpdatedAt")
+  void modifyUpdatedAt(@Param("groupId") long groupId, @Param("now") long now);
 
   @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "getGroupInfoByUserId")
   List<GroupAuthInfo> getGroupInfoByUserId(@Param("userId") long userId);

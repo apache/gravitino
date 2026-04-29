@@ -28,26 +28,13 @@ CREATE INDEX IF NOT EXISTS `idx_role_meta_del_upd` ON `role_meta`(`role_id`, `de
 CREATE INDEX IF NOT EXISTS `idx_owner_meta_obj_del_upd` ON `owner_meta`(`metadata_object_id`, `deleted_at`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_owner_meta_del_upd_obj` ON `owner_meta`(`deleted_at`, `updated_at`, `metadata_object_id`);
 
-UPDATE `role_meta`  SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;
-UPDATE `user_meta`  SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;
-UPDATE `group_meta` SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;
-UPDATE `owner_meta` SET `updated_at` = 1 WHERE `updated_at` = 0 AND `deleted_at` = 0;
-
-CREATE TABLE IF NOT EXISTS `group_user_rel` (
-  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
-  `group_id` BIGINT(20) UNSIGNED NOT NULL,
-  `user_id` BIGINT(20) UNSIGNED NOT NULL,
-  `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_gid_uid_del` (`group_id`, `user_id`, `deleted_at`)
-) ENGINE=InnoDB;
-
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `metalake_name` VARCHAR(128)    NOT NULL,
   `entity_type`   VARCHAR(32)     NOT NULL,
   `full_name`     VARCHAR(512)    NOT NULL,
-  `operate_type`  VARCHAR(16)     NOT NULL,
+  -- Operate type code: 1=RENAME, 2=DROP, 3=INSERT. Codes are stable and never re-used.
+  `operate_type`  TINYINT UNSIGNED NOT NULL,
   `created_at`    BIGINT          NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB;

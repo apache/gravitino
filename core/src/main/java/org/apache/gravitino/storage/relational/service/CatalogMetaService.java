@@ -58,6 +58,7 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -248,7 +249,7 @@ public class CatalogMetaService {
                           metalakeName,
                           Entity.EntityType.CATALOG.name(),
                           oldFullName,
-                          "ALTER",
+                          OperateType.RENAME,
                           now));
             }
           });
@@ -353,7 +354,11 @@ public class CatalogMetaService {
                 EntityChangeLogMapper.class,
                 mapper ->
                     mapper.insertChange(
-                        metalakeName, Entity.EntityType.CATALOG.name(), catalogName, "DROP", now));
+                        metalakeName,
+                        Entity.EntityType.CATALOG.name(),
+                        catalogName,
+                        OperateType.DROP,
+                        now));
           });
     } else {
       List<SchemaEntity> schemaEntities =
@@ -403,7 +408,11 @@ public class CatalogMetaService {
                 EntityChangeLogMapper.class,
                 mapper ->
                     mapper.insertChange(
-                        metalakeName, Entity.EntityType.CATALOG.name(), catalogName, "DROP", now));
+                        metalakeName,
+                        Entity.EntityType.CATALOG.name(),
+                        catalogName,
+                        OperateType.DROP,
+                        now));
           });
     }
 

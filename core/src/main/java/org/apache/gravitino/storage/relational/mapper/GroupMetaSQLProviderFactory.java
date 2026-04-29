@@ -96,8 +96,9 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().deleteGroupMetasByLegacyTimeline(legacyTimeline, limit);
   }
 
-  public static String touchGroupUpdatedAt(@Param("groupId") long groupId, @Param("now") long now) {
-    return getProvider().touchGroupUpdatedAt(groupId, now);
+  public static String modifyGroupUpdatedAt(
+      @Param("groupId") long groupId, @Param("now") long now) {
+    return getProvider().modifyGroupUpdatedAt(groupId, now);
   }
 
   public static String getGroupInfoByUserId(@Param("userId") long userId) {

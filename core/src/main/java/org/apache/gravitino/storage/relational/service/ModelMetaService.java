@@ -49,6 +49,7 @@ import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -188,7 +189,11 @@ public class ModelMetaService {
                 EntityChangeLogMapper.class,
                 mapper ->
                     mapper.insertChange(
-                        metalakeName, Entity.EntityType.MODEL.name(), modelFullName, "DROP", now));
+                        metalakeName,
+                        Entity.EntityType.MODEL.name(),
+                        modelFullName,
+                        OperateType.DROP,
+                        now));
           }
         });
 
@@ -388,7 +393,11 @@ public class ModelMetaService {
                   EntityChangeLogMapper.class,
                   mapper ->
                       mapper.insertChange(
-                          metalakeName, Entity.EntityType.MODEL.name(), oldFullName, "ALTER", now));
+                          metalakeName,
+                          Entity.EntityType.MODEL.name(),
+                          oldFullName,
+                          OperateType.RENAME,
+                          now));
             }
           });
     } catch (RuntimeException re) {

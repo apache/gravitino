@@ -28,25 +28,13 @@ CREATE INDEX idx_role_meta_del_upd ON role_meta (role_id, deleted_at, updated_at
 CREATE INDEX idx_owner_meta_obj_del_upd ON owner_meta (metadata_object_id, deleted_at, updated_at);
 CREATE INDEX idx_owner_meta_del_upd_obj ON owner_meta (deleted_at, updated_at, metadata_object_id);
 
-UPDATE role_meta  SET updated_at = 1 WHERE updated_at = 0 AND deleted_at = 0;
-UPDATE user_meta  SET updated_at = 1 WHERE updated_at = 0 AND deleted_at = 0;
-UPDATE group_meta SET updated_at = 1 WHERE updated_at = 0 AND deleted_at = 0;
-UPDATE owner_meta SET updated_at = 1 WHERE updated_at = 0 AND deleted_at = 0;
-
-CREATE TABLE IF NOT EXISTS group_user_rel (
-    id BIGSERIAL PRIMARY KEY,
-    group_id BIGINT NOT NULL,
-    user_id BIGINT NOT NULL,
-    deleted_at BIGINT NOT NULL DEFAULT 0,
-    UNIQUE (group_id, user_id, deleted_at)
-);
-
 CREATE TABLE IF NOT EXISTS entity_change_log (
     id BIGSERIAL PRIMARY KEY,
     metalake_name VARCHAR(128) NOT NULL,
     entity_type VARCHAR(32) NOT NULL,
     full_name VARCHAR(512) NOT NULL,
-    operate_type VARCHAR(16) NOT NULL,
+    -- Operate type code: 1=RENAME, 2=DROP, 3=INSERT. Codes are stable and never re-used.
+    operate_type SMALLINT NOT NULL,
     created_at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ecl_created_at ON entity_change_log(created_at);

@@ -43,6 +43,7 @@ import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.ViewPO;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -299,7 +300,11 @@ public class ViewMetaService {
                 EntityChangeLogMapper.class,
                 mapper ->
                     mapper.insertChange(
-                        metalakeName, Entity.EntityType.VIEW.name(), viewFullName, "DROP", now));
+                        metalakeName,
+                        Entity.EntityType.VIEW.name(),
+                        viewFullName,
+                        OperateType.DROP,
+                        now));
           }
         });
     return deleteResult.get() > 0;
@@ -326,7 +331,11 @@ public class ViewMetaService {
                   EntityChangeLogMapper.class,
                   mapper ->
                       mapper.insertChange(
-                          metalakeName, Entity.EntityType.VIEW.name(), oldFullName, "ALTER", now));
+                          metalakeName,
+                          Entity.EntityType.VIEW.name(),
+                          oldFullName,
+                          OperateType.RENAME,
+                          now));
             }
           });
       if (updateResult.get() == 0) {

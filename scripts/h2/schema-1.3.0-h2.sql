@@ -543,21 +543,13 @@ CREATE INDEX IF NOT EXISTS `idx_table_metrics_composite`
 CREATE INDEX IF NOT EXISTS `idx_job_metrics_identifier_metric_ts`
   ON `job_metrics`(`job_identifier`, `metric_ts`);
 
-CREATE TABLE IF NOT EXISTS `group_user_rel` (
-    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
-    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'deleted at',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_gid_uid_del` (`group_id`, `user_id`, `deleted_at`)
-) ENGINE=InnoDB;
-
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `metalake_name` VARCHAR(128)    NOT NULL,
   `entity_type`   VARCHAR(32)     NOT NULL,
   `full_name`     VARCHAR(512)    NOT NULL,
-  `operate_type`  VARCHAR(16)     NOT NULL,
+  -- Operate type code: 1=RENAME, 2=DROP, 3=INSERT. Codes are stable and never re-used.
+  `operate_type`  TINYINT UNSIGNED NOT NULL,
   `created_at`    BIGINT          NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB;

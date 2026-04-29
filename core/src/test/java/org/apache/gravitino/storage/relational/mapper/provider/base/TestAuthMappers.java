@@ -49,6 +49,7 @@ import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.auth.GroupAuthInfo;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserAuthInfo;
@@ -307,7 +308,7 @@ public class TestAuthMappers {
     Assertions.assertEquals(0L, before);
 
     long now = System.currentTimeMillis();
-    groupMetaMapper.touchUpdatedAt(30L, now);
+    groupMetaMapper.modifyUpdatedAt(30L, now);
 
     long after = queryUpdatedAt("group_meta", "group_id", 30L);
     Assertions.assertEquals(now, after);
@@ -411,7 +412,8 @@ public class TestAuthMappers {
   @Test
   void testEntityChangeLogInsertAndSelect() {
     long now = System.currentTimeMillis();
-    entityChangeLogMapper.insertChange("metalake1", "TABLE", "cat.schema.tbl", "ALTER", now);
+    entityChangeLogMapper.insertChange(
+        "metalake1", "TABLE", "cat.schema.tbl", OperateType.RENAME, now);
 
     List<EntityChangeRecord> records = entityChangeLogMapper.selectChanges(now - 1, 10);
     Assertions.assertEquals(1, records.size());
@@ -419,7 +421,7 @@ public class TestAuthMappers {
     Assertions.assertEquals("metalake1", r.getMetalakeName());
     Assertions.assertEquals("TABLE", r.getEntityType());
     Assertions.assertEquals("cat.schema.tbl", r.getFullName());
-    Assertions.assertEquals("ALTER", r.getOperateType());
+    Assertions.assertEquals(OperateType.RENAME, r.getOperateType());
     Assertions.assertEquals(now, r.getCreatedAt());
   }
 
@@ -427,8 +429,10 @@ public class TestAuthMappers {
   void testEntityChangeLogPruneOldEntries() {
     long old = 1000L;
     long recent = System.currentTimeMillis();
-    entityChangeLogMapper.insertChange("metalake1", "SCHEMA", "cat.schema", "CREATE", old);
-    entityChangeLogMapper.insertChange("metalake1", "TABLE", "cat.schema.tbl", "DROP", recent);
+    entityChangeLogMapper.insertChange(
+        "metalake1", "SCHEMA", "cat.schema", OperateType.INSERT, old);
+    entityChangeLogMapper.insertChange(
+        "metalake1", "TABLE", "cat.schema.tbl", OperateType.DROP, recent);
 
     // Prune entries before (old + 1)
     entityChangeLogMapper.pruneOldEntries(old + 1);

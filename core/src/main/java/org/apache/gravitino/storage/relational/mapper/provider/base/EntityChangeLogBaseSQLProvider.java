@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper.ENTITY_CHANGE_LOG_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.ibatis.annotations.Param;
 
 public class EntityChangeLogBaseSQLProvider {
@@ -37,7 +38,7 @@ public class EntityChangeLogBaseSQLProvider {
       @Param("metalakeName") String metalakeName,
       @Param("entityType") String entityType,
       @Param("fullName") String fullName,
-      @Param("operateType") String operateType,
+      @Param("operateType") OperateType operateType,
       @Param("createdAt") long createdAt) {
     return "INSERT INTO "
         + ENTITY_CHANGE_LOG_TABLE_NAME

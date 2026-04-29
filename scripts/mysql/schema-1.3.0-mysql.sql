@@ -530,21 +530,12 @@ CREATE TABLE IF NOT EXISTS `job_metrics` (
     KEY `idx_job_metrics_identifier_metric_ts` (`job_identifier`(255), `metric_ts`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'optimizer job metrics';
 
-CREATE TABLE IF NOT EXISTS `group_user_rel` (
-  `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-  `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
-  `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
-  `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'deleted at',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_gid_uid_del` (`group_id`, `user_id`, `deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group user relation';
-
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `metalake_name` VARCHAR(128)    NOT NULL COMMENT 'metalake name',
   `entity_type`   VARCHAR(32)     NOT NULL COMMENT 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW',
   `full_name`     VARCHAR(512)    NOT NULL COMMENT 'Dot-separated full name. For RENAME stores the OLD name',
-  `operate_type`  VARCHAR(16)     NOT NULL COMMENT 'DROP | CREATE | ALTER',
+  `operate_type`  TINYINT UNSIGNED NOT NULL COMMENT 'Operate type code: 1=RENAME, 2=DROP, 3=INSERT. Codes are stable and never re-used.',
   `created_at`    BIGINT          NOT NULL COMMENT 'timestamp of the change in millis',
   PRIMARY KEY (`id`),
   KEY `idx_ecl_created_at` (`created_at`)

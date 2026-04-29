@@ -264,7 +264,7 @@ public class GroupMetaService {
             long now = System.currentTimeMillis();
             SessionUtils.doWithoutCommit(
                 GroupMetaMapper.class,
-                mapper -> mapper.touchUpdatedAt(oldGroupPO.getGroupId(), now));
+                mapper -> mapper.modifyUpdatedAt(oldGroupPO.getGroupId(), now));
           });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
