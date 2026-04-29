@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS `view_version_info` (
     `default_catalog` VARCHAR(128) DEFAULT NULL COMMENT 'default catalog for view SQL resolution',
     `default_schema` VARCHAR(128) DEFAULT NULL COMMENT 'default schema for view SQL resolution',
     `representations` MEDIUMTEXT NOT NULL COMMENT 'view representations (JSON array)',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view version audit info',
+    `audit_info` MEDIUMTEXT COMMENT 'view version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'view version deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_vid_ver_del` (`view_id`, `version`, `deleted_at`),
