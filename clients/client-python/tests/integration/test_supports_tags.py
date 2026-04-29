@@ -136,15 +136,6 @@ class TestSupportsTags(IntegrationTestEnv):
             properties={"metastore.uris": hive_metastore_uri},
         )
         cls._table_catalog = cls._relational_catalog.as_table_catalog()
-        cls._model_catalog.as_schemas().create_schema(
-            cls._schema_name, "model schema comment", {}
-        )
-        cls._relational_catalog.as_schemas().create_schema(
-            cls._schema_name, "relational schema comment", {}
-        )
-        cls._fileset_catalog.as_schemas().create_schema(
-            cls._schema_name, "fileset schema comment", {}
-        )
 
     @classmethod
     def tearDownClass(cls) -> None:
