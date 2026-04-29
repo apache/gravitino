@@ -722,7 +722,37 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```
 ---
 
-## 10. Security Considerations
+## 10. Work Plan and Checklist
+
+### 10.1 Suggested Work Plan
+
+| Phase | Work Item | Module / Files | Notes |
+|---|---|---|---|
+| 1 | Authenticator module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `authenticators:authenticator-basic` | Add the new module and make the server load it when `gravitino.authenticators=basic`. |
+| 2 | Password hashing support | `PasswordHasher`, `Argon2idPasswordHasher`, related tests | Use Argon2id as the only supported password hashing algorithm and store PHC-style hash strings. |
+| 3 | IdP metadata schema | JDBC schema files, mapper definitions, store layer | Create `idp_user_meta`, `idp_group_meta`, and `idp_group_user_rel` with soft-delete support. |
+| 4 | Service admin initialization | initialization script, JDBC helper, validation logic | Prompt for the first service admin, validate inputs, hash the password, and insert the initial record. |
+| 5 | Basic authentication flow | `BasicAuthenticator`, auth manager, filter integration | Verify Basic credentials against `idp_user_meta` and resolve the authenticated principal. |
+| 6 | Group resolution | store layer, auth manager | Load the user's active groups from `idp_group_user_rel` and `idp_group_meta` for later authorization. |
+| 7 | Local IdP management APIs | REST resources, DTOs, request/response classes | Implement user CRUD, group CRUD, and group membership management under `/api/idp`. |
+| 8 | Tests and documentation | unit tests, integration tests, design and user docs | Cover initialization flow, authentication, metadata persistence, REST APIs, and doc/config alignment. |
+
+### 10.2 Review Checklist
+
+| Area | Checklist |
+|---|---|
+| Module wiring | The design, module name, and server wiring all consistently use `authenticators:authenticator-basic`, while the authenticator mode remains `basic`. |
+| Configuration | All examples use `gravitino.authenticators=basic`, and no obsolete configuration keys remain in the document. |
+| Schema design | The document consistently uses `idp_user_meta`, `idp_group_meta`, and `idp_group_user_rel`, and the soft-delete lifecycle is clearly described. |
+| Security constraints | The document states that passwords are never stored in plaintext, Basic authentication should be used only over HTTPS, and initialization must enforce password policy. |
+| Initialization flow | The document explains how the first service admin is initialized, what inputs are required, and that only hashed passwords are written. |
+| Authentication flow | The Basic authentication flow is described end-to-end, including username/password parsing, user lookup, hash verification, and group resolution. |
+| API contract | The request paths, request bodies, and response bodies for all `/api/idp` APIs are defined consistently across the document. |
+| Implementation alignment | The proposed work items are specific enough that reviewers and AI tools can map each part of the design to code changes and tests. |
+
+---
+
+## 11. Security Considerations
 
 The local authentication capability is intentionally lightweight, but the following constraints remain important:
 
@@ -735,7 +765,7 @@ The local authentication capability is intentionally lightweight, but the follow
 
 ---
 
-## 11. Summary
+## 12. Summary
 
 This design adds local authentication support to Gravitino for environments where an external IdP is
 either unavailable or unnecessarily heavy. The key design choices are:
