@@ -33,7 +33,7 @@ additionalConfigItems:
 
 extraVolumeMounts:
   - name: gravitino-log
-    mountPath: /root/gravitino/logs
+    mountPath: /opt/gravitino/logs
   - name: extra-volume
     mountPath: /extra-volume-path
   - name: another-extra-volume

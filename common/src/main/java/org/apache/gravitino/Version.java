@@ -38,7 +38,9 @@ public class Version {
   private static final Pattern PATTERN =
       Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:rc(0|[1-9]\\d*)|-.*|\\.([a-zA-Z].*))?$");
 
-  private static final Version INSTANCE = new Version();
+  private static class InstanceHolder {
+    private static final Version INSTANCE = new Version();
+  }
 
   private final VersionInfo versionInfo;
   private final VersionDTO versionDTO;
@@ -74,14 +76,14 @@ public class Version {
    * @return the current versionInfo
    */
   public static VersionInfo getCurrentVersion() {
-    return INSTANCE.versionInfo;
+    return InstanceHolder.INSTANCE.versionInfo;
   }
 
   /**
    * @return the current version DTO
    */
   public static VersionDTO getCurrentVersionDTO() {
-    return INSTANCE.versionDTO;
+    return InstanceHolder.INSTANCE.versionDTO;
   }
 
   /**

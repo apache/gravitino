@@ -103,9 +103,7 @@ public class TestIcebergConfig extends IcebergTestBase {
     // Per the Iceberg REST spec, the config endpoint does not accept a prefix.
     String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, IcebergRestTestUtil.PREFIX);
     Response response = getIcebergClientBuilder(path, Optional.empty()).get();
-    // Jersey returns 500 (not 404) for unmatched routes because the
-    // IcebergExceptionMapper converts the NotFoundException into an internal error response.
-    Assertions.assertEquals(500, response.getStatus());
+    Assertions.assertEquals(404, response.getStatus());
   }
 
   @Test
@@ -126,5 +124,38 @@ public class TestIcebergConfig extends IcebergTestBase {
     Assertions.assertTrue(
         hasViewListEndpoint,
         "Config response should contain view list endpoint for catalog that supports views");
+  }
+
+  @Test
+  public void testConfigScanPlanEndpointPathIsNamespaceScoped() {
+    // Iceberg 1.10.1's Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN advertises the wrong path
+    // (missing namespaces/{namespace}) — fixed in apache/iceberg#14120 (targeting 1.11.x).
+    // This test guards against regressing to the broken path after an Iceberg upgrade.
+    Response resp = getConfigClientBuilder().get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    ConfigResponse response = resp.readEntity(ConfigResponse.class);
+
+    boolean hasScanPlanEndpoint =
+        response.endpoints().stream()
+            .anyMatch(
+                endpoint ->
+                    "POST".equals(endpoint.httpMethod())
+                        && endpoint.path().contains("namespaces/{namespace}/tables/{table}/plan"));
+    Assertions.assertTrue(
+        hasScanPlanEndpoint,
+        "Config response must advertise the namespace-scoped scan plan path: "
+            + "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan");
+
+    boolean hasBrokenScanPlanEndpoint =
+        response.endpoints().stream()
+            .anyMatch(
+                endpoint ->
+                    "POST".equals(endpoint.httpMethod())
+                        && endpoint.path().endsWith("/tables/{table}/plan")
+                        && !endpoint.path().contains("namespaces/{namespace}"));
+    Assertions.assertFalse(
+        hasBrokenScanPlanEndpoint,
+        "Config response must not advertise the namespace-less scan plan path from Iceberg 1.10.1");
   }
 }

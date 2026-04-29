@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.Assertions;
@@ -119,5 +120,29 @@ public class TestIcebergAuthenticationFilter {
     Assertions.assertEquals(500, errorResponse.code());
     Assertions.assertEquals("ServiceFailureException", errorResponse.type());
     Assertions.assertEquals("Server Error", errorResponse.message());
+  }
+
+  @Test
+  public void testTokenExpiredExceptionReturns419() throws Exception {
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(
+        response, new TokenExpiredException("Authentication token is expired"));
+
+    verify(response).setStatus(419);
+    verify(response).setContentType("application/json");
+    verify(response).setCharacterEncoding("UTF-8");
+
+    printWriter.flush();
+    String json = stringWriter.toString();
+    ErrorResponse errorResponse = MAPPER.readValue(json, ErrorResponse.class);
+    Assertions.assertEquals(419, errorResponse.code());
+    Assertions.assertEquals("AuthenticationTimeoutException", errorResponse.type());
+    Assertions.assertEquals("Authentication token is expired", errorResponse.message());
   }
 }

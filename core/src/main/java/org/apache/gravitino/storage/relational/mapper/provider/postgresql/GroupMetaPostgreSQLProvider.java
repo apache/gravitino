@@ -69,7 +69,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   }
 
   @Override
-  public String listExtendedGroupPOsByMetalakeId(Long metalakeId) {
+  public String listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
         + " gt.metalake_id as metalakeId,"
         + " gt.audit_info as auditInfo,"

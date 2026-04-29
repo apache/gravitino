@@ -20,12 +20,14 @@ package org.apache.gravitino.iceberg.service;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import javax.ws.rs.NotFoundException;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.BadRequestException;
@@ -60,8 +62,11 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(NamespaceNotEmptyException.class, 400)
           .put(NotAuthorizedException.class, 401)
           .put(UnauthorizedException.class, 401)
+          .put(AuthenticationTimeoutException.class, 419)
+          .put(TokenExpiredException.class, 419)
           .put(org.apache.gravitino.exceptions.ForbiddenException.class, 403)
           .put(ForbiddenException.class, 403)
+          .put(NotFoundException.class, 404)
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)
           .put(NoSuchIcebergTableException.class, 404)
@@ -95,6 +100,9 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
    */
   public static Exception convertToIcebergException(Exception e) {
     String message = e.getMessage() != null ? e.getMessage() : "";
+    if (e instanceof TokenExpiredException) {
+      return new AuthenticationTimeoutException("%s", message);
+    }
     if (e instanceof UnauthorizedException) {
       return new NotAuthorizedException("%s", message);
     }

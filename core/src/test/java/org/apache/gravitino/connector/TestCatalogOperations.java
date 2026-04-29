@@ -302,16 +302,6 @@ public class TestCatalogOperations
     }
   }
 
-  // ViewCatalog methods
-  @Override
-  public View loadView(NameIdentifier ident) throws NoSuchViewException {
-    if (views.containsKey(ident)) {
-      return views.get(ident);
-    } else {
-      throw new NoSuchViewException("View %s does not exist", ident);
-    }
-  }
-
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     return schemas.keySet().stream()
@@ -1432,5 +1422,14 @@ public class TestCatalogOperations
     }
 
     return aliasList.toArray(new String[0]);
+  }
+
+  @Override
+  public View loadView(NameIdentifier ident) throws NoSuchViewException {
+    if (views.containsKey(ident)) {
+      return views.get(ident);
+    } else {
+      throw new NoSuchViewException("View %s does not exist", ident);
+    }
   }
 }

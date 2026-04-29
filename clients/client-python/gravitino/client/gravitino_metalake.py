@@ -644,6 +644,8 @@ class GravitinoMetalake(
         Raises:
             NoSuchTagException: If the tag does not exist.
             NoSuchMetalakeException: If the metalake does not exist.
+            IllegalArgumentException: If the changes cannot be applied to the tag.
+            TagAlreadyExistsException: If a tag with the new name already exists.
         """
         Precondition.check_argument(
             StringUtils.is_not_blank(tag_name),
@@ -660,7 +662,7 @@ class GravitinoMetalake(
         url = self.API_METALAKES_TAG_PATH.format(
             encode_string(self.name()), encode_string(tag_name)
         )
-        response = self.rest_client.post(
+        response = self.rest_client.put(
             url,
             json=update_req,
             error_handler=TAG_ERROR_HANDLER,
