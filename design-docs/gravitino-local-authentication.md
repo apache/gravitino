@@ -109,11 +109,12 @@ The local authentication feature should be implemented as an independent Graviti
 
 The recommended module name is:
 
-- `authenticators:authenticator-local-authentication`
+- `authenticators:authenticator-basic`
 
-This naming keeps the capability grouping explicit and avoids tying the module name to the HTTP
-Basic transport syntax alone. Although the initial login flow uses Basic authentication, the module
-itself is responsible for the broader local authentication capability set, including:
+This naming keeps the capability grouping explicit while aligning the module name with the
+configured authenticator type. Although the module also includes the broader built-in
+authentication capability set, the entry point exposed to Gravitino is still the `basic`
+authenticator, including:
 
 - local user and local group management,
 - password hashing and verification,
@@ -121,7 +122,7 @@ itself is responsible for the broader local authentication capability set, inclu
 - and the local authentication management API wiring.
 
 The local authentication-specific logic should be owned by
-`authenticators:authenticator-local-authentication`, including storage access, authenticator logic, bootstrap
+`authenticators:authenticator-basic`, including storage access, authenticator logic, bootstrap
 handling, password hashing, and management API exposure, so that the feature has a clear packaging
 boundary and can evolve independently.
 
