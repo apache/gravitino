@@ -131,7 +131,6 @@ public class TestAuthMappers {
       try (Connection connection = sqlSession.getConnection()) {
         try (Statement statement = connection.createStatement()) {
           statement.execute("TRUNCATE TABLE entity_change_log");
-          statement.execute("TRUNCATE TABLE group_user_rel");
           statement.execute("TRUNCATE TABLE owner_meta");
           statement.execute("TRUNCATE TABLE user_role_rel");
           statement.execute("TRUNCATE TABLE group_role_rel");
