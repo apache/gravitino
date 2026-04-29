@@ -396,10 +396,36 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                   return builder.build();
                 });
 
-            // The only problem is that we can't make sure we can change all catalog properties
-            // in a transaction. If any catalog property update fails, the metalake is already
-            // enabled but catalog properties remain inconsistent.
-            updateMetalakeInUseStatusInCatalog(ident, true);
+            // We can't change all catalog properties in a transaction
+            // If any catalog property update fails, we will try to roll back the changes
+            // to both the catalog and the metalake storage
+            try {
+              updateMetalakeInUseStatusInCatalog(ident, true);
+            } catch (Exception e) {
+              LOG.error(
+                  "Failed to update catalog properties, rolling back metalake in-use status", e);
+
+              try {
+                updateMetalakeInUseStatusInCatalog(ident, false);
+              } catch (Exception rollbackEx) {
+                LOG.warn("Failed to rollback catalog properties", rollbackEx);
+              }
+
+              store.update(
+                  ident,
+                  BaseMetalake.class,
+                  EntityType.METALAKE,
+                  rolledBackMetalake -> {
+                    BaseMetalake.Builder builder = newMetalakeBuilder(rolledBackMetalake);
+                    Map<String, String> newProps =
+                        rolledBackMetalake.properties() == null
+                            ? Maps.newHashMap()
+                            : Maps.newHashMap(rolledBackMetalake.properties());
+                    newProps.put(PROPERTY_IN_USE, "false");
+                    return builder.withProperties(newProps).build();
+                  });
+              throw new RuntimeException(e);
+            }
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -436,10 +462,36 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                   return builder.build();
                 });
 
-            // The only problem is that we can't make sure we can change all catalog properties
-            // in a transaction, if any of them fails, the metalake is already enabled and the value
-            // in catalog is inconsistent.
-            updateMetalakeInUseStatusInCatalog(ident, false);
+            // We can't change all catalog properties in a transaction
+            // if any catalog property update fails, we try to roll back the changes
+            // to both the catalog and the metalake storage
+            try {
+              updateMetalakeInUseStatusInCatalog(ident, false);
+            } catch (Exception e) {
+              LOG.error(
+                  "Failed to update catalog properties, rolling back metalake in-use status", e);
+
+              try {
+                updateMetalakeInUseStatusInCatalog(ident, true);
+              } catch (Exception rollbackEx) {
+                LOG.warn("Failed to rollback catalog properties", rollbackEx);
+              }
+
+              store.update(
+                  ident,
+                  BaseMetalake.class,
+                  EntityType.METALAKE,
+                  rolledBackMetalake -> {
+                    BaseMetalake.Builder builder = newMetalakeBuilder(rolledBackMetalake);
+                    Map<String, String> newProps =
+                        rolledBackMetalake.properties() == null
+                            ? Maps.newHashMap()
+                            : Maps.newHashMap(rolledBackMetalake.properties());
+                    newProps.put(PROPERTY_IN_USE, "true");
+                    return builder.withProperties(newProps).build();
+                  });
+              throw new RuntimeException(e);
+            }
             return null;
           } catch (IOException e) {
             throw new RuntimeException(e);
