@@ -158,14 +158,10 @@ class TestSupportsTags(IntegrationTestEnv):
             self._table_name,
         )
         self._fileset_ident: NameIdentifier = NameIdentifier.of(
-            self._metalake_name,
-            self._fileset_catalog_name,
             self._schema_name,
             self._fileset_name,
         )
         self._model_ident = NameIdentifier.of(
-            self._metalake_name,
-            self._model_catalog_name,
             self._schema_name,
             self._model_name,
         )
@@ -189,9 +185,9 @@ class TestSupportsTags(IntegrationTestEnv):
             tags_to_add=[self._tag_name1, self._tag_name2],
             tags_to_remove=[self._tag_name3, self._tag_name4],
         )
-        self.test_list_tags(model_catalog)
-        self.test_list_tags_info(model_catalog)
-        self.test_get_tag(model_catalog)
+        self._test_list_tags(model_catalog)
+        self._test_list_tags_info(model_catalog)
+        self._test_get_tag(model_catalog)
         model_catalog.associate_tags(
             tags_to_add=[],
             tags_to_remove=[self._tag_name1, self._tag_name2],
@@ -202,6 +198,12 @@ class TestSupportsTags(IntegrationTestEnv):
         """
         Test tag operations (associate, list, get, dissociate) on schema.
         """
+        self._model_catalog.as_schemas().create_schema(
+            schema_name=self._schema_name,
+            comment="model it schema",
+            properties={},
+        )
+
         schema = self._model_catalog.as_schemas().load_schema(self._schema_name)
 
         schema_supports_tags = schema.supports_tags()
@@ -213,9 +215,9 @@ class TestSupportsTags(IntegrationTestEnv):
             tags_to_add=[self._tag_name1, self._tag_name2],
             tags_to_remove=[self._tag_name3, self._tag_name4],
         )
-        self.test_list_tags(schema_supports_tags)
-        self.test_list_tags_info(schema_supports_tags)
-        self.test_get_tag(schema_supports_tags)
+        self._test_list_tags(schema_supports_tags)
+        self._test_list_tags_info(schema_supports_tags)
+        self._test_get_tag(schema_supports_tags)
 
         schema.supports_tags().associate_tags(
             tags_to_add=[],
@@ -248,9 +250,9 @@ class TestSupportsTags(IntegrationTestEnv):
             tags_to_add=[self._tag_name1, self._tag_name2],
             tags_to_remove=[self._tag_name3, self._tag_name4],
         )
-        self.test_list_tags(fileset.supports_tags())
-        self.test_list_tags_info(fileset.supports_tags())
-        self.test_get_tag(fileset.supports_tags())
+        self._test_list_tags(fileset.supports_tags())
+        self._test_list_tags_info(fileset.supports_tags())
+        self._test_get_tag(fileset.supports_tags())
 
         fileset.supports_tags().associate_tags(
             tags_to_add=[],
@@ -279,9 +281,9 @@ class TestSupportsTags(IntegrationTestEnv):
             tags_to_add=[self._tag_name1, self._tag_name2],
             tags_to_remove=[self._tag_name3, self._tag_name4],
         )
-        self.test_list_tags(model.supports_tags())
-        self.test_list_tags_info(model.supports_tags())
-        self.test_get_tag(model.supports_tags())
+        self._test_list_tags(model.supports_tags())
+        self._test_list_tags_info(model.supports_tags())
+        self._test_get_tag(model.supports_tags())
         model.supports_tags().associate_tags(
             tags_to_add=[],
             tags_to_remove=[self._tag_name1, self._tag_name2],
@@ -306,9 +308,9 @@ class TestSupportsTags(IntegrationTestEnv):
             tags_to_add=[self._tag_name1, self._tag_name2],
             tags_to_remove=[self._tag_name3, self._tag_name4],
         )
-        self.test_list_tags(relational_table.supports_tags())
-        self.test_list_tags_info(relational_table.supports_tags())
-        self.test_get_tag(relational_table.supports_tags())
+        self._test_list_tags(relational_table.supports_tags())
+        self._test_list_tags_info(relational_table.supports_tags())
+        self._test_get_tag(relational_table.supports_tags())
 
         relational_table.supports_tags().associate_tags(
             tags_to_add=[],
@@ -333,9 +335,9 @@ class TestSupportsTags(IntegrationTestEnv):
                 tags_to_add=[self._tag_name1, self._tag_name2],
                 tags_to_remove=[self._tag_name3, self._tag_name4],
             )
-            self.test_list_tags(column.supports_tags())
-            self.test_list_tags_info(column.supports_tags())
-            self.test_get_tag(column.supports_tags())
+            self._test_list_tags(column.supports_tags())
+            self._test_list_tags_info(column.supports_tags())
+            self._test_get_tag(column.supports_tags())
 
             column.supports_tags().associate_tags(
                 tags_to_add=[],
@@ -355,20 +357,20 @@ class TestSupportsTags(IntegrationTestEnv):
         with self.assertRaises(NoSuchTagException):
             self._model_catalog.supports_tags().get_tag(self._tag_name1)
 
-    def test_get_tag(self, supports_tags: SupportsTags) -> None:
+    def _test_get_tag(self, supports_tags: SupportsTags) -> None:
         tag1: Tag = supports_tags.get_tag(self._tag_name1)
         self._check_tag(self._tag1, tag1)
 
         tag2: Tag = supports_tags.get_tag(self._tag_name2)
         self._check_tag(self._tag2, tag2)
 
-    def test_list_tags(self, supports_tags: SupportsTags) -> None:
+    def _test_list_tags(self, supports_tags: SupportsTags) -> None:
         tags = supports_tags.list_tags()
         self.assertEqual(2, len(tags))
         self.assertIn(self._tag_name1, tags)
         self.assertIn(self._tag_name2, tags)
 
-    def test_list_tags_info(self, supports_tags: SupportsTags) -> None:
+    def _test_list_tags_info(self, supports_tags: SupportsTags) -> None:
         tags: list[Tag] = supports_tags.list_tags_info()
         self.assertEqual(2, len(tags))
         for tag in tags:
