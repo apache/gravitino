@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS view_version_info (
     default_catalog VARCHAR(128),
     default_schema VARCHAR(128),
     representations TEXT NOT NULL,
-    audit_info TEXT,
+    audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
     UNIQUE (view_id, version, deleted_at)
