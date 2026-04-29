@@ -118,13 +118,13 @@ authenticator, including:
 
 - local user and local group management,
 - password hashing and verification,
-- bootstrap credential handling,
+- service admin initialization support,
 - and the local authentication management API wiring.
 
 The local authentication-specific logic should be owned by
-`authenticators:authenticator-basic`, including storage access, authenticator logic, bootstrap
-handling, password hashing, and management API exposure, so that the feature has a clear packaging
-boundary and can evolve independently.
+`authenticators:authenticator-basic`, including storage access, authenticator logic, service admin
+initialization logic, password hashing, and management API exposure, so that the feature has a
+clear packaging boundary and can evolve independently.
 
 ---
 
@@ -166,9 +166,9 @@ introducing additional columns.
 
 Local authentication requires three new tables:
 
-1. `local_user_meta` — local user records
-2. `local_group_meta` — local group records
-3. `local_group_user_rel` — user/group membership mapping
+1. `idp_user_meta` — IdP user records
+2. `idp_group_meta` — IdP group records
+3. `idp_group_user_rel` — user/group membership mapping
 
 These tables follow Gravitino's existing metadata table conventions:
 
@@ -176,22 +176,22 @@ These tables follow Gravitino's existing metadata table conventions:
 - optimistic version fields,
 - and `deleted_at` for soft deletion.
 
-Soft-deleted rows in `local_user_meta` and `local_group_meta` should be cleaned asynchronously by
+Soft-deleted rows in `idp_user_meta` and `idp_group_meta` should be cleaned asynchronously by
 Gravitino's GC thread, following the same lifecycle management pattern used by other metadata
 tables. When a local user or local group is physically removed by the GC thread, the implementation
-should also clean the corresponding soft-deleted rows in `local_group_user_rel` to avoid leaving
+should also clean the corresponding soft-deleted rows in `idp_group_user_rel` to avoid leaving
 orphaned membership records.
 
-Unlike Gravitino's existing `user_meta` and `group_meta` tables, `local_user_meta` and
-`local_group_meta` are intentionally designed as **global identity tables** and therefore **do not
+Unlike Gravitino's existing `user_meta` and `group_meta` tables, `idp_user_meta` and
+`idp_group_meta` are intentionally designed as **global identity tables** and therefore **do not
 contain `metalake_id`**. The purpose of these tables is to store local authentication identities
 and credentials once at the server level, instead of duplicating the same login identity in every
 metalake.
 
-### 5.1 `local_user_meta`
+### 5.1 `idp_user_meta`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `local_user_meta` (
+CREATE TABLE IF NOT EXISTS `idp_user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'username',
     `password_hash` VARCHAR(1024) NOT NULL COMMENT 'hashed password',
@@ -201,13 +201,13 @@ CREATE TABLE IF NOT EXISTS `local_user_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'user deleted at',
     PRIMARY KEY (`user_id`),
     UNIQUE KEY `uk_un_del` (`user_name`, `deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local user metadata';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'IdP user metadata';
 ```
 
-### 5.2 `local_group_meta`
+### 5.2 `idp_group_meta`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `local_group_meta` (
+CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'group audit info',
@@ -216,16 +216,16 @@ CREATE TABLE IF NOT EXISTS `local_group_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',
     PRIMARY KEY (`group_id`),
     UNIQUE KEY `uk_gn_del` (`group_name`, `deleted_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local group metadata';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'IdP group metadata';
 ```
 
-### 5.3 `local_group_user_rel`
+### 5.3 `idp_group_user_rel`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `local_group_user_rel` (
+CREATE TABLE IF NOT EXISTS `idp_group_user_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'local group id',
-    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'local user id',
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'IdP group id',
+    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'IdP user id',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'relation audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
@@ -233,7 +233,7 @@ CREATE TABLE IF NOT EXISTS `local_group_user_rel` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_gi_ui_del` (`group_id`, `user_id`, `deleted_at`),
     KEY `idx_uid` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local group user relation';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'IdP group user relation';
 ```
 
 ### 5.4 Relationship Model
@@ -241,23 +241,23 @@ CREATE TABLE IF NOT EXISTS `local_group_user_rel` (
 The logical entity relationship is straightforward:
 
 ```text
-local_user_meta
-    └──< local_group_user_rel >── local_group_meta
+idp_user_meta
+    └──< idp_group_user_rel >── idp_group_meta
 ```
 
 For integration with Gravitino's existing access control model, the local authentication tables are also
 logically associated with the existing metadata tables:
 
-- `local_user_meta` is associated with `user_meta` through `user_name`
-- `local_group_meta` is associated with `group_meta` through `group_name`
+- `idp_user_meta` is associated with `user_meta` through `user_name`
+- `idp_group_meta` is associated with `group_meta` through `group_name`
 
-In other words, `local_user_meta` stores local authentication credentials, while `user_meta`
+In other words, `idp_user_meta` stores local authentication credentials, while `user_meta`
 continues to represent the Gravitino user object used by the current authorization model.
-Similarly, `local_group_meta` stores local group identities, while `group_meta` remains the
+Similarly, `idp_group_meta` stores local group identities, while `group_meta` remains the
 authorization-side group metadata.
 
-Because `user_meta` and `group_meta` are metalake-scoped while `local_user_meta` and
-`local_group_meta` are global, this association should be treated as a **name-based logical
+Because `user_meta` and `group_meta` are metalake-scoped while `idp_user_meta` and
+`idp_group_meta` are global, this association should be treated as a **name-based logical
 mapping**, not as a database-level one-to-one foreign key constraint. A single local user or local
 group may correspond to multiple `user_meta` or `group_meta` entries with the same name across
 different metalakes.
@@ -265,11 +265,11 @@ different metalakes.
 The combined relationship can be viewed as:
 
 ```text
-local_user_meta --(user_name, logical mapping)--> user_meta[*]
-local_group_meta --(group_name, logical mapping)--> group_meta[*]
+idp_user_meta --(user_name, logical mapping)--> user_meta[*]
+idp_group_meta --(group_name, logical mapping)--> group_meta[*]
 
-local_user_meta
-    └──< local_group_user_rel >── local_group_meta
+idp_user_meta
+    └──< idp_group_user_rel >── idp_group_meta
 ```
 
 This supports direct username lookup for authentication, group resolution for authorization, and a
@@ -278,46 +278,55 @@ preserving the requirement that local identity tables remain global and metalake
 
 ---
 
-## 6. Bootstrap Experience
+## 6. Service Admin Initialization
 
-To keep local authentication usable immediately after installation, Gravitino should provision a default
-administrator account on first startup.
+To keep local authentication usable immediately after installation without introducing a hard-coded
+default password, Gravitino should provide an interactive initialization script for provisioning the
+first service admin account directly in the backend database.
 
-### 6.1 Initial Administrator
+### 6.1 Initialization Script Inputs
 
-- only one bootstrap account is created by default: the configured **service admin** account (for
-  example, **adminUser**)
-- the default password is **123456**
-- the default password **123456** is intended only for the initial bootstrap login and the immediate
-  password reset flow
-- other management operations must not rely on the bootstrap password
-- after the first login, the service admin is expected to reset the bootstrap password immediately
+After Gravitino is installed, the installer should run an interactive script and provide:
 
-This design favors usability for POC scenarios. The default password is intentionally simple so that
-the service admin can complete the bootstrap flow immediately, but it must be treated as a
-bootstrap-only credential rather than as a secure long-term password or a general-purpose access
-credential for other APIs.
+- the service admin name
+- the service admin password
+- the JDBC URL
+- the Gravitino database name
+- the JDBC user name
+- the JDBC password
 
-### 6.2 Bootstrap Process
+The service admin name entered in the script should be consistent with
+`gravitino.authorization.serviceAdmins`.
 
-The bootstrap process should be:
+### 6.2 Initialization Process
 
-1. When the `basic` authenticator is enabled for the first time, check whether the configured
-   bootstrap **service admin** account already exists in `local_user_meta`.
-2. If the bootstrap account does not exist, the web filter allows the configured bootstrap service
-   admin account (for example, **adminUser**) with password **123456** to pass Basic verification
-   only for the bootstrap login and immediate password reset flow.
-3. Reject other management operations until the bootstrap password has been reset successfully.
-4. During the first successful password reset, create the bootstrap service admin record and store
-   the new password hash in `password_hash`.
-5. After the password reset succeeds, treat the account as a normal service admin account for later
-   authentication and authorization.
+The initialization process should be:
 
-### 6.3 Example Basic Authentication Bootstrap Flow
+1. Install Gravitino and configure the `basic` authenticator together with
+   `gravitino.authorization.serviceAdmins`.
+2. Run the interactive service admin initialization script before the deployment is put into use.
+3. Prompt the installer for the service admin name, service admin password, JDBC URL, Gravitino
+   database name, JDBC user name, and JDBC password.
+4. Validate the input before writing anything to the database:
+   - the service admin name must not contain a colon (`:`)
+   - the password must satisfy the local authentication password policy
+   - the JDBC parameters must be non-empty and syntactically valid
+5. Connect to the configured JDBC backend.
+6. Check whether an active row for the target service admin already exists in `idp_user_meta`. If
+   it already exists, abort rather than overwrite it implicitly.
+7. Hash the password with Argon2id.
+8. Generate the `INSERT` statement required for the target JDBC backend and execute it immediately
+   so the service admin record is written into `idp_user_meta`.
+9. Exit successfully only after the insert has been committed.
 
-The following end-to-end flow shows how a user can start from a fresh Gravitino deployment, enable
-Basic authentication, configure the bootstrap service admin identity, and immediately rotate the
-bootstrap password.
+This design keeps the first-use flow explicit while avoiding any built-in default credential. The
+service admin exists before the first authenticated request is served, and the database stores only
+the password hash rather than plaintext input.
+
+### 6.3 Example Initialization Flow
+
+The following end-to-end flow shows how an installer can provision the initial service admin for a
+fresh Gravitino deployment.
 
 1. Deploy Gravitino with the `basic` authenticator enabled:
 
@@ -326,38 +335,21 @@ bootstrap password.
    gravitino.authorization.serviceAdmins=adminUser
    ```
 
-2. Start Gravitino.
+2. Run the interactive initialization script.
 
-3. On first startup, no active `adminUser` record exists yet in `local_user_meta`, so Gravitino
-   accepts the bootstrap credential `adminUser:123456` only for the bootstrap login and immediate
-   password reset flow.
+3. Enter the requested values when prompted:
 
-4. Call the password reset API with HTTP Basic authentication:
-
-   ```bash
-   curl -X PUT \
-     -u 'adminUser:123456' \
-     -H 'Content-Type: application/json' \
-     https://<gravitino-host>/api/idp/users/adminUser \
-     -d '{
-       "password": "ChangeMeToAStrongPassword"
-     }'
+   ```text
+   Service admin name: adminUser
+   Service admin password: ********
+   JDBC URL: jdbc:mysql://localhost:3306
+   Gravitino database: gravitino
+   JDBC user: gravitino
+   JDBC password: ********
    ```
 
-5. If the request succeeds, Gravitino creates the bootstrap `adminUser` record in
-   `local_user_meta` and stores the new Argon2id password hash.
-
-6. After that point, the bootstrap password `123456` is no longer accepted, and the service admin
-   must use the new password for later management APIs:
-
-   ```bash
-   curl -u 'adminUser:ChangeMeToAStrongPassword' \
-     https://<gravitino-host>/api/idp/users/adminUser
-   ```
-
-This flow makes the first-use experience explicit: deployment enables the feature, the
-`adminUser` identity is recognized through `gravitino.authorization.serviceAdmins`, and the
-default bootstrap password is usable only once to complete the initial password rotation.
+4. The script validates the password format, hashes the password, generates the required `INSERT`
+   SQL, and writes the service admin record into `idp_user_meta`.
 
 ---
 
@@ -370,22 +362,15 @@ The user verification flow is:
 1. Read the `Authorization` header and verify that it uses the `Basic` scheme.
 2. Decode the Base64 payload and split the decoded credential on the first colon to get `username`
    and `password`.
-3. Query `local_user_meta` by `user_name` and `deleted_at = 0`.
-4. If no active user is found and the credential is the configured bootstrap service admin account
-   with the default password (for example, **adminUser:123456**), allow only the
-   bootstrap login and immediate password reset flow.
-5. If no active user is found for any other credential, reject the request with **401**.
-6. If the user is the bootstrap service admin and the bootstrap password is still in use, allow only
-   the bootstrap login and password reset flow.
-7. If the request targets another management operation while the bootstrap password is still active,
-   reject the request.
-8. If the user passes these checks, continue to password verification.
+3. Query `idp_user_meta` by `user_name` and `deleted_at = 0`.
+4. If no active user is found, reject the request with **401**.
+5. If the user exists, continue to password verification.
 
 ### 7.2 Password Verification
 
 The password verification flow is:
 
-1. Query `local_user_meta` by `user_name` and `deleted_at = 0`.
+1. Query `idp_user_meta` by `user_name` and `deleted_at = 0`.
 2. Read the stored `password_hash`.
 3. Verify the submitted password against `password_hash` using the configured hashing algorithm.
 4. If verification succeeds, authenticate the request; otherwise reject it.
@@ -394,9 +379,9 @@ The password verification flow is:
 
 The local user's groups are resolved by:
 
-1. Query `local_user_meta` by username and `deleted_at = 0` to get `user_id`.
-2. Query `local_group_user_rel` by `user_id` to get all active `group_id` values.
-3. Query `local_group_meta` by those `group_id` values to load the full group set.
+1. Query `idp_user_meta` by username and `deleted_at = 0` to get `user_id`.
+2. Query `idp_group_user_rel` by `user_id` to get all active `group_id` values.
+3. Query `idp_group_meta` by those `group_id` values to load the full group set.
 
 This keeps the model aligned with Gravitino's existing authorization architecture, where user-group
 relationships are an input to later privilege evaluation.
@@ -481,7 +466,7 @@ At a high level:
 5. **Get group**: read the local group information and its current user memberships.
 6. **Add group**: create a new local group.
 7. **Remove group**: soft-delete the group record.
-8. **Add user to group**: create a row in `local_group_user_rel`.
+8. **Add user to group**: create a row in `idp_group_user_rel`.
 9. **Remove user from group**: soft-delete the corresponding relation row.
 
 ### 9.1 HTTP Interface Design
@@ -743,7 +728,7 @@ The local authentication capability is intentionally lightweight, but the follow
 
 - passwords are stored as hashes, never plaintext
 - Basic authentication should be used only over HTTPS
-- bootstrap credentials must be rotated after installation
+- the initialization script must validate password policy and write only hashed passwords
 - all metadata tables use soft deletion for traceability and operational safety
 - local authentication is recommended for POC, offline, and isolated environments rather than as a
   replacement for enterprise-grade external identity systems
@@ -759,7 +744,7 @@ either unavailable or unnecessarily heavy. The key design choices are:
 - **username/password credentials**
 - **database-backed storage**
 - **Argon2id password hashing**
-- **bootstrap service admin account**
+- **interactive service admin initialization**
 
 The result is a self-contained authentication path that is easy to deploy, fast to evaluate, and
 well aligned with Gravitino's lightweight quick-start experience.
