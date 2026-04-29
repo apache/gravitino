@@ -521,6 +521,18 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/idp/users/alice
 ```
 
+**Response:**
+
+```json
+{
+  "code": 0,
+  "user": {
+    "name": "alice",
+    "groups": ["engineering", "devops"]
+  }
+}
+```
+
 #### 9.1.2 Create a local user
 
 You can create a local user by providing a user name and password. The password must be stored as a
@@ -536,6 +548,18 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/idp/users
 ```
 
+**Response:**
+
+```json
+{
+  "code": 0,
+  "user": {
+    "name": "alice",
+    "groups": []
+  }
+}
+```
+
 #### 9.1.3 Remove a local user
 
 You can remove a local user by its name. This operation should soft-delete the user record rather
@@ -546,6 +570,15 @@ The request path for REST API is `/api/idp/users/{user}`.
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/idp/users/alice
+```
+
+**Response:**
+
+```json
+{
+  "code": 0,
+  "removed": true
+}
 ```
 
 #### 9.1.4 Reset a local user password
@@ -560,6 +593,18 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "password": "Passw0rd-For-Alice-V2"
 }' http://localhost:8090/api/idp/users/alice
+```
+
+**Response:**
+
+```json
+{
+  "code": 0,
+  "user": {
+    "name": "alice",
+    "groups": ["engineering", "devops"]
+  }
+}
 ```
 
 The password reset API follows these rules:
@@ -589,6 +634,18 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/idp/groups/engineering
 ```
 
+**Response:**
+
+```json
+{
+  "code": 0,
+  "group": {
+    "name": "engineering",
+    "users": ["alice", "bob"]
+  }
+}
+```
+
 #### 9.1.6 Create a local group
 
 You can create a local group by providing a group name.
@@ -602,6 +659,18 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/idp/groups
 ```
 
+**Response:**
+
+```json
+{
+  "code": 0,
+  "group": {
+    "name": "engineering",
+    "users": []
+  }
+}
+```
+
 #### 9.1.7 Remove a local group
 
 You can remove a local group by its name. This operation should soft-delete the group record rather
@@ -612,6 +681,15 @@ The request path for REST API is `/api/idp/groups/{group}`.
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/idp/groups/engineering
+```
+
+**Response:**
+
+```json
+{
+  "code": 0,
+  "removed": true
+}
 ```
 
 #### 9.1.8 Add users to a local group
@@ -628,6 +706,18 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/idp/groups/engineering/add
 ```
 
+**Response:**
+
+```json
+{
+  "code": 0,
+  "group": {
+    "name": "engineering",
+    "users": ["alice", "bob"]
+  }
+}
+```
+
 #### 9.1.9 Remove users from a local group
 
 You can remove users from a local group by providing the group name in the path and the target
@@ -640,6 +730,18 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "users": ["alice"]
 }' http://localhost:8090/api/idp/groups/engineering/remove
+```
+
+**Response:**
+
+```json
+{
+  "code": 0,
+  "group": {
+    "name": "engineering",
+    "users": ["bob"]
+  }
+}
 ```
 ---
 
