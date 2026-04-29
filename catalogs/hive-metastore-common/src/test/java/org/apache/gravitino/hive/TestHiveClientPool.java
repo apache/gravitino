@@ -90,6 +90,7 @@ public class TestHiveClientPool {
     clients.close();
     assertTrue(clients.isClosed());
     Mockito.verify(hiveClient).close();
+    Mockito.verify(clients).closeClientFactory();
   }
 
   private HiveClient newClient() {
