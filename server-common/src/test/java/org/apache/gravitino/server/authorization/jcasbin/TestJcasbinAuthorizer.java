@@ -56,6 +56,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
@@ -349,61 +350,27 @@ public class TestJcasbinAuthorizer {
   public void testAuthorizeByGroupRole() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
 
-    // Set up a principal whose groups include GROUP_NAME
-    UserPrincipal groupPrincipal =
-        new UserPrincipal(USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), GROUP_NAME)));
-    principalUtilsMockedStatic.when(PrincipalUtils::getCurrentPrincipal).thenReturn(groupPrincipal);
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
 
     // Create a role with USE_CATALOG privilege
     Long groupRoleId = 7L;
     RoleEntity groupRole =
-        getRoleEntity(groupRoleId, "groupRole", ImmutableList.of(getAllowSecurableObject()));
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofRole(METALAKE, groupRole.name())),
-            eq(Entity.EntityType.ROLE),
-            eq(RoleEntity.class)))
-        .thenReturn(groupRole);
+        mockRoleInStore(groupRoleId, "groupRole", ImmutableList.of(getAllowSecurableObject()));
 
-    // User has no direct roles
-    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
-    when(supportsRelationOperations.listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
-            eq(userNameIdentifier),
-            eq(Entity.EntityType.USER)))
-        .thenReturn(ImmutableList.of());
-
-    // Group has the role assigned
-    GroupEntity groupWithRole =
-        GroupEntity.builder()
-            .withId(GROUP_ID)
-            .withName(GROUP_NAME)
-            .withNamespace(Namespace.of(METALAKE, "group"))
-            .withAuditInfo(AuditInfo.EMPTY)
-            .withRoleNames(ImmutableList.of(groupRole.name()))
-            .withRoleIds(ImmutableList.of(groupRoleId))
-            .build();
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME)),
-            eq(Entity.EntityType.GROUP),
-            eq(GroupEntity.class)))
-        .thenReturn(groupWithRole);
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(
+        GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of(groupRole.name()));
 
     // Authorization should succeed via group-inherited role
     assertTrue(doAuthorize(groupPrincipal));
 
     // A principal with no groups should fail
-    UserPrincipal noGroupPrincipal = new UserPrincipal(USERNAME);
-    principalUtilsMockedStatic
-        .when(PrincipalUtils::getCurrentPrincipal)
-        .thenReturn(noGroupPrincipal);
+    UserPrincipal noGroupPrincipal = setCurrentPrincipalWithGroup(null);
     // Clear role caches to force re-evaluation
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
     assertFalse(doAuthorize(noGroupPrincipal));
 
-    // Restore the original principal mock
-    principalUtilsMockedStatic
-        .when(PrincipalUtils::getCurrentPrincipal)
-        .thenReturn(new UserPrincipal(USERNAME));
+    restoreDefaultPrincipal();
   }
 
   @Test
@@ -411,31 +378,16 @@ public class TestJcasbinAuthorizer {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
 
-    // Set up a principal whose groups include GROUP_NAME
-    UserPrincipal groupPrincipal =
-        new UserPrincipal(USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), GROUP_NAME)));
-    principalUtilsMockedStatic.when(PrincipalUtils::getCurrentPrincipal).thenReturn(groupPrincipal);
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
 
-    // Create a direct role (no USE_CATALOG privilege — empty securable objects)
+    // Direct role has no privilege; group role grants USE_CATALOG
     Long directRoleId = 8L;
-    RoleEntity directRole = getRoleEntity(directRoleId, "directRole", ImmutableList.of());
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofRole(METALAKE, directRole.name())),
-            eq(Entity.EntityType.ROLE),
-            eq(RoleEntity.class)))
-        .thenReturn(directRole);
-
-    // Create a group role with USE_CATALOG privilege
+    RoleEntity directRole = mockRoleInStore(directRoleId, "directRole", ImmutableList.of());
     Long groupRoleId = 9L;
     RoleEntity groupRole =
-        getRoleEntity(groupRoleId, "groupCatalogRole", ImmutableList.of(getAllowSecurableObject()));
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofRole(METALAKE, groupRole.name())),
-            eq(Entity.EntityType.ROLE),
-            eq(RoleEntity.class)))
-        .thenReturn(groupRole);
+        mockRoleInStore(
+            groupRoleId, "groupCatalogRole", ImmutableList.of(getAllowSecurableObject()));
 
-    // User has a direct role (without the needed privilege)
     NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
@@ -443,29 +395,13 @@ public class TestJcasbinAuthorizer {
             eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of(directRole));
 
-    // Group has the role with the needed privilege
-    GroupEntity groupWithRole =
-        GroupEntity.builder()
-            .withId(GROUP_ID)
-            .withName(GROUP_NAME)
-            .withNamespace(Namespace.of(METALAKE, "group"))
-            .withAuditInfo(AuditInfo.EMPTY)
-            .withRoleNames(ImmutableList.of(groupRole.name()))
-            .withRoleIds(ImmutableList.of(groupRoleId))
-            .build();
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME)),
-            eq(Entity.EntityType.GROUP),
-            eq(GroupEntity.class)))
-        .thenReturn(groupWithRole);
+    mockGroupWithRoles(
+        GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of(groupRole.name()));
 
-    // Authorization should succeed — direct role has no privilege, but group role does
+    // Authorization should succeed -- direct role has no privilege, but group role does
     assertTrue(doAuthorize(groupPrincipal));
 
-    // Restore the original principal mock
-    principalUtilsMockedStatic
-        .when(PrincipalUtils::getCurrentPrincipal)
-        .thenReturn(new UserPrincipal(USERNAME));
+    restoreDefaultPrincipal();
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
   }
 
@@ -476,49 +412,127 @@ public class TestJcasbinAuthorizer {
     String groupRoleName = "groupSelfRole";
     NameIdentifier roleIdent = NameIdentifierUtil.ofRole(METALAKE, groupRoleName);
 
-    // User has no direct role assignment
+    mockNoDirectUserRoles();
+    setCurrentPrincipalWithGroup(GROUP_NAME);
+    mockGroupWithRoles(GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of(groupRoleName));
+
+    // isSelf should return true -- role is assigned to user's group
+    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+
+    // A principal with no groups should fail
+    setCurrentPrincipalWithGroup(null);
+    assertFalse(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+
+    restoreDefaultPrincipal();
+  }
+
+  @Test
+  public void testGroupRoleSkippedWhenRoleIdsAndNamesMismatch() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    String mismatchGroupName = "mismatchGroup";
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(mismatchGroupName);
+
+    mockNoDirectUserRoles();
+    // Mismatched roleIds (1) and roleNames (2) -- the whole group should be skipped
+    mockGroupWithRoles(
+        mismatchGroupName, ImmutableList.of(101L), ImmutableList.of("roleA", "roleB"));
+
+    // Authorization denied -- the mismatched group is skipped, so no role is loaded
+    assertFalse(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  @Test
+  public void testStaleGroupSkippedWhenNoSuchEntity() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    String staleGroupName = "staleGroup";
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(staleGroupName);
+
+    mockNoDirectUserRoles();
+    // Group lookup throws NoSuchEntityException (stale group reference in the principal)
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofGroup(METALAKE, staleGroupName)),
+            eq(Entity.EntityType.GROUP),
+            eq(GroupEntity.class)))
+        .thenThrow(new NoSuchEntityException("group not found"));
+
+    // Authorization denied without throwing -- the stale group is silently skipped
+    assertFalse(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
+   * Sets the current principal mock to a {@link UserPrincipal} with the given group, or with no
+   * groups when {@code groupName} is null. Returns the principal for use in assertions.
+   */
+  private static UserPrincipal setCurrentPrincipalWithGroup(String groupName) {
+    UserPrincipal principal =
+        groupName == null
+            ? new UserPrincipal(USERNAME)
+            : new UserPrincipal(
+                USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), groupName)));
+    principalUtilsMockedStatic.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
+    return principal;
+  }
+
+  /** Restores the default principal mock used by other tests. */
+  private static void restoreDefaultPrincipal() {
+    principalUtilsMockedStatic
+        .when(PrincipalUtils::getCurrentPrincipal)
+        .thenReturn(new UserPrincipal(USERNAME));
+  }
+
+  /** Mocks the user as having no direct (ROLE_USER_REL) role assignments. */
+  private static void mockNoDirectUserRoles() throws IOException {
     NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
             eq(userNameIdentifier),
             eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of());
+  }
 
-    // Set up principal with a group
-    UserPrincipal groupPrincipal =
-        new UserPrincipal(USERNAME, ImmutableList.of(new UserGroup(Optional.empty(), GROUP_NAME)));
-    principalUtilsMockedStatic.when(PrincipalUtils::getCurrentPrincipal).thenReturn(groupPrincipal);
+  /** Builds a {@link RoleEntity} and registers it in the mocked entity store. */
+  private static RoleEntity mockRoleInStore(
+      Long roleId, String roleName, List<SecurableObject> securableObjects) throws IOException {
+    RoleEntity role = getRoleEntity(roleId, roleName, securableObjects);
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, roleName)),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(role);
+    return role;
+  }
 
-    // Group has the role
-    GroupEntity groupWithRole =
+  /**
+   * Builds a {@link GroupEntity} with the given role ids/names and registers it in the mocked
+   * entity store.
+   */
+  private static GroupEntity mockGroupWithRoles(
+      String groupName, List<Long> roleIds, List<String> roleNames) throws IOException {
+    GroupEntity group =
         GroupEntity.builder()
             .withId(GROUP_ID)
-            .withName(GROUP_NAME)
+            .withName(groupName)
             .withNamespace(Namespace.of(METALAKE, "group"))
             .withAuditInfo(AuditInfo.EMPTY)
-            .withRoleNames(ImmutableList.of(groupRoleName))
-            .withRoleIds(ImmutableList.of(groupRoleId))
+            .withRoleNames(roleNames)
+            .withRoleIds(roleIds)
             .build();
     when(entityStore.get(
-            eq(NameIdentifierUtil.ofGroup(METALAKE, GROUP_NAME)),
+            eq(NameIdentifierUtil.ofGroup(METALAKE, groupName)),
             eq(Entity.EntityType.GROUP),
             eq(GroupEntity.class)))
-        .thenReturn(groupWithRole);
-
-    // isSelf should return true — role is assigned to user's group
-    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
-
-    // A principal with no groups should fail
-    UserPrincipal noGroupPrincipal = new UserPrincipal(USERNAME);
-    principalUtilsMockedStatic
-        .when(PrincipalUtils::getCurrentPrincipal)
-        .thenReturn(noGroupPrincipal);
-    assertFalse(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
-
-    // Restore the original principal mock
-    principalUtilsMockedStatic
-        .when(PrincipalUtils::getCurrentPrincipal)
-        .thenReturn(new UserPrincipal(USERNAME));
+        .thenReturn(group);
+    return group;
   }
 
   private Boolean doAuthorize(Principal currentPrincipal) {

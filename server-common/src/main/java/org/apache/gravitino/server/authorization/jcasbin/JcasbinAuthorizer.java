@@ -529,7 +529,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               }
               if (roleIds.size() != roleNames.size()) {
                 LOG.warn(
-                    "Group {} has mismatched roleIds ({}) and roleNames ({}) — skipping",
+                    "Group {} has mismatched roleIds ({}) and roleNames ({}) -- skipping",
                     groupEntity.name(),
                     roleIds.size(),
                     roleNames.size());
