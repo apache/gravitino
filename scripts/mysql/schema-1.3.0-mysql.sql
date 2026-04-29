@@ -482,6 +482,7 @@ CREATE TABLE IF NOT EXISTS `view_meta` (
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'view current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'view last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'view deleted at',
@@ -490,6 +491,28 @@ CREATE TABLE IF NOT EXISTS `view_meta` (
     KEY `idx_vemid` (`metalake_id`),
     KEY `idx_vecid` (`catalog_id`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'view metadata';
+
+CREATE TABLE IF NOT EXISTS `view_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `view_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'view id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'view version',
+    `view_comment` TEXT DEFAULT NULL COMMENT 'view version comment',
+    `columns` MEDIUMTEXT NOT NULL COMMENT 'view columns snapshot (JSON)',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'view properties (JSON)',
+    `default_catalog` VARCHAR(128) DEFAULT NULL COMMENT 'default catalog for view SQL resolution',
+    `default_schema` VARCHAR(128) DEFAULT NULL COMMENT 'default schema for view SQL resolution',
+    `representations` MEDIUMTEXT NOT NULL COMMENT 'view representations (JSON array)',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view version audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'view version deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_vid_ver_del` (`view_id`, `version`, `deleted_at`),
+    KEY `idx_vvmid` (`metalake_id`),
+    KEY `idx_vvcid` (`catalog_id`),
+    KEY `idx_vvsid` (`schema_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'view version info';
 
 -- This schema extends version 1.1.0 with partition statistics storage support
 -- The partition_statistic_meta table stores partition-level statistics for tables

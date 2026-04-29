@@ -21,6 +21,7 @@ package org.apache.gravitino.listener;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.listener.api.event.AlterTagEvent;
 import org.apache.gravitino.listener.api.event.AlterTagFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterTagPreEvent;
@@ -141,7 +142,8 @@ public class TagEventDispatcher implements TagDispatcher {
   }
 
   @Override
-  public Tag alterTag(String metalake, String name, TagChange... changes) {
+  public Tag alterTag(String metalake, String name, TagChange... changes)
+      throws IllegalArgumentException, TagAlreadyExistsException {
     AlterTagPreEvent preEvent =
         new AlterTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name, changes);
 

@@ -653,6 +653,11 @@ public class NameIdentifierUtil {
         String modelParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(modelParent, ident.name(), MetadataObject.Type.MODEL);
 
+      case FUNCTION:
+        checkFunction(ident);
+        String functionParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(functionParent, ident.name(), MetadataObject.Type.FUNCTION);
+
       case ROLE:
         AuthorizationUtils.checkRole(ident);
         return MetadataObjects.of(null, ident.name(), MetadataObject.Type.ROLE);
@@ -895,6 +900,7 @@ public class NameIdentifierUtil {
       case FILESET:
       case MODEL:
       case TOPIC:
+      case FUNCTION:
         return Entity.EntityType.SCHEMA;
 
       case SCHEMA:

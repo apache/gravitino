@@ -68,3 +68,37 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
   PRIMARY KEY (`id`),
   INDEX `idx_ecl_created_at` (`created_at`)
 ) COMMENT 'Append-only log of entity structural changes. One row per affected entity per operation. The entity change poller reads this table to drive targeted invalidation of metadataIdCache on HA peer nodes. Rows older than the retention window (default 1 h) are pruned periodically.';
+
+-- add audit_info as nullable first for MySQL 5.7 compatibility
+ALTER TABLE `view_meta`
+    ADD COLUMN `audit_info` MEDIUMTEXT COMMENT 'view audit info' AFTER `schema_id`;
+
+-- backfill existing rows before enforcing NOT NULL
+UPDATE `view_meta`
+    SET `audit_info` = '{}'
+    WHERE `audit_info` IS NULL;
+
+ALTER TABLE `view_meta`
+    MODIFY COLUMN `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view audit info' AFTER `schema_id`;
+
+CREATE TABLE IF NOT EXISTS `view_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `view_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'view id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'view version',
+    `view_comment` TEXT DEFAULT NULL COMMENT 'view version comment',
+    `columns` MEDIUMTEXT NOT NULL COMMENT 'view columns snapshot (JSON)',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'view properties (JSON)',
+    `default_catalog` VARCHAR(128) DEFAULT NULL COMMENT 'default catalog for view SQL resolution',
+    `default_schema` VARCHAR(128) DEFAULT NULL COMMENT 'default schema for view SQL resolution',
+    `representations` MEDIUMTEXT NOT NULL COMMENT 'view representations (JSON array)',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view version audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'view version deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_vid_ver_del` (`view_id`, `version`, `deleted_at`),
+    KEY `idx_vvmid` (`metalake_id`),
+    KEY `idx_vvcid` (`catalog_id`),
+    KEY `idx_vvsid` (`schema_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'view version info';
