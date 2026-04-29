@@ -126,40 +126,41 @@ class TestSupportsTags(IntegrationTestEnv):
         cls._gravitino_client.delete_tag(cls._tag_name4)
 
         cls._gravitino_admin_client.drop_metalake(name=cls._metalake_name, force=True)
+        hive_metastore_uri = f"thrift://{cls._hdfs_container.get_ip()}:9083"
 
-    def setUp(self) -> None:
-        hive_metastore_uri = f"thrift://{self._hdfs_container.get_ip()}:9083"
-        self._model_catalog = self._gravitino_client.create_catalog(
-            name=self._model_catalog_name,
+        cls._model_catalog = cls._gravitino_client.create_catalog(
+            name=cls._model_catalog_name,
             catalog_type=Catalog.Type.MODEL,
             provider="",
             comment="comment",
             properties={},
         )
-        self._fileset_catalog = self._gravitino_client.create_catalog(
-            name=self._fileset_catalog_name,
+        cls._fileset_catalog = cls._gravitino_client.create_catalog(
+            name=cls._fileset_catalog_name,
             catalog_type=Catalog.Type.FILESET,
             provider="",
             comment="",
-            properties={self.catalog_location_prop: "/tmp/test1"},
+            properties={cls.catalog_location_prop: "/tmp/test1"},
         )
-        self._relational_catalog = self._gravitino_client.create_catalog(
-            name=self._relational_catalog_name,
+        cls._relational_catalog = cls._gravitino_client.create_catalog(
+            name=cls._relational_catalog_name,
             catalog_type=Catalog.Type.RELATIONAL,
-            provider=self.relational_catalog_provider,
+            provider=cls.relational_catalog_provider,
             comment="Test relational catalog",
             properties={"metastore.uris": hive_metastore_uri},
         )
-        self._table_catalog = self._relational_catalog.as_table_catalog()
-        self._model_catalog.as_schemas().create_schema(
-            self._schema_name, "model schema comment", {}
+        cls._table_catalog = cls._relational_catalog.as_table_catalog()
+        cls._model_catalog.as_schemas().create_schema(
+            cls._schema_name, "model schema comment", {}
         )
-        self._relational_catalog.as_schemas().create_schema(
-            self._schema_name, "relational schema comment", {}
+        cls._relational_catalog.as_schemas().create_schema(
+            cls._schema_name, "relational schema comment", {}
         )
-        self._fileset_catalog.as_schemas().create_schema(
-            self._schema_name, "fileset schema comment", {}
+        cls._fileset_catalog.as_schemas().create_schema(
+            cls._schema_name, "fileset schema comment", {}
         )
+
+    def setUp(self) -> None:
         self._table_ident: NameIdentifier = NameIdentifier.of(
             self._metalake_name,
             self._relational_catalog_name,
