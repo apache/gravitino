@@ -19,8 +19,12 @@
 
 package org.apache.gravitino.flink.connector.paimon;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
@@ -30,14 +34,19 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
+import org.apache.gravitino.rel.Table;
 import org.apache.paimon.flink.FlinkCatalogFactory;
 import org.apache.paimon.flink.FlinkTableFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The GravitinoPaimonCatalog class is an implementation of the BaseCatalog class that is used to
  * proxy the PaimonCatalog class.
  */
 public class GravitinoPaimonCatalog extends BaseCatalog {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoPaimonCatalog.class);
 
   private final AbstractCatalog paimonCatalog;
 
@@ -53,12 +62,104 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
         schemaAndTablePropertiesConverter,
         partitionConverter);
     FlinkCatalogFactory flinkCatalogFactory = new FlinkCatalogFactory();
-    this.paimonCatalog = flinkCatalogFactory.createCatalog(context);
+    this.paimonCatalog = flinkCatalogFactory.createCatalog(toPaimonContext(context));
+  }
+
+  /**
+   * Translates Gravitino catalog property names to their Paimon/Flink equivalents so that the
+   * underlying {@code FlinkCatalog} can be initialised correctly (e.g., {@code catalog-backend}
+   * becomes {@code metastore}).
+   */
+  private static CatalogFactory.Context toPaimonContext(CatalogFactory.Context context) {
+    Map<String, String> translatedOptions = new HashMap<>();
+    for (Map.Entry<String, String> entry : context.getOptions().entrySet()) {
+      String mappedKey =
+          PaimonPropertiesConverter.INSTANCE.transformPropertyToFlinkCatalog(entry.getKey());
+      // Fall back to the original key when no mapping exists so Paimon-native properties are not
+      // silently dropped.
+      translatedOptions.put(mappedKey != null ? mappedKey : entry.getKey(), entry.getValue());
+    }
+    return new CatalogFactory.Context() {
+      @Override
+      public String getName() {
+        return context.getName();
+      }
+
+      @Override
+      public Map<String, String> getOptions() {
+        return translatedOptions;
+      }
+
+      @Override
+      public ReadableConfig getConfiguration() {
+        return context.getConfiguration();
+      }
+
+      @Override
+      public ClassLoader getClassLoader() {
+        return context.getClassLoader();
+      }
+    };
   }
 
   @Override
   protected AbstractCatalog realCatalog() {
     return paimonCatalog;
+  }
+
+  @Override
+  public Optional<Factory> getFactory() {
+    return Optional.of(new FlinkTableFactory());
+  }
+
+  @Override
+  protected CatalogBaseTable toFlinkTable(Table table, ObjectPath tablePath) {
+    try {
+      return paimonCatalog.getTable(tablePath);
+    } catch (TableNotExistException e) {
+      // The table was confirmed to exist in Gravitino (auth passed in BaseCatalog.getTable).
+      // This branch indicates the two stores are out of sync.
+      throw new CatalogException(
+          "Table "
+              + tablePath
+              + " exists in Gravitino but not in Paimon/Hive metastore."
+              + " The two stores may be out of sync.",
+          e);
+    }
+  }
+
+  /**
+   * Overrides alterTable to also sync the change into {@code paimonCatalog}, which invalidates its
+   * internal table-metadata cache. Without this, {@link #toFlinkTable} delegates to {@code
+   * paimonCatalog.getTable()}, which may return stale cached metadata (e.g., the old comment) after
+   * Gravitino updates the Paimon backend through a separate catalog instance.
+   *
+   * <p>When {@code ignoreIfNotExists=true} and the table is absent in Gravitino, this method
+   * returns immediately without touching the Paimon/Hive metastore, keeping the two stores in sync.
+   *
+   * <p>This variant is documented as comment-only, so the extra write to the Paimon Flink catalog
+   * is idempotent.
+   */
+  @Override
+  public void alterTable(ObjectPath tablePath, CatalogBaseTable newTable, boolean ignoreIfNotExists)
+      throws TableNotExistException, CatalogException {
+    if (ignoreIfNotExists && !tableExists(tablePath)) {
+      return;
+    }
+    super.alterTable(tablePath, newTable, ignoreIfNotExists);
+    try {
+      paimonCatalog.alterTable(tablePath, newTable, ignoreIfNotExists);
+    } catch (TableNotExistException e) {
+      // The table existed in Gravitino (checked above) but is absent in the Paimon/Hive
+      // metastore — the two stores are out of sync. Log and swallow so the Gravitino
+      // change is not rolled back.
+      LOG.warn(
+          "Table {} was altered in Gravitino but not found in Paimon/Hive metastore."
+              + " The two stores may be out of sync.",
+          tablePath);
+    } catch (Exception e) {
+      LOG.warn("Failed to sync paimonCatalog after alterTable for {}", tablePath, e);
+    }
   }
 
   @Override
@@ -71,10 +172,5 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     if (!dropped && !ignoreIfNotExists) {
       throw new TableNotExistException(catalogName(), tablePath);
     }
-  }
-
-  @Override
-  public Optional<Factory> getFactory() {
-    return Optional.of(new FlinkTableFactory());
   }
 }
