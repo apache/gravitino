@@ -28,12 +28,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.io.SwitchingFileIO;
 import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
@@ -53,6 +55,12 @@ import org.slf4j.LoggerFactory;
 
 public class IcebergCatalogUtil {
 
+  private static final String S3_FILE_IO = "org.apache.iceberg.aws.s3.S3FileIO";
+  private static final String GCS_FILE_IO = "org.apache.iceberg.gcp.gcs.GCSFileIO";
+  private static final String ADLS_FILE_IO = "org.apache.iceberg.azure.adlsv2.ADLSFileIO";
+  private static final String OSS_FILE_IO = "org.apache.iceberg.aliyun.oss.OSSFileIO";
+  private static final String HADOOP_FILE_IO = "org.apache.iceberg.hadoop.HadoopFileIO";
+
   private static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogUtil.class);
 
   private static InMemoryCatalog loadMemoryCatalog(IcebergConfig icebergConfig) {
@@ -62,6 +70,7 @@ public class IcebergCatalogUtil {
     if (!resultProperties.containsKey(IcebergConstants.WAREHOUSE)) {
       resultProperties.put(IcebergConstants.WAREHOUSE, "/tmp");
     }
+    applyDefaultSwitchingFileIO(resultProperties);
     memoryCatalog.initialize(icebergCatalogName, resultProperties);
     return memoryCatalog;
   }
@@ -72,6 +81,7 @@ public class IcebergCatalogUtil {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
 
     Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
+    applyDefaultSwitchingFileIO(properties);
     properties.forEach(hdfsConfiguration::set);
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (authenticationConfig.isSimpleAuth()) {
@@ -98,6 +108,7 @@ public class IcebergCatalogUtil {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
 
     Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
+    applyDefaultSwitchingFileIO(properties);
     try {
       // Load the jdbc driver
       Class.forName(driverClassName);
@@ -131,6 +142,7 @@ public class IcebergCatalogUtil {
     RESTCatalog restCatalog = new RESTCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     Map<String, String> properties = Maps.newHashMap(icebergConfig.getIcebergCatalogProperties());
+    applyDefaultSwitchingFileIO(properties);
 
     // REST catalog must use forward access token from the user request
     properties.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
@@ -144,11 +156,47 @@ public class IcebergCatalogUtil {
   private static Catalog loadCustomCatalog(IcebergConfig icebergConfig) {
     String customCatalogName = icebergConfig.getCatalogBackendName();
     String className = icebergConfig.get(IcebergConfig.CATALOG_BACKEND_IMPL);
+    Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
+    applyDefaultSwitchingFileIO(properties);
     return CatalogUtil.loadCatalog(
-        className,
-        customCatalogName,
-        icebergConfig.getIcebergCatalogProperties(),
-        new HdfsConfiguration());
+        className, customCatalogName, properties, new HdfsConfiguration());
+  }
+
+  @VisibleForTesting
+  public static void applyDefaultSwitchingFileIO(Map<String, String> properties) {
+    properties.putIfAbsent(IcebergConstants.IO_IMPL, SwitchingFileIO.class.getName());
+  }
+
+  @VisibleForTesting
+  public static Optional<String> resolveFileIOImplByLocation(String location) {
+    if (location == null || location.isBlank()) {
+      return Optional.empty();
+    }
+
+    int schemeSeparator = location.indexOf("://");
+    String scheme = schemeSeparator >= 0 ? location.substring(0, schemeSeparator) : "file";
+    String normalizedScheme = scheme.toLowerCase(Locale.ROOT);
+    switch (normalizedScheme) {
+      case "s3":
+      case "s3a":
+      case "s3n":
+        return Optional.of(S3_FILE_IO);
+      case "gs":
+      case "gcs":
+        return Optional.of(GCS_FILE_IO);
+      case "abfs":
+      case "abfss":
+      case "wasb":
+      case "wasbs":
+        return Optional.of(ADLS_FILE_IO);
+      case "oss":
+        return Optional.of(OSS_FILE_IO);
+      case "file":
+      case "hdfs":
+        return Optional.of(HADOOP_FILE_IO);
+      default:
+        return Optional.empty();
+    }
   }
 
   @VisibleForTesting

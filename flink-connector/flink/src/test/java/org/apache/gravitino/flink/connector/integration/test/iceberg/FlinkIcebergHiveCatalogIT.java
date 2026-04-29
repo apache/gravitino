@@ -21,6 +21,7 @@ package org.apache.gravitino.flink.connector.integration.test.iceberg;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.junit.jupiter.api.Tag;
 
@@ -37,6 +38,7 @@ public class FlinkIcebergHiveCatalogIT extends FlinkIcebergCatalogIT {
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE, warehouse);
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, hiveMetastoreUri);
+    catalogProperties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.hadoop.HadoopFileIO");
     return catalogProperties;
   }
 
