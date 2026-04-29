@@ -40,9 +40,8 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation("io.trino:trino-jdbc:$trinoVersion")
   compileOnly(libs.airlift.resolver)
-  compileOnly("io.trino:trino-spi:$trinoVersion") {
-    exclude("org.apache.logging.log4j")
-  }
+  compileOnly(files("../starburst-libs/io.trino_trino-spi-$starburstVersion.jar"))
+  compileOnly("io.airlift:slice:0.46")
   testImplementation(libs.awaitility)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
