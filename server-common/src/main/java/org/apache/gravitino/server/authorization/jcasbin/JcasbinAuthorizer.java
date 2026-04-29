@@ -291,25 +291,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         if (entities.stream().anyMatch(roleEntity -> Objects.equals(roleEntity.id(), roleId))) {
           return true;
         }
-        // Check group-role assignments. Groups are fetched individually so that a
-        // single stale or deleted group does not prevent checking the remaining ones.
-        Principal principal = PrincipalUtils.getCurrentPrincipal();
-        if (principal instanceof UserPrincipal) {
-          for (UserGroup group : ((UserPrincipal) principal).getGroups()) {
-            try {
-              NameIdentifier groupIdent =
-                  NameIdentifierUtil.ofGroup(metalake, group.getGroupname());
-              GroupEntity groupEntity =
-                  entityStore.get(groupIdent, Entity.EntityType.GROUP, GroupEntity.class);
-              List<Long> groupRoleIds = groupEntity.roleIds();
-              if (groupRoleIds != null && groupRoleIds.contains(roleId)) {
-                return true;
-              }
-            } catch (NoSuchEntityException ex) {
-              LOG.debug("Group not found in store: {}", group.getGroupname());
-            } catch (Exception ex) {
-              LOG.warn("Failed to check group role for group: {}", group.getGroupname(), ex);
-            }
+        // Check group-role assignments.
+        for (GroupEntity groupEntity : resolveCurrentUserGroups(metalake, entityStore)) {
+          List<Long> groupRoleIds = groupEntity.roleIds();
+          if (groupRoleIds != null && groupRoleIds.contains(roleId)) {
+            return true;
           }
         }
         return false;
@@ -534,34 +520,29 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   userId, metalake, role.id(), role.name(), loadRoleFutures, entityStore);
             }
 
-            // Load roles inherited from the user's groups. Groups are fetched individually
-            // so that a single stale or deleted group does not block loading the rest.
-            Principal principal = PrincipalUtils.getCurrentPrincipal();
-            if (principal instanceof UserPrincipal) {
-              for (UserGroup group : ((UserPrincipal) principal).getGroups()) {
-                try {
-                  NameIdentifier groupIdent =
-                      NameIdentifierUtil.ofGroup(metalake, group.getGroupname());
-                  GroupEntity groupEntity =
-                      entityStore.get(groupIdent, Entity.EntityType.GROUP, GroupEntity.class);
-                  List<Long> roleIds = groupEntity.roleIds();
-                  List<String> roleNames = groupEntity.roleNames();
-                  if (roleIds != null && roleNames != null && roleIds.size() == roleNames.size()) {
-                    for (int i = 0; i < roleIds.size(); i++) {
-                      addRoleForUserAndLoadPolicies(
-                          userId,
-                          metalake,
-                          roleIds.get(i),
-                          roleNames.get(i),
-                          loadRoleFutures,
-                          entityStore);
-                    }
-                  }
-                } catch (NoSuchEntityException e) {
-                  LOG.debug("Group not found in store: {}", group.getGroupname());
-                } catch (Exception e) {
-                  LOG.warn("Failed to load roles for group: {}", group.getGroupname(), e);
-                }
+            // Load roles inherited from the user's groups.
+            for (GroupEntity groupEntity : resolveCurrentUserGroups(metalake, entityStore)) {
+              List<Long> roleIds = groupEntity.roleIds();
+              List<String> roleNames = groupEntity.roleNames();
+              if (roleIds == null || roleNames == null) {
+                continue;
+              }
+              if (roleIds.size() != roleNames.size()) {
+                LOG.warn(
+                    "Group {} has mismatched roleIds ({}) and roleNames ({}) — skipping",
+                    groupEntity.name(),
+                    roleIds.size(),
+                    roleNames.size());
+                continue;
+              }
+              for (int i = 0; i < roleIds.size(); i++) {
+                addRoleForUserAndLoadPolicies(
+                    userId,
+                    metalake,
+                    roleIds.get(i),
+                    roleNames.get(i),
+                    loadRoleFutures,
+                    entityStore);
               }
             }
 
@@ -570,6 +551,29 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  /**
+   * Resolves GroupEntity objects for the current principal's groups, skipping any that are stale or
+   * not found in the store.
+   */
+  private List<GroupEntity> resolveCurrentUserGroups(String metalake, EntityStore entityStore) {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    List<GroupEntity> result = new ArrayList<>();
+    if (!(principal instanceof UserPrincipal)) {
+      return result;
+    }
+    for (UserGroup group : ((UserPrincipal) principal).getGroups()) {
+      try {
+        NameIdentifier groupIdent = NameIdentifierUtil.ofGroup(metalake, group.getGroupname());
+        result.add(entityStore.get(groupIdent, Entity.EntityType.GROUP, GroupEntity.class));
+      } catch (NoSuchEntityException e) {
+        LOG.debug("Group not found in store: {}", group.getGroupname());
+      } catch (Exception e) {
+        LOG.warn("Failed to resolve group: {}", group.getGroupname(), e);
+      }
+    }
+    return result;
   }
 
   /**
