@@ -1,10 +1,6 @@
 --
 -- Licensed to the Apache Software Foundation (ASF) under one
-<<<<<<< HEAD
 -- or more contributor license agreements.  See the NOTICE file
-=======
--- or more contributor license agreements.  See the NOTICE file--
->>>>>>> branch-cache-improvement
 --  distributed with this work for additional information
 -- regarding copyright ownership.  The ASF licenses this file
 -- to you under the Apache License, Version 2.0 (the
@@ -393,10 +389,7 @@ CREATE TABLE IF NOT EXISTS group_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-<<<<<<< HEAD
     updated_at BIGINT NOT NULL DEFAULT 0,
-=======
->>>>>>> branch-cache-improvement
     PRIMARY KEY (group_id),
     UNIQUE (metalake_id, group_name, deleted_at)
 );
@@ -978,7 +971,6 @@ COMMENT ON COLUMN job_metrics.job_identifier IS 'normalized job identifier';
 COMMENT ON COLUMN job_metrics.metric_name IS 'metric name';
 COMMENT ON COLUMN job_metrics.metric_ts IS 'metric timestamp in epoch seconds';
 COMMENT ON COLUMN job_metrics.metric_value IS 'metric value payload';
-<<<<<<< HEAD
 
 CREATE TABLE IF NOT EXISTS entity_change_log (
     id BIGSERIAL PRIMARY KEY,
