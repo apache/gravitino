@@ -80,6 +80,7 @@ import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
@@ -152,6 +153,21 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
     if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(identifier, loadTableResponse, privilege);
+    }
+    return loadTableResponse;
+  }
+
+  public LoadTableResponse registerTable(
+      Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
+    LoadTableResponse loadTableResponse = super.registerTable(namespace, request);
+    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
+      // Vend WRITE credentials: the registering user becomes the table owner
+      // (IcebergNamespaceHookDispatcher.setTableOwner runs after this call
+      // returns), consistent with createTable which also vends WRITE.
+      return injectCredentialConfig(
+          TableIdentifier.of(namespace, request.name()),
+          loadTableResponse,
+          CredentialPrivilege.WRITE);
     }
     return loadTableResponse;
   }
@@ -286,7 +302,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return false;
   }
 
-  private LoadTableResponse injectCredentialConfig(
+  @VisibleForTesting
+  protected LoadTableResponse injectCredentialConfig(
       TableIdentifier tableIdentifier,
       LoadTableResponse loadTableResponse,
       CredentialPrivilege privilege) {
@@ -336,7 +353,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return credential;
   }
 
-  private boolean shouldGenerateCredential(
+  @VisibleForTesting
+  protected boolean shouldGenerateCredential(
       LoadTableResponse loadTableResponse, boolean requestCredential) {
     if (!requestCredential) {
       return false;

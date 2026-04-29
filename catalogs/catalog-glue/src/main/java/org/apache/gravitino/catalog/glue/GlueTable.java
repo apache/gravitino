@@ -26,7 +26,9 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_NAME;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_PARAMETER_PREFIX;
 import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE;
 
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +39,7 @@ import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -45,6 +48,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.Table;
 
@@ -58,12 +62,44 @@ import software.amazon.awssdk.services.glue.model.Table;
 @ToString
 public class GlueTable extends BaseTable {
 
+  /** Glue client injected after construction to support partition operations. */
+  private GlueClient glueClient;
+
+  /** Nullable — when null, Glue uses the caller's AWS account ID. */
+  private String catalogId;
+
+  /** Database (schema) this table belongs to. */
+  private String dbName;
+
   private GlueTable() {}
+
+  /**
+   * Injects the Glue connection context required for partition operations.
+   *
+   * <p>Called by {@link GlueCatalogOperations} after constructing a table instance.
+   */
+  void initOpsContext(GlueClient glueClient, String catalogId, String dbName) {
+    this.glueClient = glueClient;
+    this.catalogId = catalogId;
+    this.dbName = dbName;
+  }
 
   @Override
   protected TableOperations newOps() {
-    throw new UnsupportedOperationException(
-        "Partition operations are not yet supported for GlueTable");
+    Preconditions.checkState(
+        glueClient != null,
+        "Partition operations require Glue context; call initOpsContext() first");
+    String[] partColNames =
+        Arrays.stream(partitioning)
+            .filter(t -> t instanceof Transforms.IdentityTransform)
+            .map(t -> ((Transforms.IdentityTransform) t).fieldName()[0])
+            .toArray(String[]::new);
+    return new GlueTableOperations(glueClient, catalogId, dbName, name, partColNames);
+  }
+
+  @Override
+  public SupportsPartitions supportPartitions() throws UnsupportedOperationException {
+    return (SupportsPartitions) ops();
   }
 
   /**

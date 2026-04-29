@@ -37,6 +37,7 @@ import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
@@ -50,6 +51,7 @@ import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
+import org.apache.gravitino.storage.relational.po.FunctionPO;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
@@ -82,6 +84,7 @@ public class MetadataObjectService {
               .put(MetadataObject.Type.TABLE, MetadataObjectService::getTableObjectsFullName)
               .put(MetadataObject.Type.FILESET, MetadataObjectService::getFilesetObjectsFullName)
               .put(MetadataObject.Type.MODEL, MetadataObjectService::getModelObjectsFullName)
+              .put(MetadataObject.Type.FUNCTION, MetadataObjectService::getFunctionObjectsFullName)
               .put(MetadataObject.Type.TOPIC, MetadataObjectService::getTopicObjectsFullName)
               .put(MetadataObject.Type.VIEW, MetadataObjectService::getViewObjectsFullName)
               .put(MetadataObject.Type.COLUMN, MetadataObjectService::getColumnObjectsFullName)
@@ -323,6 +326,56 @@ public class MetadataObjectService {
         });
 
     return modelIdAndNameMap;
+  }
+
+  /**
+   * Retrieves a map of Function object IDs to their full names.
+   *
+   * @param functionIds A list of Function object IDs to fetch names for.
+   * @return A Map where the key is the Function ID and the value is the Function full name. The map
+   *     may contain null values for the names if its parent object is deleted. Returns an empty map
+   *     if no Function objects are found for the given IDs. {@code @example} value of function full
+   *     name: "catalog1.schema1.function1"
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getFunctionObjectsFullName")
+  public static Map<Long, String> getFunctionObjectsFullName(List<Long> functionIds) {
+    if (functionIds == null || functionIds.isEmpty()) {
+      return Maps.newHashMap();
+    }
+
+    List<FunctionPO> functionPOs =
+        SessionUtils.getWithoutCommit(
+            FunctionMetaMapper.class, mapper -> mapper.listFunctionPOsByFunctionIds(functionIds));
+
+    if (functionPOs == null || functionPOs.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    List<Long> schemaIds =
+        functionPOs.stream().map(FunctionPO::schemaId).collect(Collectors.toList());
+
+    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
+
+    HashMap<Long, String> functionIdAndNameMap = new HashMap<>();
+
+    functionPOs.forEach(
+        functionPO -> {
+          // since the schema can be deleted, we need to check the null value,
+          // and when schema is deleted, we will set fullName of functionPO to null.
+          String schemaName = schemaIdAndNameMap.getOrDefault(functionPO.schemaId(), null);
+          if (schemaName == null) {
+            LOG.warn("The schema of function {} may be deleted", functionPO.functionId());
+            functionIdAndNameMap.put(functionPO.functionId(), null);
+            return;
+          }
+
+          String fullName = DOT_JOINER.join(schemaName, functionPO.functionName());
+          functionIdAndNameMap.put(functionPO.functionId(), fullName);
+        });
+
+    return functionIdAndNameMap;
   }
 
   /**

@@ -12,11 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
-        with:
-          java-version: 17
-          distribution: 'temurin'
-          cache: 'gradle'
+      - uses: ./.github/actions/setup-java-toolchains
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
