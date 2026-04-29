@@ -93,13 +93,14 @@ class TestSupportsTags(IntegrationTestEnv):
     def setUpClass(cls) -> None:
         super().setUpClass()
         cls._hdfs_container = HDFSContainer()
-
-        cls._get_gravitino_home()
-        cls.restart_server()
         cls._gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=cls._metalake_name
         )
         cls._gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
+
+        cls._metalake = cls._gravitino_admin_client.create_metalake(
+            cls._metalake_name, comment="test metalake", properties={}
+        )
 
         cls._gravitino_client.create_tag(cls._tag_name1, "test tag1", {})
         cls._gravitino_client.create_tag(cls._tag_name2, "test tag2", {})
@@ -128,9 +129,6 @@ class TestSupportsTags(IntegrationTestEnv):
 
     def setUp(self) -> None:
         hive_metastore_uri = f"thrift://{self._hdfs_container.get_ip()}:9083"
-        self._metalake = self._gravitino_admin_client.create_metalake(
-            self._metalake_name, comment="test metalake", properties={}
-        )
         self._model_catalog = self._gravitino_client.create_catalog(
             name=self._model_catalog_name,
             catalog_type=Catalog.Type.MODEL,
