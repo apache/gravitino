@@ -322,7 +322,6 @@ bootstrap password.
 
    ```properties
    gravitino.authenticators=basic
-   gravitino.authenticator.basic.passwordHasher=Argon2id
    gravitino.authorization.serviceAdmins=adminUser
    ```
 
@@ -447,20 +446,9 @@ The local authentication management capability is enabled only when `basic` is i
 `gravitino.authenticators`. If `basic` is not enabled, Gravitino should not allow local authentication
 management APIs to be used.
 
-### 8.2 Password Algorithm Configuration
+### 8.2 Password Algorithm
 
-Add a dedicated configuration for password hashing.
-
-To align with Gravitino's current configuration naming convention, authenticator-specific settings
-should use the `gravitino.authenticator.<mode>.*` prefix rather than
-`gravitino.authenticators.<mode>.*`.
-
-| Key | Default | Optional Values |
-|---|---|---|
-| `gravitino.authenticator.basic.passwordHasher` | `Argon2id` | `Argon2id` |
-
-Even though the initial implementation supports only one algorithm, an explicit configuration key
-keeps the design extensible and makes the hashing choice visible in configuration.
+The initial implementation uses Argon2id as the fixed password hashing algorithm.
 
 ---
 
