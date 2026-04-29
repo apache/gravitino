@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
@@ -163,6 +164,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     PartitionInput input =
         PartitionInput.builder()
             .values(values)
+            .parameters(partition.properties())
             .storageDescriptor(StorageDescriptor.builder().build())
             .build();
 
@@ -261,6 +263,8 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
       fieldNames[i] = new String[] {partitionColNames[i]};
       literals[i] = Literals.stringLiteral(i < values.size() ? values.get(i) : null);
     }
-    return Partitions.identity(name, fieldNames, literals, Collections.emptyMap());
+    Map<String, String> props =
+        gluePartition.hasParameters() ? gluePartition.parameters() : Collections.emptyMap();
+    return Partitions.identity(name, fieldNames, literals, props);
   }
 }

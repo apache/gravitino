@@ -385,6 +385,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     try {
       glueClient.createTable(req.build());
+    } catch (EntityNotFoundException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", dbName);
     } catch (GlueException e) {
       throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
     }
@@ -430,7 +432,15 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
-        newName = ((TableChange.RenameTable) change).getNewName();
+        TableChange.RenameTable renameTable = (TableChange.RenameTable) change;
+        renameTable
+            .getNewSchemaName()
+            .ifPresent(
+                s -> {
+                  throw new UnsupportedOperationException(
+                      "Glue does not support cross-schema table rename");
+                });
+        newName = renameTable.getNewName();
       } else if (change instanceof TableChange.UpdateComment) {
         newComment = ((TableChange.UpdateComment) change).getNewComment();
       } else if (change instanceof TableChange.SetProperty) {
