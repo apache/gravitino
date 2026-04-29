@@ -27,7 +27,7 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
-import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -159,20 +159,14 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
       if (store != null) {
         store.update(
             sourceIdent,
-            ViewEntity.class,
+            GenericEntity.class,
             Entity.EntityType.VIEW,
             viewEntity ->
-                ViewEntity.builder()
+                GenericEntity.builder()
                     .withId(viewEntity.id())
                     .withName(destIdent.name())
                     .withNamespace(destIdent.namespace())
-                    .withComment(viewEntity.comment())
-                    .withColumns(viewEntity.columns())
-                    .withRepresentations(viewEntity.representations())
-                    .withDefaultCatalog(viewEntity.defaultCatalog())
-                    .withDefaultSchema(viewEntity.defaultSchema())
-                    .withProperties(viewEntity.properties())
-                    .withAuditInfo(viewEntity.auditInfo())
+                    .withEntityType(Entity.EntityType.VIEW)
                     .build());
         LOG.info(
             "Successfully renamed view in Gravitino entity store from {} to {}",

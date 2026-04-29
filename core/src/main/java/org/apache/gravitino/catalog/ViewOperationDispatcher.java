@@ -21,17 +21,22 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.io.IOException;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
-import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.storage.IdGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -90,6 +95,33 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     return entityCombinedView;
   }
 
+  @Override
+  public NameIdentifier[] listViews(Namespace namespace) {
+    throw new UnsupportedOperationException("Listing views is not supported yet");
+  }
+
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    throw new UnsupportedOperationException("Dropping a view is not supported yet");
+  }
+
+  @Override
+  public View createView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      @Nullable String defaultCatalog,
+      @Nullable String defaultSchema,
+      Map<String, String> properties) {
+    throw new UnsupportedOperationException("Creating a view is not supported yet");
+  }
+
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes) {
+    throw new UnsupportedOperationException("Altering a view is not supported yet");
+  }
+
   /**
    * Internal method to load view and check if it exists in entity store.
    *
@@ -107,7 +139,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     // Check if view exists in entity store
     try {
-      ViewEntity viewEntity = store.get(ident, Entity.EntityType.VIEW, ViewEntity.class);
+      GenericEntity viewEntity = store.get(ident, Entity.EntityType.VIEW, GenericEntity.class);
       return EntityCombinedView.of(catalogView, viewEntity).withImported(true);
     } catch (NoSuchEntityException e) {
       // View not in store yet
@@ -136,26 +168,12 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     LOG.info("Auto-importing view {} into Gravitino entity store", ident);
     long uid = idGenerator.nextId();
-    View catalogView = entityCombinedView.viewFromCatalog();
-    AuditInfo auditInfo =
-        AuditInfo.builder()
-            .withCreator(catalogView.auditInfo().creator())
-            .withCreateTime(catalogView.auditInfo().createTime())
-            .withLastModifier(catalogView.auditInfo().lastModifier())
-            .withLastModifiedTime(catalogView.auditInfo().lastModifiedTime())
-            .build();
-    ViewEntity newViewEntity =
-        ViewEntity.builder()
+    GenericEntity newViewEntity =
+        GenericEntity.builder()
             .withId(uid)
             .withName(ident.name())
             .withNamespace(ident.namespace())
-            .withComment(catalogView.comment())
-            .withColumns(catalogView.columns())
-            .withRepresentations(catalogView.representations())
-            .withDefaultCatalog(catalogView.defaultCatalog())
-            .withDefaultSchema(catalogView.defaultSchema())
-            .withProperties(catalogView.properties())
-            .withAuditInfo(auditInfo)
+            .withEntityType(Entity.EntityType.VIEW)
             .build();
     try {
       store.put(newViewEntity, false /* overwrite */);

@@ -216,8 +216,12 @@ public class JDBCBackend implements RelationalBackend {
       ViewMetaService.getInstance().insertView((ViewEntity) e, overwritten);
     } else if (e instanceof GenericEntity) {
       GenericEntity genericEntity = (GenericEntity) e;
-      throw new UnsupportedEntityTypeException(
-          "Unsupported entity type: %s for insert operation", genericEntity.type());
+      if (genericEntity.type() == Entity.EntityType.VIEW) {
+        ViewMetaService.getInstance().insertView(genericEntity, overwritten);
+      } else {
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for insert operation", genericEntity.type());
+      }
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
