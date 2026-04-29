@@ -163,8 +163,6 @@ class TestSupportsTags(IntegrationTestEnv):
 
     def setUp(self) -> None:
         self._table_ident: NameIdentifier = NameIdentifier.of(
-            self._metalake_name,
-            self._relational_catalog_name,
             self._schema_name,
             self._table_name,
         )
