@@ -289,6 +289,12 @@ class TestSupportsTags(IntegrationTestEnv):
 
     def test_table_tag_operations(self) -> None:
         """Test tag operations (associate, list, get, dissociate) on table."""
+
+        self._relational_catalog.as_schemas().create_schema(
+            self._schema_name,
+            "table it schema",
+            {},
+        )
         relational_table = self.create_test_table()
 
         relational_table.supports_tags().associate_tags(
@@ -311,6 +317,11 @@ class TestSupportsTags(IntegrationTestEnv):
 
     def test_column_tag_operations(self) -> None:
         """Test tag operations (associate, list, get, dissociate) on column."""
+        self._relational_catalog.as_schemas().create_schema(
+            self._schema_name,
+            "table it schema",
+            {},
+        )
         relational_table = self.create_test_table()
         for column in relational_table.columns():
             column.supports_tags().associate_tags(
