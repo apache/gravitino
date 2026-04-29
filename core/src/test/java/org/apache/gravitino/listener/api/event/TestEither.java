@@ -48,7 +48,7 @@ public class TestEither {
     Either<String, Integer> left = Either.left("model_v1");
     Either<String, Integer> right = Either.right(3);
 
-    // Optional checks — not essential but good to verify Optional usage
+    // Optional checks - not essential but good to verify Optional usage
     Assertions.assertTrue(left.left().isPresent());
     Assertions.assertEquals("model_v1", left.left().get());
 
