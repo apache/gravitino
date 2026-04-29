@@ -236,6 +236,12 @@ class TestSupportsTags(IntegrationTestEnv):
         """
         Test tag operations (associate, list, get, dissociate) on fileset.
         """
+        self._fileset_catalog.as_schemas().create_schema(
+            schema_name=self._schema_name,
+            comment="fileset it schema",
+            properties={},
+        )
+
         fileset: Fileset = self._fileset_catalog.as_fileset_catalog().create_fileset(
             ident=self._fileset_ident,
             fileset_type=Fileset.Type.MANAGED,
@@ -265,7 +271,11 @@ class TestSupportsTags(IntegrationTestEnv):
         """
         Test tag operations (associate, list, get, dissociate) on model.
         """
-
+        self._model_catalog.as_schemas().create_schema(
+            schema_name=self._schema_name,
+            comment="model it schema",
+            properties={},
+        )
         model: Model = self._model_catalog.as_model_catalog().register_model(
             self._model_ident, "test_model", {}
         )
@@ -291,9 +301,9 @@ class TestSupportsTags(IntegrationTestEnv):
         """Test tag operations (associate, list, get, dissociate) on table."""
 
         self._relational_catalog.as_schemas().create_schema(
-            self._schema_name,
-            "table it schema",
-            {},
+            schema_name=self._schema_name,
+            comment="table it schema",
+            properties={},
         )
         relational_table = self.create_test_table()
 
@@ -318,9 +328,9 @@ class TestSupportsTags(IntegrationTestEnv):
     def test_column_tag_operations(self) -> None:
         """Test tag operations (associate, list, get, dissociate) on column."""
         self._relational_catalog.as_schemas().create_schema(
-            self._schema_name,
-            "table it schema",
-            {},
+            schema_name=self._schema_name,
+            comment="table it schema",
+            properties={},
         )
         relational_table = self.create_test_table()
         for column in relational_table.columns():
