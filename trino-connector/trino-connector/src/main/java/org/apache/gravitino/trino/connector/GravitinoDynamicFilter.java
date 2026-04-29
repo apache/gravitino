@@ -56,6 +56,12 @@ class GravitinoDynamicFilter implements DynamicFilter {
   }
 
   @Override
+  public OptionalLong getPreferredDynamicFilterTimeout() {
+    return OptionalLong.empty();
+  }
+
+
+  @Override
   public TupleDomain<ColumnHandle> getCurrentPredicate() {
     return delegate.getCurrentPredicate().transformKeys(GravitinoHandle::unWrap);
   }
