@@ -576,7 +576,6 @@ The password reset API should return:
 | Error case | HTTP status |
 |---|---|
 | Account doesn't exist | `404` |
-| Password same with old | `422` |
 
 #### 9.1.5 Get a local group
 
@@ -620,13 +619,13 @@ http://localhost:8090/api/idp/groups/engineering
 You can add users to a local group by providing the group name in the path and the target user
 names in the request body.
 
-The request path for REST API is `/api/idp/groups/{group}/users/add`.
+The request path for REST API is `/api/idp/groups/{group}/add`.
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "userNames": ["alice", "bob"]
-}' http://localhost:8090/api/idp/groups/engineering/users/add
+  "users": ["alice", "bob"]
+}' http://localhost:8090/api/idp/groups/engineering/add
 ```
 
 #### 9.1.9 Remove users from a local group
@@ -634,13 +633,13 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 You can remove users from a local group by providing the group name in the path and the target
 user names in the request body.
 
-The request path for REST API is `/api/idp/groups/{group}/users/remove`.
+The request path for REST API is `/api/idp/groups/{group}/remove`.
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "userNames": ["alice"]
-}' http://localhost:8090/api/idp/groups/engineering/users/remove
+  "users": ["alice"]
+}' http://localhost:8090/api/idp/groups/engineering/remove
 ```
 ---
 
