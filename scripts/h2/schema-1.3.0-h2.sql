@@ -292,8 +292,8 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_oid` (`owner_id`),
-    KEY `idx_owner_meta_obj_del_upd_id` (`metadata_object_id`, `deleted_at`, `updated_at`, `id`),
-    KEY `idx_owner_meta_del_upd_id_obj` (`deleted_at`, `updated_at`, `id`, `metadata_object_id`)
+    KEY `idx_meid` (`metadata_object_id`),
+    KEY `idx_owner_meta_del_upd_obj` (`deleted_at`, `updated_at`, `metadata_object_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `model_meta` (
@@ -553,4 +553,4 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `created_at`    BIGINT          NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB;
-CREATE INDEX IF NOT EXISTS `idx_ecl_created_at_id` ON `entity_change_log`(`created_at`, `id`);
+CREATE INDEX IF NOT EXISTS `idx_ecl_created_at` ON `entity_change_log`(`created_at`);

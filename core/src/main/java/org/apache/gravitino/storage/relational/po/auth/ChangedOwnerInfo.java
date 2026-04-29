@@ -20,25 +20,15 @@ package org.apache.gravitino.storage.relational.po.auth;
 
 /** Owner change poller result -- one row per changed owner_meta entry. */
 public class ChangedOwnerInfo {
-  private long id;
   private long metadataObjectId;
   private long updatedAt;
 
   /** Required by MyBatis for result mapping. */
   public ChangedOwnerInfo() {}
 
-  public ChangedOwnerInfo(long id, long metadataObjectId, long updatedAt) {
-    this.id = id;
+  public ChangedOwnerInfo(long metadataObjectId, long updatedAt) {
     this.metadataObjectId = metadataObjectId;
     this.updatedAt = updatedAt;
-  }
-
-  public long getId() {
-    return id;
-  }
-
-  public void setId(long id) {
-    this.id = id;
   }
 
   public long getMetadataObjectId() {

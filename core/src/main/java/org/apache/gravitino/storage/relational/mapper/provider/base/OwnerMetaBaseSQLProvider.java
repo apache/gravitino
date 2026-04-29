@@ -245,13 +245,11 @@ public class OwnerMetaBaseSQLProvider {
         + " ORDER BY updated_at DESC, id DESC LIMIT 1";
   }
 
-  public String selectChangedOwners(
-      @Param("updatedAtAfter") long updatedAtAfter, @Param("idAfter") long idAfter) {
-    return "SELECT id as id, metadata_object_id as metadataObjectId, updated_at as updatedAt"
+  public String selectChangedOwners(@Param("updatedAtAfter") long updatedAtAfter) {
+    return "SELECT metadata_object_id as metadataObjectId, updated_at as updatedAt"
         + " FROM "
         + OWNER_TABLE_NAME
-        + " WHERE deleted_at = 0 AND (updated_at > #{updatedAtAfter}"
-        + " OR (updated_at = #{updatedAtAfter} AND id > #{idAfter}))"
+        + " WHERE deleted_at = 0 AND updated_at >= #{updatedAtAfter}"
         + " ORDER BY updated_at, id LIMIT 1000";
   }
 }

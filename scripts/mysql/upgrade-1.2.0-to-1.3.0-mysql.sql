@@ -52,10 +52,10 @@ CREATE INDEX idx_group_meta_del_upd
     ON group_meta (group_id, deleted_at, updated_at);
 CREATE INDEX idx_role_meta_del_upd
     ON role_meta (role_id, deleted_at, updated_at);
-CREATE INDEX idx_owner_meta_obj_del_upd_id
-    ON owner_meta (metadata_object_id, deleted_at, updated_at, id);
-CREATE INDEX idx_owner_meta_del_upd_id_obj
-    ON owner_meta (deleted_at, updated_at, id, metadata_object_id);
+CREATE INDEX idx_owner_meta_obj_del_upd
+    ON owner_meta (metadata_object_id, deleted_at, updated_at);
+CREATE INDEX idx_owner_meta_del_upd_obj
+    ON owner_meta (deleted_at, updated_at, metadata_object_id);
 
 -- Entity name->id mutation tracking (eventual consistency -- entity change poller)
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
@@ -66,5 +66,5 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `operate_type`  TINYINT UNSIGNED NOT NULL COMMENT 'Operate type code: 1=RENAME, 2=DROP, 3=INSERT. Codes are stable and never re-used.',
   `created_at`    BIGINT          NOT NULL,
   PRIMARY KEY (`id`),
-  INDEX `idx_ecl_created_at_id` (`created_at`, `id`)
+  INDEX `idx_ecl_created_at` (`created_at`)
 ) COMMENT 'Append-only log of entity structural changes. One row per affected entity per operation. The entity change poller reads this table to drive targeted invalidation of metadataIdCache on HA peer nodes. Rows older than the retention window (default 1 h) are pruned periodically.';

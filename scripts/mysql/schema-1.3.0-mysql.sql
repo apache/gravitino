@@ -283,8 +283,8 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`,`deleted_at`),
     KEY `idx_oid` (`owner_id`),
-    KEY `idx_owner_meta_obj_del_upd_id` (`metadata_object_id`, `deleted_at`, `updated_at`, `id`),
-    KEY `idx_owner_meta_del_upd_id_obj` (`deleted_at`, `updated_at`, `id`, `metadata_object_id`)
+    KEY `idx_meid` (`metadata_object_id`),
+    KEY `idx_owner_meta_del_upd_obj` (`deleted_at`, `updated_at`, `metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'owner relation';
 
 CREATE TABLE IF NOT EXISTS `model_meta` (
@@ -538,5 +538,5 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `operate_type`  TINYINT UNSIGNED NOT NULL COMMENT 'Operate type code: 1=RENAME, 2=DROP, 3=INSERT. Codes are stable and never re-used.',
   `created_at`    BIGINT          NOT NULL COMMENT 'timestamp of the change in millis',
   PRIMARY KEY (`id`),
-  KEY `idx_ecl_created_at_id` (`created_at`, `id`)
+  KEY `idx_ecl_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Append-only log of entity structural changes for targeted metadataIdCache invalidation';

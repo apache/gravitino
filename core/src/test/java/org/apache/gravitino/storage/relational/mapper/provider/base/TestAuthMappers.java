@@ -373,16 +373,14 @@ public class TestAuthMappers {
       throw new RuntimeException("Update failed", e);
     }
 
-    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(50L, 0L);
+    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(50L);
     Assertions.assertEquals(1, changed.size());
-    Assertions.assertTrue(changed.get(0).getId() > 0);
     Assertions.assertEquals(200L, changed.get(0).getMetadataObjectId());
     Assertions.assertEquals(100L, changed.get(0).getUpdatedAt());
 
-    // With the same timestamp and the last seen id, should find nothing.
-    List<ChangedOwnerInfo> empty =
-        ownerMetaMapper.selectChangedOwners(100L, changed.get(0).getId());
-    Assertions.assertTrue(empty.isEmpty());
+    // With the same timestamp, the row is returned again for timestamp-only polling.
+    List<ChangedOwnerInfo> sameTimestamp = ownerMetaMapper.selectChangedOwners(100L);
+    Assertions.assertEquals(1, sameTimestamp.size());
   }
 
   @Test
@@ -391,10 +389,9 @@ public class TestAuthMappers {
     entityChangeLogMapper.insertChange(
         "metalake1", "TABLE", "cat.schema.tbl", OperateType.RENAME, now);
 
-    List<EntityChangeRecord> records = entityChangeLogMapper.selectChanges(now - 1, 0L, 10);
+    List<EntityChangeRecord> records = entityChangeLogMapper.selectChanges(now - 1, 10);
     Assertions.assertEquals(1, records.size());
     EntityChangeRecord r = records.get(0);
-    Assertions.assertTrue(r.getId() > 0);
     Assertions.assertEquals("metalake1", r.getMetalakeName());
     Assertions.assertEquals("TABLE", r.getEntityType());
     Assertions.assertEquals("cat.schema.tbl", r.getFullName());
@@ -414,7 +411,7 @@ public class TestAuthMappers {
     // Prune entries before (old + 1)
     entityChangeLogMapper.pruneOldEntries(old + 1);
 
-    List<EntityChangeRecord> after = entityChangeLogMapper.selectChanges(0L, 0L, 100);
+    List<EntityChangeRecord> after = entityChangeLogMapper.selectChanges(0L, 100);
     Assertions.assertEquals(1, after.size());
     Assertions.assertEquals(recent, after.get(0).getCreatedAt());
   }

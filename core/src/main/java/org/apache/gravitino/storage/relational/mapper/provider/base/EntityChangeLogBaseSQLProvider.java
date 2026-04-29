@@ -26,16 +26,12 @@ import org.apache.ibatis.annotations.Param;
 public class EntityChangeLogBaseSQLProvider {
 
   public String selectEntityChanges(
-      @Param("createdAtAfter") long createdAtAfter,
-      @Param("idAfter") long idAfter,
-      @Param("maxRows") int maxRows) {
-    return "SELECT id as id, metalake_name as metalakeName, entity_type as entityType,"
+      @Param("createdAtAfter") long createdAtAfter, @Param("maxRows") int maxRows) {
+    return "SELECT metalake_name as metalakeName, entity_type as entityType,"
         + " full_name as fullName, operate_type as operateType, created_at as createdAt"
         + " FROM "
         + ENTITY_CHANGE_LOG_TABLE_NAME
-        + " WHERE (created_at > #{createdAtAfter}"
-        + " OR (created_at = #{createdAtAfter} AND id > #{idAfter}))"
-        + " ORDER BY created_at, id LIMIT #{maxRows}";
+        + " WHERE created_at >= #{createdAtAfter} ORDER BY created_at LIMIT #{maxRows}";
   }
 
   public String insertEntityChange(

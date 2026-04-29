@@ -492,10 +492,9 @@ CREATE TABLE IF NOT EXISTS owner_meta (
 );
 
 CREATE INDEX IF NOT EXISTS owner_meta_idx_owner_id ON owner_meta (owner_id);
-CREATE INDEX IF NOT EXISTS idx_owner_meta_obj_del_upd_id
-  ON owner_meta (metadata_object_id, deleted_at, updated_at, id);
-CREATE INDEX IF NOT EXISTS idx_owner_meta_del_upd_id_obj
-  ON owner_meta (deleted_at, updated_at, id, metadata_object_id);
+CREATE INDEX IF NOT EXISTS owner_meta_idx_metadata_object_id ON owner_meta (metadata_object_id);
+CREATE INDEX IF NOT EXISTS idx_owner_meta_del_upd_obj
+    ON owner_meta (deleted_at, updated_at, metadata_object_id);
 COMMENT ON TABLE owner_meta IS 'owner relation';
 COMMENT ON COLUMN owner_meta.id IS 'auto increment id';
 COMMENT ON COLUMN owner_meta.metalake_id IS 'metalake id';
@@ -939,7 +938,7 @@ CREATE TABLE IF NOT EXISTS entity_change_log (
     operate_type SMALLINT NOT NULL,
     created_at BIGINT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_ecl_created_at_id ON entity_change_log(created_at, id);
+CREATE INDEX IF NOT EXISTS idx_ecl_created_at ON entity_change_log(created_at);
 COMMENT ON TABLE entity_change_log IS 'Append-only log of entity structural changes';
 COMMENT ON COLUMN entity_change_log.id IS 'auto increment id';
 COMMENT ON COLUMN entity_change_log.metalake_name IS 'metalake name';

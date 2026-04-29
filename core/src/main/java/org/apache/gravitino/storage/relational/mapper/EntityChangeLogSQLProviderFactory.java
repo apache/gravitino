@@ -58,15 +58,13 @@ public class EntityChangeLogSQLProviderFactory {
           + ENTITY_CHANGE_LOG_TABLE_NAME
           + " WHERE id IN (SELECT id FROM "
           + ENTITY_CHANGE_LOG_TABLE_NAME
-          + " WHERE created_at < #{before} ORDER BY created_at, id LIMIT 1000)";
+          + " WHERE created_at < #{before} ORDER BY created_at LIMIT 1000)";
     }
   }
 
   public static String selectEntityChanges(
-      @Param("createdAtAfter") long createdAtAfter,
-      @Param("idAfter") long idAfter,
-      @Param("maxRows") int maxRows) {
-    return getProvider().selectEntityChanges(createdAtAfter, idAfter, maxRows);
+      @Param("createdAtAfter") long createdAtAfter, @Param("maxRows") int maxRows) {
+    return getProvider().selectEntityChanges(createdAtAfter, maxRows);
   }
 
   public static String insertEntityChange(
