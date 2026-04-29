@@ -28,6 +28,7 @@ import com.google.common.collect.Streams;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Map;
+import java.util.Objects;
 import java.util.ServiceLoader;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
@@ -35,7 +36,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.security.UserGroupInformation;
-import java.util.Objects;
 
 public class FileSystemUtils {
 

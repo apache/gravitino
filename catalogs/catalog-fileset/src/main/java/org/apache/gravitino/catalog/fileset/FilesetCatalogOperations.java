@@ -45,7 +45,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils.FileSystemCacheKey;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -76,6 +75,7 @@ import org.apache.gravitino.catalog.FilesetFileOps;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils.FileSystemCacheKey;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -1292,7 +1292,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         provider != null ? provider.getFullAuthority(path, conf) : path.toUri().getAuthority();
 
     return fileSystemCache.get(
-                  new FileSystemCacheKey(scheme, authority, null),
+        new FileSystemCacheKey(scheme, authority, null),
         cacheKey -> {
           try {
             return getFileSystem(path, conf);
