@@ -105,6 +105,13 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
   @Override
   public void close() {
+    if (tableOperations != null) {
+      try {
+        ((GravitinoLanceTableOperations) tableOperations).close();
+      } catch (Exception e) {
+        LOG.warn("Error closing table operations", e);
+      }
+    }
     if (client != null) {
       try {
         client.close();
