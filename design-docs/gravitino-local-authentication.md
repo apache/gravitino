@@ -518,7 +518,7 @@ The request path for REST API is `/api/idp/users`.
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "user": "alice",
-  "password": "Passw0rd-For-Alice"
+  "password": "Passw0rd-For-Gravitino-Alice"
 }' http://localhost:8090/api/idp/users
 ```
 
@@ -565,7 +565,7 @@ The request path for REST API is `/api/idp/users/{user}`.
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "password": "Passw0rd-For-Alice-V2"
+  "password": "Passw0rd-For-Gravitino-Alice-V2"
 }' http://localhost:8090/api/idp/users/alice
 ```
 
