@@ -17,7 +17,7 @@
 
 # gravitino-design-doc skill
 
-A Claude Code skill that enforces consistent structure and content quality for Apache Gravitino design documents.
+An agent skill that enforces consistent structure and content quality for Apache Gravitino design documents.
 
 ## What it does
 
@@ -38,35 +38,29 @@ For each section, the skill checks content quality — not just presence. For ex
 
 ## Installation
 
-Copy the skill directory to Claude Code's skills folder:
+Copy `SKILL.md` into your agent's skill/instruction directory according to the agent's documentation. For example, with Claude Code:
 
 ```bash
-# Global — available in all projects
 cp -r agent-skills/gravitino-design-doc ~/.claude/skills/
-
-# Project-local — available only inside this repo
-cp -r agent-skills/gravitino-design-doc .claude/skills/
 ```
 
 ## Usage
 
 ### Writing a new design doc
 
-Invoke the skill before you start writing:
+Ask the agent to use this skill before you start writing:
 
-```
-/gravitino-design-doc
-```
+> "Write a design doc for \<feature\> using the gravitino-design-doc skill"
 
-Claude will guide you through each section, prompting for the right content and flagging weak or missing parts before you open a PR.
+The agent will guide you through each section, prompting for the right content and flagging weak or missing parts before you open a PR.
 
 ### Reviewing a design doc PR
 
-Ask Claude to review an existing doc against the skill's checklist:
+Ask the agent to review an existing doc against the skill's checklist:
 
 > "Review this design doc using the gravitino-design-doc skill"
 
-Claude will check each section against the quality checklist and report what needs to be fixed before the PR is ready to merge.
+The agent will check each section against the quality checklist and report what needs to be fixed before the PR is ready to merge.
 
 ### Auto-trigger
 
