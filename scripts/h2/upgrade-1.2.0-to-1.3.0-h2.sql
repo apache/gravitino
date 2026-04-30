@@ -22,7 +22,6 @@ ALTER TABLE `role_meta` ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEF
 ALTER TABLE `owner_meta` ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at';
 
 CREATE INDEX IF NOT EXISTS `idx_user_meta_name_del_upd` ON `user_meta`(`metalake_id`, `user_name`, `deleted_at`, `updated_at`);
-CREATE INDEX IF NOT EXISTS `idx_role_meta_del_upd` ON `role_meta`(`role_id`, `deleted_at`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_owner_meta_del_upd_obj` ON `owner_meta`(`deleted_at`, `updated_at`, `metadata_object_id`);
 
 CREATE TABLE IF NOT EXISTS `entity_change_log` (

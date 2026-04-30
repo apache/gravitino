@@ -496,8 +496,6 @@ CREATE INDEX IF NOT EXISTS owner_meta_idx_owner_id ON owner_meta (owner_id);
 CREATE INDEX IF NOT EXISTS owner_meta_idx_metadata_object_id ON owner_meta (metadata_object_id);
 CREATE INDEX IF NOT EXISTS idx_user_meta_name_del_upd
     ON user_meta (metalake_id, user_name, deleted_at, updated_at);
-CREATE INDEX IF NOT EXISTS idx_role_meta_del_upd
-    ON role_meta (role_id, deleted_at, updated_at);
 CREATE INDEX IF NOT EXISTS idx_owner_meta_del_upd_obj
     ON owner_meta (deleted_at, updated_at, metadata_object_id);
 

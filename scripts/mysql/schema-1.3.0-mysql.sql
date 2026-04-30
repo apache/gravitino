@@ -183,8 +183,7 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'role deleted at',
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`role_id`),
-    UNIQUE KEY `uk_mid_rn_del` (`metalake_id`, `role_name`, `deleted_at`),
-    KEY `idx_role_meta_del_upd` (`role_id`, `deleted_at`, `updated_at`)
+    UNIQUE KEY `uk_mid_rn_del` (`metalake_id`, `role_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'role metadata';
 
 CREATE TABLE IF NOT EXISTS `role_meta_securable_object` (
