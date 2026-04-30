@@ -78,28 +78,28 @@ class StatisticValues:
         return StatisticValues.StringValue(value)
 
     @staticmethod
-    def list_value(value_list: list[StatisticValue[T]]) -> "ListValue[T]":
+    def list_value(value: list[StatisticValue[T]]) -> "ListValue[T]":
         """Creates a statistic value that holds a list of other statistic values.
 
         Args:
-            value_list: the list of statistic values to be held by this statistic value
+            value: the list of statistic values to be held by this statistic value
 
         Returns:
             A ListValue instance containing the provided list of statistic values
         """
-        return StatisticValues.ListValue(value_list)
+        return StatisticValues.ListValue(value)
 
     @staticmethod
-    def object_value(value_list: dict[str, StatisticValue[Any]]) -> "ObjectValue[Any]":
-        """Creates a statistic value that holds a list of other statistic values.
+    def object_value(value: dict[str, StatisticValue[Any]]) -> "ObjectValue[Any]":
+        """Creates a statistic value that holds a map of string keys to other statistic values.
 
         Args:
-            value_list: the list of statistic values to be held by this statistic value
+            value: the map of string keys to statistic values to be held by this statistic value
 
         Returns:
-            A ListValue instance containing the provided list of statistic values
+            An ObjectValue instance containing the provided map of statistic values
         """
-        return StatisticValues.ObjectValue(value_list)
+        return StatisticValues.ObjectValue(value)
 
     @staticmethod
     def _make_hash(value: StatisticValue[Any]) -> int:
@@ -250,8 +250,10 @@ class StatisticValues:
 
         def data_type(self) -> Type:
             return Types.StructType.of(
-                Types.StructType.Field.nullable_field(key, value.data_type())
-                for key, value in self._value_map.items()
+                *[
+                    Types.StructType.Field.nullable_field(key, value.data_type())
+                    for key, value in self._value_map.items()
+                ]
             )
 
         def __hash__(self) -> int:

@@ -93,13 +93,6 @@ class TestStatisticValues(unittest.TestCase):
         self.assertEqual(hash(value), hash(tuple(v.value() for v in value_list)))
         self.assertEqual(value, twin_value)
         self.assertNotEqual(value, another_value)
-        self.assertEqual(
-            value.data_type().name(),
-            Types.ListType.nullable(value_list[0].data_type()).name(),
-        )
-        self.assertEqual(hash(value), hash(tuple(v.value() for v in value_list)))
-        self.assertEqual(value, twin_value)
-        self.assertNotEqual(value, another_value)
         self.assertNotEqual(value, StatisticValues.LongValue(self._rand_int))
 
     def test_object_value(self):
@@ -117,25 +110,15 @@ class TestStatisticValues(unittest.TestCase):
         )
         another_value = StatisticValues.ObjectValue(another_value_dict)
 
+        expected_data_type = Types.StructType.of(
+            *[
+                Types.StructType.Field.nullable_field(key, statistic_value.data_type())
+                for key, statistic_value in value_dict.items()
+            ]
+        )
         self.assertEqual(value.value(), value_dict)
         self.assertEqual(
-            value.data_type().name(),
-            Types.StructType.of(
-                Types.StructType.Field.nullable_field(key, value.data_type())
-                for key, value in value_dict.items()
-            ).name(),
-        )
-        self.assertEqual(
-            hash(value), hash(tuple(v.value() for v in value_dict.values()))
-        )
-        self.assertEqual(value, twin_value)
-        self.assertNotEqual(value, another_value)
-        self.assertEqual(
-            value.data_type().name(),
-            Types.StructType.of(
-                Types.StructType.Field.nullable_field(key, value.data_type())
-                for key, value in value_dict.items()
-            ).name(),
+            value.data_type().simple_string(), expected_data_type.simple_string()
         )
         self.assertEqual(
             hash(value), hash(tuple(v.value() for v in value_dict.values()))
