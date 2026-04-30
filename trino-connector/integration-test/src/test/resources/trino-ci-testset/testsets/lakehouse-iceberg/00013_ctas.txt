@@ -1,0 +1,71 @@
+CREATE SCHEMA
+
+CREATE TABLE
+
+INSERT: 3 rows
+
+CREATE TABLE: 3 rows
+
+"1","alice","10.50"
+"2","bob","20.75"
+"3","charlie","30.00"
+
+CREATE TABLE: 2 rows
+
+"2","BOB"
+"3","CHARLIE"
+
+CREATE TABLE: 3 rows
+
+"1","alice","10.50"
+"2","bob","20.75"
+"3","charlie","30.00"
+
+"CREATE TABLE %.gt_ctas_db.ctas_with_props (
+   id integer,
+   name varchar,
+   value decimal(12, 2)
+)
+COMMENT ''
+WITH (
+   format = 'ORC',
+   format_version = '2',
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_ctas_db%/ctas_with_props'
+)"
+
+CREATE TABLE: 0 rows
+
+"0"
+
+CREATE TABLE: 3 rows
+
+"1","alice","10.50"
+"2","bob","20.75"
+"3","charlie","30.00"
+
+"CREATE TABLE %.gt_ctas_db.ctas_partitioned (
+   id integer,
+   name varchar,
+   value decimal(12, 2)
+)
+COMMENT ''
+WITH (
+   format = 'PARQUET',
+   format_version = '2',
+   location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_ctas_db%/ctas_partitioned',
+   partitioning = ARRAY['name']
+)"
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP TABLE
+
+DROP SCHEMA

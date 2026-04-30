@@ -31,6 +31,7 @@ import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorPartitioningHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
@@ -218,6 +219,72 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     GravitinoTable table = metadataAdapter.createTable(tableMetadata);
     // saveMode = SaveMode.IGNORE is used to ignore the table creation if it already exists
     catalogConnectorMetadata.createTable(table, saveMode == SaveMode.IGNORE);
+  }
+
+  @Override
+  public ConnectorOutputTableHandle beginCreateTable(
+      ConnectorSession session,
+      ConnectorTableMetadata tableMetadata,
+      Optional<ConnectorTableLayout> layout,
+      RetryMode retryMode,
+      boolean noExistingData) {
+    // First, create the table in the Gravitino catalog
+    GravitinoTable table = metadataAdapter.createTable(tableMetadata);
+    catalogConnectorMetadata.createTable(table, false);
+
+    SchemaTableName tableName = tableMetadata.getTable();
+    try {
+      // Get the table handle from the internal connector for the newly created table
+      ConnectorTableHandle internalTableHandle =
+          internalMetadata.getTableHandle(session, tableName, Optional.empty(), Optional.empty());
+      if (internalTableHandle == null) {
+        throw new TrinoException(
+            GRAVITINO_TABLE_NOT_EXISTS,
+            "Internal connector could not find newly created table: " + tableName);
+      }
+
+      // Build column list in the same order as tableMetadata to preserve column ordering
+      Map<String, ColumnHandle> internalColumnHandles =
+          internalMetadata.getColumnHandles(session, internalTableHandle);
+      List<ColumnHandle> columns = new ArrayList<>(tableMetadata.getColumns().size());
+      for (ColumnMetadata columnMetadata : tableMetadata.getColumns()) {
+        ColumnHandle handle = internalColumnHandles.get(columnMetadata.getName());
+        if (handle == null) {
+          throw new TrinoException(
+              GRAVITINO_COLUMN_NOT_EXISTS,
+              "Column '"
+                  + columnMetadata.getName()
+                  + "' not found in internal connector for table: "
+                  + tableName);
+        }
+        columns.add(handle);
+      }
+
+      // Delegate to the internal connector's insert path to write data,
+      // avoiding double table creation in the original connector
+      ConnectorInsertTableHandle insertTableHandle =
+          internalMetadata.beginInsert(session, internalTableHandle, columns, retryMode);
+      return new GravitinoOutputTableHandle(insertTableHandle, tableName);
+    } catch (Exception e) {
+      // Clean up the table created in the Gravitino catalog on failure
+      catalogConnectorMetadata.dropTable(tableName);
+      throw e;
+    }
+  }
+
+  @Override
+  public Optional<ConnectorTableLayout> getNewTableLayout(
+      ConnectorSession session, ConnectorTableMetadata tableMetadata) {
+    return internalMetadata
+        .getNewTableLayout(session, tableMetadata)
+        .map(
+            result ->
+                result.getPartitioning().isPresent()
+                    ? new ConnectorTableLayout(
+                        new GravitinoPartitioningHandle(result.getPartitioning().get()),
+                        result.getPartitionColumns(),
+                        result.supportsMultipleWritersPerPartition())
+                    : new ConnectorTableLayout(result.getPartitionColumns()));
   }
 
   @Override
