@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.RoleMetaBaseSQLProvider;
@@ -100,5 +101,13 @@ public class RoleMetaSQLProviderFactory {
   public static String deleteRoleMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteRoleMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  public static String touchRoleUpdatedAt(@Param("roleId") long roleId, @Param("now") long now) {
+    return getProvider().touchRoleUpdatedAt(roleId, now);
+  }
+
+  public static String batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds) {
+    return getProvider().batchGetRoleUpdatedAt(roleIds);
   }
 }
