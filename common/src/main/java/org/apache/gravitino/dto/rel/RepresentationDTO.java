@@ -34,6 +34,7 @@ import org.apache.gravitino.rel.SQLRepresentation;
 })
 public abstract class RepresentationDTO implements Representation {
 
+  /** Constructor for Jackson. */
   protected RepresentationDTO() {}
 
   /**
