@@ -60,6 +60,7 @@ github:
     - laserninja
     - geyanggang
     - markhoerth
+    - danhuawang
 
 notifications:
   commits: commits@gravitino.apache.org
