@@ -535,11 +535,9 @@ abstract class AbstractGlueCatalogIT {
         new Index[0]);
 
     Table loaded = ops.loadTable(tableIdent(schema, "complex"));
-    assertEquals(
-        "array<string>", ((Types.ExternalType) loaded.columns()[0].dataType()).catalogString());
-    assertEquals(
-        "struct<name:string,age:int>",
-        ((Types.ExternalType) loaded.columns()[1].dataType()).catalogString());
+    // GlueTypeConverter.toGravitino converts known complex types to native types.
+    assertEquals(Types.ListType.class, loaded.columns()[0].dataType().getClass());
+    assertEquals(Types.StructType.class, loaded.columns()[1].dataType().getClass());
   }
 
   @Test
