@@ -69,11 +69,11 @@ public class TestHierarchicalSchemaUtil {
   }
 
   @Test
-  public void testIsNested() {
-    Assertions.assertTrue(HierarchicalSchemaUtil.isNested("A:B:C", ":"));
-    Assertions.assertFalse(HierarchicalSchemaUtil.isNested("flat", ":"));
-    Assertions.assertFalse(HierarchicalSchemaUtil.isNested("", ":"));
-    Assertions.assertFalse(HierarchicalSchemaUtil.isNested(null, ":"));
+  public void testIsHierarchical() {
+    Assertions.assertTrue(HierarchicalSchemaUtil.isHierarchical("A:B:C", ":"));
+    Assertions.assertFalse(HierarchicalSchemaUtil.isHierarchical("flat", ":"));
+    Assertions.assertFalse(HierarchicalSchemaUtil.isHierarchical("", ":"));
+    Assertions.assertFalse(HierarchicalSchemaUtil.isHierarchical(null, ":"));
   }
 
   @Test

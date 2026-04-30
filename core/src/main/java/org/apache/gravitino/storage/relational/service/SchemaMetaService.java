@@ -595,7 +595,7 @@ public class SchemaMetaService {
    */
   private SchemaEntity toPhysicalEntity(SchemaEntity entity) {
     String separator = HierarchicalSchemaUtil.schemaSeparator();
-    if (!HierarchicalSchemaUtil.isNested(entity.name(), separator)) {
+    if (!HierarchicalSchemaUtil.isHierarchical(entity.name(), separator)) {
       return entity;
     }
     String physicalName = toPhysicalSchemaName(entity.name());

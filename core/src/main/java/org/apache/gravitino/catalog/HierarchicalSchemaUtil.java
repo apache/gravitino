@@ -101,13 +101,13 @@ public final class HierarchicalSchemaUtil {
   }
 
   /**
-   * Returns whether a schema name is a nested path (contains the external separator).
+   * Returns whether a schema name is a hierarchical path (contains the external separator).
    *
    * @param name the schema name to test
    * @param separator the external separator
    * @return {@code true} if the name contains the external separator
    */
-  public static boolean isNested(String name, String separator) {
+  public static boolean isHierarchical(String name, String separator) {
     return StringUtils.isNotBlank(name) && name.contains(separator);
   }
 
