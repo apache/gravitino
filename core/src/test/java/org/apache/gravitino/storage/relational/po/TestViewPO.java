@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -84,6 +87,33 @@ public class TestViewPO {
 
     Assertions.assertEquals(viewPOWithVersionOne, viewPOWithVersionTwo);
     Assertions.assertEquals(viewPOWithVersionOne.hashCode(), viewPOWithVersionTwo.hashCode());
+  }
+
+  @Test
+  public void testRepresentationsSerDe() throws JsonProcessingException {
+    Representation[] representations =
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build(),
+          SQLRepresentation.builder().withDialect("trino").withSql("SELECT 1").build()
+        };
+
+    String json = ViewPO.serializeRepresentations(representations);
+    Representation[] deserialized = ViewPO.deserializeRepresentations(json);
+
+    Assertions.assertArrayEquals(representations, deserialized);
+  }
+
+  @Test
+  public void testDeserializeRepresentationsWithoutType() throws JsonProcessingException {
+    String json = "[{\"dialect\":\"spark\",\"sql\":\"SELECT 1\"}]";
+
+    Representation[] deserialized = ViewPO.deserializeRepresentations(json);
+
+    Assertions.assertEquals(1, deserialized.length);
+    Assertions.assertTrue(deserialized[0] instanceof SQLRepresentation);
+    SQLRepresentation sqlRepresentation = (SQLRepresentation) deserialized[0];
+    Assertions.assertEquals("spark", sqlRepresentation.dialect());
+    Assertions.assertEquals("SELECT 1", sqlRepresentation.sql());
   }
 
   private ViewVersionInfoPO buildViewVersionInfoPO(Long id, Integer version) {

@@ -23,7 +23,6 @@ import static org.apache.gravitino.storage.relational.utils.POConverters.DEFAULT
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.type.CollectionType;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -36,13 +35,13 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.rel.ColumnDTO;
+import org.apache.gravitino.dto.rel.RepresentationDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
-import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 
 @Getter
@@ -210,42 +209,20 @@ public class ViewPO {
 
   static String serializeRepresentations(Representation[] representations)
       throws JsonProcessingException {
-    List<Map<String, Object>> out =
+    List<RepresentationDTO> out =
         Arrays.stream(representations == null ? new Representation[0] : representations)
-            .map(ViewPO::toMap)
+            .map(RepresentationDTO::fromRepresentation)
             .collect(Collectors.toList());
     return JsonUtils.anyFieldMapper().writeValueAsString(out);
   }
 
   static Representation[] deserializeRepresentations(String json) throws JsonProcessingException {
     CollectionType type =
-        JsonUtils.anyFieldMapper().getTypeFactory().constructCollectionType(List.class, Map.class);
-    List<Map<String, Object>> list = JsonUtils.anyFieldMapper().readValue(json, type);
-    return list.stream().map(ViewPO::fromMap).toArray(Representation[]::new);
-  }
-
-  private static Map<String, Object> toMap(Representation rep) {
-    if (rep instanceof SQLRepresentation) {
-      SQLRepresentation sql = (SQLRepresentation) rep;
-      ImmutableMap.Builder<String, Object> m = ImmutableMap.builder();
-      m.put("type", Representation.TYPE_SQL);
-      m.put("dialect", sql.dialect());
-      m.put("sql", sql.sql());
-      return m.build();
-    }
-    throw new IllegalArgumentException(
-        "Unsupported representation type: " + rep.getClass().getName());
-  }
-
-  private static Representation fromMap(Map<String, Object> map) {
-    Object type = map.get("type");
-    if (type == null || Representation.TYPE_SQL.equals(type)) {
-      return SQLRepresentation.builder()
-          .withDialect((String) map.get("dialect"))
-          .withSql((String) map.get("sql"))
-          .build();
-    }
-    throw new IllegalArgumentException("Unsupported representation type: " + type);
+        JsonUtils.anyFieldMapper()
+            .getTypeFactory()
+            .constructCollectionType(List.class, RepresentationDTO.class);
+    List<RepresentationDTO> list = JsonUtils.anyFieldMapper().readValue(json, type);
+    return list.stream().map(RepresentationDTO::toRepresentation).toArray(Representation[]::new);
   }
 
   private static ColumnDTO toColumnDTO(Column column) {
