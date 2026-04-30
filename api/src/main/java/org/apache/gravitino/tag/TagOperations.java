@@ -78,6 +78,7 @@ public interface TagOperations {
    * @return The altered tag.
    * @throws NoSuchTagException If the tag does not exist.
    * @throws IllegalArgumentException If the changes cannot be applied to the tag.
+   * @throws TagAlreadyExistsException If a tag with the new name already exists.
    */
   Tag alterTag(String name, TagChange... changes)
       throws NoSuchTagException, IllegalArgumentException;
