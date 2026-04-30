@@ -102,7 +102,7 @@ public class IcebergRestKerberosHiveWithUserImpersonationCatalogIT
     String separator;
     String parentNamespace;
 
-    if (supportsNestedNamespaces()) {
+    if (supportsHierarchicalSchema()) {
       parentNamespace = "iceberg_rest.nested.table_test";
       separator = ".";
     } else {

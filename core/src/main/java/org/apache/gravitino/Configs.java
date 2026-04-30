@@ -504,7 +504,7 @@ public class Configs {
   public static final ConfigEntry<String> SCHEMA_SEPARATOR =
       new ConfigBuilder("gravitino.schema.separator")
           .doc(
-              "The separator used to represent nested namespace hierarchy in schema names at the "
+              "The separator used to represent HierarchicalSchema hierarchy in schema names at the "
                   + "API boundary (e.g. ':' for 'A:B:C'). Schema names are stored internally in "
                   + "EntityStore using ASCII-1 (\\u0001) as the physical separator. The "
                   + "configured separator is only used at external API and catalog capability "

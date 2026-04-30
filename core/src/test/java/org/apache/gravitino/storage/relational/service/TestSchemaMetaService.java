@@ -346,7 +346,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     assertThrows(
         EntityAlreadyExistsException.class,
         () -> schemaMetaService.insertSchema(duplicate, false),
-        "Duplicate nested schema name must throw EntityAlreadyExistsException");
+        "Duplicate HierarchicalSchema name must throw EntityAlreadyExistsException");
   }
 
   /**

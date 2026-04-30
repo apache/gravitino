@@ -31,7 +31,7 @@ import org.apache.gravitino.GravitinoEnv;
 /**
  * Utility class for hierarchical schema name conversions.
  *
- * <p>Gravitino supports nested namespace semantics where a logical schema name like {@code A:B:C}
+ * <p>Gravitino supports HierarchicalSchema semantics where a logical schema name like {@code A:B:C}
  * (using a configurable external separator, default {@code :}) is mapped to a physical schema name
  * {@code A\u0001B\u0001C} stored in {@code EntityStore} using ASCII-1 ({@code \u0001}) as the
  * internal separator.
@@ -41,7 +41,7 @@ import org.apache.gravitino.GravitinoEnv;
  */
 public final class HierarchicalSchemaUtil {
 
-  /** The internal separator used in EntityStore for nested schema names. */
+  /** The internal separator used in EntityStore for HierarchicalSchema names. */
   private static final String PHYSICAL_SEPARATOR = "\u0001";
 
   private HierarchicalSchemaUtil() {}

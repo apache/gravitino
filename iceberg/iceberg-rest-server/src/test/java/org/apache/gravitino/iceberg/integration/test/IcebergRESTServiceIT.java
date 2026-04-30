@@ -46,7 +46,7 @@ import org.junit.jupiter.api.condition.EnabledIf;
 @TestInstance(Lifecycle.PER_CLASS)
 public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
 
-  protected boolean supportsNestedNamespaces() {
+  protected boolean supportsHierarchicalSchema() {
     return true;
   }
 
@@ -58,7 +58,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     String separator;
     String parentNamespace;
 
-    if (supportsNestedNamespaces()) {
+    if (supportsHierarchicalSchema()) {
       parentNamespace = "iceberg_rest.nested.table_test";
       separator = ".";
     } else {
@@ -78,7 +78,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
     // use rest catalog
     sql("USE rest");
     purgeAllIcebergTestNamespaces();
-    if (supportsNestedNamespaces()) {
+    if (supportsHierarchicalSchema()) {
       // create all parent namespaces
       final String[] parentNamespace = {""};
       Arrays.stream(getTestNamespace().split("\\."))
@@ -126,7 +126,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
       return;
     }
 
-    if (supportsNestedNamespaces()) {
+    if (supportsHierarchicalSchema()) {
       // list and purge child namespaces
       List<Object[]> childNamespaces = sql(String.format("SHOW DATABASES IN %s ", namespace));
       Set<String> childNamespacesString = convertToStringSet(childNamespaces, 0);
@@ -148,7 +148,7 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   }
 
   private void purgeAllIcebergTestNamespaces() {
-    if (supportsNestedNamespaces()) {
+    if (supportsHierarchicalSchema()) {
       purgeNamespace(getTestNamespace());
     } else {
       List<Object[]> databases =
@@ -190,11 +190,11 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
 
   @Test
   void testListNamespace() {
-    String separator = supportsNestedNamespaces() ? "." : "_";
+    String separator = supportsHierarchicalSchema() ? "." : "_";
     sql(String.format("CREATE DATABASE %s%slist_foo1", getTestNamespace(), separator));
     sql(String.format("CREATE DATABASE %s%slist_foo2", getTestNamespace(), separator));
     List<Object[]> databases;
-    if (supportsNestedNamespaces()) {
+    if (supportsHierarchicalSchema()) {
       databases = sql(String.format("SHOW DATABASES IN %s LIKE '*list_foo*'", getTestNamespace()));
     } else {
       databases =
