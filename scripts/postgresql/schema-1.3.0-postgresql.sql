@@ -1,6 +1,6 @@
 --
 -- Licensed to the Apache Software Foundation (ASF) under one
--- or more contributor license agreements.  See the NOTICE file--
+-- or more contributor license agreements.  See the NOTICE file
 --  distributed with this work for additional information
 -- regarding copyright ownership.  The ASF licenses this file
 -- to you under the Apache License, Version 2.0 (the
@@ -290,6 +290,7 @@ CREATE TABLE IF NOT EXISTS user_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
+    updated_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (user_id),
     UNIQUE (metalake_id, user_name, deleted_at)
 );
@@ -302,6 +303,7 @@ COMMENT ON COLUMN user_meta.audit_info IS 'user audit info';
 COMMENT ON COLUMN user_meta.current_version IS 'user current version';
 COMMENT ON COLUMN user_meta.last_version IS 'user last version';
 COMMENT ON COLUMN user_meta.deleted_at IS 'user deleted at';
+COMMENT ON COLUMN user_meta.updated_at IS 'updated at';
 
 CREATE TABLE IF NOT EXISTS role_meta (
     role_id BIGINT NOT NULL,
@@ -312,6 +314,7 @@ CREATE TABLE IF NOT EXISTS role_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
+    updated_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (role_id),
     UNIQUE (metalake_id, role_name, deleted_at)
 );
@@ -326,6 +329,7 @@ COMMENT ON COLUMN role_meta.audit_info IS 'role audit info';
 COMMENT ON COLUMN role_meta.current_version IS 'role current version';
 COMMENT ON COLUMN role_meta.last_version IS 'role last version';
 COMMENT ON COLUMN role_meta.deleted_at IS 'role deleted at';
+COMMENT ON COLUMN role_meta.updated_at IS 'updated at';
 
 
 CREATE TABLE IF NOT EXISTS role_meta_securable_object (
@@ -483,12 +487,20 @@ CREATE TABLE IF NOT EXISTS owner_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
+    updated_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
     UNIQUE (owner_id, metadata_object_id, metadata_object_type, deleted_at)
 );
 
 CREATE INDEX IF NOT EXISTS owner_meta_idx_owner_id ON owner_meta (owner_id);
 CREATE INDEX IF NOT EXISTS owner_meta_idx_metadata_object_id ON owner_meta (metadata_object_id);
+CREATE INDEX IF NOT EXISTS idx_user_meta_name_del_upd
+    ON user_meta (metalake_id, user_name, deleted_at, updated_at);
+CREATE INDEX IF NOT EXISTS idx_role_meta_del_upd
+    ON role_meta (role_id, deleted_at, updated_at);
+CREATE INDEX IF NOT EXISTS idx_owner_meta_del_upd_obj
+    ON owner_meta (deleted_at, updated_at, metadata_object_id);
+
 COMMENT ON TABLE owner_meta IS 'owner relation';
 COMMENT ON COLUMN owner_meta.id IS 'auto increment id';
 COMMENT ON COLUMN owner_meta.metalake_id IS 'metalake id';
@@ -500,6 +512,7 @@ COMMENT ON COLUMN owner_meta.audit_info IS 'owner relation audit info';
 COMMENT ON COLUMN owner_meta.current_version IS 'owner relation current version';
 COMMENT ON COLUMN owner_meta.last_version IS 'owner relation last version';
 COMMENT ON COLUMN owner_meta.deleted_at IS 'owner relation deleted at';
+COMMENT ON COLUMN owner_meta.updated_at IS 'updated at';
 
 
 CREATE TABLE IF NOT EXISTS model_meta (
@@ -964,3 +977,20 @@ COMMENT ON COLUMN job_metrics.job_identifier IS 'normalized job identifier';
 COMMENT ON COLUMN job_metrics.metric_name IS 'metric name';
 COMMENT ON COLUMN job_metrics.metric_ts IS 'metric timestamp in epoch seconds';
 COMMENT ON COLUMN job_metrics.metric_value IS 'metric value payload';
+
+CREATE TABLE IF NOT EXISTS entity_change_log (
+    id BIGSERIAL PRIMARY KEY,
+    metalake_name VARCHAR(128) NOT NULL,
+    entity_type VARCHAR(32) NOT NULL,
+    entity_full_name VARCHAR(512) NOT NULL,
+    operate_type SMALLINT NOT NULL,
+    created_at BIGINT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ecl_created_at ON entity_change_log(created_at);
+COMMENT ON TABLE entity_change_log IS 'Append-only log of entity structural changes';
+COMMENT ON COLUMN entity_change_log.id IS 'auto increment id';
+COMMENT ON COLUMN entity_change_log.metalake_name IS 'metalake name';
+COMMENT ON COLUMN entity_change_log.entity_type IS 'entity type';
+COMMENT ON COLUMN entity_change_log.entity_full_name IS 'dot-separated full name of the affected entity';
+COMMENT ON COLUMN entity_change_log.operate_type IS 'Operate type code: 1=ALTER, 2=DROP, 3=INSERT. Codes are stable and never re-used.';
+COMMENT ON COLUMN entity_change_log.created_at IS 'change timestamp in millis';
