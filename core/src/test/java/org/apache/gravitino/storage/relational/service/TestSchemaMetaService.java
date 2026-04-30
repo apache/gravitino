@@ -34,6 +34,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -47,6 +48,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
 public class TestSchemaMetaService extends TestJDBCBackend {
+  private static final String PHYSICAL_SEPARATOR = HierarchicalSchemaUtil.physicalSeparator();
   private final String metalakeName = "metalake_for_catalog_test";
   private final String catalogName = "catalog_for_catalog_test";
 
@@ -200,9 +202,10 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             NameIdentifierUtil.ofSchema(metalakeName, catalogName, logicalName));
     Assertions.assertEquals(logicalName, loaded.name());
 
-    // The raw row stored in the DB must use the physical separator ".".
+    // The raw row stored in the DB must use the internal physical separator.
     String rawStoredName = readRawSchemaNameFromDb(schema.id());
-    Assertions.assertEquals("teamA.sales.reports", rawStoredName);
+    Assertions.assertEquals(
+        "teamA" + PHYSICAL_SEPARATOR + "sales" + PHYSICAL_SEPARATOR + "reports", rawStoredName);
   }
 
   @TestTemplate
@@ -265,9 +268,12 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     Assertions.assertTrue(names.contains("flat"), "flat name must be present");
     Assertions.assertTrue(names.contains("A:B"), "2-level logical name must be present");
     Assertions.assertTrue(names.contains("A:B:C"), "3-level logical name must be present");
-    // Physical dot-separated names must NOT appear.
-    Assertions.assertFalse(names.contains("A.B"), "physical name must not be exposed");
-    Assertions.assertFalse(names.contains("A.B.C"), "physical name must not be exposed");
+    // Physical names with internal separators must NOT appear.
+    Assertions.assertFalse(
+        names.contains("A" + PHYSICAL_SEPARATOR + "B"), "physical name must not be exposed");
+    Assertions.assertFalse(
+        names.contains("A" + PHYSICAL_SEPARATOR + "B" + PHYSICAL_SEPARATOR + "C"),
+        "physical name must not be exposed");
   }
 
   @TestTemplate
@@ -311,8 +317,9 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     // Name must still be logical after update.
     Assertions.assertEquals(logicalName, updated.name());
     Assertions.assertEquals("updated comment", updated.comment());
-    // Physical storage must still use ".".
-    Assertions.assertEquals("dep.analytics", readRawSchemaNameFromDb(schema.id()));
+    // Physical storage must still use the internal separator.
+    Assertions.assertEquals(
+        "dep" + PHYSICAL_SEPARATOR + "analytics", readRawSchemaNameFromDb(schema.id()));
   }
 
   @TestTemplate
@@ -345,7 +352,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   /**
    * Reads the raw {@code schema_name} value directly from the {@code schema_meta} table, bypassing
    * any logical conversion in {@link SchemaMetaService}. This lets us verify that the physical
-   * (dot-separated) name is actually persisted in the database.
+   * (internal separator encoded) name is actually persisted in the database.
    */
   private String readRawSchemaNameFromDb(Long schemaId) {
     try (SqlSession sqlSession =

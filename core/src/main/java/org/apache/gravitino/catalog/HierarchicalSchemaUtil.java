@@ -33,7 +33,8 @@ import org.apache.gravitino.GravitinoEnv;
  *
  * <p>Gravitino supports nested namespace semantics where a logical schema name like {@code A:B:C}
  * (using a configurable external separator, default {@code :}) is mapped to a physical schema name
- * {@code A.B.C} stored in {@code EntityStore} using {@code .} as the internal separator.
+ * {@code A\u0001B\u0001C} stored in {@code EntityStore} using ASCII-1 ({@code \u0001}) as the
+ * internal separator.
  *
  * <p>Schema names in {@code EntityStore} never contain the external separator; the external
  * separator is only used at the API boundary and in catalog capability validation.
@@ -41,7 +42,7 @@ import org.apache.gravitino.GravitinoEnv;
 public final class HierarchicalSchemaUtil {
 
   /** The internal separator used in EntityStore for nested schema names. */
-  private static final String PHYSICAL_SEPARATOR = ".";
+  private static final String PHYSICAL_SEPARATOR = "\u0001";
 
   private HierarchicalSchemaUtil() {}
 
@@ -60,15 +61,20 @@ public final class HierarchicalSchemaUtil {
     return StringUtils.defaultIfBlank(separator, Configs.SCHEMA_SEPARATOR.getDefaultValue());
   }
 
+  /** Returns the internal physical separator used in EntityStore. */
+  public static String physicalSeparator() {
+    return PHYSICAL_SEPARATOR;
+  }
+
   /**
    * Converts a logical schema path (using the external separator) to a physical schema name (using
-   * {@code .} as separator) suitable for storage in EntityStore.
+   * ASCII-1 ({@code \u0001}) as separator) suitable for storage in EntityStore.
    *
-   * <p>Example: {@code "A:B:C"} with separator {@code ":"} → {@code "A.B.C"}
+   * <p>Example: {@code "A:B:C"} with separator {@code ":"} → {@code "A\u0001B\u0001C"}
    *
    * @param logicalPath the logical schema path using the external separator
    * @param separator the external separator configured on the server
-   * @return the physical schema name using {@code .} as separator
+   * @return the physical schema name using ASCII-1 as separator
    */
   public static String logicalToPhysical(String logicalPath, String separator) {
     Preconditions.checkArgument(
@@ -78,12 +84,12 @@ public final class HierarchicalSchemaUtil {
   }
 
   /**
-   * Converts a physical schema name (using {@code .} as separator) back to the logical schema path
+   * Converts a physical schema name (using ASCII-1 as separator) back to the logical schema path
    * using the configured external separator.
    *
-   * <p>Example: {@code "A.B.C"} with separator {@code ":"} → {@code "A:B:C"}
+   * <p>Example: {@code "A\u0001B\u0001C"} with separator {@code ":"} → {@code "A:B:C"}
    *
-   * @param physicalName the physical schema name using {@code .} as separator
+   * @param physicalName the physical schema name using ASCII-1 as separator
    * @param separator the external separator configured on the server
    * @return the logical schema path using the external separator
    */

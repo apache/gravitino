@@ -82,7 +82,7 @@ public class SchemaMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSchemaPOByCatalogIdAndName")
   public SchemaPO getSchemaPOByCatalogIdAndName(Long catalogId, String schemaName) {
-    // Convert logical name to physical for DB lookup (e.g. "A:B:C" → "A.B.C").
+    // Convert logical name to physical for DB lookup (e.g. "A:B:C" → "A\u0001B\u0001C").
     String physicalName = toPhysicalSchemaName(schemaName);
     SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
@@ -158,7 +158,7 @@ public class SchemaMetaService {
     NamespaceUtil.checkSchema(namespace);
 
     List<SchemaPO> schemaPOs = listSchemaPOs(namespace);
-    // PO names are physical (e.g. "A.B.C"); convert back to logical (e.g. "A:B:C").
+    // PO names are physical (e.g. "A\u0001B\u0001C"); convert back to logical (e.g. "A:B:C").
     return POConverters.fromSchemaPOs(schemaPOs, namespace).stream()
         .map(this::toLogicalEntity)
         .collect(Collectors.toList());
@@ -539,8 +539,8 @@ public class SchemaMetaService {
   // ---------------------------------------------------------------------------
 
   /**
-   * Converts a logical schema name (e.g. {@code "A:B:C"}) to the physical dot-separated form (e.g.
-   * {@code "A.B.C"}) used in the database. Non-nested names are returned unchanged.
+   * Converts a logical schema name (e.g. {@code "A:B:C"}) to the physical internal form (e.g.
+   * {@code "A\u0001B\u0001C"}) used in the database. Non-nested names are returned unchanged.
    */
   private String toPhysicalSchemaName(String logicalName) {
     return HierarchicalSchemaUtil.logicalToPhysical(
@@ -548,8 +548,8 @@ public class SchemaMetaService {
   }
 
   /**
-   * Converts a physical schema name (e.g. {@code "A.B.C"}) back to the logical separator form (e.g.
-   * {@code "A:B:C"}). Non-nested names are returned unchanged.
+   * Converts a physical schema name (e.g. {@code "A\u0001B\u0001C"}) back to the logical separator
+   * form (e.g. {@code "A:B:C"}). Non-nested names are returned unchanged.
    */
   private String toLogicalSchemaName(String physicalName) {
     return HierarchicalSchemaUtil.physicalToLogical(
@@ -570,14 +570,14 @@ public class SchemaMetaService {
 
   /**
    * Returns a {@link SchemaEntity} whose {@code name()} is the logical representation. If the PO
-   * stored a physical name (contains {@code "."}), it is converted back to the logical separator
-   * form. Otherwise the original entity is returned unchanged.
+   * stored a physical name (contains the internal physical separator), it is converted back to the
+   * logical separator form. Otherwise the original entity is returned unchanged.
    */
   private SchemaEntity toLogicalEntity(SchemaEntity entity) {
-    if (!entity.name().contains(".")) {
+    String logicalName = toLogicalSchemaName(entity.name());
+    if (logicalName.equals(entity.name())) {
       return entity;
     }
-    String logicalName = toLogicalSchemaName(entity.name());
     return SchemaEntity.builder()
         .withId(entity.id())
         .withName(logicalName)
@@ -591,7 +591,7 @@ public class SchemaMetaService {
   /**
    * Returns a {@link SchemaEntity} whose {@code name()} is the physical representation suitable for
    * storage. If the entity carries a logical name (contains the separator), it is converted to the
-   * physical dot-separated form. Otherwise the original entity is returned unchanged.
+   * physical internal form. Otherwise the original entity is returned unchanged.
    */
   private SchemaEntity toPhysicalEntity(SchemaEntity entity) {
     String separator = HierarchicalSchemaUtil.schemaSeparator();

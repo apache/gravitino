@@ -27,24 +27,34 @@ import org.junit.jupiter.api.Test;
 // eliminated during cleanup.
 
 public class TestHierarchicalSchemaUtil {
+  private static final String PHYSICAL_SEPARATOR = HierarchicalSchemaUtil.physicalSeparator();
 
   @Test
   public void testLogicalToPhysicalWithColonSeparator() {
-    Assertions.assertEquals("A.B.C", HierarchicalSchemaUtil.logicalToPhysical("A:B:C", ":"));
-    Assertions.assertEquals("A.B", HierarchicalSchemaUtil.logicalToPhysical("A:B", ":"));
+    Assertions.assertEquals(
+        "A" + PHYSICAL_SEPARATOR + "B" + PHYSICAL_SEPARATOR + "C",
+        HierarchicalSchemaUtil.logicalToPhysical("A:B:C", ":"));
+    Assertions.assertEquals(
+        "A" + PHYSICAL_SEPARATOR + "B", HierarchicalSchemaUtil.logicalToPhysical("A:B", ":"));
     Assertions.assertEquals("flat", HierarchicalSchemaUtil.logicalToPhysical("flat", ":"));
   }
 
   @Test
   public void testLogicalToPhysicalWithCustomSeparator() {
-    Assertions.assertEquals("A.B.C", HierarchicalSchemaUtil.logicalToPhysical("A/B/C", "/"));
+    Assertions.assertEquals(
+        "A" + PHYSICAL_SEPARATOR + "B" + PHYSICAL_SEPARATOR + "C",
+        HierarchicalSchemaUtil.logicalToPhysical("A/B/C", "/"));
     Assertions.assertEquals("flat", HierarchicalSchemaUtil.logicalToPhysical("flat", "/"));
   }
 
   @Test
   public void testPhysicalToLogicalWithColonSeparator() {
-    Assertions.assertEquals("A:B:C", HierarchicalSchemaUtil.physicalToLogical("A.B.C", ":"));
-    Assertions.assertEquals("A:B", HierarchicalSchemaUtil.physicalToLogical("A.B", ":"));
+    Assertions.assertEquals(
+        "A:B:C",
+        HierarchicalSchemaUtil.physicalToLogical(
+            "A" + PHYSICAL_SEPARATOR + "B" + PHYSICAL_SEPARATOR + "C", ":"));
+    Assertions.assertEquals(
+        "A:B", HierarchicalSchemaUtil.physicalToLogical("A" + PHYSICAL_SEPARATOR + "B", ":"));
     Assertions.assertEquals("flat", HierarchicalSchemaUtil.physicalToLogical("flat", ":"));
   }
 
@@ -53,7 +63,8 @@ public class TestHierarchicalSchemaUtil {
     String logical = "team:sales:reports";
     String separator = ":";
     String physical = HierarchicalSchemaUtil.logicalToPhysical(logical, separator);
-    Assertions.assertEquals("team.sales.reports", physical);
+    Assertions.assertEquals(
+        "team" + PHYSICAL_SEPARATOR + "sales" + PHYSICAL_SEPARATOR + "reports", physical);
     Assertions.assertEquals(logical, HierarchicalSchemaUtil.physicalToLogical(physical, separator));
   }
 
