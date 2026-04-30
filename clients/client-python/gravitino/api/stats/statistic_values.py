@@ -251,8 +251,10 @@ class StatisticValues:
         def data_type(self) -> Type:
             return Types.StructType.of(
                 *[
-                    Types.StructType.Field.nullable_field(key, value.data_type())
-                    for key, value in self._value_map.items()
+                    Types.StructType.Field.nullable_field(
+                        key, self._value_map[key].data_type()
+                    )
+                    for key in sorted(self._value_map)
                 ]
             )
 

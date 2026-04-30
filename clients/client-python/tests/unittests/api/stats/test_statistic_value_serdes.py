@@ -23,6 +23,7 @@ from gravitino.api.stats.json_serdes.statistic_value_serdes import (
     StatisticValueSerdes,
 )
 from gravitino.api.stats.statistic_values import StatisticValues
+from gravitino.exceptions.base import IllegalArgumentException
 
 
 class TestStatisticValueJsonSerdes(unittest.TestCase):
@@ -99,7 +100,7 @@ class TestStatisticValueJsonSerdes(unittest.TestCase):
         self.assertEqual(deserialized_value, expected_value)
 
     def test_deserialize_unsupported_type(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(IllegalArgumentException):
             StatisticValueSerdes.deserialize(None)
 
     def test_serialize_naive_types(self):

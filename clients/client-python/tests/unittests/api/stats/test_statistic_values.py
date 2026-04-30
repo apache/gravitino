@@ -120,9 +120,7 @@ class TestStatisticValues(unittest.TestCase):
         self.assertEqual(
             value.data_type().simple_string(), expected_data_type.simple_string()
         )
-        self.assertEqual(
-            hash(value), hash(tuple(v.value() for v in value_dict.values()))
-        )
+        self.assertEqual(hash(value), hash(twin_value))
         self.assertEqual(value, twin_value)
         self.assertNotEqual(value, another_value)
         self.assertNotEqual(value, StatisticValues.LongValue(self._rand_int))
