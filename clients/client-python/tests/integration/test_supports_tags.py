@@ -349,13 +349,19 @@ class TestSupportsTags(IntegrationTestEnv):
         """
         Test get tag on non-existent tag.
         """
-        self._model_catalog.supports_tags().associate_tags(
+        model_catalog = self._model_catalog.supports_tags()
+        model_catalog.associate_tags(
             tags_to_add=[self._tag_name3, self._tag_name4],
             tags_to_remove=[],
         )
-
-        with self.assertRaises(NoSuchTagException):
-            self._model_catalog.supports_tags().get_tag(self._tag_name1)
+        try:
+            with self.assertRaises(NoSuchTagException):
+                model_catalog.get_tag(self._tag_name1)
+        finally:
+            model_catalog.associate_tags(
+                tags_to_add=[],
+                tags_to_remove=[self._tag_name3, self._tag_name4],
+            )
 
     def _test_get_tag(self, supports_tags: SupportsTags) -> None:
         tag1: Tag = supports_tags.get_tag(self._tag_name1)
