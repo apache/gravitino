@@ -540,7 +540,8 @@ public class SchemaMetaService {
 
   /**
    * Converts a logical schema name (e.g. {@code "A:B:C"}) to the physical internal form (e.g.
-   * {@code "A\u0001B\u0001C"}) used in the database. Non-nested names are returned unchanged.
+   * {@code "A\u0001B\u0001C"}) used in the database. Non-HierarchicalSchema names are returned
+   * unchanged.
    */
   private String toPhysicalSchemaName(String logicalName) {
     return HierarchicalSchemaUtil.logicalToPhysical(
@@ -549,7 +550,7 @@ public class SchemaMetaService {
 
   /**
    * Converts a physical schema name (e.g. {@code "A\u0001B\u0001C"}) back to the logical separator
-   * form (e.g. {@code "A:B:C"}). Non-nested names are returned unchanged.
+   * form (e.g. {@code "A:B:C"}). Non-HierarchicalSchema names are returned unchanged.
    */
   private String toLogicalSchemaName(String physicalName) {
     return HierarchicalSchemaUtil.physicalToLogical(

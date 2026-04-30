@@ -113,13 +113,14 @@ public final class HierarchicalSchemaUtil {
 
   /**
    * Returns all ancestor schema names of the given schema name, ordered from outermost to innermost
-   * (but excluding the name itself). Returns an empty list for top-level (non-nested) schemas.
+   * (but excluding the name itself). Returns an empty list for top-level (non-HierarchicalSchema)
+   * schemas.
    *
    * <p>Example: {@code "A:B:C"} with separator {@code ":"} → {@code ["A", "A:B"]}
    *
    * @param schemaName the schema name to find ancestors for
    * @param separator the external separator
-   * @return ancestor names from outermost to innermost, or empty list if not nested
+   * @return ancestor names from outermost to innermost, or empty list if not HierarchicalSchema
    */
   public static List<String> getAncestorNames(String schemaName, String separator) {
     Preconditions.checkArgument(StringUtils.isNotBlank(schemaName), "schemaName must not be blank");
@@ -134,7 +135,8 @@ public final class HierarchicalSchemaUtil {
 
   /**
    * Returns the schema name and all its ancestor schema names, ordered from the schema itself to
-   * the outermost ancestor. Returns a single-element list for top-level (non-nested) schemas.
+   * the outermost ancestor. Returns a single-element list for top-level (non-HierarchicalSchema)
+   * schemas.
    *
    * <p>Example: {@code "A:B:C"} with separator {@code ":"} → {@code ["A:B:C", "A:B", "A"]}
    *
