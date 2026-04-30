@@ -97,7 +97,7 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedSchemaAutoCreatesMissingParents() {
+  public void testCreateHierarchicalSchemaAutoCreatesMissingParents() {
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B:C");
     NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
     NameIdentifier parentAB = NameIdentifier.of(METALAKE, CATALOG, "A:B");
@@ -137,7 +137,7 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedSchemaSkipsExistingParents() {
+  public void testCreateHierarchicalSchemaSkipsExistingParents() {
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B:C");
     NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
     NameIdentifier parentAB = NameIdentifier.of(METALAKE, CATALOG, "A:B");
@@ -178,7 +178,7 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedSchemaAllParentsExist() {
+  public void testCreateHierarchicalSchemaAllParentsExist() {
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B");
     NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
     Schema mockSchema = mock(Schema.class);
@@ -196,7 +196,7 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedSchemaDoesNotOverwriteOwnerOnConcurrentParentCreate() {
+  public void testCreateHierarchicalSchemaDoesNotOverwriteOwnerOnConcurrentParentCreate() {
     NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B:C");
     NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
     NameIdentifier parentAB = NameIdentifier.of(METALAKE, CATALOG, "A:B");

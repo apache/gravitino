@@ -445,7 +445,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * {@code "catalog.A:B:C"} this returns MetadataObjects for {@code catalog.A:B:C}, {@code
    * catalog.A:B}, and {@code catalog.A} in that order.
    *
-   * <p>For flat (non-nested) schemas the list contains only the original object.
+   * <p>For flat (non-HierarchicalSchema) schemas the list contains only the original object.
    */
   private List<MetadataObject> buildSchemaInheritanceChain(MetadataObject schemaObject) {
     String separator = HierarchicalSchemaUtil.schemaSeparator();

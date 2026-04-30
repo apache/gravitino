@@ -182,7 +182,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testNestedSchemaInsertStoresPhysicalNameAndReturnsLogical() throws IOException {
+  public void testHierarchicalSchemaInsertStoresPhysicalNameAndReturnsLogical() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
@@ -277,7 +277,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUpdateNestedSchemaPreservesLogicalName() throws IOException {
+  public void testUpdateHierarchicalSchemaPreservesLogicalName() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
@@ -323,7 +323,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testNestedSchemaInsertDuplicateThrows() throws IOException {
+  public void testHierarchicalSchemaInsertDuplicateThrows() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
