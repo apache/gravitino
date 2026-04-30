@@ -508,16 +508,17 @@ public class Configs {
                   + "API boundary (e.g. ':' for 'A:B:C'). Schema names are stored internally in "
                   + "EntityStore using ASCII-1 (\\u0001) as the physical separator. The "
                   + "configured separator is only used at external API and catalog capability "
-                  + "validation layer. The internal physical separator must not be used as the "
-                  + "external separator.")
+                  + "validation layer. The internal physical separator and '.' must not be used "
+                  + "as the external separator.")
           .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .checkValue(
               value ->
                   StringUtils.isNotBlank(value)
-                      && !value.contains("."),
+                      && !value.contains(".")
+                      && !value.contains(HierarchicalSchemaUtil.physicalSeparator()),
               ConfigConstants.NOT_BLANK_ERROR_MSG
-                  + " and must not contain .")
+                  + " and must not contain '.' or the internal physical separator (\\u0001)")
           .createWithDefault(":");
 
   public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS =
