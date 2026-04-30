@@ -64,13 +64,16 @@ spec:
             - /bin/bash
             - -c
             - |
-              cp -r /opt/gravitino/scripts/*  /tmp/scripts/
-              VERSION=$(ls /opt/gravitino/libs/gravitino-server-* | grep -oP '[0-9]+\.[0-9]+\.[0-9]+'|head -1)
+              cp -r ${GRAVITINO_HOME}/scripts/*  /tmp/scripts/
+              VERSION=$(ls ${GRAVITINO_HOME}/libs/gravitino-server-* | grep -oP '[0-9]+\.[0-9]+\.[0-9]+'|head -1)
               echo $VERSION > /tmp/scripts/version.txt
           resources:
             {{- toYaml .Values.initResources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
+          env:
+            - name: GRAVITINO_HOME
+              value: {{ .Values.gravitinoHome | quote }}
           volumeMounts:
             - mountPath: /tmp/scripts/
               name: scripts-emptydir
@@ -195,7 +198,7 @@ spec:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           env:
             - name: GRAVITINO_HOME
-              value: /opt/gravitino
+              value: {{ .Values.gravitinoHome | quote }}
             - name: SKIP_CONFIG_REWRITE
               value: "true"
           {{- with .Values.env }}

@@ -34,6 +34,16 @@ image:
   tag: 1.3.0-SNAPSHOT
   pullPolicy: IfNotPresent
 
+## @param gravitinoHome Path to GRAVITINO_HOME inside the apache/gravitino image.
+## The image lays out its files at /root/gravitino/{libs,scripts,bin,...} and
+## the main container's startup script reads from there. Init containers
+## (sqlfile, init-mysql, init-postgresql) read the bundled schema scripts and
+## server JAR from the same path and must use this same value.
+##
+## Override this only if you build a custom image with a different layout.
+##
+gravitinoHome: /root/gravitino
+
 ## MySQL chart configuration
 ## ref: https://github.com/bitnami/charts/blob/main/bitnami/mysql/values.yaml
 ##
@@ -512,20 +522,41 @@ livenessProbe:
 podSecurityContext: {}
   # fsGroup: 1000  # set when using PVCs so mounted volumes are writable by UID 1000
 
-## Init container security context configuration
+## Init container security context configuration.
 ## Applied to all initContainers (sqlfile, init-mysql, init-postgresql).
-## Required on clusters enforcing the Kubernetes Pod Security Standard "restricted" policy.
+##
+## The init containers read schema scripts and the server JAR from
+## ${GRAVITINO_HOME} (defaults to /root/gravitino). The /root directory
+## in the apache/gravitino image is mode 0700, owned by root — so init
+## containers must run as root to traverse into it. Running them as a
+## non-root user produces "Permission denied" errors on cp/ls operations
+## against the image's bundled files.
+##
+## This is a workaround for the image layout. A proper fix at the image
+## layer (move bundled files to a world-traversable path, or chown to
+## a known non-root user) would let init containers run as non-root.
+## Tracked separately from this chart.
+##
+## Clusters enforcing the Kubernetes Pod Security Standard "restricted"
+## policy will reject this. Those deployments need a custom image with
+## a fixed layout, or a relaxed PSS namespace label.
 ##
 initContainerSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 1000
+  runAsNonRoot: false
+  runAsUser: 0
 
 ## Container-specific security context configuration
 ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
 ##
+## The main container also runs as root in the apache/gravitino image
+## because of the same /root/gravitino layout. The image's launch script
+## writes to ${GRAVITINO_HOME}/libs (creating symlinks for bundled JDBC
+## drivers) and ${GRAVITINO_HOME}/logs at startup, both of which require
+## write access to /root.
+##
 containerSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 1000
+  runAsNonRoot: false
+  runAsUser: 0
 
 ## Container Environment
 ##
