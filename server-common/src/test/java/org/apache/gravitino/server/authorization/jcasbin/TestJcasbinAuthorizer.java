@@ -515,6 +515,86 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testLoadPolicyByRoleEntityAddsAllowOnlyToAllowEnforcer() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    Long roleId = 2010L;
+    RoleEntity allowRole =
+        getRoleEntity(
+            roleId,
+            "allowLoadRole" + roleId,
+            ImmutableList.of(
+                makeSecurableObject(
+                    "testCatalog", MetadataObject.Type.CATALOG, roleId, USE_CATALOG, "ALLOW")));
+    mockRoleEntity(allowRole);
+    mockUserRoles(userIdent, allowRole);
+
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal, METALAKE, catalog, USE_CATALOG, new AuthorizationRequestContext()));
+
+    String roleIdStr = String.valueOf(roleId);
+    String metadataIdStr = String.valueOf(CATALOG_ID);
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    Enforcer denyEnforcer = getDenyEnforcer(jcasbinAuthorizer);
+    assertTrue(
+        allowEnforcer.hasPolicy(roleIdStr, "CATALOG", metadataIdStr, "USE_CATALOG", "allow"));
+    assertFalse(
+        denyEnforcer.hasPolicy(roleIdStr, "CATALOG", metadataIdStr, "USE_CATALOG", "allow"));
+
+    Cache<Long, Map<JcasbinAuthorizer.PolicyKey, JcasbinAuthorizer.Effect>> loadedRoles =
+        getLoadedRolesCache(jcasbinAuthorizer);
+    assertEquals(
+        JcasbinAuthorizer.Effect.ALLOW,
+        loadedRoles
+            .getIfPresent(roleId)
+            .get(new JcasbinAuthorizer.PolicyKey("CATALOG", CATALOG_ID, "USE_CATALOG")));
+  }
+
+  @Test
+  public void testLoadPolicyByRoleEntityAddsDenyToBothEnforcersWithExpectedEffects()
+      throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    Long roleId = 2011L;
+    RoleEntity denyRole =
+        getRoleEntity(
+            roleId,
+            "denyLoadRole" + roleId,
+            ImmutableList.of(
+                makeSecurableObject(
+                    "testCatalog", MetadataObject.Type.CATALOG, roleId, USE_CATALOG, "DENY")));
+    mockRoleEntity(denyRole);
+    mockUserRoles(userIdent, denyRole);
+
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    assertFalse(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal, METALAKE, catalog, USE_CATALOG, new AuthorizationRequestContext()));
+    assertTrue(
+        jcasbinAuthorizer.deny(
+            currentPrincipal, METALAKE, catalog, USE_CATALOG, new AuthorizationRequestContext()));
+
+    String roleIdStr = String.valueOf(roleId);
+    String metadataIdStr = String.valueOf(CATALOG_ID);
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    Enforcer denyEnforcer = getDenyEnforcer(jcasbinAuthorizer);
+    assertTrue(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", metadataIdStr, "USE_CATALOG", "deny"));
+    assertTrue(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", metadataIdStr, "USE_CATALOG", "allow"));
+
+    Cache<Long, Map<JcasbinAuthorizer.PolicyKey, JcasbinAuthorizer.Effect>> loadedRoles =
+        getLoadedRolesCache(jcasbinAuthorizer);
+    assertEquals(
+        JcasbinAuthorizer.Effect.DENY,
+        loadedRoles
+            .getIfPresent(roleId)
+            .get(new JcasbinAuthorizer.PolicyKey("CATALOG", CATALOG_ID, "USE_CATALOG")));
+  }
+
+  @Test
   public void testCrossRoleDenyBeatsAllowOnBothEndpoints() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
