@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -36,6 +37,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -43,6 +45,7 @@ import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -110,21 +113,44 @@ public class TopicMetaService {
         newEntity.id(),
         oldTopicEntity.id());
 
-    Integer updateResult;
+    String metalakeName = ident.namespace().level(0);
+    String catalogName = ident.namespace().level(1);
+    String schemaName = ident.namespace().level(2);
+    String oldFullName = catalogName + "." + schemaName + "." + oldTopicEntity.name();
+    boolean isRenamed = !Objects.equals(oldTopicEntity.name(), newEntity.name());
+
+    AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              TopicMetaMapper.class,
-              mapper ->
-                  mapper.updateTopicMeta(
-                      POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity), oldTopicPO));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              updateResult.set(
+                  SessionUtils.getWithoutCommit(
+                      TopicMetaMapper.class,
+                      mapper ->
+                          mapper.updateTopicMeta(
+                              POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity),
+                              oldTopicPO))),
+          () -> {
+            if (isRenamed && updateResult.get() > 0) {
+              long now = System.currentTimeMillis();
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertChange(
+                          metalakeName,
+                          Entity.EntityType.TOPIC.name(),
+                          oldFullName,
+                          OperateType.ALTER,
+                          now));
+            }
+          });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TOPIC, newEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult > 0) {
+    if (updateResult.get() > 0) {
       return newEntity;
     } else {
       throw new IOException("Failed to update the entity: " + ident);
@@ -267,6 +293,11 @@ public class TopicMetaService {
     TopicPO topicPO = getTopicPOByIdentifier(identifier);
     Long topicId = topicPO.getTopicId();
 
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String topicFullName = catalogName + "." + schemaName + "." + identifier.name();
+
     SessionUtils.doMultipleWithCommit(
         () ->
             SessionUtils.doWithoutCommit(
@@ -298,7 +329,19 @@ public class TopicMetaService {
                 PolicyMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        topicId, MetadataObject.Type.TOPIC.name())));
+                        topicId, MetadataObject.Type.TOPIC.name())),
+        () -> {
+          long now = System.currentTimeMillis();
+          SessionUtils.doWithoutCommit(
+              EntityChangeLogMapper.class,
+              mapper ->
+                  mapper.insertChange(
+                      metalakeName,
+                      Entity.EntityType.TOPIC.name(),
+                      topicFullName,
+                      OperateType.DROP,
+                      now));
+        });
 
     return true;
   }

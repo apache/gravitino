@@ -25,6 +25,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -36,6 +37,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -64,6 +66,7 @@ import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -173,19 +176,39 @@ public class MetalakeMetaService {
         oldMetalakeEntity.id());
     MetalakePO newMetalakePO =
         POConverters.updateMetalakePOWithVersion(oldMetalakePO, newMetalakeEntity);
-    Integer updateResult;
+
+    String oldFullName = oldMetalakeEntity.name();
+    boolean isRenamed = !Objects.equals(oldMetalakeEntity.name(), newMetalakeEntity.name());
+
+    AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              MetalakeMetaMapper.class,
-              mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              updateResult.set(
+                  SessionUtils.getWithoutCommit(
+                      MetalakeMetaMapper.class,
+                      mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO))),
+          () -> {
+            if (isRenamed && updateResult.get() > 0) {
+              long now = System.currentTimeMillis();
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertChange(
+                          oldFullName,
+                          Entity.EntityType.METALAKE.name(),
+                          oldFullName,
+                          OperateType.ALTER,
+                          now));
+            }
+          });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.METALAKE, newMetalakeEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult > 0) {
+    if (updateResult.get() > 0) {
       return newMetalakeEntity;
     } else {
       throw new IOException("Failed to update the entity: " + ident);
@@ -312,7 +335,19 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     ViewMetaMapper.class,
-                    mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)),
+            () -> {
+              long now = System.currentTimeMillis();
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertChange(
+                          ident.name(),
+                          Entity.EntityType.METALAKE.name(),
+                          ident.name(),
+                          OperateType.DROP,
+                          now));
+            });
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()
@@ -373,7 +408,19 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     JobMetaMapper.class,
-                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)),
+            () -> {
+              long now = System.currentTimeMillis();
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertChange(
+                          ident.name(),
+                          Entity.EntityType.METALAKE.name(),
+                          ident.name(),
+                          OperateType.DROP,
+                          now));
+            });
       }
     }
     return true;
