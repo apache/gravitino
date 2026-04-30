@@ -535,6 +535,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               roleIds.add(roleId);
               allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
               denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+              if (loadedRoles.getIfPresent(roleId) != null) {
+                continue;
+              }
               CompletableFuture<Void> loadRoleFuture =
                   CompletableFuture.runAsync(
                       () -> {

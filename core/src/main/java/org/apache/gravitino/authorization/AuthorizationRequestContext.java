@@ -19,6 +19,7 @@ package org.apache.gravitino.authorization;
 
 import java.security.Principal;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -113,12 +114,37 @@ public class AuthorizationRequestContext {
     this.originalAuthorizationExpression = originalAuthorizationExpression;
   }
 
+  /**
+   * Returns the user role IDs associated with the current authorization request.
+   *
+   * <p>This context is request-scoped and is expected to be used only for the lifetime of a single
+   * authorization request.
+   *
+   * <p>The returned set is immutable and safe to iterate without defensive copying.
+   *
+   * @return the user role IDs for the current request, or an empty set if none have been set
+   */
   public Set<Long> getUserRoleIds() {
     return userRoleIds;
   }
 
+  /**
+   * Sets the user role IDs associated with the current authorization request.
+   *
+   * <p>This context is request-scoped and is expected to be used only for the lifetime of a single
+   * authorization request.
+   *
+   * <p>The provided set is defensively copied before being stored, so subsequent caller-side
+   * mutations are not reflected in this context.
+   *
+   * @param userRoleIds the user role IDs for the current request; if {@code null}, an empty set is
+   *     stored
+   */
   public void setUserRoleIds(@Nullable Set<Long> userRoleIds) {
-    this.userRoleIds = userRoleIds == null ? Collections.emptySet() : userRoleIds;
+    this.userRoleIds =
+        userRoleIds == null || userRoleIds.isEmpty()
+            ? Collections.emptySet()
+            : Collections.unmodifiableSet(new HashSet<>(userRoleIds));
   }
 
   public static class AuthorizationKey {

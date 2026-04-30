@@ -20,10 +20,12 @@ package org.apache.gravitino.authorization;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -128,5 +130,15 @@ public class TestAuthorizationRequestContext {
     Set<Long> roles = ImmutableSet.of(7L, 11L, 13L);
     context.setUserRoleIds(roles);
     assertEquals(roles, context.getUserRoleIds());
+  }
+
+  @Test
+  public void testSetUserRoleIdsDefensivelyCopiesAndReturnsImmutableSet() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    Set<Long> roles = new HashSet<>(ImmutableSet.of(17L, 19L));
+    context.setUserRoleIds(roles);
+    roles.add(23L);
+    assertEquals(ImmutableSet.of(17L, 19L), context.getUserRoleIds());
+    assertThrows(UnsupportedOperationException.class, () -> context.getUserRoleIds().add(29L));
   }
 }

@@ -723,6 +723,34 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testCachedRolePolicyIndexSkipsRoleEntityLoad() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    Long roleId = 1012L;
+    RoleEntity role = getRoleEntity(roleId, "cachedRole" + roleId, ImmutableList.of());
+    mockUserRoles(userIdent, role);
+    getLoadedRolesCache(jcasbinAuthorizer)
+        .put(
+            roleId,
+            Collections.singletonMap(
+                new JcasbinAuthorizer.PolicyKey("CATALOG", CATALOG_ID, "USE_CATALOG"),
+                JcasbinAuthorizer.Effect.ALLOW));
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, role.name())),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenThrow(new AssertionError("Cached roles should not be loaded again."));
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal,
+            METALAKE,
+            MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+            USE_CATALOG,
+            new AuthorizationRequestContext()));
+  }
+
+  @Test
   public void testPolicyKeyEqualityAndHash() {
     JcasbinAuthorizer.PolicyKey base =
         new JcasbinAuthorizer.PolicyKey("CATALOG", 1L, "USE_CATALOG");
