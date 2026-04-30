@@ -101,6 +101,31 @@ class StatisticValues:
         """
         return StatisticValues.ObjectValue(value_list)
 
+    @staticmethod
+    def _make_hash(value: StatisticValue[Any]) -> int:
+        """Recursively compute hash for any StatisticValue.
+
+        Args:
+            value: the StatisticValue to hash
+
+        Returns:
+            Hash code for the StatisticValue
+        """
+        match value:
+            case StatisticValues.ListValue():
+                return hash(tuple(StatisticValues._make_hash(v) for v in value.value()))
+            case StatisticValues.ObjectValue():
+                return hash(
+                    tuple(
+                        sorted(
+                            (k, StatisticValues._make_hash(v))
+                            for k, v in value.value().items()
+                        )
+                    )
+                )
+            case _:
+                return hash(value.value())
+
     class BooleanValue(StatisticValue[bool]):
         """A statistic value that holds a Boolean value."""
 
@@ -203,7 +228,7 @@ class StatisticValues:
             return Types.ListType.nullable(self._value_list[0].data_type())
 
         def __hash__(self) -> int:
-            return hash(tuple(v.value() for v in self._value_list))
+            return StatisticValues._make_hash(self)
 
         def __eq__(self, other) -> bool:
             if not isinstance(other, StatisticValues.ListValue):
@@ -230,7 +255,7 @@ class StatisticValues:
             )
 
         def __hash__(self) -> int:
-            return hash(tuple(v.value() for v in self._value_map.values()))
+            return StatisticValues._make_hash(self)
 
         def __eq__(self, other) -> bool:
             if not isinstance(other, StatisticValues.ObjectValue):
