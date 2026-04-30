@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.filter;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.aopalliance.intercept.MethodInterceptor;
@@ -28,11 +29,10 @@ import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.exceptions.ForbiddenException;
@@ -77,6 +77,14 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
      *     standard expression-based authorization
      */
     boolean authorizationCompleted();
+
+    default Map<ExpressionCondition, Boolean> expressionConditionContext() {
+      return Map.of();
+    }
+
+    default Map<String, Object> additionalPathParams() {
+      return Map.of();
+    }
   }
 
   protected abstract Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
@@ -161,24 +169,26 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
 
         // Process custom authorization if handler exists
         Optional<AuthorizationHandler> handler = createAuthorizationHandler(parameters, args);
+        Map<ExpressionCondition, Boolean> expressionConditionContext = new HashMap<>();
+        Map<String, Object> additionalPathParams = new HashMap<>();
 
         if (!skipStandardCheck && handler.isPresent()) {
           AuthorizationHandler authzHandler = handler.get();
           authzHandler.process(nameIdentifierMap);
           skipStandardCheck = authzHandler.authorizationCompleted();
+          expressionConditionContext.putAll(authzHandler.expressionConditionContext());
+          additionalPathParams.putAll(authzHandler.additionalPathParams());
         }
 
         // Perform standard authorization check if custom handler didn't complete it
         if (!skipStandardCheck) {
           Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
-          AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
-              new AuthorizationExpressionEvaluator(expression);
+          pathParams.putAll(additionalPathParams);
+          IcebergStagedAuthorizationEvaluator stagedAuthorizationEvaluator =
+              new IcebergStagedAuthorizationEvaluator();
           boolean authorizeResult =
-              authorizationExpressionEvaluator.evaluate(
-                  nameIdentifierMap,
-                  pathParams,
-                  new AuthorizationRequestContext(),
-                  Optional.empty());
+              stagedAuthorizationEvaluator.evaluate(
+                  expressionAnnotation, nameIdentifierMap, pathParams, expressionConditionContext);
           if (!authorizeResult) {
             MetadataObject.Type type = expressionAnnotation.accessMetadataType();
             NameIdentifier accessMetadataName =

@@ -20,27 +20,22 @@
 package org.apache.gravitino.server.web.filter;
 
 import java.lang.reflect.Parameter;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.rest.RESTUtil;
 
@@ -53,6 +48,7 @@ import org.apache.iceberg.rest.RESTUtil;
  * the /views/ endpoint.
  */
 public class LoadTableAuthzHandler implements AuthorizationHandler {
+  private boolean containRequiredPrivileges = false;
   private final Parameter[] parameters;
   private final Object[] args;
 
@@ -77,6 +73,12 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
         // See: https://docs.google.com/document/d/18yx88tBbU3S9LB8hhL7xUVzSWHIWkXJ7sRNmLh2v_kQ/
         // Consider consolidating custom authorization handlers and standardizing parameter decoding
         tableName = RESTUtil.decodeString(String.valueOf(args[i]));
+      }
+
+      if (StringUtils.equals(parameters[i].getName(), "requiredPrivileges")
+          && args[i] instanceof String
+          && StringUtils.isNotBlank((String) args[i])) {
+        containRequiredPrivileges = true;
       }
 
       AuthorizationMetadata authMetadata = parameter.getAnnotation(AuthorizationMetadata.class);
@@ -125,37 +127,16 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
 
     nameIdentifierMap.put(
         EntityType.TABLE, NameIdentifierUtil.ofTable(metalakeName, catalog, schema, tableName));
-    performTableAuthorization(nameIdentifierMap);
   }
 
   @Override
   public boolean authorizationCompleted() {
-    // This handler performs complete authorization
-    return true;
+    return false;
   }
 
-  /**
-   * Perform TABLE-level authorization check using ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION. This
-   * enforces table-specific privileges including ANY_CREATE_TABLE for Iceberg REST.
-   */
-  private void performTableAuthorization(Map<EntityType, NameIdentifier> nameIdentifierMap) {
-    AuthorizationExpressionEvaluator evaluator =
-        new AuthorizationExpressionEvaluator(
-            AuthorizationExpressionConstants.ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION);
-
-    boolean authorized =
-        evaluator.evaluate(
-            nameIdentifierMap,
-            new HashMap<>(),
-            new AuthorizationRequestContext(),
-            Optional.empty());
-
-    if (!authorized) {
-      String currentUser = PrincipalUtils.getCurrentUserName();
-      NameIdentifier tableId = nameIdentifierMap.get(EntityType.TABLE);
-      throw new ForbiddenException(
-          "User '%s' is not authorized to load table '%s'", currentUser, tableId);
-    }
+  @Override
+  public Map<ExpressionCondition, Boolean> expressionConditionContext() {
+    return Map.of(ExpressionCondition.CONTAIN_REQUIRED_PRIVILEGES, containRequiredPrivileges);
   }
 
   /**

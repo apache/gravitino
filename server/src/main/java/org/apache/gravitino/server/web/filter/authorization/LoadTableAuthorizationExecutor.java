@@ -26,6 +26,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.ParameterUtil;
@@ -52,7 +53,7 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
       Map<String, Object> pathParams,
       Optional<String> entityType,
       String secondaryExpression,
-      String secondaryExpressionCondition) {
+      ExpressionCondition secondaryExpressionCondition) {
     super(expression, metadataContext, pathParams, entityType);
 
     // If secondaryExpression and condition are provided, evaluate the condition
@@ -62,8 +63,7 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
 
       // Evaluate the condition: does the request contain MODIFY_TABLE privilege?
       if (privileges != null
-          && secondaryExpressionCondition.equals(
-              AuthorizationExpressionConstants.REQUEST_REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE)) {
+          && secondaryExpressionCondition == ExpressionCondition.CONTAIN_REQUIRED_PRIVILEGES) {
         Set<Privilege.Name> privilegeNames =
             Arrays.stream(privileges.split(","))
                 .map(Privilege.Name::valueOf)

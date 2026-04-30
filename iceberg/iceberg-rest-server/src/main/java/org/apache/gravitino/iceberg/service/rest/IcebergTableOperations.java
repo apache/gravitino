@@ -63,6 +63,8 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.ExpressionAction;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -352,7 +354,11 @@ public class IcebergTableOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+      secondaryExpression =
+          "ANY_USE_CATALOG && ANY_USE_SCHEMA && (ANY_CREATE_TABLE || ANY_SELECT_VIEW)",
+      secondaryExpressionCondition = ExpressionCondition.PREVIOUS_EXPRESSION_FORBIDDEN,
+      secondaryExpressionAction = ExpressionAction.CHECK_METADATA_OBJECT_EXISTS,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response tableExists(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,

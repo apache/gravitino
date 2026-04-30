@@ -20,17 +20,13 @@
 package org.apache.gravitino.server.web.filter;
 
 import java.lang.reflect.Parameter;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 
@@ -43,6 +39,7 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
   private final Parameter[] parameters;
   private final Object[] args;
   private boolean crossNamespaceRename = false;
+  private String destinationSchema = null;
 
   public RenameTableAuthzHandler(Parameter[] parameters, Object[] args) {
     this.parameters = parameters;
@@ -89,96 +86,24 @@ public class RenameTableAuthzHandler implements AuthorizationHandler {
         EntityType.TABLE,
         NameIdentifierUtil.ofTable(metalakeName, catalog, sourceSchema, sourceTable));
 
-    String destSchema = renameTableRequest.destination().namespace().level(0);
-    if (!sourceSchema.equals(destSchema)) {
-      // Cross-namespace rename - perform complete authorization here
-      crossNamespaceRename = true;
-      validateCrossNamespaceRename(catalog, metalakeName, sourceSchema, sourceTable, destSchema);
-    }
+    destinationSchema = renameTableRequest.destination().namespace().level(0);
+    crossNamespaceRename = !sourceSchema.equals(destinationSchema);
   }
 
   @Override
   public boolean authorizationCompleted() {
-    // Return true if we performed complete authorization (cross-namespace case)
-    return crossNamespaceRename;
+    return false;
   }
 
-  /**
-   * Validates authorization for cross-namespace renames following MySQL privilege model: - Requires
-   * ownership on source table (equivalent to DROP privilege) - Requires CREATE_TABLE privilege on
-   * destination schema
-   *
-   * @param catalog The catalog name
-   * @param metalakeName The metalake name
-   * @param sourceSchema The source schema name
-   * @param sourceTable The source table name
-   * @param destSchema The destination schema name
-   * @throws ForbiddenException if the user lacks required privileges
-   */
-  private void validateCrossNamespaceRename(
-      String catalog,
-      String metalakeName,
-      String sourceSchema,
-      String sourceTable,
-      String destSchema) {
-    String currentUser = PrincipalUtils.getCurrentUserName();
-    Map<EntityType, NameIdentifier> sourceContext = new HashMap<>();
-    sourceContext.put(EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalakeName));
-    sourceContext.put(EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
-    sourceContext.put(
-        EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, sourceSchema));
-    sourceContext.put(
-        EntityType.TABLE,
-        NameIdentifierUtil.ofTable(metalakeName, catalog, sourceSchema, sourceTable));
+  @Override
+  public Map<ExpressionCondition, Boolean> expressionConditionContext() {
+    return Map.of(ExpressionCondition.RENAMING_CROSSING_NAMESPACE, crossNamespaceRename);
+  }
 
-    String sourceExpression =
-        "ANY(OWNER, METALAKE, CATALOG) || "
-            + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-            + "ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER";
-
-    AuthorizationExpressionEvaluator sourceEvaluator =
-        new AuthorizationExpressionEvaluator(sourceExpression);
-
-    boolean sourceAuthorized =
-        sourceEvaluator.evaluate(
-            sourceContext, new HashMap<>(), new AuthorizationRequestContext(), Optional.empty());
-
-    if (!sourceAuthorized) {
-      String notAuthzMessage =
-          String.format(
-              "User '%s' is not authorized to drop/move table '%s' from schema '%s'. "
-                  + "Only the table owner can move a table to a different schema.",
-              currentUser, sourceTable, sourceSchema);
-      throw new ForbiddenException(notAuthzMessage);
-    }
-
-    // Check CREATE_TABLE privilege on destination schema
-    // Note: The destination schema is NOT in the nameIdentifierMap, so the standard expression
-    // never checked it. We need to perform a full authorization check here.
-    Map<EntityType, NameIdentifier> destContext = new HashMap<>();
-    destContext.put(EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalakeName));
-    destContext.put(EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
-    destContext.put(
-        EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, destSchema));
-
-    String destExpression =
-        "ANY(OWNER, METALAKE, CATALOG) || "
-            + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-            + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE";
-
-    AuthorizationExpressionEvaluator destEvaluator =
-        new AuthorizationExpressionEvaluator(destExpression);
-
-    boolean destAuthorized =
-        destEvaluator.evaluate(
-            destContext, new HashMap<>(), new AuthorizationRequestContext(), Optional.empty());
-
-    if (!destAuthorized) {
-      String notAuthzMessage =
-          String.format(
-              "User '%s' is not authorized to create table in destination schema '%s'",
-              currentUser, destSchema);
-      throw new ForbiddenException(notAuthzMessage);
-    }
+  @Override
+  public Map<String, Object> additionalPathParams() {
+    return destinationSchema == null
+        ? Map.of()
+        : Map.of("destinationSchema", destinationSchema, "crossNamespaceRename", crossNamespaceRename);
   }
 }

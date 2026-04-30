@@ -40,6 +40,7 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.web.Utils;
@@ -71,6 +72,10 @@ public class IcebergTableRenameOperations {
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
               + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+      secondaryExpression = "ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER",
+      secondaryExpressionCondition = ExpressionCondition.RENAMING_CROSSING_NAMESPACE,
+      thirdExpression = "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
+      thirdExpressionCondition = ExpressionCondition.RENAMING_CROSSING_NAMESPACE,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response renameTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,

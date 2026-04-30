@@ -50,6 +50,12 @@ public class TestAnnotations {
 
     @AuthorizationExpression(
         expression = "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE",
+        secondaryExpression = "TABLE::MODIFY_TABLE",
+        secondaryExpressionCondition = ExpressionCondition.CONTAIN_REQUIRED_PRIVILEGES,
+        secondaryExpressionAction = ExpressionAction.EVALUATE,
+        thirdExpression = "TABLE::SELECT_TABLE",
+        thirdExpressionCondition = ExpressionCondition.PREVIOUS_EXPRESSION_FORBIDDEN,
+        thirdExpressionAction = ExpressionAction.CHECK_METADATA_OBJECT_EXISTS,
         accessMetadataType = MetadataObject.Type.METALAKE)
     public void testAuthedMethodUseExpression() {}
   }
@@ -67,6 +73,15 @@ public class TestAnnotations {
 
     Assertions.assertEquals(
         "CATALOG::CREATE_TABLE || TABLE::CREATE_TABLE", annotation.expression());
+    Assertions.assertEquals("TABLE::MODIFY_TABLE", annotation.secondaryExpression());
+    Assertions.assertEquals(
+        ExpressionCondition.CONTAIN_REQUIRED_PRIVILEGES, annotation.secondaryExpressionCondition());
+    Assertions.assertEquals(ExpressionAction.EVALUATE, annotation.secondaryExpressionAction());
+    Assertions.assertEquals("TABLE::SELECT_TABLE", annotation.thirdExpression());
+    Assertions.assertEquals(
+        ExpressionCondition.PREVIOUS_EXPRESSION_FORBIDDEN, annotation.thirdExpressionCondition());
+    Assertions.assertEquals(
+        ExpressionAction.CHECK_METADATA_OBJECT_EXISTS, annotation.thirdExpressionAction());
   }
 
   @Test
