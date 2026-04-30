@@ -281,21 +281,19 @@ preserving the requirement that local identity tables remain global and metalake
 ## 6. Service Admin Initialization
 
 To keep local authentication usable immediately after installation without introducing a hard-coded
-default password, Gravitino should provide an interactive initialization script for provisioning the
-first service admin account directly in the backend database.
+default password, Gravitino should initialize service admin accounts from an environment variable
+during startup when the `basic` authenticator is enabled.
 
-### 6.1 Initialization Script Inputs
+### 6.1 Initialization Inputs
 
-After Gravitino is installed, the installer should run an interactive script and provide:
+After Gravitino is installed, the operator should configure:
 
-- the service admin name
-- the service admin password
-- the JDBC URL
-- the Gravitino database name
-- the JDBC user name
-- the JDBC password
+- `gravitino.authorization.serviceAdmins`, which remains the source of truth for service admin
+  usernames
+- `GRAVITINO_INITIAL_ADMIN_PASSWORD`, a JSON array of `username:password` strings used only when a
+  configured service admin does not already have a password configured in the gravitino
 
-The service admin name entered in the script should be consistent with
+Each username in `GRAVITINO_INITIAL_ADMIN_PASSWORD` should match a user configured in
 `gravitino.authorization.serviceAdmins`.
 
 ### 6.2 Initialization Process
@@ -304,20 +302,26 @@ The initialization process should be:
 
 1. Install Gravitino and configure the `basic` authenticator together with
    `gravitino.authorization.serviceAdmins`.
-2. Run the interactive service admin initialization script before the deployment is put into use.
-3. Prompt the installer for the service admin name, service admin password, JDBC URL, Gravitino
-   database name, JDBC user name, and JDBC password.
+2. If `basic` authentication is enabled for the first startup, set the
+   `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable when any configured service admin does
+   not yet have a password configured in the gravitino.
+3. Parse `GRAVITINO_INITIAL_ADMIN_PASSWORD` as a JSON array of `username:password` strings.
 4. Validate the input before writing anything to the database:
+   - the value must be valid JSON
+   - every entry must use the format `username:password`
    - the service admin name must not contain a colon (`:`)
    - the password must satisfy the local authentication password policy
-   - the JDBC parameters must be non-empty and syntactically valid
-5. Connect to the configured JDBC backend.
-6. Check whether an active row for the target service admin already exists in `idp_user_meta`. If
-   it already exists, abort rather than overwrite it implicitly.
-7. Hash the password with Argon2id.
-8. Generate the `INSERT` statement required for the target JDBC backend and execute it immediately
-   so the service admin record is written into `idp_user_meta`.
-9. Exit successfully only after the insert has been committed.
+5. Connect to the configured JDBC backend during Gravitino startup.
+6. For each user configured in `gravitino.authorization.serviceAdmins`, check whether that service
+   admin already has a password configured in the gravitino.
+7. If the service admin already has a password configured, continue startup without modifying the
+   stored password.
+8. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is configured and the service admin does not yet have a
+   password configured in the gravitino, hash the supplied password with Argon2id and initialize that
+   service admin account.
+9. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is not configured and any configured service admin does not
+   yet have a password configured in the gravitino, fail startup immediately and prompt the user to
+   declare `GRAVITINO_INITIAL_ADMIN_PASSWORD`.
 
 This design keeps the first-use flow explicit while avoiding any built-in default credential. The
 service admin exists before the first authenticated request is served, and the database stores only
@@ -325,31 +329,27 @@ the password hash rather than plaintext input.
 
 ### 6.3 Example Initialization Flow
 
-The following end-to-end flow shows how an installer can provision the initial service admin for a
+The following end-to-end flow shows how an operator can provision the initial service admins for a
 fresh Gravitino deployment.
 
 1. Deploy Gravitino with the `basic` authenticator enabled:
 
    ```properties
    gravitino.authenticators=basic
-   gravitino.authorization.serviceAdmins=adminUser
+   gravitino.authorization.serviceAdmins=admin1,admin2
    ```
 
-2. Run the interactive initialization script.
+2. Export the initial service admin passwords before starting Gravitino:
 
-3. Enter the requested values when prompted:
-
-   ```text
-   Service admin name: adminUser
-   Service admin password: ********
-   JDBC URL: jdbc:mysql://localhost:3306
-   Gravitino database: gravitino
-   JDBC user: gravitino
-   JDBC password: ********
+   ```bash
+   export GRAVITINO_INITIAL_ADMIN_PASSWORD='["admin1:passwordForAdmin1","admin2:passwordForAdmin2"]'
    ```
 
-4. The script validates the password format, hashes the password, generates the required `INSERT`
-   SQL, and writes the service admin record into `idp_user_meta`.
+3. Start Gravitino.
+
+4. During startup, Gravitino validates the JSON payload, initializes passwords only for service
+   admins that do not yet have one configured in the gravitino, and leaves existing service admin
+   passwords unchanged.
 
 ---
 
@@ -435,6 +435,19 @@ management APIs to be used.
 ### 8.2 Password Algorithm
 
 The initial implementation uses Argon2id as the fixed password hashing algorithm.
+
+### 8.3 How Trino Accesses IRC with Basic Authentication
+
+For Trino to access IRC with Basic authentication, Trino must act as an HTTP client for IRC requests
+and attach the required authentication information to the outbound REST catalog requests.
+
+The current Trino version used here does not support this path out of the box, so users cannot
+directly configure Trino to access IRC through Basic authentication in the current baseline.
+
+If a user needs this capability, they can merge
+[`trinodb/trino#29132`](https://github.com/trinodb/trino/pull/29132) first, and then use the
+extended REST catalog header passing capability introduced by that change as the foundation for the
+IRC access path.
 
 ---
 
@@ -731,7 +744,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 | 1 | Authenticator module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `authenticators:authenticator-basic` | Add the new module and make the server load it when `gravitino.authenticators=basic`. |
 | 2 | Password hashing support | `PasswordHasher`, `Argon2idPasswordHasher`, related tests | Use Argon2id as the only supported password hashing algorithm and store PHC-style hash strings. |
 | 3 | IdP metadata schema | JDBC schema files, mapper definitions, store layer | Create `idp_user_meta`, `idp_group_meta`, and `idp_group_user_rel` with soft-delete support. |
-| 4 | Service admin initialization | initialization script, JDBC helper, validation logic | Prompt for the first service admin, validate inputs, hash the password, and insert the initial record. |
+| 4 | Service admin initialization | startup initialization logic, validation logic | Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD`, initialize missing configured service admins during startup, and fail startup when required credentials are absent. |
 | 5 | Basic authentication flow | `BasicAuthenticator`, auth manager, filter integration | Verify Basic credentials against `idp_user_meta` and resolve the authenticated principal. |
 | 6 | Group resolution | store layer, auth manager | Load the user's active groups from `idp_group_user_rel` and `idp_group_meta` for later authorization. |
 | 7 | Local IdP management APIs | REST resources, DTOs, request/response classes | Implement user CRUD, group CRUD, and group membership management under `/api/idp`. |
@@ -745,7 +758,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 | Configuration | All examples use `gravitino.authenticators=basic`, and no obsolete configuration keys remain in the document. |
 | Schema design | The document consistently uses `idp_user_meta`, `idp_group_meta`, and `idp_group_user_rel`, and the soft-delete lifecycle is clearly described. |
 | Security constraints | The document states that passwords are never stored in plaintext, Basic authentication should be used only over HTTPS, and initialization must enforce password policy. |
-| Initialization flow | The document explains how the first service admin is initialized, what inputs are required, and that only hashed passwords are written. |
+| Initialization flow | The document explains how configured service admins are initialized during startup, when `GRAVITINO_INITIAL_ADMIN_PASSWORD` is required, and that only hashed passwords are written. |
 | Authentication flow | The Basic authentication flow is described end-to-end, including username/password parsing, user lookup, hash verification, and group resolution. |
 | API contract | The request paths, request bodies, and response bodies for all `/api/idp` APIs are defined consistently across the document. |
 | Implementation alignment | The proposed work items are specific enough that reviewers and AI tools can map each part of the design to code changes and tests. |
@@ -758,7 +771,7 @@ The local authentication capability is intentionally lightweight, but the follow
 
 - passwords are stored as hashes, never plaintext
 - Basic authentication should be used only over HTTPS
-- the initialization script must validate password policy and write only hashed passwords
+- the startup initialization flow must validate password policy and write only hashed passwords
 - all metadata tables use soft deletion for traceability and operational safety
 - local authentication is recommended for POC, offline, and isolated environments rather than as a
   replacement for enterprise-grade external identity systems
@@ -774,7 +787,7 @@ either unavailable or unnecessarily heavy. The key design choices are:
 - **username/password credentials**
 - **database-backed storage**
 - **Argon2id password hashing**
-- **interactive service admin initialization**
+- **startup-time service admin initialization**
 
 The result is a self-contained authentication path that is easy to deploy, fast to evaluate, and
 well aligned with Gravitino's lightweight quick-start experience.
