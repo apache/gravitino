@@ -57,7 +57,6 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
-import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
@@ -69,9 +68,13 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -548,12 +551,17 @@ public abstract class TestJDBCBackend {
         .build();
   }
 
-  protected GenericEntity createViewEntity(Long id, Namespace namespace, String viewName) {
-    return GenericEntity.builder()
+  protected ViewEntity createViewEntity(Long id, Namespace namespace, String viewName) {
+    return ViewEntity.builder()
         .withId(id)
         .withName(viewName)
         .withNamespace(namespace)
-        .withEntityType(Entity.EntityType.VIEW)
+        .withColumns(new Column[0])
+        .withRepresentations(
+            new Representation[] {
+              SQLRepresentation.builder().withDialect("unknown").withSql("SELECT 1").build()
+            })
+        .withAuditInfo(AUDIT_INFO)
         .build();
   }
 

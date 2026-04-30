@@ -38,7 +38,6 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
-import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -46,6 +45,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -249,7 +249,7 @@ class TestOwnerMetaService extends TestJDBCBackend {
             null,
             AUDIT_INFO);
     backend.insert(model, false);
-    GenericEntity view =
+    ViewEntity view =
         createViewEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),

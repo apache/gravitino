@@ -40,7 +40,7 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
-import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -255,8 +255,7 @@ public class TestIcebergViewHookDispatcher {
     NameIdentifier sourceGravitinoIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent);
     verify(mockEntityStore, times(1))
-        .update(
-            eq(sourceGravitinoIdent), eq(GenericEntity.class), eq(Entity.EntityType.VIEW), any());
+        .update(eq(sourceGravitinoIdent), eq(ViewEntity.class), eq(Entity.EntityType.VIEW), any());
   }
 
   @Test
@@ -270,7 +269,7 @@ public class TestIcebergViewHookDispatcher {
     NameIdentifier sourceGravitinoIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent);
     when(mockEntityStore.update(
-            eq(sourceGravitinoIdent), eq(GenericEntity.class), eq(Entity.EntityType.VIEW), any()))
+            eq(sourceGravitinoIdent), eq(ViewEntity.class), eq(Entity.EntityType.VIEW), any()))
         .thenThrow(new NoSuchEntityException("Entity not found"));
 
     // Should not throw - missing entity is ignored
@@ -290,7 +289,7 @@ public class TestIcebergViewHookDispatcher {
     NameIdentifier sourceGravitinoIdent =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, sourceIdent);
     when(mockEntityStore.update(
-            eq(sourceGravitinoIdent), eq(GenericEntity.class), eq(Entity.EntityType.VIEW), any()))
+            eq(sourceGravitinoIdent), eq(ViewEntity.class), eq(Entity.EntityType.VIEW), any()))
         .thenThrow(new IOException("IO error"));
 
     // Should throw RuntimeException wrapping the IOException
