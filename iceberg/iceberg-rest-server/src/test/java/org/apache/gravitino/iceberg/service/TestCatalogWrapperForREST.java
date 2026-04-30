@@ -22,11 +22,11 @@ package org.apache.gravitino.iceberg.service;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyMap;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -190,7 +190,7 @@ public class TestCatalogWrapperForREST {
 
   @Test
   void testStageTableCreateWithLocationIncludesFileIoProperties() throws Exception {
-    Catalog catalog = mock(Catalog.class);
+    RESTCatalog catalog = mock(RESTCatalog.class);
     Catalog.TableBuilder tableBuilder = mock(Catalog.TableBuilder.class);
     Transaction transaction = mock(Transaction.class);
     Table table = mock(Table.class);
@@ -230,18 +230,58 @@ public class TestCatalogWrapperForREST {
             .stageCreate()
             .build();
 
-    Method method =
-        CatalogWrapperForREST.class.getDeclaredMethod(
-            "stageTableCreateInternal", Namespace.class, CreateTableRequest.class);
-    method.setAccessible(true);
-    LoadTableResponse response =
-        (LoadTableResponse) method.invoke(wrapper, Namespace.of("db"), request);
+    LoadTableResponse response = wrapper.createTable(Namespace.of("db"), request, false);
 
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));
     Assertions.assertEquals(
         "http://localhost:9000", response.config().get(IcebergConstants.ICEBERG_S3_ENDPOINT));
     verify(tableBuilder).withLocation("s3://bucket/warehouse/table");
+  }
+
+  @Test
+  void testStageTableCreateWithNullLocationDoesNotCallWithLocation() {
+    RESTCatalog catalog = mock(RESTCatalog.class);
+    Catalog.TableBuilder tableBuilder = mock(Catalog.TableBuilder.class);
+    Transaction transaction = mock(Transaction.class);
+    Table table = mock(Table.class);
+    FileIO fileIO = mock(FileIO.class);
+    when(catalog.buildTable(any(TableIdentifier.class), any())).thenReturn(tableBuilder);
+    when(tableBuilder.withPartitionSpec(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withSortOrder(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withProperties(anyMap())).thenReturn(tableBuilder);
+    when(tableBuilder.createTransaction()).thenReturn(transaction);
+    when(transaction.table()).thenReturn(table);
+    when(table.io()).thenReturn(fileIO);
+    when(table.location()).thenReturn("s3://bucket/warehouse/default-location");
+    when(fileIO.properties())
+        .thenReturn(
+            ImmutableMap.of(
+                IcebergConstants.IO_IMPL,
+                "org.apache.iceberg.aws.s3.S3FileIO",
+                IcebergConstants.ICEBERG_S3_ENDPOINT,
+                "http://localhost:9000"));
+
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
+
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    CreateTableRequest request =
+        CreateTableRequest.builder().withName("tbl").withSchema(schema).stageCreate().build();
+
+    LoadTableResponse response = wrapper.createTable(Namespace.of("db"), request, false);
+
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", response.config().get(IcebergConstants.IO_IMPL));
+    Assertions.assertEquals(
+        "http://localhost:9000", response.config().get(IcebergConstants.ICEBERG_S3_ENDPOINT));
+    verify(tableBuilder, never()).withLocation(any());
   }
 
   private static class LazyCheckCatalogWrapperForREST extends CatalogWrapperForREST {
