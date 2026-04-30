@@ -36,17 +36,16 @@ CREATE INDEX idx_role_meta_del_upd
 CREATE INDEX idx_owner_meta_del_upd_obj
     ON owner_meta (deleted_at, updated_at, metadata_object_id);
 
--- Entity name->id mutation tracking (eventual consistency -- entity change poller)
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
-  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `metalake_name` VARCHAR(128)    NOT NULL,
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+  `metalake_name` VARCHAR(128)    NOT NULL COMMENT 'metalake name',
   `entity_type`   VARCHAR(32)     NOT NULL COMMENT 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW',
   `entity_full_name` VARCHAR(512) NOT NULL COMMENT 'Dot-separated full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.',
   `operate_type`  TINYINT UNSIGNED NOT NULL COMMENT 'Operate type code: 1=ALTER, 2=DROP, 3=INSERT. Codes are stable and never re-used.',
   `created_at`    BIGINT          NOT NULL COMMENT 'timestamp of the change in millis',
   PRIMARY KEY (`id`),
-  INDEX `idx_ecl_created_at` (`created_at`)
-) COMMENT 'Append-only log of entity structural changes. One row per affected entity per operation. The entity change poller reads this table to drive targeted invalidation of metadataIdCache on HA peer nodes. Rows older than the retention window (default 1 h) are pruned periodically.';
+  KEY `idx_ecl_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Append-only log of entity structural changes for targeted metadataIdCache invalidation';
 
 -- add audit_info as nullable first for MySQL 5.7 compatibility
 ALTER TABLE `view_meta`
