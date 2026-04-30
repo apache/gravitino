@@ -33,6 +33,7 @@ import org.apache.flink.table.types.logical.DoubleType;
 import org.apache.flink.table.types.logical.IntType;
 import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.NullType;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.SmallIntType;
@@ -252,5 +253,36 @@ public class TestTypeUtils {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> TypeUtils.toFlinkType(Types.TimestampType.withTimeZone(10)));
+  }
+
+  @Test
+  public void testMultisetTypeConversion() {
+    // MULTISET<STRING> (VARCHAR(MAX)) should be preserved as ExternalType
+    Assertions.assertEquals(
+        Types.ExternalType.of("MULTISET<VARCHAR(2147483647)>"),
+        TypeUtils.toGravitinoType(new MultisetType(new VarCharType(Integer.MAX_VALUE))));
+
+    // MULTISET<INT> should be preserved as ExternalType
+    Assertions.assertEquals(
+        Types.ExternalType.of("MULTISET<INT>"),
+        TypeUtils.toGravitinoType(new MultisetType(new IntType())));
+
+    // MULTISET<BIGINT> should be preserved as ExternalType
+    Assertions.assertEquals(
+        Types.ExternalType.of("MULTISET<BIGINT>"),
+        TypeUtils.toGravitinoType(new MultisetType(new BigIntType())));
+
+    // ExternalType with MULTISET should be converted back to Flink MULTISET
+    Assertions.assertEquals(
+        DataTypes.MULTISET(DataTypes.STRING()),
+        TypeUtils.toFlinkType(Types.ExternalType.of("MULTISET<VARCHAR(2147483647)>")));
+
+    Assertions.assertEquals(
+        DataTypes.MULTISET(DataTypes.INT()),
+        TypeUtils.toFlinkType(Types.ExternalType.of("MULTISET<INT>")));
+
+    Assertions.assertEquals(
+        DataTypes.MULTISET(DataTypes.BIGINT()),
+        TypeUtils.toFlinkType(Types.ExternalType.of("MULTISET<BIGINT>")));
   }
 }
