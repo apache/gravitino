@@ -2,20 +2,20 @@ CREATE SCHEMA
 
 CREATE TABLE
 
-3 rows affected
+INSERT: 3 rows
 
-CREATE TABLE
+CREATE TABLE: 3 rows
 
 "1","alice","10.50"
 "2","bob","20.75"
 "3","charlie","30.00"
 
-CREATE TABLE
+CREATE TABLE: 2 rows
 
 "2","BOB"
 "3","CHARLIE"
 
-CREATE TABLE
+CREATE TABLE: 3 rows
 
 "1","alice","10.50"
 "2","bob","20.75"
@@ -33,11 +33,11 @@ WITH (
    location = 'hdfs://%/user/iceberg/warehouse/TrinoQueryIT/gt_ctas_db%/ctas_with_props'
 )"
 
-CREATE TABLE
+CREATE TABLE: 0 rows
 
 "0"
 
-CREATE TABLE
+CREATE TABLE: 3 rows
 
 "1","alice","10.50"
 "2","bob","20.75"
