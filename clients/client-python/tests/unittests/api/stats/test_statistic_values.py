@@ -179,3 +179,43 @@ class TestStatisticValues(unittest.TestCase):
                     StatisticValues.DoubleValue(self._rand_float),
                 ]
             )
+
+    def test_list_value_nested_hash(self):
+        inner_list1 = StatisticValues.list_value(
+            [StatisticValues.long_value(1), StatisticValues.long_value(2)]
+        )
+        inner_list2 = StatisticValues.list_value(
+            [StatisticValues.long_value(3), StatisticValues.long_value(4)]
+        )
+        nested_list = StatisticValues.list_value([inner_list1, inner_list2])
+        twin_nested_list = StatisticValues.list_value([inner_list1, inner_list2])
+
+        self.assertEqual(len(nested_list.value()), 2)
+        self.assertEqual(nested_list, twin_nested_list)
+        self.assertEqual(hash(nested_list), hash(twin_nested_list))
+
+    def test_object_value_nested_hash(self):
+        inner_list = StatisticValues.list_value(
+            [StatisticValues.long_value(10), StatisticValues.long_value(20)]
+        )
+        inner_obj = StatisticValues.object_value(
+            {"x": StatisticValues.long_value(100), "y": StatisticValues.long_value(200)}
+        )
+        nested_obj = StatisticValues.object_value(
+            {
+                "simple": StatisticValues.long_value(42),
+                "list": inner_list,
+                "object": inner_obj,
+            }
+        )
+        twin_nested_obj = StatisticValues.object_value(
+            {
+                "simple": StatisticValues.long_value(42),
+                "list": inner_list,
+                "object": inner_obj,
+            }
+        )
+
+        self.assertEqual(len(nested_obj.value()), 3)
+        self.assertEqual(nested_obj, twin_nested_obj)
+        self.assertEqual(hash(nested_obj), hash(twin_nested_obj))
