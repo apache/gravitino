@@ -39,6 +39,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
@@ -178,6 +179,9 @@ public abstract class OperationDispatcher {
       } else if (item instanceof TopicChange.RemoveProperty) {
         TopicChange.RemoveProperty removeProperty = (TopicChange.RemoveProperty) item;
         properties.put(removeProperty.getProperty(), removeProperty.getProperty());
+      } else if (item instanceof ViewChange.RemoveProperty) {
+        ViewChange.RemoveProperty removeProperty = (ViewChange.RemoveProperty) item;
+        properties.put(removeProperty.getProperty(), removeProperty.getProperty());
       }
     }
 
@@ -256,6 +260,9 @@ public abstract class OperationDispatcher {
         properties.put(setProperty.getProperty(), setProperty.getValue());
       } else if (item instanceof TopicChange.SetProperty) {
         TopicChange.SetProperty setProperty = (TopicChange.SetProperty) item;
+        properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof ViewChange.SetProperty) {
+        ViewChange.SetProperty setProperty = (ViewChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
       }
     }

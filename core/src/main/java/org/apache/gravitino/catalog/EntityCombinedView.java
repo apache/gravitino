@@ -18,8 +18,13 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
@@ -33,14 +38,17 @@ public final class EntityCombinedView implements View {
 
   private final View view;
 
-  private final ViewEntity viewEntity;
+  @Nullable private final ViewEntity viewEntity;
+
+  // Sets of properties that should be hidden from the user.
+  private Set<String> hiddenProperties = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
   // the correct entity. Otherwise, we should import the external entity to the storage backend.
   private boolean imported;
 
-  private EntityCombinedView(View view, ViewEntity viewEntity) {
+  private EntityCombinedView(View view, @Nullable ViewEntity viewEntity) {
     this.view = view;
     this.viewEntity = viewEntity;
     this.imported = false;
@@ -56,6 +64,11 @@ public final class EntityCombinedView implements View {
 
   public EntityCombinedView withImported(boolean imported) {
     this.imported = imported;
+    return this;
+  }
+
+  public EntityCombinedView withHiddenProperties(Set<String> hiddenProperties) {
+    this.hiddenProperties = hiddenProperties == null ? Collections.emptySet() : hiddenProperties;
     return this;
   }
 
@@ -91,12 +104,29 @@ public final class EntityCombinedView implements View {
 
   @Override
   public Map<String, String> properties() {
-    return view.properties();
+    Map<String, String> props = view.properties();
+    if (props == null) {
+      return Collections.emptyMap();
+    }
+    return props.entrySet().stream()
+        .filter(p -> !hiddenProperties.contains(p.getKey()))
+        .filter(entry -> entry.getKey() != null && entry.getValue() != null)
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
   @Override
   public Audit auditInfo() {
-    return view.auditInfo();
+    if (viewEntity == null) {
+      return view.auditInfo();
+    }
+    AuditInfo mergedAudit =
+        AuditInfo.builder()
+            .withCreator(view.auditInfo().creator())
+            .withCreateTime(view.auditInfo().createTime())
+            .withLastModifier(view.auditInfo().lastModifier())
+            .withLastModifiedTime(view.auditInfo().lastModifiedTime())
+            .build();
+    return mergedAudit.merge(viewEntity.auditInfo(), true /* overwrite */);
   }
 
   public boolean imported() {
@@ -107,7 +137,14 @@ public final class EntityCombinedView implements View {
     return view;
   }
 
-  public ViewEntity viewFromGravitino() {
+  /**
+   * Returns the Gravitino-side view entity when this combined view was built from a full {@link
+   * ViewEntity}, otherwise {@code null}.
+   *
+   * @return The view entity, or {@code null}.
+   */
+  @Nullable
+  public ViewEntity viewEntity() {
     return viewEntity;
   }
 }

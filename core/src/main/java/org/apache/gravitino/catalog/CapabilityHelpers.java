@@ -30,6 +30,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
@@ -93,6 +94,18 @@ public class CapabilityHelpers {
         .toArray(FilesetChange[]::new);
   }
 
+  public static ViewChange[] applyCapabilities(Capability capabilities, ViewChange... changes) {
+    return Arrays.stream(changes)
+        .map(
+            change -> {
+              if (change instanceof ViewChange.RenameView) {
+                return applyCapabilities((ViewChange.RenameView) change, capabilities);
+              }
+              return change;
+            })
+        .toArray(ViewChange[]::new);
+  }
+
   public static NameIdentifier[] applyCapabilities(
       NameIdentifier[] idents, Capability.Scope scope, Capability capabilities) {
     return Arrays.stream(idents)
@@ -129,6 +142,7 @@ public class CapabilityHelpers {
     String metalake = namespace.level(0);
     String catalog = namespace.level(1);
     if (identScope == Capability.Scope.TABLE
+        || identScope == Capability.Scope.VIEW
         || identScope == Capability.Scope.FILESET
         || identScope == Capability.Scope.TOPIC
         || identScope == Capability.Scope.MODEL
@@ -201,6 +215,7 @@ public class CapabilityHelpers {
     String metalake = namespace.level(0);
     String catalog = namespace.level(1);
     if (identScope == Capability.Scope.TABLE
+        || identScope == Capability.Scope.VIEW
         || identScope == Capability.Scope.FILESET
         || identScope == Capability.Scope.TOPIC
         || identScope == Capability.Scope.FUNCTION) {
@@ -324,6 +339,14 @@ public class CapabilityHelpers {
             Capability.Scope.FILESET, renameFileset.getNewName(), capabilities);
     applyNameSpecification(Capability.Scope.FILESET, newName, capabilities);
     return FilesetChange.rename(newName);
+  }
+
+  private static ViewChange applyCapabilities(
+      ViewChange.RenameView renameView, Capability capabilities) {
+    String newName =
+        applyCaseSensitiveOnName(Capability.Scope.VIEW, renameView.getNewName(), capabilities);
+    applyNameSpecification(Capability.Scope.VIEW, newName, capabilities);
+    return ViewChange.rename(newName);
   }
 
   private static TableChange applyCapabilities(
