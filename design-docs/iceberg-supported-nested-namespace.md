@@ -99,7 +99,7 @@ Cons:
 - `HierarchicalSchema` uses a configurable logical separator (default `:`) in API/logic layer.
 - For Gravitino REST create/update schema APIs, `request.getName()` keeps the logical schema name
   and may contain `:` (for example `A:B` or `A:B:C`).
-- Before persisting to `EntityStore`, schema path is normalized to `.`-separated physical schema
+- Before persisting to `EntityStore`, schema path is normalized to ASCII-1 (`\u0001`)-separated physical schema
   name.
 - Escaping strategy: each path segment is encoded before physical flattening to avoid ambiguity.
 - Configured logical separator is reserved as hierarchy separator and is not allowed inside one
@@ -128,19 +128,20 @@ Examples:
 
 ### Physical Name Mapping and Reversibility
 
-- **Persisted schema name in `EntityStore` always uses `.` as the internal storage separator** for
+- **Persisted schema name in `EntityStore` always uses ASCII-1 (`\u0001`) as the internal storage separator** for
   stable storage semantics.
 - External request/response handling uses configured logical separator and converts at API boundary.
 - Connector-facing behavior remains Iceberg-compatible and does not require users to configure or
   input internal storage representation.
 - Mapping must be reversible:
-  - `logical path segments` -> `encode each segment` -> `join by '.'` for physical storage.
-  - physical schema name -> `split by '.'` -> `decode each segment` -> logical path segments.
-  - physical schema name -> "A.B.C"
+  - `logical path segments` -> `encode each segment` -> `join by '\u0001'` for physical storage.
+  - physical schema name -> `split by '\u0001'` -> `decode each segment` -> logical path segments.
+  - This avoids ambiguity when one segment contains `.` (for example `my.schema`).
 
 ### Existing Name Compatibility and Migration Guard
 
-- Before upgrading the new version, select all the Iceberg namespaces to check whether contains the logical delimiter.
+- Before enabling nested namespace mode for a catalog, run a pre-check scan on existing schema names
+  against configured logical separator.
 - If existing schema names conflict with selected separator, enabling is rejected with actionable
   error and user can choose another separator or rename conflicting schema names.
 - Once nested mode is enabled for a catalog, creating new schema names containing configured logical
@@ -148,9 +149,9 @@ Examples:
 
 ### Delimiter Configuration Policy
 
-- Logical separator is configurable in the server configuration (for example `:`, `;`, `$`) and can be chosen to avoid conflict
+- Logical separator is configurable (for example `:`, `;`, `$`) and can be chosen to avoid conflict
   with existing names.
-- Physical separator in storage remains fixed as `.`.
+- Physical separator in storage remains fixed as ASCII-1 (`\u0001`).
 - Recommended: keep logical separator stable after nested namespace is enabled for a catalog.
 - Delimiter is configured at server level for nested-namespace parsing behavior.
 
@@ -177,12 +178,13 @@ Two delimiter-governance options are under evaluation:
 Delimiter validity should be explicit and observable, not implicit.
 
 - Validation checkpoints:
-  - Validate delimiter when server starts.
+  - Validate delimiter when server starts or when delimiter configuration is updated.
   - Re-validate against existing catalog schema names before enabling nested mode for a catalog.
   - Reject invalid delimiter configuration early before request-time namespace operations.
 - Validation rules:
   - Delimiter must be a single non-empty character.
-  - Delimiter must not be `.` because `.` is reserved as physical storage separator.
+  - Delimiter must not be `.` and must not be ASCII-1 (`\u0001`) because both are reserved by
+    internal storage/compatibility rules.
   - Delimiter should avoid characters that cause parser or route ambiguity in REST/SQL contexts
     (for example `/`).
   - Under Option 1, delimiter must belong to server predefined allowlist.
@@ -224,7 +226,7 @@ sequenceDiagram
 ### Iceberg REST Side Behavior
 
 - **Create nested namespace**:
-  - Creating `A:B:C` creates (or ensures existence of) `A`, `A.B`, and `A.B.C` in one atomic
+  - Creating `A:B:C` creates (or ensures existence of) `A`, `A\u0001B`, and `A\u0001B\u0001C` in one atomic
     operation.
   - Parent-chain creation is transactional: if any step fails, all created parents in this request
     are rolled back and no partial parent namespaces remain.
@@ -416,15 +418,6 @@ List<String> authzScopes = HierarchicalSchemaUtil.parentScopes("A:B:C");
 // Authorization passes if user has required privilege on any allowed parent scope by policy.
 ```
 
-### Snippet 4: Create nested namespace in executor flow
-
-```java
-// For create namespace A:B:C, ensure parent schemas exist in physical model
-for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
-  String schemaName = HierarchicalSchemaUtil.toPhysicalSchemaName(scope); // A, A.B, A.B.C
-  // create schema if not exists
-}
-```
 
 ## Affected Classes
 
@@ -460,7 +453,7 @@ for (String scope : HierarchicalSchemaUtil.parentScopes("A:B:C")) {
 
 - Add a dedicated conversion utility for `HierarchicalSchema` path:
   - Iceberg namespace levels -> logical path (preferred `:`).
-  - Logical path -> physical schema name (phase-1 uses `.` flattened mapping).
+  - Logical path -> physical schema name (phase-1 uses ASCII-1 `\u0001` flattened mapping).
 - Override `Capability.specificationOnName(SCHEMA, name)` naming rules for related catalogs so
   schema names containing `:` are accepted in this phase.
 
