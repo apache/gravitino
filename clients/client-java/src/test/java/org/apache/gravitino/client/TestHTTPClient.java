@@ -41,6 +41,7 @@ import java.util.function.Consumer;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RESTException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.rest.RESTResponse;
 import org.apache.hc.client5.http.config.ConnectionConfig;
@@ -351,6 +352,59 @@ public class TestHTTPClient {
       Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
       Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());
     }
+  }
+
+  @Test
+  public void testSchemaErrorHandlerReturnsUnauthorizedForEmptyBody() {
+    String path = "schema_unauthorized_empty_body";
+    mockServer
+        .when(request().withPath("/" + path).withMethod(Method.GET.name().toUpperCase(Locale.ROOT)))
+        .respond(response().withStatusCode(401).withBody(""));
+
+    UnauthorizedException exception =
+        Assertions.assertThrows(
+            UnauthorizedException.class,
+            () ->
+                restClient.get(
+                    path, Item.class, ImmutableMap.of(), ErrorHandlers.schemaErrorHandler()));
+    Assertions.assertTrue(exception.getMessage().contains("Unauthorized error:"));
+    Assertions.assertTrue(exception.getMessage().contains("Error code: 401"));
+    Assertions.assertTrue(exception.getMessage().contains("empty body"));
+  }
+
+  @Test
+  public void testSchemaErrorHandlerReturnsUnauthorizedForMissingBody() {
+    String path = "schema_unauthorized_missing_body";
+    mockServer
+        .when(request().withPath("/" + path).withMethod(Method.GET.name().toUpperCase(Locale.ROOT)))
+        .respond(response().withStatusCode(401));
+
+    UnauthorizedException exception =
+        Assertions.assertThrows(
+            UnauthorizedException.class,
+            () ->
+                restClient.get(
+                    path, Item.class, ImmutableMap.of(), ErrorHandlers.schemaErrorHandler()));
+    Assertions.assertTrue(exception.getMessage().contains("Unauthorized error:"));
+    Assertions.assertTrue(exception.getMessage().contains("Error code: 401"));
+    Assertions.assertTrue(exception.getMessage().contains("empty body"));
+  }
+
+  @Test
+  public void testSchemaErrorHandlerReturnsUnauthorizedForNonJsonBody() {
+    String path = "schema_unauthorized_non_json_body";
+    mockServer
+        .when(request().withPath("/" + path).withMethod(Method.GET.name().toUpperCase(Locale.ROOT)))
+        .respond(response().withStatusCode(401).withBody("unauthorized"));
+
+    UnauthorizedException exception =
+        Assertions.assertThrows(
+            UnauthorizedException.class,
+            () ->
+                restClient.get(
+                    path, Item.class, ImmutableMap.of(), ErrorHandlers.schemaErrorHandler()));
+    Assertions.assertTrue(exception.getMessage().contains("Unauthorized error: Error code: 401"));
+    Assertions.assertTrue(exception.getMessage().contains("json string: unauthorized"));
   }
 
   public static void testHttpMethodOnSuccess(

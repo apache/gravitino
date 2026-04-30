@@ -30,6 +30,7 @@ import lombok.Getter;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.RESTException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 
 /** Represents an error response. */
 @Getter
@@ -344,6 +345,21 @@ public class ErrorResponse extends BaseResponse {
     return new ErrorResponse(
         ErrorConstants.FORBIDDEN_CODE,
         ForbiddenException.class.getSimpleName(),
+        message,
+        getStackTrace(throwable));
+  }
+
+  /**
+   * Create a new unauthorized operation error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse unauthorized(String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.UNAUTHORIZED_CODE,
+        UnauthorizedException.class.getSimpleName(),
         message,
         getStackTrace(throwable));
   }

@@ -188,7 +188,18 @@ public class HTTPClient implements RESTClient {
         responseReason != null && !responseReason.isEmpty()
             ? responseReason
             : EnglishReasonPhraseCatalog.INSTANCE.getReason(response.getCode(), null /* ignored */);
-    return ErrorResponse.restError(message);
+
+    switch (response.getCode()) {
+      case HttpStatus.SC_UNAUTHORIZED:
+        return ErrorResponse.unauthorized(message, null);
+
+      case HttpStatus.SC_FORBIDDEN:
+        return ErrorResponse.forbidden(message, null);
+
+      default:
+        return ErrorResponse.restError(
+            String.format("Error code: %d, error message: %s", response.getCode(), message));
+    }
   }
 
   /**
