@@ -664,13 +664,13 @@ You can remove a local group by its name. This operation should soft-delete the 
 than physically remove it immediately.
 
 Note that removing a local group will also remove all relationships between that group and its
-users.
+users. If the group still has users, the caller must explicitly set `force=true`.
 
 The request path for REST API is `/api/idp/groups/{group}`.
 
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/idp/groups/engineering
+'http://localhost:8090/api/idp/groups/engineering?force=true'
 ```
 
 **Response:**
