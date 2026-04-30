@@ -16,14 +16,16 @@
 # under the License.
 
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
+from gravitino.api.authorization.owner import Owner
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_handle import JobHandle
 from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
+from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.client.dto_converters import DTOConverters
@@ -40,6 +42,7 @@ from gravitino.dto.requests.job_template_register_request import (
 from gravitino.dto.requests.job_template_updates_request import (
     JobTemplateUpdatesRequest,
 )
+from gravitino.dto.requests.owner_set_request import OwnerSetRequest
 from gravitino.dto.requests.tag_create_request import TagCreateRequest
 from gravitino.dto.requests.tag_updates_request import TagUpdatesRequest
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
@@ -50,6 +53,8 @@ from gravitino.dto.responses.job_list_response import JobListResponse
 from gravitino.dto.responses.job_response import JobResponse
 from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
 from gravitino.dto.responses.job_template_response import JobTemplateResponse
+from gravitino.dto.responses.owner_response import OwnerResponse
+from gravitino.dto.responses.set_response import SetResponse
 from gravitino.dto.responses.tag_response import (
     TagListResponse,
     TagNamesListResponse,
@@ -57,6 +62,7 @@ from gravitino.dto.responses.tag_response import (
 )
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
+from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLER
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils.http_client import HTTPClient
@@ -82,6 +88,7 @@ class GravitinoMetalake(
     API_METALAKES_CATALOGS_PATH = "api/metalakes/{}/catalogs/{}"
     API_METALAKES_JOB_TEMPLATES_PATH = "api/metalakes/{}/jobs/templates"
     API_METALAKES_JOB_RUNS_PATH = "api/metalakes/{}/jobs/runs"
+    API_METALAKES_OWNERS_PATH = "api/metalakes/{}/owners/{}"
     API_METALAKES_TAG_PATH = "api/metalakes/{}/tags/{}"
     API_METALAKES_TAGS_PATH = "api/metalakes/{}/tags"
 
@@ -706,3 +713,57 @@ class GravitinoMetalake(
         drop_response.validate()
 
         return drop_response.dropped()
+
+    #########
+    # Owner operations
+    #########
+    def get_owner(self, metadata_object: MetadataObject) -> Optional[Owner]:
+        """Get the owner of a metadata object.
+
+        Args:
+            metadata_object: The metadata object to get the owner for.
+
+        Returns:
+            Optional[Owner]: The owner of the metadata object, or None if no owner is set.
+
+        Raises:
+            NoSuchMetadataObjectException: If the metadata object does not exist.
+            NotFoundException: If a related resource is not found.
+            MetalakeNotInUseException: If the metalake is not in use.
+        """
+        url = self.API_METALAKES_OWNERS_PATH.format(
+            encode_string(self.name()),
+            f"{metadata_object.type().value}/{encode_string(metadata_object.full_name())}",
+        )
+        response = self.rest_client.get(url, error_handler=OWNER_ERROR_HANDLER)
+        resp = OwnerResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return resp.owner()
+
+    def set_owner(
+        self, metadata_object: MetadataObject, owner_name: str, owner_type: Owner.Type
+    ) -> None:
+        """Set the owner of a metadata object.
+
+        Args:
+            metadata_object: The metadata object to set the owner for.
+            owner_name: The name of the owner.
+            owner_type: The type of the owner (USER or GROUP).
+
+        Raises:
+            NoSuchMetadataObjectException: If the metadata object does not exist.
+            NotFoundException: If a related resource is not found.
+            MetalakeNotInUseException: If the metalake is not in use.
+            UnsupportedOperationException: If the operation is not supported.
+        """
+        url = self.API_METALAKES_OWNERS_PATH.format(
+            encode_string(self.name()),
+            f"{metadata_object.type().value}/{encode_string(metadata_object.full_name())}",
+        )
+        req = OwnerSetRequest(owner_name, owner_type)
+        req.validate()
+        response = self.rest_client.put(
+            url, json=req, error_handler=OWNER_ERROR_HANDLER
+        )
+        set_resp = SetResponse.from_json(response.body, infer_missing=True)
+        set_resp.validate()
