@@ -89,11 +89,13 @@ import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -300,6 +302,35 @@ public class TestCatalogOperations
     } else {
       return false;
     }
+  }
+
+  @Override
+  public View createView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties) {
+    throw new UnsupportedOperationException("createView not implemented in test");
+  }
+
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes) {
+    throw new UnsupportedOperationException("alterView not implemented in test");
+  }
+
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    return views.remove(ident) != null;
+  }
+
+  @Override
+  public NameIdentifier[] listViews(Namespace namespace) {
+    return views.keySet().stream()
+        .filter(ident -> ident.namespace().equals(namespace))
+        .toArray(NameIdentifier[]::new);
   }
 
   @Override

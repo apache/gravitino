@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.VERSION_TABLE_NAME;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -30,14 +31,19 @@ import org.apache.ibatis.annotations.Param;
 public class ViewMetaBaseSQLProvider {
 
   public String listViewPOsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "SELECT view_id as viewId, view_name as viewName,"
-        + " metalake_id as metalakeId, catalog_id as catalogId,"
-        + " schema_id as schemaId,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
+    return "SELECT vm.view_id, vm.view_name, vm.metalake_id, vm.catalog_id, vm.schema_id,"
+        + " vm.current_version, vm.last_version, vm.audit_info, vm.deleted_at,"
+        + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
+        + " vi.schema_id as version_schema_id, vi.view_id as version_view_id,"
+        + " vi.version, vi.view_comment, vi.columns, vi.properties,"
+        + " vi.default_catalog, vi.default_schema, vi.representations,"
+        + " vi.audit_info as version_audit_info, vi.deleted_at as version_deleted_at"
         + " FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " vm INNER JOIN "
+        + VERSION_TABLE_NAME
+        + " vi ON vm.view_id = vi.view_id AND vm.current_version = vi.version"
+        + " WHERE vm.schema_id = #{schemaId} AND vm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
   public String listViewPOsByFullQualifiedName(
@@ -46,14 +52,29 @@ public class ViewMetaBaseSQLProvider {
       @Param("schemaName") String schemaName) {
     return """
         SELECT
-            sm.schema_id AS schemaId,
-            cm.catalog_id AS catalogId,
-            vm.view_id AS viewId,
-            vm.view_name AS viewName,
-            vm.metalake_id AS metalakeId,
-            vm.current_version AS currentVersion,
-            vm.last_version AS lastVersion,
-            vm.deleted_at AS deletedAt
+            mm.metalake_id,
+            cm.catalog_id,
+            sm.schema_id,
+            vm.view_id,
+            vm.view_name,
+            vm.current_version,
+            vm.last_version,
+            vm.audit_info,
+            vm.deleted_at,
+            vi.id,
+            vi.metalake_id as version_metalake_id,
+            vi.catalog_id as version_catalog_id,
+            vi.schema_id as version_schema_id,
+            vi.view_id as version_view_id,
+            vi.version,
+            vi.view_comment,
+            vi.columns,
+            vi.properties,
+            vi.default_catalog,
+            vi.default_schema,
+            vi.representations,
+            vi.audit_info as version_audit_info,
+            vi.deleted_at as version_deleted_at
         FROM
             %s mm
         INNER JOIN
@@ -67,15 +88,20 @@ public class ViewMetaBaseSQLProvider {
         LEFT JOIN
             %s vm ON sm.schema_id = vm.schema_id
             AND vm.deleted_at = 0
+        LEFT JOIN
+            %s vi ON vm.view_id = vi.view_id
+            AND vm.current_version = vi.version
+            AND vi.deleted_at = 0
         WHERE
             mm.metalake_name = #{metalakeName}
-            AND mm.deleted_at = 0;
-            """
+            AND mm.deleted_at = 0
+        """
         .formatted(
             MetalakeMetaMapper.TABLE_NAME,
             CatalogMetaMapper.TABLE_NAME,
             SchemaMetaMapper.TABLE_NAME,
-            TABLE_NAME);
+            TABLE_NAME,
+            VERSION_TABLE_NAME);
   }
 
   public String selectViewIdBySchemaIdAndName(
@@ -88,14 +114,20 @@ public class ViewMetaBaseSQLProvider {
 
   public String selectViewMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("viewName") String name) {
-    return "SELECT view_id as viewId, view_name as viewName,"
-        + " metalake_id as metalakeId, catalog_id as catalogId,"
-        + " schema_id as schemaId,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
+    return "SELECT vm.view_id, vm.view_name, vm.metalake_id, vm.catalog_id, vm.schema_id,"
+        + " vm.current_version, vm.last_version, vm.audit_info, vm.deleted_at,"
+        + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
+        + " vi.schema_id as version_schema_id, vi.view_id as version_view_id,"
+        + " vi.version, vi.view_comment, vi.columns, vi.properties,"
+        + " vi.default_catalog, vi.default_schema, vi.representations,"
+        + " vi.audit_info as version_audit_info, vi.deleted_at as version_deleted_at"
         + " FROM "
         + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND view_name = #{viewName} AND deleted_at = 0";
+        + " vm INNER JOIN "
+        + VERSION_TABLE_NAME
+        + " vi ON vm.view_id = vi.view_id AND vm.current_version = vi.version"
+        + " WHERE vm.schema_id = #{schemaId} AND vm.view_name = #{viewName}"
+        + " AND vm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
   public String insertViewMeta(@Param("viewMeta") ViewPO viewPO) {
@@ -103,7 +135,7 @@ public class ViewMetaBaseSQLProvider {
         + TABLE_NAME
         + " (view_id, view_name, metalake_id,"
         + " catalog_id, schema_id,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, audit_info, deleted_at)"
         + " VALUES ("
         + " #{viewMeta.viewId},"
         + " #{viewMeta.viewName},"
@@ -112,6 +144,7 @@ public class ViewMetaBaseSQLProvider {
         + " #{viewMeta.schemaId},"
         + " #{viewMeta.currentVersion},"
         + " #{viewMeta.lastVersion},"
+        + " #{viewMeta.auditInfo},"
         + " #{viewMeta.deletedAt}"
         + " )";
   }
@@ -121,7 +154,7 @@ public class ViewMetaBaseSQLProvider {
         + TABLE_NAME
         + " (view_id, view_name, metalake_id,"
         + " catalog_id, schema_id,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, audit_info, deleted_at)"
         + " VALUES ("
         + " #{viewMeta.viewId},"
         + " #{viewMeta.viewName},"
@@ -130,6 +163,7 @@ public class ViewMetaBaseSQLProvider {
         + " #{viewMeta.schemaId},"
         + " #{viewMeta.currentVersion},"
         + " #{viewMeta.lastVersion},"
+        + " #{viewMeta.auditInfo},"
         + " #{viewMeta.deletedAt}"
         + " )"
         + " ON DUPLICATE KEY UPDATE"
@@ -139,6 +173,7 @@ public class ViewMetaBaseSQLProvider {
         + " schema_id = #{viewMeta.schemaId},"
         + " current_version = #{viewMeta.currentVersion},"
         + " last_version = #{viewMeta.lastVersion},"
+        + " audit_info = #{viewMeta.auditInfo},"
         + " deleted_at = #{viewMeta.deletedAt}";
   }
 
@@ -150,6 +185,7 @@ public class ViewMetaBaseSQLProvider {
         + " schema_id = #{newViewMeta.schemaId}, "
         + " current_version = #{newViewMeta.currentVersion}, "
         + " last_version = #{newViewMeta.lastVersion}, "
+        + " audit_info = #{newViewMeta.auditInfo}, "
         + " deleted_at = #{newViewMeta.deletedAt} "
         + " WHERE view_id = #{oldViewMeta.viewId} "
         + " AND current_version = #{oldViewMeta.currentVersion} "
@@ -158,16 +194,23 @@ public class ViewMetaBaseSQLProvider {
 
   public String listViewPOsByViewIds(@Param("viewIds") List<Long> viewIds) {
     return "<script>"
-        + "SELECT view_id as viewId, view_name as viewName, "
-        + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId, "
-        + " current_version as currentVersion, last_version as lastVersion, deleted_at as deletedAt "
+        + "SELECT vm.view_id, vm.view_name, vm.metalake_id, vm.catalog_id, vm.schema_id,"
+        + " vm.current_version, vm.last_version, vm.audit_info, vm.deleted_at,"
+        + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
+        + " vi.schema_id as version_schema_id, vi.view_id as version_view_id,"
+        + " vi.version, vi.view_comment, vi.columns, vi.properties,"
+        + " vi.default_catalog, vi.default_schema, vi.representations,"
+        + " vi.audit_info as version_audit_info, vi.deleted_at as version_deleted_at"
         + " FROM "
         + TABLE_NAME
-        + " WHERE view_id IN "
+        + " vm INNER JOIN "
+        + VERSION_TABLE_NAME
+        + " vi ON vm.view_id = vi.view_id AND vm.current_version = vi.version"
+        + " WHERE vm.view_id IN "
         + "<foreach item='viewId' index='index' collection='viewIds' open='(' separator=',' close=')'>"
         + "#{viewId}"
         + "</foreach>"
-        + " AND deleted_at = 0"
+        + " AND vm.deleted_at = 0 AND vi.deleted_at = 0"
         + "</script>";
   }
 
@@ -217,14 +260,29 @@ public class ViewMetaBaseSQLProvider {
       @Param("viewName") String viewName) {
     return """
         SELECT
-            sm.schema_id AS schemaId,
-            cm.catalog_id AS catalogId,
-            vm.view_id AS viewId,
-            vm.view_name AS viewName,
-            vm.metalake_id AS metalakeId,
-            vm.current_version AS currentVersion,
-            vm.last_version AS lastVersion,
-            vm.deleted_at AS deletedAt
+            mm.metalake_id,
+            cm.catalog_id,
+            sm.schema_id,
+            vm.view_id,
+            vm.view_name,
+            vm.current_version,
+            vm.last_version,
+            vm.audit_info,
+            vm.deleted_at,
+            vi.id,
+            vi.metalake_id as version_metalake_id,
+            vi.catalog_id as version_catalog_id,
+            vi.schema_id as version_schema_id,
+            vi.view_id as version_view_id,
+            vi.version,
+            vi.view_comment,
+            vi.columns,
+            vi.properties,
+            vi.default_catalog,
+            vi.default_schema,
+            vi.representations,
+            vi.audit_info as version_audit_info,
+            vi.deleted_at as version_deleted_at
         FROM
             %s mm
         INNER JOIN
@@ -239,14 +297,19 @@ public class ViewMetaBaseSQLProvider {
             %s vm ON sm.schema_id = vm.schema_id
             AND vm.view_name = #{viewName}
             AND vm.deleted_at = 0
+        LEFT JOIN
+            %s vi ON vm.view_id = vi.view_id
+            AND vm.current_version = vi.version
+            AND vi.deleted_at = 0
         WHERE
             mm.metalake_name = #{metalakeName}
-            AND mm.deleted_at = 0;
-            """
+            AND mm.deleted_at = 0
+        """
         .formatted(
             MetalakeMetaMapper.TABLE_NAME,
             CatalogMetaMapper.TABLE_NAME,
             SchemaMetaMapper.TABLE_NAME,
-            TABLE_NAME);
+            TABLE_NAME,
+            VERSION_TABLE_NAME);
   }
 }

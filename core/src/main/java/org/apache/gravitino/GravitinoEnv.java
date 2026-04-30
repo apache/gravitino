@@ -58,6 +58,7 @@ import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
+import org.apache.gravitino.hook.FunctionHookDispatcher;
 import org.apache.gravitino.hook.JobHookDispatcher;
 import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
@@ -613,14 +614,16 @@ public class GravitinoEnv {
         new ModelNormalizeDispatcher(modelHookDispatcher, catalogManager);
     this.modelDispatcher = new ModelEventDispatcher(eventBus, modelNormalizeDispatcher);
 
-    // TODO: Add FunctionHookDispatcher when needed
     // The operation chain is:
-    // FunctionEventDispatcher -> FunctionNormalizeDispatcher -> FunctionOperationDispatcher
+    // FunctionEventDispatcher -> FunctionNormalizeDispatcher -> FunctionHookDispatcher ->
+    // FunctionOperationDispatcher
     FunctionOperationDispatcher functionOperationDispatcher =
         new FunctionOperationDispatcher(
             catalogManager, schemaOperationDispatcher, entityStore, idGenerator);
+    FunctionHookDispatcher functionHookDispatcher =
+        new FunctionHookDispatcher(functionOperationDispatcher);
     FunctionNormalizeDispatcher functionNormalizeDispatcher =
-        new FunctionNormalizeDispatcher(functionOperationDispatcher, catalogManager);
+        new FunctionNormalizeDispatcher(functionHookDispatcher, catalogManager);
     this.functionDispatcher = new FunctionEventDispatcher(eventBus, functionNormalizeDispatcher);
 
     // TODO: Add ViewHookDispatcher and ViewEventDispatcher when needed for view-specific hooks
