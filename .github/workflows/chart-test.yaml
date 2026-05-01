@@ -107,7 +107,7 @@ jobs:
           done
 
       - name: Set up kubectl
-        uses: azure/setup-kubectl@15650b3ad78fff148532a140b8a4c821796b2d7b
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d
 
       - name: Run chart-testing (install default,gravitino)
         if: steps.list-changed.outputs.changed == 'true'
