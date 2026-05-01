@@ -54,7 +54,6 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -559,21 +558,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private List<GroupEntity> resolveCurrentUserGroups(String metalake, EntityStore entityStore) {
     Principal principal = PrincipalUtils.getCurrentPrincipal();
-    List<GroupEntity> result = new ArrayList<>();
     if (!(principal instanceof UserPrincipal)) {
-      return result;
+      return new ArrayList<>();
     }
-    for (UserGroup group : ((UserPrincipal) principal).getGroups()) {
-      try {
-        NameIdentifier groupIdent = NameIdentifierUtil.ofGroup(metalake, group.getGroupname());
-        result.add(entityStore.get(groupIdent, Entity.EntityType.GROUP, GroupEntity.class));
-      } catch (NoSuchEntityException e) {
-        LOG.debug("Group not found in store: {}", group.getGroupname());
-      } catch (Exception e) {
-        LOG.warn("Failed to resolve group: {}", group.getGroupname(), e);
-      }
+    List<UserGroup> groups = ((UserPrincipal) principal).getGroups();
+    if (groups.isEmpty()) {
+      return new ArrayList<>();
     }
-    return result;
+    List<NameIdentifier> groupIdents =
+        groups.stream()
+            .map(g -> NameIdentifierUtil.ofGroup(metalake, g.getGroupname()))
+            .collect(Collectors.toList());
+    return entityStore.batchGet(groupIdents, Entity.EntityType.GROUP, GroupEntity.class);
   }
 
   /**

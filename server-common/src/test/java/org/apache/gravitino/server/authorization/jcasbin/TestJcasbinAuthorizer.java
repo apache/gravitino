@@ -56,7 +56,6 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
@@ -447,7 +446,7 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testStaleGroupSkippedWhenNoSuchEntity() throws Exception {
+  public void testStaleGroupSkippedWhenNotInStore() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
 
@@ -455,12 +454,12 @@ public class TestJcasbinAuthorizer {
     UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(staleGroupName);
 
     mockNoDirectUserRoles();
-    // Group lookup throws NoSuchEntityException (stale group reference in the principal)
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofGroup(METALAKE, staleGroupName)),
+    // batchGet silently skips missing entities -- the stale group returns an empty list
+    when(entityStore.batchGet(
+            eq(ImmutableList.of(NameIdentifierUtil.ofGroup(METALAKE, staleGroupName))),
             eq(Entity.EntityType.GROUP),
             eq(GroupEntity.class)))
-        .thenThrow(new NoSuchEntityException("group not found"));
+        .thenReturn(ImmutableList.of());
 
     // Authorization denied without throwing -- the stale group is silently skipped
     assertFalse(doAuthorize(groupPrincipal));
@@ -490,8 +489,8 @@ public class TestJcasbinAuthorizer {
 
     // Simulate group removing the role: invalidate the cache (same as handleRolePrivilegeChange)
     // and update the group mock to have no roles
-    jcasbinAuthorizer.handleRolePrivilegeChange(groupRoleId);
     mockGroupWithRoles(GROUP_NAME, ImmutableList.of(), ImmutableList.of());
+    jcasbinAuthorizer.handleRolePrivilegeChange(groupRoleId);
 
     // Authorization should now be denied -- the role was removed from the group
     assertFalse(doAuthorize(groupPrincipal));
@@ -525,8 +524,8 @@ public class TestJcasbinAuthorizer {
     assertTrue(doAuthorize(groupPrincipal));
 
     // Group removes the role; user still has it directly
-    jcasbinAuthorizer.handleRolePrivilegeChange(sharedRoleId);
     mockGroupWithRoles(GROUP_NAME, ImmutableList.of(), ImmutableList.of());
+    jcasbinAuthorizer.handleRolePrivilegeChange(sharedRoleId);
 
     // Authorization should still succeed -- role is retained via direct assignment
     assertTrue(doAuthorize(groupPrincipal));
@@ -580,7 +579,7 @@ public class TestJcasbinAuthorizer {
 
   /**
    * Builds a {@link GroupEntity} with the given role ids/names and registers it in the mocked
-   * entity store.
+   * entity store via batchGet.
    */
   private static GroupEntity mockGroupWithRoles(
       String groupName, List<Long> roleIds, List<String> roleNames) throws IOException {
@@ -593,11 +592,11 @@ public class TestJcasbinAuthorizer {
             .withRoleNames(roleNames)
             .withRoleIds(roleIds)
             .build();
-    when(entityStore.get(
-            eq(NameIdentifierUtil.ofGroup(METALAKE, groupName)),
+    when(entityStore.batchGet(
+            eq(ImmutableList.of(NameIdentifierUtil.ofGroup(METALAKE, groupName))),
             eq(Entity.EntityType.GROUP),
             eq(GroupEntity.class)))
-        .thenReturn(group);
+        .thenReturn(ImmutableList.of(group));
     return group;
   }
 
