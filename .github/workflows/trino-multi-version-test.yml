@@ -15,7 +15,7 @@ jobs:
       - uses: ./.github/actions/setup-java-toolchains
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Check required command
         run: dev/ci/check_commands.sh
