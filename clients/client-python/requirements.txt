@@ -24,7 +24,7 @@ fsspec==2026.2.0
 pyarrow==23.0.1
 cachetools==7.0.1
 gcsfs==2026.2.0
-s3fs==2026.2.0
+s3fs==2026.4.0
 ossfs==2025.5.0
 adlfs==2026.2.0
 black==26.1.0
