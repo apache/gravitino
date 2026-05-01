@@ -21,16 +21,24 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.io.IOException;
+import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
-import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.storage.IdGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,6 +97,33 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     return entityCombinedView;
   }
 
+  @Override
+  public NameIdentifier[] listViews(Namespace namespace) {
+    throw new UnsupportedOperationException("Listing views is not supported yet");
+  }
+
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    throw new UnsupportedOperationException("Dropping a view is not supported yet");
+  }
+
+  @Override
+  public View createView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      @Nullable String defaultCatalog,
+      @Nullable String defaultSchema,
+      Map<String, String> properties) {
+    throw new UnsupportedOperationException("Creating a view is not supported yet");
+  }
+
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes) {
+    throw new UnsupportedOperationException("Altering a view is not supported yet");
+  }
+
   /**
    * Internal method to load view and check if it exists in entity store.
    *
@@ -106,7 +141,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     // Check if view exists in entity store
     try {
-      GenericEntity viewEntity = store.get(ident, Entity.EntityType.VIEW, GenericEntity.class);
+      ViewEntity viewEntity = store.get(ident, Entity.EntityType.VIEW, ViewEntity.class);
       return EntityCombinedView.of(catalogView, viewEntity).withImported(true);
     } catch (NoSuchEntityException e) {
       // View not in store yet
@@ -135,22 +170,45 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
     LOG.info("Auto-importing view {} into Gravitino entity store", ident);
     long uid = idGenerator.nextId();
-    GenericEntity newViewEntity =
-        GenericEntity.builder()
-            .withId(uid)
-            .withName(ident.name())
-            .withNamespace(ident.namespace())
-            .withEntityType(Entity.EntityType.VIEW)
-            .build();
+    View catalogView = entityCombinedView.viewFromCatalog();
+    ViewEntity newViewEntity = buildViewEntityForImport(uid, ident, catalogView);
     try {
       store.put(newViewEntity, false /* overwrite */);
       LOG.info("Successfully imported view {} into entity store with id {}", ident, uid);
-      return EntityCombinedView.of(entityCombinedView.viewFromCatalog(), newViewEntity)
-          .withImported(true);
+      return EntityCombinedView.of(catalogView, newViewEntity).withImported(true);
     } catch (Exception e) {
       // Log but don't fail - view import is best-effort
       LOG.warn("Failed to import view {} into entity store: {}", ident, e.getMessage());
-      return EntityCombinedView.of(entityCombinedView.viewFromCatalog()).withImported(false);
+      return EntityCombinedView.of(catalogView).withImported(false);
     }
+  }
+
+  private ViewEntity buildViewEntityForImport(Long uid, NameIdentifier ident, View view) {
+    return ViewEntity.builder()
+        .withId(uid)
+        .withName(ident.name())
+        .withNamespace(ident.namespace())
+        .withComment(view.comment())
+        .withColumns(view.columns() == null ? new Column[0] : view.columns())
+        .withRepresentations(
+            view.representations() == null ? new Representation[0] : view.representations())
+        .withDefaultCatalog(view.defaultCatalog())
+        .withDefaultSchema(view.defaultSchema())
+        .withProperties(view.properties())
+        .withAuditInfo(toAuditInfo(view.auditInfo()))
+        .build();
+  }
+
+  private AuditInfo toAuditInfo(Audit audit) {
+    if (audit == null) {
+      return AuditInfo.EMPTY;
+    }
+
+    return AuditInfo.builder()
+        .withCreator(audit.creator())
+        .withCreateTime(audit.createTime())
+        .withLastModifier(audit.lastModifier())
+        .withLastModifiedTime(audit.lastModifiedTime())
+        .build();
   }
 }

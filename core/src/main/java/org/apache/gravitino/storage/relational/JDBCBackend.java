@@ -60,6 +60,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
@@ -211,14 +212,12 @@ public class JDBCBackend implements RelationalBackend {
       JobTemplateMetaService.getInstance().insertJobTemplate((JobTemplateEntity) e, overwritten);
     } else if (e instanceof JobEntity) {
       JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
+    } else if (e instanceof ViewEntity) {
+      ViewMetaService.getInstance().insertView((ViewEntity) e, overwritten);
     } else if (e instanceof GenericEntity) {
       GenericEntity genericEntity = (GenericEntity) e;
-      if (genericEntity.type() == Entity.EntityType.VIEW) {
-        ViewMetaService.getInstance().insertView(genericEntity, overwritten);
-      } else {
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for insert operation", genericEntity.type());
-      }
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for insert operation", genericEntity.type());
     } else {
       throw new UnsupportedEntityTypeException(
           "Unsupported entity type: %s for insert operation", e.getClass());
@@ -352,28 +351,44 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>)
             JobTemplateMetaService.getInstance().batchGetJobTemplateByIdentifier(identifiers);
       case USER:
-        // TODO: I will add batch operations for users, groups and views
+        // TODO: Add true batch SQL operations for users, groups, roles, and views
         List<E> users = Lists.newArrayList();
         for (NameIdentifier identifier : identifiers) {
-          users.add((E) UserMetaService.getInstance().getUserByIdentifier(identifier));
+          try {
+            users.add((E) UserMetaService.getInstance().getUserByIdentifier(identifier));
+          } catch (NoSuchEntityException e) {
+            LOG.debug("Skipping missing user during batch get: {}", identifier.name());
+          }
         }
         return users;
       case GROUP:
         List<E> groups = Lists.newArrayList();
         for (NameIdentifier identifier : identifiers) {
-          groups.add((E) GroupMetaService.getInstance().getGroupByIdentifier(identifier));
+          try {
+            groups.add((E) GroupMetaService.getInstance().getGroupByIdentifier(identifier));
+          } catch (NoSuchEntityException e) {
+            LOG.debug("Skipping missing group during batch get: {}", identifier.name());
+          }
         }
         return groups;
       case ROLE:
         List<E> roles = Lists.newArrayList();
         for (NameIdentifier identifier : identifiers) {
-          roles.add((E) RoleMetaService.getInstance().getRoleByIdentifier(identifier));
+          try {
+            roles.add((E) RoleMetaService.getInstance().getRoleByIdentifier(identifier));
+          } catch (NoSuchEntityException e) {
+            LOG.debug("Skipping missing role during batch get: {}", identifier.name());
+          }
         }
         return roles;
       case VIEW:
         List<E> views = Lists.newArrayList();
         for (NameIdentifier identifier : identifiers) {
-          views.add((E) ViewMetaService.getInstance().getViewByIdentifier(identifier));
+          try {
+            views.add((E) ViewMetaService.getInstance().getViewByIdentifier(identifier));
+          } catch (NoSuchEntityException e) {
+            LOG.debug("Skipping missing view during batch get: {}", identifier.name());
+          }
         }
         return views;
       default:

@@ -63,8 +63,12 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -942,20 +946,25 @@ public class TestEntityStorageRelationCache extends AbstractEntityStorageTest {
       store.put(schema, false);
 
       Namespace viewNamespace = Namespace.of("metalake", "catalog", "schema");
-      GenericEntity view =
-          GenericEntity.builder()
+      ViewEntity view =
+          ViewEntity.builder()
               .withId(RandomIdGenerator.INSTANCE.nextId())
               .withName("test_view")
               .withNamespace(viewNamespace)
-              .withEntityType(Entity.EntityType.VIEW)
+              .withColumns(new Column[0])
+              .withRepresentations(
+                  new Representation[] {
+                    SQLRepresentation.builder().withDialect("unknown").withSql("SELECT 1").build()
+                  })
+              .withAuditInfo(auditInfo)
               .build();
 
       // Use store.put() to trigger the actual cache + reverse index flow
       store.put(view, false);
 
       // Verify view IS in forward cache (performance cache for get operations)
-      GenericEntity retrievedView =
-          store.get(view.nameIdentifier(), Entity.EntityType.VIEW, GenericEntity.class);
+      ViewEntity retrievedView =
+          store.get(view.nameIdentifier(), Entity.EntityType.VIEW, ViewEntity.class);
       Assertions.assertNotNull(retrievedView);
       Assertions.assertEquals(view.id(), retrievedView.id());
       Assertions.assertEquals(view.name(), retrievedView.name());
