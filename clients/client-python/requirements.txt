@@ -21,7 +21,7 @@ requests==2.32.5
 dataclasses-json==0.6.7
 readerwriterlock==1.0.9
 fsspec==2026.2.0
-pyarrow==23.0.1
+pyarrow==24.0.0
 cachetools==7.0.1
 gcsfs==2026.2.0
 s3fs==2026.2.0
