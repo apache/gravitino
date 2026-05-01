@@ -27,6 +27,6 @@ gcsfs==2026.2.0
 s3fs==2026.2.0
 ossfs==2025.5.0
 adlfs==2026.2.0
-black==26.1.0
+black==26.3.1
 flake8==7.0.0
 pre-commit==3.5.0
