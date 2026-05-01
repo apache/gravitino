@@ -1,7 +1,7 @@
 --
 -- Licensed to the Apache Software Foundation (ASF) under one
 -- or more contributor license agreements.  See the NOTICE file
---  distributed with this work for additional information
+-- distributed with this work for additional information
 -- regarding copyright ownership.  The ASF licenses this file
 -- to you under the Apache License, Version 2.0 (the
 -- "License"). You may not use this file except in compliance
@@ -981,14 +981,15 @@ CREATE TABLE IF NOT EXISTS entity_change_log (
     metalake_name VARCHAR(128) NOT NULL,
     entity_type VARCHAR(32) NOT NULL,
     entity_full_name VARCHAR(512) NOT NULL,
+    -- Operate type code: 1=ALTER, 2=DROP, 3=INSERT. Codes are stable and never re-used.
     operate_type SMALLINT NOT NULL,
     created_at BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ecl_created_at ON entity_change_log(created_at);
-COMMENT ON TABLE entity_change_log IS 'Append-only log of entity structural changes';
+COMMENT ON TABLE entity_change_log IS 'Append-only log of entity structural changes for targeted metadataIdCache invalidation';
 COMMENT ON COLUMN entity_change_log.id IS 'auto increment id';
 COMMENT ON COLUMN entity_change_log.metalake_name IS 'metalake name';
-COMMENT ON COLUMN entity_change_log.entity_type IS 'entity type';
-COMMENT ON COLUMN entity_change_log.entity_full_name IS 'dot-separated full name of the affected entity';
+COMMENT ON COLUMN entity_change_log.entity_type IS 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW';
+COMMENT ON COLUMN entity_change_log.entity_full_name IS 'Dot-separated full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.';
 COMMENT ON COLUMN entity_change_log.operate_type IS 'Operate type code: 1=ALTER, 2=DROP, 3=INSERT. Codes are stable and never re-used.';
-COMMENT ON COLUMN entity_change_log.created_at IS 'change timestamp in millis';
+COMMENT ON COLUMN entity_change_log.created_at IS 'timestamp of the change in millis';
