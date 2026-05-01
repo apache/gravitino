@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -205,6 +207,13 @@ public class JobManager implements JobOperationDispatcher {
   public void registerJobTemplate(String metalake, JobTemplateEntity jobTemplateEntity)
       throws JobTemplateAlreadyExistsException {
     checkMetalake(NameIdentifierUtil.ofMetalake(metalake), entityStore);
+
+    // Warn if the template arguments have a ?-prefixed literal flag followed by a value arg that
+    // does not carry the ? marker. Such a pair will now be correctly skipped when the value is
+    // absent, but the missing ? is still worth flagging so template authors are aware of the
+    // convention.
+    warnIfMissingOptionalValueMarker(
+        jobTemplateEntity.templateContent().arguments(), jobTemplateEntity.name());
 
     NameIdentifier jobTemplateIdent =
         NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateEntity.name());
@@ -677,10 +686,7 @@ public class JobManager implements JobOperationDispatcher {
         fetchFileFromUri(
             replacePlaceholder(content.executable(), jobConf), stagingDir, TIMEOUT_IN_MS);
 
-    List<String> args =
-        content.arguments().stream()
-            .map(arg -> replacePlaceholder(arg, jobConf))
-            .collect(Collectors.toList());
+    List<String> args = buildArgumentsWithOptional(content.arguments(), jobConf);
     Map<String, String> environments =
         content.environments().entrySet().stream()
             .collect(
@@ -788,6 +794,174 @@ public class JobManager implements JobOperationDispatcher {
     matcher.appendTail(result);
 
     return result.toString();
+  }
+
+  /**
+   * Build arguments list with optional argument support.
+   *
+   * <p>Arguments prefixed with {@code ?} are <em>optional</em>. An optional argument is omitted
+   * from the final list when its resolved value is considered empty (see {@link
+   * #isEmptyValue(String)}). "Empty" means the value is {@code null}, blank, or an unreplaced
+   * placeholder (e.g. {@code {{key}}} where {@code key} is absent from {@code jobConf}).
+   *
+   * <p><b>Flag–value pairs</b>: a {@code ?}-prefixed <em>literal flag</em> and the immediately
+   * following value argument form a pair when the value contains a placeholder. The entire pair is
+   * skipped when the value resolves to empty, <em>regardless of whether the value argument itself
+   * carries a {@code ?} prefix</em>. When the value is non-empty both the flag and the value are
+   * included.
+   *
+   * <p><b>Independent optional placeholders</b>: two consecutive {@code ?{{...}}} arguments (both
+   * are placeholders, neither is a literal flag) are evaluated <em>independently</em>. The absence
+   * of one does not suppress the other.
+   *
+   * <p><b>Standalone optional literals</b>: a {@code ?}-prefixed literal flag that is the last
+   * element of the list, or whose next neighbour is also a literal flag (not a placeholder), is
+   * always included. There is no placeholder value to evaluate, so the {@code ?} has no effect. To
+   * make such a flag conditionally suppressible, pair it with a sentinel optional placeholder and
+   * omit the sentinel key from {@code jobConf}:
+   *
+   * <pre>
+   *   ["?--dry-run", "?{{dry_run_sentinel}}"]  // omit dry_run_sentinel to suppress both
+   * </pre>
+   *
+   * <p><b>Pattern reference</b>:
+   *
+   * <pre>
+   *   Template pattern                          | jobConf           | Result
+   *   -----------------------------------------+-------------------+---------------------------
+   *   ["?--strategy", "?{{strategy}}"]          | {strategy:binpack}| ["--strategy", "binpack"]
+   *   ["?--strategy", "?{{strategy}}"]          | {}                | []
+   *   ["?--strategy", "{{strategy}}"]           | {strategy:binpack}| ["--strategy", "binpack"]
+   *   ["?--strategy", "{{strategy}}"]           | {}                | []  (pair still skipped)
+   *   ["?{{opt1}}", "?{{opt2}}"]                | {opt1:v1}         | ["v1"]  (independent)
+   *   ["?--dry-run"]                            | {}                | ["--dry-run"]  (standalone)
+   * </pre>
+   *
+   * @param templateArgs Template argument list (may contain optional markers)
+   * @param jobConf Job configuration for placeholder replacement
+   * @return Final argument list with optional arguments filtered
+   */
+  @VisibleForTesting
+  static List<String> buildArgumentsWithOptional(
+      List<String> templateArgs, Map<String, String> jobConf) {
+    List<String> result = new ArrayList<>();
+
+    for (int i = 0; i < templateArgs.size(); i++) {
+      String arg = templateArgs.get(i);
+      boolean isOptional = arg.startsWith("?");
+      String cleanArg = isOptional ? arg.substring(1) : arg;
+
+      // Replace placeholder
+      String replacedArg = replacePlaceholder(cleanArg, jobConf);
+
+      // If optional and value is empty, skip this argument
+      if (isOptional && isEmptyValue(replacedArg)) {
+        continue;
+      }
+
+      // If this is an optional literal flag (not a placeholder itself) and the next argument
+      // contains a placeholder, the two form a flag-value pair. Skip both when the value resolves
+      // to empty — regardless of whether the value arg carries a ? prefix.
+      // Independent optional placeholders like ?{{opt1}} ?{{opt2}} are handled individually by
+      // the per-element check above.
+      if (isOptional
+          && !PLACEHOLDER_PATTERN.matcher(cleanArg).find()
+          && i + 1 < templateArgs.size()) {
+        String nextArg = templateArgs.get(i + 1);
+        boolean nextIsOptional = nextArg.startsWith("?");
+        String cleanNextArg = nextIsOptional ? nextArg.substring(1) : nextArg;
+        // Only treat them as a pair when the following arg contains a placeholder (i.e. it is a
+        // value slot, not another literal flag).
+        if (PLACEHOLDER_PATTERN.matcher(cleanNextArg).find()) {
+          String replacedNextArg = replacePlaceholder(cleanNextArg, jobConf);
+          if (isEmptyValue(replacedNextArg)) {
+            // Skip both the flag and its value
+            i++;
+            continue;
+          }
+        }
+      }
+
+      result.add(replacedArg);
+    }
+
+    return result;
+  }
+
+  /**
+   * Warn when a {@code ?}-prefixed literal flag is followed by a value argument that does not carry
+   * the {@code ?} optional marker.
+   *
+   * <p>Such a configuration is valid — the pair will still be correctly skipped when the value
+   * resolves to empty — but the missing {@code ?} on the value arg is likely an oversight, since
+   * the recommended convention is to mark both the flag and its value as optional. Logging a
+   * warning at template registration time surfaces the issue early, before any job is submitted.
+   *
+   * <p><b>Cases that do NOT trigger a warning</b>:
+   *
+   * <ul>
+   *   <li>The optional arg is itself a placeholder (e.g. {@code ?{{opt}}}), not a literal flag.
+   *   <li>The following arg is also {@code ?}-prefixed (well-formed pair, e.g. {@code ?{{value}}}).
+   *   <li>The following arg is another literal flag, not a value placeholder.
+   *   <li>The {@code ?}-prefixed literal flag is the last element of the list (standalone).
+   * </ul>
+   *
+   * @param arguments the raw argument list from the job template
+   * @param templateName the template name, used for log context
+   */
+  @VisibleForTesting
+  static void warnIfMissingOptionalValueMarker(List<String> arguments, String templateName) {
+    for (int i = 0; i < arguments.size() - 1; i++) {
+      String arg = arguments.get(i);
+      if (!arg.startsWith("?")) {
+        continue;
+      }
+      String cleanArg = arg.substring(1);
+      // Only interested in optional literal flags (not optional placeholders)
+      if (PLACEHOLDER_PATTERN.matcher(cleanArg).find()) {
+        continue;
+      }
+      String nextArg = arguments.get(i + 1);
+      if (!nextArg.startsWith("?") && PLACEHOLDER_PATTERN.matcher(nextArg).find()) {
+        LOG.warn(
+            "Job template '{}': optional flag '{}' is followed by value argument '{}' which does "
+                + "not carry the '?' optional marker. The pair will still be skipped when the "
+                + "value is absent, but consider adding '?' to the value argument (e.g. '?{}') "
+                + "to make the intent explicit.",
+            templateName,
+            arg,
+            nextArg,
+            nextArg);
+      }
+    }
+  }
+
+  /**
+   * Check if a value should be considered empty for optional argument filtering.
+   *
+   * <p>A value is considered empty if it is {@code null}, blank, or consists entirely of unreplaced
+   * placeholders (with only whitespace between them). This handles both single placeholders (e.g.
+   * {@code {{key}}}) and compound placeholder strings (e.g. {@code {{a}}{{b}}} or {@code {{prefix}}
+   * {{suffix}}}) where every placeholder key was absent from {@code jobConf}.
+   *
+   * <p>Note: if non-whitespace literal characters appear between placeholders (e.g. {@code
+   * {{k1}}/{{k2}}}), those characters are treated as meaningful content and the value is
+   * <em>not</em> considered empty, even when all keys are absent.
+   *
+   * @param value The value to check
+   * @return true if the value is null, blank, or consists solely of whitespace and unreplaced
+   *     {@code {{...}}} placeholder tokens
+   */
+  @VisibleForTesting
+  static boolean isEmptyValue(@Nullable String value) {
+    if (value == null || value.trim().isEmpty()) {
+      return true;
+    }
+    // Consider a value empty when it still contains placeholder tokens and, after stripping all
+    // of them out, nothing meaningful remains. This fixes compound placeholders such as
+    // "{{prefix}}{{suffix}}" or "{{a}} {{b}}" that .matches() would miss.
+    return PLACEHOLDER_PATTERN.matcher(value).find()
+        && value.replaceAll("\\{\\{[\\w.-]+\\}\\}", "").isBlank();
   }
 
   @VisibleForTesting
