@@ -469,6 +469,72 @@ public class TestJcasbinAuthorizer {
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
   }
 
+  @Test
+  public void testGroupRoleRevokedDeniesAccess() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+
+    // Group has a role that grants USE_CATALOG
+    Long groupRoleId = 10L;
+    RoleEntity groupRole =
+        mockRoleInStore(groupRoleId, "revokableRole", ImmutableList.of(getAllowSecurableObject()));
+
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(
+        GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of(groupRole.name()));
+
+    // Authorization succeeds via group-inherited role
+    assertTrue(doAuthorize(groupPrincipal));
+
+    // Simulate group removing the role: invalidate the cache (same as handleRolePrivilegeChange)
+    // and update the group mock to have no roles
+    jcasbinAuthorizer.handleRolePrivilegeChange(groupRoleId);
+    mockGroupWithRoles(GROUP_NAME, ImmutableList.of(), ImmutableList.of());
+
+    // Authorization should now be denied -- the role was removed from the group
+    assertFalse(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  @Test
+  public void testRoleSharedByUserAndGroupSurvivesGroupRevocation() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+
+    // The same role is assigned both directly to the user AND to the user's group
+    Long sharedRoleId = 11L;
+    RoleEntity sharedRole =
+        mockRoleInStore(sharedRoleId, "sharedRole", ImmutableList.of(getAllowSecurableObject()));
+
+    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.USER)))
+        .thenReturn(ImmutableList.of(sharedRole));
+    mockGroupWithRoles(
+        GROUP_NAME, ImmutableList.of(sharedRoleId), ImmutableList.of(sharedRole.name()));
+
+    // Authorization succeeds (role via both direct and group)
+    assertTrue(doAuthorize(groupPrincipal));
+
+    // Group removes the role; user still has it directly
+    jcasbinAuthorizer.handleRolePrivilegeChange(sharedRoleId);
+    mockGroupWithRoles(GROUP_NAME, ImmutableList.of(), ImmutableList.of());
+
+    // Authorization should still succeed -- role is retained via direct assignment
+    assertTrue(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
   /**
    * Sets the current principal mock to a {@link UserPrincipal} with the given group, or with no
    * groups when {@code groupName} is null. Returns the principal for use in assertions.
