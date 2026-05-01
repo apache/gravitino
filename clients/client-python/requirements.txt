@@ -22,7 +22,7 @@ dataclasses-json==0.6.7
 readerwriterlock==1.0.9
 fsspec==2026.2.0
 pyarrow==23.0.1
-cachetools==7.0.1
+cachetools==7.0.6
 gcsfs==2026.2.0
 s3fs==2026.2.0
 ossfs==2025.5.0
