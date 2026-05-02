@@ -943,6 +943,97 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testIntraRoleDenyBeatsAllowForSameKey() throws Exception {
+    // Within a single role, granting both ALLOW and DENY for the same (type, metadataId,
+    // privilege) must resolve to DENY. The unified resolveEffect relies on
+    // loadPolicyByRoleEntity's merge function (existing == DENY ? existing : incoming) to enforce
+    // intra-role priority, so authorize/deny see DENY regardless of insertion order.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    Long roleId = 2020L;
+    SecurableObject allow =
+        makeSecurableObject(
+            "testCatalog", MetadataObject.Type.CATALOG, roleId, USE_CATALOG, "ALLOW");
+    SecurableObject deny =
+        makeSecurableObject(
+            "testCatalog", MetadataObject.Type.CATALOG, roleId, USE_CATALOG, "DENY");
+    RoleEntity mixedRole =
+        getRoleEntity(roleId, "mixedSameKey" + roleId, ImmutableList.of(allow, deny));
+    mockRoleEntity(mixedRole);
+    mockUserRoles(userIdent, mixedRole);
+
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+    assertFalse(jcasbinAuthorizer.authorize(currentPrincipal, METALAKE, catalog, USE_CATALOG, ctx));
+    assertTrue(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, catalog, USE_CATALOG, ctx));
+
+    Cache<Long, Map<JcasbinAuthorizer.PolicyKey, JcasbinAuthorizer.Effect>> loadedRoles =
+        getLoadedRolesCache(jcasbinAuthorizer);
+    assertEquals(
+        JcasbinAuthorizer.Effect.DENY,
+        loadedRoles
+            .getIfPresent(roleId)
+            .get(new JcasbinAuthorizer.PolicyKey("CATALOG", CATALOG_ID, "USE_CATALOG")));
+  }
+
+  @Test
+  public void testAuthorizeAndDenyBothFalseWhenRoleHasNoRuleForKey() throws Exception {
+    // The role grants USE_CATALOG on the catalog but the request probes SELECT_TABLE. The shared
+    // resolver returns null (no matching rule), so both endpoints must return false. This guards
+    // against the unified resolveEffect collapsing "no rule" into either ALLOW or DENY.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    Long roleId = 2021L;
+    RoleEntity role =
+        getRoleEntity(
+            roleId,
+            "noRuleRole" + roleId,
+            ImmutableList.of(
+                makeSecurableObject(
+                    "testCatalog", MetadataObject.Type.CATALOG, roleId, USE_CATALOG, "ALLOW")));
+    mockRoleEntity(role);
+    mockUserRoles(userIdent, role);
+
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+    assertFalse(
+        jcasbinAuthorizer.authorize(currentPrincipal, METALAKE, catalog, SELECT_TABLE, ctx));
+    assertFalse(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, catalog, SELECT_TABLE, ctx));
+  }
+
+  @Test
+  public void testAuthorizeAndDenyShareSameResolveAcrossPrivileges() throws Exception {
+    // A single role grants ALLOW on USE_CATALOG and DENY on USE_SCHEMA for the same metadata
+    // object. The unified resolveEffect must return the corresponding Effect for each PolicyKey
+    // independently, so authorize/deny disagree per privilege rather than collapsing to one
+    // verdict for the whole role. This is the core property roryqi asked for: one resolver, two
+    // endpoints differing only in how they compare the result.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    Long roleId = 2022L;
+    SecurableObject allowUseCatalog =
+        makeSecurableObject(
+            "testCatalog", MetadataObject.Type.CATALOG, roleId, USE_CATALOG, "ALLOW");
+    SecurableObject denyUseSchema =
+        makeSecurableObject("testCatalog", MetadataObject.Type.CATALOG, roleId, USE_SCHEMA, "DENY");
+    RoleEntity role =
+        getRoleEntity(
+            roleId, "mixedPrivRole" + roleId, ImmutableList.of(allowUseCatalog, denyUseSchema));
+    mockRoleEntity(role);
+    mockUserRoles(userIdent, role);
+
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+    AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+    assertTrue(jcasbinAuthorizer.authorize(currentPrincipal, METALAKE, catalog, USE_CATALOG, ctx));
+    assertFalse(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, catalog, USE_CATALOG, ctx));
+    assertFalse(jcasbinAuthorizer.authorize(currentPrincipal, METALAKE, catalog, USE_SCHEMA, ctx));
+    assertTrue(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, catalog, USE_SCHEMA, ctx));
+  }
+
+  @Test
   public void testCacheInitialization() throws Exception {
     // Verify that caches are initialized
     Cache<Long, Map<JcasbinAuthorizer.PolicyKey, JcasbinAuthorizer.Effect>> loadedRoles =
