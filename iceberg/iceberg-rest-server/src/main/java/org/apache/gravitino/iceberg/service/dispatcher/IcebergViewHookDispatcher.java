@@ -69,13 +69,23 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     importView(context.catalogName(), namespace, createViewRequest.name());
 
     // Set ownership for the newly created view
-    IcebergOwnershipUtils.setViewOwner(
-        metalake,
-        context.catalogName(),
-        namespace,
-        createViewRequest.name(),
-        context.userName(),
-        GravitinoEnv.getInstance().ownerDispatcher());
+    try {
+      IcebergOwnershipUtils.setViewOwner(
+          metalake,
+          context.catalogName(),
+          namespace,
+          createViewRequest.name(),
+          context.userName(),
+          GravitinoEnv.getInstance().ownerDispatcher());
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to set owner for view: {}.{}.{}.{} - {}",
+          metalake,
+          context.catalogName(),
+          namespace,
+          createViewRequest.name(),
+          e.getMessage());
+    }
 
     return response;
   }
