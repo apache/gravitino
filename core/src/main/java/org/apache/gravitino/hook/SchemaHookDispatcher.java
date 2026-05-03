@@ -89,8 +89,10 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.SCHEMA);
     boolean dropped = dispatcher.dropSchema(ident, cascade);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.SCHEMA, locations);
+    if (dropped) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.SCHEMA, locations);
+    }
     return dropped;
   }
 

@@ -20,21 +20,27 @@ package org.apache.gravitino.hook;
 
 import static org.mockito.ArgumentMatchers.any;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.catalog.TestTopicOperationDispatcher;
+import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestTopicHookDispatcher extends TestOperationDispatcher {
@@ -76,5 +82,29 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
         () -> {
           topicHookDispatcher.dropTopic(topicIdent);
         });
+  }
+
+  @Test
+  public void testDropTopicShouldNotRemovePrivilegesWhenDropFails() {
+    TopicDispatcher dispatcher = Mockito.mock(TopicDispatcher.class);
+    TopicHookDispatcher hookDispatcher = new TopicHookDispatcher(dispatcher);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+
+    Mockito.when(dispatcher.dropTopic(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(() -> AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TOPIC))
+          .thenReturn(ImmutableList.of("/test"));
+
+      boolean dropped = hookDispatcher.dropTopic(ident);
+
+      Assertions.assertFalse(dropped);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.TOPIC, ImmutableList.of("/test")),
+          Mockito.never());
+    }
   }
 }
