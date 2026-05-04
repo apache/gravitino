@@ -17,28 +17,14 @@
  * under the License.
  */
 
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
+package org.apache.gravitino.auth.local;
 
-dependencies {
-  implementation(project(":api"))
-  implementation(project(":common"))
-  implementation(project(":core"))
-  implementation(project(":server-common"))
-  implementation(libs.argon2.jvm)
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
+/** Password hasher abstraction for local authentication. */
+public interface PasswordHasher {
 
-  testImplementation(libs.junit.jupiter.api)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+  /** Hash a plain text password for persistence. */
+  String hash(String plainPassword);
 
-tasks {
-  test {
-    environment("GRAVITINO_HOME", rootDir.path)
-    environment("GRAVITINO_TEST", "true")
-  }
+  /** Verify a plain text password against a stored hash. */
+  boolean verify(String plainPassword, String hashedPassword);
 }

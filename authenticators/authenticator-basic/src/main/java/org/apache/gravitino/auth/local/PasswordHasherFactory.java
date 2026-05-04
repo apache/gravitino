@@ -17,28 +17,15 @@
  * under the License.
  */
 
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
+package org.apache.gravitino.auth.local;
 
-dependencies {
-  implementation(project(":api"))
-  implementation(project(":common"))
-  implementation(project(":core"))
-  implementation(project(":server-common"))
-  implementation(libs.argon2.jvm)
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
+/** Factory for password hasher implementations. */
+public final class PasswordHasherFactory {
 
-  testImplementation(libs.junit.jupiter.api)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+  private PasswordHasherFactory() {}
 
-tasks {
-  test {
-    environment("GRAVITINO_HOME", rootDir.path)
-    environment("GRAVITINO_TEST", "true")
+  /** Create the built-in password hasher. */
+  public static PasswordHasher create() {
+    return new Argon2idPasswordHasher();
   }
 }
