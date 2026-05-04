@@ -37,6 +37,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.junit.jupiter.api.Test;
 
@@ -74,6 +75,27 @@ public class TestAuthenticationFilter {
         .thenThrow(new UnauthorizedException("UNAUTHORIZED"));
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED");
+  }
+
+  @Test
+  public void testDoFilterWithBadRequestException() throws ServletException, IOException {
+    Authenticator authenticator = mock(Authenticator.class);
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(
+            new Vector<>(Collections.singletonList(AuthConstants.AUTHORIZATION_BASIC_HEADER))
+                .elements());
+    when(authenticator.supportsToken(any())).thenReturn(true);
+    when(authenticator.isDataFromToken()).thenReturn(true);
+    when(authenticator.authenticateToken(any()))
+        .thenThrow(new BadRequestException("MALFORMED_BASIC_HEADER"));
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+
+    verify(mockResponse).sendError(HttpServletResponse.SC_BAD_REQUEST, "MALFORMED_BASIC_HEADER");
   }
 
   @Test

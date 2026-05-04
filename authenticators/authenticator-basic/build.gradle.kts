@@ -17,22 +17,25 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth;
+plugins {
+  `maven-publish`
+  id("java")
+  id("idea")
+}
 
-/** The type of authenticator for http/https request. */
-public enum AuthenticatorType {
-  /** No authentication. */
-  NONE,
+dependencies {
+  implementation(project(":api"))
+  implementation(project(":common"))
+  implementation(project(":core"))
+  implementation(project(":server-common"))
 
-  /** Simple authentication. */
-  SIMPLE,
+  testImplementation(libs.junit.jupiter.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
+}
 
-  /** Authentication that uses local basic auth. */
-  BASIC,
-
-  /** Authentication that uses OAuth. */
-  OAUTH,
-
-  /** Authentication that uses Kerberos. */
-  KERBEROS
+tasks {
+  test {
+    environment("GRAVITINO_HOME", rootDir.path)
+    environment("GRAVITINO_TEST", "true")
+  }
 }
