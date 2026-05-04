@@ -502,6 +502,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake, String username, Long userId, AuthorizationRequestContext requestContext) {
     requestContext.loadRole(
         () -> {
+          // TODO: Consider calling allowEnforcer.deleteUser(userId) and
+          //  denyEnforcer.deleteUser(userId) here to clear stale g-rows when a user is removed
+          //  from a group at the IdP level. Currently there is no hook signal for IdP group
+          //  membership changes, so stale group-inherited roles can persist until cache TTL.
           EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
           NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
           List<RoleEntity> entities;

@@ -74,6 +74,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.casbin.jcasbin.main.Enforcer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
@@ -172,6 +173,21 @@ public class TestJcasbinAuthorizer {
     if (gravitinoEnvMockedStatic != null) {
       gravitinoEnvMockedStatic.close();
     }
+  }
+
+  @BeforeEach
+  public void resetSharedState() throws Exception {
+    // Reset shared enforcer and cache state to prevent test ordering contamination.
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    restoreDefaultPrincipal();
+    // Reset role-user relation mock to return empty list (no roles) by default; individual tests
+    // can override as needed.
+    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.USER)))
+        .thenReturn(ImmutableList.of());
   }
 
   @Test
@@ -529,6 +545,250 @@ public class TestJcasbinAuthorizer {
 
     // Authorization should still succeed -- role is retained via direct assignment
     assertTrue(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
+   * Inverse of {@link #testRoleSharedByUserAndGroupSurvivesGroupRevocation}: the same role is
+   * assigned to both the user directly AND the user's group. When the role is revoked from the
+   * user, the group still has it. Access should survive via group inheritance.
+   */
+  @Test
+  public void testRoleSharedByUserAndGroupSurvivesUserRevocation() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+
+    // The same role is assigned both directly to the user AND to the user's group
+    Long sharedRoleId = 12L;
+    RoleEntity sharedRole =
+        mockRoleInStore(
+            sharedRoleId, "sharedRoleForUserRevoke", ImmutableList.of(getAllowSecurableObject()));
+
+    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.USER)))
+        .thenReturn(ImmutableList.of(sharedRole));
+    mockGroupWithRoles(
+        GROUP_NAME, ImmutableList.of(sharedRoleId), ImmutableList.of(sharedRole.name()));
+
+    // Authorization succeeds (role via both direct and group)
+    assertTrue(doAuthorize(groupPrincipal));
+
+    // User loses the role directly; group still has it
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.USER)))
+        .thenReturn(ImmutableList.of());
+    jcasbinAuthorizer.handleRolePrivilegeChange(sharedRoleId);
+
+    // Authorization should still succeed -- role is retained via group inheritance
+    assertTrue(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
+   * When the user is removed from a group at the IdP level (e.g. Azure AD), the next JWT token
+   * won't include that group. On the next request the group's roles should no longer be available.
+   */
+  @Test
+  public void testUserRemovedFromGroupAtIdpDeniesAccess() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+
+    // Group has a role that grants USE_CATALOG; user has no direct roles
+    Long groupRoleId = 13L;
+    RoleEntity groupRole =
+        mockRoleInStore(groupRoleId, "idpGroupRole", ImmutableList.of(getAllowSecurableObject()));
+
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(
+        GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of(groupRole.name()));
+
+    // Authorization succeeds via group-inherited role
+    assertTrue(doAuthorize(groupPrincipal));
+
+    // User is removed from the group at the IdP level -- next token has no groups.
+    UserPrincipal noGroupPrincipal = setCurrentPrincipalWithGroup(null);
+
+    // Known limitation: stale g-rows from the previous request still grant access because
+    // there is no signal path from the IdP into Gravitino for group membership changes.
+    // Access persists until the role's cache entry is evicted (TTL or explicit invalidation).
+    assertTrue(doAuthorize(noGroupPrincipal));
+
+    // Simulate cache invalidation by calling handleRolePrivilegeChange.
+    // After cache invalidation (e.g. TTL expiry), the role is re-resolved and access is denied.
+    jcasbinAuthorizer.handleRolePrivilegeChange(groupRoleId);
+    assertFalse(doAuthorize(noGroupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
+   * When a user belongs to multiple groups and one group's role is revoked, roles from the other
+   * group should still grant access.
+   */
+  @Test
+  public void testMultipleGroupsPartialRevocationRetainsAccess() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    String groupA = "groupA";
+    String groupB = "groupB";
+    Long groupAId = 14L;
+    Long groupBId = 15L;
+
+    // Principal belongs to two groups
+    UserPrincipal multiGroupPrincipal =
+        new UserPrincipal(
+            USERNAME,
+            ImmutableList.of(
+                new UserGroup(Optional.empty(), groupA), new UserGroup(Optional.empty(), groupB)));
+    principalUtilsMockedStatic
+        .when(PrincipalUtils::getCurrentPrincipal)
+        .thenReturn(multiGroupPrincipal);
+
+    // Group A has a role with USE_CATALOG; Group B has a different role also with USE_CATALOG
+    Long roleAId = 16L;
+    Long roleBId = 17L;
+    RoleEntity roleA =
+        mockRoleInStore(roleAId, "roleA", ImmutableList.of(getAllowSecurableObject()));
+    RoleEntity roleB =
+        mockRoleInStore(roleBId, "roleB", ImmutableList.of(getAllowSecurableObject()));
+
+    mockNoDirectUserRoles();
+
+    GroupEntity groupAEntity =
+        GroupEntity.builder()
+            .withId(groupAId)
+            .withName(groupA)
+            .withNamespace(Namespace.of(METALAKE, "group"))
+            .withAuditInfo(AuditInfo.EMPTY)
+            .withRoleNames(ImmutableList.of(roleA.name()))
+            .withRoleIds(ImmutableList.of(roleAId))
+            .build();
+    GroupEntity groupBEntity =
+        GroupEntity.builder()
+            .withId(groupBId)
+            .withName(groupB)
+            .withNamespace(Namespace.of(METALAKE, "group"))
+            .withAuditInfo(AuditInfo.EMPTY)
+            .withRoleNames(ImmutableList.of(roleB.name()))
+            .withRoleIds(ImmutableList.of(roleBId))
+            .build();
+    when(entityStore.batchGet(
+            eq(
+                ImmutableList.of(
+                    NameIdentifierUtil.ofGroup(METALAKE, groupA),
+                    NameIdentifierUtil.ofGroup(METALAKE, groupB))),
+            eq(Entity.EntityType.GROUP),
+            eq(GroupEntity.class)))
+        .thenReturn(ImmutableList.of(groupAEntity, groupBEntity));
+
+    // Authorization succeeds
+    assertTrue(doAuthorize(multiGroupPrincipal));
+
+    // Revoke roleA from groupA; groupB still has roleB
+    GroupEntity groupANoRoles =
+        GroupEntity.builder()
+            .withId(groupAId)
+            .withName(groupA)
+            .withNamespace(Namespace.of(METALAKE, "group"))
+            .withAuditInfo(AuditInfo.EMPTY)
+            .withRoleNames(ImmutableList.of())
+            .withRoleIds(ImmutableList.of())
+            .build();
+    when(entityStore.batchGet(
+            eq(
+                ImmutableList.of(
+                    NameIdentifierUtil.ofGroup(METALAKE, groupA),
+                    NameIdentifierUtil.ofGroup(METALAKE, groupB))),
+            eq(Entity.EntityType.GROUP),
+            eq(GroupEntity.class)))
+        .thenReturn(ImmutableList.of(groupANoRoles, groupBEntity));
+    jcasbinAuthorizer.handleRolePrivilegeChange(roleAId);
+
+    // Authorization should still succeed via groupB's role
+    assertTrue(doAuthorize(multiGroupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /**
+   * When a group grants an ALLOW privilege and a user has a direct DENY on the same resource, the
+   * deny should take precedence (deny wins over allow).
+   */
+  @Test
+  public void testDenyRoleOnUserOverridesAllowFromGroup() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+
+    // Group has an allow role
+    Long allowRoleId = 18L;
+    RoleEntity allowRole =
+        mockRoleInStore(allowRoleId, "groupAllowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockGroupWithRoles(
+        GROUP_NAME, ImmutableList.of(allowRoleId), ImmutableList.of(allowRole.name()));
+
+    // User has a deny role directly
+    Long denyRoleId = 19L;
+    RoleEntity denyRole =
+        mockRoleInStore(denyRoleId, "userDenyRole", ImmutableList.of(getDenySecurableObject()));
+    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.USER)))
+        .thenReturn(ImmutableList.of(denyRole));
+
+    // Deny should win -- user has explicit deny even though group provides allow
+    assertFalse(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** Inverse: group has a DENY role while user has a direct ALLOW role. Deny should still win. */
+  @Test
+  public void testDenyRoleFromGroupOverridesAllowOnUser() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+
+    // Group has a deny role
+    Long denyRoleId = 20L;
+    RoleEntity denyRole =
+        mockRoleInStore(denyRoleId, "groupDenyRole", ImmutableList.of(getDenySecurableObject()));
+    mockGroupWithRoles(GROUP_NAME, ImmutableList.of(denyRoleId), ImmutableList.of(denyRole.name()));
+
+    // User has an allow role directly
+    Long allowRoleId = 21L;
+    RoleEntity allowRole =
+        mockRoleInStore(allowRoleId, "userAllowRole", ImmutableList.of(getAllowSecurableObject()));
+    NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    when(supportsRelationOperations.listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.ROLE_USER_REL),
+            eq(userNameIdentifier),
+            eq(Entity.EntityType.USER)))
+        .thenReturn(ImmutableList.of(allowRole));
+
+    // Deny should win -- group provides deny even though user has direct allow
+    assertFalse(doAuthorize(groupPrincipal));
 
     restoreDefaultPrincipal();
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
