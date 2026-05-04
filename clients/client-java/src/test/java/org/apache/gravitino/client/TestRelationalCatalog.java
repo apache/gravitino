@@ -86,6 +86,7 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.hc.core5.http.Method;
@@ -714,6 +715,68 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertTrue(ex1.getMessage().contains("table already exists"));
   }
 
+  @Test
+  public void testCreateIndexTableWithProperties() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of("schema1", "index_with_properties");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
+    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace));
+
+    ColumnDTO[] columns =
+        new ColumnDTO[] {
+          createMockColumn("id", Types.IntegerType.get(), "id"),
+          createMockColumn("amount", Types.DoubleType.get(), "amount")
+        };
+    IndexDTO[] indexDTOs =
+        new IndexDTO[] {
+          IndexDTO.builder()
+              .withName("idx_amount_mm")
+              .withIndexType(IndexDTO.IndexType.DATA_SKIPPING_MINMAX)
+              .withFieldNames(new String[][] {{"amount"}})
+              .withProperties(ImmutableMap.of("granularity", "9"))
+              .build()
+        };
+
+    TableDTO expectedTable =
+        createMockTable(
+            tableId.name(),
+            columns,
+            "comment",
+            Collections.emptyMap(),
+            EMPTY_PARTITIONING,
+            DistributionDTO.NONE,
+            SortOrderDTO.EMPTY_SORT,
+            indexDTOs);
+
+    TableCreateRequest req =
+        new TableCreateRequest(
+            tableId.name(),
+            "comment",
+            columns,
+            Collections.emptyMap(),
+            SortOrderDTO.EMPTY_SORT,
+            DistributionDTO.NONE,
+            EMPTY_PARTITIONING,
+            indexDTOs);
+    buildMockResource(Method.POST, tablePath, req, new TableResponse(expectedTable), SC_OK);
+
+    Table table =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableId,
+                fromDTOs(columns),
+                "comment",
+                Collections.emptyMap(),
+                EMPTY_PARTITIONING,
+                DistributionDTO.NONE,
+                SortOrderDTO.EMPTY_SORT,
+                indexDTOs);
+
+    Assertions.assertEquals(1, table.index().length);
+    Assertions.assertEquals("idx_amount_mm", table.index()[0].name());
+    Assertions.assertEquals("9", table.index()[0].properties().get("granularity"));
+  }
+
   private void assertTableEquals(Table expected, Table actual) {
     Assertions.assertEquals(expected.name(), actual.name());
     Assertions.assertEquals(expected.comment(), actual.comment());
@@ -780,6 +843,46 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   @Test
+  public void testLoadTableWithIndexProperties() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table_with_index_properties");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
+    String tablePath =
+        withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace) + "/" + tableId.name());
+    ColumnDTO[] columns =
+        new ColumnDTO[] {
+          createMockColumn("id", Types.IntegerType.get(), "id"),
+          createMockColumn("amount", Types.DoubleType.get(), "amount")
+        };
+    IndexDTO[] indexDTOs =
+        new IndexDTO[] {
+          IndexDTO.builder()
+              .withName("idx_amount_mm")
+              .withIndexType(IndexDTO.IndexType.DATA_SKIPPING_MINMAX)
+              .withFieldNames(new String[][] {{"amount"}})
+              .withProperties(ImmutableMap.of("granularity", "9"))
+              .build()
+        };
+
+    TableDTO expectedTable =
+        createMockTable(
+            tableId.name(),
+            columns,
+            "comment",
+            Collections.emptyMap(),
+            EMPTY_PARTITIONING,
+            DistributionDTO.NONE,
+            SortOrderDTO.EMPTY_SORT,
+            indexDTOs);
+
+    buildMockResource(Method.GET, tablePath, null, new TableResponse(expectedTable), SC_OK);
+
+    Table table = catalog.asTableCatalog().loadTable(tableId);
+    Assertions.assertEquals(1, table.index().length);
+    Assertions.assertEquals("idx_amount_mm", table.index()[0].name());
+    Assertions.assertEquals("9", table.index()[0].properties().get("granularity"));
+  }
+
+  @Test
   public void testRenameTable() throws JsonProcessingException {
     NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
     ColumnDTO[] columns =
@@ -801,6 +904,54 @@ public class TestRelationalCatalog extends TestBase {
         new TableUpdateRequest.RenameTableRequest(expectedTable.name());
 
     testAlterTable(tableId, req, expectedTable);
+  }
+
+  @Test
+  public void testAddTableIndexWithProperties() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table1");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
+    String tablePath =
+        withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace) + "/" + tableId.name());
+
+    ColumnDTO[] columns =
+        new ColumnDTO[] {
+          createMockColumn("id", Types.IntegerType.get(), "id"),
+          createMockColumn("amount", Types.DoubleType.get(), "amount")
+        };
+    IndexDTO[] indexDTOs =
+        new IndexDTO[] {
+          IndexDTO.builder()
+              .withName("idx_amount_mm")
+              .withIndexType(IndexDTO.IndexType.DATA_SKIPPING_MINMAX)
+              .withFieldNames(new String[][] {{"amount"}})
+              .withProperties(ImmutableMap.of("granularity", "7"))
+              .build()
+        };
+    TableDTO expectedTable =
+        createMockTable(
+            tableId.name(),
+            columns,
+            "comment",
+            Collections.emptyMap(),
+            EMPTY_PARTITIONING,
+            DistributionDTO.NONE,
+            SortOrderDTO.EMPTY_SORT,
+            indexDTOs);
+
+    TableUpdateRequest.AddTableIndexRequest request =
+        new TableUpdateRequest.AddTableIndexRequest(
+            Index.IndexType.DATA_SKIPPING_MINMAX,
+            "idx_amount_mm",
+            new String[][] {{"amount"}},
+            ImmutableMap.of("granularity", "7"));
+    TableUpdatesRequest updatesRequest = new TableUpdatesRequest(ImmutableList.of(request));
+    buildMockResource(
+        Method.PUT, tablePath, updatesRequest, new TableResponse(expectedTable), SC_OK);
+
+    Table alteredTable = catalog.asTableCatalog().alterTable(tableId, request.tableChange());
+    Assertions.assertEquals(1, alteredTable.index().length);
+    Assertions.assertEquals("idx_amount_mm", alteredTable.index()[0].name());
+    Assertions.assertEquals("7", alteredTable.index()[0].properties().get("granularity"));
   }
 
   @Test
