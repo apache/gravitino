@@ -115,22 +115,19 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       return properties;
     }
 
-    // Paimon does not allow 'bucket-key' with bucket=-1 (dynamic mode).
-    if (number != Distributions.AUTO && hasExpressions) {
-      String bucketKey =
-          Arrays.stream(expressions)
-              .map(
-                  e -> {
-                    Preconditions.checkArgument(
-                        e instanceof NamedReference,
-                        "Paimon bucket-key expressions must be NamedReference, but got: %s",
-                        e.getClass().getSimpleName());
-                    return ((NamedReference) e).fieldName()[0];
-                  })
-              .collect(Collectors.joining(","));
-      if (StringUtils.isNotBlank(bucketKey)) {
-        properties.put(PaimonConstants.BUCKET_KEY, bucketKey);
-      }
+    String bucketKey =
+        Arrays.stream(expressions)
+            .map(
+                e -> {
+                  Preconditions.checkArgument(
+                      e instanceof NamedReference,
+                      "Paimon bucket-key expressions must be NamedReference, but got: %s",
+                      e.getClass().getSimpleName());
+                  return ((NamedReference) e).fieldName()[0];
+                })
+            .collect(Collectors.joining(","));
+    if (StringUtils.isNotBlank(bucketKey)) {
+      properties.put(PaimonConstants.BUCKET_KEY, bucketKey);
     }
     properties.put(PaimonConstants.BUCKET_NUM, String.valueOf(number));
     return properties;
