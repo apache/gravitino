@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local;
+package org.apache.gravitino.server.authentication;
 
 import java.nio.charset.StandardCharsets;
 import org.apache.gravitino.auth.AuthConstants;

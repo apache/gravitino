@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local;
+package org.apache.gravitino.auth.local.password;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

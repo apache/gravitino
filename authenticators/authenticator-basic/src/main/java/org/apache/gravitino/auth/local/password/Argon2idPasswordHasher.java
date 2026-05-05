@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local;
+package org.apache.gravitino.auth.local.password;
 
 import com.google.common.base.Preconditions;
 import de.mkammerer.argon2.Argon2;

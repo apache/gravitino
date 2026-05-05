@@ -24,7 +24,6 @@ import java.util.List;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthenticatorType;
-import org.apache.gravitino.auth.local.BasicAuthenticator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

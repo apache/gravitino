@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local;
+package org.apache.gravitino.server.authentication;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Principal;
@@ -27,7 +27,6 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
-import org.apache.gravitino.server.authentication.Authenticator;
 
 /**
  * Basic authenticator wiring for the local authentication module.

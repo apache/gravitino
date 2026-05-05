@@ -17,14 +17,15 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local;
+package org.apache.gravitino.auth.local.password;
 
-/** Password hasher abstraction for local authentication. */
-public interface PasswordHasher {
+/** Factory for password hasher implementations. */
+public final class PasswordHasherFactory {
 
-  /** Hash a plain text password for persistence. */
-  String hash(String plainPassword);
+  private PasswordHasherFactory() {}
 
-  /** Verify a plain text password against a stored hash. */
-  boolean verify(String plainPassword, String hashedPassword);
+  /** Create the built-in password hasher. */
+  public static PasswordHasher create() {
+    return new Argon2idPasswordHasher();
+  }
 }
