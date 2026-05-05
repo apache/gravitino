@@ -36,25 +36,19 @@ import org.apache.gravitino.auth.local.password.PasswordHasherFactory;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
-import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 
 public class BasicAuthenticator implements Authenticator {
   private static final String BASIC_AUTH_CHALLENGE = "Basic";
 
   private IdpUserMetaService userMetaService;
-  private IdpGroupMetaService groupMetaService;
   private PasswordHasher passwordHasher;
 
   public BasicAuthenticator() {}
 
   @VisibleForTesting
-  BasicAuthenticator(
-      IdpUserMetaService userMetaService,
-      IdpGroupMetaService groupMetaService,
-      PasswordHasher passwordHasher) {
+  BasicAuthenticator(IdpUserMetaService userMetaService, PasswordHasher passwordHasher) {
     this.userMetaService = userMetaService;
-    this.groupMetaService = groupMetaService;
     this.passwordHasher = passwordHasher;
   }
 
@@ -66,7 +60,7 @@ public class BasicAuthenticator implements Authenticator {
   @Override
   public Principal authenticateToken(byte[] tokenData) {
     Preconditions.checkState(
-        userMetaService != null && groupMetaService != null && passwordHasher != null,
+        userMetaService != null && passwordHasher != null,
         "Basic authenticator has not been initialized");
     if (tokenData == null) {
       throw new UnauthorizedException("Empty token authorization header", BASIC_AUTH_CHALLENGE);
@@ -117,7 +111,7 @@ public class BasicAuthenticator implements Authenticator {
       }
 
       List<UserGroup> groups =
-          groupMetaService.listGroupNames(userPO.getUserId()).stream()
+          userMetaService.listGroupNames(userName).stream()
               .map(groupName -> new UserGroup(Optional.empty(), groupName))
               .collect(Collectors.toList());
       return new UserPrincipal(userName, groups, authData);
@@ -129,7 +123,6 @@ public class BasicAuthenticator implements Authenticator {
   @Override
   public void initialize(Config config) {
     this.userMetaService = IdpUserMetaService.getInstance();
-    this.groupMetaService = IdpGroupMetaService.getInstance();
     this.passwordHasher = PasswordHasherFactory.create();
   }
 

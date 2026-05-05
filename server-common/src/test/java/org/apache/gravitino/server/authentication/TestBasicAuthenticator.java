@@ -24,14 +24,12 @@ import static org.mockito.Mockito.when;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.Collections;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.local.password.PasswordHasher;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
-import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -102,17 +100,14 @@ public class TestBasicAuthenticator {
   @Test
   public void testAuthenticateTokenReturnsPrincipalWhenCredentialsValid() {
     IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    IdpGroupMetaService groupMetaService = mock(IdpGroupMetaService.class);
     PasswordHasher passwordHasher = mock(PasswordHasher.class);
     IdpUserPO userPO = mock(IdpUserPO.class);
     when(userMetaService.findUser("alice")).thenReturn(java.util.Optional.of(userPO));
-    when(userPO.getUserId()).thenReturn(1L);
     when(userPO.getPasswordHash()).thenReturn("hash-1");
     when(passwordHasher.verify("Passw0rd-For-Alice", "hash-1")).thenReturn(true);
-    when(groupMetaService.listGroupNames(1L))
+    when(userMetaService.listGroupNames("alice"))
         .thenReturn(java.util.Arrays.asList("group-a", "group-b"));
-    BasicAuthenticator authenticator =
-        new BasicAuthenticator(userMetaService, groupMetaService, passwordHasher);
+    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
     String authHeader =
         AuthConstants.AUTHORIZATION_BASIC_HEADER
             + Base64.getEncoder()
@@ -132,11 +127,9 @@ public class TestBasicAuthenticator {
   @Test
   public void testAuthenticateTokenThrowsUnauthorizedWhenUserMissing() {
     IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    IdpGroupMetaService groupMetaService = mock(IdpGroupMetaService.class);
     PasswordHasher passwordHasher = mock(PasswordHasher.class);
     when(userMetaService.findUser("alice")).thenReturn(java.util.Optional.empty());
-    BasicAuthenticator authenticator =
-        new BasicAuthenticator(userMetaService, groupMetaService, passwordHasher);
+    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
     String authHeader =
         AuthConstants.AUTHORIZATION_BASIC_HEADER
             + Base64.getEncoder()
@@ -154,14 +147,12 @@ public class TestBasicAuthenticator {
   @Test
   public void testAuthenticateTokenThrowsUnauthorizedWhenPasswordMismatch() {
     IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    IdpGroupMetaService groupMetaService = mock(IdpGroupMetaService.class);
     PasswordHasher passwordHasher = mock(PasswordHasher.class);
     IdpUserPO userPO = mock(IdpUserPO.class);
     when(userMetaService.findUser("alice")).thenReturn(java.util.Optional.of(userPO));
     when(userPO.getPasswordHash()).thenReturn("hash-1");
     when(passwordHasher.verify("Passw0rd-For-Alice", "hash-1")).thenReturn(false);
-    BasicAuthenticator authenticator =
-        new BasicAuthenticator(userMetaService, groupMetaService, passwordHasher);
+    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
     String authHeader =
         AuthConstants.AUTHORIZATION_BASIC_HEADER
             + Base64.getEncoder()
@@ -179,10 +170,8 @@ public class TestBasicAuthenticator {
   @Test
   public void testAuthenticateTokenThrowsUnauthorizedWhenPasswordEmpty() {
     IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    IdpGroupMetaService groupMetaService = mock(IdpGroupMetaService.class);
     PasswordHasher passwordHasher = mock(PasswordHasher.class);
-    BasicAuthenticator authenticator =
-        new BasicAuthenticator(userMetaService, groupMetaService, passwordHasher);
+    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
     String authHeader =
         AuthConstants.AUTHORIZATION_BASIC_HEADER
             + Base64.getEncoder().encodeToString("alice:".getBytes(StandardCharsets.UTF_8));
@@ -197,10 +186,6 @@ public class TestBasicAuthenticator {
   }
 
   private BasicAuthenticator authenticator() {
-    IdpGroupMetaService groupMetaService = mock(IdpGroupMetaService.class);
-    when(groupMetaService.listGroupNames(org.mockito.ArgumentMatchers.anyLong()))
-        .thenReturn(Collections.emptyList());
-    return new BasicAuthenticator(
-        mock(IdpUserMetaService.class), groupMetaService, mock(PasswordHasher.class));
+    return new BasicAuthenticator(mock(IdpUserMetaService.class), mock(PasswordHasher.class));
   }
 }

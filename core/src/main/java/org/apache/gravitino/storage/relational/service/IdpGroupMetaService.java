@@ -54,11 +54,6 @@ public class IdpGroupMetaService {
         mapper -> mapper.selectUserNamesByGroupId(group.get().getGroupId()));
   }
 
-  public List<String> listGroupNames(Long userId) {
-    return SessionUtils.getWithoutCommit(
-        IdpGroupUserRelMapper.class, mapper -> mapper.selectGroupNamesByUserId(userId));
-  }
-
   public void createGroup(IdpGroupPO groupPO) {
     SessionUtils.doWithCommit(IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO));
   }
