@@ -250,12 +250,11 @@ public class TestPaimonPropertiesConverter {
 
   @Test
   public void testDistributionToPropertiesWithAutoDistribution() {
-    // Paimon does not allow 'bucket-key' with bucket=-1, so it is suppressed.
     Distribution distribution = Distributions.auto(Strategy.HASH, NamedReference.field("col_a"));
     Map<String, String> properties = GravitinoPaimonCatalog.distributionToProperties(distribution);
-    Assertions.assertFalse(properties.containsKey(PaimonConstants.BUCKET_KEY));
+    Assertions.assertEquals("col_a", properties.get(PaimonConstants.BUCKET_KEY));
     Assertions.assertEquals("-1", properties.get(PaimonConstants.BUCKET_NUM));
-    Assertions.assertEquals(1, properties.size());
+    Assertions.assertEquals(2, properties.size());
   }
 
   @Test
