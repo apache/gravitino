@@ -40,6 +40,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.local.password.PasswordHasher;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.junit.jupiter.api.Test;
 
@@ -83,7 +84,10 @@ public class TestAuthenticationFilter {
   public void testDoFilterReturnsBadRequestWhenBasicCredentialMissing()
       throws ServletException, IOException {
     BasicAuthenticator authenticator =
-        new BasicAuthenticator(mock(IdpUserMetaService.class), mock(PasswordHasher.class));
+        new BasicAuthenticator(
+            mock(IdpUserMetaService.class),
+            mock(IdpGroupMetaService.class),
+            mock(PasswordHasher.class));
     AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
     FilterChain mockChain = mock(FilterChain.class);
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);

@@ -29,6 +29,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -85,6 +86,28 @@ class TestIdpGroupMetaService extends TestJDBCBackend {
     assertTrue(groupMetaService.findGroup(anotherGroup.getGroupName()).isPresent());
     assertEquals(1, countIdpGroups());
     assertEquals(0, countIdpGroupUserRels());
+  }
+
+  @TestTemplate
+  void testListGroupNamesByUserId() throws IOException {
+    IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
+    IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
+
+    IdpUserPO user =
+        createIdpUserPO(RandomIdGenerator.INSTANCE.nextId(), "idp-user", "hashed-password");
+    userMetaService.createUser(user);
+
+    IdpGroupPO groupB = createIdpGroupPO(RandomIdGenerator.INSTANCE.nextId(), "group-b");
+    IdpGroupPO groupA = createIdpGroupPO(RandomIdGenerator.INSTANCE.nextId(), "group-a");
+    groupMetaService.createGroup(groupB);
+    groupMetaService.createGroup(groupA);
+    groupMetaService.addUsersToGroup(
+        Arrays.asList(
+            createIdpGroupUserRelPO(RandomIdGenerator.INSTANCE.nextId(), groupB, user),
+            createIdpGroupUserRelPO(RandomIdGenerator.INSTANCE.nextId(), groupA, user)));
+
+    assertEquals(
+        Arrays.asList("group-a", "group-b"), groupMetaService.listGroupNames(user.getUserId()));
   }
 
   private IdpUserPO createIdpUserPO(Long id, String userName, String passwordHash) {
