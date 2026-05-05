@@ -32,13 +32,13 @@ import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.auth.local.dto.IdpUserDTO;
-import org.apache.gravitino.auth.local.storage.relational.po.IdpUserPO;
-import org.apache.gravitino.auth.local.storage.relational.service.IdpGroupMetaService;
-import org.apache.gravitino.auth.local.storage.relational.service.IdpUserMetaService;
+import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
+import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,6 +75,7 @@ public class TestIdpUserManager {
             new UserPrincipal("admin"), () -> manager.createUser("alice", "Passw0rd-For-Alice"));
 
     assertEquals("alice", user.name());
+    assertEquals("admin", user.auditInfo().creator());
     verify(userMetaService).createUser(any(IdpUserPO.class));
   }
 
@@ -116,6 +117,6 @@ public class TestIdpUserManager {
             .withLastModifier("admin")
             .withLastModifiedTime(Instant.now())
             .build();
-    return JsonUtils.objectMapper().writeValueAsString(auditInfo);
+    return JsonUtils.anyFieldMapper().writeValueAsString(auditInfo);
   }
 }

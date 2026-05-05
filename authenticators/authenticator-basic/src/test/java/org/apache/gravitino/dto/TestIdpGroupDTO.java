@@ -20,6 +20,7 @@
 package org.apache.gravitino.dto;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.time.Instant;
 import java.util.Arrays;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
@@ -33,6 +34,7 @@ public class TestIdpGroupDTO {
         IdpGroupDTO.builder()
             .withName("test_group")
             .withUsers(Arrays.asList("user1", "user2"))
+            .withAudit(buildAudit())
             .build();
 
     String json = JsonUtils.objectMapper().writeValueAsString(groupDTO);
@@ -41,9 +43,11 @@ public class TestIdpGroupDTO {
     Assertions.assertEquals(groupDTO, deserialized);
     Assertions.assertEquals("test_group", deserialized.name());
     Assertions.assertEquals(Arrays.asList("user1", "user2"), deserialized.users());
+    Assertions.assertEquals("admin", deserialized.auditInfo().creator());
 
     // Test with default users
-    IdpGroupDTO groupDTO1 = IdpGroupDTO.builder().withName("test_group").build();
+    IdpGroupDTO groupDTO1 =
+        IdpGroupDTO.builder().withName("test_group").withAudit(buildAudit()).build();
 
     String json1 = JsonUtils.objectMapper().writeValueAsString(groupDTO1);
     IdpGroupDTO deserialized1 = JsonUtils.objectMapper().readValue(json1, IdpGroupDTO.class);
@@ -53,6 +57,18 @@ public class TestIdpGroupDTO {
     Assertions.assertTrue(deserialized1.users().isEmpty());
 
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> IdpGroupDTO.builder().withName(" ").build());
+        IllegalArgumentException.class,
+        () -> IdpGroupDTO.builder().withName(" ").withAudit(buildAudit()).build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> IdpGroupDTO.builder().withName("test_group").build());
+  }
+
+  private AuditDTO buildAudit() {
+    return AuditDTO.builder()
+        .withCreator("admin")
+        .withCreateTime(Instant.parse("2024-01-01T00:00:00Z"))
+        .withLastModifier("admin")
+        .withLastModifiedTime(Instant.parse("2024-01-01T00:00:00Z"))
+        .build();
   }
 }

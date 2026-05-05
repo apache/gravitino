@@ -59,7 +59,7 @@ public class IdpUserOperations {
       return Utils.doAs(
           httpRequest, () -> Utils.ok(new IdpUserResponse(userManager.getUser(user))));
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.GET, user, e);
+      return IdpExceptionHandlers.handleUserException(IdpOperationType.GET, user, e);
     }
   }
 
@@ -76,7 +76,7 @@ public class IdpUserOperations {
                     userManager.createUser(request.getUser(), request.getPassword())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.ADD, request.getUser(), e);
+      return IdpExceptionHandlers.handleUserException(IdpOperationType.ADD, request.getUser(), e);
     }
   }
 
@@ -93,7 +93,7 @@ public class IdpUserOperations {
                 new IdpUserResponse(userManager.resetPassword(user, request.getPassword())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.UPDATE, user, e);
+      return IdpExceptionHandlers.handleUserException(IdpOperationType.UPDATE, user, e);
     }
   }
 
@@ -109,7 +109,7 @@ public class IdpUserOperations {
             return Utils.ok(new RemoveResponse(removed));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.REMOVE, user, e);
+      return IdpExceptionHandlers.handleUserException(IdpOperationType.REMOVE, user, e);
     }
   }
 }

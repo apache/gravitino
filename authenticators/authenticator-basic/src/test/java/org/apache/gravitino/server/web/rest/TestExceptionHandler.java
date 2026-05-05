@@ -32,23 +32,23 @@ public class TestExceptionHandler {
     RuntimeException exception = new RuntimeException("boom");
     RecordingExceptionHandler handler = new RecordingExceptionHandler();
 
-    Response response = handler.handle(OperationType.UPDATE, "alice", "group", exception);
+    Response response = handler.handle(IdpOperationType.UPDATE, "alice", "group", exception);
 
     assertEquals(Response.Status.ACCEPTED.getStatusCode(), response.getStatus());
-    assertEquals(OperationType.UPDATE, handler.operationType);
+    assertEquals(IdpOperationType.UPDATE, handler.operationType);
     assertEquals("alice", handler.object);
     assertEquals("group", handler.parent);
     assertSame(exception, handler.exception);
   }
 
-  private static class RecordingExceptionHandler extends ExceptionHandler {
-    private OperationType operationType;
+  private static class RecordingExceptionHandler extends IdpExceptionHandler {
+    private IdpOperationType operationType;
     private String object;
     private String parent;
     private Exception exception;
 
     @Override
-    public Response handle(OperationType op, String object, String parent, Exception e) {
+    public Response handle(IdpOperationType op, String object, String parent, Exception e) {
       this.operationType = op;
       this.object = object;
       this.parent = parent;

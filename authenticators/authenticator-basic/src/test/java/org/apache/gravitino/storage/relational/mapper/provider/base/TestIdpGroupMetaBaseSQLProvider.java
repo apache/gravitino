@@ -33,10 +33,13 @@ public class TestIdpGroupMetaBaseSQLProvider {
     return "deleted_at = #{deletedAt}";
   }
 
+  protected String expectedDeleteIdpGroupMetasByLegacyTimelineSql() {
+    return "DELETE FROM idp_group_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
   @Test
-  public void testSelectLocalGroup() {
-    String normalizedSql =
-        createProvider().selectLocalGroup("group").replaceAll("\\s+", " ").trim();
+  public void testSelectIdpGroup() {
+    String normalizedSql = createProvider().selectIdpGroup("group").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT group_id as groupId"));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta"));
@@ -45,9 +48,9 @@ public class TestIdpGroupMetaBaseSQLProvider {
   }
 
   @Test
-  public void testInsertLocalGroup() {
+  public void testInsertIdpGroup() {
     String normalizedSql =
-        createProvider().insertLocalGroup(newGroupPO()).replaceAll("\\s+", " ").trim();
+        createProvider().insertIdpGroup(newGroupPO()).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_group_meta"));
     Assertions.assertTrue(
@@ -59,9 +62,9 @@ public class TestIdpGroupMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteLocalGroup() {
+  public void testSoftDeleteIdpGroup() {
     String normalizedSql =
-        createProvider().softDeleteLocalGroup(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
+        createProvider().softDeleteIdpGroup(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_meta"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
@@ -72,11 +75,11 @@ public class TestIdpGroupMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteLocalGroupDoesNotUseOptimisticLocking() {
+  public void testSoftDeleteIdpGroupDoesNotUseOptimisticLocking() {
     IdpGroupMetaBaseSQLProvider provider = createProvider();
 
     String normalizedSql =
-        provider.softDeleteLocalGroup(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
+        provider.softDeleteIdpGroup(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
 
     Assertions.assertFalse(
         normalizedSql.contains("current_version = #{currentVersion}"),
@@ -90,9 +93,11 @@ public class TestIdpGroupMetaBaseSQLProvider {
   }
 
   @Test
-  public void testTruncateLocalGroupMeta() {
-    Assertions.assertEquals(
-        "DELETE FROM idp_group_meta", createProvider().truncateLocalGroupMeta());
+  public void testDeleteIdpGroupMetasByLegacyTimeline() {
+    String normalizedSql =
+        createProvider().deleteIdpGroupMetasByLegacyTimeline(1L, 2).replaceAll("\\s+", " ").trim();
+
+    Assertions.assertEquals(expectedDeleteIdpGroupMetasByLegacyTimelineSql(), normalizedSql);
   }
 
   private IdpGroupPO newGroupPO() {

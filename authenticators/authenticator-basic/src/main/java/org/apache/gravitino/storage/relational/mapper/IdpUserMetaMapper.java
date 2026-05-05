@@ -38,17 +38,17 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface IdpUserMetaMapper {
   String IDP_USER_TABLE_NAME = "idp_user_meta";
 
-  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectLocalUser")
-  IdpUserPO selectLocalUser(@Param("userName") String userName);
+  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUser")
+  IdpUserPO selectIdpUser(@Param("userName") String userName);
 
-  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectLocalUsers")
-  List<IdpUserPO> selectLocalUsers(@Param("userNames") List<String> userNames);
+  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUsers")
+  List<IdpUserPO> selectIdpUsers(@Param("userNames") List<String> userNames);
 
-  @InsertProvider(type = IdpUserMetaSQLProviderFactory.class, method = "insertLocalUser")
-  void insertLocalUser(@Param("userMeta") IdpUserPO userPO);
+  @InsertProvider(type = IdpUserMetaSQLProviderFactory.class, method = "insertIdpUser")
+  void insertIdpUser(@Param("userMeta") IdpUserPO userPO);
 
-  @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "updateLocalUserPassword")
-  Integer updateLocalUserPassword(
+  @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "updateIdpUserPassword")
+  Integer updateIdpUserPassword(
       @Param("userId") Long userId,
       @Param("passwordHash") String passwordHash,
       @Param("auditInfo") String auditInfo,
@@ -56,12 +56,15 @@ public interface IdpUserMetaMapper {
       @Param("newCurrentVersion") Long newCurrentVersion,
       @Param("newLastVersion") Long newLastVersion);
 
-  @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "softDeleteLocalUser")
-  void softDeleteLocalUser(
+  @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "softDeleteIdpUser")
+  void softDeleteIdpUser(
       @Param("userId") Long userId,
       @Param("deletedAt") Long deletedAt,
       @Param("auditInfo") String auditInfo);
 
-  @DeleteProvider(type = IdpUserMetaSQLProviderFactory.class, method = "truncateLocalUserMeta")
-  Integer truncateLocalUserMeta();
+  @DeleteProvider(
+      type = IdpUserMetaSQLProviderFactory.class,
+      method = "deleteIdpUserMetasByLegacyTimeline")
+  Integer deleteIdpUserMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

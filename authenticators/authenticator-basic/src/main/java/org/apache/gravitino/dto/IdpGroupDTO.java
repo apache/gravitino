@@ -36,6 +36,9 @@ public class IdpGroupDTO {
   @JsonProperty("users")
   private List<String> users;
 
+  @JsonProperty("audit")
+  private AuditDTO audit;
+
   /** Default constructor for Jackson deserialization. */
   protected IdpGroupDTO() {
     this.users = Collections.emptyList();
@@ -46,10 +49,12 @@ public class IdpGroupDTO {
    *
    * @param name The name of the built-in IdP group DTO.
    * @param users The users of the built-in IdP group DTO.
+   * @param audit The audit of the built-in IdP group DTO.
    */
-  protected IdpGroupDTO(String name, List<String> users) {
+  protected IdpGroupDTO(String name, List<String> users, AuditDTO audit) {
     this.name = name;
     this.users = users;
+    this.audit = audit;
   }
 
   /**
@@ -66,6 +71,13 @@ public class IdpGroupDTO {
    */
   public List<String> users() {
     return users;
+  }
+
+  /**
+   * @return The audit of the built-in IdP group DTO.
+   */
+  public AuditDTO auditInfo() {
+    return audit;
   }
 
   /**
@@ -89,6 +101,9 @@ public class IdpGroupDTO {
 
     /** The users of the built-in IdP group. */
     protected List<String> users = Collections.emptyList();
+
+    /** The audit of the built-in IdP group. */
+    protected AuditDTO audit;
 
     /**
      * Sets the name of the built-in IdP group.
@@ -116,14 +131,26 @@ public class IdpGroupDTO {
     }
 
     /**
+     * Sets the audit of the built-in IdP group.
+     *
+     * @param audit The audit of the built-in IdP group.
+     * @return The builder instance.
+     */
+    public S withAudit(AuditDTO audit) {
+      this.audit = audit;
+      return (S) this;
+    }
+
+    /**
      * Builds an instance of IdpGroupDTO using the builder's properties.
      *
      * @return An instance of IdpGroupDTO.
-     * @throws IllegalArgumentException If the name is not set.
+     * @throws IllegalArgumentException If the name or audit is not set.
      */
     public IdpGroupDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
-      return new IdpGroupDTO(name, users);
+      Preconditions.checkArgument(audit != null, "audit cannot be null");
+      return new IdpGroupDTO(name, users, audit);
     }
   }
 }

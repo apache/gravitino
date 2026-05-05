@@ -51,19 +51,19 @@ public class IdpUserMetaSQLProviderFactory {
 
   static class IdpUserMetaMySQLProvider extends IdpUserMetaBaseSQLProvider {}
 
-  public static String selectLocalUser(@Param("userName") String userName) {
-    return getProvider().selectLocalUser(userName);
+  public static String selectIdpUser(@Param("userName") String userName) {
+    return getProvider().selectIdpUser(userName);
   }
 
-  public static String selectLocalUsers(@Param("userNames") List<String> userNames) {
-    return getProvider().selectLocalUsers(userNames);
+  public static String selectIdpUsers(@Param("userNames") List<String> userNames) {
+    return getProvider().selectIdpUsers(userNames);
   }
 
-  public static String insertLocalUser(@Param("userMeta") IdpUserPO userPO) {
-    return getProvider().insertLocalUser(userPO);
+  public static String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
+    return getProvider().insertIdpUser(userPO);
   }
 
-  public static String updateLocalUserPassword(
+  public static String updateIdpUserPassword(
       @Param("userId") Long userId,
       @Param("passwordHash") String passwordHash,
       @Param("auditInfo") String auditInfo,
@@ -71,18 +71,19 @@ public class IdpUserMetaSQLProviderFactory {
       @Param("newCurrentVersion") Long newCurrentVersion,
       @Param("newLastVersion") Long newLastVersion) {
     return getProvider()
-        .updateLocalUserPassword(
+        .updateIdpUserPassword(
             userId, passwordHash, auditInfo, currentVersion, newCurrentVersion, newLastVersion);
   }
 
-  public static String softDeleteLocalUser(
+  public static String softDeleteIdpUser(
       @Param("userId") Long userId,
       @Param("deletedAt") Long deletedAt,
       @Param("auditInfo") String auditInfo) {
-    return getProvider().softDeleteLocalUser(userId, deletedAt, auditInfo);
+    return getProvider().softDeleteIdpUser(userId, deletedAt, auditInfo);
   }
 
-  public static String truncateLocalUserMeta() {
-    return getProvider().truncateLocalUserMeta();
+  public static String deleteIdpUserMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return getProvider().deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }

@@ -23,11 +23,12 @@ import static org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapp
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.base.IdpGroupUserRelBaseSQLProvider;
+import org.apache.ibatis.annotations.Param;
 
 public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLProvider {
 
   @Override
-  public String softDeleteLocalGroupUsers(
+  public String softDeleteIdpGroupUsers(
       Long groupId, List<Long> userIds, Long deletedAt, String auditInfo) {
     return "<script>"
         + "UPDATE "
@@ -73,5 +74,15 @@ public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLPro
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE group_id = #{groupId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String deleteIdpGroupUserRelMetasByLegacyTimeline(
+      Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + IDP_GROUP_USER_REL_TABLE_NAME
+        + " WHERE id IN (SELECT id FROM "
+        + IDP_GROUP_USER_REL_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

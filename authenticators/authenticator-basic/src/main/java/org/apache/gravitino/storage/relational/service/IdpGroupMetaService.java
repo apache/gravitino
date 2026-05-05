@@ -40,7 +40,7 @@ public class IdpGroupMetaService {
   public Optional<IdpGroupPO> findGroup(String groupName) {
     return Optional.ofNullable(
         SessionUtils.getWithoutCommit(
-            IdpGroupMetaMapper.class, mapper -> mapper.selectLocalGroup(groupName)));
+            IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName)));
   }
 
   public List<String> listUserNames(String groupName) {
@@ -55,7 +55,7 @@ public class IdpGroupMetaService {
   }
 
   public void createGroup(IdpGroupPO groupPO) {
-    SessionUtils.doWithCommit(IdpGroupMetaMapper.class, mapper -> mapper.insertLocalGroup(groupPO));
+    SessionUtils.doWithCommit(IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO));
   }
 
   public boolean deleteGroup(IdpGroupPO groupPO, Long deletedAt, String auditInfo) {
@@ -63,7 +63,7 @@ public class IdpGroupMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 IdpGroupMetaMapper.class,
-                mapper -> mapper.softDeleteLocalGroup(groupPO.getGroupId(), deletedAt, auditInfo)),
+                mapper -> mapper.softDeleteIdpGroup(groupPO.getGroupId(), deletedAt, auditInfo)),
         () ->
             SessionUtils.doWithoutCommit(
                 IdpGroupUserRelMapper.class,
@@ -83,7 +83,7 @@ public class IdpGroupMetaService {
       return;
     }
     SessionUtils.doWithCommit(
-        IdpGroupUserRelMapper.class, mapper -> mapper.batchInsertLocalGroupUsers(relations));
+        IdpGroupUserRelMapper.class, mapper -> mapper.batchInsertIdpGroupUsers(relations));
   }
 
   public void removeUsersFromGroup(
@@ -94,6 +94,26 @@ public class IdpGroupMetaService {
 
     SessionUtils.doWithCommit(
         IdpGroupUserRelMapper.class,
-        mapper -> mapper.softDeleteLocalGroupUsers(groupId, userIds, deletedAt, auditInfo));
+        mapper -> mapper.softDeleteIdpGroupUsers(groupId, userIds, deletedAt, auditInfo));
+  }
+
+  public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {
+    int[] groupDeletedCount = new int[] {0};
+    int[] groupUserRelDeletedCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            groupDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    IdpGroupMetaMapper.class,
+                    mapper -> mapper.deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit)),
+        () ->
+            groupUserRelDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    IdpGroupUserRelMapper.class,
+                    mapper ->
+                        mapper.deleteIdpGroupUserRelMetasByLegacyTimeline(legacyTimeline, limit)));
+
+    return groupDeletedCount[0] + groupUserRelDeletedCount[0];
   }
 }

@@ -34,14 +34,14 @@ import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.auth.local.dto.IdpGroupDTO;
-import org.apache.gravitino.auth.local.storage.relational.po.IdpGroupPO;
-import org.apache.gravitino.auth.local.storage.relational.po.IdpUserPO;
-import org.apache.gravitino.auth.local.storage.relational.service.IdpGroupMetaService;
-import org.apache.gravitino.auth.local.storage.relational.service.IdpUserMetaService;
+import org.apache.gravitino.dto.IdpGroupDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.po.IdpGroupPO;
+import org.apache.gravitino.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
+import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -105,6 +105,7 @@ public class TestIdpGroupManager {
 
     assertEquals("engineering", group.name());
     assertEquals(Collections.emptyList(), group.users());
+    assertEquals("admin", group.auditInfo().creator());
     verify(groupMetaService)
         .removeUsersFromGroup(
             eq(groupPO.getGroupId()),
@@ -144,6 +145,6 @@ public class TestIdpGroupManager {
             .withLastModifier("admin")
             .withLastModifiedTime(Instant.now())
             .build();
-    return JsonUtils.objectMapper().writeValueAsString(auditInfo);
+    return JsonUtils.anyFieldMapper().writeValueAsString(auditInfo);
   }
 }

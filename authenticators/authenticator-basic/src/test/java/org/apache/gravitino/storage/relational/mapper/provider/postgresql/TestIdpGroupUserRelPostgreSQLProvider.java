@@ -33,4 +33,9 @@ public class TestIdpGroupUserRelPostgreSQLProvider extends TestIdpGroupUserRelBa
   protected String expectedDeleteAtClause() {
     return "deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
   }
+
+  @Override
+  protected String expectedDeleteIdpGroupUserRelMetasByLegacyTimelineSql() {
+    return "DELETE FROM idp_group_user_rel WHERE id IN (SELECT id FROM idp_group_user_rel WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
 }

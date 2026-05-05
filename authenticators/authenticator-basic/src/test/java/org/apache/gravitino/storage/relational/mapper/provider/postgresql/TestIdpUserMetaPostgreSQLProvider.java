@@ -33,4 +33,9 @@ public class TestIdpUserMetaPostgreSQLProvider extends TestIdpUserMetaBaseSQLPro
   protected String expectedDeleteAtClause() {
     return "deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
   }
+
+  @Override
+  protected String expectedDeleteIdpUserMetasByLegacyTimelineSql() {
+    return "DELETE FROM idp_user_meta WHERE user_id IN (SELECT user_id FROM idp_user_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
 }

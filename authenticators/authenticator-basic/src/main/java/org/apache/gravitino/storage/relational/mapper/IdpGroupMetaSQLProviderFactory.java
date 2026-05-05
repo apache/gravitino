@@ -50,22 +50,23 @@ public class IdpGroupMetaSQLProviderFactory {
 
   static class IdpGroupMetaMySQLProvider extends IdpGroupMetaBaseSQLProvider {}
 
-  public static String selectLocalGroup(@Param("groupName") String groupName) {
-    return getProvider().selectLocalGroup(groupName);
+  public static String selectIdpGroup(@Param("groupName") String groupName) {
+    return getProvider().selectIdpGroup(groupName);
   }
 
-  public static String insertLocalGroup(@Param("groupMeta") IdpGroupPO groupPO) {
-    return getProvider().insertLocalGroup(groupPO);
+  public static String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
+    return getProvider().insertIdpGroup(groupPO);
   }
 
-  public static String softDeleteLocalGroup(
+  public static String softDeleteIdpGroup(
       @Param("groupId") Long groupId,
       @Param("deletedAt") Long deletedAt,
       @Param("auditInfo") String auditInfo) {
-    return getProvider().softDeleteLocalGroup(groupId, deletedAt, auditInfo);
+    return getProvider().softDeleteIdpGroup(groupId, deletedAt, auditInfo);
   }
 
-  public static String truncateLocalGroupMeta() {
-    return getProvider().truncateLocalGroupMeta();
+  public static String deleteIdpGroupMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return getProvider().deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }

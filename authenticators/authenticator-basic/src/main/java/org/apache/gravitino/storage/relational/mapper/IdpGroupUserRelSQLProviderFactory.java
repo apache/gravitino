@@ -66,17 +66,17 @@ public class IdpGroupUserRelSQLProviderFactory {
     return getProvider().selectRelatedUserIds(groupId, userIds);
   }
 
-  public static String batchInsertLocalGroupUsers(
+  public static String batchInsertIdpGroupUsers(
       @Param("relations") List<IdpGroupUserRelPO> relations) {
-    return getProvider().batchInsertLocalGroupUsers(relations);
+    return getProvider().batchInsertIdpGroupUsers(relations);
   }
 
-  public static String softDeleteLocalGroupUsers(
+  public static String softDeleteIdpGroupUsers(
       @Param("groupId") Long groupId,
       @Param("userIds") List<Long> userIds,
       @Param("deletedAt") Long deletedAt,
       @Param("auditInfo") String auditInfo) {
-    return getProvider().softDeleteLocalGroupUsers(groupId, userIds, deletedAt, auditInfo);
+    return getProvider().softDeleteIdpGroupUsers(groupId, userIds, deletedAt, auditInfo);
   }
 
   public static String softDeleteGroupUsersByUserId(
@@ -93,7 +93,8 @@ public class IdpGroupUserRelSQLProviderFactory {
     return getProvider().softDeleteGroupUsersByGroupId(groupId, deletedAt, auditInfo);
   }
 
-  public static String truncateLocalGroupUserRel() {
-    return getProvider().truncateLocalGroupUserRel();
+  public static String deleteIdpGroupUserRelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return getProvider().deleteIdpGroupUserRelMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }

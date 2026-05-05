@@ -56,13 +56,13 @@ public interface IdpGroupUserRelMapper {
 
   @InsertProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "batchInsertLocalGroupUsers")
-  void batchInsertLocalGroupUsers(@Param("relations") List<IdpGroupUserRelPO> relations);
+      method = "batchInsertIdpGroupUsers")
+  void batchInsertIdpGroupUsers(@Param("relations") List<IdpGroupUserRelPO> relations);
 
   @UpdateProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "softDeleteLocalGroupUsers")
-  void softDeleteLocalGroupUsers(
+      method = "softDeleteIdpGroupUsers")
+  void softDeleteIdpGroupUsers(
       @Param("groupId") Long groupId,
       @Param("userIds") List<Long> userIds,
       @Param("deletedAt") Long deletedAt,
@@ -86,6 +86,7 @@ public interface IdpGroupUserRelMapper {
 
   @DeleteProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "truncateLocalGroupUserRel")
-  Integer truncateLocalGroupUserRel();
+      method = "deleteIdpGroupUserRelMetasByLegacyTimeline")
+  Integer deleteIdpGroupUserRelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

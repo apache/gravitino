@@ -37,18 +37,21 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface IdpGroupMetaMapper {
   String IDP_GROUP_TABLE_NAME = "idp_group_meta";
 
-  @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectLocalGroup")
-  IdpGroupPO selectLocalGroup(@Param("groupName") String groupName);
+  @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroup")
+  IdpGroupPO selectIdpGroup(@Param("groupName") String groupName);
 
-  @InsertProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "insertLocalGroup")
-  void insertLocalGroup(@Param("groupMeta") IdpGroupPO groupPO);
+  @InsertProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "insertIdpGroup")
+  void insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO);
 
-  @UpdateProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "softDeleteLocalGroup")
-  void softDeleteLocalGroup(
+  @UpdateProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "softDeleteIdpGroup")
+  void softDeleteIdpGroup(
       @Param("groupId") Long groupId,
       @Param("deletedAt") Long deletedAt,
       @Param("auditInfo") String auditInfo);
 
-  @DeleteProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "truncateLocalGroupMeta")
-  Integer truncateLocalGroupMeta();
+  @DeleteProvider(
+      type = IdpGroupMetaSQLProviderFactory.class,
+      method = "deleteIdpGroupMetasByLegacyTimeline")
+  Integer deleteIdpGroupMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

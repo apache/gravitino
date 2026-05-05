@@ -41,6 +41,10 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     return "deleted_at = #{deletedAt}";
   }
 
+  protected String expectedDeleteIdpGroupUserRelMetasByLegacyTimelineSql() {
+    return "DELETE FROM idp_group_user_rel WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
   @Test
   public void testSelectGroupNamesByUserId() {
     String normalizedSql =
@@ -113,11 +117,11 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testBatchInsertLocalGroupUsers() {
+  public void testBatchInsertIdpGroupUsers() {
     List<IdpGroupUserRelPO> relations =
         Arrays.asList(newRelation(1L, 10L, 20L), newRelation(2L, 10L, 21L));
 
-    String script = createProvider().batchInsertLocalGroupUsers(relations);
+    String script = createProvider().batchInsertIdpGroupUsers(relations);
     Map<String, Object> params = new HashMap<>();
     params.put("relations", relations);
 
@@ -136,9 +140,9 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteLocalGroupUsers() {
+  public void testSoftDeleteIdpGroupUsers() {
     String script =
-        createProvider().softDeleteLocalGroupUsers(10L, Arrays.asList(20L, 21L), 2L, "audit");
+        createProvider().softDeleteIdpGroupUsers(10L, Arrays.asList(20L, 21L), 2L, "audit");
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
     params.put("userIds", Arrays.asList(20L, 21L));
@@ -157,9 +161,9 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteLocalGroupUsersWithEmptyUserIds() {
+  public void testSoftDeleteIdpGroupUsersWithEmptyUserIds() {
     String script =
-        createProvider().softDeleteLocalGroupUsers(10L, Collections.emptyList(), 2L, "audit");
+        createProvider().softDeleteIdpGroupUsers(10L, Collections.emptyList(), 2L, "audit");
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
     params.put("userIds", Collections.emptyList());
@@ -177,8 +181,8 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteLocalGroupUsersWithNullUserIds() {
-    String script = createProvider().softDeleteLocalGroupUsers(10L, null, 2L, "audit");
+  public void testSoftDeleteIdpGroupUsersWithNullUserIds() {
+    String script = createProvider().softDeleteIdpGroupUsers(10L, null, 2L, "audit");
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
     params.put("deletedAt", 2L);
@@ -223,9 +227,14 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testTruncateLocalGroupUserRel() {
-    Assertions.assertEquals(
-        "DELETE FROM idp_group_user_rel", createProvider().truncateLocalGroupUserRel());
+  public void testDeleteIdpGroupUserRelMetasByLegacyTimeline() {
+    String normalizedSql =
+        createProvider()
+            .deleteIdpGroupUserRelMetasByLegacyTimeline(1L, 2)
+            .replaceAll("\\s+", " ")
+            .trim();
+
+    Assertions.assertEquals(expectedDeleteIdpGroupUserRelMetasByLegacyTimelineSql(), normalizedSql);
   }
 
   private String renderScript(String script, Map<String, Object> params) {

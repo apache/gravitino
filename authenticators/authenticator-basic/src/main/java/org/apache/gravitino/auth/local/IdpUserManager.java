@@ -19,25 +19,31 @@
 
 package org.apache.gravitino.auth.local;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.auth.local.dto.IdpUserDTO;
-import org.apache.gravitino.auth.local.storage.relational.po.IdpUserPO;
-import org.apache.gravitino.auth.local.storage.relational.service.IdpGroupMetaService;
-import org.apache.gravitino.auth.local.storage.relational.service.IdpUserMetaService;
+import org.apache.gravitino.dto.IdpUserDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
+import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Manager for built-in IdP user management APIs. */
 public class IdpUserManager {
+  private static final long INITIAL_VERSION = 1L;
 
   private final Config config;
   private final IdGenerator idGenerator;
@@ -75,7 +81,33 @@ public class IdpUserManager {
       throw new UserAlreadyExistsException("Built-in IdP user %s already exists", userName);
     }
 
-    userMetaService().createUser(nextId(), userName, passwordHasher.hash(password), currentUser());
+    String auditInfo;
+    try {
+      Instant now = Instant.now();
+      auditInfo =
+          JsonUtils.anyFieldMapper()
+              .writeValueAsString(
+                  AuditInfo.builder()
+                      .withCreator(currentUser())
+                      .withCreateTime(now)
+                      .withLastModifier(currentUser())
+                      .withLastModifiedTime(now)
+                      .build());
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Failed to serialize built-in IdP audit info", e);
+    }
+
+    userMetaService()
+        .createUser(
+            IdpUserPO.builder()
+                .withUserId(nextId())
+                .withUserName(userName)
+                .withPasswordHash(passwordHasher.hash(password))
+                .withAuditInfo(auditInfo)
+                .withCurrentVersion(INITIAL_VERSION)
+                .withLastVersion(INITIAL_VERSION)
+                .withDeletedAt(0L)
+                .build());
     return getUser(userName);
   }
 
@@ -95,7 +127,28 @@ public class IdpUserManager {
     ensureServiceAdmin();
     validateUserName(userName);
     Optional<IdpUserPO> user = userMetaService().findUser(userName);
-    return user.isPresent() && userMetaService().deleteUser(user.get(), currentUser());
+    if (!user.isPresent()) {
+      return false;
+    }
+
+    Long deletedAt = Instant.now().toEpochMilli();
+    String auditInfo;
+    try {
+      AuditInfo original =
+          JsonUtils.anyFieldMapper().readValue(user.get().getAuditInfo(), AuditInfo.class);
+      auditInfo =
+          JsonUtils.anyFieldMapper()
+              .writeValueAsString(
+                  AuditInfo.builder()
+                      .withCreator(original.creator())
+                      .withCreateTime(original.createTime())
+                      .withLastModifier(currentUser())
+                      .withLastModifiedTime(Instant.now())
+                      .build());
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Failed to deserialize built-in IdP audit info", e);
+    }
+    return userMetaService().deleteUser(user.get(), deletedAt, auditInfo);
   }
 
   public IdpUserDTO resetPassword(String userName, String password) {
@@ -113,7 +166,25 @@ public class IdpUserManager {
           "The new password must be different from the old password");
     }
 
-    userMetaService().updatePassword(userPO, passwordHasher.hash(password), currentUser());
+    Long nextVersion = userPO.getCurrentVersion() + 1;
+    String updatedAudit;
+    try {
+      AuditInfo original =
+          JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class);
+      updatedAudit =
+          JsonUtils.anyFieldMapper()
+              .writeValueAsString(
+                  AuditInfo.builder()
+                      .withCreator(original.creator())
+                      .withCreateTime(original.createTime())
+                      .withLastModifier(currentUser())
+                      .withLastModifiedTime(Instant.now())
+                      .build());
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Failed to deserialize built-in IdP audit info", e);
+    }
+    userMetaService()
+        .updatePassword(userPO, passwordHasher.hash(password), updatedAudit, nextVersion);
     return getUser(userName);
   }
 
@@ -153,9 +224,17 @@ public class IdpUserManager {
   }
 
   private IdpUserDTO toUserDTO(IdpUserPO userPO) {
+    AuditInfo auditInfo;
+    try {
+      auditInfo = JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("Failed to deserialize built-in IdP audit info", e);
+    }
+
     return IdpUserDTO.builder()
         .withName(userPO.getUserName())
         .withGroups(userMetaService.listGroupNames(userPO.getUserName()))
+        .withAudit(DTOConverters.toDTO(auditInfo))
         .build();
   }
 

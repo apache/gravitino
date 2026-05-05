@@ -22,11 +22,12 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper.IDP_USER_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.apache.ibatis.annotations.Param;
 
 public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
 
   @Override
-  public String softDeleteLocalUser(Long userId, Long deletedAt, String auditInfo) {
+  public String softDeleteIdpUser(Long userId, Long deletedAt, String auditInfo) {
     return "UPDATE "
         + IDP_USER_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
@@ -34,5 +35,14 @@ public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String deleteIdpUserMetasByLegacyTimeline(Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + IDP_USER_TABLE_NAME
+        + " WHERE user_id IN (SELECT user_id FROM "
+        + IDP_USER_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

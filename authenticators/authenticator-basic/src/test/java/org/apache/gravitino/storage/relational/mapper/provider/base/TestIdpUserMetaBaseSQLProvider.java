@@ -40,9 +40,13 @@ public class TestIdpUserMetaBaseSQLProvider {
     return "deleted_at = #{deletedAt}";
   }
 
+  protected String expectedDeleteIdpUserMetasByLegacyTimelineSql() {
+    return "DELETE FROM idp_user_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
   @Test
-  public void testSelectLocalUser() {
-    String normalizedSql = createProvider().selectLocalUser("tom").replaceAll("\\s+", " ").trim();
+  public void testSelectIdpUser() {
+    String normalizedSql = createProvider().selectIdpUser("tom").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT user_id as userId"));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta"));
@@ -51,8 +55,8 @@ public class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSelectLocalUsers() {
-    String script = createProvider().selectLocalUsers(Arrays.asList("tom", "jerry"));
+  public void testSelectIdpUsers() {
+    String script = createProvider().selectIdpUsers(Arrays.asList("tom", "jerry"));
     Map<String, Object> params = new HashMap<>();
     params.put("userNames", Arrays.asList("tom", "jerry"));
 
@@ -64,9 +68,9 @@ public class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testInsertLocalUser() {
+  public void testInsertIdpUser() {
     String normalizedSql =
-        createProvider().insertLocalUser(newUserPO()).replaceAll("\\s+", " ").trim();
+        createProvider().insertIdpUser(newUserPO()).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_user_meta"));
     Assertions.assertTrue(
@@ -78,10 +82,10 @@ public class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testUpdateLocalUserPassword() {
+  public void testUpdateIdpUserPassword() {
     String normalizedSql =
         createProvider()
-            .updateLocalUserPassword(1L, "hash", "audit", 1L, 2L, 3L)
+            .updateIdpUserPassword(1L, "hash", "audit", 1L, 2L, 3L)
             .replaceAll("\\s+", " ")
             .trim();
 
@@ -95,9 +99,9 @@ public class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteLocalUser() {
+  public void testSoftDeleteIdpUser() {
     String normalizedSql =
-        createProvider().softDeleteLocalUser(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
+        createProvider().softDeleteIdpUser(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_meta"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
@@ -108,11 +112,11 @@ public class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteLocalUserDoesNotUseOptimisticLocking() {
+  public void testSoftDeleteIdpUserDoesNotUseOptimisticLocking() {
     IdpUserMetaBaseSQLProvider provider = createProvider();
 
     String normalizedSql =
-        provider.softDeleteLocalUser(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
+        provider.softDeleteIdpUser(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
 
     Assertions.assertFalse(
         normalizedSql.contains("current_version = #{currentVersion}"),
@@ -126,8 +130,11 @@ public class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testTruncateLocalUserMeta() {
-    Assertions.assertEquals("DELETE FROM idp_user_meta", createProvider().truncateLocalUserMeta());
+  public void testDeleteIdpUserMetasByLegacyTimeline() {
+    String normalizedSql =
+        createProvider().deleteIdpUserMetasByLegacyTimeline(1L, 2).replaceAll("\\s+", " ").trim();
+
+    Assertions.assertEquals(expectedDeleteIdpUserMetasByLegacyTimelineSql(), normalizedSql);
   }
 
   private String renderScript(String script, Map<String, Object> params) {

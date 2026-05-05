@@ -26,7 +26,7 @@ import org.apache.ibatis.annotations.Param;
 
 public class IdpGroupMetaBaseSQLProvider {
 
-  public String selectLocalGroup(@Param("groupName") String groupName) {
+  public String selectIdpGroup(@Param("groupName") String groupName) {
     return "SELECT group_id as groupId, group_name as groupName,"
         + " audit_info as auditInfo, current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
@@ -35,7 +35,7 @@ public class IdpGroupMetaBaseSQLProvider {
         + " WHERE group_name = #{groupName} AND deleted_at = 0";
   }
 
-  public String insertLocalGroup(@Param("groupMeta") IdpGroupPO groupPO) {
+  public String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
     return "INSERT INTO "
         + IDP_GROUP_TABLE_NAME
         + " (group_id, group_name, audit_info,"
@@ -50,7 +50,7 @@ public class IdpGroupMetaBaseSQLProvider {
         + " )";
   }
 
-  public String softDeleteLocalGroup(
+  public String softDeleteIdpGroup(
       @Param("groupId") Long groupId,
       @Param("deletedAt") Long deletedAt,
       @Param("auditInfo") String auditInfo) {
@@ -63,7 +63,10 @@ public class IdpGroupMetaBaseSQLProvider {
         + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 
-  public String truncateLocalGroupMeta() {
-    return "DELETE FROM " + IDP_GROUP_TABLE_NAME;
+  public String deleteIdpGroupMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + IDP_GROUP_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 }

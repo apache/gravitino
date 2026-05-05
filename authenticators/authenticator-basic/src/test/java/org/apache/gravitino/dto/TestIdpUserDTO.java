@@ -20,6 +20,7 @@
 package org.apache.gravitino.dto;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.time.Instant;
 import java.util.Arrays;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
@@ -33,6 +34,7 @@ public class TestIdpUserDTO {
         IdpUserDTO.builder()
             .withName("test_user")
             .withGroups(Arrays.asList("group1", "group2"))
+            .withAudit(buildAudit())
             .build();
 
     String json = JsonUtils.objectMapper().writeValueAsString(userDTO);
@@ -41,9 +43,11 @@ public class TestIdpUserDTO {
     Assertions.assertEquals(userDTO, deserialized);
     Assertions.assertEquals("test_user", deserialized.name());
     Assertions.assertEquals(Arrays.asList("group1", "group2"), deserialized.groups());
+    Assertions.assertEquals("admin", deserialized.auditInfo().creator());
 
     // Test with default groups
-    IdpUserDTO userDTO1 = IdpUserDTO.builder().withName("test_user").build();
+    IdpUserDTO userDTO1 =
+        IdpUserDTO.builder().withName("test_user").withAudit(buildAudit()).build();
 
     String json1 = JsonUtils.objectMapper().writeValueAsString(userDTO1);
     IdpUserDTO deserialized1 = JsonUtils.objectMapper().readValue(json1, IdpUserDTO.class);
@@ -53,6 +57,18 @@ public class TestIdpUserDTO {
     Assertions.assertTrue(deserialized1.groups().isEmpty());
 
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> IdpUserDTO.builder().withName(" ").build());
+        IllegalArgumentException.class,
+        () -> IdpUserDTO.builder().withName(" ").withAudit(buildAudit()).build());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> IdpUserDTO.builder().withName("test_user").build());
+  }
+
+  private AuditDTO buildAudit() {
+    return AuditDTO.builder()
+        .withCreator("admin")
+        .withCreateTime(Instant.parse("2024-01-01T00:00:00Z"))
+        .withLastModifier("admin")
+        .withLastModifiedTime(Instant.parse("2024-01-01T00:00:00Z"))
+        .build();
   }
 }

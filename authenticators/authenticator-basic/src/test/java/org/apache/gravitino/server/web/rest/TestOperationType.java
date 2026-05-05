@@ -29,14 +29,17 @@ public class TestOperationType {
   @Test
   public void testOperationTypesMatchBuiltInIdpRestUsage() {
     assertArrayEquals(
-        new OperationType[] {
-          OperationType.GET, OperationType.ADD, OperationType.REMOVE, OperationType.UPDATE
+        new IdpOperationType[] {
+          IdpOperationType.GET,
+          IdpOperationType.ADD,
+          IdpOperationType.REMOVE,
+          IdpOperationType.UPDATE
         },
-        OperationType.values());
+        IdpOperationType.values());
   }
 
   @Test
   public void testValueOfReturnsExpectedOperationType() {
-    assertEquals(OperationType.REMOVE, OperationType.valueOf("REMOVE"));
+    assertEquals(IdpOperationType.REMOVE, IdpOperationType.valueOf("REMOVE"));
   }
 }

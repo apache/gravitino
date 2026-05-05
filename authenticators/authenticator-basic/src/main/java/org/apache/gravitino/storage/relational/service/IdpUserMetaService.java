@@ -40,7 +40,7 @@ public class IdpUserMetaService {
   public Optional<IdpUserPO> findUser(String userName) {
     return Optional.ofNullable(
         SessionUtils.getWithoutCommit(
-            IdpUserMetaMapper.class, mapper -> mapper.selectLocalUser(userName)));
+            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(userName)));
   }
 
   public List<IdpUserPO> findUsers(List<String> userNames) {
@@ -49,7 +49,7 @@ public class IdpUserMetaService {
     }
 
     return SessionUtils.getWithoutCommit(
-        IdpUserMetaMapper.class, mapper -> mapper.selectLocalUsers(userNames));
+        IdpUserMetaMapper.class, mapper -> mapper.selectIdpUsers(userNames));
   }
 
   public List<String> listGroupNames(String userName) {
@@ -64,7 +64,7 @@ public class IdpUserMetaService {
   }
 
   public void createUser(IdpUserPO userPO) {
-    SessionUtils.doWithCommit(IdpUserMetaMapper.class, mapper -> mapper.insertLocalUser(userPO));
+    SessionUtils.doWithCommit(IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO));
   }
 
   public void updatePassword(
@@ -73,7 +73,7 @@ public class IdpUserMetaService {
         SessionUtils.doWithCommitAndFetchResult(
             IdpUserMetaMapper.class,
             mapper ->
-                mapper.updateLocalUserPassword(
+                mapper.updateIdpUserPassword(
                     userPO.getUserId(),
                     passwordHash,
                     auditInfo,
@@ -89,12 +89,32 @@ public class IdpUserMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 IdpUserMetaMapper.class,
-                mapper -> mapper.softDeleteLocalUser(userPO.getUserId(), deletedAt, auditInfo)),
+                mapper -> mapper.softDeleteIdpUser(userPO.getUserId(), deletedAt, auditInfo)),
         () ->
             SessionUtils.doWithoutCommit(
                 IdpGroupUserRelMapper.class,
                 mapper ->
                     mapper.softDeleteGroupUsersByUserId(userPO.getUserId(), deletedAt, auditInfo)));
     return true;
+  }
+
+  public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
+    int[] userDeletedCount = new int[] {0};
+    int[] userGroupRelDeletedCount = new int[] {0};
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            userDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    IdpUserMetaMapper.class,
+                    mapper -> mapper.deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit)),
+        () ->
+            userGroupRelDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    IdpGroupUserRelMapper.class,
+                    mapper ->
+                        mapper.deleteIdpGroupUserRelMetasByLegacyTimeline(legacyTimeline, limit)));
+
+    return userDeletedCount[0] + userGroupRelDeletedCount[0];
   }
 }

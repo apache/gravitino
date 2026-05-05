@@ -61,7 +61,7 @@ public class IdpGroupOperations {
       return Utils.doAs(
           httpRequest, () -> Utils.ok(new IdpGroupResponse(groupManager.getGroup(group))));
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(OperationType.GET, group, e);
+      return IdpExceptionHandlers.handleGroupException(IdpOperationType.GET, group, e);
     }
   }
 
@@ -76,7 +76,7 @@ public class IdpGroupOperations {
             return Utils.ok(new IdpGroupResponse(groupManager.createGroup(request.getGroup())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(OperationType.ADD, request.getGroup(), e);
+      return IdpExceptionHandlers.handleGroupException(IdpOperationType.ADD, request.getGroup(), e);
     }
   }
 
@@ -93,7 +93,7 @@ public class IdpGroupOperations {
             return Utils.ok(new RemoveResponse(removed));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(OperationType.REMOVE, group, e);
+      return IdpExceptionHandlers.handleGroupException(IdpOperationType.REMOVE, group, e);
     }
   }
 
@@ -110,7 +110,7 @@ public class IdpGroupOperations {
                 new IdpGroupResponse(groupManager.addUsersToGroup(group, request.getUsers())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(OperationType.ADD, group, e);
+      return IdpExceptionHandlers.handleGroupException(IdpOperationType.ADD, group, e);
     }
   }
 
@@ -127,7 +127,7 @@ public class IdpGroupOperations {
                 new IdpGroupResponse(groupManager.removeUsersFromGroup(group, request.getUsers())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(OperationType.REMOVE, group, e);
+      return IdpExceptionHandlers.handleGroupException(IdpOperationType.REMOVE, group, e);
     }
   }
 }

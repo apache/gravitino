@@ -31,21 +31,21 @@ public class TestExceptionHandlers {
 
   @Test
   public void testGetErrorMsgReturnsEmptyStringForNullThrowable() {
-    assertEquals("", ExceptionHandlers.BaseExceptionHandler.getErrorMsg(null));
+    assertEquals("", IdpExceptionHandlers.BaseExceptionHandler.getErrorMsg(null));
   }
 
   @Test
   public void testGetErrorMsgStripsNestedExceptionPrefix() {
     RuntimeException exception = new RuntimeException("outer Exception: root cause");
 
-    assertEquals("root cause", ExceptionHandlers.BaseExceptionHandler.getErrorMsg(exception));
+    assertEquals("root cause", IdpExceptionHandlers.BaseExceptionHandler.getErrorMsg(exception));
   }
 
   @Test
   public void testBaseExceptionHandlerMapsUnhandledExceptionToInternalError() {
     Response response =
-        new ExceptionHandlers.BaseExceptionHandler()
-            .handle(OperationType.GET, "alice", "team", new RuntimeException("boom"));
+        new IdpExceptionHandlers.BaseExceptionHandler()
+            .handle(IdpOperationType.GET, "alice", "team", new RuntimeException("boom"));
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
 
     assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
@@ -57,8 +57,8 @@ public class TestExceptionHandlers {
   @Test
   public void testHandleUserExceptionMapsForbiddenException() {
     Response response =
-        ExceptionHandlers.handleUserException(
-            OperationType.ADD, "alice", new ForbiddenException("denied"));
+        IdpExceptionHandlers.handleUserException(
+            IdpOperationType.ADD, "alice", new ForbiddenException("denied"));
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
 
     assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
@@ -70,8 +70,8 @@ public class TestExceptionHandlers {
   @Test
   public void testHandleGroupExceptionMapsAlreadyExistsException() {
     Response response =
-        ExceptionHandlers.handleGroupException(
-            OperationType.ADD, "dev", new GroupAlreadyExistsException("group already exists"));
+        IdpExceptionHandlers.handleGroupException(
+            IdpOperationType.ADD, "dev", new GroupAlreadyExistsException("group already exists"));
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
 
     assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());

@@ -27,7 +27,7 @@ import org.apache.ibatis.annotations.Param;
 
 public class IdpUserMetaBaseSQLProvider {
 
-  public String selectLocalUser(@Param("userName") String userName) {
+  public String selectIdpUser(@Param("userName") String userName) {
     return "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
         + " audit_info as auditInfo, current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
@@ -36,7 +36,7 @@ public class IdpUserMetaBaseSQLProvider {
         + " WHERE user_name = #{userName} AND deleted_at = 0";
   }
 
-  public String selectLocalUsers(@Param("userNames") List<String> userNames) {
+  public String selectIdpUsers(@Param("userNames") List<String> userNames) {
     return "<script>"
         + "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
         + " audit_info as auditInfo, current_version as currentVersion,"
@@ -50,7 +50,7 @@ public class IdpUserMetaBaseSQLProvider {
         + "</script>";
   }
 
-  public String insertLocalUser(@Param("userMeta") IdpUserPO userPO) {
+  public String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
     return "INSERT INTO "
         + IDP_USER_TABLE_NAME
         + " (user_id, user_name, password_hash,"
@@ -66,7 +66,7 @@ public class IdpUserMetaBaseSQLProvider {
         + " )";
   }
 
-  public String updateLocalUserPassword(
+  public String updateIdpUserPassword(
       @Param("userId") Long userId,
       @Param("passwordHash") String passwordHash,
       @Param("auditInfo") String auditInfo,
@@ -84,7 +84,7 @@ public class IdpUserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteLocalUser(
+  public String softDeleteIdpUser(
       @Param("userId") Long userId,
       @Param("deletedAt") Long deletedAt,
       @Param("auditInfo") String auditInfo) {
@@ -97,7 +97,10 @@ public class IdpUserMetaBaseSQLProvider {
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
-  public String truncateLocalUserMeta() {
-    return "DELETE FROM " + IDP_USER_TABLE_NAME;
+  public String deleteIdpUserMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + IDP_USER_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 }

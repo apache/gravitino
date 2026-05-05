@@ -20,7 +20,9 @@
 package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.time.Instant;
 import java.util.Arrays;
+import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
@@ -34,6 +36,7 @@ public class TestIdpUserResponse {
         IdpUserDTO.builder()
             .withName("test_user")
             .withGroups(Arrays.asList("group1", "group2"))
+            .withAudit(buildAudit())
             .build();
     IdpUserResponse response = new IdpUserResponse(user);
 
@@ -44,6 +47,7 @@ public class TestIdpUserResponse {
     Assertions.assertEquals(response, deserResponse);
     Assertions.assertEquals("test_user", deserResponse.getUser().name());
     Assertions.assertEquals(Arrays.asList("group1", "group2"), deserResponse.getUser().groups());
+    Assertions.assertEquals("admin", deserResponse.getUser().auditInfo().creator());
   }
 
   @Test
@@ -52,6 +56,7 @@ public class TestIdpUserResponse {
         IdpUserDTO.builder()
             .withName("test_user")
             .withGroups(Arrays.asList("group1", "group2"))
+            .withAudit(buildAudit())
             .build();
     IdpUserResponse response = new IdpUserResponse(user);
     response.validate(); // No exception thrown
@@ -61,5 +66,14 @@ public class TestIdpUserResponse {
   public void testIdpUserResponseException() {
     IdpUserResponse response = new IdpUserResponse();
     Assertions.assertThrows(IllegalArgumentException.class, response::validate);
+  }
+
+  private AuditDTO buildAudit() {
+    return AuditDTO.builder()
+        .withCreator("admin")
+        .withCreateTime(Instant.parse("2024-01-01T00:00:00Z"))
+        .withLastModifier("admin")
+        .withLastModifiedTime(Instant.parse("2024-01-01T00:00:00Z"))
+        .build();
   }
 }

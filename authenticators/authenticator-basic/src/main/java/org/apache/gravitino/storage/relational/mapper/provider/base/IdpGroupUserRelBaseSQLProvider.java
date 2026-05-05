@@ -78,7 +78,7 @@ public class IdpGroupUserRelBaseSQLProvider {
         + "</script>";
   }
 
-  public String batchInsertLocalGroupUsers(@Param("relations") List<IdpGroupUserRelPO> relations) {
+  public String batchInsertIdpGroupUsers(@Param("relations") List<IdpGroupUserRelPO> relations) {
     return "<script>"
         + "INSERT INTO "
         + IDP_GROUP_USER_REL_TABLE_NAME
@@ -91,7 +91,7 @@ public class IdpGroupUserRelBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteLocalGroupUsers(
+  public String softDeleteIdpGroupUsers(
       @Param("groupId") Long groupId,
       @Param("userIds") List<Long> userIds,
       @Param("deletedAt") Long deletedAt,
@@ -146,7 +146,10 @@ public class IdpGroupUserRelBaseSQLProvider {
         + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 
-  public String truncateLocalGroupUserRel() {
-    return "DELETE FROM " + IDP_GROUP_USER_REL_TABLE_NAME;
+  public String deleteIdpGroupUserRelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + IDP_GROUP_USER_REL_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 }
