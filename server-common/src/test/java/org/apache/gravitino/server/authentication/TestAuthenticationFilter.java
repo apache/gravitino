@@ -37,8 +37,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.auth.local.password.PasswordHasher;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthenticationFilter {
@@ -75,6 +77,28 @@ public class TestAuthenticationFilter {
         .thenThrow(new UnauthorizedException("UNAUTHORIZED"));
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse).sendError(HttpServletResponse.SC_UNAUTHORIZED, "UNAUTHORIZED");
+  }
+
+  @Test
+  public void testDoFilterReturnsBadRequestWhenBasicCredentialMissing()
+      throws ServletException, IOException {
+    BasicAuthenticator authenticator =
+        new BasicAuthenticator(mock(IdpUserMetaService.class), mock(PasswordHasher.class));
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(
+            new Vector<>(Collections.singletonList(AuthConstants.AUTHORIZATION_BASIC_HEADER))
+                .elements());
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+
+    verify(mockResponse)
+        .sendError(
+            HttpServletResponse.SC_BAD_REQUEST,
+            "Malformed Basic authorization header: missing credentials");
   }
 
   @Test
