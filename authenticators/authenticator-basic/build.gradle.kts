@@ -24,14 +24,9 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
-  implementation(project(":common"))
-  implementation(project(":core"))
-  implementation(project(":server-common"))
   implementation(libs.argon2.jvm)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

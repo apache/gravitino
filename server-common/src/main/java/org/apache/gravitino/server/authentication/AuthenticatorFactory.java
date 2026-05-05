@@ -32,15 +32,12 @@ import org.slf4j.LoggerFactory;
 public class AuthenticatorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticatorFactory.class);
-  private static final String BASIC_AUTHENTICATOR_CLASS_NAME =
-      "org.apache.gravitino.auth.local.BasicAuthenticator";
-
   public static final ImmutableMap<String, String> AUTHENTICATORS =
       ImmutableMap.of(
           AuthenticatorType.SIMPLE.name().toLowerCase(),
           SimpleAuthenticator.class.getCanonicalName(),
           AuthenticatorType.BASIC.name().toLowerCase(),
-          BASIC_AUTHENTICATOR_CLASS_NAME,
+          BasicAuthenticator.class.getCanonicalName(),
           AuthenticatorType.OAUTH.name().toLowerCase(),
           OAuth2TokenAuthenticator.class.getCanonicalName(),
           AuthenticatorType.KERBEROS.name().toLowerCase(),
