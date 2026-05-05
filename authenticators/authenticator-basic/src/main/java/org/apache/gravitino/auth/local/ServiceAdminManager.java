@@ -17,26 +17,24 @@
  * under the License.
  */
 
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
+package org.apache.gravitino.auth.local;
 
-dependencies {
-  implementation(project(":common"))
-  implementation(libs.argon2.jvm)
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
-  implementation(libs.jackson.databind)
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.mockito.inline)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+/** The manager used by the service admin initializer. */
+public interface ServiceAdminManager {
 
-tasks {
-  test {
-    environment("GRAVITINO_HOME", rootDir.path)
-    environment("GRAVITINO_TEST", "true")
-  }
+  /**
+   * Check whether the service admin already exists.
+   *
+   * @param userName The service admin name.
+   * @return True if the service admin exists, otherwise false.
+   */
+  boolean serviceAdminExists(String userName);
+
+  /**
+   * Initialize the service admin with the specified password.
+   *
+   * @param userName The service admin name.
+   * @param password The plain text password.
+   */
+  void initializeServiceAdmin(String userName, String password);
 }

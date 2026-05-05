@@ -30,6 +30,8 @@ import javax.ws.rs.container.ContainerRequestFilter;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.auth.local.ServiceAdminInitializer;
+import org.apache.gravitino.authorization.IdpServiceAdminManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
@@ -106,6 +108,8 @@ public class GravitinoServer extends ResourceConfig {
 
   public void initialize() {
     gravitinoEnv.initializeFullComponents(serverConfig);
+    ServiceAdminInitializer.getInstance()
+        .initialize(serverConfig, IdpServiceAdminManager.fromEnvironment());
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);

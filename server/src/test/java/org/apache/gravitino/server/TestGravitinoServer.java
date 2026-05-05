@@ -40,6 +40,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.auth.local.ServiceAdminInitializer;
+import org.apache.gravitino.authorization.IdpServiceAdminManager;
 import org.apache.gravitino.authorization.IdpUserManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -75,6 +77,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 @TestInstance(Lifecycle.PER_CLASS)
@@ -127,7 +130,21 @@ public class TestGravitinoServer {
 
   @Test
   public void testInitialize() {
-    gravitinoServer.initialize();
+    try (MockedStatic<ServiceAdminInitializer> initializerStatic =
+            Mockito.mockStatic(ServiceAdminInitializer.class);
+        MockedStatic<IdpServiceAdminManager> serviceAdminManagerStatic =
+            Mockito.mockStatic(IdpServiceAdminManager.class)) {
+      ServiceAdminInitializer initializer = Mockito.mock(ServiceAdminInitializer.class);
+      IdpServiceAdminManager serviceAdminManager = Mockito.mock(IdpServiceAdminManager.class);
+      initializerStatic.when(ServiceAdminInitializer::getInstance).thenReturn(initializer);
+      serviceAdminManagerStatic
+          .when(IdpServiceAdminManager::fromEnvironment)
+          .thenReturn(serviceAdminManager);
+
+      gravitinoServer.initialize();
+
+      Mockito.verify(initializer).initialize(spyServerConfig, serviceAdminManager);
+    }
   }
 
   @Test
