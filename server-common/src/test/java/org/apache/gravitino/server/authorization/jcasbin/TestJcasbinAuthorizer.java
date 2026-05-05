@@ -17,6 +17,7 @@
 
 package org.apache.gravitino.server.authorization.jcasbin;
 
+import static org.apache.gravitino.authorization.Privilege.Name.RUN_JOB;
 import static org.apache.gravitino.authorization.Privilege.Name.SELECT_TABLE;
 import static org.apache.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static org.apache.gravitino.authorization.Privilege.Name.USE_SCHEMA;
@@ -1031,6 +1032,145 @@ public class TestJcasbinAuthorizer {
     assertFalse(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, catalog, USE_CATALOG, ctx));
     assertFalse(jcasbinAuthorizer.authorize(currentPrincipal, METALAKE, catalog, USE_SCHEMA, ctx));
     assertTrue(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, catalog, USE_SCHEMA, ctx));
+  }
+
+  @Test
+  public void testAuthorizeReturnsFalseForDirectPrivilegeDenyOnly() throws Exception {
+    // Reproduces the case roryqi flagged: an OGNL expression like `METALAKE::RUN_JOB` is rewritten
+    // by AuthorizationExpressionConverter to a *single* `authorizer.authorize(...)` call — there is
+    // no companion `authorizer.deny(...)` call (which only ANY_xxx aliases generate). So the
+    // authorize endpoint must independently respect explicit DENY policies; a role that grants
+    // only DENY RUN_JOB on the metalake must cause authorize() to return false.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    Long roleId = 3001L;
+    RoleEntity denyRole =
+        getRoleEntity(
+            roleId,
+            "denyRunJobRole" + roleId,
+            ImmutableList.of(
+                makeSecurableObject(
+                    "testMetalake", MetadataObject.Type.METALAKE, roleId, RUN_JOB, "DENY")));
+    mockRoleEntity(denyRole);
+    mockUserRoles(userIdent, denyRole);
+
+    MetadataObject metalake = MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE);
+    AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+    assertFalse(jcasbinAuthorizer.authorize(currentPrincipal, METALAKE, metalake, RUN_JOB, ctx));
+    assertTrue(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, metalake, RUN_JOB, ctx));
+  }
+
+  @Test
+  public void testAuthorizeReturnsFalseForDirectPrivilegeIntraRoleDeny() throws Exception {
+    // Same role grants both ALLOW and DENY for METALAKE::RUN_JOB. Even though the expression
+    // converter only emits a single authorize() call (no deny() probe), DENY must still beat
+    // ALLOW inside the role and propagate through resolveEffect to the authorize endpoint.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    Long roleId = 3002L;
+    SecurableObject allow =
+        makeSecurableObject("testMetalake", MetadataObject.Type.METALAKE, roleId, RUN_JOB, "ALLOW");
+    SecurableObject deny =
+        makeSecurableObject("testMetalake", MetadataObject.Type.METALAKE, roleId, RUN_JOB, "DENY");
+    RoleEntity mixedRole =
+        getRoleEntity(roleId, "mixedRunJobRole" + roleId, ImmutableList.of(allow, deny));
+    mockRoleEntity(mixedRole);
+    mockUserRoles(userIdent, mixedRole);
+
+    MetadataObject metalake = MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE);
+    AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+    assertFalse(jcasbinAuthorizer.authorize(currentPrincipal, METALAKE, metalake, RUN_JOB, ctx));
+    assertTrue(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, metalake, RUN_JOB, ctx));
+  }
+
+  @Test
+  public void testAuthorizeReturnsFalseForDirectPrivilegeCrossRoleDeny() throws Exception {
+    // One role grants ALLOW RUN_JOB on metalake, another role grants DENY RUN_JOB on the same
+    // metalake. The direct-privilege expression `METALAKE::RUN_JOB` only triggers authorize();
+    // cross-role DENY priority must still take effect from the authorize side without relying on
+    // a paired deny() call from an ANY_xxx expansion.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    Long allowRoleId = 3003L;
+    Long denyRoleId = 3004L;
+    RoleEntity allowRole =
+        getRoleEntity(
+            allowRoleId,
+            "allowRunJob" + allowRoleId,
+            ImmutableList.of(
+                makeSecurableObject(
+                    "testMetalake", MetadataObject.Type.METALAKE, allowRoleId, RUN_JOB, "ALLOW")));
+    RoleEntity denyRole =
+        getRoleEntity(
+            denyRoleId,
+            "denyRunJob" + denyRoleId,
+            ImmutableList.of(
+                makeSecurableObject(
+                    "testMetalake", MetadataObject.Type.METALAKE, denyRoleId, RUN_JOB, "DENY")));
+    mockRoleEntity(allowRole);
+    mockRoleEntity(denyRole);
+    mockUserRoles(userIdent, allowRole, denyRole);
+
+    MetadataObject metalake = MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE);
+    AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+    assertFalse(jcasbinAuthorizer.authorize(currentPrincipal, METALAKE, metalake, RUN_JOB, ctx));
+    assertTrue(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, metalake, RUN_JOB, ctx));
+  }
+
+  @Test
+  public void testIsOwnerReturnsFalseWhenAnotherUserIsOwner() throws Exception {
+    // Existing testAuthorizeByOwner only covers "user is owner" and "no owner cached". This case
+    // pins the third branch: ownerRel resolves to a *different* user, so isOwner must return
+    // false even though the cache entry exists.
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    Long otherUserId = USER_ID + 1000L;
+    Cache<Long, Optional<Long>> ownerRel = getOwnerRelCache(jcasbinAuthorizer);
+    ownerRel.invalidateAll();
+    ownerRel.put(CATALOG_ID, Optional.of(otherUserId));
+
+    NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
+    // Stub the relation lookup so loadOwnerPolicy doesn't overwrite our manually-injected entry
+    // when isOwner walks through. We pre-seed ownerRel above, so loadOwnerPolicy's
+    // `getIfPresent != null` short-circuit fires and the relation lookup is never reached — but
+    // stub it defensively so a future refactor that drops the short-circuit doesn't silently
+    // change this test's semantics.
+    doReturn(ImmutableList.of())
+        .when(supportsRelationOperations)
+        .listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.OWNER_REL),
+            eq(catalogIdent),
+            eq(Entity.EntityType.CATALOG));
+
+    assertFalse(doAuthorizeOwner(currentPrincipal));
+  }
+
+  @Test
+  public void testAuthorizeReturnsFalseWhenMetadataIdLookupFails() throws Exception {
+    // loadAndResolveEffect swallows exceptions from the user/metadata id lookup and returns null
+    // (treated as "no rule"). This guards against an unauthenticated user or a transient
+    // catalog-resolution error inadvertently leaking through as an ALLOW or DENY verdict — both
+    // endpoints must return false.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    MetadataObject unknown =
+        MetadataObjects.of(null, "missingCatalog", MetadataObject.Type.CATALOG);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(eq(unknown), eq(METALAKE)))
+        .thenThrow(new RuntimeException("simulated id lookup failure"));
+    try {
+      AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+      assertFalse(
+          jcasbinAuthorizer.authorize(currentPrincipal, METALAKE, unknown, USE_CATALOG, ctx));
+      assertFalse(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, unknown, USE_CATALOG, ctx));
+    } finally {
+      // Restore the default stub so subsequent tests still resolve to CATALOG_ID.
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(eq(unknown), eq(METALAKE)))
+          .thenReturn(CATALOG_ID);
+    }
   }
 
   @Test
