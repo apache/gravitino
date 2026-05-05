@@ -40,7 +40,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.auth.local.IdpUserManager;
+import org.apache.gravitino.authorization.IdpUserManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;

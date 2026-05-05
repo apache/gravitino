@@ -19,9 +19,8 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
-import static org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME;
-
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.IdpGroupUserRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
@@ -32,7 +31,7 @@ public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLPro
       Long groupId, List<Long> userIds, Long deletedAt, String auditInfo) {
     return "<script>"
         + "UPDATE "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
         + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
@@ -57,7 +56,7 @@ public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLPro
   @Override
   public String softDeleteGroupUsersByUserId(Long userId, Long deletedAt, String auditInfo) {
     return "UPDATE "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
         + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
@@ -68,7 +67,7 @@ public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLPro
   @Override
   public String softDeleteGroupUsersByGroupId(Long groupId, Long deletedAt, String auditInfo) {
     return "UPDATE "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
         + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
@@ -80,9 +79,9 @@ public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLPro
   public String deleteIdpGroupUserRelMetasByLegacyTimeline(
       Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " WHERE id IN (SELECT id FROM "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

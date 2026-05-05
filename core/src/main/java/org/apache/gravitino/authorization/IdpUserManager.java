@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local;
+package org.apache.gravitino.authorization;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
@@ -28,6 +28,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.auth.local.password.PasswordHasher;
+import org.apache.gravitino.auth.local.password.PasswordHasherFactory;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.ForbiddenException;
@@ -37,7 +39,6 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
-import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -51,20 +52,21 @@ public class IdpUserManager {
   private final PasswordHasher passwordHasher;
 
   public static IdpUserManager fromEnvironment() {
-    GravitinoEnv env = GravitinoEnv.getInstance();
+    return fromEnvironment(PasswordHasherFactory.create());
+  }
+
+  public static IdpUserManager fromEnvironment(PasswordHasher passwordHasher) {
     return new IdpUserManager(
-        env.config(),
-        env.idGenerator(),
+        GravitinoEnv.getInstance().config(),
+        GravitinoEnv.getInstance().idGenerator(),
         IdpUserMetaService.getInstance(),
-        IdpGroupMetaService.getInstance(),
-        PasswordHasherFactory.create());
+        passwordHasher);
   }
 
   IdpUserManager(
       Config config,
       IdGenerator idGenerator,
       IdpUserMetaService userMetaService,
-      IdpGroupMetaService groupMetaService,
       PasswordHasher passwordHasher) {
     this.config = config;
     this.idGenerator = idGenerator;
@@ -233,7 +235,7 @@ public class IdpUserManager {
 
     return IdpUserDTO.builder()
         .withName(userPO.getUserName())
-        .withGroups(userMetaService.listGroupNames(userPO.getUserName()))
+        .withGroups(userMetaService().listGroupNames(userPO.getUserName()))
         .withAudit(DTOConverters.toDTO(auditInfo))
         .build();
   }

@@ -30,7 +30,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.auth.local.IdpUserManager;
+import org.apache.gravitino.authorization.IdpUserManager;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.dto.requests.CreateUserRequest;

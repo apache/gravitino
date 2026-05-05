@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local;
+package org.apache.gravitino.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -60,12 +60,7 @@ public class TestIdpGroupManager {
     userMetaService = mock(IdpUserMetaService.class);
     groupMetaService = mock(IdpGroupMetaService.class);
     manager =
-        new IdpGroupManager(
-            config,
-            mock(IdGenerator.class),
-            userMetaService,
-            groupMetaService,
-            mock(PasswordHasher.class));
+        new IdpGroupManager(config, mock(IdGenerator.class), userMetaService, groupMetaService);
   }
 
   @Test

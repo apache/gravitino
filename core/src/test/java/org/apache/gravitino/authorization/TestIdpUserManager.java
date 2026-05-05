@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local;
+package org.apache.gravitino.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,12 +32,12 @@ import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.local.password.PasswordHasher;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
-import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,9 +58,7 @@ public class TestIdpUserManager {
     passwordHasher = mock(PasswordHasher.class);
     IdGenerator idGenerator = mock(IdGenerator.class);
     when(idGenerator.nextId()).thenReturn(1L);
-    manager =
-        new IdpUserManager(
-            config, idGenerator, userMetaService, mock(IdpGroupMetaService.class), passwordHasher);
+    manager = new IdpUserManager(config, idGenerator, userMetaService, passwordHasher);
   }
 
   @Test

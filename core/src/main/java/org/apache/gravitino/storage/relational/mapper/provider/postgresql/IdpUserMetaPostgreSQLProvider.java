@@ -19,31 +19,29 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
-import static org.apache.gravitino.storage.relational.mapper.IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME;
-
-import org.apache.gravitino.storage.relational.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
-public class IdpGroupMetaPostgreSQLProvider extends IdpGroupMetaBaseSQLProvider {
+public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
 
   @Override
-  public String softDeleteIdpGroup(Long groupId, Long deletedAt, String auditInfo) {
+  public String softDeleteIdpUser(Long userId, Long deletedAt, String auditInfo) {
     return "UPDATE "
-        + IDP_GROUP_TABLE_NAME
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
         + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
   @Override
-  public String deleteIdpGroupMetasByLegacyTimeline(
-      Long legacyTimeline, @Param("limit") int limit) {
+  public String deleteIdpUserMetasByLegacyTimeline(Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
-        + IDP_GROUP_TABLE_NAME
-        + " WHERE group_id IN (SELECT group_id FROM "
-        + IDP_GROUP_TABLE_NAME
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " WHERE user_id IN (SELECT user_id FROM "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

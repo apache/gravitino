@@ -19,11 +19,8 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
-import static org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper.IDP_GROUP_TABLE_NAME;
-import static org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME;
-import static org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper.IDP_USER_TABLE_NAME;
-
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
 import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -32,9 +29,9 @@ public class IdpGroupUserRelBaseSQLProvider {
   public String selectGroupNamesByUserId(@Param("userId") Long userId) {
     return "SELECT g.group_name"
         + " FROM "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " r JOIN "
-        + IDP_GROUP_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_TABLE_NAME
         + " g ON g.group_id = r.group_id"
         + " WHERE r.user_id = #{userId}"
         + " AND r.deleted_at = 0"
@@ -45,9 +42,9 @@ public class IdpGroupUserRelBaseSQLProvider {
   public String selectUserNamesByGroupId(@Param("groupId") Long groupId) {
     return "SELECT u.user_name"
         + " FROM "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " r JOIN "
-        + IDP_USER_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_USER_TABLE_NAME
         + " u ON u.user_id = r.user_id"
         + " WHERE r.group_id = #{groupId}"
         + " AND r.deleted_at = 0"
@@ -60,7 +57,7 @@ public class IdpGroupUserRelBaseSQLProvider {
     return "<script>"
         + "SELECT user_id"
         + " FROM "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " WHERE group_id = #{groupId} "
         + "<choose>"
         + "<when test='userIds != null and userIds.size() > 0'>"
@@ -81,7 +78,7 @@ public class IdpGroupUserRelBaseSQLProvider {
   public String batchInsertIdpGroupUsers(@Param("relations") List<IdpGroupUserRelPO> relations) {
     return "<script>"
         + "INSERT INTO "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " (id, group_id, user_id, audit_info, current_version, last_version, deleted_at)"
         + " VALUES "
         + "<foreach item='item' collection='relations' separator=','>"
@@ -98,7 +95,7 @@ public class IdpGroupUserRelBaseSQLProvider {
       @Param("auditInfo") String auditInfo) {
     return "<script>"
         + "UPDATE "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = #{deletedAt},"
         + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
@@ -125,7 +122,7 @@ public class IdpGroupUserRelBaseSQLProvider {
       @Param("deletedAt") Long deletedAt,
       @Param("auditInfo") String auditInfo) {
     return "UPDATE "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = #{deletedAt},"
         + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
@@ -138,7 +135,7 @@ public class IdpGroupUserRelBaseSQLProvider {
       @Param("deletedAt") Long deletedAt,
       @Param("auditInfo") String auditInfo) {
     return "UPDATE "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = #{deletedAt},"
         + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
@@ -149,7 +146,7 @@ public class IdpGroupUserRelBaseSQLProvider {
   public String deleteIdpGroupUserRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
-        + IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 }

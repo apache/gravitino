@@ -19,9 +19,8 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
-import static org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper.IDP_USER_TABLE_NAME;
-
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -32,7 +31,7 @@ public class IdpUserMetaBaseSQLProvider {
         + " audit_info as auditInfo, current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
-        + IDP_USER_TABLE_NAME
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " WHERE user_name = #{userName} AND deleted_at = 0";
   }
 
@@ -42,7 +41,7 @@ public class IdpUserMetaBaseSQLProvider {
         + " audit_info as auditInfo, current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
-        + IDP_USER_TABLE_NAME
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " WHERE deleted_at = 0 AND user_name IN "
         + "<foreach item='item' collection='userNames' open='(' separator=',' close=')'>"
         + "#{item}"
@@ -52,7 +51,7 @@ public class IdpUserMetaBaseSQLProvider {
 
   public String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
     return "INSERT INTO "
-        + IDP_USER_TABLE_NAME
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " (user_id, user_name, password_hash,"
         + " audit_info, current_version, last_version, deleted_at)"
         + " VALUES ("
@@ -74,7 +73,7 @@ public class IdpUserMetaBaseSQLProvider {
       @Param("newCurrentVersion") Long newCurrentVersion,
       @Param("newLastVersion") Long newLastVersion) {
     return "UPDATE "
-        + IDP_USER_TABLE_NAME
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET password_hash = #{passwordHash},"
         + " audit_info = #{auditInfo},"
         + " current_version = #{newCurrentVersion},"
@@ -89,7 +88,7 @@ public class IdpUserMetaBaseSQLProvider {
       @Param("deletedAt") Long deletedAt,
       @Param("auditInfo") String auditInfo) {
     return "UPDATE "
-        + IDP_USER_TABLE_NAME
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET deleted_at = #{deletedAt},"
         + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
@@ -100,7 +99,7 @@ public class IdpUserMetaBaseSQLProvider {
   public String deleteIdpUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
-        + IDP_USER_TABLE_NAME
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 }

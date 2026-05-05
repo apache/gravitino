@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local;
+package org.apache.gravitino.authorization;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
@@ -58,21 +58,18 @@ public class IdpGroupManager {
   private final IdpGroupMetaService groupMetaService;
 
   public static IdpGroupManager fromEnvironment() {
-    GravitinoEnv env = GravitinoEnv.getInstance();
     return new IdpGroupManager(
-        env.config(),
-        env.idGenerator(),
+        GravitinoEnv.getInstance().config(),
+        GravitinoEnv.getInstance().idGenerator(),
         IdpUserMetaService.getInstance(),
-        IdpGroupMetaService.getInstance(),
-        PasswordHasherFactory.create());
+        IdpGroupMetaService.getInstance());
   }
 
   IdpGroupManager(
       Config config,
       IdGenerator idGenerator,
       IdpUserMetaService userMetaService,
-      IdpGroupMetaService groupMetaService,
-      PasswordHasher passwordHasher) {
+      IdpGroupMetaService groupMetaService) {
     this.config = config;
     this.idGenerator = idGenerator;
     this.userMetaService = userMetaService;

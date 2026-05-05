@@ -24,15 +24,12 @@ plugins {
 }
 
 dependencies {
-  compileOnly(project(":api"))
-  compileOnly(project(":common"))
-  compileOnly(project(":core"))
-  compileOnly(project(":server-common"))
   implementation(libs.argon2.jvm)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.databind)
+  implementation(libs.jackson.datatype.jsr310)
   implementation(libs.javax.ws.rs.api)
   implementation(libs.mybatis)
   annotationProcessor(libs.lombok)

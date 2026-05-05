@@ -31,7 +31,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.auth.local.IdpGroupManager;
+import org.apache.gravitino.authorization.IdpGroupManager;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.IdpGroupDTO;
 import org.apache.gravitino.dto.requests.CreateGroupRequest;
