@@ -28,6 +28,7 @@ import org.apache.paimon.types.BooleanType;
 import org.apache.paimon.types.CharType;
 import org.apache.paimon.types.DataType;
 import org.apache.paimon.types.DataTypeDefaultVisitor;
+import org.apache.paimon.types.DataTypeJsonParser;
 import org.apache.paimon.types.DataTypes;
 import org.apache.paimon.types.DateType;
 import org.apache.paimon.types.DecimalType;
@@ -192,14 +193,10 @@ public class TypeUtils {
 
     @Override
     public Type visit(MultisetType multisetType) {
-      // Unlike a Java Set, MultisetType allows for multiple instances for each of its
-      // elements with a common subtype. And a conversion is possible through a map
-      // that assigns each value to an integer to represent the multiplicity of the values.
-      // For example, a `MULTISET<INT>` is converted to a `MAP<Integer, Integer>`, the key of the
-      // map represents the elements of the Multiset and the value represents the multiplicity of
-      // the elements in the Multiset.
-      return Types.MapType.of(
-          multisetType.getElementType().accept(this), Types.IntegerType.get(), false);
+      // Gravitino's type system does not have a native MULTISET type. We use ExternalType to
+      // preserve the original Paimon MULTISET type information, so it can be correctly restored
+      // when converting back to Paimon or Flink types.
+      return Types.ExternalType.of(multisetType.asSQLString());
     }
 
     @Override
@@ -280,6 +277,18 @@ public class TypeUtils {
                     builder.field(field.name(), dataTypeWithNullable, field.comment());
                   });
           return builder.build();
+        case EXTERNAL:
+          Types.ExternalType externalType = (Types.ExternalType) type;
+          String catalogString = externalType.catalogString();
+          if (catalogString.startsWith("MULTISET<") && catalogString.endsWith(">")) {
+            // Restore MULTISET type: extract element type SQL string and parse it
+            String elementTypeSql =
+                catalogString.substring("MULTISET<".length(), catalogString.length() - 1);
+            DataType elementDataType = DataTypeJsonParser.parseAtomicTypeSQLString(elementTypeSql);
+            return new MultisetType(elementDataType);
+          }
+          throw new UnsupportedOperationException(
+              String.format("Paimon does not support Gravitino external type: %s", catalogString));
         default:
           throw new UnsupportedOperationException(
               String.format(
