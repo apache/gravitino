@@ -35,6 +35,7 @@ env_map = {
     "GRAVITINO_S3_ENDPOINT": "s3-endpoint",
     "GRAVITINO_S3_REGION": "s3-region",
     "GRAVITINO_S3_PATH_STYLE_ACCESS": "s3-path-style-access",
+    "GRAVITINO_S3_PROXY_ENDPOINT": "s3-proxy-endpoint",
     "GRAVITINO_S3_ROLE_ARN": "s3-role-arn",
     "GRAVITINO_S3_EXTERNAL_ID": "s3-external-id",
     "GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME": "azure-storage-account-name",

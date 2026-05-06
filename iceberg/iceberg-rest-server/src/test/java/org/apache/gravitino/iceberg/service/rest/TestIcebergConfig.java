@@ -72,19 +72,15 @@ public class TestIcebergConfig extends IcebergTestBase {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ConfigResponse response = resp.readEntity(ConfigResponse.class);
     Map<String, String> expectedConfig =
-        ImmutableMap.of(
-            "prefix",
-            warehouseName,
-            IcebergConstants.IO_IMPL,
-            "org.apache.iceberg.aws.s3.S3FileIO",
-            IcebergConstants.ICEBERG_S3_ENDPOINT,
-            "https://s3-endpoint.example.com",
-            IcebergConstants.AWS_S3_REGION,
-            "us-west-2",
-            IcebergConstants.ICEBERG_OSS_ENDPOINT,
-            "https://oss-endpoint.example.com",
-            IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
-            "true");
+        ImmutableMap.<String, String>builder()
+            .put("prefix", warehouseName)
+            .put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO")
+            .put(IcebergConstants.ICEBERG_S3_ENDPOINT, "https://s3-endpoint.example.com")
+            .put(IcebergConstants.AWS_S3_REGION, "us-west-2")
+            .put(IcebergConstants.ICEBERG_OSS_ENDPOINT, "https://oss-endpoint.example.com")
+            .put(IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS, "true")
+            .put(IcebergConstants.ICEBERG_S3_PROXY_ENDPOINT, "http://proxy:8080")
+            .build();
     Assertions.assertEquals(expectedConfig, response.defaults());
     Assertions.assertEquals(0, response.overrides().size());
   }
