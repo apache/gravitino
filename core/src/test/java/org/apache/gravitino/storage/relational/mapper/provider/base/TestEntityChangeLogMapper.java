@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
-import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -35,31 +38,30 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestAuthMappers {
+public class TestEntityChangeLogMapper {
 
-  private static final String JDBC_STORE_PATH =
-      "/tmp/gravitino_jdbc_authMappers_" + UUID.randomUUID().toString().replace("-", "");
-  private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
+  private static Path jdbcStorePath;
+  private static String dbDir;
   private static JDBCBackend backend;
   private static EntityChangeLogMapper entityChangeLogMapper;
   private static SqlSession sharedSession;
 
   @BeforeAll
   public static void setup() throws Exception {
-    File dir = new File(DB_DIR);
-    if (dir.exists()) {
-      FileUtils.deleteDirectory(dir);
-    }
-    dir.mkdirs();
+    jdbcStorePath = Files.createTempDirectory("gravitino_jdbc_entityChangeLog_");
+    Path dbPath = jdbcStorePath.resolve("testdb");
+    Files.createDirectories(dbPath);
+    dbDir = dbPath.toString();
 
     Config config = Mockito.mock(Config.class);
     Mockito.when(config.get(Configs.ENTITY_STORE)).thenReturn("relational");
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_STORE)).thenReturn("h2");
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL))
-        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
+        .thenReturn(String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", dbDir));
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER)).thenReturn("gravitino");
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD))
         .thenReturn("gravitino");
@@ -84,9 +86,19 @@ public class TestAuthMappers {
     if (backend != null) {
       backend.close();
     }
-    File dir = new File(JDBC_STORE_PATH);
-    if (dir.exists()) {
-      FileUtils.deleteDirectory(dir);
+    if (jdbcStorePath != null) {
+      FileUtils.deleteDirectory(jdbcStorePath.toFile());
+    }
+  }
+
+  @BeforeEach
+  void truncate() throws SQLException {
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection();
+          Statement statement = connection.createStatement()) {
+        statement.execute("DELETE FROM entity_change_log");
+      }
     }
   }
 
@@ -104,6 +116,7 @@ public class TestAuthMappers {
     Assertions.assertEquals("cat.schema.tbl", record.getFullName());
     Assertions.assertEquals(OperateType.ALTER, record.getOperateType());
     Assertions.assertEquals(now, record.getCreatedAt());
+    Assertions.assertTrue(record.getId() > 0L);
   }
 
   @Test
@@ -120,5 +133,18 @@ public class TestAuthMappers {
     List<EntityChangeRecord> after = entityChangeLogMapper.selectChanges(0L, 100);
     Assertions.assertEquals(1, after.size());
     Assertions.assertEquals(recent, after.get(0).getCreatedAt());
+  }
+
+  @Test
+  void testEntityChangeLogSameTimestampOrderedById() {
+    long t = 5_000_000L;
+    entityChangeLogMapper.insertChange("metalake1", "TABLE", "a", OperateType.INSERT, t);
+    entityChangeLogMapper.insertChange("metalake1", "TABLE", "b", OperateType.INSERT, t);
+    entityChangeLogMapper.insertChange("metalake1", "TABLE", "c", OperateType.INSERT, t);
+
+    List<EntityChangeRecord> rows = entityChangeLogMapper.selectChanges(0L, 100);
+    Assertions.assertEquals(3, rows.size());
+    Assertions.assertTrue(rows.get(0).getId() < rows.get(1).getId());
+    Assertions.assertTrue(rows.get(1).getId() < rows.get(2).getId());
   }
 }

@@ -27,11 +27,11 @@ public class EntityChangeLogBaseSQLProvider {
 
   public String selectEntityChanges(
       @Param("createdAtAfter") long createdAtAfter, @Param("maxRows") int maxRows) {
-    return "SELECT metalake_name as metalakeName, entity_type as entityType,"
+    return "SELECT id, metalake_name as metalakeName, entity_type as entityType,"
         + " entity_full_name as fullName, operate_type as operateType, created_at as createdAt"
         + " FROM "
         + ENTITY_CHANGE_LOG_TABLE_NAME
-        + " WHERE created_at >= #{createdAtAfter} ORDER BY created_at LIMIT #{maxRows}";
+        + " WHERE created_at >= #{createdAtAfter} ORDER BY created_at, id LIMIT #{maxRows}";
   }
 
   public String insertEntityChange(
