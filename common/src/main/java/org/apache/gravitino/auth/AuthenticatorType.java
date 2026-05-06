@@ -27,9 +27,6 @@ public enum AuthenticatorType {
   /** Simple authentication. */
   SIMPLE,
 
-  /** Authentication that uses local basic auth. */
-  BASIC,
-
   /** Authentication that uses OAuth. */
   OAUTH,
 
