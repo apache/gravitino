@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.GROU
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
@@ -191,5 +192,21 @@ public class RoleMetaBaseSQLProvider {
     return "DELETE FROM "
         + ROLE_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String touchRoleUpdatedAt(@Param("roleId") long roleId, @Param("now") long now) {
+    return "UPDATE " + ROLE_TABLE_NAME + " SET updated_at = #{now} WHERE role_id = #{roleId}";
+  }
+
+  public String batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds) {
+    if (roleIds == null || roleIds.isEmpty()) {
+      return "SELECT role_id as roleId, role_name as roleName, updated_at as updatedAt FROM "
+          + ROLE_TABLE_NAME
+          + " WHERE 1 = 0";
+    }
+    return "<script>SELECT role_id as roleId, role_name as roleName, updated_at as updatedAt FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE role_id IN <foreach item='id' collection='roleIds' open='(' separator=',' close=')'>#{id}</foreach>"
+        + " AND deleted_at = 0</script>";
   }
 }

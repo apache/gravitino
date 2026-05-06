@@ -187,4 +187,21 @@ public class UserMetaBaseSQLProvider {
         + USER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String touchUserUpdatedAt(@Param("userId") long userId, @Param("now") long now) {
+    return "UPDATE " + USER_TABLE_NAME + " SET updated_at = #{now} WHERE user_id = #{userId}";
+  }
+
+  public String getUserInfo(
+      @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
+    return "SELECT um.user_id as userId, um.updated_at as updatedAt"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " um"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON um.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
+        + " WHERE mm.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
+        + " AND um.deleted_at = 0";
+  }
 }

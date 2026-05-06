@@ -35,6 +35,7 @@ public class OwnerRelPO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+  private Long updatedAt;
 
   private OwnerRelPO() {}
 
@@ -94,6 +95,11 @@ public class OwnerRelPO {
       return this;
     }
 
+    public Builder withUpdatedAt(Long updatedAt) {
+      ownerRelPO.updatedAt = updatedAt;
+      return this;
+    }
+
     public OwnerRelPO build() {
       validate();
       return ownerRelPO;
@@ -111,6 +117,7 @@ public class OwnerRelPO {
       Preconditions.checkArgument(ownerRelPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(ownerRelPO.lastVersion != null, "Last version is required");
       Preconditions.checkArgument(ownerRelPO.deletedAt != null, "Deleted at is required");
+      Preconditions.checkArgument(ownerRelPO.updatedAt != null, "Updated at is required");
     }
   }
 }

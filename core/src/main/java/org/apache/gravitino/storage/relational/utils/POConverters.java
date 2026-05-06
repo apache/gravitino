@@ -1575,6 +1575,7 @@ public class POConverters {
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
           .withDeleteAt(DEFAULT_DELETED_AT)
+          .withUpdatedAt(System.currentTimeMillis())
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
