@@ -36,6 +36,7 @@ public interface Capability {
   enum Scope {
     SCHEMA,
     TABLE,
+    VIEW,
     COLUMN,
     FILESET,
     TOPIC,

@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -53,6 +54,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -321,7 +323,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertEquals("concurrent_view", loadedView.name());
 
         EntityCombinedView combinedView = (EntityCombinedView) loadedView;
-        long currentEntityId = combinedView.viewFromGravitino().id();
+        long currentEntityId = combinedView.viewEntity().id();
 
         if (entityId == null) {
           entityId = currentEntityId;
@@ -371,5 +373,156 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     // Verify view was re-imported
     ViewEntity viewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
     Assertions.assertNotNull(viewEntity);
+  }
+
+  @Test
+  public void testCreateView() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_create_view");
+    Map<String, String> schemaProps = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", schemaProps);
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "created_view");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    Map<String, String> viewProps = ImmutableMap.of("k1", "v1", "p1", "pv1");
+
+    View created =
+        viewOperationDispatcher.createView(
+            viewIdent, "view comment", new Column[0], representations, null, null, viewProps);
+
+    Assertions.assertEquals("created_view", created.name());
+    Assertions.assertEquals("view comment", created.comment());
+    Assertions.assertTrue(created instanceof EntityCombinedView);
+
+    // Entity stored as ViewEntity in entity store.
+    ViewEntity stored = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+    Assertions.assertNotNull(stored);
+    Assertions.assertEquals("view comment", stored.comment());
+    Assertions.assertEquals("pv1", stored.properties().get("p1"));
+  }
+
+  @Test
+  public void testDropView() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_drop_view");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "to_drop");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    Assertions.assertTrue(viewOperationDispatcher.dropView(viewIdent));
+    // Entity removed.
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> entityStore.get(viewIdent, VIEW, ViewEntity.class));
+    // Dropping again returns false (underlying catalog reports missing).
+    Assertions.assertFalse(viewOperationDispatcher.dropView(viewIdent));
+  }
+
+  @Test
+  public void testListViews() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_list_view");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    for (int i = 0; i < 3; i++) {
+      viewOperationDispatcher.createView(
+          NameIdentifier.of(viewNs, "lv" + i),
+          null,
+          new Column[0],
+          representations,
+          null,
+          null,
+          ImmutableMap.of("k1", "v1"));
+    }
+
+    NameIdentifier[] listed = viewOperationDispatcher.listViews(viewNs);
+    Assertions.assertEquals(3, listed.length);
+  }
+
+  @Test
+  public void testAlterViewProperties() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_alter_props");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "c", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "alter_props");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, "c", new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    View altered =
+        viewOperationDispatcher.alterView(
+            viewIdent, ViewChange.setProperty("k2", "v2"), ViewChange.removeProperty("k1"));
+    Assertions.assertEquals("v2", altered.properties().get("k2"));
+    Assertions.assertFalse(altered.properties().containsKey("k1"));
+
+    ViewEntity stored = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+    Assertions.assertEquals("v2", stored.properties().get("k2"));
+    Assertions.assertFalse(stored.properties().containsKey("k1"));
+  }
+
+  @Test
+  public void testAlterViewRename() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_alter_rename");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "c", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier oldIdent = NameIdentifier.of(viewNs, "old_view");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        oldIdent, "c", new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    View altered = viewOperationDispatcher.alterView(oldIdent, ViewChange.rename("new_view"));
+    Assertions.assertEquals("new_view", altered.name());
+  }
+
+  @Test
+  public void testAlterViewReplace() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_alter_replace");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "c", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "replace");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, "c", new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    Representation[] newRepresentations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build(),
+      SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+    };
+    View altered =
+        viewOperationDispatcher.alterView(
+            viewIdent,
+            ViewChange.replaceView(
+                new Column[0], newRepresentations, "cat1", "sch1", "new comment"));
+    Assertions.assertEquals(2, altered.representations().length);
+    Assertions.assertEquals("new comment", altered.comment());
+    Assertions.assertEquals("cat1", altered.defaultCatalog());
+    Assertions.assertEquals("sch1", altered.defaultSchema());
+
+    SQLRepresentation trino =
+        (SQLRepresentation)
+            Arrays.stream(altered.representations())
+                .filter(r -> r instanceof SQLRepresentation)
+                .filter(r -> "trino".equals(((SQLRepresentation) r).dialect()))
+                .findFirst()
+                .orElseThrow(AssertionError::new);
+    Assertions.assertEquals("SELECT 2", trino.sql());
   }
 }

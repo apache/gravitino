@@ -53,6 +53,7 @@ import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.server.web.Utils;
 import org.eclipse.jetty.util.StringUtil;
 import org.slf4j.Logger;
@@ -72,6 +73,11 @@ public class ExceptionHandlers {
   public static Response handleTableException(
       OperationType op, String table, String schema, Exception e) {
     return TableExceptionHandler.INSTANCE.handle(op, table, schema, e);
+  }
+
+  public static Response handleViewException(
+      OperationType op, String view, String schema, Exception e) {
+    return ViewExceptionHandler.INSTANCE.handle(op, view, schema, e);
   }
 
   public static Response handleSchemaException(
@@ -280,6 +286,47 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, table, schema, e);
+      }
+    }
+  }
+
+  private static class ViewExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new ViewExceptionHandler();
+
+    private static String getViewErrorMsg(
+        String view, String operation, String schema, String reason) {
+      return String.format(
+          "Failed to operate view(s)%s operation [%s] under schema [%s], reason [%s]",
+          view, operation, schema, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String view, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(view) ? "" : " [" + view + "]";
+      String errorMsg = getViewErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof ViewAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, view, schema, e);
       }
     }
   }
