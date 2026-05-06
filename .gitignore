@@ -63,4 +63,4 @@ web/.next
 
 .venv/
 .worktrees/
-.claude
+.claude/settings.local.json
