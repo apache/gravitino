@@ -19,19 +19,57 @@
 package org.apache.gravitino.server;
 
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
+import java.util.Collections;
+import java.util.Set;
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.core.Application;
+import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.auth.local.ServiceAdminInitializer;
+import org.apache.gravitino.authorization.IdpServiceAdminManager;
+import org.apache.gravitino.authorization.IdpUserManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
+import org.apache.gravitino.catalog.PartitionDispatcher;
+import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.IdpUserDTO;
+import org.apache.gravitino.dto.responses.IdpUserResponse;
+import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.lineage.LineageService;
+import org.apache.gravitino.metalake.MetalakeDispatcher;
+import org.apache.gravitino.metrics.MetricsSystem;
+import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.rest.IdpUserOperations;
+import org.apache.gravitino.stats.StatisticDispatcher;
+import org.apache.gravitino.tag.TagDispatcher;
+import org.eclipse.jetty.util.thread.ThreadPool;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
+import org.glassfish.jersey.test.JerseyTest;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -39,6 +77,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 @TestInstance(Lifecycle.PER_CLASS)
@@ -91,7 +130,21 @@ public class TestGravitinoServer {
 
   @Test
   public void testInitialize() {
-    gravitinoServer.initialize();
+    try (MockedStatic<ServiceAdminInitializer> initializerStatic =
+            Mockito.mockStatic(ServiceAdminInitializer.class);
+        MockedStatic<IdpServiceAdminManager> serviceAdminManagerStatic =
+            Mockito.mockStatic(IdpServiceAdminManager.class)) {
+      ServiceAdminInitializer initializer = Mockito.mock(ServiceAdminInitializer.class);
+      IdpServiceAdminManager serviceAdminManager = Mockito.mock(IdpServiceAdminManager.class);
+      initializerStatic.when(ServiceAdminInitializer::getInstance).thenReturn(initializer);
+      serviceAdminManagerStatic
+          .when(IdpServiceAdminManager::fromEnvironment)
+          .thenReturn(serviceAdminManager);
+
+      gravitinoServer.initialize();
+
+      Mockito.verify(initializer).initialize(spyServerConfig, serviceAdminManager);
+    }
   }
 
   @Test
@@ -135,5 +188,163 @@ public class TestGravitinoServer {
     assertTrue(
         hookBlock.contains("server.gracefulStop()"),
         "Shutdown hook should invoke server.gracefulStop() so app-level cleanup runs on SIGTERM");
+  }
+
+  @Test
+  public void testInitializeRestApiWithBasicAuthenticator() throws Exception {
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.loadFromMap(ImmutableMap.of(Configs.AUTHENTICATORS.getKey(), "basic"), t -> true);
+
+    GravitinoServer restServer = newRestApiTestServer(serverConfig, Collections.emptySet());
+    invokeInitializeRestApi(restServer);
+
+    IdpUserManager userManager = Mockito.mock(IdpUserManager.class);
+    Mockito.when(userManager.getUser("user1"))
+        .thenReturn(
+            IdpUserDTO.builder()
+                .withName("user1")
+                .withGroups(Collections.emptyList())
+                .withAudit(buildAudit())
+                .build());
+
+    restServer.register(newIdpUserOperations(userManager));
+    restServer.register(
+        new AbstractBinder() {
+          @Override
+          protected void configure() {
+            bind(Mockito.mock(HttpServletRequest.class)).to(HttpServletRequest.class);
+          }
+        });
+
+    JerseyTest jerseyTest =
+        new JerseyTest() {
+          @Override
+          protected Application configure() {
+            return restServer;
+          }
+        };
+
+    try {
+      jerseyTest.setUp();
+      Response response =
+          jerseyTest.target("/idp/users/user1").request("application/vnd.gravitino.v1+json").get();
+      assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+
+      IdpUserResponse userResponse = response.readEntity(IdpUserResponse.class);
+      assertEquals("user1", userResponse.getUser().name());
+      assertEquals("admin", userResponse.getUser().auditInfo().creator());
+    } finally {
+      jerseyTest.tearDown();
+    }
+  }
+
+  @Test
+  public void testInitializeRestApiWithoutBasicAuthenticator() throws Exception {
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.loadFromMap(
+        ImmutableMap.of(
+            Configs.AUTHENTICATORS.getKey(), "simple",
+            Configs.REST_API_EXTENSION_PACKAGES.getKey(), "org.apache.gravitino.test.extension"),
+        t -> true);
+
+    GravitinoServer restServer =
+        newRestApiTestServer(serverConfig, Set.of("org.apache.gravitino.test.lineage"));
+
+    invokeInitializeRestApi(restServer);
+
+    JerseyTest jerseyTest =
+        new JerseyTest() {
+          @Override
+          protected Application configure() {
+            return restServer;
+          }
+        };
+
+    try {
+      jerseyTest.setUp();
+      assertIdpInterfaceNotFound(jerseyTest, "/idp/users/user1");
+      assertIdpInterfaceNotFound(jerseyTest, "/idp/groups/group1");
+    } finally {
+      jerseyTest.tearDown();
+    }
+  }
+
+  private GravitinoServer newRestApiTestServer(
+      ServerConfig serverConfig, Set<String> lineagePackages) throws IllegalAccessException {
+    GravitinoEnv gravitinoEnv = Mockito.mock(GravitinoEnv.class);
+    mockDispatchers(gravitinoEnv);
+
+    GravitinoServer restServer = new GravitinoServer(serverConfig, gravitinoEnv);
+    JettyServer jettyServer = Mockito.mock(JettyServer.class);
+    ThreadPool threadPool = Mockito.mock(ThreadPool.class);
+    LineageService lineageService = Mockito.mock(LineageService.class);
+
+    Mockito.when(jettyServer.getThreadPool()).thenReturn(threadPool);
+    Mockito.when(lineageService.getRESTPackages()).thenReturn(lineagePackages);
+
+    FieldUtils.writeField(restServer, "server", jettyServer, true);
+    FieldUtils.writeField(restServer, "lineageService", lineageService, true);
+    return restServer;
+  }
+
+  private void mockDispatchers(GravitinoEnv gravitinoEnv) {
+    Mockito.when(gravitinoEnv.metalakeDispatcher())
+        .thenReturn(Mockito.mock(MetalakeDispatcher.class));
+    Mockito.when(gravitinoEnv.catalogDispatcher())
+        .thenReturn(Mockito.mock(CatalogDispatcher.class));
+    Mockito.when(gravitinoEnv.schemaDispatcher()).thenReturn(Mockito.mock(SchemaDispatcher.class));
+    Mockito.when(gravitinoEnv.tableDispatcher()).thenReturn(Mockito.mock(TableDispatcher.class));
+    Mockito.when(gravitinoEnv.partitionDispatcher())
+        .thenReturn(Mockito.mock(PartitionDispatcher.class));
+    Mockito.when(gravitinoEnv.filesetDispatcher())
+        .thenReturn(Mockito.mock(FilesetDispatcher.class));
+    Mockito.when(gravitinoEnv.topicDispatcher()).thenReturn(Mockito.mock(TopicDispatcher.class));
+    Mockito.when(gravitinoEnv.tagDispatcher()).thenReturn(Mockito.mock(TagDispatcher.class));
+    Mockito.when(gravitinoEnv.policyDispatcher()).thenReturn(Mockito.mock(PolicyDispatcher.class));
+    Mockito.when(gravitinoEnv.credentialOperationDispatcher())
+        .thenReturn(Mockito.mock(CredentialOperationDispatcher.class));
+    Mockito.when(gravitinoEnv.modelDispatcher()).thenReturn(Mockito.mock(ModelDispatcher.class));
+    Mockito.when(gravitinoEnv.functionDispatcher())
+        .thenReturn(Mockito.mock(FunctionDispatcher.class));
+    Mockito.when(gravitinoEnv.jobOperationDispatcher())
+        .thenReturn(Mockito.mock(JobOperationDispatcher.class));
+    Mockito.when(gravitinoEnv.statisticDispatcher())
+        .thenReturn(Mockito.mock(StatisticDispatcher.class));
+  }
+
+  private void invokeInitializeRestApi(GravitinoServer restServer) throws Exception {
+    Method method = GravitinoServer.class.getDeclaredMethod("initializeRestApi");
+    method.setAccessible(true);
+    MetricsSystem originalMetricsSystem =
+        (MetricsSystem) FieldUtils.readField(GravitinoEnv.getInstance(), "metricsSystem", true);
+    try {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "metricsSystem", Mockito.mock(MetricsSystem.class), true);
+      method.invoke(restServer);
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "metricsSystem", originalMetricsSystem, true);
+    }
+  }
+
+  private IdpUserOperations newIdpUserOperations(IdpUserManager userManager) throws Exception {
+    Constructor<IdpUserOperations> constructor =
+        IdpUserOperations.class.getDeclaredConstructor(IdpUserManager.class);
+    constructor.setAccessible(true);
+    return constructor.newInstance(userManager);
+  }
+
+  private AuditDTO buildAudit() {
+    return AuditDTO.builder()
+        .withCreator("admin")
+        .withCreateTime(Instant.parse("2024-01-01T00:00:00Z"))
+        .withLastModifier("admin")
+        .withLastModifiedTime(Instant.parse("2024-01-01T00:00:00Z"))
+        .build();
+  }
+
+  private void assertIdpInterfaceNotFound(JerseyTest jerseyTest, String path) {
+    Response response = jerseyTest.target(path).request("application/vnd.gravitino.v1+json").get();
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
   }
 }
