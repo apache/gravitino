@@ -35,6 +35,7 @@ import org.apache.gravitino.spark.connector.jdbc.SparkJdbcTable;
 import org.apache.spark.sql.connector.catalog.SupportsMetadataColumns;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.catalog.V1Table;
 import org.apache.spark.sql.connector.expressions.ApplyTransform;
 import org.apache.spark.sql.connector.expressions.BucketTransform;
 import org.apache.spark.sql.connector.expressions.DaysTransform;
@@ -118,27 +119,31 @@ public class SparkTableInfo {
         items.length == 2, "Table name format should be $db.$table, but is: " + identifier);
     sparkTableInfo.tableName = items[1];
     sparkTableInfo.database = items[0];
-    sparkTableInfo.columns =
-        // using `baseTable.schema()` directly will failed because the method named `schema` is
-        // Deprecated in Spark Table interface
-        Arrays.stream(getSchema(baseTable).fields())
-            .map(
-                sparkField ->
-                    new SparkColumnInfo(
-                        sparkField.name(),
-                        sparkField.dataType(),
-                        sparkField.getComment().isDefined() ? sparkField.getComment().get() : null,
-                        sparkField.nullable()))
-            .collect(Collectors.toList());
     sparkTableInfo.comment = baseTable.properties().remove(ConnectorConstants.COMMENT);
     sparkTableInfo.tableProperties = baseTable.properties();
+    // V1Table.schema() includes partition columns in the data schema. We must filter them
+    // out so that columns contains only the data columns (non-partition columns).
+    // Collect partition column names first, then filter schema fields.
+    java.util.Set<String> partitionColNames = new java.util.HashSet<>();
     Arrays.stream(baseTable.partitioning())
         .forEach(
             transform -> {
+              if (transform instanceof IdentityTransform) {
+                partitionColNames.add(((IdentityTransform) transform).reference().fieldNames()[0]);
+              }
               if (transform instanceof BucketTransform
                   || transform instanceof SortedBucketTransform) {
                 if (isBucketPartition(baseTable, transform)) {
                   sparkTableInfo.addPartition(transform);
+                  // Collect bucket partition column names
+                  if (transform instanceof BucketTransform) {
+                    for (org.apache.spark.sql.connector.expressions.NamedReference ref :
+                        ((BucketTransform) transform).references()) {
+                      for (String fieldName : ref.fieldNames()) {
+                        partitionColNames.add(fieldName);
+                      }
+                    }
+                  }
                 } else {
                   sparkTableInfo.setBucket(transform);
                 }
@@ -155,6 +160,20 @@ public class SparkTableInfo {
                     "Doesn't support Spark transform: " + transform.name());
               }
             });
+    sparkTableInfo.columns =
+        Arrays.stream(getSchema(baseTable).fields())
+            .filter(
+                sparkField ->
+                    !(baseTable instanceof V1Table)
+                        || !partitionColNames.contains(sparkField.name()))
+            .map(
+                sparkField ->
+                    new SparkColumnInfo(
+                        sparkField.name(),
+                        sparkField.dataType(),
+                        sparkField.getComment().isDefined() ? sparkField.getComment().get() : null,
+                        sparkField.nullable()))
+            .collect(Collectors.toList());
     if (baseTable instanceof SupportsMetadataColumns) {
       SupportsMetadataColumns supportsMetadataColumns = (SupportsMetadataColumns) baseTable;
       sparkTableInfo.metadataColumns =
@@ -195,6 +214,8 @@ public class SparkTableInfo {
       return baseTable.schema();
     } else if (baseTable instanceof SparkJdbcTable) {
       return ((SparkJdbcTable) baseTable).schema();
+    } else if (baseTable instanceof V1Table) {
+      return ((V1Table) baseTable).schema();
     } else {
       throw new IllegalArgumentException(
           "Doesn't support Spark table: " + baseTable.getClass().getName());

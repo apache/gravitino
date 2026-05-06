@@ -25,26 +25,44 @@ import org.apache.spark.package$;
 import org.apache.spark.util.VersionUtils$;
 
 public class CatalogNameAdaptor {
-  private static final Map<String, String> catalogNames =
-      ImmutableMap.of(
-          "hive-3.3",
-          "org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark33",
-          "hive-3.4",
-          "org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark34",
-          "hive-3.5",
-          "org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark35",
-          "lakehouse-iceberg-3.3",
-          "org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark33",
-          "lakehouse-iceberg-3.4",
-          "org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark34",
-          "lakehouse-iceberg-3.5",
-          "org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark35",
-          "lakehouse-paimon-3.3",
-          "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark33",
-          "lakehouse-paimon-3.4",
-          "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark34",
-          "lakehouse-paimon-3.5",
-          "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark35");
+  private static final Map<String, String> catalogNames;
+
+  static {
+    ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
+    catalogNames =
+        builder
+            .put(
+                "hive-3.3", "org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark33")
+            .put(
+                "hive-3.4", "org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark34")
+            .put(
+                "hive-3.5", "org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark35")
+            .put(
+                "lakehouse-iceberg-3.3",
+                "org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark33")
+            .put(
+                "lakehouse-iceberg-3.4",
+                "org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark34")
+            .put(
+                "lakehouse-iceberg-3.5",
+                "org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark35")
+            .put(
+                "lakehouse-paimon-3.3",
+                "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark33")
+            .put(
+                "lakehouse-paimon-3.4",
+                "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark34")
+            .put(
+                "lakehouse-paimon-3.5",
+                "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark35")
+            .put(
+                "glue-3.3", "org.apache.gravitino.spark.connector.glue.GravitinoGlueCatalogSpark33")
+            .put(
+                "glue-3.4", "org.apache.gravitino.spark.connector.glue.GravitinoGlueCatalogSpark34")
+            .put(
+                "glue-3.5", "org.apache.gravitino.spark.connector.glue.GravitinoGlueCatalogSpark35")
+            .build();
+  }
 
   private static final Map<String, String> jdbcCatalogNames =
       ImmutableMap.of(

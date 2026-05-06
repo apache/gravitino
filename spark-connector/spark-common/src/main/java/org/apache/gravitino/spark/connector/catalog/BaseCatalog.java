@@ -65,6 +65,8 @@ import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * BaseCatalog acts as the foundational class for Apache Spark CatalogManager registration, enabling
@@ -79,6 +81,8 @@ import org.apache.spark.sql.util.CaseInsensitiveStringMap;
  * initialization.
  */
 public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, FunctionCatalog {
+
+  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
   // The specific Spark catalog to do IO operations, different catalogs have different spark catalog
   // implementations, like HiveTableCatalog for Hive, JDBCTableCatalog for JDBC, SparkCatalog for
@@ -328,12 +332,34 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         newDatabase.equals(oldDatabase), "Doesn't support rename table to different database");
     org.apache.gravitino.rel.TableChange rename =
         org.apache.gravitino.rel.TableChange.rename(newIdent.name());
+    NameIdentifier ident = NameIdentifier.of(getDatabase(oldIdent), oldIdent.name());
+    System.out.println(
+        "[DEBUG] renameTable: oldIdent.namespace="
+            + java.util.Arrays.toString(oldIdent.namespace())
+            + ", getDatabase(oldIdent)="
+            + getDatabase(oldIdent)
+            + ", oldIdent.name()="
+            + oldIdent.name()
+            + ", NameIdentifier="
+            + ident);
+    LOG.info(
+        "renameTable: oldIdent.namespace={}, getDatabase(oldIdent)={}, oldIdent.name()={}, NameIdentifier={}",
+        Arrays.toString(oldIdent.namespace()),
+        getDatabase(oldIdent),
+        oldIdent.name(),
+        ident);
     try {
-      sparkCatalog.invalidateTable(oldIdent);
-      gravitinoCatalogClient
-          .asTableCatalog()
-          .alterTable(NameIdentifier.of(getDatabase(oldIdent), oldIdent.name()), rename);
+      gravitinoCatalogClient.asTableCatalog().alterTable(ident, rename);
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
+      System.out.println(
+          "[ERROR] renameTable: alterTable failed for ident="
+              + ident
+              + ". Gravitino exception: "
+              + e.getMessage());
+      LOG.error(
+          "renameTable: alterTable failed for ident={}. Gravitino exception: {}",
+          ident,
+          e.getMessage());
       throw new NoSuchTableException(oldIdent);
     }
   }

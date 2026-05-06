@@ -87,6 +87,12 @@ dependencies {
   testImplementation(project(":server-common")) {
     exclude("org.apache.logging.log4j")
   }
+  testImplementation(project(":catalogs:catalog-glue")) {
+    exclude("org.apache.logging.log4j")
+  }
+  // Iceberg's GlueCatalog (in iceberg-spark-runtime) references AWS Glue SDK classes at runtime.
+  // catalog-glue uses `implementation` (not `api`) so the SDK is not transitively exposed here.
+  testImplementation(libs.aws.glue)
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation(libs.hive2.common) {
@@ -123,6 +129,8 @@ dependencies {
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.testcontainers)
 
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")

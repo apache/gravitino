@@ -427,8 +427,23 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     List<Column> partCols =
         new ArrayList<>(allCols.subList(allCols.size() - partCount, allCols.size()));
 
+    System.out.println(
+        "[DEBUG] GlueCatalogOperations.alterTable ENTER: ident="
+            + ident
+            + ", current.name()="
+            + current.name()
+            + ", catalogId="
+            + catalogId
+            + ", changes="
+            + java.util.Arrays.toString(changes));
     for (TableChange change : changes) {
+      System.out.println(
+          "[DEBUG] GlueCatalogOperations.alterTable: processing change="
+              + change.getClass().getSimpleName());
       if (change instanceof TableChange.RenameTable) {
+        System.out.println(
+            "[DEBUG] GlueCatalogOperations.alterTable: RenameTable newName="
+                + ((TableChange.RenameTable) change).getNewName());
         newName = ((TableChange.RenameTable) change).getNewName();
       } else if (change instanceof TableChange.UpdateComment) {
         newComment = ((TableChange.UpdateComment) change).getNewComment();
@@ -444,6 +459,14 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             "Unsupported table change: " + change.getClass().getSimpleName());
       }
     }
+    boolean isRename = !newName.equals(current.name());
+    System.out.println(
+        "[DEBUG] GlueCatalogOperations.alterTable EXIT: current.name()="
+            + current.name()
+            + ", newName="
+            + newName
+            + ", isRename="
+            + isRename);
 
     List<Column> newAllCols = new ArrayList<>(dataCols);
     newAllCols.addAll(partCols);
@@ -459,14 +482,33 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             current.distribution(),
             current.sortOrder());
 
-    UpdateTableRequest.Builder req =
-        UpdateTableRequest.builder().databaseName(dbName).tableInput(input);
-    applyCatalogId(req::catalogId);
-
-    try {
-      glueClient.updateTable(req.build());
-    } catch (GlueException e) {
-      throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
+    if (isRename) {
+      CreateTableRequest.Builder createReq =
+          CreateTableRequest.builder().databaseName(dbName).tableInput(input);
+      applyCatalogId(createReq::catalogId);
+      try {
+        glueClient.createTable(createReq.build());
+      } catch (GlueException e) {
+        throw GlueExceptionConverter.toTableException(e, "table " + newName);
+      }
+      DeleteTableRequest.Builder delReq =
+          DeleteTableRequest.builder().databaseName(dbName).name(ident.name());
+      applyCatalogId(delReq::catalogId);
+      try {
+        glueClient.deleteTable(delReq.build());
+      } catch (GlueException e) {
+        // Best-effort cleanup; log and swallow so the renamed table is not lost.
+        LOG.warn("Failed to delete old Glue table {}.{} after rename: {}", dbName, ident.name(), e);
+      }
+    } else {
+      UpdateTableRequest.Builder req =
+          UpdateTableRequest.builder().databaseName(dbName).tableInput(input);
+      applyCatalogId(req::catalogId);
+      try {
+        glueClient.updateTable(req.build());
+      } catch (GlueException e) {
+        throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
+      }
     }
 
     LOG.info("Altered Glue table {}.{}", dbName, ident.name());

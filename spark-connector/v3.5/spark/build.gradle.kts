@@ -136,6 +136,13 @@ dependencies {
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.hadoop3.aws)
+  // Iceberg's GlueCatalog references several AWS SDK modules at runtime; must be on test classpath
+  testImplementation(libs.aws.glue)
+  testImplementation(libs.aws.sts)
+  testImplementation(libs.aws.s3)
+  testImplementation(libs.aws.dynamodb)
+  testImplementation(libs.aws.kms)
 
   // org.apache.iceberg.rest.RESTSerializers#registerAll(ObjectMapper) has different method signature for iceberg-core and iceberg-spark-runtime package, we must make sure iceberg-core is in front to start up MiniGravitino server.
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")

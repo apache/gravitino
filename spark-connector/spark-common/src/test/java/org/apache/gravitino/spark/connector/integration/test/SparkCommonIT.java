@@ -222,7 +222,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testLoadCatalogs() {
+  protected void testLoadCatalogs() {
     Set<String> catalogs = getCatalogs();
     Assertions.assertTrue(catalogs.contains(getCatalogName()));
   }
@@ -281,7 +281,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testDropSchema() {
+  protected void testDropSchema() {
     String testDatabaseName = "t_drop";
     dropDatabaseIfExists(testDatabaseName);
     Set<String> databases = getDatabases();
@@ -381,7 +381,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testRenameTable() {
+  protected void testRenameTable() {
     String tableName = "rename1";
     String newTableName = "rename2";
     dropTableIfExists(tableName);
@@ -408,7 +408,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testListTable() {
+  protected void testListTable() {
     String table1 = "list1";
     String table2 = "list2";
     dropTableIfExists(table1);
@@ -858,7 +858,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
-  void testDropAndWriteTable() {
+  protected void testDropAndWriteTable() {
     String tableName = "drop_then_create_write_table";
 
     createSimpleTable(tableName);

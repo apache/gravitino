@@ -30,12 +30,13 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.spark.sql.AnalysisException;
-import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.catalyst.analysis.ResolvedTable;
-import org.apache.spark.sql.catalyst.plans.logical.CommandResult;
-import org.apache.spark.sql.catalyst.plans.logical.DescribeRelation;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.connector.catalog.CatalogManager;
+import org.apache.spark.sql.connector.catalog.CatalogPlugin;
+import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.junit.jupiter.api.Assertions;
 
 /**
@@ -134,12 +135,42 @@ public abstract class SparkUtilIT extends BaseIT {
   }
 
   // Create SparkTableInfo from SparkBaseTable retrieved from LogicalPlan.
+  // In Spark 3.3/3.5: DESC TABLE EXTENDED returns DescribeRelation.
+  // In Spark 3.4: DESC TABLE EXTENDED returns DescribeTableCommand (different class hierarchy).
+  // Use the v2 Catalog API (CatalogManager + TableCatalog.loadTable) for cross-version
+  // compatibility.
   protected SparkTableInfo getTableInfo(String tableName) {
-    Dataset ds = getSparkSession().sql("DESC TABLE EXTENDED " + tableName);
-    CommandResult result = (CommandResult) ds.logicalPlan();
-    DescribeRelation relation = (DescribeRelation) result.commandLogicalPlan();
-    ResolvedTable table = (ResolvedTable) relation.child();
-    return SparkTableInfo.create(table.table());
+    CatalogManager catalogManager = getSparkSession().sessionState().catalogManager();
+
+    // Parse tableName: could be short (tbl), partially-qualified (db.tbl),
+    // or fully-qualified (cat.db.tbl).
+    String[] parts = tableName.split("\\.");
+    Identifier identifier;
+    TableCatalog tableCatalog;
+    if (parts.length == 1) {
+      // Short table name: use current catalog + current database
+      CatalogPlugin currentCatalog = catalogManager.currentCatalog();
+      String currentDb = getSparkSession().catalog().currentDatabase();
+      identifier = Identifier.of(new String[] {currentDb}, parts[0]);
+      tableCatalog = (TableCatalog) currentCatalog;
+    } else if (parts.length == 2) {
+      // Partially qualified: db.table
+      identifier = Identifier.of(new String[] {parts[0]}, parts[1]);
+      CatalogPlugin currentCatalog = catalogManager.currentCatalog();
+      tableCatalog = (TableCatalog) currentCatalog;
+    } else if (parts.length == 3) {
+      // Fully qualified: cat.db.table
+      identifier = Identifier.of(new String[] {parts[0], parts[1]}, parts[2]);
+      CatalogPlugin catalog = catalogManager.catalog(parts[0]);
+      tableCatalog = (TableCatalog) catalog;
+    } else {
+      throw new IllegalArgumentException("Invalid table name format: " + tableName);
+    }
+    try {
+      return SparkTableInfo.create(tableCatalog.loadTable(identifier));
+    } catch (NoSuchTableException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   protected List<Object[]> getTablePartitions(String tableName) {
@@ -157,6 +188,10 @@ public abstract class SparkUtilIT extends BaseIT {
       return true;
     } catch (Exception e) {
       if (e instanceof AnalysisException) {
+        return false;
+      }
+      // getTableInfo() wraps NoSuchTableException (extends AnalysisException) in RuntimeException
+      if (e.getCause() instanceof AnalysisException) {
         return false;
       }
       throw e;
