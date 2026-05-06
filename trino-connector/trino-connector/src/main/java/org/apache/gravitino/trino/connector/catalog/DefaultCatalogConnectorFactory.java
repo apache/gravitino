@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.Set;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.catalog.glue.GlueConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.hive.HiveConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLConnectorAdapter;
@@ -37,6 +38,7 @@ import org.slf4j.LoggerFactory;
 public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
   private static final Logger LOG = LoggerFactory.getLogger(DefaultCatalogConnectorFactory.class);
 
+  private static final String GLUE_CONNECTOR_PROVIDER_NAME = "glue";
   private static final String HIVE_CONNECTOR_PROVIDER_NAME = "hive";
   private static final String ICEBERG_CONNECTOR_PROVIDER_NAME = "lakehouse-iceberg";
   private static final String MEMORY_CONNECTOR_PROVIDER_NAME = "memory";
@@ -59,6 +61,9 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
   public DefaultCatalogConnectorFactory(GravitinoConfig config) {
     this.region = config.getRegion();
 
+    catalogBuilders.put(
+        GLUE_CONNECTOR_PROVIDER_NAME,
+        new CatalogConnectorContext.Builder(new GlueConnectorAdapter()));
     catalogBuilders.put(
         HIVE_CONNECTOR_PROVIDER_NAME,
         new CatalogConnectorContext.Builder(new HiveConnectorAdapter()));
