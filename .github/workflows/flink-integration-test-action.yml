@@ -48,8 +48,8 @@ jobs:
         id: integrationTest
         # run embedded mode and deploy mode integration tests
         run: |
-          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false -PskipWeb=true :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
-          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false -PskipWeb=true :flink-connector:flink:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=embedded -PskipDockerTests=false -PskipWeb=true :flink-connector:flink-1.18:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
+          ./gradlew -PskipTests -PtestMode=deploy -PskipDockerTests=false -PskipWeb=true :flink-connector:flink-1.18:test --tests "org.apache.gravitino.flink.connector.integration.test.**"
 
       - name: Upload integrate tests reports
         uses: actions/upload-artifact@v7
@@ -58,8 +58,8 @@ jobs:
           name: flink-connector-integrate-test-reports-${{ inputs.java-version }}
           path: |
             build/reports
-            flink-connector/flink/build/*.log
-            flink-connector/flink/build/*.tar
+            flink-connector/v1.18/flink/build/*.log
+            flink-connector/v1.18/flink/build/*.tar
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
             catalogs/**/*.log
