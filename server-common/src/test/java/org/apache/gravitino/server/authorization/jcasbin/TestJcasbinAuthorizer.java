@@ -211,8 +211,8 @@ public class TestJcasbinAuthorizer {
         .thenReturn(ImmutableList.of(allowRole));
     assertTrue(doAuthorize(currentPrincipal));
     // Test role cache.
-    // When permissions are changed but handleRolePrivilegeChange is not executed, the system will
-    // use the cached permissions in JCasbin, so authorize can succeed.
+    // When the user's role changes to one with no privileges, the prune step removes
+    // the stale role's g-rows from the enforcer, so authorization fails immediately.
     Long newRoleId = -1L;
     RoleEntity tempNewRole = getRoleEntity(newRoleId, "tempNewRole", ImmutableList.of());
     when(entityStore.get(
@@ -225,10 +225,7 @@ public class TestJcasbinAuthorizer {
             eq(userNameIdentifier),
             eq(Entity.EntityType.USER)))
         .thenReturn(ImmutableList.of(tempNewRole));
-    assertTrue(doAuthorize(currentPrincipal));
-    // After clearing the cache, authorize will fail
-    jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
-    //    assertFalse(doAuthorize(currentPrincipal));
+    assertFalse(doAuthorize(currentPrincipal));
     // When the user is re-assigned the correct role, the authorization will succeed.
     when(supportsRelationOperations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.ROLE_USER_REL),
@@ -621,14 +618,9 @@ public class TestJcasbinAuthorizer {
     // User is removed from the group at the IdP level -- next token has no groups.
     UserPrincipal noGroupPrincipal = setCurrentPrincipalWithGroup(null);
 
-    // Known limitation: stale g-rows from the previous request still grant access because
-    // there is no signal path from the IdP into Gravitino for group membership changes.
-    // Access persists until the role's cache entry is evicted (TTL or explicit invalidation).
-    assertTrue(doAuthorize(noGroupPrincipal));
-
-    // Simulate cache invalidation by calling handleRolePrivilegeChange.
-    // After cache invalidation (e.g. TTL expiry), the role is re-resolved and access is denied.
-    jcasbinAuthorizer.handleRolePrivilegeChange(groupRoleId);
+    // The prune step detects that the group-inherited role is no longer valid
+    // (group not in token → role not in desiredRoleIds) and removes the stale g-rows.
+    // Access is denied immediately without waiting for cache TTL expiry.
     assertFalse(doAuthorize(noGroupPrincipal));
 
     restoreDefaultPrincipal();
