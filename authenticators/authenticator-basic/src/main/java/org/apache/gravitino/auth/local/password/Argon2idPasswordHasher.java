@@ -26,6 +26,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator;
+import org.bouncycastle.crypto.params.Argon2Parameters;
 import org.bouncycastle.util.Arrays;
 
 /** Argon2id-based password hasher. */
@@ -39,26 +40,26 @@ public class Argon2idPasswordHasher implements PasswordHasher {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(plainPassword), "Plain password must not be blank");
 
-    byte[] salt = new byte[Argon2Parameters.DEFAULT_SALT_LENGTH];
+    byte[] salt = new byte[Argon2idDefaults.DEFAULT_SALT_LENGTH];
     SECURE_RANDOM.nextBytes(salt);
     byte[] passwordBytes = plainPassword.getBytes(StandardCharsets.UTF_8);
-    byte[] hash = new byte[Argon2Parameters.DEFAULT_HASH_LENGTH];
+    byte[] hash = new byte[Argon2idDefaults.DEFAULT_HASH_LENGTH];
     try {
       generateHash(
           passwordBytes,
           salt,
-          Argon2Parameters.DEFAULT_ITERATIONS,
-          Argon2Parameters.DEFAULT_MEMORY_KB,
-          Argon2Parameters.DEFAULT_PARALLELISM,
-          Argon2Parameters.DEFAULT_VERSION,
+          Argon2idDefaults.DEFAULT_ITERATIONS,
+          Argon2idDefaults.DEFAULT_MEMORY_KB,
+          Argon2idDefaults.DEFAULT_PARALLELISM,
+          Argon2idDefaults.DEFAULT_VERSION,
           hash);
       return toPhcString(
           salt,
           hash,
-          Argon2Parameters.DEFAULT_ITERATIONS,
-          Argon2Parameters.DEFAULT_MEMORY_KB,
-          Argon2Parameters.DEFAULT_PARALLELISM,
-          Argon2Parameters.DEFAULT_VERSION);
+          Argon2idDefaults.DEFAULT_ITERATIONS,
+          Argon2idDefaults.DEFAULT_MEMORY_KB,
+          Argon2idDefaults.DEFAULT_PARALLELISM,
+          Argon2idDefaults.DEFAULT_VERSION);
     } finally {
       Arrays.clear(passwordBytes);
       Arrays.clear(salt);
@@ -100,8 +101,8 @@ public class Argon2idPasswordHasher implements PasswordHasher {
       int parallelism,
       int version,
       byte[] output) {
-    org.bouncycastle.crypto.params.Argon2Parameters parameters =
-        new org.bouncycastle.crypto.params.Argon2Parameters.Builder(Argon2Parameters.DEFAULT_TYPE)
+    Argon2Parameters parameters =
+        new Argon2Parameters.Builder(Argon2idDefaults.DEFAULT_TYPE)
             .withVersion(version)
             .withIterations(iterations)
             .withMemoryAsKB(memoryKb)
@@ -132,29 +133,74 @@ public class Argon2idPasswordHasher implements PasswordHasher {
   }
 
   private static ParsedHash parse(String hashedPassword) {
-    Preconditions.checkArgument(
-        hashedPassword.startsWith(PHC_PREFIX), "Invalid Argon2id hash format");
+    Preconditions.checkArgument(hashedPassword.startsWith(PHC_PREFIX), invalidHashFormatMessage());
     String[] parts = hashedPassword.split("\\$");
-    Preconditions.checkArgument(parts.length == 6, "Invalid Argon2id hash format");
-    Preconditions.checkArgument("argon2id".equals(parts[1]), "Invalid Argon2id hash format");
-    Preconditions.checkArgument(parts[2].startsWith("v="), "Invalid Argon2id hash format");
-    Preconditions.checkArgument(parts[3].startsWith("m="), "Invalid Argon2id hash format");
+    Preconditions.checkArgument(parts.length == 6, invalidHashFormatMessage());
+    Preconditions.checkArgument("argon2id".equals(parts[1]), invalidHashFormatMessage());
+    Preconditions.checkArgument(parts[2].startsWith("v="), invalidHashFormatMessage());
+    Preconditions.checkArgument(parts[3].startsWith("m="), invalidHashFormatMessage());
 
     String[] parameterParts = parts[3].split(",");
-    Preconditions.checkArgument(parameterParts.length == 3, "Invalid Argon2id hash format");
-    return new ParsedHash(
-        Integer.parseInt(parts[2].substring(2)),
-        Integer.parseInt(parameterParts[0].substring(2)),
-        Integer.parseInt(parameterParts[1].substring(2)),
-        Integer.parseInt(parameterParts[2].substring(2)),
-        decodeBase64(parts[4]),
-        decodeBase64(parts[5]));
+    Preconditions.checkArgument(parameterParts.length == 3, invalidHashFormatMessage());
+    Preconditions.checkArgument(parameterParts[1].startsWith("t="), invalidHashFormatMessage());
+    Preconditions.checkArgument(parameterParts[2].startsWith("p="), invalidHashFormatMessage());
+
+    ParsedHash parsedHash =
+        new ParsedHash(
+            parseInteger(parts[2].substring(2)),
+            parseInteger(parameterParts[0].substring(2)),
+            parseInteger(parameterParts[1].substring(2)),
+            parseInteger(parameterParts[2].substring(2)),
+            decodeBase64(parts[4]),
+            decodeBase64(parts[5]));
+    validateSupportedParameters(parsedHash);
+    return parsedHash;
   }
 
   private static byte[] decodeBase64(String value) {
     int remainder = value.length() % 4;
+    Preconditions.checkArgument(remainder != 1, invalidHashFormatMessage());
     String paddedValue = remainder == 0 ? value : value + "====".substring(0, 4 - remainder);
-    return Base64.getDecoder().decode(paddedValue);
+    try {
+      return Base64.getDecoder().decode(paddedValue);
+    } catch (IllegalArgumentException e) {
+      throw invalidHashFormat();
+    }
+  }
+
+  private static int parseInteger(String value) {
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException e) {
+      throw invalidHashFormat();
+    }
+  }
+
+  private static void validateSupportedParameters(ParsedHash parsedHash) {
+    Preconditions.checkArgument(
+        parsedHash.version == Argon2idDefaults.DEFAULT_VERSION,
+        "Unsupported Argon2id hash parameters");
+    Preconditions.checkArgument(
+        parsedHash.memoryKb == Argon2idDefaults.DEFAULT_MEMORY_KB,
+        "Unsupported Argon2id hash parameters");
+    Preconditions.checkArgument(
+        parsedHash.iterations == Argon2idDefaults.DEFAULT_ITERATIONS,
+        "Unsupported Argon2id hash parameters");
+    Preconditions.checkArgument(
+        parsedHash.parallelism == Argon2idDefaults.DEFAULT_PARALLELISM,
+        "Unsupported Argon2id hash parameters");
+    Preconditions.checkArgument(
+        parsedHash.salt.length == Argon2idDefaults.DEFAULT_SALT_LENGTH, invalidHashFormatMessage());
+    Preconditions.checkArgument(
+        parsedHash.hash.length == Argon2idDefaults.DEFAULT_HASH_LENGTH, invalidHashFormatMessage());
+  }
+
+  private static IllegalArgumentException invalidHashFormat() {
+    return new IllegalArgumentException(invalidHashFormatMessage());
+  }
+
+  private static String invalidHashFormatMessage() {
+    return "Invalid Argon2id hash format";
   }
 
   private static class ParsedHash {

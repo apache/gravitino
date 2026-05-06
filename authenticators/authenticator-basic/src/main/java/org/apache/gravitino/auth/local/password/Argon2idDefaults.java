@@ -19,17 +19,18 @@
 
 package org.apache.gravitino.auth.local.password;
 
-/** Default parameters for the built-in Argon2id password hasher. */
-public final class Argon2Parameters {
+import org.bouncycastle.crypto.params.Argon2Parameters;
 
-  public static final int DEFAULT_VERSION =
-      org.bouncycastle.crypto.params.Argon2Parameters.ARGON2_VERSION_13;
-  public static final int DEFAULT_TYPE = org.bouncycastle.crypto.params.Argon2Parameters.ARGON2_id;
+/** Default parameters for the built-in Argon2id password hasher. */
+public final class Argon2idDefaults {
+
+  public static final int DEFAULT_VERSION = Argon2Parameters.ARGON2_VERSION_13;
+  public static final int DEFAULT_TYPE = Argon2Parameters.ARGON2_id;
   public static final int DEFAULT_HASH_LENGTH = 32;
   public static final int DEFAULT_MEMORY_KB = 1 << 16;
   public static final int DEFAULT_ITERATIONS = 3;
   public static final int DEFAULT_PARALLELISM = 1;
   public static final int DEFAULT_SALT_LENGTH = 16;
 
-  private Argon2Parameters() {}
+  private Argon2idDefaults() {}
 }
