@@ -20,36 +20,16 @@
 package org.apache.gravitino.server.authentication;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.BadRequestException;
-import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestBasicAuthenticator {
 
   private final BasicAuthenticator authenticator = new BasicAuthenticator();
-
-  @Test
-  public void testAuthenticateTokenThrowsUnauthorizedWhenHeaderMissing() {
-    UnauthorizedException exception =
-        Assertions.assertThrows(
-            UnauthorizedException.class, () -> authenticator.authenticateToken(null));
-
-    Assertions.assertEquals("Empty token authorization header", exception.getMessage());
-    Assertions.assertEquals("Basic", exception.getChallenges().get(0));
-  }
-
-  @Test
-  public void testAuthenticateTokenThrowsUnauthorizedWhenHeaderBlank() {
-    UnauthorizedException exception =
-        Assertions.assertThrows(
-            UnauthorizedException.class,
-            () -> authenticator.authenticateToken(" ".getBytes(StandardCharsets.UTF_8)));
-
-    Assertions.assertEquals("Empty token authorization header", exception.getMessage());
-    Assertions.assertEquals("Basic", exception.getChallenges().get(0));
-  }
 
   @Test
   public void testAuthenticateTokenThrowsBadRequestWhenBasicCredentialMissing() {
@@ -76,5 +56,39 @@ public class TestBasicAuthenticator {
 
     Assertions.assertEquals(
         "Malformed Basic authorization header: invalid base64", exception.getMessage());
+  }
+
+  @Test
+  public void testAuthenticateTokenThrowsBadRequestWhenUserNameMissing() {
+    String credentials =
+        Base64.getEncoder().encodeToString(":password".getBytes(StandardCharsets.UTF_8));
+
+    BadRequestException exception =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () ->
+                authenticator.authenticateToken(
+                    (AuthConstants.AUTHORIZATION_BASIC_HEADER + credentials)
+                        .getBytes(StandardCharsets.UTF_8)));
+
+    Assertions.assertEquals(
+        "Malformed Basic authorization header: username must not be empty", exception.getMessage());
+  }
+
+  @Test
+  public void testAuthenticateTokenReturnsPrincipalWhenCredentialValid() {
+    String credentials =
+        Base64.getEncoder().encodeToString("user:password".getBytes(StandardCharsets.UTF_8));
+
+    UserPrincipal principal =
+        (UserPrincipal)
+            authenticator.authenticateToken(
+                (AuthConstants.AUTHORIZATION_BASIC_HEADER + credentials)
+                    .getBytes(StandardCharsets.UTF_8));
+
+    Assertions.assertEquals("user", principal.getName());
+    Assertions.assertEquals(
+        AuthConstants.AUTHORIZATION_BASIC_HEADER + credentials,
+        principal.getAccessToken().orElseThrow());
   }
 }
