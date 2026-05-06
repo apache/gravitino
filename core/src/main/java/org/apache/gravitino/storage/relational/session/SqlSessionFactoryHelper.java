@@ -89,14 +89,14 @@ public class SqlSessionFactoryHelper {
           config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS));
       dataSource.setMaxTotal(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS));
       dataSource.setMaxIdle(5);
-      dataSource.setMinIdle(0);
+      dataSource.setMinIdle(5);
       dataSource.setLogAbandoned(true);
       dataSource.setRemoveAbandonedOnBorrow(true);
       dataSource.setRemoveAbandonedTimeout(60);
       dataSource.setTimeBetweenEvictionRunsMillis(Duration.ofMillis(10 * 60 * 1000L).toMillis());
       dataSource.setTestOnBorrow(true);
       dataSource.setTestWhileIdle(true);
-      dataSource.setMinEvictableIdleTimeMillis(1000);
+      dataSource.setMinEvictableIdleTimeMillis(Duration.ofSeconds(30).toMillis());
       dataSource.setNumTestsPerEvictionRun(BaseObjectPoolConfig.DEFAULT_NUM_TESTS_PER_EVICTION_RUN);
       dataSource.setTestOnReturn(BaseObjectPoolConfig.DEFAULT_TEST_ON_RETURN);
       dataSource.setSoftMinEvictableIdleTimeMillis(
