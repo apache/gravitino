@@ -17,19 +17,14 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth;
+package org.apache.gravitino.auth.local.password;
 
-/** The type of authenticator for http/https request. */
-public enum AuthenticatorType {
-  /** No authentication. */
-  NONE,
+/** Password hasher abstraction for local authentication. */
+public interface PasswordHasher {
 
-  /** Simple authentication. */
-  SIMPLE,
+  /** Hash a plain text password for persistence. */
+  String hash(String plainPassword);
 
-  /** Authentication that uses OAuth. */
-  OAUTH,
-
-  /** Authentication that uses Kerberos. */
-  KERBEROS
+  /** Verify a plain text password against a stored hash. */
+  boolean verify(String plainPassword, String hashedPassword);
 }

@@ -17,28 +17,20 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.authentication;
+package org.apache.gravitino.auth.local.password;
 
-import java.util.Collections;
-import java.util.List;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
-import org.apache.gravitino.auth.AuthenticatorType;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.bouncycastle.crypto.params.Argon2Parameters;
 
-public class TestAuthenticatorFactory {
+/** Default parameters for the built-in Argon2id password hasher. */
+public final class Argon2idDefaults {
 
-  @Test
-  public void testCreateBasicAuthenticator() {
-    Config config = new Config(false) {};
-    config.set(
-        Configs.AUTHENTICATORS,
-        Collections.singletonList(AuthenticatorType.BASIC.name().toLowerCase()));
+  public static final int DEFAULT_VERSION = Argon2Parameters.ARGON2_VERSION_13;
+  public static final int DEFAULT_TYPE = Argon2Parameters.ARGON2_id;
+  public static final int DEFAULT_HASH_LENGTH = 32;
+  public static final int DEFAULT_MEMORY_KB = 1 << 16;
+  public static final int DEFAULT_ITERATIONS = 3;
+  public static final int DEFAULT_PARALLELISM = 1;
+  public static final int DEFAULT_SALT_LENGTH = 16;
 
-    List<Authenticator> authenticators = AuthenticatorFactory.createAuthenticators(config);
-
-    Assertions.assertEquals(1, authenticators.size());
-    Assertions.assertTrue(authenticators.get(0) instanceof BasicAuthenticator);
-  }
+  private Argon2idDefaults() {}
 }

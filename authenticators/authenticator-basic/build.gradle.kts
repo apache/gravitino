@@ -24,6 +24,9 @@ plugins {
 }
 
 dependencies {
+  implementation(libs.bcprov.jdk18on)
+  implementation(libs.commons.lang3)
+  implementation(libs.guava)
   testImplementation(libs.junit.jupiter.api)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }

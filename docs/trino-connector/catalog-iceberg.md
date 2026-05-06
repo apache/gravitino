@@ -73,6 +73,48 @@ See also [Delete limitation](https://trino.io/docs/current/connector/iceberg.htm
 
 `MERGE` is only supported for table using v2 or higher of the Iceberg specification.
 
+### Table procedures
+
+The Apache Gravitino Trino connector delegates Iceberg table maintenance procedures
+to the underlying Iceberg connector, so they can be invoked via
+`ALTER TABLE ... EXECUTE` on Iceberg tables managed by Gravitino. The following
+procedures are supported:
+
+| Procedure            | Description                                                                                          |
+|----------------------|------------------------------------------------------------------------------------------------------|
+| `expire_snapshots`   | Remove old snapshots and their associated metadata/data files to reclaim storage.                    |
+| `remove_orphan_files`| Remove files in the table's data directory that are not referenced by any snapshot.                  |
+| `optimize`           | Rewrite small data files into fewer, larger files to improve read performance (a.k.a. `rewrite_data_files`). |
+| `rewrite_manifests`  | Rewrite the table's manifest files to optimize metadata scans.                                       |
+
+Example usage:
+
+```sql
+-- Expire snapshots older than the default retention threshold
+ALTER TABLE iceberg_test.database_01.table_01 EXECUTE expire_snapshots;
+
+-- Expire snapshots older than 7 days (requires the minimum retention override
+-- to be less than or equal to the requested threshold)
+ALTER TABLE iceberg_test.database_01.table_01
+  EXECUTE expire_snapshots(retention_threshold => '7d');
+
+-- Remove orphan files
+ALTER TABLE iceberg_test.database_01.table_01 EXECUTE remove_orphan_files;
+
+-- Compact small data files
+ALTER TABLE iceberg_test.database_01.table_01 EXECUTE optimize;
+
+-- Compact small data files whose size is under a threshold
+ALTER TABLE iceberg_test.database_01.table_01
+  EXECUTE optimize(file_size_threshold => '128MB');
+
+-- Rewrite manifests for faster metadata scans
+ALTER TABLE iceberg_test.database_01.table_01 EXECUTE rewrite_manifests;
+```
+
+For the full list of parameters accepted by each procedure, see the
+[Trino Iceberg connector documentation](https://trino.io/docs/current/connector/iceberg.html#alter-table-execute).
+
 ## Table and Schema properties
 
 ### Create a schema with properties

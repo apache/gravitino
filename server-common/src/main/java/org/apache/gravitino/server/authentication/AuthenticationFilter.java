@@ -33,7 +33,6 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.auth.AuthConstants;
-import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -127,11 +126,9 @@ public class AuthenticationFilter implements Filter {
   protected void sendAuthErrorResponse(HttpServletResponse response, Exception exception)
       throws IOException {
     int status =
-        exception instanceof BadRequestException
-            ? HttpServletResponse.SC_BAD_REQUEST
-            : exception instanceof UnauthorizedException
-                ? HttpServletResponse.SC_UNAUTHORIZED
-                : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
+        exception instanceof UnauthorizedException
+            ? HttpServletResponse.SC_UNAUTHORIZED
+            : HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
     response.sendError(status, exception.getMessage());
   }
 

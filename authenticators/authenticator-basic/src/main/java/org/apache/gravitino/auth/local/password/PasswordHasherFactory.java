@@ -17,19 +17,15 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth;
+package org.apache.gravitino.auth.local.password;
 
-/** The type of authenticator for http/https request. */
-public enum AuthenticatorType {
-  /** No authentication. */
-  NONE,
+/** Factory for password hasher implementations. */
+public final class PasswordHasherFactory {
 
-  /** Simple authentication. */
-  SIMPLE,
+  private PasswordHasherFactory() {}
 
-  /** Authentication that uses OAuth. */
-  OAUTH,
-
-  /** Authentication that uses Kerberos. */
-  KERBEROS
+  /** Create the built-in password hasher. */
+  public static PasswordHasher create() {
+    return new Argon2idPasswordHasher();
+  }
 }

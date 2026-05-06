@@ -32,12 +32,11 @@ import org.slf4j.LoggerFactory;
 public class AuthenticatorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticatorFactory.class);
+
   public static final ImmutableMap<String, String> AUTHENTICATORS =
       ImmutableMap.of(
           AuthenticatorType.SIMPLE.name().toLowerCase(),
           SimpleAuthenticator.class.getCanonicalName(),
-          AuthenticatorType.BASIC.name().toLowerCase(),
-          BasicAuthenticator.class.getCanonicalName(),
           AuthenticatorType.OAUTH.name().toLowerCase(),
           OAuth2TokenAuthenticator.class.getCanonicalName(),
           AuthenticatorType.KERBEROS.name().toLowerCase(),

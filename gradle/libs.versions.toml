@@ -93,6 +93,7 @@ kafka = "3.4.0"
 curator = "2.12.0"
 awaitility = "4.2.1"
 servlet = "3.1.0"
+bouncycastle = "1.84"
 jodd = "3.5.2"
 flink = "1.18.0"
 flinkjdbc = "3.2.0-1.18"
@@ -191,6 +192,7 @@ jersey-test-framework-provider-jetty = { group = "org.glassfish.jersey.test-fram
 jodd-core = { group = "org.jodd", name = "jodd-core", version.ref = "jodd" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 mockito-inline = { group = "org.mockito", name = "mockito-inline", version.ref = "mockito" }
+bcprov-jdk18on = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
 hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive2"}
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
 hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
