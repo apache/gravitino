@@ -27,6 +27,8 @@ from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class Table(Auditable):
@@ -110,3 +112,6 @@ class Table(Auditable):
         """
 
         return {}
+
+    def supports_tags(self) -> SupportsTags:
+        raise UnsupportedOperationException("Table does not support tag operations.")

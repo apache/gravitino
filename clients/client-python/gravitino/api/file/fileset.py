@@ -17,9 +17,11 @@
 
 from abc import abstractmethod
 from enum import Enum
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class Fileset(Auditable):
@@ -209,3 +211,6 @@ class Fileset(Auditable):
             The properties of the fileset object. Empty map is returned if no properties are set.
         """
         pass
+
+    def supports_tags(self) -> SupportsTags:
+        raise UnsupportedOperationException("Table does not support tag operations.")

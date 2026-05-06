@@ -352,3 +352,6 @@ class BaseSchemaCatalog(
         self, tags_to_add: List[str], tags_to_remove: List[str]
     ) -> List[str]:
         return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
+
+    def supports_tags(self) -> SupportsTags:
+        return self
