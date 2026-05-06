@@ -68,7 +68,7 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     // Then import it into Gravitino so Gravitino is aware of the view
     importView(context.catalogName(), namespace, createViewRequest.name());
 
-    // Set ownership for the newly created view
+    // Set ownership for the newly created view.
     IcebergOwnershipUtils.setViewOwner(
         metalake,
         context.catalogName(),

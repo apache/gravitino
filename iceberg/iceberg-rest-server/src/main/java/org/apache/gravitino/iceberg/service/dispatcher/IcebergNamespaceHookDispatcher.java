@@ -46,6 +46,7 @@ import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
  * operations.
  */
 public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperationDispatcher {
+
   private final IcebergNamespaceOperationDispatcher dispatcher;
   private final String metalake;
 
@@ -59,7 +60,11 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
     CreateNamespaceResponse response = dispatcher.createNamespace(context, createRequest);
 
+    // Import is intentionally NOT wrapped in try-catch: if it fails the namespace exists in
+    // Iceberg but not in Gravitino, and silently swallowing that would mislead callers into
+    // thinking the entity is registered. Surface the failure so the caller can react.
     importSchema(context.catalogName(), createRequest.namespace());
+
     IcebergOwnershipUtils.setSchemaOwner(
         metalake,
         context.catalogName(),
@@ -122,10 +127,11 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       RegisterTableRequest registerTableRequest) {
     LoadTableResponse response = dispatcher.registerTable(context, namespace, registerTableRequest);
 
-    // Import the registered table into Gravitino's catalog so it exists as a metadata object
+    // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
+    // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
+    // entity is registered. Surface the failure so the caller can react.
     importTable(context.catalogName(), namespace, registerTableRequest.name());
 
-    // Set the owner of the registered table to the current user
     IcebergOwnershipUtils.setTableOwner(
         metalake,
         context.catalogName(),

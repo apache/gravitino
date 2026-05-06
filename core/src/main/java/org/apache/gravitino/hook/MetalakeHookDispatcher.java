@@ -64,7 +64,7 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
       throws MetalakeAlreadyExistsException {
     Metalake metalake = dispatcher.createMetalake(ident, comment, properties);
 
-    // Add the creator to the metalake
+    // Add the creator to the metalake.
     AccessControlDispatcher accessControlDispatcher =
         GravitinoEnv.getInstance().accessControlDispatcher();
     if (accessControlDispatcher != null) {
