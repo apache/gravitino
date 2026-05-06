@@ -105,6 +105,7 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("io.netty")
   }
+  testImplementation(libs.hadoop3.hdfs.client)
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion")
 }

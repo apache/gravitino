@@ -104,6 +104,7 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("io.netty")
   }
+  testImplementation(libs.hadoop3.hdfs.client)
 }
 
 tasks {
