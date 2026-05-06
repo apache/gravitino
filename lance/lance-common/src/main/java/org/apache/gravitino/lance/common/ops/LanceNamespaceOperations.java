@@ -18,15 +18,13 @@
  */
 package org.apache.gravitino.lance.common.ops;
 
-import com.lancedb.lance.namespace.LanceNamespaceException;
-import com.lancedb.lance.namespace.model.CreateNamespaceRequest;
-import com.lancedb.lance.namespace.model.CreateNamespaceResponse;
-import com.lancedb.lance.namespace.model.DescribeNamespaceResponse;
-import com.lancedb.lance.namespace.model.DropNamespaceRequest;
-import com.lancedb.lance.namespace.model.DropNamespaceResponse;
-import com.lancedb.lance.namespace.model.ListNamespacesResponse;
-import com.lancedb.lance.namespace.model.ListTablesResponse;
 import java.util.Map;
+import org.lance.namespace.errors.LanceNamespaceException;
+import org.lance.namespace.model.CreateNamespaceResponse;
+import org.lance.namespace.model.DescribeNamespaceResponse;
+import org.lance.namespace.model.DropNamespaceResponse;
+import org.lance.namespace.model.ListNamespacesResponse;
+import org.lance.namespace.model.ListTablesResponse;
 
 public interface LanceNamespaceOperations {
 
@@ -36,16 +34,10 @@ public interface LanceNamespaceOperations {
   DescribeNamespaceResponse describeNamespace(String namespaceId, String delimiter);
 
   CreateNamespaceResponse createNamespace(
-      String namespaceId,
-      String delimiter,
-      CreateNamespaceRequest.ModeEnum mode,
-      Map<String, String> properties);
+      String namespaceId, String delimiter, String mode, Map<String, String> properties);
 
   DropNamespaceResponse dropNamespace(
-      String namespaceId,
-      String delimiter,
-      DropNamespaceRequest.ModeEnum mode,
-      DropNamespaceRequest.BehaviorEnum behavior);
+      String namespaceId, String delimiter, String mode, String behavior);
 
   void namespaceExists(String namespaceId, String delimiter) throws LanceNamespaceException;
 

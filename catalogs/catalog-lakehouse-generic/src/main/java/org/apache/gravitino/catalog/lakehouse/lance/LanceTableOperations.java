@@ -23,13 +23,6 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.lancedb.lance.Dataset;
-import com.lancedb.lance.WriteParams;
-import com.lancedb.lance.index.DistanceType;
-import com.lancedb.lance.index.IndexParams;
-import com.lancedb.lance.index.IndexType;
-import com.lancedb.lance.index.vector.VectorIndexParams;
-import com.lancedb.lance.schema.ColumnAlteration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -59,6 +52,14 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
+import org.lance.Dataset;
+import org.lance.WriteParams;
+import org.lance.index.DistanceType;
+import org.lance.index.IndexOptions;
+import org.lance.index.IndexParams;
+import org.lance.index.IndexType;
+import org.lance.index.vector.VectorIndexParams;
+import org.lance.schema.ColumnAlteration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -278,11 +279,13 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
     try (Dataset ignored =
-        Dataset.create(
-            new RootAllocator(),
-            location,
-            convertColumnsToArrowSchema(columns),
-            new WriteParams.Builder().withStorageOptions(storageProps).build())) {
+        Dataset.write()
+            .allocator(new RootAllocator())
+            .schema(convertColumnsToArrowSchema(columns))
+            .uri(location)
+            .mode(WriteParams.WriteMode.CREATE)
+            .storageOptions(storageProps)
+            .execute()) {
       // Only create the table metadata in Gravitino after the Lance dataset is successfully
       // created.
       long datasetVersion = ignored.version();
@@ -349,13 +352,15 @@ public class LanceTableOperations extends ManagedTableOperations {
           IndexType indexType = IndexType.valueOf(addIndex.getType().name());
           IndexParams indexParams = getIndexParamsByIndexType(indexType);
           dataset.createIndex(
-              Arrays.stream(addIndex.getFieldNames())
-                  .map(field -> String.join(".", field))
-                  .collect(Collectors.toList()),
-              indexType,
-              Optional.of(addIndex.getName()),
-              indexParams,
-              true);
+              IndexOptions.builder(
+                      Arrays.stream(addIndex.getFieldNames())
+                          .map(field -> String.join(".", field))
+                          .collect(Collectors.toList()),
+                      indexType,
+                      indexParams)
+                  .replace(true)
+                  .withIndexName(addIndex.getName())
+                  .build());
         } else if (change instanceof TableChange.RenameColumn renameColumn) {
           ColumnAlteration lanceColumnAlter =
               new ColumnAlteration.Builder(String.join(".", renameColumn.fieldName()))
@@ -380,7 +385,7 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   Dataset openDataset(String location) {
-    return Dataset.open(location, new RootAllocator());
+    return Dataset.open().allocator(new RootAllocator()).uri(location).build();
   }
 
   private IndexParams getIndexParamsByIndexType(IndexType indexType) {

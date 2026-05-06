@@ -81,7 +81,8 @@ The Lance REST service provides comprehensive support for namespace management, 
 | TableExists       | Check whether a table exists                                                                                                                                                       | POST        | `/lance/v1/table/{id}/exists`         | 1.1.0         |
 | RegisterTable     | Register an existing Lance table to a namespace                                                                                                                                    | POST        | `/lance/v1/table/{id}/register`       | 1.1.0         |
 | DeregisterTable   | Unregister a table from a namespace (metadata only, data remains)                                                                                                                  | POST        | `/lance/v1/table/{id}/deregister`     | 1.1.0         |
-| CreateEmptyTable  | Declare a table and store the metadata without touching lance table data, for more, please refer to [doc](https://docs.lancedb.com/api-reference/rest/table/create-an-empty-table) | POST        | `/lance/v1/table/{id}/create-empty`   | 1.1.0         |
+| CreateEmptyTable  | **Deprecated**: Use `DeclareTable` instead. Declare a table and store the metadata without touching lance table data, for more, please refer to [doc](https://docs.lancedb.com/api-reference/rest/table/create-an-empty-table) | POST        | `/lance/v1/table/{id}/create-empty`   | 1.1.0         |
+| DeclareTable      | Declare a table and store the metadata without touching lance table data. This is the preferred replacement for `CreateEmptyTable`.                                                | POST        | `/lance/v1/table/{id}/declare`        | 1.1.0         |
 
 More details, please refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
 
@@ -273,17 +274,26 @@ curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table
   -d '{
     "id": ["lance_catalog", "schema", "table01"],
     "location": "/tmp/lance_catalog/schema/table01",
-    "mode": "CREATE"
+    "mode": "create"
   }'
 
 # Create a new empty table
+# x-lance-table-properties is optional; if omitted, it defaults to an empty map.
 curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table02/create-empty \
   -H 'Content-Type: application/json' \
+  -H "x-lance-table-properties: {\"description\":\"This is table02\"}" \
   -d '{
     "id": ["lance_catalog", "schema", "table02"],
-    "location": "/tmp/lance_catalog/schema/table02",
-    "properties": { "description": "This is table02"  }
+    "location": "/tmp/lance_catalog/schema/table02"
   }'  
+
+# Declare a table (preferred replacement for create-empty)
+curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table04/declare \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "id": ["lance_catalog", "schema", "table04"],
+    "location": "/tmp/lance_catalog/schema/table04"
+  }'
   
 # Create a table with schema, the schema is inferred from the Arrow IPC file
 curl -X POST \
@@ -298,10 +308,13 @@ curl -X POST \
 <TabItem value="java" label="Java">
 
 ```java
-// Add dependency: implementation("com.lancedb:lance-namespace-core:0.0.20")
+// Add dependency: implementation("org.lance:lance-namespace-core:0.4.5")
 
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
+import org.lance.namespace.client.apache.ApiClient;
+import org.lance.namespace.client.apache.api.TableApi;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -309,48 +322,51 @@ import java.util.Map;
 private final BufferAllocator allocator = new RootAllocator(Long.MAX_VALUE);
 
 Map<String, String> props = new HashMap<>();
-props.put(RestNamespaceConfig.URI, "http://localhost:9101/lance");
-props.put(RestNamespaceConfig.DELIMITER, RestNamespaceConfig.DELIMITER_DEFAULT);
+props.put("uri", "http://localhost:9101/lance");
+props.put("delimiter", "$");
 
-LanceNamespace ns = LanceNamespaces.connect("rest", props, null, allocator);
+LanceNamespace ns = LanceNamespace.connect("rest", props, allocator);
 
 // Create catalog namespace
 CreateNamespaceRequest createCatalogNsRequest = new CreateNamespaceRequest();
 createCatalogNsRequest.addIdItem("lance_catalog");
-createCatalogNsRequest.setMode(CreateNamespaceRequest.ModeEnum.CREATE);
+createCatalogNsRequest.setMode("create");
 ns.createNamespace(createCatalogNsRequest);
 
 // Create schema namespace
 CreateNamespaceRequest createSchemaNsRequest = new CreateNamespaceRequest();
 createSchemaNsRequest.addIdItem("lance_catalog");
 createSchemaNsRequest.addIdItem("schema");
-createSchemaNsRequest.setMode(CreateNamespaceRequest.ModeEnum.CREATE);
+createSchemaNsRequest.setMode("create");
 ns.createNamespace(createSchemaNsRequest);
 
 // Register a table
 RegisterTableRequest registerTableRequest = new RegisterTableRequest();
 registerTableRequest.setLocation("/tmp/lance_catalog/schema/table01");
-registerTableRequest.setId(Lists.newArrayList("lance_catalog", "schema", "table01"));
-registerTableRequest.setMode(RegisterTableRequest.ModeEnum.CREATE);
+registerTableRequest.setId(Arrays.asList("lance_catalog", "schema", "table01"));
+registerTableRequest.setMode("create");
 ns.registerTable(registerTableRequest);
 
 // Create an empty table
 CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
 createEmptyTableRequest.setLocation("/tmp/lance_catalog/schema/table02");
-createEmptyTableRequest.setId(Lists.newArrayList("lance_catalog", "schema", "table02"));
+createEmptyTableRequest.setId(Arrays.asList("lance_catalog", "schema", "table02"));
 ns.createEmptyTable(createEmptyTableRequest);
 
-// Create a table with schema inferred from Arrow IPC file
-CreateTableRequest createTableRequest = new CreateTableRequest();
-createTableRequest.setIds(Lists.newArrayList("lance_catalog", "schema", "table03"));
-createTableRequest.setLocation("/tmp/lance_catalog/schema/table03");
+// Create a table with schema inferred from Arrow IPC file.
+// For REST create API, location/properties are passed via headers.
 org.apache.arrow.vector.types.pojo.Schema schema =
         new org.apache.arrow.vector.types.pojo.Schema(
                 Arrays.asList(
                         Field.nullable("id", new ArrowType.Int(32, true)),
                         Field.nullable("value", new ArrowType.Utf8())));
 byte[] body = ArrowUtils.generateIpcStream(schema);
-ns.createTable(createTableRequest, body);
+TableApi tableApi = new TableApi(new ApiClient().setBasePath("http://localhost:9101/lance"));
+Map<String, String> createTableHeaders = new HashMap<>();
+createTableHeaders.put("x-lance-table-location", "/tmp/lance_catalog/schema/table03");
+createTableHeaders.put("x-lance-table-properties", "{}");
+tableApi.createTable(
+    "lance_catalog$schema$table03", body, "$", "create", createTableHeaders);
 
 ```
 
@@ -358,9 +374,10 @@ ns.createTable(createTableRequest, body);
 <TabItem value="python" label="Python">
 
 ```python
-# Install: pip install lance-namespace==0.0.20
+# Install: pip install lance-namespace==0.4.5
 
 import lance_namespace as ln
+import requests
 
 # Connect to Lance REST service
 ns = ln.connect("rest", {"uri": "http://your_lance_rest:9101/lance"})
@@ -385,16 +402,25 @@ create_empty_table_request = ln.CreateEmptyTableRequest(
     id=['lance_catalog', 'schema', 'table02'],
     location='/tmp/lance_catalog/schema/table02'
 )
+ns.create_empty_table(create_empty_table_request)
 
-# Create a table with schema inferred from Arrow IPC file
-create_table_request = ln.CreateTableRequest(
-    id=['lance_catalog', 'schema', 'table03'],
-    location='/tmp/lance_catalog/schema/table03'
-)
+# Create a table with schema inferred from Arrow IPC file.
+# For REST create API, location/properties are passed via headers.
 with open('schema.ipc', 'rb') as f:
     body = f.read()
 
-ns.create_table(create_table_request, body)
+response = requests.post(
+    "http://your_lance_rest:9101/lance/v1/table/lance_catalog%24schema%24table03/create",
+    params={"delimiter": "$", "mode": "create"},
+    headers={
+        "Content-Type": "application/vnd.apache.arrow.stream",
+        "x-lance-table-location": "/tmp/lance_catalog/schema/table03",
+        "x-lance-table-properties": "{}",
+    },
+    data=body,
+    timeout=30,
+)
+response.raise_for_status()
 ```
 
 </TabItem>

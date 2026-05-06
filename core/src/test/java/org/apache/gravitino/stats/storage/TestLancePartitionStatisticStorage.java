@@ -28,7 +28,6 @@ import static org.mockito.Mockito.when;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.lancedb.lance.Dataset;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.List;
@@ -50,6 +49,7 @@ import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.lance.Dataset;
 import org.mockito.InOrder;
 
 public class TestLancePartitionStatisticStorage {

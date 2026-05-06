@@ -27,25 +27,6 @@ import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
-import com.lancedb.lance.namespace.model.ColumnAlteration;
-import com.lancedb.lance.namespace.model.CreateEmptyTableRequest;
-import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
-import com.lancedb.lance.namespace.model.CreateTableRequest;
-import com.lancedb.lance.namespace.model.CreateTableResponse;
-import com.lancedb.lance.namespace.model.DeregisterTableRequest;
-import com.lancedb.lance.namespace.model.DeregisterTableResponse;
-import com.lancedb.lance.namespace.model.DescribeTableRequest;
-import com.lancedb.lance.namespace.model.DescribeTableResponse;
-import com.lancedb.lance.namespace.model.DropTableRequest;
-import com.lancedb.lance.namespace.model.DropTableResponse;
-import com.lancedb.lance.namespace.model.RegisterTableRequest;
-import com.lancedb.lance.namespace.model.RegisterTableRequest.ModeEnum;
-import com.lancedb.lance.namespace.model.RegisterTableResponse;
-import com.lancedb.lance.namespace.model.TableExistsRequest;
 import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -67,6 +48,25 @@ import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
+import org.lance.namespace.errors.TableNotFoundException;
+import org.lance.namespace.model.AlterColumnsEntry;
+import org.lance.namespace.model.AlterTableAlterColumnsRequest;
+import org.lance.namespace.model.AlterTableAlterColumnsResponse;
+import org.lance.namespace.model.AlterTableDropColumnsRequest;
+import org.lance.namespace.model.AlterTableDropColumnsResponse;
+import org.lance.namespace.model.CreateEmptyTableResponse;
+import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.model.DeclareTableRequest;
+import org.lance.namespace.model.DeclareTableResponse;
+import org.lance.namespace.model.DeregisterTableRequest;
+import org.lance.namespace.model.DeregisterTableResponse;
+import org.lance.namespace.model.DescribeTableRequest;
+import org.lance.namespace.model.DescribeTableResponse;
+import org.lance.namespace.model.DropTableRequest;
+import org.lance.namespace.model.DropTableResponse;
+import org.lance.namespace.model.RegisterTableRequest;
+import org.lance.namespace.model.RegisterTableResponse;
+import org.lance.namespace.model.TableExistsRequest;
 
 @Path("/v1/table/{id}")
 @Consumes(MediaType.APPLICATION_JSON)
@@ -117,12 +117,17 @@ public class LanceTableOperations {
       MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
       String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
       String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
-      CreateTableRequest.ModeEnum modeEnum = CreateTableRequest.ModeEnum.fromValue(mode);
       Map<String, String> props = SerializationUtils.deserializeProperties(tableProperties);
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
-              .createTable(tableId, modeEnum, delimiter, tableLocation, props, arrowStreamBody);
+              .createTable(
+                  tableId,
+                  normalizeCreateTableMode(mode),
+                  delimiter,
+                  tableLocation,
+                  props,
+                  arrowStreamBody);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -138,22 +143,55 @@ public class LanceTableOperations {
   @Produces("application/json")
   @Timed(name = "create-empty-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-empty-table", absolute = true)
+  @SuppressWarnings("deprecation")
   public Response createEmptyTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
-      CreateEmptyTableRequest request,
+      Map<String, Object> requestBody,
       @Context HttpHeaders headers) {
     try {
-      validateCreateEmptyTableRequest(request);
-
-      String tableLocation = request.getLocation();
-      Map<String, String> props =
-          request.getProperties() == null
-              ? Maps.newHashMap()
-              : Maps.newHashMap(request.getProperties());
+      validateCreateEmptyTableRequest(requestBody);
+      String tableLocation =
+          Optional.ofNullable(requestBody)
+              .map(body -> body.get(LANCE_LOCATION))
+              .map(String::valueOf)
+              .orElse(null);
+      Map<String, String> props = extractPropertiesFromBody(requestBody);
+      MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
+      String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
+      Map<String, String> headerProps = SerializationUtils.deserializeProperties(tableProperties);
+      // Keep backward compatibility: accept body properties and let header override on key
+      // conflict.
+      props.putAll(headerProps);
 
       CreateEmptyTableResponse response =
           lanceNamespace.asTableOps().createEmptyTable(tableId, delimiter, tableLocation, props);
+      return Response.ok(response).build();
+    } catch (Exception e) {
+      return LanceExceptionMapper.toRESTResponse(tableId, e);
+    }
+  }
+
+  @POST
+  @Path("/declare")
+  @Produces("application/json")
+  @Timed(name = "declare-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "declare-table", absolute = true)
+  public Response declareTable(
+      @PathParam("id") String tableId,
+      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
+      DeclareTableRequest declareTableRequest,
+      @Context HttpHeaders headers) {
+    try {
+      validateDeclareTableRequest(declareTableRequest);
+      String tableLocation =
+          declareTableRequest.getLocation() != null ? declareTableRequest.getLocation() : null;
+      MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
+      String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
+      Map<String, String> props = SerializationUtils.deserializeProperties(tableProperties);
+
+      DeclareTableResponse response =
+          lanceNamespace.asTableOps().declareTable(tableId, delimiter, tableLocation, props);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -178,8 +216,8 @@ public class LanceTableOperations {
               : Maps.newHashMap(registerTableRequest.getProperties());
       props.put(LANCE_LOCATION, registerTableRequest.getLocation());
       props.put(LanceConstants.LANCE_TABLE_REGISTER, "true");
-      ModeEnum mode =
-          registerTableRequest.getMode() == null ? ModeEnum.CREATE : registerTableRequest.getMode();
+      String mode =
+          registerTableRequest.getMode() == null ? "create" : registerTableRequest.getMode();
 
       RegisterTableResponse response =
           lanceNamespace.asTableOps().registerTable(tableId, mode, delimiter, props);
@@ -224,7 +262,7 @@ public class LanceTableOperations {
       if (exists) {
         return Response.status(Response.Status.OK).build();
       }
-      return Response.status(Response.Status.NOT_FOUND).build();
+      throw new TableNotFoundException("Table not found: " + tableId, null, tableId);
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
     }
@@ -293,9 +331,30 @@ public class LanceTableOperations {
     }
   }
 
-  private void validateCreateEmptyTableRequest(
-      @SuppressWarnings("unused") CreateEmptyTableRequest request) {
+  @SuppressWarnings({"unused", "deprecation"})
+  private void validateCreateEmptyTableRequest(Map<String, Object> requestBody) {
     // No specific fields to validate for now
+  }
+
+  private void validateDeclareTableRequest(
+      @SuppressWarnings("unused") DeclareTableRequest request) {
+    // No specific fields to validate for now
+  }
+
+  private static Map<String, String> extractPropertiesFromBody(Map<String, Object> requestBody) {
+    if (requestBody == null) {
+      return Maps.newHashMap();
+    }
+
+    Object propertiesObject = requestBody.get("properties");
+    if (!(propertiesObject instanceof Map<?, ?>)) {
+      return Maps.newHashMap();
+    }
+
+    Map<String, String> properties = Maps.newHashMap();
+    ((Map<?, ?>) propertiesObject)
+        .forEach((key, value) -> properties.put(String.valueOf(key), String.valueOf(value)));
+    return properties;
   }
 
   private void validateRegisterTableRequest(
@@ -337,13 +396,23 @@ public class LanceTableOperations {
     Preconditions.checkArgument(
         !request.getAlterations().isEmpty(), "Columns to alter cannot be empty.");
 
-    for (ColumnAlteration alteration : request.getAlterations()) {
+    for (AlterColumnsEntry alteration : request.getAlterations()) {
       Preconditions.checkArgument(
-          StringUtils.isBlank(alteration.getCastTo()),
+          StringUtils.isNotBlank(alteration.getPath()), "Column path to alter cannot be empty.");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(alteration.getRename()), "Rename field must be specified.");
+      Preconditions.checkArgument(
+          alteration.getDataType() == null
+              && alteration.getNullable() == null
+              && alteration.getVirtualColumn() == null,
           "Only RENAME alteration is supported currently.");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(alteration.getRename()),
-          "Rename field must be specified when castTo is not provided.");
     }
+  }
+
+  private static String normalizeCreateTableMode(String mode) {
+    if (mode == null) {
+      return "create";
+    }
+    return mode;
   }
 }
