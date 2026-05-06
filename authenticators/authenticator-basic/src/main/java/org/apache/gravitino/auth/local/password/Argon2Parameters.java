@@ -17,23 +17,19 @@
  * under the License.
  */
 
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
+package org.apache.gravitino.auth.local.password;
 
-dependencies {
-  implementation(libs.bcprov.jdk18on)
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
-  testImplementation(libs.junit.jupiter.api)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+/** Default parameters for the built-in Argon2id password hasher. */
+public final class Argon2Parameters {
 
-tasks {
-  test {
-    environment("GRAVITINO_HOME", rootDir.path)
-    environment("GRAVITINO_TEST", "true")
-  }
+  public static final int DEFAULT_VERSION =
+      org.bouncycastle.crypto.params.Argon2Parameters.ARGON2_VERSION_13;
+  public static final int DEFAULT_TYPE = org.bouncycastle.crypto.params.Argon2Parameters.ARGON2_id;
+  public static final int DEFAULT_HASH_LENGTH = 32;
+  public static final int DEFAULT_MEMORY_KB = 1 << 16;
+  public static final int DEFAULT_ITERATIONS = 3;
+  public static final int DEFAULT_PARALLELISM = 1;
+  public static final int DEFAULT_SALT_LENGTH = 16;
+
+  private Argon2Parameters() {}
 }

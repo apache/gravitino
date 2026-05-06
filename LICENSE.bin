@@ -316,6 +316,7 @@
    Apache Log4j Core
    Apache Log4j SLF4J 2.0 Binding
    Apache Log4j Layout For Templated JSON Encoding
+   Bouncy Castle
    Apache ORC
    Apache Parquet Hadoop Bundle
    Apache Thrift
