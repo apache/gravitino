@@ -59,6 +59,7 @@ import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.auth.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -226,7 +227,12 @@ public class TestTableMetaService extends TestJDBCBackend {
                 record ->
                     record.getMetalakeName().equals(metalakeName)
                         && record.getEntityType().equals(Entity.EntityType.TABLE.name())
-                        && record.getFullName().equals("catalog1.schema1.table1")
+                        && record
+                            .getFullName()
+                            .equals(
+                                NameIdentifierUtil.ofTable(
+                                        metalakeName, catalogName, schemaName, "table1")
+                                    .toString())
                         && record.getOperateType() == OperateType.ALTER));
 
     // test update table with changing schema name to a non-existing schema
@@ -275,7 +281,12 @@ public class TestTableMetaService extends TestJDBCBackend {
                 record ->
                     record.getMetalakeName().equals(metalakeName)
                         && record.getEntityType().equals(Entity.EntityType.TABLE.name())
-                        && record.getFullName().equals("catalog1.schema2.table3")
+                        && record
+                            .getFullName()
+                            .equals(
+                                NameIdentifierUtil.ofTable(
+                                        metalakeName, catalogName, newSchemaName, "table3")
+                                    .toString())
                         && record.getOperateType() == OperateType.DROP));
   }
 

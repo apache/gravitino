@@ -200,7 +200,8 @@ public class SchemaMetaService {
 
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
-    String oldFullName = catalogName + "." + oldSchemaEntity.name();
+    String oldFullName =
+        NameIdentifierUtil.ofSchema(metalakeName, catalogName, oldSchemaEntity.name()).toString();
     boolean isRenamed = !Objects.equals(oldSchemaEntity.name(), newEntity.name());
 
     AtomicInteger updateResult = new AtomicInteger(0);
@@ -252,7 +253,8 @@ public class SchemaMetaService {
     Long schemaId = schemaPO.getSchemaId();
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
-    String schemaFullName = catalogName + "." + schemaName;
+    String schemaFullName =
+        NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName).toString();
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(

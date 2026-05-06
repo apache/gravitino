@@ -191,7 +191,9 @@ public class TableMetaService {
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
-    String oldFullName = catalogName + "." + schemaName + "." + oldTableEntity.name();
+    String oldFullName =
+        NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, oldTableEntity.name())
+            .toString();
     boolean isRenamed = !Objects.equals(oldTableEntity.name(), newTableEntity.name());
 
     final AtomicInteger updateResult = new AtomicInteger(0);
@@ -251,7 +253,9 @@ public class TableMetaService {
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
-    String tableFullName = catalogName + "." + schemaName + "." + identifier.name();
+    String tableFullName =
+        NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, identifier.name())
+            .toString();
 
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(

@@ -212,7 +212,9 @@ public class FilesetMetaService {
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
-    String oldFullName = catalogName + "." + schemaName + "." + oldFilesetEntity.name();
+    String oldFullName =
+        NameIdentifierUtil.ofFileset(metalakeName, catalogName, schemaName, oldFilesetEntity.name())
+            .toString();
     boolean isRenamed = !Objects.equals(oldFilesetEntity.name(), newEntity.name());
 
     Integer updateResult;
@@ -316,7 +318,9 @@ public class FilesetMetaService {
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
-    String filesetFullName = catalogName + "." + schemaName + "." + identifier.name();
+    String filesetFullName =
+        NameIdentifierUtil.ofFileset(metalakeName, catalogName, schemaName, identifier.name())
+            .toString();
 
     // We should delete meta and version info
     SessionUtils.doMultipleWithCommit(

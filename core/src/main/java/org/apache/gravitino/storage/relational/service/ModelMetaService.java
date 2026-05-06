@@ -128,7 +128,8 @@ public class ModelMetaService {
     String metalakeName = ident.namespace().level(0);
     String catalogName = ident.namespace().level(1);
     String schemaName = ident.namespace().level(2);
-    String modelFullName = catalogName + "." + schemaName + "." + ident.name();
+    String modelFullName =
+        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name()).toString();
 
     AtomicInteger modelDeletedCount = new AtomicInteger();
     SessionUtils.doMultipleWithCommit(
@@ -373,7 +374,9 @@ public class ModelMetaService {
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
-    String oldFullName = catalogName + "." + schemaName + "." + oldModelEntity.name();
+    String oldFullName =
+        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, oldModelEntity.name())
+            .toString();
     boolean isRenamed = !Objects.equals(oldModelEntity.name(), newEntity.name());
 
     AtomicInteger updateResult = new AtomicInteger(0);

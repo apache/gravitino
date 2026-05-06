@@ -158,7 +158,9 @@ public class ViewMetaService {
       String metalakeName = ident.namespace().level(0);
       String catalogName = ident.namespace().level(1);
       String schemaName = ident.namespace().level(2);
-      String oldFullName = catalogName + "." + schemaName + "." + oldViewPO.getViewName();
+      String oldFullName =
+          NameIdentifierUtil.ofView(metalakeName, catalogName, schemaName, oldViewPO.getViewName())
+              .toString();
       boolean isRenamed = !Objects.equals(oldViewPO.getViewName(), newViewPO.getViewName());
 
       SessionUtils.doMultipleWithCommit(
@@ -208,7 +210,9 @@ public class ViewMetaService {
     String metalakeName = ident.namespace().level(0);
     String catalogName = ident.namespace().level(1);
     String schemaName = ident.namespace().level(2);
-    String viewFullName = catalogName + "." + schemaName + "." + viewPO.getViewName();
+    String viewFullName =
+        NameIdentifierUtil.ofView(metalakeName, catalogName, schemaName, viewPO.getViewName())
+            .toString();
     return deleteView(viewPO.getViewId(), metalakeName, viewFullName);
   }
 

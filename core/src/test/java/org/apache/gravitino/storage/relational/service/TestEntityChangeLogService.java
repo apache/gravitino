@@ -37,6 +37,7 @@ import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.auth.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -111,7 +112,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeCatalogRename,
         METALAKE_NAME,
         Entity.EntityType.CATALOG,
-        CATALOG_NAME,
+        NameIdentifierUtil.ofCatalog(METALAKE_NAME, CATALOG_NAME).toString(),
         OperateType.ALTER);
 
     long beforeCatalogDrop = System.currentTimeMillis() - 1;
@@ -121,7 +122,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeCatalogDrop,
         METALAKE_NAME,
         Entity.EntityType.CATALOG,
-        renamedCatalog.name(),
+        NameIdentifierUtil.ofCatalog(METALAKE_NAME, renamedCatalog.name()).toString(),
         OperateType.DROP);
 
     CatalogEntity schemaCatalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME + "_schema");
@@ -138,7 +139,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeSchemaRename,
         METALAKE_NAME,
         Entity.EntityType.SCHEMA,
-        schemaCatalog.name() + "." + SCHEMA_NAME,
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, schemaCatalog.name(), SCHEMA_NAME).toString(),
         OperateType.ALTER);
 
     long beforeSchemaDrop = System.currentTimeMillis() - 1;
@@ -148,7 +149,8 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeSchemaDrop,
         METALAKE_NAME,
         Entity.EntityType.SCHEMA,
-        schemaCatalog.name() + "." + renamedSchema.name(),
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, schemaCatalog.name(), renamedSchema.name())
+            .toString(),
         OperateType.DROP);
   }
 
@@ -171,7 +173,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeTableRename,
         METALAKE_NAME,
         Entity.EntityType.TABLE,
-        CATALOG_NAME + "." + SCHEMA_NAME + ".table1",
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table1").toString(),
         OperateType.ALTER);
 
     long beforeTableDrop = System.currentTimeMillis() - 1;
@@ -181,7 +183,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeTableDrop,
         METALAKE_NAME,
         Entity.EntityType.TABLE,
-        CATALOG_NAME + "." + SCHEMA_NAME + ".table2",
+        NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table2").toString(),
         OperateType.DROP);
 
     TopicEntity topic =
@@ -201,7 +203,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeTopicRename,
         METALAKE_NAME,
         Entity.EntityType.TOPIC,
-        CATALOG_NAME + "." + SCHEMA_NAME + ".topic1",
+        NameIdentifierUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "topic1").toString(),
         OperateType.ALTER);
 
     long beforeTopicDrop = System.currentTimeMillis() - 1;
@@ -211,7 +213,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeTopicDrop,
         METALAKE_NAME,
         Entity.EntityType.TOPIC,
-        CATALOG_NAME + "." + SCHEMA_NAME + ".topic2",
+        NameIdentifierUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "topic2").toString(),
         OperateType.DROP);
 
     ViewEntity view =
@@ -238,7 +240,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeViewRename,
         METALAKE_NAME,
         Entity.EntityType.VIEW,
-        CATALOG_NAME + "." + SCHEMA_NAME + ".view1",
+        NameIdentifierUtil.ofView(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "view1").toString(),
         OperateType.ALTER);
 
     long beforeViewDrop = System.currentTimeMillis() - 1;
@@ -247,7 +249,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeViewDrop,
         METALAKE_NAME,
         Entity.EntityType.VIEW,
-        CATALOG_NAME + "." + SCHEMA_NAME + ".view2",
+        NameIdentifierUtil.ofView(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "view2").toString(),
         OperateType.DROP);
 
     FilesetEntity fileset =
@@ -268,7 +270,8 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeFilesetRename,
         METALAKE_NAME,
         Entity.EntityType.FILESET,
-        CATALOG_NAME + "." + SCHEMA_NAME + ".fileset1",
+        NameIdentifierUtil.ofFileset(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "fileset1")
+            .toString(),
         OperateType.ALTER);
 
     long beforeFilesetDrop = System.currentTimeMillis() - 1;
@@ -278,7 +281,8 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeFilesetDrop,
         METALAKE_NAME,
         Entity.EntityType.FILESET,
-        CATALOG_NAME + "." + SCHEMA_NAME + ".fileset2",
+        NameIdentifierUtil.ofFileset(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "fileset2")
+            .toString(),
         OperateType.DROP);
 
     ModelEntity model =
@@ -309,7 +313,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeModelRename,
         METALAKE_NAME,
         Entity.EntityType.MODEL,
-        CATALOG_NAME + "." + SCHEMA_NAME + ".model1",
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "model1").toString(),
         OperateType.ALTER);
 
     long beforeModelDrop = System.currentTimeMillis() - 1;
@@ -319,7 +323,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         beforeModelDrop,
         METALAKE_NAME,
         Entity.EntityType.MODEL,
-        CATALOG_NAME + "." + SCHEMA_NAME + ".model2",
+        NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "model2").toString(),
         OperateType.DROP);
   }
 }

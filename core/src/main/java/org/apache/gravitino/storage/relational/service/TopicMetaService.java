@@ -116,7 +116,9 @@ public class TopicMetaService {
     String metalakeName = ident.namespace().level(0);
     String catalogName = ident.namespace().level(1);
     String schemaName = ident.namespace().level(2);
-    String oldFullName = catalogName + "." + schemaName + "." + oldTopicEntity.name();
+    String oldFullName =
+        NameIdentifierUtil.ofTopic(metalakeName, catalogName, schemaName, oldTopicEntity.name())
+            .toString();
     boolean isRenamed = !Objects.equals(oldTopicEntity.name(), newEntity.name());
 
     AtomicInteger updateResult = new AtomicInteger(0);
@@ -296,7 +298,9 @@ public class TopicMetaService {
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
-    String topicFullName = catalogName + "." + schemaName + "." + identifier.name();
+    String topicFullName =
+        NameIdentifierUtil.ofTopic(metalakeName, catalogName, schemaName, identifier.name())
+            .toString();
 
     SessionUtils.doMultipleWithCommit(
         () ->

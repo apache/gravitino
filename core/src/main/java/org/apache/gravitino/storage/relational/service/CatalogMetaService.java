@@ -223,8 +223,9 @@ public class CatalogMetaService {
         oldCatalogEntity.id());
 
     String metalakeName = identifier.namespace().level(0);
-    String oldFullName = oldCatalogEntity.name();
-    String newFullName = newEntity.name();
+    String oldFullName =
+        NameIdentifierUtil.ofCatalog(metalakeName, oldCatalogEntity.name()).toString();
+    String newFullName = NameIdentifierUtil.ofCatalog(metalakeName, newEntity.name()).toString();
     boolean isRenamed = !Objects.equals(oldFullName, newFullName);
 
     AtomicInteger updateResult = new AtomicInteger(0);
@@ -356,7 +357,7 @@ public class CatalogMetaService {
                     mapper.insertChange(
                         metalakeName,
                         Entity.EntityType.CATALOG.name(),
-                        catalogName,
+                        NameIdentifierUtil.ofCatalog(metalakeName, catalogName).toString(),
                         OperateType.DROP,
                         now));
           });
@@ -410,7 +411,7 @@ public class CatalogMetaService {
                     mapper.insertChange(
                         metalakeName,
                         Entity.EntityType.CATALOG.name(),
-                        catalogName,
+                        NameIdentifierUtil.ofCatalog(metalakeName, catalogName).toString(),
                         OperateType.DROP,
                         now));
           });

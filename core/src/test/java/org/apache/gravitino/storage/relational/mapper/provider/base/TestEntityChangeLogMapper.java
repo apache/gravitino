@@ -106,14 +106,14 @@ public class TestEntityChangeLogMapper {
   void testEntityChangeLogInsertAndSelect() {
     long now = System.currentTimeMillis();
     entityChangeLogMapper.insertChange(
-        "metalake1", "TABLE", "cat.schema.tbl", OperateType.ALTER, now);
+        "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.ALTER, now);
 
     List<EntityChangeRecord> records = entityChangeLogMapper.selectChanges(now - 1, 10);
     Assertions.assertEquals(1, records.size());
     EntityChangeRecord record = records.get(0);
     Assertions.assertEquals("metalake1", record.getMetalakeName());
     Assertions.assertEquals("TABLE", record.getEntityType());
-    Assertions.assertEquals("cat.schema.tbl", record.getFullName());
+    Assertions.assertEquals("metalake1.cat.schema.tbl", record.getFullName());
     Assertions.assertEquals(OperateType.ALTER, record.getOperateType());
     Assertions.assertEquals(now, record.getCreatedAt());
     Assertions.assertTrue(record.getId() > 0L);
@@ -124,9 +124,9 @@ public class TestEntityChangeLogMapper {
     long old = 1000L;
     long recent = System.currentTimeMillis();
     entityChangeLogMapper.insertChange(
-        "metalake1", "SCHEMA", "cat.schema", OperateType.INSERT, old);
+        "metalake1", "SCHEMA", "metalake1.cat.schema", OperateType.INSERT, old);
     entityChangeLogMapper.insertChange(
-        "metalake1", "TABLE", "cat.schema.tbl", OperateType.DROP, recent);
+        "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.DROP, recent);
 
     entityChangeLogMapper.pruneOldEntries(old + 1);
 
