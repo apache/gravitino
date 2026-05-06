@@ -351,3 +351,4 @@ errorprone = {id = "net.ltgt.errorprone", version.ref = "error-prone"}
 jcstress = { id = "io.github.reyerizo.gradle.jcstress", version.ref = "jcstress" }
 jmh = { id = "me.champeau.jmh", version.ref = "jmh-plugin" }
 aspectj-post-compile-weaving = { id = "io.freefair.aspectj.post-compile-weaving", version = "8.14.2" }
+owasp-dependencycheck = { id = "org.owasp.dependencycheck", version = "12.2.0" }

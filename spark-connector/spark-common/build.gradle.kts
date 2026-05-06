@@ -141,6 +141,11 @@ dependencies {
     exclude("org.glassfish.jersey.core")
     exclude("org.glassfish.jersey.containers")
     exclude("org.glassfish.jersey.inject")
+    // Hive 2.x transitive deps conflict with Gravitino's Jetty 9.4.x, Hadoop 3.x, and Parquet
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.apache.hive", "hive-common")
+    exclude("org.apache.hive", "hive-serde")
+    exclude("org.apache.parquet", "parquet-hadoop-bundle")
   }
   testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
   testImplementation("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
