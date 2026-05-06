@@ -79,7 +79,7 @@ class TestGlueCatalogTableOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testListTables_paginated() {
+  void testListTablesPaginated() {
     Namespace ns = Namespace.of("metalake", "catalog", "mydb");
     Table t1 = Table.builder().name("t1").build();
     Table t2 = Table.builder().name("t2").build();
@@ -97,7 +97,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testListTables_schemaNotFound() {
+  void testListTablesSchemaNotFound() {
     Namespace ns = Namespace.of("metalake", "catalog", "missing");
     when(mockClient.getTables(any(GetTablesRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
@@ -106,7 +106,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testListTables_formatFilter() {
+  void testListTablesFormatFilter() {
     ops.tableFormatFilter = Set.of("iceberg");
     Namespace ns = Namespace.of("metalake", "catalog", "mydb");
 
@@ -132,7 +132,7 @@ class TestGlueCatalogTableOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testLoadTable_success() {
+  void testLoadTableSuccess() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
     Table glueTable =
         Table.builder()
@@ -160,7 +160,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testLoadTable_notFound() {
+  void testLoadTableNotFound() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "missing");
     when(mockClient.getTable(any(GetTableRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
@@ -173,7 +173,7 @@ class TestGlueCatalogTableOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testCreateTable_success() {
+  void testCreateTableSuccess() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
     Column[] columns = {
       GlueColumn.builder().withName("id").withType(Types.LongType.get()).withNullable(true).build(),
@@ -202,7 +202,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testCreateTable_alreadyExists() {
+  void testCreateTableAlreadyExists() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
     when(mockClient.createTable(any(CreateTableRequest.class)))
         .thenThrow(AlreadyExistsException.builder().message("exists").build());
@@ -222,7 +222,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testCreateTable_indexesRejected() {
+  void testCreateTableIndexesRejected() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
 
     assertThrows(
@@ -240,7 +240,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testCreateTable_storageDescriptorProperties() {
+  void testCreateTableStorageDescriptorProperties() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
     Map<String, String> props =
         Map.of(
@@ -275,7 +275,7 @@ class TestGlueCatalogTableOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testAlterTable_renameAndComment() {
+  void testAlterTableRenameAndComment() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "old");
     Table glueTable =
         Table.builder()
@@ -300,7 +300,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testAlterTable_setProperty() {
+  void testAlterTableSetProperty() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "t");
     Table glueTable =
         Table.builder()
@@ -321,7 +321,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testAlterTable_addColumn() {
+  void testAlterTableAddColumn() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "t");
     Table glueTable =
         Table.builder()
@@ -351,7 +351,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testAlterTable_notFound() {
+  void testAlterTableNotFound() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "missing");
     when(mockClient.getTable(any(GetTableRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
@@ -365,7 +365,7 @@ class TestGlueCatalogTableOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testDropTable_success() {
+  void testDropTableSuccess() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "t");
 
     boolean result = ops.dropTable(ident);
@@ -375,7 +375,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testDropTable_notFound() {
+  void testDropTableNotFound() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "missing");
     when(mockClient.deleteTable(any(DeleteTableRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
@@ -384,7 +384,7 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
-  void testDropTable_withCatalogId() {
+  void testDropTableWithCatalogId() {
     ops.catalogId = "123456789012";
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "t");
     ArgumentCaptor<DeleteTableRequest> captor = ArgumentCaptor.forClass(DeleteTableRequest.class);

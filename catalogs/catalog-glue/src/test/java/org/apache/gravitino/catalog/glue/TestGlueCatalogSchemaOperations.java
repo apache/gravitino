@@ -75,7 +75,7 @@ class TestGlueCatalogSchemaOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testListSchemas_paginated() {
+  void testListSchemasPaginated() {
     Namespace ns = Namespace.of("metalake", "catalog");
     Database db1 = Database.builder().name("db1").build();
     Database db2 = Database.builder().name("db2").build();
@@ -95,7 +95,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testListSchemas_empty() {
+  void testListSchemasEmpty() {
     Namespace ns = Namespace.of("metalake", "catalog");
     when(mockClient.getDatabases(any(GetDatabasesRequest.class)))
         .thenReturn(
@@ -114,7 +114,7 @@ class TestGlueCatalogSchemaOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testCreateSchema_success() {
+  void testCreateSchemaSuccess() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
     Map<String, String> props = Map.of("k", "v");
 
@@ -127,7 +127,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testCreateSchema_alreadyExists() {
+  void testCreateSchemaAlreadyExists() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
     when(mockClient.createDatabase(any(CreateDatabaseRequest.class)))
         .thenThrow(AlreadyExistsException.builder().message("exists").build());
@@ -142,7 +142,7 @@ class TestGlueCatalogSchemaOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testLoadSchema_success() {
+  void testLoadSchemaSuccess() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
     Database db =
         Database.builder()
@@ -162,7 +162,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testLoadSchema_notFound() {
+  void testLoadSchemaNotFound() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "missing");
     when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
@@ -175,7 +175,7 @@ class TestGlueCatalogSchemaOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testAlterSchema_setProperty() {
+  void testAlterSchemaSetProperty() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
     Database db =
         Database.builder()
@@ -201,7 +201,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testAlterSchema_removeProperty() {
+  void testAlterSchemaRemoveProperty() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
     Database db =
         Database.builder()
@@ -224,7 +224,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testAlterSchema_unsupportedChange() {
+  void testAlterSchemaUnsupportedChange() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
     Database db =
         Database.builder().name("mydb").parameters(Map.of()).createTime(Instant.now()).build();
@@ -237,7 +237,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testAlterSchema_notFound() {
+  void testAlterSchemaNotFound() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "missing");
     when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
@@ -252,7 +252,7 @@ class TestGlueCatalogSchemaOperations {
   // -------------------------------------------------------------------------
 
   @Test
-  void testDropSchema_cascadeFalse_empty() {
+  void testDropSchemaCascadeFalseEmpty() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
     when(mockClient.getTables(any(GetTablesRequest.class)))
         .thenReturn(GetTablesResponse.builder().tableList(List.of()).build());
@@ -264,7 +264,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testDropSchema_cascadeFalse_nonEmpty() {
+  void testDropSchemaCascadeFalseNonEmpty() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
     Table t = Table.builder().name("t1").build();
     when(mockClient.getTables(any(GetTablesRequest.class)))
@@ -275,7 +275,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testDropSchema_cascadeTrue() {
+  void testDropSchemaCascadeTrue() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
 
     boolean dropped = ops.dropSchema(ident, true);
@@ -286,7 +286,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testDropSchema_notFound() {
+  void testDropSchemaNotFound() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "missing");
     when(mockClient.deleteDatabase(any(DeleteDatabaseRequest.class)))
         .thenThrow(EntityNotFoundException.builder().message("not found").build());
@@ -297,7 +297,7 @@ class TestGlueCatalogSchemaOperations {
   }
 
   @Test
-  void testDropSchema_withCatalogId() {
+  void testDropSchemaWithCatalogId() {
     ops.catalogId = "123456789012";
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
     when(mockClient.getTables(any(GetTablesRequest.class)))
