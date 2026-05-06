@@ -199,6 +199,11 @@ public class RoleMetaBaseSQLProvider {
   }
 
   public String batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds) {
+    if (roleIds == null || roleIds.isEmpty()) {
+      return "SELECT role_id as roleId, role_name as roleName, updated_at as updatedAt FROM "
+          + ROLE_TABLE_NAME
+          + " WHERE 1 = 0";
+    }
     return "<script>SELECT role_id as roleId, role_name as roleName, updated_at as updatedAt FROM "
         + ROLE_TABLE_NAME
         + " WHERE role_id IN <foreach item='id' collection='roleIds' open='(' separator=',' close=')'>#{id}</foreach>"

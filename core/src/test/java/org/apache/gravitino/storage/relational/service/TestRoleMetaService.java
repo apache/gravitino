@@ -72,6 +72,22 @@ class TestRoleMetaService extends TestJDBCBackend {
 
   private static final String METALAKE_NAME = "metalake_for_role_test";
 
+  private long queryRoleUpdatedAt(long roleId) {
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection();
+          Statement statement = connection.createStatement();
+          ResultSet resultSet =
+              statement.executeQuery(
+                  "SELECT updated_at FROM role_meta WHERE role_id = " + roleId)) {
+        Assertions.assertTrue(resultSet.next());
+        return resultSet.getLong(1);
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("Query role updated_at failed", se);
+    }
+  }
+
   @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
@@ -661,6 +677,7 @@ class TestRoleMetaService extends TestJDBCBackend {
             AUDIT_INFO,
             "catalog");
     roleMetaService.insertRole(roleEntity, false);
+    long updatedAtBeforeGrant = queryRoleUpdatedAt(roleEntity.id());
 
     // grant privileges to the role
     Function<RoleEntity, RoleEntity> grantUpdater =
@@ -689,6 +706,7 @@ class TestRoleMetaService extends TestJDBCBackend {
         };
 
     Assertions.assertNotNull(roleMetaService.updateRole(roleEntity.nameIdentifier(), grantUpdater));
+    Assertions.assertTrue(queryRoleUpdatedAt(roleEntity.id()) > updatedAtBeforeGrant);
     RoleEntity grantRole = roleMetaService.getRoleByIdentifier(roleEntity.nameIdentifier());
 
     assertEquals(grantRole.id(), roleEntity.id());

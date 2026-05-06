@@ -67,6 +67,22 @@ class TestUserMetaService extends TestJDBCBackend {
 
   private final String metalakeName = "metalake_for_user_test";
 
+  private long queryUserUpdatedAt(long userId) {
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection();
+          Statement statement = connection.createStatement();
+          ResultSet resultSet =
+              statement.executeQuery(
+                  "SELECT updated_at FROM user_meta WHERE user_id = " + userId)) {
+        Assertions.assertTrue(resultSet.next());
+        return resultSet.getLong(1);
+      }
+    } catch (SQLException se) {
+      throw new RuntimeException("Query user updated_at failed", se);
+    }
+  }
+
   @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(metalakeName);
@@ -683,6 +699,7 @@ class TestUserMetaService extends TestJDBCBackend {
             auditInfo,
             "catalog");
     roleMetaService.insertRole(role3, false);
+    long updatedAtBeforeGrant = queryUserUpdatedAt(user1.id());
 
     // update user (grant)
     Function<UserEntity, UserEntity> grantUpdater =
@@ -711,6 +728,7 @@ class TestUserMetaService extends TestJDBCBackend {
         };
 
     Assertions.assertNotNull(userMetaService.updateUser(user1.nameIdentifier(), grantUpdater));
+    Assertions.assertTrue(queryUserUpdatedAt(user1.id()) > updatedAtBeforeGrant);
     UserEntity grantUser =
         UserMetaService.getInstance().getUserByIdentifier(user1.nameIdentifier());
     Assertions.assertEquals(user1.id(), grantUser.id());

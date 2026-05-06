@@ -28,6 +28,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.apache.commons.io.FileUtils;
@@ -261,6 +262,9 @@ public class TestAuthMappers {
     Assertions.assertEquals(1000L, results.get(0).getUpdatedAt());
     Assertions.assertEquals(12L, results.get(1).getRoleId());
     Assertions.assertEquals(2000L, results.get(1).getUpdatedAt());
+
+    Assertions.assertTrue(roleMetaMapper.batchGetUpdatedAt(Collections.emptyList()).isEmpty());
+    Assertions.assertTrue(roleMetaMapper.batchGetUpdatedAt(null).isEmpty());
   }
 
   @Test
@@ -293,7 +297,7 @@ public class TestAuthMappers {
   }
 
   @Test
-  void testOwnerMetaSelectOwnerByMetadataObjectId() {
+  void testOwnerMetaSelectOwnerByMetadataObjectIdAndType() {
     insertMetalake(1L, "metalake1");
     insertUser(50L, "user50", 1L);
     AuditInfo auditInfo = buildAuditInfo();
@@ -313,10 +317,13 @@ public class TestAuthMappers {
             .build();
     ownerMetaMapper.insertOwnerRel(ownerRelPO);
 
-    OwnerInfo info = ownerMetaMapper.selectOwnerByMetadataObjectId(100L);
+    OwnerInfo info = ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(100L, "TABLE");
     Assertions.assertNotNull(info);
     Assertions.assertEquals(50L, info.getOwnerId());
     Assertions.assertEquals("USER", info.getOwnerType());
+
+    // ID collision with different type is filtered out.
+    Assertions.assertNull(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(100L, "SCHEMA"));
   }
 
   @Test
