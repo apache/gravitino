@@ -68,6 +68,13 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(3), TIMESTAMP, 23, null, 3);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(6), TIMESTAMP, 26, null, 6);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), NUMERIC, 10, 2, 0);
+    // Unconstrained NUMERIC (no precision) returns columnSize=0 from JDBC metadata;
+    // mapped to Gravitino's maximum supported decimal as a compatibility tradeoff.
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 18), NUMERIC, 0, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 18), NUMERIC, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(9, 0), NUMERIC, 9, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(18, 0), NUMERIC, 18, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(20, 0), NUMERIC, 20, 0, 0);
     checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, 20, null, 0);
     checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), BPCHAR, 20, null, 0);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null, 0);

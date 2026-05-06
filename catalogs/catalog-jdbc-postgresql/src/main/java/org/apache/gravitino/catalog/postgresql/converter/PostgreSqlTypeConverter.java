@@ -76,7 +76,15 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
             .map(Types.TimestampType::withTimeZone)
             .orElseGet(Types.TimestampType::withTimeZone);
       case NUMERIC:
-        return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
+        Integer columnSize = typeBean.getColumnSize();
+        Integer scale = typeBean.getScale();
+        if (columnSize == null || columnSize == 0) {
+          // PostgreSQL unconstrained NUMERIC has no fixed precision/scale. Gravitino DecimalType
+          // cannot represent that exactly, so use the maximum supported decimal as a compatibility
+          // tradeoff for engines and clients that cannot consume ExternalType.
+          return Types.DecimalType.of(38, 18);
+        }
+        return Types.DecimalType.of(columnSize, scale == null ? 0 : scale);
       case VARCHAR:
         return typeBean.getColumnSize() == null
             ? Types.StringType.get()
