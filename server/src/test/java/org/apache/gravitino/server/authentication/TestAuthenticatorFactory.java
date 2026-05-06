@@ -17,22 +17,28 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth;
+package org.apache.gravitino.server.authentication;
 
-/** The type of authenticator for http/https request. */
-public enum AuthenticatorType {
-  /** No authentication. */
-  NONE,
+import java.util.Collections;
+import java.util.List;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.auth.AuthenticatorType;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-  /** Simple authentication. */
-  SIMPLE,
+public class TestAuthenticatorFactory {
 
-  /** Authentication that uses local basic auth. */
-  BASIC,
+  @Test
+  public void testCreateBasicAuthenticator() {
+    Config config = new Config(false) {};
+    config.set(
+        Configs.AUTHENTICATORS,
+        Collections.singletonList(AuthenticatorType.BASIC.name().toLowerCase()));
 
-  /** Authentication that uses OAuth. */
-  OAUTH,
+    List<Authenticator> authenticators = AuthenticatorFactory.createAuthenticators(config);
 
-  /** Authentication that uses Kerberos. */
-  KERBEROS
+    Assertions.assertEquals(1, authenticators.size());
+    Assertions.assertTrue(authenticators.get(0) instanceof BasicAuthenticator);
+  }
 }
