@@ -22,6 +22,7 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 import static org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter.CONVERTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_CREATE_EMPTY;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
@@ -152,6 +153,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     // Pass creation mode as property to delegate handling to LanceTableOperations
     createTableProperties.put(LANCE_CREATION_MODE, mode.name());
 
+    // Merge catalog-level lance.storage.* properties (table-level takes precedence)
+    mergeCatalogStorageProperties(catalog, createTableProperties);
+
     // Single call - mode is handled server-side
     Table t =
         catalog
@@ -212,6 +216,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     // Pass creation mode as property to delegate handling to LanceTableOperations
     copiedTableProperties.put(LANCE_CREATION_MODE, mode.name());
+
+    // Merge catalog-level lance.storage.* properties (table-level takes precedence)
+    mergeCatalogStorageProperties(catalog, copiedTableProperties);
 
     // Single call - mode is handled server-side
     Table t =
@@ -365,5 +372,14 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     return JsonArrowSchemaConverter.convertToJsonArrowSchema(
         new org.apache.arrow.vector.types.pojo.Schema(fields));
+  }
+
+  private void mergeCatalogStorageProperties(Catalog catalog, Map<String, String> tableProperties) {
+    Map<String, String> catalogProps = catalog.properties();
+    if (catalogProps != null) {
+      catalogProps.entrySet().stream()
+          .filter(e -> e.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
+          .forEach(e -> tableProperties.putIfAbsent(e.getKey(), e.getValue()));
+    }
   }
 }
