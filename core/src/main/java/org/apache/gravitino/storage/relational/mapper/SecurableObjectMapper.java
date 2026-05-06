@@ -83,6 +83,11 @@ public interface SecurableObjectMapper {
       method = "listSecurableObjectsByRoleId")
   List<SecurableObjectPO> listSecurableObjectsByRoleId(@Param("roleId") Long roleId);
 
+  @SelectProvider(
+      type = SecurableObjectSQLProviderFactory.class,
+      method = "listSecurableObjectsByRoleIds")
+  List<SecurableObjectPO> listSecurableObjectsByRoleIds(@Param("roleIds") List<Long> roleIds);
+
   @DeleteProvider(
       type = SecurableObjectSQLProviderFactory.class,
       method = "deleteSecurableObjectsByLegacyTimeline")

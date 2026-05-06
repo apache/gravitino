@@ -736,4 +736,71 @@ public class AccessControlIT extends BaseIT {
     // Cleanup.
     metalake.deleteRole(roleName);
   }
+
+  /**
+   * Verifies that roles carrying multiple securable objects of mixed types are correctly loaded by
+   * the batch path in {@code RoleMetaService.batchListSecurableObjectsForRoles()}.
+   *
+   * <p>The test creates several roles, each with securable objects at different hierarchy levels
+   * (metalake, catalog, schema), grants them all to a single user, and then retrieves each role via
+   * {@code getRole()} to confirm that all securable objects are returned with the correct names and
+   * privilege counts.
+   */
+  @Test
+  void testBatchLoadSecurableObjectsForMultipleRoles() {
+    String roleName1 = RandomNameUtils.genRandomName("batchRole1");
+    String roleName2 = RandomNameUtils.genRandomName("batchRole2");
+    String roleName3 = RandomNameUtils.genRandomName("batchRole3");
+    String userName = RandomNameUtils.genRandomName("batchUser");
+
+    metalake.addUser(userName);
+
+    // Role 1: metalake-level securable object with two privileges
+    SecurableObject metalakeObj =
+        SecurableObjects.ofMetalake(
+            metalakeName,
+            Lists.newArrayList(Privileges.CreateCatalog.allow(), Privileges.UseCatalog.allow()));
+    metalake.createRole(roleName1, Collections.emptyMap(), Lists.newArrayList(metalakeObj));
+
+    // Role 2: catalog-level securable object (fileset_catalog)
+    SecurableObject catalogObj =
+        SecurableObjects.ofCatalog(
+            "fileset_catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    metalake.createRole(roleName2, Collections.emptyMap(), Lists.newArrayList(catalogObj));
+
+    // Role 3: schema-level securable object (fileset_catalog.fileset_schema)
+    SecurableObject schemaObj =
+        SecurableObjects.ofSchema(
+            catalogObj,
+            "fileset_schema",
+            Lists.newArrayList(Privileges.UseSchema.allow(), Privileges.CreateFileset.allow()));
+    metalake.createRole(roleName3, Collections.emptyMap(), Lists.newArrayList(schemaObj));
+
+    // Grant all three roles to the user in one call so JcasbinAuthorizer must batch-load
+    // securable objects for all three roles when the user's policy is first evaluated.
+    metalake.grantRolesToUser(Lists.newArrayList(roleName1, roleName2, roleName3), userName);
+
+    // Retrieve each role through the API and verify securable objects are correctly populated.
+    Role role1 = metalake.getRole(roleName1);
+    Assertions.assertEquals(1, role1.securableObjects().size());
+    Assertions.assertEquals(metalakeName, role1.securableObjects().get(0).fullName());
+    Assertions.assertEquals(2, role1.securableObjects().get(0).privileges().size());
+
+    Role role2 = metalake.getRole(roleName2);
+    Assertions.assertEquals(1, role2.securableObjects().size());
+    Assertions.assertEquals("fileset_catalog", role2.securableObjects().get(0).fullName());
+
+    Role role3 = metalake.getRole(roleName3);
+    Assertions.assertEquals(1, role3.securableObjects().size());
+    Assertions.assertEquals(
+        "fileset_catalog.fileset_schema", role3.securableObjects().get(0).fullName());
+    Assertions.assertEquals(2, role3.securableObjects().get(0).privileges().size());
+
+    // Cleanup.
+    metalake.revokeRolesFromUser(Lists.newArrayList(roleName1, roleName2, roleName3), userName);
+    metalake.removeUser(userName);
+    metalake.deleteRole(roleName1);
+    metalake.deleteRole(roleName2);
+    metalake.deleteRole(roleName3);
+  }
 }
