@@ -101,8 +101,54 @@ If only one approach was seriously considered, explain briefly why alternatives 
 The actual design for the chosen approach. Use sub-sections. Should cover at minimum:
 - API changes (new interfaces, REST endpoints, or CLI commands)
 - Data/metadata model (new entities, fields, schemas)
-- Implementation approach or algorithm
+- User process
+- Implementation process
 - Backward compatibility impact
+
+**API changes format:**
+
+For **new REST APIs**, define all three:
+```markdown
+#### POST /api/metalakes/{metalake}/...
+**Request:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| name  | string | yes | ... |
+
+**Response:** `200 OK`
+```json
+{ "id": "...", "name": "..." }
+```
+**Behavior:** Describe what the endpoint does, preconditions, and error cases.
+```
+
+For **changed APIs** (modified request/response/semantics), document old vs. new explicitly:
+```markdown
+#### PATCH /api/metalakes/{metalake}/...
+**Old behavior:** ...
+**New behavior:** ...
+**Migration impact:** What callers must change and whether a deprecation window applies.
+```
+
+For **Java/Python client API or interface changes**, show the old and new signatures side by side and note any incompatibility.
+
+**User process:**
+Describe how a user interacts with the feature end-to-end. Use numbered steps or a sequence diagram so that a newcomer can follow the intended usage flow without reading the implementation.
+
+```markdown
+1. User creates a catalog via `POST /api/metalakes/{metalake}/catalogs`.
+2. User lists views with `GET /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views`.
+3. ...
+```
+
+**Implementation process:**
+Describe how the system internally handles the feature. Cover component interactions, data flow, and any non-obvious sequencing. Use ASCII sequence diagrams or component diagrams where the flow would be hard to follow in prose.
+
+```
+Client → REST Server → Core Service → Metadata Store
+                 ↑
+           Authorization
+```
 
 ### 8. Task Breakdown
 A flat checklist of the concrete implementation tasks required to deliver this feature. Each task should map to one GitHub issue or PR.
@@ -148,6 +194,9 @@ Before submitting a design doc PR, verify:
 - [ ] Solution Investigations documents at least two approaches (or explains why only one was viable)
 - [ ] Each rejected alternative has a concrete reason for rejection, not just "Option B is better"
 - [ ] Proposal has at least one concrete sub-section (API, data model, or algorithm)
+- [ ] New REST APIs define request, response, and behavior; changed APIs document old vs. new behavior and migration impact
+- [ ] User process is described step-by-step so a newcomer can follow the intended usage flow
+- [ ] Implementation process describes component interactions and data flow (diagram preferred)
 - [ ] Task Breakdown has one task per GitHub issue/PR, ordered by dependency
 - [ ] Complex structures use tables, code blocks, or diagrams — no wall-of-text paragraphs
 - [ ] Section separators (`---`) between major sections for readability
@@ -163,6 +212,10 @@ Before submitting a design doc PR, verify:
 | Solution Investigations only lists the chosen approach | Document rejected alternatives with specific reasons |
 | Rejected alternatives say "too complex" with no detail | Explain the specific complexity or constraint that disqualifies it |
 | Proposal skips API/data model and jumps to implementation | Add API design and data model before implementation details |
+| New API defined without request/response/behavior | Add request fields table, response schema, and behavior description |
+| Changed API doesn't show old vs. new behavior | Add explicit before/after comparison and migration impact |
+| Proposal missing user process | Add numbered steps describing end-to-end user interaction |
+| Proposal missing implementation process | Add component interaction diagram or sequence description |
 | Goals have no bold label | Use `**Label**: Description` format |
 | Task Breakdown bundles multiple concerns into one task | Split into one task per issue/PR |
 | Task Breakdown is unordered with no dependency awareness | Order so dependencies come first |
