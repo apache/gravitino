@@ -274,7 +274,8 @@ export const partitionInfoMap = {
   hive: ['identity'],
   'jdbc-doris': ['range', 'list'],
   'lakehouse-iceberg': ['identity', 'bucket', 'truncate', 'year', 'month', 'day', 'hour'],
-  'lakehouse-paimon': ['identity']
+  'lakehouse-paimon': ['identity'],
+  'jdbc-clickhouse': ['identity', 'year', 'month', 'day']
 }
 
 export const transformsLimitMap = {
@@ -310,7 +311,8 @@ export const indexesInfoMap = {
   'jdbc-mysql': ['primary_key', 'unique_key'],
   'jdbc-oceanbase': ['primary_key', 'unique_key'],
   'jdbc-postgresql': ['primary_key', 'unique_key'],
-  'lakehouse-paimon': ['primary_key']
+  'lakehouse-paimon': ['primary_key'],
+  'jdbc-clickhouse': ['primary_key']
 }
 
 export const autoIncrementInfoMap = {
