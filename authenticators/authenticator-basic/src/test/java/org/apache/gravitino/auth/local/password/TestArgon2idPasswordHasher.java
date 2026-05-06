@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.auth.local.password;
 
+import java.util.Base64;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -30,7 +31,25 @@ public class TestArgon2idPasswordHasher {
   public void testHashProducesArgon2idPhcString() {
     String hashedPassword = passwordHasher.hash("test-password");
 
-    Assertions.assertTrue(hashedPassword.startsWith("$argon2id$"));
+    String[] parts = hashedPassword.split("\\$");
+
+    Assertions.assertEquals(6, parts.length);
+    Assertions.assertEquals("", parts[0]);
+    Assertions.assertEquals("argon2id", parts[1]);
+    Assertions.assertEquals("v=" + Argon2Parameters.DEFAULT_VERSION, parts[2]);
+    Assertions.assertEquals(
+        "m="
+            + Argon2Parameters.DEFAULT_MEMORY_KB
+            + ",t="
+            + Argon2Parameters.DEFAULT_ITERATIONS
+            + ",p="
+            + Argon2Parameters.DEFAULT_PARALLELISM,
+        parts[3]);
+
+    byte[] salt = decodeBase64(parts[4]);
+    byte[] hash = decodeBase64(parts[5]);
+    Assertions.assertEquals(Argon2Parameters.DEFAULT_SALT_LENGTH, salt.length);
+    Assertions.assertEquals(Argon2Parameters.DEFAULT_HASH_LENGTH, hash.length);
   }
 
   @Test
@@ -44,5 +63,11 @@ public class TestArgon2idPasswordHasher {
   @Test
   public void testFactoryCreatesArgon2idHasher() {
     Assertions.assertTrue(PasswordHasherFactory.create() instanceof Argon2idPasswordHasher);
+  }
+
+  private static byte[] decodeBase64(String value) {
+    int remainder = value.length() % 4;
+    String paddedValue = remainder == 0 ? value : value + "====".substring(0, 4 - remainder);
+    return Base64.getDecoder().decode(paddedValue);
   }
 }
