@@ -27,9 +27,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -502,10 +504,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake, String username, Long userId, AuthorizationRequestContext requestContext) {
     requestContext.loadRole(
         () -> {
-          // TODO: Consider calling allowEnforcer.deleteUser(userId) and
-          //  denyEnforcer.deleteUser(userId) here to clear stale g-rows when a user is removed
-          //  from a group at the IdP level. Currently there is no hook signal for IdP group
-          //  membership changes, so stale group-inherited roles can persist until cache TTL.
           EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
           NameIdentifier userNameIdentifier = NameIdentifierUtil.ofUser(metalake, username);
           List<RoleEntity> entities;
@@ -518,7 +516,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                         userNameIdentifier,
                         Entity.EntityType.USER);
             List<CompletableFuture<Void>> loadRoleFutures = new ArrayList<>();
+            Set<String> desiredRoleIds = new HashSet<>();
             for (RoleEntity role : entities) {
+              desiredRoleIds.add(String.valueOf(role.id()));
               addRoleForUserAndLoadPolicies(
                   userId, metalake, role.id(), role.name(), loadRoleFutures, entityStore);
             }
@@ -539,6 +539,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                 continue;
               }
               for (int i = 0; i < roleIds.size(); i++) {
+                desiredRoleIds.add(String.valueOf(roleIds.get(i)));
                 addRoleForUserAndLoadPolicies(
                     userId,
                     metalake,
@@ -550,6 +551,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             }
 
             CompletableFuture.allOf(loadRoleFutures.toArray(new CompletableFuture[0])).join();
+
+            // Prune stale g-rows: remove role mappings that are no longer valid
+            // (e.g. user was removed from a group at the IdP level).
+            String userIdStr = String.valueOf(userId);
+            for (String currentRole : allowEnforcer.getRolesForUser(userIdStr)) {
+              if (!desiredRoleIds.contains(currentRole)) {
+                allowEnforcer.deleteRoleForUser(userIdStr, currentRole);
+                denyEnforcer.deleteRoleForUser(userIdStr, currentRole);
+              }
+            }
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
