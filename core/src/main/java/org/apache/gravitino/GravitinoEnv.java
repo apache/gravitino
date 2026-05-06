@@ -53,6 +53,7 @@ import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.TopicOperationDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
@@ -630,7 +631,9 @@ public class GravitinoEnv {
     //  and event handling.
     ViewOperationDispatcher viewOperationDispatcher =
         new ViewOperationDispatcher(catalogManager, entityStore, idGenerator);
-    this.viewDispatcher = viewOperationDispatcher;
+    ViewNormalizeDispatcher viewNormalizeDispatcher =
+        new ViewNormalizeDispatcher(viewOperationDispatcher, catalogManager);
+    this.viewDispatcher = viewNormalizeDispatcher;
 
     this.statisticDispatcher =
         new StatisticEventDispatcher(
