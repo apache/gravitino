@@ -217,6 +217,49 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
   }
 
+  /**
+   * Vend credentials for a table if eligible. Unlike {@link #getTableCredentials}, this method
+   * respects the same vending gate ({@link #shouldGenerateCredential}) used by
+   * createTable/loadTable, so local/HDFS tables correctly return empty.
+   *
+   * <p>Returns credentials separately (not embedded in a response config map) because {@link
+   * PlanTableScanResponse} in Iceberg 1.10.1 has no config/credentials field.
+   *
+   * @param identifier the table identifier
+   * @param requestCredential whether the client requested credential vending
+   * @param privilege the credential privilege level (READ for scans)
+   * @return credentials response, empty if the table is not eligible for vending
+   */
+  public LoadCredentialsResponse getCredentialsIfEligible(
+      TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
+    try {
+      LoadTableResponse loadTableResponse = super.loadTable(identifier);
+      if (!shouldGenerateCredential(loadTableResponse, requestCredential)) {
+        return ImmutableLoadCredentialsResponse.builder().build();
+      }
+      Credential credential = getCredential(loadTableResponse, privilege);
+      org.apache.iceberg.rest.credentials.Credential icebergCredential =
+          new org.apache.iceberg.rest.credentials.Credential() {
+            @Override
+            public String prefix() {
+              return "";
+            }
+
+            @Override
+            public Map<String, String> config() {
+              return CredentialPropertyUtils.toIcebergProperties(credential);
+            }
+
+            @Override
+            public void validate() {}
+          };
+      return ImmutableLoadCredentialsResponse.builder().addCredentials(icebergCredential).build();
+    } catch (ServiceUnavailableException e) {
+      LOG.warn("Failed to generate scan credentials for table: {}", identifier, e);
+      return ImmutableLoadCredentialsResponse.builder().build();
+    }
+  }
+
   @Override
   public void close() throws Exception {
     try {

@@ -1046,4 +1046,109 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         allTableResponse.tableMetadata().snapshots().size(),
         "Default load and snapshots=all should return the same number of snapshots");
   }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScanWithCredentialVending(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    PlanTableScanRequest emptyRequest = PlanTableScanRequest.builder().build();
+
+    // scan without credential vending -- no storage-credentials in response
+    String tableName = "scan_cred_no_header";
+    verifyCreateTableSucc(namespace, tableName);
+    Response noCredResponse = doPlanTableScan(namespace, tableName, emptyRequest);
+    Assertions.assertEquals(Status.OK.getStatusCode(), noCredResponse.getStatus());
+    try {
+      JsonNode noCredJson = JsonUtil.mapper().readTree(noCredResponse.readEntity(String.class));
+      Assertions.assertFalse(
+          noCredJson.has("storage-credentials"),
+          "Response should not have storage-credentials without header");
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    // scan with credential vending on local table -- no storage-credentials
+    String localTableName = "scan_cred_local";
+    Response localCreateResponse =
+        doCreateTableWithCredentialVending(
+            namespace, localTableName, "file:///tmp/" + localTableName);
+    Assertions.assertEquals(Status.OK.getStatusCode(), localCreateResponse.getStatus());
+    Response localScanResponse =
+        doPlanTableScanWithCredentialVending(namespace, localTableName, emptyRequest);
+    Assertions.assertEquals(Status.OK.getStatusCode(), localScanResponse.getStatus());
+    try {
+      JsonNode localScanJson =
+          JsonUtil.mapper().readTree(localScanResponse.readEntity(String.class));
+      Assertions.assertFalse(
+          localScanJson.has("storage-credentials"),
+          "Local table should not have storage-credentials");
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    // scan with credential vending on S3 table -- should have storage-credentials
+    String s3TableName = "scan_cred_s3";
+    String s3Location = "s3://dummy-bucket/" + s3TableName;
+    Response s3CreateResponse =
+        doCreateTableWithCredentialVending(namespace, s3TableName, s3Location);
+    Assertions.assertEquals(Status.OK.getStatusCode(), s3CreateResponse.getStatus());
+    Response s3ScanResponse =
+        doPlanTableScanWithCredentialVending(namespace, s3TableName, emptyRequest);
+    Assertions.assertEquals(Status.OK.getStatusCode(), s3ScanResponse.getStatus());
+    try {
+      JsonNode s3ScanJson = JsonUtil.mapper().readTree(s3ScanResponse.readEntity(String.class));
+      Assertions.assertTrue(
+          s3ScanJson.has("storage-credentials"), "S3 table should have storage-credentials");
+      JsonNode credentials = s3ScanJson.get("storage-credentials");
+      Assertions.assertTrue(credentials.isArray() && credentials.size() > 0);
+      JsonNode firstCred = credentials.get(0);
+      Assertions.assertTrue(firstCred.has("config"));
+      Assertions.assertEquals(
+          DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
+          firstCred.get("config").get(Credential.CREDENTIAL_TYPE).asText());
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScanRemoteSigningNotSupported(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "scan_remote_signing");
+    PlanTableScanRequest request = PlanTableScanRequest.builder().build();
+    Response response =
+        getTableClientBuilder(namespace, Optional.of("scan_remote_signing/scan"))
+            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(406, response.getStatus());
+    String errorBody = response.readEntity(String.class);
+    Assertions.assertTrue(
+        errorBody.contains("remote signing") || errorBody.contains("remote-signing"),
+        "Error message should mention remote signing: " + errorBody);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testPlanTableScanInvalidAccessDelegation(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "scan_invalid_delegation");
+    PlanTableScanRequest request = PlanTableScanRequest.builder().build();
+    Response response =
+        getTableClientBuilder(namespace, Optional.of("scan_invalid_delegation/scan"))
+            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "invalid-value")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(400, response.getStatus());
+    String errorBody = response.readEntity(String.class);
+    Assertions.assertTrue(
+        errorBody.contains("vended-credentials") && errorBody.contains("illegal"),
+        "Error message should mention valid values: " + errorBody);
+  }
+
+  private Response doPlanTableScanWithCredentialVending(
+      Namespace ns, String tableName, PlanTableScanRequest request) {
+    return getTableClientBuilder(ns, Optional.of(tableName + "/scan"))
+        .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+        .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
 }
