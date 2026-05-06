@@ -1894,6 +1894,18 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testListSchemaWithDotInMysqlUnderlyingDatabaseName() {
+    String schemaWithDot = GravitinoITUtils.genRandomName("db") + ".nested";
+    String sql = String.format("CREATE DATABASE `%s`", schemaWithDot);
+    mysqlService.executeQuery(sql);
+
+    String[] schemas = catalog.asSchemas().listSchemas();
+    Assertions.assertTrue(
+        Arrays.asList(schemas).contains(schemaWithDot),
+        "Schema with dot in MySQL should be listed as logical schema name");
+  }
+
+  @Test
   void testMySQLSchemaNameCaseSensitive() {
     Column col1 = Column.of("col_1", Types.LongType.get(), "id", false, false, null);
     Column col2 = Column.of("col_2", Types.VarCharType.of(255), "code", false, false, null);

@@ -23,21 +23,32 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
 public class TestSchemaMetaService extends TestJDBCBackend {
+  private static final String PHYSICAL_SEPARATOR = HierarchicalSchemaUtil.physicalSeparator();
   private final String metalakeName = "metalake_for_catalog_test";
   private final String catalogName = "catalog_for_catalog_test";
 
@@ -168,6 +179,197 @@ public class TestSchemaMetaService extends TestJDBCBackend {
       backend.hardDeleteLegacyData(entityType, Instant.now().toEpochMilli() + 1000);
     }
     assertFalse(legacyRecordExistsInDB(schema.id(), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
+  public void testHierarchicalSchemaInsertStoresPhysicalNameAndReturnsLogical() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String logicalName = "teamA:sales:reports";
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            logicalName,
+            AUDIT_INFO);
+    schemaMetaService.insertSchema(schema, false);
+
+    // Reading back via getSchemaByIdentifier must return the logical name.
+    SchemaEntity loaded =
+        schemaMetaService.getSchemaByIdentifier(
+            NameIdentifierUtil.ofSchema(metalakeName, catalogName, logicalName));
+    Assertions.assertEquals(logicalName, loaded.name());
+
+    // The raw row stored in the DB must use the internal physical separator.
+    String rawStoredName = readRawSchemaNameFromDb(schema.id());
+    Assertions.assertEquals(
+        "teamA" + PHYSICAL_SEPARATOR + "sales" + PHYSICAL_SEPARATOR + "reports", rawStoredName);
+  }
+
+  @TestTemplate
+  public void testFlatSchemaNameStoredAndReturnedUnchanged() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String flatName = "flat_schema";
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            flatName,
+            AUDIT_INFO);
+    schemaMetaService.insertSchema(schema, false);
+
+    SchemaEntity loaded =
+        schemaMetaService.getSchemaByIdentifier(
+            NameIdentifierUtil.ofSchema(metalakeName, catalogName, flatName));
+    Assertions.assertEquals(flatName, loaded.name());
+
+    // Flat name: raw DB value must equal the name as-is.
+    Assertions.assertEquals(flatName, readRawSchemaNameFromDb(schema.id()));
+  }
+
+  @TestTemplate
+  public void testListSchemasReturnsLogicalNames() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+
+    SchemaEntity flat =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "flat",
+            AUDIT_INFO);
+    SchemaEntity nested2 =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "A:B",
+            AUDIT_INFO);
+    SchemaEntity nested3 =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "A:B:C",
+            AUDIT_INFO);
+    schemaMetaService.insertSchema(flat, false);
+    schemaMetaService.insertSchema(nested2, false);
+    schemaMetaService.insertSchema(nested3, false);
+
+    List<SchemaEntity> listed =
+        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName));
+
+    List<String> names = listed.stream().map(SchemaEntity::name).collect(Collectors.toList());
+    Assertions.assertTrue(names.contains("flat"), "flat name must be present");
+    Assertions.assertTrue(names.contains("A:B"), "2-level logical name must be present");
+    Assertions.assertTrue(names.contains("A:B:C"), "3-level logical name must be present");
+    // Physical names with internal separators must NOT appear.
+    Assertions.assertFalse(
+        names.contains("A" + PHYSICAL_SEPARATOR + "B"), "physical name must not be exposed");
+    Assertions.assertFalse(
+        names.contains("A" + PHYSICAL_SEPARATOR + "B" + PHYSICAL_SEPARATOR + "C"),
+        "physical name must not be exposed");
+  }
+
+  @TestTemplate
+  public void testUpdateHierarchicalSchemaPreservesLogicalName() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String logicalName = "dep:analytics";
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            logicalName,
+            AUDIT_INFO);
+    schemaMetaService.insertSchema(schema, false);
+
+    NameIdentifier ident = NameIdentifierUtil.ofSchema(metalakeName, catalogName, logicalName);
+    AtomicReference<String> updaterInputName = new AtomicReference<>();
+    SchemaEntity returned =
+        schemaMetaService.updateSchema(
+            ident,
+            entity -> {
+              SchemaEntity s = (SchemaEntity) entity;
+              updaterInputName.set(s.name());
+              return SchemaEntity.builder()
+                  .withId(s.id())
+                  .withName(s.name())
+                  .withNamespace(s.namespace())
+                  .withComment("updated comment")
+                  .withProperties(s.properties())
+                  .withAuditInfo(s.auditInfo())
+                  .build();
+            });
+
+    SchemaEntity updated = schemaMetaService.getSchemaByIdentifier(ident);
+    Assertions.assertEquals(
+        logicalName, updaterInputName.get(), "updater should receive logical schema name");
+    Assertions.assertEquals(
+        logicalName, returned.name(), "updateSchema should return logical name");
+    // Name must still be logical after update.
+    Assertions.assertEquals(logicalName, updated.name());
+    Assertions.assertEquals("updated comment", updated.comment());
+    // Physical storage must still use the internal separator.
+    Assertions.assertEquals(
+        "dep" + PHYSICAL_SEPARATOR + "analytics", readRawSchemaNameFromDb(schema.id()));
+  }
+
+  @TestTemplate
+  public void testHierarchicalSchemaInsertDuplicateThrows() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String logicalName = "X:Y:Z";
+    SchemaEntity first =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            logicalName,
+            AUDIT_INFO);
+    SchemaEntity duplicate =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            logicalName,
+            AUDIT_INFO);
+
+    schemaMetaService.insertSchema(first, false);
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () -> schemaMetaService.insertSchema(duplicate, false),
+        "Duplicate HierarchicalSchema name must throw EntityAlreadyExistsException");
+  }
+
+  /**
+   * Reads the raw {@code schema_name} value directly from the {@code schema_meta} table, bypassing
+   * any logical conversion in {@link SchemaMetaService}. This lets us verify that the physical
+   * (internal separator encoded) name is actually persisted in the database.
+   */
+  private String readRawSchemaNameFromDb(Long schemaId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT schema_name FROM schema_meta WHERE schema_id = %d", schemaId))) {
+      if (rs.next()) {
+        return rs.getString("schema_name");
+      }
+      throw new RuntimeException("No schema row found for id " + schemaId);
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to read raw schema name", e);
+    }
   }
 
   @TestTemplate

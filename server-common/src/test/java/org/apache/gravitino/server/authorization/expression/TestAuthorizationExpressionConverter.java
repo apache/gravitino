@@ -120,4 +120,13 @@ public class TestAuthorizationExpressionConverter {
         AuthorizationExpressionConverter.replaceAnyExpressions(
             "(ANY(OWNER, METALAKE, CATALOG)) && CATALOG::USE_CATALOG"));
   }
+
+  @Test
+  public void testReplaceAnyPrivilegeForAnyCreateSchemaIncludesSchemaAndDeny() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_CREATE_SCHEMA");
+    Assertions.assertEquals(
+        "((ANY(CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)) "
+            + "&& !(ANY(DENY_CREATE_SCHEMA, METALAKE, CATALOG, SCHEMA)))",
+        replaced);
+  }
 }

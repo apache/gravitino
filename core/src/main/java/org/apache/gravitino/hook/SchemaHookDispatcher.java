@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -29,6 +31,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -57,18 +60,60 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    // Collect missing parent identifiers BEFORE the underlying call; the catalog itself is
+    // responsible for auto-creating them. We only need to assign ownership afterwards.
+    List<NameIdentifier> missingParents = findMissingParents(ident);
     Schema schema = dispatcher.createSchema(ident, comment, properties);
 
-    // Set the creator as the owner of the schema.
+    String metalake = ident.namespace().level(0);
     OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerManager != null) {
+      String creator = PrincipalUtils.getCurrentUserName();
+      for (NameIdentifier parent : missingParents) {
+        if (dispatcher.schemaExists(parent)) {
+          // Parent schemas can be concurrently created by another request between the pre-check and
+          // this point. Only assign owner when there is no owner to avoid overwriting ownership.
+          if (canSetOwner(ownerManager, metalake, parent)) {
+            ownerManager.setOwner(
+                metalake,
+                NameIdentifierUtil.toMetadataObject(parent, Entity.EntityType.SCHEMA),
+                creator,
+                Owner.Type.USER);
+          }
+        }
+      }
       ownerManager.setOwner(
-          ident.namespace().level(0),
+          metalake,
           NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA),
-          PrincipalUtils.getCurrentUserName(),
+          creator,
           Owner.Type.USER);
     }
     return schema;
+  }
+
+  /**
+   * Returns ancestor schema identifiers for {@code ident} that do not currently exist. The catalog
+   * will auto-create them during {@link #createSchema}; we collect them here only so we can assign
+   * ownership after the fact.
+   */
+  private List<NameIdentifier> findMissingParents(NameIdentifier ident) {
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(ident.name(), separator);
+    List<NameIdentifier> missing = new ArrayList<>();
+    for (String ancestorName : ancestorNames) {
+      NameIdentifier ancestorIdent = NameIdentifier.of(ident.namespace(), ancestorName);
+      if (!dispatcher.schemaExists(ancestorIdent)) {
+        missing.add(ancestorIdent);
+      }
+    }
+    return missing;
+  }
+
+  private boolean canSetOwner(OwnerDispatcher ownerManager, String metalake, NameIdentifier ident) {
+    Optional<Owner> owner =
+        ownerManager.getOwner(
+            metalake, NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA));
+    return !owner.isPresent();
   }
 
   @Override

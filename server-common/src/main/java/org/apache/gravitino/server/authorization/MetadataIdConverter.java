@@ -33,6 +33,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
@@ -76,6 +77,8 @@ public class MetadataIdConverter {
       entity =
           entityStore.get(
               normalizedIdent, entityType, EntityClassMapper.getEntityClass(entityType));
+    } catch (NoSuchEntityException nse) {
+      return null;
     } catch (IOException e) {
       throw new RuntimeException(
           "failed to load entity from entity store: " + metadataObject.fullName(), e);
