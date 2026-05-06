@@ -59,6 +59,23 @@ public class TestBasicAuthenticator {
   }
 
   @Test
+  public void testAuthenticateTokenThrowsBadRequestWhenBasicCredentialContainsExtraSpaces() {
+    String credentials =
+        Base64.getEncoder().encodeToString("user:password".getBytes(StandardCharsets.UTF_8));
+
+    BadRequestException exception =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () ->
+                authenticator.authenticateToken(
+                    (AuthConstants.AUTHORIZATION_BASIC_HEADER + "  " + credentials)
+                        .getBytes(StandardCharsets.UTF_8)));
+
+    Assertions.assertEquals(
+        "Malformed Basic authorization header: invalid base64", exception.getMessage());
+  }
+
+  @Test
   public void testAuthenticateTokenThrowsBadRequestWhenUserNameMissing() {
     String credentials =
         Base64.getEncoder().encodeToString(":password".getBytes(StandardCharsets.UTF_8));
