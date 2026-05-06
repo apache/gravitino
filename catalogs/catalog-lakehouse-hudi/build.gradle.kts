@@ -48,12 +48,17 @@ dependencies {
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.hadoop2.auth) {
+  implementation(libs.hadoop3.auth) {
     exclude("*")
   }
-  implementation(libs.hadoop2.common) {
+  implementation(libs.hadoop3.common) {
     exclude("*")
   }
+  // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
+  implementation(libs.hadoop3.shaded.guava)
+  implementation(libs.hadoop3.shaded.protobuf)
+  implementation(libs.commons.configuration2)
+  implementation(libs.re2j)
   implementation(libs.htrace.core4)
   implementation(libs.slf4j.api)
   implementation(libs.woodstox.core)
@@ -113,13 +118,19 @@ dependencies {
   testImplementation(libs.datanucleus.jdo)
   testImplementation(libs.datanucleus.rdbms)
   testImplementation(libs.derby)
-  testImplementation(libs.hadoop2.auth) {
+  testImplementation(libs.hadoop3.auth) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.hdfs)
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
+  testImplementation(libs.hadoop3.hdfs)
+  testImplementation(libs.hadoop3.hdfs.client)
+  testImplementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
+  // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
+  testImplementation(libs.hadoop3.shaded.guava)
+  testImplementation(libs.hadoop3.shaded.protobuf)
+  testImplementation(libs.commons.configuration2)
+  testImplementation(libs.re2j)
   testImplementation(libs.htrace.core4)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)

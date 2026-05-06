@@ -21,9 +21,11 @@ package org.apache.gravitino.catalog.clickhouse.converter;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
+import com.google.common.base.Preconditions;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -57,10 +59,20 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
         return literal.value().toString();
       } else {
         Object value = literal.value();
+        Preconditions.checkArgument(
+            value != null, "Null default literal value is not supported for ClickHouse.");
         if (value instanceof LocalDateTime) {
           value = ((LocalDateTime) value).format(DATE_TIME_FORMATTER);
+        } else if (value instanceof String str
+            && str.length() >= 2
+            && str.startsWith("'")
+            && str.endsWith("'")) {
+          // The API caller may pass quoted string literals (e.g. "'active'"), but DDL generation
+          // is responsible for adding the outer quotes.
+          value = ClickHouseClusterUtils.unescapeSingleQuotes(str.substring(1, str.length() - 1));
         }
-        return String.format("'%s'", value);
+
+        return String.format("'%s'", ClickHouseClusterUtils.escapeSingleQuotes(value.toString()));
       }
     }
 
