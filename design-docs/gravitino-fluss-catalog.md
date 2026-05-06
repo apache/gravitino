@@ -513,8 +513,6 @@ sequenceDiagram
 
 This is simpler than Option 2 because it does not translate Gravitino privileges into Fluss ACLs. It is also safer than Option 1 for production environments where direct Fluss access exists, because Fluss still enforces its own ACLs on direct clients.
 
-However, it is not a strict same-principal double-check for Gravitino-originated requests. Gravitino checks the end user, but Fluss sees the configured service principal unless a future Fluss client impersonation or credential delegation mechanism is added.
-
 **Minimum Fluss ACL sample:**
 
 Following the Glue catalog design, the Fluss counterpart of the AWS IAM minimum policy is the ACL set attached to the Fluss service principal configured in the catalog. The sample below grants Gravitino enough permission to manage one Fluss database, `analytics`, while keeping direct end-user access separate. `admin_catalog` is the Flink catalog used by an administrator to call Fluss ACL procedures; replace it with the actual admin catalog name.
@@ -559,10 +557,6 @@ CALL admin_catalog.sys.add_acl('cluster.analytics', 'ALLOW', 'User:alice', 'CREA
 - **Two policy stores**: Operators must manage Gravitino grants and Fluss ACLs separately.
 - **Possible policy drift**: A user may be allowed in one layer and denied in the other, depending on the access path.
 - **No unified RBAC semantics**: Gravitino deny rules, ownership, and inheritance are not reflected in Fluss ACLs.
-
-#### Upgrade Path to Option 2
-
-Option 3 can evolve into Option 2 without changing the engine read/write path. Operators would enable `authorization-provider=fluss` on the catalog after the Gravitino-side `FlussAuthorizationPlugin` is implemented. The plugin should then synchronize only supported Gravitino `ALLOW` grants to Fluss ACLs and should not delete pre-existing manually managed Fluss ACLs unless an explicit reconciliation mode is configured. During migration, operators should keep the dedicated Gravitino service principal ACLs from Option 3 so Gravitino metadata operations continue to work while user/group ACLs are gradually managed by Gravitino.
 
 ### Recommendation
 
