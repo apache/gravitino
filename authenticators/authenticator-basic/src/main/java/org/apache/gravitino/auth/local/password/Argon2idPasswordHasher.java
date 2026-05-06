@@ -90,6 +90,8 @@ public class Argon2idPasswordHasher implements PasswordHasher {
     } finally {
       Arrays.clear(passwordBytes);
       Arrays.clear(actualHash);
+      Arrays.clear(parsedHash.salt);
+      Arrays.clear(parsedHash.hash);
     }
   }
 
