@@ -1,7 +1,7 @@
 --
 -- Licensed to the Apache Software Foundation (ASF) under one
--- or more contributor license agreements.  See the NOTICE file--
---  distributed with this work for additional information
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
 -- regarding copyright ownership.  The ASF licenses this file
 -- to you under the Apache License, Version 2.0 (the
 -- "License"). You may not use this file except in compliance
@@ -16,6 +16,34 @@
 -- specific language governing permissions and limitations
 -- under the License.
 --
+
+ALTER TABLE `user_meta`
+    ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0
+    COMMENT 'updated at';
+
+ALTER TABLE `role_meta`
+    ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0
+    COMMENT 'updated at';
+
+ALTER TABLE `owner_meta`
+    ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0
+    COMMENT 'updated at';
+
+CREATE INDEX idx_user_meta_name_del_upd
+    ON user_meta (metalake_id, user_name, deleted_at, updated_at);
+CREATE INDEX idx_owner_meta_del_upd_obj
+    ON owner_meta (deleted_at, updated_at, metadata_object_id);
+
+CREATE TABLE IF NOT EXISTS `entity_change_log` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+  `metalake_name` VARCHAR(128)    NOT NULL COMMENT 'metalake name',
+  `entity_type`   VARCHAR(32)     NOT NULL COMMENT 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW',
+  `entity_full_name` VARCHAR(512) NOT NULL COMMENT 'Dot-separated full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.',
+  `operate_type`  TINYINT UNSIGNED NOT NULL COMMENT 'Operate type code: 1=ALTER, 2=DROP, 3=INSERT. Codes are stable and never re-used.',
+  `created_at`    BIGINT          NOT NULL COMMENT 'timestamp of the change in millis',
+  PRIMARY KEY (`id`),
+  KEY `idx_ecl_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Append-only log of entity structural changes for targeted metadataIdCache invalidation';
 
 -- add audit_info as nullable first for MySQL 5.7 compatibility
 ALTER TABLE `view_meta`

@@ -175,8 +175,10 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'user deleted at',
+    `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`user_id`),
-    CONSTRAINT `uk_mid_us_del` UNIQUE (`metalake_id`, `user_name`, `deleted_at`)
+    CONSTRAINT `uk_mid_us_del` UNIQUE (`metalake_id`, `user_name`, `deleted_at`),
+    KEY `idx_user_meta_name_del_upd` (`metalake_id`, `user_name`, `deleted_at`, `updated_at`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `role_meta` (
@@ -188,6 +190,7 @@ CREATE TABLE IF NOT EXISTS `role_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'role last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'role deleted at',
+    `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`role_id`),
     CONSTRAINT `uk_mid_rn_del` UNIQUE (`metalake_id`, `role_name`, `deleted_at`)
 ) ENGINE=InnoDB;
@@ -285,10 +288,12 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'owner relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'owner relation deleted at',
+    `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_oid` (`owner_id`),
-    KEY `idx_meid` (`metadata_object_id`)
+    KEY `idx_meid` (`metadata_object_id`),
+    KEY `idx_owner_meta_del_upd_obj` (`deleted_at`, `updated_at`, `metadata_object_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `model_meta` (
@@ -560,3 +565,14 @@ CREATE INDEX IF NOT EXISTS `idx_table_metrics_composite`
   ON `table_metrics`(`table_identifier`, `table_partition`, `metric_ts`);
 CREATE INDEX IF NOT EXISTS `idx_job_metrics_identifier_metric_ts`
   ON `job_metrics`(`job_identifier`, `metric_ts`);
+
+CREATE TABLE IF NOT EXISTS `entity_change_log` (
+  `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+  `metalake_name` VARCHAR(128)    NOT NULL COMMENT 'metalake name',
+  `entity_type`   VARCHAR(32)     NOT NULL COMMENT 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW',
+  `entity_full_name` VARCHAR(512) NOT NULL COMMENT 'Dot-separated full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.',
+  `operate_type`  TINYINT UNSIGNED NOT NULL COMMENT 'Operate type code: 1=ALTER, 2=DROP, 3=INSERT. Codes are stable and never re-used.',
+  `created_at`    BIGINT          NOT NULL COMMENT 'timestamp of the change in millis',
+  PRIMARY KEY (`id`),
+  KEY `idx_ecl_created_at` (`created_at`)
+) ENGINE=InnoDB COMMENT='Append-only log of entity structural changes for targeted metadataIdCache invalidation';
