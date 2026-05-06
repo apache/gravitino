@@ -92,6 +92,9 @@ tasks {
 
 tasks.test {
   dependsOn(tasks.jar)
+  if (project.hasProperty("skipITs")) {
+    exclude("**/integration/test/**")
+  }
 }
 
 tasks.getByName("generateMetadataFileForMavenJavaPublication") {

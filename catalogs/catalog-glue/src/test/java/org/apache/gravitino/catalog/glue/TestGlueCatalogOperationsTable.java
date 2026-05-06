@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -41,6 +42,7 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,7 +107,7 @@ class TestGlueCatalogOperationsTable {
 
   @Test
   void testListTables_formatFilter() {
-    ops.tableFormatFilter = java.util.Set.of("iceberg");
+    ops.tableFormatFilter = Set.of("iceberg");
     Namespace ns = Namespace.of("metalake", "catalog", "mydb");
 
     Table icebergTable =
@@ -234,9 +236,7 @@ class TestGlueCatalogOperationsTable {
                 Transforms.EMPTY_TRANSFORM,
                 Distributions.NONE,
                 SortOrders.NONE,
-                new org.apache.gravitino.rel.indexes.Index[] {
-                  mock(org.apache.gravitino.rel.indexes.Index.class)
-                }));
+                new Index[] {mock(Index.class)}));
   }
 
   @Test

@@ -37,7 +37,7 @@ import org.junit.jupiter.api.TestInstance;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MotoGlueCatalogIT extends AbstractGlueCatalogIT {
 
-  private static final String FALLBACK_IMAGE = "motoserver/moto:latest";
+  private static final String FALLBACK_IMAGE = "motoserver/moto:5.1.4";
 
   private GravitinoMotoContainer moto;
 
