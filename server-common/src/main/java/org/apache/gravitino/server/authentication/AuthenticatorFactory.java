@@ -37,6 +37,8 @@ public class AuthenticatorFactory {
       ImmutableMap.of(
           AuthenticatorType.SIMPLE.name().toLowerCase(),
           SimpleAuthenticator.class.getCanonicalName(),
+          AuthenticatorType.BASIC.name().toLowerCase(),
+          BasicAuthenticator.class.getCanonicalName(),
           AuthenticatorType.OAUTH.name().toLowerCase(),
           OAuth2TokenAuthenticator.class.getCanonicalName(),
           AuthenticatorType.KERBEROS.name().toLowerCase(),
