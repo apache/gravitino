@@ -20,6 +20,8 @@
 package org.apache.gravitino.catalog.lakehouse.generic;
 
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyPrefixEntry;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
@@ -41,7 +43,14 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "The root directory of the generic catalog.",
                 false /* immutable */,
                 null, /* defaultValue */
-                false /* hidden */));
+                false /* hidden */),
+            stringOptionalPropertyPrefixEntry(
+                LANCE_STORAGE_OPTIONS_PREFIX,
+                "Storage options for Lance tables at catalog level, inherited by schemas and tables.",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden — credentials should not be exposed in API responses */,
+                false /* reserved */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }
