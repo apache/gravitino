@@ -17,22 +17,20 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth;
+package org.apache.gravitino.auth.local.password;
 
-/** The type of authenticator for http/https request. */
-public enum AuthenticatorType {
-  /** No authentication. */
-  NONE,
+import org.bouncycastle.crypto.params.Argon2Parameters;
 
-  /** Simple authentication. */
-  SIMPLE,
+/** Default parameters for the built-in Argon2id password hasher. */
+public final class Argon2idDefaults {
 
-  /** Authentication that uses local basic auth. */
-  BASIC,
+  public static final int DEFAULT_VERSION = Argon2Parameters.ARGON2_VERSION_13;
+  public static final int DEFAULT_TYPE = Argon2Parameters.ARGON2_id;
+  public static final int DEFAULT_HASH_LENGTH = 32;
+  public static final int DEFAULT_MEMORY_KB = 1 << 16;
+  public static final int DEFAULT_ITERATIONS = 3;
+  public static final int DEFAULT_PARALLELISM = 1;
+  public static final int DEFAULT_SALT_LENGTH = 16;
 
-  /** Authentication that uses OAuth. */
-  OAUTH,
-
-  /** Authentication that uses Kerberos. */
-  KERBEROS
+  private Argon2idDefaults() {}
 }
