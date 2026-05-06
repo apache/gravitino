@@ -68,6 +68,7 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("io.netty")
   }
+  testImplementation(libs.hadoop3.hdfs.client)
   testImplementation(libs.httpclient5)
   testImplementation(libs.javax.jaxb.api) {
     exclude("*")
