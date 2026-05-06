@@ -153,13 +153,15 @@ public class Argon2idPasswordHasher implements PasswordHasher {
             parseInteger(parameterParts[0].substring(2)),
             parseInteger(parameterParts[1].substring(2)),
             parseInteger(parameterParts[2].substring(2)),
-            decodeBase64(parts[4]),
-            decodeBase64(parts[5]));
+            decodeBase64(parts[4], Argon2idDefaults.DEFAULT_SALT_LENGTH),
+            decodeBase64(parts[5], Argon2idDefaults.DEFAULT_HASH_LENGTH));
     validateSupportedParameters(parsedHash);
     return parsedHash;
   }
 
-  private static byte[] decodeBase64(String value) {
+  private static byte[] decodeBase64(String value, int maxDecodedLength) {
+    Preconditions.checkArgument(
+        value.length() <= maxEncodedLength(maxDecodedLength), invalidHashFormatMessage());
     int remainder = value.length() % 4;
     Preconditions.checkArgument(remainder != 1, invalidHashFormatMessage());
     String paddedValue = remainder == 0 ? value : value + "====".substring(0, 4 - remainder);
@@ -168,6 +170,12 @@ public class Argon2idPasswordHasher implements PasswordHasher {
     } catch (IllegalArgumentException e) {
       throw invalidHashFormat();
     }
+  }
+
+  private static int maxEncodedLength(int decodedLength) {
+    int fullGroups = decodedLength / 3;
+    int remainder = decodedLength % 3;
+    return fullGroups * 4 + (remainder == 0 ? 0 : remainder + 1);
   }
 
   private static int parseInteger(String value) {

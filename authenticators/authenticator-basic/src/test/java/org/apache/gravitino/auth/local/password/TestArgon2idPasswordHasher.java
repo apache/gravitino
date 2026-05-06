@@ -66,11 +66,52 @@ public class TestArgon2idPasswordHasher {
   }
 
   @Test
+  public void testHashRejectsBlankPassword() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> passwordHasher.hash(" "));
+
+    Assertions.assertEquals("Plain password must not be blank", exception.getMessage());
+  }
+
+  @Test
+  public void testVerifyRejectsBlankPlainPassword() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> passwordHasher.verify(" ", passwordHasher.hash("test-password")));
+
+    Assertions.assertEquals("Plain password must not be blank", exception.getMessage());
+  }
+
+  @Test
+  public void testVerifyRejectsBlankHashedPassword() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> passwordHasher.verify("test-password", " "));
+
+    Assertions.assertEquals("Hashed password must not be blank", exception.getMessage());
+  }
+
+  @Test
   public void testVerifyRejectsMalformedPhcString() {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> passwordHasher.verify("test-password", "$argon2id$v=19$m=65536,x=3,p=1$abc$abc"));
+
+    Assertions.assertEquals("Invalid Argon2id hash format", exception.getMessage());
+  }
+
+  @Test
+  public void testVerifyRejectsOversizedBase64PhcString() {
+    String oversizedBase64 = "A".repeat(100);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                passwordHasher.verify(
+                    "test-password",
+                    "$argon2id$v=19$m=65536,t=3,p=1$" + oversizedBase64 + "$" + oversizedBase64));
 
     Assertions.assertEquals("Invalid Argon2id hash format", exception.getMessage());
   }
