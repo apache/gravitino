@@ -47,7 +47,7 @@ import software.amazon.awssdk.services.glue.model.GetPartitionResponse;
 import software.amazon.awssdk.services.glue.model.GetPartitionsRequest;
 import software.amazon.awssdk.services.glue.model.GetPartitionsResponse;
 
-class TestGlueTableOperations {
+class TestGluePartitionOperations {
 
   private GlueClient mockClient;
   private GlueTableOperations ops;
