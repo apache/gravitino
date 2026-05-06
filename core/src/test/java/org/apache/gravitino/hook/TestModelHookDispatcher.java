@@ -82,7 +82,7 @@ public class TestModelHookDispatcher {
   }
 
   @Test
-  public void testRegisterModelSucceedsEvenIfSetOwnerFails() {
+  public void testRegisterModelThrowsWhenSetOwnerFails() {
     NameIdentifier ident =
         NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_model");
     Model mockModel = mock(Model.class);
@@ -93,9 +93,11 @@ public class TestModelHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    Model result = hookDispatcher.registerModel(ident, "comment", Collections.emptyMap());
-
-    Assertions.assertEquals(mockModel, result);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.registerModel(ident, "comment", Collections.emptyMap()));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).registerModel(any(NameIdentifier.class), any(String.class), any());
   }
 

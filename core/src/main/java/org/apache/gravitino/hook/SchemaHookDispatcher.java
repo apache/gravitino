@@ -38,8 +38,6 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@code SchemaHookDispatcher} is a decorator for {@link SchemaDispatcher} that not only delegates
@@ -47,7 +45,6 @@ import org.slf4j.LoggerFactory;
  * before or after the underlying operations.
  */
 public class SchemaHookDispatcher implements SchemaDispatcher {
-  private static final Logger LOG = LoggerFactory.getLogger(SchemaHookDispatcher.class);
   private final SchemaDispatcher dispatcher;
 
   public SchemaHookDispatcher(SchemaDispatcher dispatcher) {
@@ -65,23 +62,19 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
     Schema schema = dispatcher.createSchema(ident, comment, properties);
 
     // Set the creator as the owner of the schema.
-    try {
-      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerManager != null) {
-        // The inner NormalizeDispatcher case-folds the schema name based on catalog capabilities,
-        // so the entity is stored under the normalized identifier. Apply the same normalization
-        // here so the owner is attached to the same identifier the manager sees.
-        NameIdentifier normalizedIdent =
-            CapabilityHelpers.applyCapabilities(
-                ident, Capability.Scope.SCHEMA, GravitinoEnv.getInstance().catalogManager());
-        ownerManager.setOwner(
-            normalizedIdent.namespace().level(0),
-            NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to set owner for schema {}, schema exists without owner", ident, e);
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerManager != null) {
+      // The inner NormalizeDispatcher case-folds the schema name based on catalog capabilities,
+      // so the entity is stored under the normalized identifier. Apply the same normalization
+      // here so the owner is attached to the same identifier the manager sees.
+      NameIdentifier normalizedIdent =
+          CapabilityHelpers.applyCapabilities(
+              ident, Capability.Scope.SCHEMA, GravitinoEnv.getInstance().catalogManager());
+      ownerManager.setOwner(
+          normalizedIdent.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
     return schema;
   }

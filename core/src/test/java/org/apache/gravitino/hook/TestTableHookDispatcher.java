@@ -244,10 +244,18 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateTableSucceedsEvenIfSetOwnerFails() throws IllegalAccessException {
+  public void testCreateTableThrowsWhenSetOwnerFails() throws IllegalAccessException {
     // Save the original ownerDispatcher so we can restore it in the finally block instead of
     // wiping it to null and leaking that into other tests in the suite.
     OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+
+    // Create the schema first with the existing (non-throwing) ownerDispatcher, then swap to the
+    // throwing mock only for the table create we actually want to exercise. Otherwise the throwing
+    // mock would fire during schema creation and we would never reach the table call.
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_owner_fail");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaHookDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
     Mockito.doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
@@ -255,10 +263,6 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
 
     try {
-      Namespace tableNs = Namespace.of(metalake, catalog, "schema_owner_fail");
-      Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-      schemaHookDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
-
       NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_owner_fail");
       Column[] columns =
           new Column[] {
@@ -268,15 +272,20 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
                 .withType(Types.StringType.get())
                 .build()
           };
-      tableHookDispatcher.createTable(
-          tableIdent,
-          columns,
-          "comment",
-          props,
-          new Transform[0],
-          Distributions.NONE,
-          new SortOrder[0],
-          new Index[0]);
+      RuntimeException thrown =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  tableHookDispatcher.createTable(
+                      tableIdent,
+                      columns,
+                      "comment",
+                      props,
+                      new Transform[0],
+                      Distributions.NONE,
+                      new SortOrder[0],
+                      new Index[0]));
+      Assertions.assertEquals("Set owner failed", thrown.getMessage());
     } finally {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);

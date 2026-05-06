@@ -72,7 +72,7 @@ public class TestMetalakeHookDispatcher {
   }
 
   @Test
-  public void testCreateMetalakeSucceedsEvenIfSetOwnerFails() {
+  public void testCreateMetalakeThrowsWhenSetOwnerFails() {
     NameIdentifier ident = NameIdentifier.of("test_metalake");
     Metalake mockMetalake = mock(Metalake.class);
     when(mockDispatcher.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
@@ -81,46 +81,52 @@ public class TestMetalakeHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    Metalake result = hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap());
-
-    Assertions.assertEquals(mockMetalake, result);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap()));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).createMetalake(any(), any(), any());
   }
 
   @Test
-  public void testCreateMetalakeProceedsToSetOwnerWhenUserAlreadyExists() {
+  public void testCreateMetalakeThrowsWhenUserAlreadyExists() {
     NameIdentifier ident = NameIdentifier.of("test_metalake");
     Metalake mockMetalake = mock(Metalake.class);
     when(mockDispatcher.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
 
-    // Benign case: the creator is already registered in the metalake (e.g. from a prior call or
-    // from simple-auth pre-registration). setOwner should still run because the user exists.
+    // With the addUser try-catch removed, UserAlreadyExistsException now propagates to the caller.
+    // The caller can treat "already exists" as idempotent if they want; the server no longer
+    // silently swallows it.
     doThrow(new UserAlreadyExistsException("User already exists"))
         .when(mockAccessControlDispatcher)
         .addUser(any(), any());
 
-    Metalake result = hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap());
-
-    Assertions.assertEquals(mockMetalake, result);
+    UserAlreadyExistsException thrown =
+        Assertions.assertThrows(
+            UserAlreadyExistsException.class,
+            () -> hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap()));
+    Assertions.assertEquals("User already exists", thrown.getMessage());
     verify(mockAccessControlDispatcher).addUser(any(), any());
-    verify(mockOwnerDispatcher).setOwner(any(), any(), any(), any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
   @Test
-  public void testCreateMetalakeSkipsSetOwnerWhenAddUserFails() {
+  public void testCreateMetalakeThrowsWhenAddUserFails() {
     NameIdentifier ident = NameIdentifier.of("test_metalake");
     Metalake mockMetalake = mock(Metalake.class);
     when(mockDispatcher.createMetalake(any(), any(), any())).thenReturn(mockMetalake);
 
-    // Real addUser failure (e.g. storage I/O): the user is not registered, so setOwner would fail
-    // validation regardless. We log a warning and skip setOwner; the metalake is still returned.
+    // addUser failure (e.g. storage I/O) now propagates to the caller; setOwner is unreachable.
     doThrow(new RuntimeException("Add user failed"))
         .when(mockAccessControlDispatcher)
         .addUser(any(), any());
 
-    Metalake result = hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap());
-
-    Assertions.assertEquals(mockMetalake, result);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createMetalake(ident, "comment", Collections.emptyMap()));
+    Assertions.assertEquals("Add user failed", thrown.getMessage());
     verify(mockAccessControlDispatcher).addUser(any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }

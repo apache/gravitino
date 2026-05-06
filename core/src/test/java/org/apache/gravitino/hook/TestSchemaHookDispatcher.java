@@ -83,7 +83,7 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
-  public void testCreateSchemaSucceedsEvenIfSetOwnerFails() {
+  public void testCreateSchemaThrowsWhenSetOwnerFails() {
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "test_schema");
     Schema mockSchema = mock(Schema.class);
     when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
@@ -92,9 +92,11 @@ public class TestSchemaHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    Schema result = hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
-
-    Assertions.assertEquals(mockSchema, result);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createSchema(ident, "comment", Collections.emptyMap()));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).createSchema(any(), any(), any());
   }
 

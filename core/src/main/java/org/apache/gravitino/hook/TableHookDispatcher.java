@@ -42,8 +42,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@code TableHookDispatcher} is a decorator for {@link TableDispatcher} that not only delegates
@@ -51,7 +49,6 @@ import org.slf4j.LoggerFactory;
  * or after the underlying operations.
  */
 public class TableHookDispatcher implements TableDispatcher {
-  private static final Logger LOG = LoggerFactory.getLogger(TableHookDispatcher.class);
   private final TableDispatcher dispatcher;
 
   public TableHookDispatcher(TableDispatcher dispatcher) {
@@ -84,24 +81,20 @@ public class TableHookDispatcher implements TableDispatcher {
             ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
 
     // Set the creator as the owner of the table.
-    try {
-      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerManager != null) {
-        // The inner NormalizeDispatcher case-folds the table name (and its schema namespace)
-        // based on catalog capabilities, so the entity is stored under the normalized identifier.
-        // Apply the same normalization here so the owner is attached to the same identifier the
-        // manager sees.
-        NameIdentifier normalizedIdent =
-            CapabilityHelpers.applyCapabilities(
-                ident, Capability.Scope.TABLE, GravitinoEnv.getInstance().catalogManager());
-        ownerManager.setOwner(
-            normalizedIdent.namespace().level(0),
-            NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.TABLE),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to set owner for table {}, table exists without owner", ident, e);
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerManager != null) {
+      // The inner NormalizeDispatcher case-folds the table name (and its schema namespace)
+      // based on catalog capabilities, so the entity is stored under the normalized identifier.
+      // Apply the same normalization here so the owner is attached to the same identifier the
+      // manager sees.
+      NameIdentifier normalizedIdent =
+          CapabilityHelpers.applyCapabilities(
+              ident, Capability.Scope.TABLE, GravitinoEnv.getInstance().catalogManager());
+      ownerManager.setOwner(
+          normalizedIdent.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.TABLE),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
     return table;
   }

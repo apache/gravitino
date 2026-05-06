@@ -30,11 +30,8 @@ import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class TagHookDispatcher implements TagDispatcher {
-  private static final Logger LOG = LoggerFactory.getLogger(TagHookDispatcher.class);
 
   private final TagDispatcher dispatcher;
 
@@ -63,18 +60,14 @@ public class TagHookDispatcher implements TagDispatcher {
     Tag tag = dispatcher.createTag(metalake, name, comment, properties);
 
     // Set the creator as the owner of the tag.
-    try {
-      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerDispatcher != null) {
-        ownerDispatcher.setOwner(
-            metalake,
-            NameIdentifierUtil.toMetadataObject(
-                NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to set owner for tag {}, tag exists without owner", name, e);
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerDispatcher != null) {
+      ownerDispatcher.setOwner(
+          metalake,
+          NameIdentifierUtil.toMetadataObject(
+              NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
 
     return tag;

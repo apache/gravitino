@@ -32,12 +32,9 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@code MetalakeHookDispatcher} is a decorator for {@link MetalakeDispatcher} that not only
@@ -45,7 +42,6 @@ import org.slf4j.LoggerFactory;
  * operations before or after the underlying operations.
  */
 public class MetalakeHookDispatcher implements MetalakeDispatcher {
-  private static final Logger LOG = LoggerFactory.getLogger(MetalakeHookDispatcher.class);
   private final MetalakeDispatcher dispatcher;
 
   public MetalakeHookDispatcher(MetalakeDispatcher dispatcher) {
@@ -68,40 +64,21 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
       throws MetalakeAlreadyExistsException {
     Metalake metalake = dispatcher.createMetalake(ident, comment, properties);
 
-    // Add the creator to the metalake
-    try {
-      AccessControlDispatcher accessControlDispatcher =
-          GravitinoEnv.getInstance().accessControlDispatcher();
-      if (accessControlDispatcher != null) {
-        accessControlDispatcher.addUser(ident.name(), PrincipalUtils.getCurrentUserName());
-      }
-    } catch (UserAlreadyExistsException e) {
-      // The creator is already registered as a user in the metalake; setOwner can still proceed.
-      LOG.debug(
-          "Creator already registered as user for metalake {}, proceeding to set owner", ident, e);
-    } catch (Exception e) {
-      // The creator could not be added, so setOwner would fail validation regardless. Skip it;
-      // the user can be added later and ownership can be set out-of-band.
-      LOG.warn(
-          "Failed to add creator as user for metalake {}, skipping setOwner; "
-              + "metalake exists without creator user",
-          ident,
-          e);
-      return metalake;
+    // Add the creator to the metalake.
+    AccessControlDispatcher accessControlDispatcher =
+        GravitinoEnv.getInstance().accessControlDispatcher();
+    if (accessControlDispatcher != null) {
+      accessControlDispatcher.addUser(ident.name(), PrincipalUtils.getCurrentUserName());
     }
 
-    try {
-      // Set the creator as owner of the metalake.
-      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerDispatcher != null) {
-        ownerDispatcher.setOwner(
-            ident.name(),
-            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.METALAKE),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to set owner for metalake {}, metalake exists without owner", ident, e);
+    // Set the creator as owner of the metalake.
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerDispatcher != null) {
+      ownerDispatcher.setOwner(
+          ident.name(),
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.METALAKE),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
     return metalake;
   }

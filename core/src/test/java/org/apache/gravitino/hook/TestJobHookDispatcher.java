@@ -32,6 +32,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,25 +63,32 @@ public class TestJobHookDispatcher {
   }
 
   @Test
-  public void testRegisterJobTemplateSucceedsEvenIfSetOwnerFails() {
+  public void testRegisterJobTemplateThrowsWhenSetOwnerFails() {
     JobTemplateEntity mockTemplate = mock(JobTemplateEntity.class);
+    // Job templates live under the reserved job-template virtual namespace, which is required
+    // to have 3 levels (metalake, system-catalog, job-template-schema).
     when(mockTemplate.nameIdentifier())
-        .thenReturn(NameIdentifier.of("test_metalake", "test_template"));
+        .thenReturn(
+            NameIdentifier.of(NamespaceUtil.ofJobTemplate("test_metalake"), "test_template"));
     when(mockTemplate.name()).thenReturn("test_template");
 
     doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    Assertions.assertDoesNotThrow(
-        () -> hookDispatcher.registerJobTemplate("test_metalake", mockTemplate));
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.registerJobTemplate("test_metalake", mockTemplate));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).registerJobTemplate(any(), any());
   }
 
   @Test
-  public void testRunJobSucceedsEvenIfSetOwnerFails() {
+  public void testRunJobThrowsWhenSetOwnerFails() {
     JobEntity mockJob = mock(JobEntity.class);
-    when(mockJob.nameIdentifier()).thenReturn(NameIdentifier.of("test_metalake", "test_job"));
+    when(mockJob.nameIdentifier())
+        .thenReturn(NameIdentifier.of(NamespaceUtil.ofJob("test_metalake"), "test_job"));
     when(mockJob.name()).thenReturn("test_job");
     when(mockDispatcher.runJob(any(), any(), any())).thenReturn(mockJob);
 
@@ -88,10 +96,11 @@ public class TestJobHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    JobEntity result =
-        hookDispatcher.runJob("test_metalake", "test_template", Collections.emptyMap());
-
-    Assertions.assertEquals(mockJob, result);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.runJob("test_metalake", "test_template", Collections.emptyMap()));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).runJob(any(), any(), any());
   }
 }

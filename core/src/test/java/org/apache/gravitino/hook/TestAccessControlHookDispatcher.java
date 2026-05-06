@@ -60,7 +60,7 @@ public class TestAccessControlHookDispatcher {
   }
 
   @Test
-  public void testCreateRoleSucceedsEvenIfSetOwnerFails() {
+  public void testCreateRoleThrowsWhenSetOwnerFails() {
     Role mockRole = mock(Role.class);
     when(mockDispatcher.createRole(any(), any(), any(), any())).thenReturn(mockRole);
 
@@ -68,11 +68,13 @@ public class TestAccessControlHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    Role result =
-        hookDispatcher.createRole(
-            "test_metalake", "test_role", Collections.emptyMap(), Collections.emptyList());
-
-    Assertions.assertEquals(mockRole, result);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                hookDispatcher.createRole(
+                    "test_metalake", "test_role", Collections.emptyMap(), Collections.emptyList()));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).createRole(any(), any(), any(), any());
   }
 }

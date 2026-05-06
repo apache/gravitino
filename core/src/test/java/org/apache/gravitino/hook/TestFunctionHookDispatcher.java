@@ -20,6 +20,7 @@ package org.apache.gravitino.hook;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
@@ -184,7 +185,7 @@ public class TestFunctionHookDispatcher {
   }
 
   @Test
-  public void testRegisterFunctionSucceedsEvenIfSetOwnerFails() throws Exception {
+  public void testRegisterFunctionThrowsWhenSetOwnerFails() throws Exception {
     GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
     Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
     Object originalCatalogManager = FieldUtils.readField(gravitinoEnv, "catalogManager", true);
@@ -215,10 +216,12 @@ public class TestFunctionHookDispatcher {
       FunctionHookDispatcher hook = new FunctionHookDispatcher(mockFunctionDispatcher);
       NameIdentifier ident =
           NameIdentifier.of("metalake1", "catalog1", "schema_owner_fail", "func_owner_fail");
-      Function result =
-          hook.registerFunction(ident, "comment", FunctionType.SCALAR, true, definitions);
-
-      assertSame(mockFunction, result);
+      RuntimeException thrown =
+          assertThrows(
+              RuntimeException.class,
+              () ->
+                  hook.registerFunction(ident, "comment", FunctionType.SCALAR, true, definitions));
+      assertEquals("Set owner failed", thrown.getMessage());
     } finally {
       FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
       FieldUtils.writeField(gravitinoEnv, "catalogManager", originalCatalogManager, true);

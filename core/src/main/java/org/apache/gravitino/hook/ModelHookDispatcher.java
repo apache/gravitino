@@ -41,8 +41,6 @@ import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@code ModelHookDispatcher} is a decorator for {@link ModelDispatcher} that not only delegates
@@ -50,7 +48,6 @@ import org.slf4j.LoggerFactory;
  * or after the underlying operations.
  */
 public class ModelHookDispatcher implements ModelDispatcher {
-  private static final Logger LOG = LoggerFactory.getLogger(ModelHookDispatcher.class);
 
   private final ModelDispatcher dispatcher;
 
@@ -74,23 +71,19 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, comment, properties);
 
     // Set the creator as owner of the model.
-    try {
-      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerManager != null) {
-        // The inner NormalizeDispatcher case-folds the model name based on catalog capabilities,
-        // so the entity is stored under the normalized identifier. Apply the same normalization
-        // here so the owner is attached to the same identifier the manager sees.
-        NameIdentifier normalizedIdent =
-            CapabilityHelpers.applyCapabilities(
-                ident, Capability.Scope.MODEL, GravitinoEnv.getInstance().catalogManager());
-        ownerManager.setOwner(
-            normalizedIdent.namespace().level(0),
-            NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.MODEL),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to set owner for model {}, model exists without owner", ident, e);
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerManager != null) {
+      // The inner NormalizeDispatcher case-folds the model name based on catalog capabilities,
+      // so the entity is stored under the normalized identifier. Apply the same normalization
+      // here so the owner is attached to the same identifier the manager sees.
+      NameIdentifier normalizedIdent =
+          CapabilityHelpers.applyCapabilities(
+              ident, Capability.Scope.MODEL, GravitinoEnv.getInstance().catalogManager());
+      ownerManager.setOwner(
+          normalizedIdent.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.MODEL),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
     return model;
   }
@@ -172,23 +165,19 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, uris, aliases, comment, properties);
 
     // Set the creator as owner of the model.
-    try {
-      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerManager != null) {
-        // The inner NormalizeDispatcher case-folds the model name based on catalog capabilities,
-        // so the entity is stored under the normalized identifier. Apply the same normalization
-        // here so the owner is attached to the same identifier the manager sees.
-        NameIdentifier normalizedIdent =
-            CapabilityHelpers.applyCapabilities(
-                ident, Capability.Scope.MODEL, GravitinoEnv.getInstance().catalogManager());
-        ownerManager.setOwner(
-            normalizedIdent.namespace().level(0),
-            NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.MODEL),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to set owner for model {}, model exists without owner", ident, e);
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerManager != null) {
+      // The inner NormalizeDispatcher case-folds the model name based on catalog capabilities,
+      // so the entity is stored under the normalized identifier. Apply the same normalization
+      // here so the owner is attached to the same identifier the manager sees.
+      NameIdentifier normalizedIdent =
+          CapabilityHelpers.applyCapabilities(
+              ident, Capability.Scope.MODEL, GravitinoEnv.getInstance().catalogManager());
+      ownerManager.setOwner(
+          normalizedIdent.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.MODEL),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
     return model;
   }

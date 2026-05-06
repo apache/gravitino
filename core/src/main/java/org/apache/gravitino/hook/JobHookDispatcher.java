@@ -36,11 +36,8 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class JobHookDispatcher implements JobOperationDispatcher {
-  private static final Logger LOG = LoggerFactory.getLogger(JobHookDispatcher.class);
   private final JobOperationDispatcher jobOperationDispatcher;
 
   public JobHookDispatcher(JobOperationDispatcher jobOperationDispatcher) {
@@ -58,21 +55,14 @@ public class JobHookDispatcher implements JobOperationDispatcher {
     jobOperationDispatcher.registerJobTemplate(metalake, jobTemplateEntity);
 
     // Set the creator as the owner of the job template.
-    try {
-      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerManager != null) {
-        ownerManager.setOwner(
-            metalake,
-            NameIdentifierUtil.toMetadataObject(
-                jobTemplateEntity.nameIdentifier(), Entity.EntityType.JOB_TEMPLATE),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to set owner for job template {}, job template exists without owner",
-          jobTemplateEntity.name(),
-          e);
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerManager != null) {
+      ownerManager.setOwner(
+          metalake,
+          NameIdentifierUtil.toMetadataObject(
+              jobTemplateEntity.nameIdentifier(), Entity.EntityType.JOB_TEMPLATE),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
   }
 
@@ -111,17 +101,13 @@ public class JobHookDispatcher implements JobOperationDispatcher {
     JobEntity jobEntity = jobOperationDispatcher.runJob(metalake, jobTemplateName, jobConf);
 
     // Set the creator as the owner of the job.
-    try {
-      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerManager != null) {
-        ownerManager.setOwner(
-            metalake,
-            NameIdentifierUtil.toMetadataObject(jobEntity.nameIdentifier(), Entity.EntityType.JOB),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to set owner for job {}, job exists without owner", jobEntity.name(), e);
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerManager != null) {
+      ownerManager.setOwner(
+          metalake,
+          NameIdentifierUtil.toMetadataObject(jobEntity.nameIdentifier(), Entity.EntityType.JOB),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
 
     return jobEntity;

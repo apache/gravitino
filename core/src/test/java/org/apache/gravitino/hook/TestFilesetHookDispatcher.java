@@ -152,10 +152,18 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateFilesetSucceedsEvenIfSetOwnerFails() throws IllegalAccessException {
+  public void testCreateFilesetThrowsWhenSetOwnerFails() throws IllegalAccessException {
     // Save the original ownerDispatcher so we can restore it in the finally block instead of
     // wiping it to null and leaking that into other tests in the suite.
     OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+
+    // Create the schema first with the existing (non-throwing) ownerDispatcher, then swap to the
+    // throwing mock only for the fileset create we actually want to exercise. Otherwise the
+    // throwing mock would fire during schema creation and we would never reach the fileset call.
+    Namespace filesetNs = Namespace.of(metalake, catalog, "schema_owner_fail");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaHookDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
+
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
     Mockito.doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
@@ -163,13 +171,14 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
 
     try {
-      Namespace filesetNs = Namespace.of(metalake, catalog, "schema_owner_fail");
-      Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-      schemaHookDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
-
       NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "fileset_owner_fail");
-      filesetHookDispatcher.createFileset(
-          filesetIdent, "comment", Fileset.Type.MANAGED, "fileset_owner", props);
+      RuntimeException thrown =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  filesetHookDispatcher.createFileset(
+                      filesetIdent, "comment", Fileset.Type.MANAGED, "fileset_owner", props));
+      Assertions.assertEquals("Set owner failed", thrown.getMessage());
     } finally {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);

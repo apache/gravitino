@@ -60,7 +60,7 @@ public class TestPolicyHookDispatcher {
   }
 
   @Test
-  public void testCreatePolicySucceedsEvenIfSetOwnerFails() {
+  public void testCreatePolicyThrowsWhenSetOwnerFails() {
     PolicyEntity mockPolicy = mock(PolicyEntity.class);
     when(mockDispatcher.createPolicy(any(), any(), any(), any(), anyBoolean(), any()))
         .thenReturn(mockPolicy);
@@ -69,10 +69,13 @@ public class TestPolicyHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    PolicyEntity result =
-        hookDispatcher.createPolicy("test_metalake", "test_policy", null, "comment", true, null);
-
-    Assertions.assertEquals(mockPolicy, result);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                hookDispatcher.createPolicy(
+                    "test_metalake", "test_policy", null, "comment", true, null));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).createPolicy(any(), any(), any(), any(), anyBoolean(), any());
   }
 }

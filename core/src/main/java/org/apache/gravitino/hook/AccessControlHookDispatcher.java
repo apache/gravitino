@@ -164,18 +164,14 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     Role createdRole = dispatcher.createRole(metalake, role, properties, securableObjects);
 
     // Set the creator as the owner of role.
-    try {
-      OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerDispatcher != null) {
-        ownerDispatcher.setOwner(
-            metalake,
-            NameIdentifierUtil.toMetadataObject(
-                AuthorizationUtils.ofRole(metalake, role), Entity.EntityType.ROLE),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to set owner for role {}, role exists without owner", role, e);
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerDispatcher != null) {
+      ownerDispatcher.setOwner(
+          metalake,
+          NameIdentifierUtil.toMetadataObject(
+              AuthorizationUtils.ofRole(metalake, role), Entity.EntityType.ROLE),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
     return createdRole;
   }

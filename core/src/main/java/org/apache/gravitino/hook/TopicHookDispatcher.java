@@ -38,8 +38,6 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@code TopicHookDispatcher} is a decorator for {@link TopicDispatcher} that not only delegates
@@ -47,7 +45,6 @@ import org.slf4j.LoggerFactory;
  * or after the underlying operations.
  */
 public class TopicHookDispatcher implements TopicDispatcher {
-  private static final Logger LOG = LoggerFactory.getLogger(TopicHookDispatcher.class);
   private final TopicDispatcher dispatcher;
 
   public TopicHookDispatcher(TopicDispatcher dispatcher) {
@@ -71,24 +68,20 @@ public class TopicHookDispatcher implements TopicDispatcher {
     Topic topic = dispatcher.createTopic(ident, comment, dataLayout, properties);
 
     // Set the creator as the owner of the topic.
-    try {
-      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerManager != null) {
-        // The inner NormalizeDispatcher case-folds the topic name (and its schema namespace)
-        // based on catalog capabilities, so the entity is stored under the normalized identifier.
-        // Apply the same normalization here so the owner is attached to the same identifier the
-        // manager sees.
-        NameIdentifier normalizedIdent =
-            CapabilityHelpers.applyCapabilities(
-                ident, Capability.Scope.TOPIC, GravitinoEnv.getInstance().catalogManager());
-        ownerManager.setOwner(
-            normalizedIdent.namespace().level(0),
-            NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.TOPIC),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to set owner for topic {}, topic exists without owner", ident, e);
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerManager != null) {
+      // The inner NormalizeDispatcher case-folds the topic name (and its schema namespace)
+      // based on catalog capabilities, so the entity is stored under the normalized identifier.
+      // Apply the same normalization here so the owner is attached to the same identifier the
+      // manager sees.
+      NameIdentifier normalizedIdent =
+          CapabilityHelpers.applyCapabilities(
+              ident, Capability.Scope.TOPIC, GravitinoEnv.getInstance().catalogManager());
+      ownerManager.setOwner(
+          normalizedIdent.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.TOPIC),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
     return topic;
   }

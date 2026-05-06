@@ -60,7 +60,7 @@ public class TestTagHookDispatcher {
   }
 
   @Test
-  public void testCreateTagSucceedsEvenIfSetOwnerFails() {
+  public void testCreateTagThrowsWhenSetOwnerFails() {
     Tag mockTag = mock(Tag.class);
     when(mockDispatcher.createTag(any(), any(), any(), any())).thenReturn(mockTag);
 
@@ -68,10 +68,13 @@ public class TestTagHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    Tag result =
-        hookDispatcher.createTag("test_metalake", "test_tag", "comment", Collections.emptyMap());
-
-    Assertions.assertEquals(mockTag, result);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                hookDispatcher.createTag(
+                    "test_metalake", "test_tag", "comment", Collections.emptyMap()));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).createTag(any(), any(), any(), any());
   }
 }

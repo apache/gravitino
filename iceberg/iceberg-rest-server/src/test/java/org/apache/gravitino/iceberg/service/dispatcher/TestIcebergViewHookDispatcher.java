@@ -188,7 +188,7 @@ public class TestIcebergViewHookDispatcher {
   }
 
   @Test
-  public void testCreateViewSucceedsEvenIfSetOwnerFails() throws Exception {
+  public void testCreateViewThrowsWhenSetOwnerFails() throws Exception {
     Namespace namespace = Namespace.of(SCHEMA_NAME);
     CreateViewRequest createRequest =
         ImmutableCreateViewRequest.builder()
@@ -215,9 +215,11 @@ public class TestIcebergViewHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    LoadViewResponse response = hookDispatcher.createView(mockContext, namespace, createRequest);
-
-    assertEquals(mockResponse, response);
+    RuntimeException thrown =
+        assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createView(mockContext, namespace, createRequest));
+    assertEquals("Set owner failed", thrown.getMessage());
     verify(mockExecutor, times(1)).createView(mockContext, namespace, createRequest);
     verify(mockViewDispatcher, times(1)).loadView(any(NameIdentifier.class));
   }

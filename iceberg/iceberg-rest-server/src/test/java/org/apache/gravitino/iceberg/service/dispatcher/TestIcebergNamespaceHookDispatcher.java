@@ -94,7 +94,7 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
-  public void testCreateNamespaceSucceedsEvenIfSetOwnerFails() {
+  public void testCreateNamespaceThrowsWhenSetOwnerFails() {
     Namespace namespace = Namespace.of("test_schema");
     CreateNamespaceRequest mockRequest = mock(CreateNamespaceRequest.class);
     when(mockRequest.namespace()).thenReturn(namespace);
@@ -106,14 +106,15 @@ public class TestIcebergNamespaceHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    CreateNamespaceResponse result = hookDispatcher.createNamespace(mockContext, mockRequest);
-
-    Assertions.assertEquals(mockResponse, result);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> hookDispatcher.createNamespace(mockContext, mockRequest));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).createNamespace(mockContext, mockRequest);
   }
 
   @Test
-  public void testRegisterTableSucceedsEvenIfSetOwnerFails() {
+  public void testRegisterTableThrowsWhenSetOwnerFails() {
     Namespace namespace = Namespace.of("test_schema");
     RegisterTableRequest mockRequest = mock(RegisterTableRequest.class);
     when(mockRequest.name()).thenReturn("test_table");
@@ -126,9 +127,11 @@ public class TestIcebergNamespaceHookDispatcher {
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    LoadTableResponse result = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
-
-    Assertions.assertEquals(mockResponse, result);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.registerTable(mockContext, namespace, mockRequest));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).registerTable(mockContext, namespace, mockRequest);
   }
 
