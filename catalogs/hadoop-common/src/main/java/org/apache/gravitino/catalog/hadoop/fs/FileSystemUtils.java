@@ -28,12 +28,14 @@ import com.google.common.collect.Streams;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.util.Map;
+import java.util.Objects;
 import java.util.ServiceLoader;
 import javax.xml.stream.XMLOutputFactory;
 import javax.xml.stream.XMLStreamWriter;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
 
 public class FileSystemUtils {
 
@@ -41,6 +43,67 @@ public class FileSystemUtils {
   private static final String PROPERTY_TAG = "property";
   private static final String NAME_TAG = "name";
   private static final String VALUE_TAG = "value";
+
+  /** A key class for caching FileSystem instances based on scheme, authority, and configuration. */
+  public static class FileSystemCacheKey {
+    private final String scheme;
+    private final String authority;
+    private final UserGroupInformation ugi;
+
+    /**
+     * Constructor for FileSystemCacheKey.
+     *
+     * @param scheme the scheme of the filesystem
+     * @param authority the authority of the filesystem
+     * @param ugi the user group information
+     */
+    public FileSystemCacheKey(String scheme, String authority, UserGroupInformation ugi) {
+      this.scheme = scheme;
+      this.authority = authority;
+      this.ugi = ugi;
+    }
+
+    /**
+     * Get the scheme of the filesystem.
+     *
+     * @return the scheme
+     */
+    public String scheme() {
+      return scheme;
+    }
+
+    /**
+     * Get the authority of the filesystem.
+     *
+     * @return the authority
+     */
+    public String authority() {
+      return authority;
+    }
+
+    /**
+     * Get the user group information of the filesystem.
+     *
+     * @return the user group information
+     */
+    public UserGroupInformation ugi() {
+      return ugi;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof FileSystemCacheKey)) return false;
+      FileSystemCacheKey that = (FileSystemCacheKey) o;
+      return Objects.equals(scheme, that.scheme)
+          && Objects.equals(authority, that.authority)
+          && Objects.equals(ugi, that.ugi);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(scheme, authority, ugi);
+    }
+  }
 
   private FileSystemUtils() {}
 

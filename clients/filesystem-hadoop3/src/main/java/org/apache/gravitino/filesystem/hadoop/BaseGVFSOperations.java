@@ -47,7 +47,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -66,6 +65,7 @@ import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils.FileSystemCacheKey;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProxy;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
@@ -144,66 +144,6 @@ public abstract class BaseGVFSOperations implements Closeable {
   private final boolean enableCredentialVending;
 
   private final boolean autoCreateLocation;
-  /** A key class for caching FileSystem instances based on scheme, authority, and configuration. */
-  public static class FileSystemCacheKey {
-    private final String scheme;
-    private final String authority;
-    private final UserGroupInformation ugi;
-
-    /**
-     * Constructor for FileSystemCacheKey.
-     *
-     * @param scheme the scheme of the filesystem
-     * @param authority the authority of the filesystem
-     * @param ugi the user group information
-     */
-    FileSystemCacheKey(String scheme, String authority, UserGroupInformation ugi) {
-      this.scheme = scheme;
-      this.authority = authority;
-      this.ugi = ugi;
-    }
-
-    /**
-     * Get the scheme of the filesystem.
-     *
-     * @return the scheme
-     */
-    public String scheme() {
-      return scheme;
-    }
-
-    /**
-     * Get the authority of the filesystem.
-     *
-     * @return the authority
-     */
-    public String authority() {
-      return authority;
-    }
-
-    /**
-     * Get the UserGroupInformation
-     *
-     * @return the UserGroupInformation
-     */
-    public UserGroupInformation ugi() {
-      return ugi;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof FileSystemCacheKey)) return false;
-      FileSystemCacheKey that = (FileSystemCacheKey) o;
-      return Objects.equals(scheme, that.scheme)
-          && Objects.equals(authority, that.authority)
-          && Objects.equals(ugi, that.ugi);
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hash(scheme, authority, ugi);
-    }
-  }
 
   /**
    * Constructs a new {@link BaseGVFSOperations} with the given {@link Configuration}.
