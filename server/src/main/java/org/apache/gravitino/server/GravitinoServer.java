@@ -25,8 +25,11 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Singleton;
 import javax.servlet.Servlet;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.container.ContainerRequestFilter;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
@@ -52,6 +55,7 @@ import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
@@ -75,6 +79,7 @@ public class GravitinoServer extends ResourceConfig {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoServer.class);
 
   private static final String API_ANY_PATH = "/api/*";
+  private static final String IDP_PATH_PREFIX = "idp";
 
   public static final String CONF_FILE = "gravitino.conf";
 
@@ -122,6 +127,10 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   private void initializeRestApi() {
+    boolean enableBasicAuthenticator =
+        serverConfig
+            .get(Configs.AUTHENTICATORS)
+            .contains(AuthenticatorType.BASIC.name().toLowerCase());
     HashSet<String> restApiPackagesSet = new HashSet<>();
     restApiPackagesSet.add("org.apache.gravitino.server.web.rest");
     restApiPackagesSet.addAll(serverConfig.get(Configs.REST_API_EXTENSION_PACKAGES));
@@ -165,6 +174,20 @@ public class GravitinoServer extends ResourceConfig {
 
     if (!enableAuthorization) {
       register(AccessControlNotAllowedFilter.class);
+    }
+    if (!enableBasicAuthenticator) {
+      register(
+          new ContainerRequestFilter() {
+            @Override
+            public void filter(ContainerRequestContext requestContext) throws IOException {
+              String path = requestContext.getUriInfo().getPath(false);
+              if (path.equals(IDP_PATH_PREFIX) || path.startsWith(IDP_PATH_PREFIX + "/")) {
+                requestContext.abortWith(
+                    Utils.notFound(
+                        "NotFoundException", "The requested IdP interface does not exist."));
+              }
+            }
+          });
     }
 
     HttpServerMetricsSource httpServerMetricsSource =

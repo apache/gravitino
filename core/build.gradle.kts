@@ -28,6 +28,7 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":authenticators:authenticator-basic"))
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":catalogs:catalog-common"))

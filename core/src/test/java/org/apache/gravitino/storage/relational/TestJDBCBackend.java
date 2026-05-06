@@ -232,8 +232,16 @@ public abstract class TestJDBCBackend {
         tableName = "user_meta";
         idColumnName = "user_id";
         break;
+      case IDP_USER:
+        tableName = "idp_user_meta";
+        idColumnName = "user_id";
+        break;
       case GROUP:
         tableName = "group_meta";
+        idColumnName = "group_id";
+        break;
+      case IDP_GROUP:
+        tableName = "idp_group_meta";
         idColumnName = "group_id";
         break;
       case TAG:
