@@ -1035,13 +1035,39 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testAuthorizeReturnsFalseForDirectPrivilegeDenyBeatsAllowRole() throws Exception {
+  public void testAuthorizeReturnsFalseForDirectPrivilegeDenyOnly() throws Exception {
     // Reproduces the case roryqi flagged: an OGNL expression like `METALAKE::RUN_JOB` is rewritten
     // by AuthorizationExpressionConverter to a *single* `authorizer.authorize(...)` call — there is
     // no companion `authorizer.deny(...)` call (which only ANY_xxx aliases generate). So the
-    // authorize endpoint must independently respect explicit DENY policies even when the user has
-    // a sibling role granting ALLOW RUN_JOB on the same metalake; DENY-beats-ALLOW must hold and
-    // authorize() must return false.
+    // authorize endpoint must independently respect explicit DENY policies; a role that grants
+    // only DENY RUN_JOB on the metalake must cause authorize() to return false.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
+    Long roleId = 3001L;
+    RoleEntity denyRole =
+        getRoleEntity(
+            roleId,
+            "denyRunJobRole" + roleId,
+            ImmutableList.of(
+                makeSecurableObject(
+                    "testMetalake", MetadataObject.Type.METALAKE, roleId, RUN_JOB, "DENY")));
+    mockRoleEntity(denyRole);
+    mockUserRoles(userIdent, denyRole);
+
+    MetadataObject metalake = MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE);
+    AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+    assertFalse(jcasbinAuthorizer.authorize(currentPrincipal, METALAKE, metalake, RUN_JOB, ctx));
+    assertTrue(jcasbinAuthorizer.deny(currentPrincipal, METALAKE, metalake, RUN_JOB, ctx));
+  }
+
+  @Test
+  public void testAuthorizeReturnsFalseForDirectPrivilegeDenyBeatsAllowRole() throws Exception {
+    // Companion to testAuthorizeReturnsFalseForDirectPrivilegeDenyOnly per roryqi's review: also
+    // assign the user a sibling role that ALLOWs RUN_JOB on the same metalake, so the test pins
+    // down DENY-beats-ALLOW on the authorize endpoint when the OGNL expression `METALAKE::RUN_JOB`
+    // emits only an authorize() call (no deny() probe). Distinct role IDs from any other test to
+    // avoid cache-pollution interactions.
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
