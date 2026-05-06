@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -48,6 +49,7 @@ import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -123,6 +125,12 @@ public class ModelMetaService {
     Long schemaId = modelPO.getSchemaId();
     Long modelId = modelPO.getModelId();
 
+    String metalakeName = ident.namespace().level(0);
+    String catalogName = ident.namespace().level(1);
+    String schemaName = ident.namespace().level(2);
+    String modelFullName =
+        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name()).toString();
+
     AtomicInteger modelDeletedCount = new AtomicInteger();
     SessionUtils.doMultipleWithCommit(
         // delete model versions first
@@ -174,7 +182,21 @@ public class ModelMetaService {
                 PolicyMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        modelId, MetadataObject.Type.MODEL.name())));
+                        modelId, MetadataObject.Type.MODEL.name())),
+        () -> {
+          if (modelDeletedCount.get() > 0) {
+            long now = System.currentTimeMillis();
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertChange(
+                        metalakeName,
+                        Entity.EntityType.MODEL.name(),
+                        modelFullName,
+                        OperateType.DROP,
+                        now));
+          }
+        });
 
     return modelDeletedCount.get() > 0;
   }
@@ -349,21 +371,45 @@ public class ModelMetaService {
         newEntity.id(),
         oldModelEntity.id());
 
-    Integer updateResult;
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String oldFullName =
+        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, oldModelEntity.name())
+            .toString();
+    boolean isRenamed = !Objects.equals(oldModelEntity.name(), newEntity.name());
+
+    AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              ModelMetaMapper.class,
-              mapper ->
-                  mapper.updateModelMeta(
-                      POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              updateResult.set(
+                  SessionUtils.getWithoutCommit(
+                      ModelMetaMapper.class,
+                      mapper ->
+                          mapper.updateModelMeta(
+                              POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO))),
+          () -> {
+            if (isRenamed && updateResult.get() > 0) {
+              long now = System.currentTimeMillis();
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertChange(
+                          metalakeName,
+                          Entity.EntityType.MODEL.name(),
+                          oldFullName,
+                          OperateType.ALTER,
+                          now));
+            }
+          });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL, newEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult > 0) {
+    if (updateResult.get() > 0) {
       return newEntity;
     } else {
       throw new IOException("Failed to update the entity: " + identifier);

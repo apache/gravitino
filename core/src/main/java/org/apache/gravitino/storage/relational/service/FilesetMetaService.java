@@ -36,6 +36,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -45,6 +46,7 @@ import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -207,6 +209,14 @@ public class FilesetMetaService {
         newEntity.id(),
         oldFilesetEntity.id());
 
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String oldFullName =
+        NameIdentifierUtil.ofFileset(metalakeName, catalogName, schemaName, oldFilesetEntity.name())
+            .toString();
+    boolean isRenamed = !Objects.equals(oldFilesetEntity.name(), newEntity.name());
+
     Integer updateResult;
     try {
       boolean checkNeedUpdateVersion =
@@ -234,6 +244,20 @@ public class FilesetMetaService {
                 if (metaUpdateCountRef[0] == 0) {
                   throw new RuntimeException("Failed to update the entity: " + identifier);
                 }
+              },
+              () -> {
+                if (isRenamed && metaUpdateCountRef[0] > 0) {
+                  long now = System.currentTimeMillis();
+                  SessionUtils.doWithoutCommit(
+                      EntityChangeLogMapper.class,
+                      mapper ->
+                          mapper.insertChange(
+                              metalakeName,
+                              Entity.EntityType.FILESET.name(),
+                              oldFullName,
+                              OperateType.ALTER,
+                              now));
+                }
               });
           updateResult = 1;
         } catch (RuntimeException re) {
@@ -248,10 +272,28 @@ public class FilesetMetaService {
           }
         }
       } else {
-        updateResult =
-            SessionUtils.doWithCommitAndFetchResult(
-                FilesetMetaMapper.class,
-                mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
+        int[] metaUpdateCountRef = new int[1];
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                metaUpdateCountRef[0] =
+                    SessionUtils.getWithoutCommit(
+                        FilesetMetaMapper.class,
+                        mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO)),
+            () -> {
+              if (isRenamed && metaUpdateCountRef[0] > 0) {
+                long now = System.currentTimeMillis();
+                SessionUtils.doWithoutCommit(
+                    EntityChangeLogMapper.class,
+                    mapper ->
+                        mapper.insertChange(
+                            metalakeName,
+                            Entity.EntityType.FILESET.name(),
+                            oldFullName,
+                            OperateType.ALTER,
+                            now));
+              }
+            });
+        updateResult = metaUpdateCountRef[0];
       }
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -272,6 +314,13 @@ public class FilesetMetaService {
   public boolean deleteFileset(NameIdentifier identifier) {
     FilesetPO filesetPO = getFilesetPOByIdentifier(identifier);
     Long filesetId = filesetPO.getFilesetId();
+
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String filesetFullName =
+        NameIdentifierUtil.ofFileset(metalakeName, catalogName, schemaName, identifier.name())
+            .toString();
 
     // We should delete meta and version info
     SessionUtils.doMultipleWithCommit(
@@ -310,7 +359,19 @@ public class FilesetMetaService {
                 PolicyMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name())));
+                        filesetId, MetadataObject.Type.FILESET.name())),
+        () -> {
+          long now = System.currentTimeMillis();
+          SessionUtils.doWithoutCommit(
+              EntityChangeLogMapper.class,
+              mapper ->
+                  mapper.insertChange(
+                      metalakeName,
+                      Entity.EntityType.FILESET.name(),
+                      filesetFullName,
+                      OperateType.DROP,
+                      now));
+        });
 
     return true;
   }

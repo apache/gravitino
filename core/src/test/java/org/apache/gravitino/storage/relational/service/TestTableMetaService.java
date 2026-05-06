@@ -55,6 +55,11 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.po.auth.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.auth.OperateType;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -63,6 +68,11 @@ public class TestTableMetaService extends TestJDBCBackend {
   private final String metalakeName = "metalake_for_table_test";
   private final String catalogName = "catalog_for_table_test";
   private final String schemaName = "schema_for_table_test";
+
+  private List<EntityChangeRecord> listEntityChanges(long createdAtAfter) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        EntityChangeLogMapper.class, mapper -> mapper.selectChanges(createdAtAfter, 100));
+  }
 
   @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {
@@ -191,6 +201,7 @@ public class TestTableMetaService extends TestJDBCBackend {
     TableMetaService.getInstance().insertTable(createdTable, false);
 
     // test update table without changing schema name
+    long beforeRename = System.currentTimeMillis() - 1;
     TableEntity updatedTable =
         TableEntity.builder()
             .withId(createdTable.id())
@@ -210,6 +221,19 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertEquals(updatedTable.auditInfo(), retrievedTable.auditInfo());
     compareTwoColumns(updatedTable.columns(), retrievedTable.columns());
     compareTwoColumns(updatedTable.columns(), retrievedTable.columns());
+    Assertions.assertTrue(
+        listEntityChanges(beforeRename).stream()
+            .anyMatch(
+                record ->
+                    record.getMetalakeName().equals(metalakeName)
+                        && record.getEntityType().equals(Entity.EntityType.TABLE.name())
+                        && record
+                            .getFullName()
+                            .equals(
+                                NameIdentifierUtil.ofTable(
+                                        metalakeName, catalogName, schemaName, "table1")
+                                    .toString())
+                        && record.getOperateType() == OperateType.ALTER));
 
     // test update table with changing schema name to a non-existing schema
     String newSchemaName = "schema2";
@@ -247,6 +271,23 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertEquals(updatedTable2.namespace(), retrievedTable2.namespace());
     Assertions.assertEquals(updatedTable2.auditInfo(), retrievedTable2.auditInfo());
     compareTwoColumns(updatedTable2.columns(), retrievedTable2.columns());
+
+    long beforeDelete = System.currentTimeMillis() - 1;
+    Assertions.assertTrue(
+        TableMetaService.getInstance().deleteTable(updatedTable2.nameIdentifier()));
+    Assertions.assertTrue(
+        listEntityChanges(beforeDelete).stream()
+            .anyMatch(
+                record ->
+                    record.getMetalakeName().equals(metalakeName)
+                        && record.getEntityType().equals(Entity.EntityType.TABLE.name())
+                        && record
+                            .getFullName()
+                            .equals(
+                                NameIdentifierUtil.ofTable(
+                                        metalakeName, catalogName, newSchemaName, "table3")
+                                    .toString())
+                        && record.getOperateType() == OperateType.DROP));
   }
 
   @TestTemplate
