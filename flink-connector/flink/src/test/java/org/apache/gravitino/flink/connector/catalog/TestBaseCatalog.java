@@ -35,6 +35,7 @@ import org.apache.flink.table.catalog.TableChange;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -120,6 +121,18 @@ public class TestBaseCatalog {
     List<org.apache.gravitino.rel.TableChange> expected =
         ImmutableList.of(org.apache.gravitino.rel.TableChange.updateComment("new comment"));
     Assertions.assertArrayEquals(expected.toArray(), tableChanges);
+  }
+
+  @Test
+  public void testToGravitinoDistributionDefaultsToNone() {
+    TestableBaseCatalog catalog = new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class));
+
+    Assertions.assertEquals(
+        Distributions.NONE,
+        catalog.toGravitinoDistribution(ImmutableMap.of("bucket-key", "id", "bucket", "4")));
+    Assertions.assertEquals(
+        Distributions.NONE, catalog.toGravitinoDistribution(Collections.emptyMap()));
+    Assertions.assertEquals(Distributions.NONE, catalog.toGravitinoDistribution(null));
   }
 
   @Test

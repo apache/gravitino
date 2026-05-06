@@ -12,6 +12,13 @@ This document provides a comprehensive guide on configuring and using Apache Gra
 ### Supported Paimon Table Types
 
 * AppendOnly Table
+* Primary Key Table (with bucket distribution)
+
+### Supported Distribution
+
+* HASH distribution via `bucket-key` and `bucket` table properties.
+* Only HASH strategy is supported. Range or other strategies are not applicable.
+* When `bucket-key` is specified without `bucket`, the bucket number defaults to auto.
 
 ### Supported Operation Types
 
@@ -94,6 +101,21 @@ SELECT * FROM paimon_table_a;
 -- |  1 |  2 |
 -- +----+----+
 -- 1 row in set
+```
+
+#### Distribution Example
+
+```sql
+-- Create a primary key table with HASH distribution on the 'id' column with 4 buckets
+-- The distribution metadata is persisted in Gravitino and can be verified via the Gravitino API or client.
+CREATE TABLE paimon_bucketed_table (
+    id BIGINT,
+    name STRING,
+    PRIMARY KEY (id) NOT ENFORCED
+) WITH (
+    'bucket-key' = 'id',
+    'bucket' = '4'
+);
 ```
 
 ## Catalog properties

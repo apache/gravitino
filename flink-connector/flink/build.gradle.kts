@@ -45,6 +45,7 @@ dependencies {
     exclude("org.apache.logging.log4j")
   }
   implementation(libs.guava)
+  implementation(libs.commons.lang3)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
 
