@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.generic;
 
 import static org.apache.gravitino.Entity.EntityType.TABLE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -29,6 +30,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -76,6 +78,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   private final Map<String, Supplier<ManagedTableOperations>> tableOpsCache;
 
   private Optional<String> catalogLocation;
+
+  private Map<String, String> conf;
 
   private HasPropertyMetadata propertiesMetadata;
 
@@ -125,6 +129,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   public void initialize(
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
+    this.conf = conf;
     String location =
         (String)
             propertiesMetadata
@@ -243,6 +248,10 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     newProperties.put(Table.PROPERTY_LOCATION, tableLocation);
     newProperties.put(Table.PROPERTY_TABLE_FORMAT, format);
 
+    // Merge lance.storage.* properties from catalog and schema levels
+    Map<String, String> mergedStorageProps = mergeLanceStorageProperties(schema, properties);
+    newProperties.putAll(mergedStorageProps);
+
     // Get the table operations for the specified table format.
     Supplier<ManagedTableOperations> tableOpsSupplier = tableOpsCache.get(format);
     Preconditions.checkArgument(tableOpsSupplier != null, "Unsupported table format: %s", format);
@@ -282,6 +291,33 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     boolean dropped = tableOps(ident).dropTable(ident);
     tableFormatCache.invalidate(ident);
     return dropped;
+  }
+
+  @VisibleForTesting
+  Map<String, String> mergeLanceStorageProperties(
+      Schema schema, Map<String, String> tableProperties) {
+    Map<String, String> merged = new HashMap<>();
+
+    // 1. Catalog-level lance.storage.* properties (lowest priority)
+    if (conf != null) {
+      conf.entrySet().stream()
+          .filter(e -> e.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
+          .forEach(e -> merged.put(e.getKey(), e.getValue()));
+    }
+
+    // 2. Schema-level lance.storage.* properties (overrides catalog)
+    if (schema.properties() != null) {
+      schema.properties().entrySet().stream()
+          .filter(e -> e.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
+          .forEach(e -> merged.put(e.getKey(), e.getValue()));
+    }
+
+    // 3. Table-level lance.storage.* properties (highest priority, overrides all)
+    tableProperties.entrySet().stream()
+        .filter(e -> e.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
+        .forEach(e -> merged.put(e.getKey(), e.getValue()));
+
+    return merged;
   }
 
   private String calculateTableLocation(

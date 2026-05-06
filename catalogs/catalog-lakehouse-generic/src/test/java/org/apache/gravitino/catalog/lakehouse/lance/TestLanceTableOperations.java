@@ -110,7 +110,7 @@ public class TestLanceTableOperations {
     Version version = mock(Version.class);
     when(dataset.getVersion()).thenReturn(version);
     when(version.getId()).thenReturn(7L);
-    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location");
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(eq("location"), any(Map.class));
 
     TableChange[] changes =
         new TableChange[] {

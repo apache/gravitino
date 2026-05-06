@@ -24,6 +24,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.lancedb.lance.Dataset;
+import com.lancedb.lance.ReadOptions;
 import com.lancedb.lance.WriteParams;
 import com.lancedb.lance.index.DistanceType;
 import com.lancedb.lance.index.IndexParams;
@@ -341,7 +342,9 @@ public class LanceTableOperations extends ManagedTableOperations {
    */
   long handleLanceTableChange(Table table, TableChange[] changes) {
     String location = table.properties().get(Table.PROPERTY_LOCATION);
-    try (Dataset dataset = openDataset(location)) {
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.getLanceStorageOptions(table.properties());
+    try (Dataset dataset = openDataset(location, storageOptions)) {
       for (TableChange change : changes) {
         if (change instanceof TableChange.DeleteColumn deleteColumn) {
           dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
@@ -380,6 +383,14 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   Dataset openDataset(String location) {
+    return openDataset(location, Map.of());
+  }
+
+  Dataset openDataset(String location, Map<String, String> storageOptions) {
+    if (storageOptions != null && !storageOptions.isEmpty()) {
+      ReadOptions readOptions = new ReadOptions.Builder().setStorageOptions(storageOptions).build();
+      return Dataset.open(new RootAllocator(), location, readOptions);
+    }
     return Dataset.open(location, new RootAllocator());
   }
 
