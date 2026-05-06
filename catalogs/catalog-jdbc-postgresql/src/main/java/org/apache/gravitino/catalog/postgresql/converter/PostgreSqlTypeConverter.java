@@ -78,21 +78,13 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       case NUMERIC:
         Integer columnSize = typeBean.getColumnSize();
         Integer scale = typeBean.getScale();
-        // Unconstrained NUMERIC (no precision/scale) — PostgreSQL JDBC returns columnSize=0.
-        // Use ExternalType to preserve arbitrary-precision semantics (backed by BigDecimal).
         if (columnSize == null || columnSize == 0) {
-          return Types.ExternalType.of(NUMERIC);
+          // PostgreSQL unconstrained NUMERIC has no fixed precision/scale. Gravitino DecimalType
+          // cannot represent that exactly, so use the maximum supported decimal as a compatibility
+          // tradeoff for engines and clients that cannot consume ExternalType.
+          return Types.DecimalType.of(38, 18);
         }
-        int effectiveScale = scale != null ? scale : 0;
-        // NUMERIC(P, 0) with small P can be represented as integer types for better performance.
-        if (effectiveScale == 0) {
-          if (columnSize < 10) {
-            return Types.IntegerType.get();
-          } else if (columnSize < 19) {
-            return Types.LongType.get();
-          }
-        }
-        return Types.DecimalType.of(columnSize, effectiveScale);
+        return Types.DecimalType.of(columnSize, scale == null ? 0 : scale);
       case VARCHAR:
         return typeBean.getColumnSize() == null
             ? Types.StringType.get()
