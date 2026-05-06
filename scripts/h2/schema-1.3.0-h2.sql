@@ -245,6 +245,42 @@ CREATE TABLE IF NOT EXISTS `group_role_rel` (
     KEY `idx_gid` (`group_id`)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS `idp_user_meta` (
+    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
+    `user_name` VARCHAR(128) NOT NULL COMMENT 'idp username',
+    `password_hash` VARCHAR(1024) NOT NULL COMMENT 'idp user password hash',
+    `audit_info` CLOB NOT NULL COMMENT 'idp user audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp user deleted at',
+    PRIMARY KEY (`user_id`),
+    CONSTRAINT `uk_iun_del` UNIQUE (`user_name`, `deleted_at`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `idp_group_meta` (
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
+    `group_name` VARCHAR(128) NOT NULL COMMENT 'idp group name',
+    `audit_info` CLOB NOT NULL COMMENT 'idp group audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp group deleted at',
+    PRIMARY KEY (`group_id`),
+    CONSTRAINT `uk_ign_del` UNIQUE (`group_name`, `deleted_at`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `idp_group_user_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
+    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
+    `audit_info` CLOB NOT NULL COMMENT 'idp group user relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp relation deleted at',
+    PRIMARY KEY (`id`),
+    CONSTRAINT `uk_igiu_del` UNIQUE (`group_id`, `user_id`, `deleted_at`),
+    KEY `idx_iug_uid` (`user_id`)
+) ENGINE=InnoDB;
+
 CREATE TABLE IF NOT EXISTS `tag_meta` (
     `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
     `tag_name` VARCHAR(128) NOT NULL COMMENT 'tag name',

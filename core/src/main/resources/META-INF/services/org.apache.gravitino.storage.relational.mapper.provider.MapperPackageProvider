@@ -17,3 +17,4 @@
 # under the License.
 #
 org.apache.gravitino.storage.relational.mapper.provider.DefaultMapperPackageProvider
+org.apache.gravitino.storage.relational.mapper.provider.IdpAuthenticationMapperPackageProvider
