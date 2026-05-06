@@ -27,10 +27,10 @@ import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.Table;
 
 /**
- * Runs {@link AbstractGlueTableTest} scenarios using AWS SDK builders — no network or credentials
+ * Runs {@link GlueTableTestBase} scenarios using AWS SDK builders — no network or credentials
  * required.
  */
-class TestSyntheticGlueTable extends AbstractGlueTableTest {
+class TestGlueTableConversion extends GlueTableTestBase {
 
   private static final String INPUT_FMT = "org.apache.hadoop.mapred.TextInputFormat";
   private static final String OUTPUT_FMT =
