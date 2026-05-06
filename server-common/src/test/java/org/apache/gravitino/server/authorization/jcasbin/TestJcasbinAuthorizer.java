@@ -1035,25 +1035,35 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
-  public void testAuthorizeReturnsFalseForDirectPrivilegeDenyOnly() throws Exception {
+  public void testAuthorizeReturnsFalseForDirectPrivilegeDenyBeatsAllowRole() throws Exception {
     // Reproduces the case roryqi flagged: an OGNL expression like `METALAKE::RUN_JOB` is rewritten
     // by AuthorizationExpressionConverter to a *single* `authorizer.authorize(...)` call — there is
     // no companion `authorizer.deny(...)` call (which only ANY_xxx aliases generate). So the
-    // authorize endpoint must independently respect explicit DENY policies; a role that grants
-    // only DENY RUN_JOB on the metalake must cause authorize() to return false.
+    // authorize endpoint must independently respect explicit DENY policies even when the user has
+    // a sibling role granting ALLOW RUN_JOB on the same metalake; DENY-beats-ALLOW must hold and
+    // authorize() must return false.
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     NameIdentifier userIdent = NameIdentifierUtil.ofUser(METALAKE, USERNAME);
-    Long roleId = 3001L;
+    Long denyRoleId = 3010L;
+    Long allowRoleId = 3011L;
     RoleEntity denyRole =
         getRoleEntity(
-            roleId,
-            "denyRunJobRole" + roleId,
+            denyRoleId,
+            "denyRunJobRole" + denyRoleId,
             ImmutableList.of(
                 makeSecurableObject(
-                    "testMetalake", MetadataObject.Type.METALAKE, roleId, RUN_JOB, "DENY")));
+                    "testMetalake", MetadataObject.Type.METALAKE, denyRoleId, RUN_JOB, "DENY")));
+    RoleEntity allowRole =
+        getRoleEntity(
+            allowRoleId,
+            "allowRunJobRole" + allowRoleId,
+            ImmutableList.of(
+                makeSecurableObject(
+                    "testMetalake", MetadataObject.Type.METALAKE, allowRoleId, RUN_JOB, "ALLOW")));
     mockRoleEntity(denyRole);
-    mockUserRoles(userIdent, denyRole);
+    mockRoleEntity(allowRole);
+    mockUserRoles(userIdent, denyRole, allowRole);
 
     MetadataObject metalake = MetadataObjects.of(null, METALAKE, MetadataObject.Type.METALAKE);
     AuthorizationRequestContext ctx = new AuthorizationRequestContext();
