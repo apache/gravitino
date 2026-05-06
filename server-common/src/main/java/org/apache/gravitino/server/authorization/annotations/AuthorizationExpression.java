@@ -64,5 +64,33 @@ public @interface AuthorizationExpression {
    *
    * @return the condition for evaluating the secondary expression.
    */
-  String secondaryExpressionCondition() default "";
+  ExpressionCondition secondaryExpressionCondition() default ExpressionCondition.ALWAYS;
+
+  /**
+   * The action used for handling the secondary expression.
+   *
+   * @return the action for the secondary expression.
+   */
+  ExpressionAction secondaryExpressionAction() default ExpressionAction.EVALUATE;
+
+  /**
+   * The third expression to evaluate for authorization, which represents multiple privileges.
+   *
+   * @return the third expression to evaluate for authorization.
+   */
+  String thirdExpression() default "";
+
+  /**
+   * The condition under which the third expression is evaluated.
+   *
+   * @return the condition for evaluating the third expression.
+   */
+  ExpressionCondition thirdExpressionCondition() default ExpressionCondition.ALWAYS;
+
+  /**
+   * The action used for handling the third expression.
+   *
+   * @return the action for the third expression.
+   */
+  ExpressionAction thirdExpressionAction() default ExpressionAction.EVALUATE;
 }

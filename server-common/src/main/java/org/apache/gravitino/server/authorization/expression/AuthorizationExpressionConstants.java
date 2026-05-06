@@ -105,7 +105,7 @@ public class AuthorizationExpressionConstants {
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
-                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || TABLE::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW
                       || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
                   """;
 

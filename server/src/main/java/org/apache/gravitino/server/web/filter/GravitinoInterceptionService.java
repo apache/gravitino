@@ -44,6 +44,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
@@ -186,7 +187,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             AuthorizationRequest.RequestType requestType =
                 extractAuthorizationRequestTypeFromParameters(parameters);
             String secondaryExpression = expressionAnnotation.secondaryExpression();
-            String secondaryExpressionCondition =
+            ExpressionCondition secondaryExpressionCondition =
                 expressionAnnotation.secondaryExpressionCondition();
             executor =
                 AuthorizeExecutorFactory.create(
