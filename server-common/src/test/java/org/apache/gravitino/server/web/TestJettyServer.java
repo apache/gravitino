@@ -95,4 +95,40 @@ public class TestJettyServer {
   public void testStartWithoutInitialise() throws InterruptedException {
     assertThrows(RuntimeException.class, () -> jettyServer.start());
   }
+
+  @Test
+  public void testInitializeHttpsWithClientAuthRequiresTrustStore() throws IOException {
+    Config config = new Config(false) {};
+
+    config.set(JettyServerConfig.ENABLE_HTTPS, true);
+    config.set(JettyServerConfig.WEBSERVER_HTTPS_PORT, RESTUtils.findAvailablePort(6000, 7000));
+
+    config.set(JettyServerConfig.SSL_KEYSTORE_PATH, "/tmp/server.jks");
+    config.set(JettyServerConfig.SSL_KEYSTORE_PASSWORD, "password");
+    config.set(JettyServerConfig.SSL_MANAGER_PASSWORD, "password");
+
+    config.set(JettyServerConfig.ENABLE_CLIENT_AUTH, true);
+
+    assertThrows(IllegalArgumentException.class, () -> JettyServerConfig.fromConfig(config));
+  }
+
+  @Test
+  public void testInitializeHttpsWithClientAuth() throws IOException {
+    Config config = new Config(false) {};
+
+    config.set(JettyServerConfig.ENABLE_HTTPS, true);
+    config.set(JettyServerConfig.WEBSERVER_HTTPS_PORT, RESTUtils.findAvailablePort(6000, 7000));
+
+    config.set(JettyServerConfig.SSL_KEYSTORE_PATH, "/tmp/server.jks");
+    config.set(JettyServerConfig.SSL_KEYSTORE_PASSWORD, "password");
+    config.set(JettyServerConfig.SSL_MANAGER_PASSWORD, "password");
+
+    config.set(JettyServerConfig.ENABLE_CLIENT_AUTH, true);
+    config.set(JettyServerConfig.SSL_TRUST_STORE_PATH, "/tmp/trust.jks");
+    config.set(JettyServerConfig.SSL_TRUST_STORE_PASSWORD, "password");
+
+    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(config);
+
+    assertDoesNotThrow(() -> jettyServer.initialize(serverConfig, "test", false));
+  }
 }
