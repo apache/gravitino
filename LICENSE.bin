@@ -327,6 +327,7 @@
    Apache Kyuubi
    Apache Ranger
    Apache Ranger intg
+   Bouncy Castle
    Jackson JSON processor
    DataNucleus
    Modernizer Maven Plugin
