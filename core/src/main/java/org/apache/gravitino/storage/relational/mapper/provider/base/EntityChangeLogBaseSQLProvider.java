@@ -20,18 +20,18 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper.ENTITY_CHANGE_LOG_TABLE_NAME;
 
-import org.apache.gravitino.storage.relational.po.auth.OperateType;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.ibatis.annotations.Param;
 
 public class EntityChangeLogBaseSQLProvider {
 
   public String selectEntityChanges(
-      @Param("createdAtAfter") long createdAtAfter, @Param("maxRows") int maxRows) {
+      @Param("createdAtFrom") long createdAtFrom, @Param("maxRows") int maxRows) {
     return "SELECT id, metalake_name as metalakeName, entity_type as entityType,"
         + " entity_full_name as fullName, operate_type as operateType, created_at as createdAt"
         + " FROM "
         + ENTITY_CHANGE_LOG_TABLE_NAME
-        + " WHERE created_at >= #{createdAtAfter} ORDER BY created_at, id LIMIT #{maxRows}";
+        + " WHERE created_at >= #{createdAtFrom} ORDER BY created_at, id LIMIT #{maxRows}";
   }
 
   public String insertEntityChange(

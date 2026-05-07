@@ -22,7 +22,6 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -31,8 +30,8 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
-import org.apache.gravitino.storage.relational.po.auth.EntityChangeRecord;
-import org.apache.gravitino.storage.relational.po.auth.OperateType;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
@@ -93,13 +92,10 @@ public class TestEntityChangeLogMapper {
 
   @BeforeEach
   void truncate() throws SQLException {
-    try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection();
-          Statement statement = connection.createStatement()) {
-        statement.execute("DELETE FROM entity_change_log");
-      }
+    try (Statement statement = sharedSession.getConnection().createStatement()) {
+      statement.execute("DELETE FROM entity_change_log");
     }
+    sharedSession.clearCache();
   }
 
   @Test

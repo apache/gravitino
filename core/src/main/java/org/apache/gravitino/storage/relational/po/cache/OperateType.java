@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.po.auth;
+package org.apache.gravitino.storage.relational.po.cache;
 
 /**
  * Operate type emitted into {@code entity_change_log.operate_type}.

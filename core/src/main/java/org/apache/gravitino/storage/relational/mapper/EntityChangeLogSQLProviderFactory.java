@@ -24,7 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.EntityChangeLogBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.auth.OperateType;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
@@ -63,8 +63,8 @@ public class EntityChangeLogSQLProviderFactory {
   }
 
   public static String selectEntityChanges(
-      @Param("createdAtAfter") long createdAtAfter, @Param("maxRows") int maxRows) {
-    return getProvider().selectEntityChanges(createdAtAfter, maxRows);
+      @Param("createdAtFrom") long createdAtFrom, @Param("maxRows") int maxRows) {
+    return getProvider().selectEntityChanges(createdAtFrom, maxRows);
   }
 
   public static String insertEntityChange(

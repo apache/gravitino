@@ -19,8 +19,8 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
-import org.apache.gravitino.storage.relational.po.auth.EntityChangeRecord;
-import org.apache.gravitino.storage.relational.po.auth.OperateType;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -39,7 +39,7 @@ public interface EntityChangeLogMapper {
 
   @SelectProvider(type = EntityChangeLogSQLProviderFactory.class, method = "selectEntityChanges")
   List<EntityChangeRecord> selectChanges(
-      @Param("createdAtAfter") long createdAtAfter, @Param("maxRows") int maxRows);
+      @Param("createdAtFrom") long createdAtFrom, @Param("maxRows") int maxRows);
 
   @InsertProvider(type = EntityChangeLogSQLProviderFactory.class, method = "insertEntityChange")
   void insertChange(
