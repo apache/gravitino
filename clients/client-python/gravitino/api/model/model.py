@@ -76,4 +76,4 @@ class Model(Auditable):
         pass
 
     def supports_tags(self) -> SupportsTags:
-        raise UnsupportedOperationException("Table does not support tag operations.")
+        raise UnsupportedOperationException("Model does not support tag operations.")

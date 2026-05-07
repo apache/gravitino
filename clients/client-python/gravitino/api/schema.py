@@ -47,4 +47,4 @@ class Schema(Auditable):
         return {}
 
     def supports_tags(self) -> SupportsTags:
-        raise UnsupportedOperationException("Table does not support tag operations.")
+        raise UnsupportedOperationException("Schema does not support tag operations.")

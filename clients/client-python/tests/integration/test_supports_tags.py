@@ -51,10 +51,6 @@ class TestSupportsTags(IntegrationTestEnv):
         fileset_properties_key1: fileset_properties_value1,
         fileset_properties_key2: fileset_properties_value2,
     }
-    multiple_locations_fileset_properties: tp.Dict[str, str] = {
-        Fileset.PROPERTY_DEFAULT_LOCATION_NAME: "location1",
-        **fileset_properties,
-    }
 
     _metalake_name: str = "tag_it_metalake" + str(randint(0, 1000))
     _relational_catalog_name: str = "relational_catalog" + str(randint(0, 1000))
@@ -117,14 +113,14 @@ class TestSupportsTags(IntegrationTestEnv):
         cls._model_catalog = cls._gravitino_client.create_catalog(
             name=cls._model_catalog_name,
             catalog_type=Catalog.Type.MODEL,
-            provider="",
+            provider=None,
             comment="comment",
             properties={},
         )
         cls._fileset_catalog = cls._gravitino_client.create_catalog(
             name=cls._fileset_catalog_name,
             catalog_type=Catalog.Type.FILESET,
-            provider="",
+            provider=None,
             comment="",
             properties={cls.catalog_location_prop: "/tmp/test1"},
         )
@@ -139,18 +135,26 @@ class TestSupportsTags(IntegrationTestEnv):
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls._gravitino_client.drop_catalog(name=cls._model_catalog_name, force=True)
-        cls._gravitino_client.drop_catalog(
-            name=cls._relational_catalog_name, force=True
-        )
-        cls._gravitino_client.drop_catalog(name=cls._fileset_catalog_name, force=True)
+        try:
+            cls._gravitino_client.drop_catalog(name=cls._model_catalog_name, force=True)
+            cls._gravitino_client.drop_catalog(
+                name=cls._relational_catalog_name, force=True
+            )
+            cls._gravitino_client.drop_catalog(
+                name=cls._fileset_catalog_name, force=True
+            )
 
-        cls._gravitino_client.delete_tag(cls._tag_name1)
-        cls._gravitino_client.delete_tag(cls._tag_name2)
-        cls._gravitino_client.delete_tag(cls._tag_name3)
-        cls._gravitino_client.delete_tag(cls._tag_name4)
+            cls._gravitino_client.delete_tag(cls._tag_name1)
+            cls._gravitino_client.delete_tag(cls._tag_name2)
+            cls._gravitino_client.delete_tag(cls._tag_name3)
+            cls._gravitino_client.delete_tag(cls._tag_name4)
 
-        cls._gravitino_admin_client.drop_metalake(name=cls._metalake_name, force=True)
+            cls._gravitino_admin_client.drop_metalake(
+                name=cls._metalake_name, force=True
+            )
+        finally:
+            cls._hdfs_container.close()
+            super().tearDownClass()
 
     def setUp(self) -> None:
         self._table_ident: NameIdentifier = NameIdentifier.of(

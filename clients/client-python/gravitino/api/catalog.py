@@ -183,7 +183,7 @@ class Catalog(Auditable):
     def as_model_catalog(self) -> "GenericModelCatalog":
         """
         Returns:
-            the {@link ModelCatalog} if the catalog supports model operations.
+            the {@link GenericModelCatalog} if the catalog supports model operations.
 
         Raises:
             UnsupportedOperationException if the catalog does not support model operations.
