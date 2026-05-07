@@ -253,11 +253,9 @@ public class UserMetaService {
                     mapper.softDeleteUserRoleRelByUserAndRoles(
                         newEntity.id(), Lists.newArrayList(deleteRoleIds)));
           },
-          () -> {
-            long now = System.currentTimeMillis();
-            SessionUtils.doWithoutCommit(
-                UserMetaMapper.class, mapper -> mapper.touchUpdatedAt(oldUserPO.getUserId(), now));
-          });
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class, mapper -> mapper.touchUpdatedAt(oldUserPO.getUserId())));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());

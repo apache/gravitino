@@ -260,11 +260,9 @@ public class RoleMetaService {
                 SecurableObjectMapper.class,
                 mapper -> mapper.batchInsertSecurableObjects(insertSecurableObjectPOs));
           },
-          () -> {
-            long now = System.currentTimeMillis();
-            SessionUtils.doWithoutCommit(
-                RoleMetaMapper.class, mapper -> mapper.touchUpdatedAt(rolePO.getRoleId(), now));
-          });
+          () ->
+              SessionUtils.doWithoutCommit(
+                  RoleMetaMapper.class, mapper -> mapper.touchUpdatedAt(rolePO.getRoleId())));
 
       return newRoleEntity;
     } catch (RuntimeException re) {

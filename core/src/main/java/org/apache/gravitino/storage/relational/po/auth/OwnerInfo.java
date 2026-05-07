@@ -18,32 +18,17 @@
  */
 package org.apache.gravitino.storage.relational.po.auth;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 /** Step 2.5: owner identity for a single metadata object. */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class OwnerInfo {
   private long ownerId;
   private String ownerType;
-
-  /** Required by MyBatis for result mapping. */
-  public OwnerInfo() {}
-
-  public OwnerInfo(long ownerId, String ownerType) {
-    this.ownerId = ownerId;
-    this.ownerType = ownerType;
-  }
-
-  public long getOwnerId() {
-    return ownerId;
-  }
-
-  public void setOwnerId(long ownerId) {
-    this.ownerId = ownerId;
-  }
-
-  public String getOwnerType() {
-    return ownerType;
-  }
-
-  public void setOwnerType(String ownerType) {
-    this.ownerType = ownerType;
-  }
 }

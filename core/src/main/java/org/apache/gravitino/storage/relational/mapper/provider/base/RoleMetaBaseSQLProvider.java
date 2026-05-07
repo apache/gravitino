@@ -194,8 +194,12 @@ public class RoleMetaBaseSQLProvider {
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 
-  public String touchRoleUpdatedAt(@Param("roleId") long roleId, @Param("now") long now) {
-    return "UPDATE " + ROLE_TABLE_NAME + " SET updated_at = #{now} WHERE role_id = #{roleId}";
+  public String touchRoleUpdatedAt(@Param("roleId") long roleId) {
+    return "UPDATE "
+        + ROLE_TABLE_NAME
+        + " SET updated_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
   public String batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds) {

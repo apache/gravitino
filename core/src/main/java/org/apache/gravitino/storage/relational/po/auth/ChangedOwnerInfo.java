@@ -18,32 +18,18 @@
  */
 package org.apache.gravitino.storage.relational.po.auth;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 /** Owner change poller result -- one row per changed owner_meta entry. */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class ChangedOwnerInfo {
   private long metadataObjectId;
+  private String metadataObjectType;
   private long updatedAt;
-
-  /** Required by MyBatis for result mapping. */
-  public ChangedOwnerInfo() {}
-
-  public ChangedOwnerInfo(long metadataObjectId, long updatedAt) {
-    this.metadataObjectId = metadataObjectId;
-    this.updatedAt = updatedAt;
-  }
-
-  public long getMetadataObjectId() {
-    return metadataObjectId;
-  }
-
-  public void setMetadataObjectId(long metadataObjectId) {
-    this.metadataObjectId = metadataObjectId;
-  }
-
-  public long getUpdatedAt() {
-    return updatedAt;
-  }
-
-  public void setUpdatedAt(long updatedAt) {
-    this.updatedAt = updatedAt;
-  }
 }

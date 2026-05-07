@@ -18,47 +18,23 @@
  */
 package org.apache.gravitino.storage.relational.po.auth;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 /** Role identity and privilege-list staleness sentinel. */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class RoleUpdatedAt {
   private long roleId;
   private String roleName;
   private long updatedAt;
 
-  /** Required by MyBatis for result mapping. */
-  public RoleUpdatedAt() {}
-
   public RoleUpdatedAt(long roleId, long updatedAt) {
     this.roleId = roleId;
-    this.updatedAt = updatedAt;
-  }
-
-  public RoleUpdatedAt(long roleId, String roleName, long updatedAt) {
-    this.roleId = roleId;
-    this.roleName = roleName;
-    this.updatedAt = updatedAt;
-  }
-
-  public long getRoleId() {
-    return roleId;
-  }
-
-  public void setRoleId(long roleId) {
-    this.roleId = roleId;
-  }
-
-  public String getRoleName() {
-    return roleName;
-  }
-
-  public void setRoleName(String roleName) {
-    this.roleName = roleName;
-  }
-
-  public long getUpdatedAt() {
-    return updatedAt;
-  }
-
-  public void setUpdatedAt(long updatedAt) {
     this.updatedAt = updatedAt;
   }
 }

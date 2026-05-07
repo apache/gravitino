@@ -141,6 +141,181 @@ public class TestAuthMappers {
     }
   }
 
+  @Test
+  void testRoleMetaTouchUpdatedAt() {
+    insertMetalake(1L, "metalake1");
+    insertRole(10L, "role10", 1L);
+
+    long before = queryUpdatedAt("role_meta", "role_id", 10L);
+    Assertions.assertEquals(0L, before);
+
+    long jvmBefore = System.currentTimeMillis();
+    roleMetaMapper.touchUpdatedAt(10L);
+    long jvmAfter = System.currentTimeMillis();
+
+    long after = queryUpdatedAt("role_meta", "role_id", 10L);
+    // updated_at is set by the DB, so it should be close to JVM time but not exactly equal.
+    Assertions.assertTrue(
+        after >= jvmBefore - 1000L && after <= jvmAfter + 1000L,
+        "expected DB-time updated_at within 1s of JVM clock, got " + after);
+  }
+
+  @Test
+  void testRoleMetaBatchGetUpdatedAt() {
+    insertMetalake(1L, "metalake1");
+    insertRole(11L, "role11", 1L);
+    insertRole(12L, "role12", 1L);
+
+    roleMetaMapper.touchUpdatedAt(11L);
+    roleMetaMapper.touchUpdatedAt(12L);
+
+    List<Long> roleIds = Lists.newArrayList(11L, 12L);
+    List<RoleUpdatedAt> results = roleMetaMapper.batchGetUpdatedAt(roleIds);
+
+    Assertions.assertEquals(2, results.size());
+    results.sort((a, b) -> Long.compare(a.getRoleId(), b.getRoleId()));
+    Assertions.assertEquals(11L, results.get(0).getRoleId());
+    Assertions.assertEquals(12L, results.get(1).getRoleId());
+    Assertions.assertTrue(results.get(0).getUpdatedAt() > 0L);
+    Assertions.assertTrue(results.get(1).getUpdatedAt() > 0L);
+
+    Assertions.assertTrue(roleMetaMapper.batchGetUpdatedAt(Collections.emptyList()).isEmpty());
+    Assertions.assertTrue(roleMetaMapper.batchGetUpdatedAt(null).isEmpty());
+  }
+
+  @Test
+  void testRoleMetaTouchUpdatedAtSkipsSoftDeleted() {
+    insertMetalake(1L, "metalake1");
+    insertRole(13L, "role13", 1L);
+    roleMetaMapper.softDeleteRoleMetaByRoleId(13L);
+
+    long beforeUpdatedAt = queryUpdatedAt("role_meta", "role_id", 13L);
+    roleMetaMapper.touchUpdatedAt(13L);
+    long afterUpdatedAt = queryUpdatedAt("role_meta", "role_id", 13L);
+
+    Assertions.assertEquals(beforeUpdatedAt, afterUpdatedAt);
+  }
+
+  @Test
+  void testUserMetaTouchUpdatedAt() {
+    insertMetalake(1L, "metalake1");
+    insertUser(20L, "user20", 1L);
+
+    long before = queryUpdatedAt("user_meta", "user_id", 20L);
+    Assertions.assertEquals(0L, before);
+
+    long jvmBefore = System.currentTimeMillis();
+    userMetaMapper.touchUpdatedAt(20L);
+    long jvmAfter = System.currentTimeMillis();
+
+    long after = queryUpdatedAt("user_meta", "user_id", 20L);
+    Assertions.assertTrue(
+        after >= jvmBefore - 1000L && after <= jvmAfter + 1000L,
+        "expected DB-time updated_at within 1s of JVM clock, got " + after);
+  }
+
+  @Test
+  void testUserMetaTouchUpdatedAtSkipsSoftDeleted() {
+    insertMetalake(1L, "metalake1");
+    insertUser(22L, "user22", 1L);
+    userMetaMapper.softDeleteUserMetaByUserId(22L);
+
+    long beforeUpdatedAt = queryUpdatedAt("user_meta", "user_id", 22L);
+    userMetaMapper.touchUpdatedAt(22L);
+    long afterUpdatedAt = queryUpdatedAt("user_meta", "user_id", 22L);
+
+    Assertions.assertEquals(beforeUpdatedAt, afterUpdatedAt);
+  }
+
+  @Test
+  void testUserMetaGetUserInfo() {
+    insertMetalake(1L, "metalake1");
+    insertUser(21L, "user21", 1L);
+
+    userMetaMapper.touchUpdatedAt(21L);
+    long expected = queryUpdatedAt("user_meta", "user_id", 21L);
+
+    UserAuthInfo info = userMetaMapper.getUserInfo("metalake1", "user21");
+    Assertions.assertNotNull(info);
+    Assertions.assertEquals(21L, info.getUserId());
+    Assertions.assertEquals(expected, info.getUpdatedAt());
+  }
+
+  @Test
+  void testOwnerMetaSelectOwnerByMetadataObjectIdAndType() {
+    insertMetalake(1L, "metalake1");
+    insertUser(50L, "user50", 1L);
+    AuditInfo auditInfo = buildAuditInfo();
+
+    OwnerRelPO ownerRelPO =
+        OwnerRelPO.builder()
+            .withMetalakeId(1L)
+            .withOwnerId(50L)
+            .withOwnerType("USER")
+            .withMetadataObjectId(100L)
+            .withMetadataObjectType("TABLE")
+            .withAuditIfo(auditInfo.toString())
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeleteAt(0L)
+            .withUpdatedAt(0L)
+            .build();
+    ownerMetaMapper.insertOwnerRel(ownerRelPO);
+
+    OwnerInfo info = ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(100L, "TABLE");
+    Assertions.assertNotNull(info);
+    Assertions.assertEquals(50L, info.getOwnerId());
+    Assertions.assertEquals("USER", info.getOwnerType());
+
+    // ID collision with different type is filtered out.
+    Assertions.assertNull(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(100L, "SCHEMA"));
+  }
+
+  @Test
+  void testOwnerMetaSelectChangedOwners() {
+    insertMetalake(1L, "metalake1");
+    insertUser(60L, "user60", 1L);
+    AuditInfo auditInfo = buildAuditInfo();
+
+    OwnerRelPO ownerRelPO =
+        OwnerRelPO.builder()
+            .withMetalakeId(1L)
+            .withOwnerId(60L)
+            .withOwnerType("USER")
+            .withMetadataObjectId(200L)
+            .withMetadataObjectType("SCHEMA")
+            .withAuditIfo(auditInfo.toString())
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeleteAt(0L)
+            .withUpdatedAt(0L)
+            .build();
+    ownerMetaMapper.insertOwnerRel(ownerRelPO);
+
+    // Set updated_at = 100 via direct SQL
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection()) {
+        try (Statement statement = connection.createStatement()) {
+          statement.execute(
+              "UPDATE owner_meta SET updated_at = 100 WHERE metadata_object_id = 200");
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Update failed", e);
+    }
+
+    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(50L);
+    Assertions.assertEquals(1, changed.size());
+    Assertions.assertEquals(200L, changed.get(0).getMetadataObjectId());
+    Assertions.assertEquals("SCHEMA", changed.get(0).getMetadataObjectType());
+    Assertions.assertEquals(100L, changed.get(0).getUpdatedAt());
+
+    // With the same timestamp, the row is returned again for timestamp-only polling.
+    List<ChangedOwnerInfo> sameTimestamp = ownerMetaMapper.selectChangedOwners(100L);
+    Assertions.assertEquals(1, sameTimestamp.size());
+  }
+
   private AuditInfo buildAuditInfo() {
     return AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
   }
@@ -227,146 +402,5 @@ public class TestAuthMappers {
     } catch (SQLException e) {
       throw new RuntimeException("SQL execution failed", e);
     }
-  }
-
-  @Test
-  void testRoleMetaTouchUpdatedAt() {
-    insertMetalake(1L, "metalake1");
-    insertRole(10L, "role10", 1L);
-
-    long before = queryUpdatedAt("role_meta", "role_id", 10L);
-    Assertions.assertEquals(0L, before);
-
-    long now = System.currentTimeMillis();
-    roleMetaMapper.touchUpdatedAt(10L, now);
-
-    long after = queryUpdatedAt("role_meta", "role_id", 10L);
-    Assertions.assertEquals(now, after);
-  }
-
-  @Test
-  void testRoleMetaBatchGetUpdatedAt() {
-    insertMetalake(1L, "metalake1");
-    insertRole(11L, "role11", 1L);
-    insertRole(12L, "role12", 1L);
-
-    roleMetaMapper.touchUpdatedAt(11L, 1000L);
-    roleMetaMapper.touchUpdatedAt(12L, 2000L);
-
-    List<Long> roleIds = Lists.newArrayList(11L, 12L);
-    List<RoleUpdatedAt> results = roleMetaMapper.batchGetUpdatedAt(roleIds);
-
-    Assertions.assertEquals(2, results.size());
-    results.sort((a, b) -> Long.compare(a.getRoleId(), b.getRoleId()));
-    Assertions.assertEquals(11L, results.get(0).getRoleId());
-    Assertions.assertEquals(1000L, results.get(0).getUpdatedAt());
-    Assertions.assertEquals(12L, results.get(1).getRoleId());
-    Assertions.assertEquals(2000L, results.get(1).getUpdatedAt());
-
-    Assertions.assertTrue(roleMetaMapper.batchGetUpdatedAt(Collections.emptyList()).isEmpty());
-    Assertions.assertTrue(roleMetaMapper.batchGetUpdatedAt(null).isEmpty());
-  }
-
-  @Test
-  void testUserMetaTouchUpdatedAt() {
-    insertMetalake(1L, "metalake1");
-    insertUser(20L, "user20", 1L);
-
-    long before = queryUpdatedAt("user_meta", "user_id", 20L);
-    Assertions.assertEquals(0L, before);
-
-    long now = System.currentTimeMillis();
-    userMetaMapper.touchUpdatedAt(20L, now);
-
-    long after = queryUpdatedAt("user_meta", "user_id", 20L);
-    Assertions.assertEquals(now, after);
-  }
-
-  @Test
-  void testUserMetaGetUserInfo() {
-    insertMetalake(1L, "metalake1");
-    insertUser(21L, "user21", 1L);
-
-    long now = System.currentTimeMillis();
-    userMetaMapper.touchUpdatedAt(21L, now);
-
-    UserAuthInfo info = userMetaMapper.getUserInfo("metalake1", "user21");
-    Assertions.assertNotNull(info);
-    Assertions.assertEquals(21L, info.getUserId());
-    Assertions.assertEquals(now, info.getUpdatedAt());
-  }
-
-  @Test
-  void testOwnerMetaSelectOwnerByMetadataObjectIdAndType() {
-    insertMetalake(1L, "metalake1");
-    insertUser(50L, "user50", 1L);
-    AuditInfo auditInfo = buildAuditInfo();
-
-    OwnerRelPO ownerRelPO =
-        OwnerRelPO.builder()
-            .withMetalakeId(1L)
-            .withOwnerId(50L)
-            .withOwnerType("USER")
-            .withMetadataObjectId(100L)
-            .withMetadataObjectType("TABLE")
-            .withAuditIfo(auditInfo.toString())
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeleteAt(0L)
-            .withUpdatedAt(0L)
-            .build();
-    ownerMetaMapper.insertOwnerRel(ownerRelPO);
-
-    OwnerInfo info = ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(100L, "TABLE");
-    Assertions.assertNotNull(info);
-    Assertions.assertEquals(50L, info.getOwnerId());
-    Assertions.assertEquals("USER", info.getOwnerType());
-
-    // ID collision with different type is filtered out.
-    Assertions.assertNull(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(100L, "SCHEMA"));
-  }
-
-  @Test
-  void testOwnerMetaSelectChangedOwners() {
-    insertMetalake(1L, "metalake1");
-    insertUser(60L, "user60", 1L);
-    AuditInfo auditInfo = buildAuditInfo();
-
-    OwnerRelPO ownerRelPO =
-        OwnerRelPO.builder()
-            .withMetalakeId(1L)
-            .withOwnerId(60L)
-            .withOwnerType("USER")
-            .withMetadataObjectId(200L)
-            .withMetadataObjectType("SCHEMA")
-            .withAuditIfo(auditInfo.toString())
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeleteAt(0L)
-            .withUpdatedAt(0L)
-            .build();
-    ownerMetaMapper.insertOwnerRel(ownerRelPO);
-
-    // Set updated_at = 100 via direct SQL
-    try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection()) {
-        try (Statement statement = connection.createStatement()) {
-          statement.execute(
-              "UPDATE owner_meta SET updated_at = 100 WHERE metadata_object_id = 200");
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Update failed", e);
-    }
-
-    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(50L);
-    Assertions.assertEquals(1, changed.size());
-    Assertions.assertEquals(200L, changed.get(0).getMetadataObjectId());
-    Assertions.assertEquals(100L, changed.get(0).getUpdatedAt());
-
-    // With the same timestamp, the row is returned again for timestamp-only polling.
-    List<ChangedOwnerInfo> sameTimestamp = ownerMetaMapper.selectChangedOwners(100L);
-    Assertions.assertEquals(1, sameTimestamp.size());
   }
 }

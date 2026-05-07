@@ -103,8 +103,8 @@ public class RoleMetaSQLProviderFactory {
     return getProvider().deleteRoleMetasByLegacyTimeline(legacyTimeline, limit);
   }
 
-  public static String touchRoleUpdatedAt(@Param("roleId") long roleId, @Param("now") long now) {
-    return getProvider().touchRoleUpdatedAt(roleId, now);
+  public static String touchRoleUpdatedAt(@Param("roleId") long roleId) {
+    return getProvider().touchRoleUpdatedAt(roleId);
   }
 
   public static String batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds) {

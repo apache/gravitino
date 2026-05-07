@@ -96,7 +96,7 @@ public interface RoleMetaMapper {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
   @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "touchRoleUpdatedAt")
-  void touchUpdatedAt(@Param("roleId") long roleId, @Param("now") long now);
+  void touchUpdatedAt(@Param("roleId") long roleId);
 
   @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "batchGetRoleUpdatedAt")
   List<RoleUpdatedAt> batchGetUpdatedAt(@Param("roleIds") List<Long> roleIds);

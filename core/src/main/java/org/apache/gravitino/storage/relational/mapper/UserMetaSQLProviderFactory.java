@@ -98,8 +98,8 @@ public class UserMetaSQLProviderFactory {
     return getProvider().deleteUserMetasByLegacyTimeline(legacyTimeline, limit);
   }
 
-  public static String touchUserUpdatedAt(@Param("userId") long userId, @Param("now") long now) {
-    return getProvider().touchUserUpdatedAt(userId, now);
+  public static String touchUserUpdatedAt(@Param("userId") long userId) {
+    return getProvider().touchUserUpdatedAt(userId);
   }
 
   public static String getUserInfo(

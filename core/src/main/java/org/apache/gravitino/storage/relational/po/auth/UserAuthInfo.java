@@ -18,32 +18,17 @@
  */
 package org.apache.gravitino.storage.relational.po.auth;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
 /** Step 1a result: user identity + role-list staleness sentinel. */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserAuthInfo {
   private long userId;
   private long updatedAt;
-
-  /** Required by MyBatis for result mapping. */
-  public UserAuthInfo() {}
-
-  public UserAuthInfo(long userId, long updatedAt) {
-    this.userId = userId;
-    this.updatedAt = updatedAt;
-  }
-
-  public long getUserId() {
-    return userId;
-  }
-
-  public void setUserId(long userId) {
-    this.userId = userId;
-  }
-
-  public long getUpdatedAt() {
-    return updatedAt;
-  }
-
-  public void setUpdatedAt(long updatedAt) {
-    this.updatedAt = updatedAt;
-  }
 }
