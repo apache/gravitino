@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import json as _json
 import unittest
 from unittest.mock import patch
 
@@ -216,6 +217,7 @@ class TestOwnerErrorHandler(unittest.TestCase):
 
 
 class TestOwnerSetRequestValidation(unittest.TestCase):
+    # pylint: disable=protected-access
     def test_validate_empty_name(self):
         req = OwnerSetRequest.__new__(OwnerSetRequest)
         req._name = ""
@@ -251,3 +253,84 @@ class TestOwnerResponseValidation(unittest.TestCase):
     def test_validate_no_owner(self):
         resp = OwnerResponse(0, None)
         resp.validate()
+
+
+class TestOwnerDTOSerialization(unittest.TestCase):
+    def test_owner_dto_serialize(self):
+        owner = OwnerDTO(_name="alice", _type=Owner.Type.USER)
+        expected = _json.dumps({"name": "alice", "type": "USER"})
+        self.assertEqual(expected, owner.to_json())
+
+    def test_owner_dto_deserialize(self):
+        json_str = _json.dumps({"name": "bob", "type": "GROUP"})
+        owner = OwnerDTO.from_json(json_str)
+        self.assertEqual("bob", owner.name())
+        self.assertEqual(Owner.Type.GROUP, owner.type())
+
+    def test_owner_dto_round_trip(self):
+        original = OwnerDTO(_name="alice", _type=Owner.Type.USER)
+        json_str = original.to_json()
+        restored = OwnerDTO.from_json(json_str)
+        self.assertEqual(original.name(), restored.name())
+        self.assertEqual(original.type(), restored.type())
+
+
+class TestOwnerSetRequestSerialization(unittest.TestCase):
+    def test_owner_set_request_serialize(self):
+        req = OwnerSetRequest("alice", Owner.Type.USER)
+        expected = _json.dumps({"name": "alice", "type": "USER"})
+        self.assertEqual(expected, req.to_json())
+
+    def test_owner_set_request_serialize_group(self):
+        req = OwnerSetRequest("admin_group", Owner.Type.GROUP)
+        expected = _json.dumps({"name": "admin_group", "type": "GROUP"})
+        self.assertEqual(expected, req.to_json())
+
+    def test_owner_set_request_to_dict(self):
+        req = OwnerSetRequest("alice", Owner.Type.USER)
+        req_dict = req.to_dict()
+        self.assertEqual("alice", req_dict["name"])
+        self.assertEqual(Owner.Type.USER, req_dict["type"])
+
+    def test_owner_set_request_to_dict_group(self):
+        req = OwnerSetRequest("admin_group", Owner.Type.GROUP)
+        req_dict = req.to_dict()
+        self.assertEqual("admin_group", req_dict["name"])
+        self.assertEqual(Owner.Type.GROUP, req_dict["type"])
+
+
+class TestOwnerResponseSerialization(unittest.TestCase):
+    def test_owner_response_deserialize_with_user(self):
+        json_str = _json.dumps({"code": 0, "owner": {"name": "alice", "type": "USER"}})
+        resp = OwnerResponse.from_json(json_str)
+        resp.validate()
+        self.assertEqual(0, resp.code())
+        self.assertIsNotNone(resp.owner())
+        self.assertEqual("alice", resp.owner().name())
+        self.assertEqual(Owner.Type.USER, resp.owner().type())
+
+    def test_owner_response_deserialize_with_group(self):
+        json_str = _json.dumps(
+            {"code": 0, "owner": {"name": "admin_group", "type": "GROUP"}}
+        )
+        resp = OwnerResponse.from_json(json_str)
+        resp.validate()
+        self.assertIsNotNone(resp.owner())
+        self.assertEqual("admin_group", resp.owner().name())
+        self.assertEqual(Owner.Type.GROUP, resp.owner().type())
+
+    def test_owner_response_deserialize_no_owner(self):
+        json_str = _json.dumps({"code": 0, "owner": None})
+        resp = OwnerResponse.from_json(json_str)
+        resp.validate()
+        self.assertIsNone(resp.owner())
+
+    def test_owner_response_round_trip(self):
+        original = OwnerResponse(0, OwnerDTO(_name="alice", _type=Owner.Type.USER))
+        original.validate()
+        json_str = original.to_json()
+        restored = OwnerResponse.from_json(json_str)
+        restored.validate()
+        self.assertEqual(original.code(), restored.code())
+        self.assertEqual(original.owner().name(), restored.owner().name())
+        self.assertEqual(original.owner().type(), restored.owner().type())
