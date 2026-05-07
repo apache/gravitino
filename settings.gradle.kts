@@ -26,6 +26,7 @@ val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion
   ?: settings.extra["defaultScalaVersion"].toString()
 
 include("api", "common", "core", "server", "server-common")
+include("authenticators:authenticator-basic")
 include("catalogs:catalog-common")
 include("catalogs:catalog-glue")
 include("catalogs:catalog-hive")
