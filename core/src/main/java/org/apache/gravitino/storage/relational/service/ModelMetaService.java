@@ -185,7 +185,6 @@ public class ModelMetaService {
                         modelId, MetadataObject.Type.MODEL.name())),
         () -> {
           if (modelDeletedCount.get() > 0) {
-            long now = System.currentTimeMillis();
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
@@ -193,8 +192,7 @@ public class ModelMetaService {
                         metalakeName,
                         Entity.EntityType.MODEL.name(),
                         modelFullName,
-                        OperateType.DROP,
-                        now));
+                        OperateType.DROP));
           }
         });
 
@@ -391,7 +389,6 @@ public class ModelMetaService {
                               POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO))),
           () -> {
             if (isRenamed && updateResult.get() > 0) {
-              long now = System.currentTimeMillis();
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -399,8 +396,7 @@ public class ModelMetaService {
                           metalakeName,
                           Entity.EntityType.MODEL.name(),
                           oldFullName,
-                          OperateType.ALTER,
-                          now));
+                          OperateType.ALTER));
             }
           });
     } catch (RuntimeException re) {

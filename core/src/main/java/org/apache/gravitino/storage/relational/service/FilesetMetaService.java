@@ -247,7 +247,6 @@ public class FilesetMetaService {
               },
               () -> {
                 if (isRenamed && metaUpdateCountRef[0] > 0) {
-                  long now = System.currentTimeMillis();
                   SessionUtils.doWithoutCommit(
                       EntityChangeLogMapper.class,
                       mapper ->
@@ -255,8 +254,7 @@ public class FilesetMetaService {
                               metalakeName,
                               Entity.EntityType.FILESET.name(),
                               oldFullName,
-                              OperateType.ALTER,
-                              now));
+                              OperateType.ALTER));
                 }
               });
           updateResult = 1;
@@ -281,7 +279,6 @@ public class FilesetMetaService {
                         mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO)),
             () -> {
               if (isRenamed && metaUpdateCountRef[0] > 0) {
-                long now = System.currentTimeMillis();
                 SessionUtils.doWithoutCommit(
                     EntityChangeLogMapper.class,
                     mapper ->
@@ -289,8 +286,7 @@ public class FilesetMetaService {
                             metalakeName,
                             Entity.EntityType.FILESET.name(),
                             oldFullName,
-                            OperateType.ALTER,
-                            now));
+                            OperateType.ALTER));
               }
             });
         updateResult = metaUpdateCountRef[0];
@@ -361,7 +357,6 @@ public class FilesetMetaService {
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
                         filesetId, MetadataObject.Type.FILESET.name())),
         () -> {
-          long now = System.currentTimeMillis();
           SessionUtils.doWithoutCommit(
               EntityChangeLogMapper.class,
               mapper ->
@@ -369,8 +364,7 @@ public class FilesetMetaService {
                       metalakeName,
                       Entity.EntityType.FILESET.name(),
                       filesetFullName,
-                      OperateType.DROP,
-                      now));
+                      OperateType.DROP));
         });
 
     return true;

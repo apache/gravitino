@@ -220,7 +220,6 @@ public class TableMetaService {
           },
           () -> {
             if (isRenamed && updateResult.get() > 0) {
-              long now = System.currentTimeMillis();
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -228,8 +227,7 @@ public class TableMetaService {
                           metalakeName,
                           Entity.EntityType.TABLE.name(),
                           oldFullName,
-                          OperateType.ALTER,
-                          now));
+                          OperateType.ALTER));
             }
           });
 
@@ -301,7 +299,6 @@ public class TableMetaService {
         },
         () -> {
           if (deleteResult.get() > 0) {
-            long now = System.currentTimeMillis();
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
@@ -309,8 +306,7 @@ public class TableMetaService {
                         metalakeName,
                         Entity.EntityType.TABLE.name(),
                         tableFullName,
-                        OperateType.DROP,
-                        now));
+                        OperateType.DROP));
           }
         });
 

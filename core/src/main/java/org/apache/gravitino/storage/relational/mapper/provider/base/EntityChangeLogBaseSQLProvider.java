@@ -38,12 +38,13 @@ public class EntityChangeLogBaseSQLProvider {
       @Param("metalakeName") String metalakeName,
       @Param("entityType") String entityType,
       @Param("fullName") String fullName,
-      @Param("operateType") OperateType operateType,
-      @Param("createdAt") long createdAt) {
+      @Param("operateType") OperateType operateType) {
     return "INSERT INTO "
         + ENTITY_CHANGE_LOG_TABLE_NAME
         + " (metalake_name, entity_type, entity_full_name, operate_type, created_at)"
-        + " VALUES (#{metalakeName}, #{entityType}, #{fullName}, #{operateType}, #{createdAt})";
+        + " VALUES (#{metalakeName}, #{entityType}, #{fullName}, #{operateType},"
+        + " (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)";
   }
 
   public String pruneOldEntityChanges(@Param("before") long before) {

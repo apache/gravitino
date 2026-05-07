@@ -53,6 +53,19 @@ public class EntityChangeLogSQLProviderFactory {
 
   static class EntityChangeLogPostgreSQLProvider extends EntityChangeLogBaseSQLProvider {
     @Override
+    public String insertEntityChange(
+        @Param("metalakeName") String metalakeName,
+        @Param("entityType") String entityType,
+        @Param("fullName") String fullName,
+        @Param("operateType") OperateType operateType) {
+      return "INSERT INTO "
+          + ENTITY_CHANGE_LOG_TABLE_NAME
+          + " (metalake_name, entity_type, entity_full_name, operate_type, created_at)"
+          + " VALUES (#{metalakeName}, #{entityType}, #{fullName}, #{operateType},"
+          + " CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT))";
+    }
+
+    @Override
     public String pruneOldEntityChanges(@Param("before") long before) {
       return "DELETE FROM "
           + ENTITY_CHANGE_LOG_TABLE_NAME
@@ -71,10 +84,8 @@ public class EntityChangeLogSQLProviderFactory {
       @Param("metalakeName") String metalakeName,
       @Param("entityType") String entityType,
       @Param("fullName") String fullName,
-      @Param("operateType") OperateType operateType,
-      @Param("createdAt") long createdAt) {
-    return getProvider()
-        .insertEntityChange(metalakeName, entityType, fullName, operateType, createdAt);
+      @Param("operateType") OperateType operateType) {
+    return getProvider().insertEntityChange(metalakeName, entityType, fullName, operateType);
   }
 
   public static String pruneOldEntityChanges(@Param("before") long before) {

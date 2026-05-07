@@ -178,7 +178,6 @@ public class ViewMetaService {
           },
           () -> {
             if (isRenamed && updateResult.get() > 0) {
-              long now = System.currentTimeMillis();
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -186,8 +185,7 @@ public class ViewMetaService {
                           metalakeName,
                           Entity.EntityType.VIEW.name(),
                           oldFullName,
-                          OperateType.ALTER,
-                          now));
+                          OperateType.ALTER));
             }
           });
       return newEntity;
@@ -260,7 +258,6 @@ public class ViewMetaService {
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         viewId, MetadataObject.Type.VIEW.name()));
-            long now = System.currentTimeMillis();
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
@@ -268,8 +265,7 @@ public class ViewMetaService {
                         metalakeName,
                         Entity.EntityType.VIEW.name(),
                         viewFullName,
-                        OperateType.DROP,
-                        now));
+                        OperateType.DROP));
           }
         });
     return deleteResult.get() > 0;

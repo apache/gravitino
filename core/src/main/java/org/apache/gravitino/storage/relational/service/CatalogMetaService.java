@@ -242,7 +242,6 @@ public class CatalogMetaService {
                               oldCatalogPO))),
           () -> {
             if (isRenamed && updateResult.get() > 0) {
-              long now = System.currentTimeMillis();
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -250,8 +249,7 @@ public class CatalogMetaService {
                           metalakeName,
                           Entity.EntityType.CATALOG.name(),
                           oldFullName,
-                          OperateType.ALTER,
-                          now));
+                          OperateType.ALTER));
             }
           });
     } catch (RuntimeException re) {
@@ -350,7 +348,6 @@ public class CatalogMetaService {
               SessionUtils.doWithoutCommit(
                   ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByCatalogId(catalogId)),
           () -> {
-            long now = System.currentTimeMillis();
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
@@ -358,8 +355,7 @@ public class CatalogMetaService {
                         metalakeName,
                         Entity.EntityType.CATALOG.name(),
                         NameIdentifierUtil.ofCatalog(metalakeName, catalogName).toString(),
-                        OperateType.DROP,
-                        now));
+                        OperateType.DROP));
           });
     } else {
       List<SchemaEntity> schemaEntities =
@@ -404,7 +400,6 @@ public class CatalogMetaService {
                       mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
                           catalogId, MetadataObject.Type.CATALOG.name())),
           () -> {
-            long now = System.currentTimeMillis();
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
@@ -412,8 +407,7 @@ public class CatalogMetaService {
                         metalakeName,
                         Entity.EntityType.CATALOG.name(),
                         NameIdentifierUtil.ofCatalog(metalakeName, catalogName).toString(),
-                        OperateType.DROP,
-                        now));
+                        OperateType.DROP));
           });
     }
 

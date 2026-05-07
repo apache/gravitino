@@ -47,19 +47,19 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
   private static final String CATALOG_NAME = "catalog_for_entity_change_log_test";
   private static final String SCHEMA_NAME = "schema_for_entity_change_log_test";
 
-  private List<EntityChangeRecord> listEntityChanges(long createdAtAfter) {
+  private List<EntityChangeRecord> listEntityChanges(long createdAtFrom) {
     return SessionUtils.doWithCommitAndFetchResult(
-        EntityChangeLogMapper.class, mapper -> mapper.selectChanges(createdAtAfter, 100));
+        EntityChangeLogMapper.class, mapper -> mapper.selectChanges(createdAtFrom, 100));
   }
 
   private void assertEntityChange(
-      long createdAtAfter,
+      long createdAtFrom,
       String metalakeName,
       Entity.EntityType entityType,
       String fullName,
       OperateType operateType) {
     Assertions.assertTrue(
-        listEntityChanges(createdAtAfter).stream()
+        listEntityChanges(createdAtFrom).stream()
             .anyMatch(
                 record ->
                     record.getMetalakeName().equals(metalakeName)

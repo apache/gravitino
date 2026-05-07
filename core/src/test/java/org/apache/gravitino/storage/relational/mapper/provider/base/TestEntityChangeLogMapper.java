@@ -100,31 +100,40 @@ public class TestEntityChangeLogMapper {
 
   @Test
   void testEntityChangeLogInsertAndSelect() {
-    long now = System.currentTimeMillis();
+    long jvmBefore = System.currentTimeMillis();
     entityChangeLogMapper.insertChange(
-        "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.ALTER, now);
+        "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.ALTER);
+    long jvmAfter = System.currentTimeMillis();
 
-    List<EntityChangeRecord> records = entityChangeLogMapper.selectChanges(now - 1, 10);
+    List<EntityChangeRecord> records = entityChangeLogMapper.selectChanges(jvmBefore - 1000L, 10);
     Assertions.assertEquals(1, records.size());
     EntityChangeRecord record = records.get(0);
     Assertions.assertEquals("metalake1", record.getMetalakeName());
     Assertions.assertEquals("TABLE", record.getEntityType());
     Assertions.assertEquals("metalake1.cat.schema.tbl", record.getFullName());
     Assertions.assertEquals(OperateType.ALTER, record.getOperateType());
-    Assertions.assertEquals(now, record.getCreatedAt());
+    // created_at is set by the DB, so it should be close to JVM time but not exactly equal.
+    Assertions.assertTrue(
+        record.getCreatedAt() >= jvmBefore - 1000L && record.getCreatedAt() <= jvmAfter + 1000L,
+        "expected DB-time created_at within 1s of JVM clock, got " + record.getCreatedAt());
     Assertions.assertTrue(record.getId() > 0L);
   }
 
   @Test
-  void testEntityChangeLogPruneOldEntries() {
-    long old = 1000L;
-    long recent = System.currentTimeMillis();
+  void testEntityChangeLogPruneOldEntries() throws SQLException {
     entityChangeLogMapper.insertChange(
-        "metalake1", "SCHEMA", "metalake1.cat.schema", OperateType.INSERT, old);
+        "metalake1", "SCHEMA", "metalake1.cat.schema", OperateType.INSERT);
+    forceCreatedAt("metalake1.cat.schema", 1000L);
     entityChangeLogMapper.insertChange(
-        "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.DROP, recent);
+        "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.DROP);
+    long recent =
+        entityChangeLogMapper.selectChanges(0L, 100).stream()
+            .filter(r -> r.getFullName().equals("metalake1.cat.schema.tbl"))
+            .mapToLong(EntityChangeRecord::getCreatedAt)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("recent row missing"));
 
-    entityChangeLogMapper.pruneOldEntries(old + 1);
+    entityChangeLogMapper.pruneOldEntries(1001L);
 
     List<EntityChangeRecord> after = entityChangeLogMapper.selectChanges(0L, 100);
     Assertions.assertEquals(1, after.size());
@@ -132,15 +141,29 @@ public class TestEntityChangeLogMapper {
   }
 
   @Test
-  void testEntityChangeLogSameTimestampOrderedById() {
-    long t = 5_000_000L;
-    entityChangeLogMapper.insertChange("metalake1", "TABLE", "a", OperateType.INSERT, t);
-    entityChangeLogMapper.insertChange("metalake1", "TABLE", "b", OperateType.INSERT, t);
-    entityChangeLogMapper.insertChange("metalake1", "TABLE", "c", OperateType.INSERT, t);
+  void testEntityChangeLogSameTimestampOrderedById() throws SQLException {
+    entityChangeLogMapper.insertChange("metalake1", "TABLE", "a", OperateType.INSERT);
+    entityChangeLogMapper.insertChange("metalake1", "TABLE", "b", OperateType.INSERT);
+    entityChangeLogMapper.insertChange("metalake1", "TABLE", "c", OperateType.INSERT);
+    forceCreatedAt("a", 5_000_000L);
+    forceCreatedAt("b", 5_000_000L);
+    forceCreatedAt("c", 5_000_000L);
 
     List<EntityChangeRecord> rows = entityChangeLogMapper.selectChanges(0L, 100);
     Assertions.assertEquals(3, rows.size());
     Assertions.assertTrue(rows.get(0).getId() < rows.get(1).getId());
     Assertions.assertTrue(rows.get(1).getId() < rows.get(2).getId());
+  }
+
+  private void forceCreatedAt(String fullName, long createdAt) throws SQLException {
+    try (Statement statement = sharedSession.getConnection().createStatement()) {
+      statement.execute(
+          "UPDATE entity_change_log SET created_at = "
+              + createdAt
+              + " WHERE entity_full_name = '"
+              + fullName
+              + "'");
+    }
+    sharedSession.clearCache();
   }
 }

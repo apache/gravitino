@@ -46,8 +46,7 @@ public interface EntityChangeLogMapper {
       @Param("metalakeName") String metalakeName,
       @Param("entityType") String entityType,
       @Param("fullName") String fullName,
-      @Param("operateType") OperateType operateType,
-      @Param("createdAt") long createdAt);
+      @Param("operateType") OperateType operateType);
 
   @DeleteProvider(type = EntityChangeLogSQLProviderFactory.class, method = "pruneOldEntityChanges")
   void pruneOldEntries(@Param("before") long before);

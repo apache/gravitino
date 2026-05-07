@@ -190,7 +190,6 @@ public class MetalakeMetaService {
                       mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO))),
           () -> {
             if (isRenamed && updateResult.get() > 0) {
-              long now = System.currentTimeMillis();
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -198,8 +197,7 @@ public class MetalakeMetaService {
                           oldFullName,
                           Entity.EntityType.METALAKE.name(),
                           oldFullName,
-                          OperateType.ALTER,
-                          now));
+                          OperateType.ALTER));
             }
           });
     } catch (RuntimeException re) {
@@ -337,7 +335,6 @@ public class MetalakeMetaService {
                     ViewMetaMapper.class,
                     mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)),
             () -> {
-              long now = System.currentTimeMillis();
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -345,8 +342,7 @@ public class MetalakeMetaService {
                           ident.name(),
                           Entity.EntityType.METALAKE.name(),
                           ident.name(),
-                          OperateType.DROP,
-                          now));
+                          OperateType.DROP));
             });
       } else {
         List<CatalogEntity> catalogEntities =
@@ -410,7 +406,6 @@ public class MetalakeMetaService {
                     JobMetaMapper.class,
                     mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)),
             () -> {
-              long now = System.currentTimeMillis();
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -418,8 +413,7 @@ public class MetalakeMetaService {
                           ident.name(),
                           Entity.EntityType.METALAKE.name(),
                           ident.name(),
-                          OperateType.DROP,
-                          now));
+                          OperateType.DROP));
             });
       }
     }

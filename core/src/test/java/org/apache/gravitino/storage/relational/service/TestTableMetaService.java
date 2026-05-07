@@ -69,9 +69,9 @@ public class TestTableMetaService extends TestJDBCBackend {
   private final String catalogName = "catalog_for_table_test";
   private final String schemaName = "schema_for_table_test";
 
-  private List<EntityChangeRecord> listEntityChanges(long createdAtAfter) {
+  private List<EntityChangeRecord> listEntityChanges(long createdAtFrom) {
     return SessionUtils.doWithCommitAndFetchResult(
-        EntityChangeLogMapper.class, mapper -> mapper.selectChanges(createdAtAfter, 100));
+        EntityChangeLogMapper.class, mapper -> mapper.selectChanges(createdAtFrom, 100));
   }
 
   @TestTemplate

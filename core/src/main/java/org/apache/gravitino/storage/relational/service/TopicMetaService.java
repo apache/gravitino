@@ -134,7 +134,6 @@ public class TopicMetaService {
                               oldTopicPO))),
           () -> {
             if (isRenamed && updateResult.get() > 0) {
-              long now = System.currentTimeMillis();
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -142,8 +141,7 @@ public class TopicMetaService {
                           metalakeName,
                           Entity.EntityType.TOPIC.name(),
                           oldFullName,
-                          OperateType.ALTER,
-                          now));
+                          OperateType.ALTER));
             }
           });
     } catch (RuntimeException re) {
@@ -335,7 +333,6 @@ public class TopicMetaService {
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
                         topicId, MetadataObject.Type.TOPIC.name())),
         () -> {
-          long now = System.currentTimeMillis();
           SessionUtils.doWithoutCommit(
               EntityChangeLogMapper.class,
               mapper ->
@@ -343,8 +340,7 @@ public class TopicMetaService {
                       metalakeName,
                       Entity.EntityType.TOPIC.name(),
                       topicFullName,
-                      OperateType.DROP,
-                      now));
+                      OperateType.DROP));
         });
 
     return true;

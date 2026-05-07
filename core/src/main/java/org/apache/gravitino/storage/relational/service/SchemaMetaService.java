@@ -217,7 +217,6 @@ public class SchemaMetaService {
                               oldSchemaPO))),
           () -> {
             if (isRenamed && updateResult.get() > 0) {
-              long now = System.currentTimeMillis();
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -225,8 +224,7 @@ public class SchemaMetaService {
                           metalakeName,
                           Entity.EntityType.SCHEMA.name(),
                           oldFullName,
-                          OperateType.ALTER,
-                          now));
+                          OperateType.ALTER));
             }
           });
     } catch (RuntimeException re) {
@@ -321,7 +319,6 @@ public class SchemaMetaService {
               SessionUtils.doWithoutCommit(
                   ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasBySchemaId(schemaId)),
           () -> {
-            long now = System.currentTimeMillis();
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
@@ -329,8 +326,7 @@ public class SchemaMetaService {
                         metalakeName,
                         Entity.EntityType.SCHEMA.name(),
                         schemaFullName,
-                        OperateType.DROP,
-                        now));
+                        OperateType.DROP));
           });
     } else {
       List<TableEntity> tableEntities =
@@ -413,7 +409,6 @@ public class SchemaMetaService {
                       mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
                           schemaId, MetadataObject.Type.SCHEMA.name())),
           () -> {
-            long now = System.currentTimeMillis();
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
@@ -421,8 +416,7 @@ public class SchemaMetaService {
                         metalakeName,
                         Entity.EntityType.SCHEMA.name(),
                         schemaFullName,
-                        OperateType.DROP,
-                        now));
+                        OperateType.DROP));
           });
     }
     return true;
