@@ -49,7 +49,7 @@ import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
-import org.apache.gravitino.storage.relational.po.auth.UserAuthInfo;
+import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
@@ -228,14 +228,14 @@ public class TestAuthMappers {
   }
 
   @Test
-  void testUserMetaGetUserInfo() {
+  void testUserMetaGetUserUpdatedAt() {
     insertMetalake(1L, "metalake1");
     insertUser(21L, "user21", 1L);
 
     userMetaMapper.touchUpdatedAt(21L);
     long expected = queryUpdatedAt("user_meta", "user_id", 21L);
 
-    UserAuthInfo info = userMetaMapper.getUserInfo("metalake1", "user21");
+    UserUpdatedAt info = userMetaMapper.getUserUpdatedAt("metalake1", "user21");
     Assertions.assertNotNull(info);
     Assertions.assertEquals(21L, info.getUserId());
     Assertions.assertEquals(expected, info.getUpdatedAt());

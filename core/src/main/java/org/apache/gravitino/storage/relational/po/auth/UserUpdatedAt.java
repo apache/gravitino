@@ -23,12 +23,12 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** Step 1a result: user identity + role-list staleness sentinel. */
+/** User identity + role-list staleness sentinel. */
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserAuthInfo {
+public class UserUpdatedAt {
   private long userId;
   private long updatedAt;
 }

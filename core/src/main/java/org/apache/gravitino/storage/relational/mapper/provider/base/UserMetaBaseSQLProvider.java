@@ -196,7 +196,7 @@ public class UserMetaBaseSQLProvider {
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
-  public String getUserInfo(
+  public String getUserUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
     return "SELECT um.user_id as userId, um.updated_at as updatedAt"
         + " FROM "

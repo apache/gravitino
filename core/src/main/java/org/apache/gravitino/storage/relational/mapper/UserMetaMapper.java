@@ -22,7 +22,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
-import org.apache.gravitino.storage.relational.po.auth.UserAuthInfo;
+import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -93,7 +93,7 @@ public interface UserMetaMapper {
   @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "touchUserUpdatedAt")
   void touchUpdatedAt(@Param("userId") long userId);
 
-  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "getUserInfo")
-  UserAuthInfo getUserInfo(
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "getUserUpdatedAt")
+  UserUpdatedAt getUserUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("userName") String userName);
 }

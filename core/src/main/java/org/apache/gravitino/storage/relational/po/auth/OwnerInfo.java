@@ -23,7 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** Step 2.5: owner identity for a single metadata object. */
+/** Owner identity for a single metadata object. */
 @Getter
 @Setter
 @NoArgsConstructor

@@ -102,8 +102,8 @@ public class UserMetaSQLProviderFactory {
     return getProvider().touchUserUpdatedAt(userId);
   }
 
-  public static String getUserInfo(
+  public static String getUserUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
-    return getProvider().getUserInfo(metalakeName, userName);
+    return getProvider().getUserUpdatedAt(metalakeName, userName);
   }
 }
