@@ -109,7 +109,7 @@ The local authentication feature should be implemented as an independent Graviti
 
 The recommended module name is:
 
-- `authenticators:authenticator-basic`
+- `plugins:idp-basic`
 
 This naming keeps the capability grouping explicit while aligning the module name with the
 configured authenticator type. Although the module also includes the broader built-in
@@ -122,7 +122,7 @@ authenticator, including:
 - and the local authentication management API wiring.
 
 The local authentication-specific logic should be owned by
-`authenticators:authenticator-basic`, including storage access, authenticator logic, service admin
+`plugins:idp-basic`, including storage access, authenticator logic, service admin
 initialization logic, password hashing, and management API exposure, so that the feature has a
 clear packaging boundary and can evolve independently.
 
@@ -741,7 +741,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 | Phase | Work Item | Module / Files | Notes |
 |---|---|---|---|
-| 1 | Authenticator module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `authenticators:authenticator-basic` | Add the new module and make the server load it when `gravitino.authenticators=basic`. |
+| 1 | Authenticator module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `plugins:idp-basic` | Add the new module and make the server load it when `gravitino.authenticators=basic`. |
 | 2 | Password hashing support | `PasswordHasher`, `Argon2idPasswordHasher`, related tests | Use Argon2id as the only supported password hashing algorithm and store PHC-style hash strings. |
 | 3 | IdP metadata schema | JDBC schema files, mapper definitions, store layer | Create `idp_user_meta`, `idp_group_meta`, and `idp_group_user_rel` with soft-delete support. |
 | 4 | Service admin initialization | startup initialization logic, validation logic | Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD`, initialize missing configured service admins during startup, and fail startup when required credentials are absent. |
@@ -754,7 +754,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 | Area | Checklist |
 |---|---|
-| Module wiring | The design, module name, and server wiring all consistently use `authenticators:authenticator-basic`, while the authenticator mode remains `basic`. |
+| Module wiring | The design, module name, and server wiring all consistently use `plugins:idp-basic`, while the authenticator mode remains `basic`. |
 | Configuration | All examples use `gravitino.authenticators=basic`, and no obsolete configuration keys remain in the document. |
 | Schema design | The document consistently uses `idp_user_meta`, `idp_group_meta`, and `idp_group_user_rel`, and the soft-delete lifecycle is clearly described. |
 | Security constraints | The document states that passwords are never stored in plaintext, Basic authentication should be used only over HTTPS, and initialization must enforce password policy. |
