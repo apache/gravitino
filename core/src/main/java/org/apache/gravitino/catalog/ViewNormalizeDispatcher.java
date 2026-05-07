@@ -95,7 +95,7 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
 
   @Override
   public boolean dropView(NameIdentifier ident) {
-    return dispatcher.dropView(normalizeCaseSensitive(ident));
+    return dispatcher.dropView(normalizeNameIdentifier(ident));
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {

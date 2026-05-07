@@ -89,4 +89,18 @@ public class TestViewNormalizeDispatcher extends TestOperationDispatcher {
         viewNormalizeDispatcher.dropView(
             NameIdentifier.of(viewNs, viewIdent.name().toUpperCase())));
   }
+
+  @Test
+  public void testDropViewNameSpec() {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_drop_view_name_spec");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(viewNs.levels()), "comment", props);
+
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> viewNormalizeDispatcher.dropView(NameIdentifier.of(viewNs, "a?")));
+    Assertions.assertEquals(
+        "The VIEW name 'a?' is illegal. Illegal name: a?", exception.getMessage());
+  }
 }
