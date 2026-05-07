@@ -255,7 +255,8 @@ public class UserMetaService {
           },
           () ->
               SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class, mapper -> mapper.touchUpdatedAt(oldUserPO.getUserId())));
+                  UserMetaMapper.class,
+                  mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());

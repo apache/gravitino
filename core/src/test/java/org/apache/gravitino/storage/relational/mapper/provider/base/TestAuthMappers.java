@@ -150,7 +150,7 @@ public class TestAuthMappers {
     Assertions.assertEquals(0L, before);
 
     long jvmBefore = System.currentTimeMillis();
-    roleMetaMapper.touchUpdatedAt(10L);
+    roleMetaMapper.touchRoleUpdatedAt(10L);
     long jvmAfter = System.currentTimeMillis();
 
     long after = queryUpdatedAt("role_meta", "role_id", 10L);
@@ -166,8 +166,8 @@ public class TestAuthMappers {
     insertRole(11L, "role11", 1L);
     insertRole(12L, "role12", 1L);
 
-    roleMetaMapper.touchUpdatedAt(11L);
-    roleMetaMapper.touchUpdatedAt(12L);
+    roleMetaMapper.touchRoleUpdatedAt(11L);
+    roleMetaMapper.touchRoleUpdatedAt(12L);
 
     List<Long> roleIds = Lists.newArrayList(11L, 12L);
     List<RoleUpdatedAt> results = roleMetaMapper.batchGetRoleUpdatedAt(roleIds);
@@ -190,7 +190,7 @@ public class TestAuthMappers {
     roleMetaMapper.softDeleteRoleMetaByRoleId(13L);
 
     long beforeUpdatedAt = queryUpdatedAt("role_meta", "role_id", 13L);
-    roleMetaMapper.touchUpdatedAt(13L);
+    roleMetaMapper.touchRoleUpdatedAt(13L);
     long afterUpdatedAt = queryUpdatedAt("role_meta", "role_id", 13L);
 
     Assertions.assertEquals(beforeUpdatedAt, afterUpdatedAt);
@@ -205,7 +205,7 @@ public class TestAuthMappers {
     Assertions.assertEquals(0L, before);
 
     long jvmBefore = System.currentTimeMillis();
-    userMetaMapper.touchUpdatedAt(20L);
+    userMetaMapper.touchUserUpdatedAt(20L);
     long jvmAfter = System.currentTimeMillis();
 
     long after = queryUpdatedAt("user_meta", "user_id", 20L);
@@ -221,7 +221,7 @@ public class TestAuthMappers {
     userMetaMapper.softDeleteUserMetaByUserId(22L);
 
     long beforeUpdatedAt = queryUpdatedAt("user_meta", "user_id", 22L);
-    userMetaMapper.touchUpdatedAt(22L);
+    userMetaMapper.touchUserUpdatedAt(22L);
     long afterUpdatedAt = queryUpdatedAt("user_meta", "user_id", 22L);
 
     Assertions.assertEquals(beforeUpdatedAt, afterUpdatedAt);
@@ -232,7 +232,7 @@ public class TestAuthMappers {
     insertMetalake(1L, "metalake1");
     insertUser(21L, "user21", 1L);
 
-    userMetaMapper.touchUpdatedAt(21L);
+    userMetaMapper.touchUserUpdatedAt(21L);
     long expected = queryUpdatedAt("user_meta", "user_id", 21L);
 
     UserUpdatedAt info = userMetaMapper.getUserUpdatedAt("metalake1", "user21");

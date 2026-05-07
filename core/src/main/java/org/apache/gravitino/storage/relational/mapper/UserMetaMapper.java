@@ -91,7 +91,7 @@ public interface UserMetaMapper {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
   @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "touchUserUpdatedAt")
-  void touchUpdatedAt(@Param("userId") long userId);
+  void touchUserUpdatedAt(@Param("userId") long userId);
 
   @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "getUserUpdatedAt")
   UserUpdatedAt getUserUpdatedAt(

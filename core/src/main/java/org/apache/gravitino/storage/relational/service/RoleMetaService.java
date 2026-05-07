@@ -262,7 +262,7 @@ public class RoleMetaService {
           },
           () ->
               SessionUtils.doWithoutCommit(
-                  RoleMetaMapper.class, mapper -> mapper.touchUpdatedAt(rolePO.getRoleId())));
+                  RoleMetaMapper.class, mapper -> mapper.touchRoleUpdatedAt(rolePO.getRoleId())));
 
       return newRoleEntity;
     } catch (RuntimeException re) {
