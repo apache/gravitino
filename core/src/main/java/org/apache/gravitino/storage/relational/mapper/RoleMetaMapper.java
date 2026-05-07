@@ -99,5 +99,5 @@ public interface RoleMetaMapper {
   void touchUpdatedAt(@Param("roleId") long roleId);
 
   @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "batchGetRoleUpdatedAt")
-  List<RoleUpdatedAt> batchGetUpdatedAt(@Param("roleIds") List<Long> roleIds);
+  List<RoleUpdatedAt> batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds);
 }

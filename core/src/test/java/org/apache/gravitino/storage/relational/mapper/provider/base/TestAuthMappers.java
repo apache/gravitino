@@ -170,7 +170,7 @@ public class TestAuthMappers {
     roleMetaMapper.touchUpdatedAt(12L);
 
     List<Long> roleIds = Lists.newArrayList(11L, 12L);
-    List<RoleUpdatedAt> results = roleMetaMapper.batchGetUpdatedAt(roleIds);
+    List<RoleUpdatedAt> results = roleMetaMapper.batchGetRoleUpdatedAt(roleIds);
 
     Assertions.assertEquals(2, results.size());
     results.sort((a, b) -> Long.compare(a.getRoleId(), b.getRoleId()));
@@ -179,8 +179,8 @@ public class TestAuthMappers {
     Assertions.assertTrue(results.get(0).getUpdatedAt() > 0L);
     Assertions.assertTrue(results.get(1).getUpdatedAt() > 0L);
 
-    Assertions.assertTrue(roleMetaMapper.batchGetUpdatedAt(Collections.emptyList()).isEmpty());
-    Assertions.assertTrue(roleMetaMapper.batchGetUpdatedAt(null).isEmpty());
+    Assertions.assertTrue(roleMetaMapper.batchGetRoleUpdatedAt(Collections.emptyList()).isEmpty());
+    Assertions.assertTrue(roleMetaMapper.batchGetRoleUpdatedAt(null).isEmpty());
   }
 
   @Test
