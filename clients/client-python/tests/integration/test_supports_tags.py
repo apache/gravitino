@@ -171,9 +171,12 @@ class TestSupportsTags(IntegrationTestEnv):
         )
 
     def tearDown(self) -> None:
-        self._model_catalog.as_schemas().drop_schema(self._schema_name, True)
-        self._relational_catalog.as_schemas().drop_schema(self._schema_name, True)
-        self._fileset_catalog.as_schemas().drop_schema(self._schema_name, True)
+        if self._model_catalog.as_schemas().schema_exists(self._schema_name):
+            self._model_catalog.as_schemas().drop_schema(self._schema_name, True)
+        if self._relational_catalog.as_schemas().schema_exists(self._schema_name):
+            self._relational_catalog.as_schemas().drop_schema(self._schema_name, True)
+        if self._fileset_catalog.as_schemas().schema_exists(self._schema_name):
+            self._fileset_catalog.as_schemas().drop_schema(self._schema_name, True)
 
     def test_catalog_tag_operations(self) -> None:
         """
