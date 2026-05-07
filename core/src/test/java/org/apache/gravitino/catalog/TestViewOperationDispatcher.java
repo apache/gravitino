@@ -22,6 +22,8 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Entity.EntityType.VIEW;
+import static org.apache.gravitino.StringIdentifier.ID_KEY;
+import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
@@ -30,6 +32,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -401,6 +404,42 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertNotNull(stored);
     Assertions.assertEquals("view comment", stored.comment());
     Assertions.assertEquals("pv1", stored.properties().get("p1"));
+
+    // Test required view properties exception
+    Map<String, String> missingRequired = new HashMap<>();
+    missingRequired.put("p1", "pv1");
+    testPropertyException(
+        () ->
+            viewOperationDispatcher.createView(
+                NameIdentifier.of(viewNs, "missing_required"),
+                "c",
+                new Column[0],
+                representations,
+                null,
+                null,
+                missingRequired),
+        "Properties or property prefixes are required and must be set");
+
+    // Test reserved view properties exception
+    Map<String, String> reservedProps = new HashMap<>();
+    reservedProps.put("k1", "v1");
+    reservedProps.put(COMMENT_KEY, "view comment");
+    reservedProps.put(ID_KEY, "gravitino.v1.uidfdsafdsa");
+    testPropertyException(
+        () ->
+            viewOperationDispatcher.createView(
+                NameIdentifier.of(viewNs, "reserved_props"),
+                "c",
+                new Column[0],
+                representations,
+                null,
+                null,
+                reservedProps),
+        "Properties or property prefixes are reserved and cannot be set",
+        "comment",
+        "gravitino.identifier");
+
+    Assertions.assertFalse(created.properties().containsKey(ID_KEY));
   }
 
   @Test
@@ -470,6 +509,12 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     ViewEntity stored = entityStore.get(viewIdent, VIEW, ViewEntity.class);
     Assertions.assertEquals("v2", stored.properties().get("k2"));
     Assertions.assertFalse(stored.properties().containsKey("k1"));
+
+    // Test immutable view properties
+    ViewChange[] illegalChange = new ViewChange[] {ViewChange.setProperty(COMMENT_KEY, "new comment")};
+    testPropertyException(
+        () -> viewOperationDispatcher.alterView(viewIdent, illegalChange),
+        "Property comment is immutable or reserved, cannot be set");
   }
 
   @Test

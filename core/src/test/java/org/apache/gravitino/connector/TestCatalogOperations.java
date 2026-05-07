@@ -352,6 +352,9 @@ public class TestCatalogOperations
       if (change instanceof ViewChange.RenameView) {
         name = ((ViewChange.RenameView) change).getNewName();
         newIdent = NameIdentifier.of(ident.namespace(), name);
+        if (views.containsKey(newIdent)) {
+          throw new ViewAlreadyExistsException("View %s already exists", newIdent);
+        }
       } else if (change instanceof ViewChange.SetProperty) {
         ViewChange.SetProperty sp = (ViewChange.SetProperty) change;
         properties.put(sp.getProperty(), sp.getValue());
