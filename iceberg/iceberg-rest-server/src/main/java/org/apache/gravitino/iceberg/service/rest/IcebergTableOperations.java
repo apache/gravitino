@@ -493,7 +493,7 @@ public class IcebergTableOperations {
    * @return Response containing the scan plan with tasks
    */
   @POST
-  @Path("{table}/scan")
+  @Path("{table}/plan")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Timed(name = "plan-table-scan." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -603,7 +603,13 @@ public class IcebergTableOperations {
     return etag.getValue().equals(clientEtag);
   }
 
-  private boolean isCredentialVending(String accessDelegation) {
+  /**
+   * Parses the {@code X-Iceberg-Access-Delegation} header value and returns whether the client is
+   * requesting credential vending. Package-private and static so that {@link
+   * IcebergNamespaceOperations#registerTable} can reuse the same parsing logic from the same
+   * package.
+   */
+  static boolean isCredentialVending(String accessDelegation) {
     if (StringUtils.isBlank(accessDelegation)) {
       return false;
     }

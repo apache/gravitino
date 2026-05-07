@@ -84,4 +84,67 @@ public class TestDataSourceUrlValidation {
     Assertions.assertThrows(
         GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
   }
+
+  @Test
+  public void testRejectH2Url() {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
+    properties.put(
+        JdbcConfig.JDBC_URL.getKey(),
+        "jdbc:h2:mem:test;INIT=CREATE ALIAS EXEC AS 'String f() throws Exception"
+            + " { Runtime.getRuntime().exec(\"id\"); return \"ok\"; }'\\;CALL EXEC()");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "H2 JDBC URL is not allowed in catalog configuration", gre.getMessage());
+  }
+
+  @Test
+  public void testRejectH2UrlCaseInsensitive() {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "JDBC:H2:mem:test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "H2 JDBC URL is not allowed in catalog configuration", gre.getMessage());
+  }
+
+  @Test
+  public void testRejectH2Driver() {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.h2.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:postgresql://localhost:5432/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "H2 JDBC driver is not allowed in catalog configuration", gre.getMessage());
+  }
+
+  @Test
+  public void testRejectH2DriverCaseInsensitive() {
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "ORG.H2.DRIVER");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:postgresql://localhost:5432/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "H2 JDBC driver is not allowed in catalog configuration", gre.getMessage());
+  }
 }

@@ -211,6 +211,9 @@ public class TestSecurableObjects {
     Privilege useJobTemplate = Privileges.UseJobTemplate.allow();
     Privilege createView = Privileges.CreateView.allow();
     Privilege selectView = Privileges.SelectView.allow();
+    Privilege registerFunction = Privileges.RegisterFunction.allow();
+    Privilege executeFunction = Privileges.ExecuteFunction.allow();
+    Privilege modifyFunction = Privileges.ModifyFunction.allow();
 
     // Test create catalog
     Assertions.assertTrue(createCatalog.canBindTo(MetadataObject.Type.METALAKE));
@@ -381,6 +384,7 @@ public class TestSecurableObjects {
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.FILESET));
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.VIEW));
     Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.MODEL));
+    Assertions.assertTrue(manageGrants.canBindTo(MetadataObject.Type.FUNCTION));
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(manageGrants.canBindTo(MetadataObject.Type.COLUMN));
 
@@ -504,5 +508,38 @@ public class TestSecurableObjects {
     Assertions.assertFalse(selectView.canBindTo(MetadataObject.Type.ROLE));
     Assertions.assertFalse(selectView.canBindTo(MetadataObject.Type.COLUMN));
     Assertions.assertTrue(selectView.canBindTo(MetadataObject.Type.VIEW));
+
+    // Test register function
+    Assertions.assertTrue(registerFunction.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(registerFunction.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(registerFunction.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertFalse(registerFunction.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(registerFunction.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(registerFunction.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(registerFunction.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(registerFunction.canBindTo(MetadataObject.Type.COLUMN));
+    Assertions.assertFalse(registerFunction.canBindTo(MetadataObject.Type.FUNCTION));
+
+    // Test execute function
+    Assertions.assertTrue(executeFunction.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(executeFunction.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(executeFunction.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(executeFunction.canBindTo(MetadataObject.Type.FUNCTION));
+    Assertions.assertFalse(executeFunction.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(executeFunction.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(executeFunction.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(executeFunction.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(executeFunction.canBindTo(MetadataObject.Type.COLUMN));
+
+    // Test modify function
+    Assertions.assertTrue(modifyFunction.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(modifyFunction.canBindTo(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(modifyFunction.canBindTo(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(modifyFunction.canBindTo(MetadataObject.Type.FUNCTION));
+    Assertions.assertFalse(modifyFunction.canBindTo(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(modifyFunction.canBindTo(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(modifyFunction.canBindTo(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(modifyFunction.canBindTo(MetadataObject.Type.ROLE));
+    Assertions.assertFalse(modifyFunction.canBindTo(MetadataObject.Type.COLUMN));
   }
 }

@@ -155,6 +155,22 @@ public class SecurableObjects {
   }
 
   /**
+   * Create the function {@link SecurableObject} with the given securable schema object, function
+   * name and privileges.
+   *
+   * @param schema The schema securable object
+   * @param function The function name
+   * @param privileges The privileges of the function
+   * @return The created function {@link SecurableObject}
+   */
+  public static SecurableObject ofFunction(
+      SecurableObject schema, String function, List<Privilege> privileges) {
+    List<String> names = Lists.newArrayList(DOT_SPLITTER.splitToList(schema.fullName()));
+    names.add(function);
+    return of(MetadataObject.Type.FUNCTION, names, privileges);
+  }
+
+  /**
    * Create the tag {@link SecurableObject} with the given tag name and privileges.
    *
    * @param tag The tag name

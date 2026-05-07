@@ -107,17 +107,17 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 
 #### JDBC backend configuration
 
-| Configuration item                            | Description                                                                                                                                                                               | Default value           | Required | Since Version |
-|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
-| `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for the JDBC catalog backend.                                                                 | `memory`                | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.uri`                  | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.                                                        | (none)                  | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.warehouse`            | The warehouse directory of JDBC catalog. Set the HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc`                                                      | (none)                  | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                      | `jdbc` for JDBC backend | No       | 0.5.2         |
-| `gravitino.iceberg-rest.jdbc-user`            | The username of the JDBC connection.                                                                                                                                                      | (none)                  | No       | 0.2.0         |
-| `gravitino.iceberg-rest.jdbc-password`        | The password of the JDBC connection.                                                                                                                                                      | (none)                  | No       | 0.2.0         |
-| `gravitino.iceberg-rest.jdbc-initialize`      | Whether to initialize the meta tables when creating the JDBC catalog.                                                                                                                     | `true`                  | No       | 0.2.0         |
-| `gravitino.iceberg-rest.jdbc-driver`          | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                                                                                  | (none)                  | Yes      | 0.3.0         |
-| `gravitino.iceberg-rest.jdbc-schema-version`  | The schema version of the JDBC catalog. Set to `V1` to enable view support. Once the underlying database is migrated to V1, this property is no longer required on subsequent restarts.   | `V0`                    | No       | 1.2.0         |
+| Configuration item                            | Description                                                                                                                                                                                                                                            | Default value           | Required | Since Version |
+|-----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for the JDBC catalog backend.                                                                                                                              | `memory`                | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.uri`                  | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.                                                                                                                     | (none)                  | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.warehouse`            | The warehouse directory of JDBC catalog. Set the HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc`                                                                                                                   | (none)                  | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                                                                                   | `jdbc` for JDBC backend | No       | 0.5.2         |
+| `gravitino.iceberg-rest.jdbc-user`            | The username of the JDBC connection.                                                                                                                                                                                                                   | (none)                  | No       | 0.2.0         |
+| `gravitino.iceberg-rest.jdbc-password`        | The password of the JDBC connection.                                                                                                                                                                                                                   | (none)                  | No       | 0.2.0         |
+| `gravitino.iceberg-rest.jdbc-initialize`      | Whether to initialize the meta tables when creating the JDBC catalog.                                                                                                                                                                                  | `true`                  | No       | 0.2.0         |
+| `gravitino.iceberg-rest.jdbc-driver`          | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                                                                                                                                               | (none)                  | Yes      | 0.3.0         |
+| `gravitino.iceberg-rest.jdbc-schema-version`  | The schema version of the JDBC catalog. Defaults to `V1` to enable view support. Set to `V0` only if you need to opt out of view support. Once the underlying database is migrated to V1, this property is no longer required on subsequent restarts.  | `V1`                    | No       | 1.2.0         |
 
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
@@ -130,12 +130,15 @@ If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to tr
 
 Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gravitino Iceberg REST service acts as IRC1 and forwards catalog operations to IRC2.
 
-| Configuration item                       | Description                                                                                                                   | Default value | Required | Since Version |
-|------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.catalog-backend` | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.     | `memory`      | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.uri`             | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                 | (none)        | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.warehouse`       | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2. | (none)        | No       | 0.2.0         |
-| `gravitino.iceberg-rest.data-access`     | Data access mode exposed to Iceberg REST clients via `/v1/config`. Supported values: `vended-credentials`, `remote-signing`.  | (none)        | No       | 1.3.0         |
+By default, when the backend catalog is a REST catalog, IRC1 skips authorization and behaves as a proxy. IRC2 handles authorization. If you want IRC1 to keep authorization checks, set `gravitino.iceberg-rest.disable-rest-authz=false`.
+
+| Configuration item                                                  | Description                                                                                                                                                    | Default value | Required | Since Version |
+|---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.catalog-backend`                            | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.                                      | `memory`      | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.uri`                                        | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                                                  | (none)        | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.warehouse`                                  | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2.                                  | (none)        | No       | 0.2.0         |
+| `gravitino.iceberg-rest.data-access`                                | Data access mode exposed to Iceberg REST clients via `/v1/config`. Supported values: `vended-credentials`, `remote-signing`.                                   | (none)        | No       | 1.3.0         |
+| `gravitino.iceberg-rest.disable-rest-authz`                         | Whether IRC1 disables authorization when the target backend catalog is a REST catalog. Set to `false` if you want IRC1 to enforce authorization before proxying. | `true`        | No       | 1.3.0         |
 
 IRC1 configuration example if IRC2 using HDFS storage:
 
@@ -157,6 +160,10 @@ gravitino.iceberg-rest.header.X-Iceberg-Access-Delegation = vended-credentials
 ```
 
 IRC1 must also configure S3 configurations if the client side requests credential vending.
+
+:::caution
+If IRC2 does not enforce authorization, keeping `gravitino.iceberg-rest.disable-rest-authz=true` can leave operations unprotected. Set it to `false` to enforce authorization in IRC1.
+:::
 
 `data-access` is returned in `/v1/config` defaults for REST clients:
 
@@ -464,11 +471,11 @@ Please set the `gravitino.iceberg-rest.warehouse` parameter to `{storage_prefix}
 
 ### View support
 
-View operations are supported when using the JDBC catalog backend with schema version `V1`. Iceberg will automatically migrate the database schema on the first restart and detect the migration on all subsequent restarts.
+View operations are supported when using the JDBC catalog backend with schema version `V1`. The default schema version is now `V1`, so view support is enabled out of the box. Iceberg will automatically migrate the database schema on the first restart and detect the migration on all subsequent restarts.
 
-| Configuration item                           | Description                                                                                | Default value | Required | Since Version |
-|----------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Set to `V1` to enable view operations.    | `V0`          | No       | 1.2.0         |
+| Configuration item                           | Description                                                                                                          | Default value | Required | Since Version |
+|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Defaults to `V1` to enable view operations. Set to `V0` to opt out.  | `V1`          | No       | 1.2.0         |
 
 ### Other Apache Iceberg catalog properties
 

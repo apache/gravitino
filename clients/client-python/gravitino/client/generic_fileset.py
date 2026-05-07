@@ -21,16 +21,23 @@ from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.file.fileset import Fileset
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.api.tag.tag import Tag
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
 )
+from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
 
-class GenericFileset(Fileset, SupportsCredentials):
+class GenericFileset(
+    Fileset,
+    SupportsCredentials,
+    SupportsTags,
+):
     _fileset: FilesetDTO
     """The fileset data transfer object"""
 
@@ -46,6 +53,9 @@ class GenericFileset(Fileset, SupportsCredentials):
             MetadataObject.Type.FILESET,
         )
         self._object_credential_operations = MetadataObjectCredentialOperations(
+            full_namespace.level(0), metadata_object, rest_client
+        )
+        self._object_tag_operations = MetadataObjectTagOperations(
             full_namespace.level(0), metadata_object, rest_client
         )
 
@@ -72,3 +82,17 @@ class GenericFileset(Fileset, SupportsCredentials):
 
     def get_credentials(self) -> List[Credential]:
         return self._object_credential_operations.get_credentials()
+
+    def list_tags(self) -> List[str]:
+        return self._object_tag_operations.list_tags()
+
+    def list_tags_info(self) -> List[Tag]:
+        return self._object_tag_operations.list_tags_info()
+
+    def get_tag(self, name: str) -> Tag:
+        return self._object_tag_operations.get_tag(name)
+
+    def associate_tags(
+        self, tags_to_add: List[str], tags_to_remove: List[str]
+    ) -> List[str]:
+        return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)

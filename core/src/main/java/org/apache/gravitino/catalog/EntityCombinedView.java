@@ -20,31 +20,33 @@ package org.apache.gravitino.catalog;
 
 import java.util.Map;
 import org.apache.gravitino.Audit;
-import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 
 /**
  * A View class to represent a view metadata object that combines the metadata both from {@link
- * View} and {@link GenericEntity}.
+ * View} and {@link ViewEntity}.
  */
 public final class EntityCombinedView implements View {
 
   private final View view;
 
-  private final GenericEntity viewEntity;
+  private final ViewEntity viewEntity;
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
   // the correct entity. Otherwise, we should import the external entity to the storage backend.
   private boolean imported;
 
-  private EntityCombinedView(View view, GenericEntity viewEntity) {
+  private EntityCombinedView(View view, ViewEntity viewEntity) {
     this.view = view;
     this.viewEntity = viewEntity;
     this.imported = false;
   }
 
-  public static EntityCombinedView of(View view, GenericEntity viewEntity) {
+  public static EntityCombinedView of(View view, ViewEntity viewEntity) {
     return new EntityCombinedView(view, viewEntity);
   }
 
@@ -55,6 +57,26 @@ public final class EntityCombinedView implements View {
   public EntityCombinedView withImported(boolean imported) {
     this.imported = imported;
     return this;
+  }
+
+  @Override
+  public Column[] columns() {
+    return view.columns();
+  }
+
+  @Override
+  public Representation[] representations() {
+    return view.representations();
+  }
+
+  @Override
+  public String defaultCatalog() {
+    return view.defaultCatalog();
+  }
+
+  @Override
+  public String defaultSchema() {
+    return view.defaultSchema();
   }
 
   @Override
@@ -85,7 +107,7 @@ public final class EntityCombinedView implements View {
     return view;
   }
 
-  public GenericEntity viewFromGravitino() {
+  public ViewEntity viewFromGravitino() {
     return viewEntity;
   }
 }

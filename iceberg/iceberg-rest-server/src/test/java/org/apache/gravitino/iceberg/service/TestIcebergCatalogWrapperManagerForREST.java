@@ -67,7 +67,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     IcebergCatalogWrapperManager manager =
         new IcebergCatalogWrapperManager(
             config, configProvider, false, configProvider.getMetalakeName());
-    IcebergRESTServerContext.create(configProvider, false, false, manager);
+    IcebergRESTServerContext.create(configProvider, false, false, true, manager);
 
     IcebergCatalogWrapper ops = manager.getOps(rawPrefix);
 
@@ -87,7 +87,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     IcebergCatalogWrapperManager manager =
         new IcebergCatalogWrapperManager(
             config, configProvider, false, configProvider.getMetalakeName());
-    IcebergRESTServerContext.create(configProvider, false, false, manager);
+    IcebergRESTServerContext.create(configProvider, false, false, true, manager);
 
     Assertions.assertThrowsExactly(IllegalArgumentException.class, () -> manager.getOps(rawPrefix));
   }
@@ -100,7 +100,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
     IcebergCatalogWrapperManager manager =
         new IcebergCatalogWrapperManager(
             config, configProvider, true, configProvider.getMetalakeName());
-    IcebergRESTServerContext.create(configProvider, true, true, manager);
+    IcebergRESTServerContext.create(configProvider, true, true, true, manager);
 
     IllegalArgumentException exception =
         Assertions.assertThrowsExactly(

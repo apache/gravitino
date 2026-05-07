@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.iceberg.DataFile;
@@ -41,7 +42,9 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
 
-// Used to override registerTable
+// Test wrapper that mocks operations the in-memory catalog cannot perform natively
+// (e.g. registerTable, which requires a real metadata.json file at the given location),
+// and adds test-only hooks (e.g. plan-task data generation for createTable).
 @SuppressWarnings("deprecation")
 public class CatalogWrapperForTest extends CatalogWrapperForREST {
   public static final String GENERATE_PLAN_TASKS_DATA_PROP = "test.generate-plan-data";
@@ -61,23 +64,44 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
   }
 
   @Override
-  public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
+  public LoadTableResponse registerTable(
+      Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
     if (request.name().contains("fail")) {
       throw new AlreadyExistsException("Already exits exception for test");
     }
 
+    // The in-memory test catalog cannot natively registerTable (it would need a real
+    // metadata.json file at the given location), so build a mock LoadTableResponse here.
+    // Honor cloud URIs (e.g. s3://) in metadataLocation so credential vending tests can
+    // verify the vended path; default to /mock otherwise for existing tests.
+    String location =
+        request.metadataLocation().contains("://") ? request.metadataLocation() : "/mock";
     Schema mockSchema = new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
     TableMetadata baseMetadata =
         TableMetadata.newTableMetadata(
-            mockSchema, PartitionSpec.unpartitioned(), "/mock", ImmutableMap.of());
+            mockSchema, PartitionSpec.unpartitioned(), location, ImmutableMap.of());
     String json = TableMetadataParser.toJson(baseMetadata);
     TableMetadata tableMetadata =
-        TableMetadataParser.fromJson("/mock/metadata/v1.metadata.json", json);
+        TableMetadataParser.fromJson(location + "/metadata/v1.metadata.json", json);
     LoadTableResponse loadTableResponse =
         LoadTableResponse.builder()
             .withTableMetadata(tableMetadata)
             .addAllConfig(ImmutableMap.of())
             .build();
+    // We must replicate the credential-vending check + injection here (rather than reuse
+    // CatalogWrapperForREST.registerTable via super) because the in-memory test catalog
+    // cannot natively perform registerTable. Above, we synthesized a mock LoadTableResponse
+    // instead of delegating to super.registerTable; that means the parent class never sees
+    // this call and therefore never runs its vending logic. Calling shouldGenerateCredential
+    // / injectCredentialConfig directly (now protected on the parent) re-applies the exact
+    // same vending behavior to the mock response, so credential-vending tests exercise the
+    // production code path end-to-end. Privilege must match the production wrapper (WRITE).
+    if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
+      return injectCredentialConfig(
+          TableIdentifier.of(namespace, request.name()),
+          loadTableResponse,
+          CredentialPrivilege.WRITE);
+    }
     return loadTableResponse;
   }
 
@@ -91,7 +115,7 @@ public class CatalogWrapperForTest extends CatalogWrapperForREST {
 
   private void appendSampleData(Namespace namespace, String tableName) {
     try {
-      Table table = catalog.loadTable(TableIdentifier.of(namespace, tableName));
+      Table table = getCatalog().loadTable(TableIdentifier.of(namespace, tableName));
       // Append multiple times to create multiple snapshots for incremental scan testing
       for (int i = 0; i < 3; i++) {
         Path tempFile = Files.createTempFile("plan-scan-" + i, ".parquet");

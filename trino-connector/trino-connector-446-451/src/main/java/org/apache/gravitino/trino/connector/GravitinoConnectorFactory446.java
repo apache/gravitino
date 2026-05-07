@@ -41,7 +41,7 @@ public class GravitinoConnectorFactory446 extends GravitinoConnectorFactory {
 
   @Override
   protected boolean supportCatalogNameWithMetalake() {
-    return true;
+    return false;
   }
 
   @Override

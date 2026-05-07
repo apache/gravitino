@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.transaction.IsolationLevel;
 import org.apache.gravitino.Catalog;
@@ -45,6 +46,11 @@ class TestGravitinoConnectorNullChecks {
     when(mockContext.getCatalog()).thenReturn(mockCatalog);
     GravitinoMetalake metalake = mockMetalake();
     when(mockContext.getMetalake()).thenReturn(metalake);
+    when(mockContext.getConfig())
+        .thenReturn(
+            new GravitinoConfig(
+                ImmutableMap.of(
+                    "gravitino.uri", "http://localhost:8090", "gravitino.metalake", "test")));
     when(mockContext.getInternalConnector()).thenReturn(null);
     GravitinoConnector connector = new GravitinoConnector(mockContext);
     assertThrows(
@@ -61,6 +67,11 @@ class TestGravitinoConnectorNullChecks {
     when(mockContext.getCatalog()).thenReturn(mockCatalog);
     GravitinoMetalake metalake = mockMetalake();
     when(mockContext.getMetalake()).thenReturn(metalake);
+    when(mockContext.getConfig())
+        .thenReturn(
+            new GravitinoConfig(
+                ImmutableMap.of(
+                    "gravitino.uri", "http://localhost:8090", "gravitino.metalake", "test")));
 
     Connector mockInternalConnector = mock(Connector.class);
     when(mockContext.getInternalConnector()).thenReturn(mockInternalConnector);
