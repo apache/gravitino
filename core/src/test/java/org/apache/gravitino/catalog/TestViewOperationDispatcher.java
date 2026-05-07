@@ -511,7 +511,8 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertFalse(stored.properties().containsKey("k1"));
 
     // Test immutable view properties
-    ViewChange[] illegalChange = new ViewChange[] {ViewChange.setProperty(COMMENT_KEY, "new comment")};
+    ViewChange[] illegalChange =
+        new ViewChange[] {ViewChange.setProperty(COMMENT_KEY, "new comment")};
     testPropertyException(
         () -> viewOperationDispatcher.alterView(viewIdent, illegalChange),
         "Property comment is immutable or reserved, cannot be set");
