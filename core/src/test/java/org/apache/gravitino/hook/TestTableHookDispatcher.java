@@ -36,18 +36,22 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.ArgumentMatchers.any;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.catalog.TestTableOperationDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -70,8 +74,10 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestTableHookDispatcher extends TestOperationDispatcher {
@@ -228,5 +234,53 @@ public class TestTableHookDispatcher extends TestOperationDispatcher {
     TableChange renameChange = TableChange.rename("newName");
     tableHookDispatcher.alterTable(tableIdent, renameChange);
     Mockito.verify(authorizationPlugin).onMetadataUpdated(any());
+  }
+
+  @Test
+  public void testDropTableShouldNotRemovePrivilegesWhenDropFails() {
+    TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    TableHookDispatcher hookDispatcher = new TableHookDispatcher(dispatcher);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+
+    Mockito.when(dispatcher.dropTable(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(() -> AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE))
+          .thenReturn(ImmutableList.of("/test"));
+
+      boolean dropped = hookDispatcher.dropTable(ident);
+
+      Assertions.assertFalse(dropped);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.TABLE, ImmutableList.of("/test")),
+          Mockito.never());
+    }
+  }
+
+  @Test
+  public void testPurgeTableShouldNotRemovePrivilegesWhenPurgeFails() {
+    TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    TableHookDispatcher hookDispatcher = new TableHookDispatcher(dispatcher);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+
+    Mockito.when(dispatcher.purgeTable(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(() -> AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TABLE))
+          .thenReturn(ImmutableList.of("/test"));
+
+      boolean purged = hookDispatcher.purgeTable(ident);
+
+      Assertions.assertFalse(purged);
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.TABLE, ImmutableList.of("/test")),
+          Mockito.never());
+    }
   }
 }
