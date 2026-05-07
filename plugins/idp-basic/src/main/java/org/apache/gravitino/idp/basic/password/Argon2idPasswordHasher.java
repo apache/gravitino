@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local.password;
+package org.apache.gravitino.idp.basic.password;
 
 import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;

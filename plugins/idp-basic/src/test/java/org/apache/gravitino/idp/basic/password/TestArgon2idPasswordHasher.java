@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local.password;
+package org.apache.gravitino.idp.basic.password;
 
 import java.util.Base64;
 import org.junit.jupiter.api.Assertions;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local.password;
+package org.apache.gravitino.idp.basic.password;
 
 /** Factory for password hasher implementations. */
 public final class PasswordHasherFactory {

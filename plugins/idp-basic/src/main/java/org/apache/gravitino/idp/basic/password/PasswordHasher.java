@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth.local.password;
+package org.apache.gravitino.idp.basic.password;
 
 /** Password hasher abstraction for local authentication. */
 public interface PasswordHasher {
