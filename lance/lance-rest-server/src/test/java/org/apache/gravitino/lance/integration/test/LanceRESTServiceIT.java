@@ -123,9 +123,40 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @AfterAll
-  public void clean() throws IOException {
-    client.dropMetalake(getLanceRESTServerMetalakeName(), true);
-    FileUtils.deleteDirectory(tempDir.toFile());
+  public void clean() throws Exception {
+    Exception failure = null;
+
+    try {
+      if (client != null) {
+        client.dropMetalake(getLanceRESTServerMetalakeName(), true);
+      }
+    } catch (Exception e) {
+      failure = appendFailure(failure, e);
+    }
+
+    try {
+      if (tempDir != null) {
+        FileUtils.deleteDirectory(tempDir.toFile());
+      }
+    } catch (Exception e) {
+      failure = appendFailure(failure, e);
+    }
+
+    try {
+      allocator.close();
+    } catch (Exception e) {
+      failure = appendFailure(failure, e);
+    }
+
+    try {
+      super.stopIntegrationTest();
+    } catch (Exception e) {
+      failure = appendFailure(failure, e);
+    }
+
+    if (failure != null) {
+      throw failure;
+    }
   }
 
   @AfterEach
@@ -180,19 +211,10 @@ public class LanceRESTServiceIT extends BaseIT {
 
     Assertions.assertEquals(schema.properties(), describeNamespaceResp.getProperties());
 
-    // test describe the root namespace
-    DescribeNamespaceRequest rootDescNamespaceReq = new DescribeNamespaceRequest();
-    RuntimeException exception =
-        Assertions.assertThrows(
-            RuntimeException.class, () -> ns.describeNamespace(rootDescNamespaceReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":13"));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Expected at most 2-level and at least 1-level namespace"));
-
     // test describe a non-existent catalog namespace
     DescribeNamespaceRequest nonExistentCatalogReq = new DescribeNamespaceRequest();
     nonExistentCatalogReq.addIdItem("non_existent_catalog");
-    exception =
+    RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.describeNamespace(nonExistentCatalogReq));
     Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
@@ -1020,5 +1042,14 @@ public class LanceRESTServiceIT extends BaseIT {
 
   private String getLanceRestServiceUrl() {
     return String.format("http://%s:%d/lance", "localhost", getLanceRESTServerPort());
+  }
+
+  private Exception appendFailure(Exception failure, Exception candidate) {
+    if (failure == null) {
+      return candidate;
+    }
+
+    failure.addSuppressed(candidate);
+    return failure;
   }
 }

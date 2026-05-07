@@ -27,6 +27,8 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.jaxrs.json.JacksonJaxbJsonProvider;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -44,6 +46,7 @@ import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rest.RESTUtils;
+import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
@@ -104,6 +107,17 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
+    // Disable Jersey's auto-discovery (including JacksonAutoDiscoverable) which would
+    // auto-register a Jackson provider that calls ObjectMapper.findAndRegisterModules().
+    // When jackson-module-scala is on the classpath (pulled in by spark-sql), the
+    // auto-discovered provider deserializes JSON objects as Scala Maps instead of
+    // java.util.Map, breaking extractPropertiesFromBody().
+    resourceConfig.property(CommonProperties.FEATURE_AUTO_DISCOVERY_DISABLE, true);
+    resourceConfig.property(CommonProperties.MOXY_JSON_FEATURE_DISABLE, true);
+    ObjectMapper mapper = new ObjectMapper();
+    JacksonJaxbJsonProvider provider = new JacksonJaxbJsonProvider();
+    provider.setMapper(mapper);
+    resourceConfig.register(provider);
     resourceConfig.register(LanceNamespaceOperations.class);
     resourceConfig.register(org.apache.gravitino.lance.service.rest.LanceTableOperations.class);
     resourceConfig.register(
@@ -231,20 +245,6 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     DescribeNamespaceResponse respEntity = resp.readEntity(DescribeNamespaceResponse.class);
     Assertions.assertEquals(describeNamespaceResp.getProperties(), respEntity.getProperties());
 
-    // describe namespace via root endpoint
-    resp =
-        target("/v1/namespace/describe")
-            .queryParam("delimiter", delimiter)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .post(null);
-
-    Mockito.verify(namespaceOps).describeNamespace(eq(""), eq(Pattern.quote(delimiter)));
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
-
-    respEntity = resp.readEntity(DescribeNamespaceResponse.class);
-    Assertions.assertEquals(describeNamespaceResp.getProperties(), respEntity.getProperties());
-
     // test throw exception
     when(namespaceOps.describeNamespace(any(), any()))
         .thenThrow(new RuntimeException("Test exception"));
@@ -261,17 +261,17 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(18, errorResp.getCode());
     Assertions.assertEquals("Test exception", errorResp.getError());
+  }
 
-    // root endpoint should use explicit root identifier instead of delimiter in error instance
-    resp =
-        target("/v1/namespace/describe")
-            .queryParam("delimiter", delimiter)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .post(null);
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
-    errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("", errorResp.getInstance());
+  @Test
+  public void testDescribeNamespaceOnRootUnsupported() {
+    Mockito.clearInvocations(namespaceOps);
+
+    Response resp =
+        target("/v1/namespace/describe").request(MediaType.APPLICATION_JSON_TYPE).post(null);
+
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
+    Mockito.verifyNoInteractions(namespaceOps);
   }
 
   @Test

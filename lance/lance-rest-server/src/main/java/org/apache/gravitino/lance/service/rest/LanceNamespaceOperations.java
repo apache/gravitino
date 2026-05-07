@@ -102,19 +102,6 @@ public class LanceNamespaceOperations {
   public Response describeNamespace(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
-    return describeNamespaceInternal(namespaceId, delimiter);
-  }
-
-  @POST
-  @Path("/describe")
-  @Timed(name = "describe-namespaces-root." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "describe-namespaces-root", absolute = true)
-  public Response describeNamespaceOnRoot(
-      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
-    return describeNamespaceInternal(ROOT_NAMESPACE_ID, delimiter);
-  }
-
-  private Response describeNamespaceInternal(String namespaceId, String delimiter) {
     try {
       DescribeNamespaceResponse response =
           lanceNamespace.asNamespaceOps().describeNamespace(namespaceId, Pattern.quote(delimiter));
