@@ -26,7 +26,6 @@ val scalaVersion: String = gradle.startParameter.projectProperties["scalaVersion
   ?: settings.extra["defaultScalaVersion"].toString()
 
 include("api", "common", "core", "server", "server-common")
-include("plugins:idp-basic")
 include("catalogs:catalog-common")
 include("catalogs:catalog-glue")
 include("catalogs:catalog-hive")
@@ -111,6 +110,7 @@ include(":bundles:azure", ":bundles:azure-bundle", ":bundles:iceberg-azure-bundl
 include(":catalogs:hadoop-common")
 include(":lineage")
 include(":mcp-server")
+include(":plugins:idp-basic")
 include(
   ":maintenance:optimizer-api",
   ":maintenance:updaters",
