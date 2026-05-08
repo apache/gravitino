@@ -784,6 +784,7 @@ tasks {
         "copyCatalogLibAndConfigs",
         "copySubprojectDependencies",
         "copySubprojectLib",
+        "copyPluginLib",
         "copyCliLib",
         "copyJobsLib",
         ":authorizations:copyLibAndConfig",
@@ -1131,6 +1132,15 @@ tasks {
     setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
   }
 
+  register("copyPluginLib", Copy::class) {
+    dependsOn(":plugins:idp-basic:build")
+    from("plugins/idp-basic/build/libs")
+    into("distribution/package/libs")
+    include("*.jar")
+    exclude("*-jcstress.jar", "*-jmh.jar", "error_prone_annotations-*.jar")
+    setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
+  }
+
   register("copySubprojectLib", Copy::class) {
     subprojects.forEach() {
       if (!it.name.startsWith("authorization") &&
@@ -1153,6 +1163,7 @@ tasks {
         it.name != "web" &&
         it.name != "web-v2" &&
         it.parent?.name != "bundles" &&
+        it.parent?.name != "plugins" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
       ) {
