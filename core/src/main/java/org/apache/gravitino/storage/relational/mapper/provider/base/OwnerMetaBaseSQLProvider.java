@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper.OWN
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -108,7 +109,7 @@ public class OwnerMetaBaseSQLProvider {
     return "INSERT INTO "
         + OWNER_TABLE_NAME
         + " (metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " audit_info, current_version, last_version, deleted_at, updated_at)"
         + " VALUES ("
         + " #{ownerRelPO.metalakeId},"
         + " #{ownerRelPO.metadataObjectId},"
@@ -118,7 +119,8 @@ public class OwnerMetaBaseSQLProvider {
         + " #{ownerRelPO.auditInfo},"
         + " #{ownerRelPO.currentVersion},"
         + " #{ownerRelPO.lastVersion},"
-        + " #{ownerRelPO.deletedAt}"
+        + " #{ownerRelPO.deletedAt},"
+        + " #{ownerRelPO.updatedAt}"
         + ")";
   }
 
@@ -189,6 +191,11 @@ public class OwnerMetaBaseSQLProvider {
         + ViewMetaMapper.TABLE_NAME
         + " vt WHERE vt.catalog_id = #{catalogId} AND"
         + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.catalog_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
+        + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 
@@ -227,6 +234,11 @@ public class OwnerMetaBaseSQLProvider {
         + ViewMetaMapper.TABLE_NAME
         + " vt WHERE vt.schema_id = #{schemaId} AND"
         + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.schema_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.schema_id = #{schemaId} AND"
+        + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 
@@ -235,5 +247,26 @@ public class OwnerMetaBaseSQLProvider {
     return "DELETE FROM "
         + OWNER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String selectOwnerByMetadataObjectIdAndType(
+      @Param("metadataObjectId") long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "SELECT owner_id as ownerId, owner_type as ownerType FROM "
+        + OWNER_TABLE_NAME
+        + " WHERE metadata_object_id = #{metadataObjectId}"
+        + " AND metadata_object_type = #{metadataObjectType}"
+        + " AND deleted_at = 0"
+        + " ORDER BY updated_at DESC, id DESC LIMIT 1";
+  }
+
+  public String selectChangedOwners(@Param("updatedAtFrom") long updatedAtFrom) {
+    return "SELECT metadata_object_id as metadataObjectId,"
+        + " metadata_object_type as metadataObjectType,"
+        + " updated_at as updatedAt"
+        + " FROM "
+        + OWNER_TABLE_NAME
+        + " WHERE deleted_at = 0 AND updated_at >= #{updatedAtFrom}"
+        + " ORDER BY updated_at, id LIMIT 1000";
   }
 }

@@ -32,7 +32,9 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
+import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.SchemaDispatcher;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -68,24 +70,16 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
     String metalake = ident.namespace().level(0);
     OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerManager != null) {
-      String creator = PrincipalUtils.getCurrentUserName();
-      for (NameIdentifier parent : missingParents) {
-        if (dispatcher.schemaExists(parent)) {
-          // Parent schemas can be concurrently created by another request between the pre-check and
-          // this point. Only assign owner when there is no owner to avoid overwriting ownership.
-          if (canSetOwner(ownerManager, metalake, parent)) {
-            ownerManager.setOwner(
-                metalake,
-                NameIdentifierUtil.toMetadataObject(parent, Entity.EntityType.SCHEMA),
-                creator,
-                Owner.Type.USER);
-          }
-        }
-      }
+      // The inner NormalizeDispatcher case-folds the schema name based on catalog capabilities,
+      // so the entity is stored under the normalized identifier. Apply the same normalization
+      // here so the owner is attached to the same identifier the manager sees.
+      NameIdentifier normalizedIdent =
+          CapabilityHelpers.applyCapabilities(
+              ident, Capability.Scope.SCHEMA, GravitinoEnv.getInstance().catalogManager());
       ownerManager.setOwner(
-          metalake,
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA),
-          creator,
+          normalizedIdent.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA),
+          PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }
     return schema;

@@ -1153,6 +1153,7 @@ tasks {
         it.name != "web" &&
         it.name != "web-v2" &&
         it.parent?.name != "bundles" &&
+        it.parent?.name != "plugins" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
       ) {

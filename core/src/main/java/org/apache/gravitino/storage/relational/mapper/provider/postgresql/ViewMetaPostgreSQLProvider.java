@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.VERSION_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.ViewMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.ViewPO;
@@ -32,7 +33,7 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
         + TABLE_NAME
         + " (view_id, view_name, metalake_id,"
         + " catalog_id, schema_id,"
-        + " current_version, last_version, deleted_at)"
+        + " current_version, last_version, audit_info, deleted_at)"
         + " VALUES ("
         + " #{viewMeta.viewId},"
         + " #{viewMeta.viewName},"
@@ -41,6 +42,7 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
         + " #{viewMeta.schemaId},"
         + " #{viewMeta.currentVersion},"
         + " #{viewMeta.lastVersion},"
+        + " #{viewMeta.auditInfo},"
         + " #{viewMeta.deletedAt}"
         + " )"
         + " ON CONFLICT (view_id) DO UPDATE SET"
@@ -50,7 +52,44 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
         + " schema_id = #{viewMeta.schemaId},"
         + " current_version = #{viewMeta.currentVersion},"
         + " last_version = #{viewMeta.lastVersion},"
+        + " audit_info = #{viewMeta.auditInfo},"
         + " deleted_at = #{viewMeta.deletedAt}";
+  }
+
+  @Override
+  public String listViewPOsBySchemaId(@Param("schemaId") Long schemaId) {
+    return "SELECT vm.view_id, vm.view_name, vm.metalake_id, vm.catalog_id, vm.schema_id,"
+        + " vm.current_version, vm.last_version, vm.audit_info, vm.deleted_at,"
+        + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
+        + " vi.schema_id as version_schema_id, vi.view_id as version_view_id,"
+        + " vi.version, vi.view_comment, vi.columns, vi.properties,"
+        + " vi.default_catalog, vi.default_schema, vi.representations,"
+        + " vi.audit_info as version_audit_info, vi.deleted_at as version_deleted_at"
+        + " FROM "
+        + TABLE_NAME
+        + " vm INNER JOIN "
+        + VERSION_TABLE_NAME
+        + " vi ON vm.view_id = vi.view_id AND vm.current_version = vi.version"
+        + " WHERE vm.schema_id = #{schemaId} AND vm.deleted_at = 0 AND vi.deleted_at = 0";
+  }
+
+  @Override
+  public String selectViewMetaBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("viewName") String name) {
+    return "SELECT vm.view_id, vm.view_name, vm.metalake_id, vm.catalog_id, vm.schema_id,"
+        + " vm.current_version, vm.last_version, vm.audit_info, vm.deleted_at,"
+        + " vi.id, vi.metalake_id as version_metalake_id, vi.catalog_id as version_catalog_id,"
+        + " vi.schema_id as version_schema_id, vi.view_id as version_view_id,"
+        + " vi.version, vi.view_comment, vi.columns, vi.properties,"
+        + " vi.default_catalog, vi.default_schema, vi.representations,"
+        + " vi.audit_info as version_audit_info, vi.deleted_at as version_deleted_at"
+        + " FROM "
+        + TABLE_NAME
+        + " vm INNER JOIN "
+        + VERSION_TABLE_NAME
+        + " vi ON vm.view_id = vi.view_id AND vm.current_version = vi.version"
+        + " WHERE vm.schema_id = #{schemaId} AND vm.view_name = #{viewName}"
+        + " AND vm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
   @Override

@@ -21,10 +21,15 @@ package org.apache.gravitino.iceberg.service.rest;
 import java.util.Arrays;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.EntityTag;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateNamespaceFailureEvent;
@@ -44,6 +49,9 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespacePreEvent;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
@@ -256,5 +264,69 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     verifyCreateNamespaceSucc(Namespace.of("update_foo3", "a"));
     dummyEventListener.clearEvent();
     verifyUpdateNamespaceSucc(Namespace.of("update_foo3", "a"));
+  }
+
+  @Test
+  void testRegisterTableWithCredentialVending() {
+    // register without credential vending -- no credentials in response
+    verifyRegisterTableSucc("register_cred_foo1", Namespace.of("register_cred_ns"));
+
+    // register with credential vending but local location -- should NOT vend
+    Response response =
+        doRegisterTableWithCredentialVending(
+            "register_cred_foo2", Namespace.of("register_cred_ns2"), "mock");
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    LoadTableResponse loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertFalse(loadTableResponse.config().containsKey(Credential.CREDENTIAL_TYPE));
+
+    // register with credential vending and S3 location -- SHOULD vend
+    String s3Location = "s3://dummy-bucket/register_cred_foo3";
+    response =
+        doRegisterTableWithCredentialVending(
+            "register_cred_foo3", Namespace.of("register_cred_ns3"), s3Location);
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    loadTableResponse = response.readEntity(LoadTableResponse.class);
+    Assertions.assertEquals(
+        DummyCredentialProvider.DUMMY_CREDENTIAL_TYPE,
+        loadTableResponse.config().get(Credential.CREDENTIAL_TYPE));
+    // DummyCredentialProvider.SimpleCredential is not one of the typed credentials handled
+    // in CredentialPropertyUtils#toIcebergProperties, so it falls through to
+    // Credential#toProperties, which always emits credential-type and expire-time-in-ms.
+    // Asserting both guards against partial-injection regressions.
+    Assertions.assertEquals("0", loadTableResponse.config().get(Credential.EXPIRE_TIME_IN_MS));
+  }
+
+  @Test
+  void testRegisterTableRemoteSigningNotSupported() {
+    RegisterTableRequest request =
+        ImmutableRegisterTableRequest.builder()
+            .name("remote_signing_test")
+            .metadataLocation("mock")
+            .build();
+    Response response =
+        getNamespaceClientBuilder(
+                Optional.of(Namespace.of("register_remote_ns")),
+                Optional.of("register"),
+                Optional.empty())
+            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(406, response.getStatus());
+  }
+
+  @Test
+  void testRegisterTableInvalidAccessDelegation() {
+    RegisterTableRequest request =
+        ImmutableRegisterTableRequest.builder()
+            .name("invalid_delegation_test")
+            .metadataLocation("mock")
+            .build();
+    Response response =
+        getNamespaceClientBuilder(
+                Optional.of(Namespace.of("register_invalid_ns")),
+                Optional.of("register"),
+                Optional.empty())
+            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "invalid-value")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(400, response.getStatus());
   }
 }

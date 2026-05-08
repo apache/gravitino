@@ -32,7 +32,7 @@ import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.GlueException;
 
 /**
- * Runs {@link AbstractGlueSchemaTest} scenarios against a real AWS Glue endpoint.
+ * Runs {@link GlueSchemaTestBase} scenarios against a real AWS Glue endpoint.
  *
  * <p>This test is <b>skipped by default</b> and only runs when {@code AWS_ACCESS_KEY_ID} is set. To
  * run it, set the following environment variables:
@@ -49,7 +49,7 @@ import software.amazon.awssdk.services.glue.model.GlueException;
  * deleted in {@link #cleanup} regardless of test outcome.
  */
 @EnabledIfEnvironmentVariable(named = "AWS_ACCESS_KEY_ID", matches = ".+")
-class TestAwsGlueSchema extends AbstractGlueSchemaTest {
+class TestAwsGlueSchemaConversion extends GlueSchemaTestBase {
 
   private static GlueClient glueClient;
   private static String catalogId;

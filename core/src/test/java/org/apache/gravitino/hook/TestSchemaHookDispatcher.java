@@ -20,237 +20,123 @@ package org.apache.gravitino.hook;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
-import java.util.Optional;
+
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SchemaDispatcher;
-import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 public class TestSchemaHookDispatcher {
 
-  private static final String METALAKE = "test_metalake";
-  private static final String CATALOG = "test_catalog";
-  private static final String SEPARATOR = ":";
-
+  private SchemaHookDispatcher hookDispatcher;
   private SchemaDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
-  private SchemaHookDispatcher hookDispatcher;
+  private CatalogManager mockCatalogManager;
+  private CatalogManager.CatalogWrapper mockCatalogWrapper;
+  // Save the originals before each test and restore them in tearDown so we do not leak null
+  // state into the GravitinoEnv singleton across tests.
+  private OwnerDispatcher savedOwnerDispatcher;
+  private CatalogManager savedCatalogManager;
 
   @BeforeEach
-  public void setUp() throws IllegalAccessException {
+  public void setUp() throws Exception {
     mockDispatcher = mock(SchemaDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
-
-    Config mockConfig = mock(Config.class);
-    when(mockConfig.get(Configs.SCHEMA_SEPARATOR)).thenReturn(SEPARATOR);
-
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
+    mockCatalogManager = mock(CatalogManager.class);
+    mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
+    when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockCatalogWrapper);
+    when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
+    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    // Tests in this class that rely on the singleton catalogManager always go through
+    // GravitinoEnv.getInstance().catalogManager(), but we cannot call the public accessor here
+    // because it Preconditions-checks for non-null and would fail when GravitinoEnv has not been
+    // initialized. Read the field directly via reflection to capture the current value safely.
+    savedCatalogManager =
+        (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
-
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
     hookDispatcher = new SchemaHookDispatcher(mockDispatcher);
-    when(mockOwnerDispatcher.getOwner(any(), any())).thenReturn(Optional.empty());
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
   }
 
   @Test
-  public void testCreateFlatSchemaCreatesNoParents() {
-    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "myschema");
+  public void testCreateSchemaThrowsWhenSetOwnerFails() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "test_schema");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+
+    doThrow(new RuntimeException("Set owner failed"))
+        .when(mockOwnerDispatcher)
+        .setOwner(any(), any(), any(), any());
+
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> hookDispatcher.createSchema(ident, "comment", Collections.emptyMap()));
+    Assertions.assertEquals("Set owner failed", thrown.getMessage());
+    verify(mockDispatcher).createSchema(any(), any(), any());
+  }
+
+  @Test
+  public void testCreateSchemaSetsOwnerWithNormalizedIdentifier() throws Exception {
+    // Use a case-insensitive capability so the schema name is normalized to lower case before
+    // setOwner is called, mirroring what NormalizeDispatcher would do for the manager.
+    when(mockCatalogWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
+
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "MY_SCHEMA");
+    Schema mockSchema = mock(Schema.class);
+    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
 
     hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
-    // Only the schema itself should be created, no parent creation calls
-    verify(mockDispatcher, times(1)).createSchema(eq(ident), any(), any());
-    verify(mockDispatcher, never()).schemaExists(any());
-
-    // Owner should be set for the schema
-    verify(mockOwnerDispatcher, times(1))
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
+    ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
+    verify(mockOwnerDispatcher)
+        .setOwner(eq("test_metalake"), captor.capture(), any(), eq(Owner.Type.USER));
+    Assertions.assertEquals(
+        "my_schema",
+        captor.getValue().name(),
+        "Schema name passed to setOwner must be lowercased by Capability.Scope.SCHEMA"
+            + " normalization");
+    // Schema's namespace is [metalake, catalog]; NameIdentifierUtil.toMetadataObject uses
+    // level(1) as parent. Catalog is not subject to per-scope name normalization here, so
+    // parent is just the catalog name -- there is no schema component to normalize.
+    Assertions.assertEquals(
+        "test_catalog",
+        captor.getValue().parent(),
+        "Schema parent must be the catalog name (level(1) of the namespace); SCHEMA's namespace"
+            + " has no schema component to normalize");
   }
 
-  @Test
-  public void testCreateHierarchicalSchemaAutoCreatesMissingParents() {
-    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B:C");
-    NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
-    NameIdentifier parentAB = NameIdentifier.of(METALAKE, CATALOG, "A:B");
-    Schema mockSchema = mock(Schema.class);
-
-    when(mockDispatcher.schemaExists(parentA)).thenReturn(false, true);
-    when(mockDispatcher.schemaExists(parentAB)).thenReturn(false, true);
-    when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
-
-    hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
-
-    // Parents are auto-created by catalog; hook dispatcher only creates target schema.
-    verify(mockDispatcher, never()).createSchema(eq(parentA), any(), any());
-    verify(mockDispatcher, never()).createSchema(eq(parentAB), any(), any());
-    verify(mockDispatcher, times(1)).createSchema(eq(ident), any(), any());
-
-    // Verify owner is set for both auto-created parents and the requested schema.
-    verify(mockOwnerDispatcher, times(3)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
-    verify(mockOwnerDispatcher, times(1))
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(parentA, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
-    verify(mockOwnerDispatcher, times(1))
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(parentAB, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
-    verify(mockOwnerDispatcher, times(1))
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
-  }
-
-  @Test
-  public void testCreateHierarchicalSchemaSkipsExistingParents() {
-    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B:C");
-    NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
-    NameIdentifier parentAB = NameIdentifier.of(METALAKE, CATALOG, "A:B");
-    Schema mockSchema = mock(Schema.class);
-
-    // A already exists, A:B does not
-    when(mockDispatcher.schemaExists(parentA)).thenReturn(true);
-    when(mockDispatcher.schemaExists(parentAB)).thenReturn(false, true);
-    when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
-
-    hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
-
-    // Parents are auto-created by catalog; hook dispatcher should not create them explicitly.
-    verify(mockDispatcher, never()).createSchema(eq(parentA), any(), any());
-    verify(mockDispatcher, never()).createSchema(eq(parentAB), any(), any());
-    verify(mockDispatcher, times(1)).createSchema(eq(ident), any(), any());
-
-    // Verify owner is set for the requested schema and the newly created parent A:B.
-    verify(mockOwnerDispatcher, times(2)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
-    verify(mockOwnerDispatcher, never())
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(parentA, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
-    verify(mockOwnerDispatcher, times(1))
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(parentAB, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
-    verify(mockOwnerDispatcher, times(1))
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
-  }
-
-  @Test
-  public void testCreateHierarchicalSchemaAllParentsExist() {
-    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B");
-    NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
-    Schema mockSchema = mock(Schema.class);
-
-    when(mockDispatcher.schemaExists(parentA)).thenReturn(true);
-    when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
-
-    hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
-
-    // A should NOT be created since it exists
-    verify(mockDispatcher, never()).createSchema(eq(parentA), isNull(), eq(Collections.emptyMap()));
-
-    // Only A:B gets owner set
-    verify(mockOwnerDispatcher, times(1)).setOwner(eq(METALAKE), any(), any(), eq(Owner.Type.USER));
-  }
-
-  @Test
-  public void testCreateHierarchicalSchemaDoesNotOverwriteOwnerOnConcurrentParentCreate() {
-    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B:C");
-    NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
-    NameIdentifier parentAB = NameIdentifier.of(METALAKE, CATALOG, "A:B");
-    Schema mockSchema = mock(Schema.class);
-
-    when(mockDispatcher.schemaExists(parentA)).thenReturn(false, true);
-    when(mockDispatcher.schemaExists(parentAB)).thenReturn(false, true);
-    when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
-    when(mockOwnerDispatcher.getOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(parentA, Entity.EntityType.SCHEMA))))
-        .thenReturn(Optional.of(mock(Owner.class)));
-    when(mockOwnerDispatcher.getOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(parentAB, Entity.EntityType.SCHEMA))))
-        .thenReturn(Optional.empty());
-
-    hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
-
-    verify(mockOwnerDispatcher, never())
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(parentA, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
-    verify(mockOwnerDispatcher, times(1))
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(parentAB, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
-    verify(mockOwnerDispatcher, times(1))
-        .setOwner(
-            eq(METALAKE),
-            eq(NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.SCHEMA)),
-            any(),
-            eq(Owner.Type.USER));
-  }
-
-  @Test
-  public void testCreateSchemaWithNullOwnerDispatcher() throws IllegalAccessException {
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
-
-    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, "A:B");
-    NameIdentifier parentA = NameIdentifier.of(METALAKE, CATALOG, "A");
-    Schema mockSchema = mock(Schema.class);
-
-    when(mockDispatcher.schemaExists(parentA)).thenReturn(false);
-    when(mockDispatcher.createSchema(eq(ident), any(), any())).thenReturn(mockSchema);
-
-    // Should not throw even with null ownerDispatcher
-    hookDispatcher.createSchema(ident, null, Collections.emptyMap());
-
-    verify(mockDispatcher, never()).createSchema(eq(parentA), any(), any());
-    verify(mockDispatcher, times(1)).createSchema(eq(ident), any(), any());
+  private static class CaseInsensitiveCapability implements Capability {
+    @Override
+    public CapabilityResult caseSensitiveOnName(Scope scope) {
+      return CapabilityResult.unsupported("case-insensitive");
+    }
   }
 }

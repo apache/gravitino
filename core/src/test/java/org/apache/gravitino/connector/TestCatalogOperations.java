@@ -75,6 +75,7 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
@@ -89,11 +90,13 @@ import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -300,6 +303,170 @@ public class TestCatalogOperations
     } else {
       return false;
     }
+  }
+
+  @Override
+  public View createView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties) {
+    if (views.containsKey(ident)) {
+      throw new ViewAlreadyExistsException("View %s already exists", ident);
+    }
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    TestView view =
+        new TestView(
+            ident.name(),
+            comment,
+            columns == null ? new Column[0] : columns,
+            representations,
+            defaultCatalog,
+            defaultSchema,
+            properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties),
+            auditInfo);
+    views.put(ident, view);
+    return view;
+  }
+
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes) {
+    if (!views.containsKey(ident)) {
+      throw new NoSuchViewException("View %s does not exist", ident);
+    }
+    TestView view = (TestView) views.get(ident);
+    String name = view.name();
+    String comment = view.comment();
+    String defaultCatalog = view.defaultCatalog();
+    String defaultSchema = view.defaultSchema();
+    Column[] columns = view.columns();
+    Representation[] representations = view.representations();
+    Map<String, String> properties = new HashMap<>(view.properties());
+
+    NameIdentifier newIdent = ident;
+    for (ViewChange change : changes) {
+      if (change instanceof ViewChange.RenameView) {
+        name = ((ViewChange.RenameView) change).getNewName();
+        newIdent = NameIdentifier.of(ident.namespace(), name);
+        if (views.containsKey(newIdent)) {
+          throw new ViewAlreadyExistsException("View %s already exists", newIdent);
+        }
+      } else if (change instanceof ViewChange.SetProperty) {
+        ViewChange.SetProperty sp = (ViewChange.SetProperty) change;
+        properties.put(sp.getProperty(), sp.getValue());
+      } else if (change instanceof ViewChange.RemoveProperty) {
+        properties.remove(((ViewChange.RemoveProperty) change).getProperty());
+      } else if (change instanceof ViewChange.ReplaceView) {
+        ViewChange.ReplaceView rv = (ViewChange.ReplaceView) change;
+        columns = rv.getColumns();
+        representations = rv.getRepresentations();
+        defaultCatalog = rv.getDefaultCatalog();
+        defaultSchema = rv.getDefaultSchema();
+        comment = rv.getComment();
+      } else {
+        throw new IllegalArgumentException("Unsupported view change: " + change);
+      }
+    }
+
+    TestView updated =
+        new TestView(
+            name,
+            comment,
+            columns,
+            representations,
+            defaultCatalog,
+            defaultSchema,
+            ImmutableMap.copyOf(properties),
+            view.auditInfo());
+    views.remove(ident);
+    views.put(newIdent, updated);
+    return updated;
+  }
+
+  private static final class TestView implements View {
+    private final String name;
+    private final String comment;
+    private final Column[] columns;
+    private final Representation[] representations;
+    private final String defaultCatalog;
+    private final String defaultSchema;
+    private final Map<String, String> properties;
+    private final AuditInfo auditInfo;
+
+    TestView(
+        String name,
+        String comment,
+        Column[] columns,
+        Representation[] representations,
+        String defaultCatalog,
+        String defaultSchema,
+        Map<String, String> properties,
+        AuditInfo auditInfo) {
+      this.name = name;
+      this.comment = comment;
+      this.columns = columns;
+      this.representations = representations;
+      this.defaultCatalog = defaultCatalog;
+      this.defaultSchema = defaultSchema;
+      this.properties = properties;
+      this.auditInfo = auditInfo;
+    }
+
+    @Override
+    public String name() {
+      return name;
+    }
+
+    @Override
+    public String comment() {
+      return comment;
+    }
+
+    @Override
+    public Column[] columns() {
+      return columns;
+    }
+
+    @Override
+    public Representation[] representations() {
+      return representations;
+    }
+
+    @Override
+    public String defaultCatalog() {
+      return defaultCatalog;
+    }
+
+    @Override
+    public String defaultSchema() {
+      return defaultSchema;
+    }
+
+    @Override
+    public Map<String, String> properties() {
+      return properties;
+    }
+
+    @Override
+    public AuditInfo auditInfo() {
+      return auditInfo;
+    }
+  }
+
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    return views.remove(ident) != null;
+  }
+
+  @Override
+  public NameIdentifier[] listViews(Namespace namespace) {
+    return views.keySet().stream()
+        .filter(ident -> ident.namespace().equals(namespace))
+        .toArray(NameIdentifier[]::new);
   }
 
   @Override
