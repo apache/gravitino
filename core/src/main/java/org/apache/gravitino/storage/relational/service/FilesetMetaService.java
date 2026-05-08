@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -319,55 +320,57 @@ public class FilesetMetaService {
             .toString();
 
     // We should delete meta and version info
+    AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
-            SessionUtils.doWithoutCommit(
-                FilesetMetaMapper.class,
-                mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId)),
-        () ->
+            deleteResult.set(
+                SessionUtils.getWithoutCommit(
+                    FilesetMetaMapper.class,
+                    mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId))),
+        () -> {
+          if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 FilesetVersionMapper.class,
-                mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId)),
-        () ->
+                mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId));
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        filesetId, MetadataObject.Type.FILESET.name())),
-        () ->
+                        filesetId, MetadataObject.Type.FILESET.name()));
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper ->
                     mapper.softDeleteObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name())),
-        () ->
+                        filesetId, MetadataObject.Type.FILESET.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name())),
-        () ->
+                        filesetId, MetadataObject.Type.FILESET.name()));
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(filesetId)),
-        () ->
+                mapper -> mapper.softDeleteStatisticsByEntityId(filesetId));
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name())),
+                        filesetId, MetadataObject.Type.FILESET.name()));
+          }
+        },
         () -> {
-          SessionUtils.doWithoutCommit(
-              EntityChangeLogMapper.class,
-              mapper ->
-                  mapper.insertEntityChange(
-                      metalakeName,
-                      Entity.EntityType.FILESET.name(),
-                      filesetFullName,
-                      OperateType.DROP));
+          if (deleteResult.get() > 0) {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.FILESET.name(),
+                        filesetFullName,
+                        OperateType.DROP));
+          }
         });
 
-    return true;
+    return deleteResult.get() > 0;
   }
 
   @Monitored(

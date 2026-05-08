@@ -258,6 +258,10 @@ public class ViewMetaService {
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         viewId, MetadataObject.Type.VIEW.name()));
+          }
+        },
+        () -> {
+          if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->

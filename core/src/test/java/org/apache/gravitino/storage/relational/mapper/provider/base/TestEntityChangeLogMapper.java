@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
@@ -123,7 +124,7 @@ public class TestEntityChangeLogMapper {
   @Test
   void testEntityChangeLogPruneOldEntries() throws SQLException {
     entityChangeLogMapper.insertEntityChange(
-        "metalake1", "SCHEMA", "metalake1.cat.schema", OperateType.INSERT);
+        "metalake1", "SCHEMA", "metalake1.cat.schema", OperateType.ALTER);
     forceCreatedAt("metalake1.cat.schema", 1000L);
     entityChangeLogMapper.insertEntityChange(
         "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.DROP);
@@ -143,9 +144,9 @@ public class TestEntityChangeLogMapper {
 
   @Test
   void testEntityChangeLogSameTimestampOrderedById() throws SQLException {
-    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "a", OperateType.INSERT);
-    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "b", OperateType.INSERT);
-    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "c", OperateType.INSERT);
+    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "a", OperateType.ALTER);
+    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "b", OperateType.ALTER);
+    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "c", OperateType.ALTER);
     forceCreatedAt("a", 5_000_000L);
     forceCreatedAt("b", 5_000_000L);
     forceCreatedAt("c", 5_000_000L);
@@ -157,13 +158,14 @@ public class TestEntityChangeLogMapper {
   }
 
   private void forceCreatedAt(String fullName, long createdAt) throws SQLException {
-    try (Statement statement = sharedSession.getConnection().createStatement()) {
-      statement.execute(
-          "UPDATE entity_change_log SET created_at = "
-              + createdAt
-              + " WHERE entity_full_name = '"
-              + fullName
-              + "'");
+    try (PreparedStatement statement =
+        sharedSession
+            .getConnection()
+            .prepareStatement(
+                "UPDATE entity_change_log SET created_at = ? WHERE entity_full_name = ?")) {
+      statement.setLong(1, createdAt);
+      statement.setString(2, fullName);
+      statement.executeUpdate();
     }
     sharedSession.clearCache();
   }

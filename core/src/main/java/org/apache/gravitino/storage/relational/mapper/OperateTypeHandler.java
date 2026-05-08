@@ -32,7 +32,7 @@ import org.apache.ibatis.type.MappedTypes;
  * {@code entity_change_log.operate_type} column.
  */
 @MappedTypes(OperateType.class)
-public class OperateTypeTypeHandler extends BaseTypeHandler<OperateType> {
+public class OperateTypeHandler extends BaseTypeHandler<OperateType> {
 
   @Override
   public void setNonNullParameter(

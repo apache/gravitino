@@ -300,50 +300,54 @@ public class TopicMetaService {
         NameIdentifierUtil.ofTopic(metalakeName, catalogName, schemaName, identifier.name())
             .toString();
 
+    AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
-            SessionUtils.doWithoutCommit(
-                TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasByTopicId(topicId)),
-        () ->
+            deleteResult.set(
+                SessionUtils.getWithoutCommit(
+                    TopicMetaMapper.class,
+                    mapper -> mapper.softDeleteTopicMetasByTopicId(topicId))),
+        () -> {
+          if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        topicId, MetadataObject.Type.TOPIC.name())),
-        () ->
+                        topicId, MetadataObject.Type.TOPIC.name()));
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper ->
                     mapper.softDeleteObjectRelsByMetadataObject(
-                        topicId, MetadataObject.Type.TOPIC.name())),
-        () ->
+                        topicId, MetadataObject.Type.TOPIC.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        topicId, MetadataObject.Type.TOPIC.name())),
-        () ->
+                        topicId, MetadataObject.Type.TOPIC.name()));
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(topicId)),
-        () ->
+                mapper -> mapper.softDeleteStatisticsByEntityId(topicId));
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        topicId, MetadataObject.Type.TOPIC.name())),
+                        topicId, MetadataObject.Type.TOPIC.name()));
+          }
+        },
         () -> {
-          SessionUtils.doWithoutCommit(
-              EntityChangeLogMapper.class,
-              mapper ->
-                  mapper.insertEntityChange(
-                      metalakeName,
-                      Entity.EntityType.TOPIC.name(),
-                      topicFullName,
-                      OperateType.DROP));
+          if (deleteResult.get() > 0) {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.TOPIC.name(),
+                        topicFullName,
+                        OperateType.DROP));
+          }
         });
 
-    return true;
+    return deleteResult.get() > 0;
   }
 
   @Monitored(

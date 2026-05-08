@@ -31,7 +31,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.RelationDatasourceMetricsSource;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
-import org.apache.gravitino.storage.relational.mapper.OperateTypeTypeHandler;
+import org.apache.gravitino.storage.relational.mapper.OperateTypeHandler;
 import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.JdbcUrlUtils;
@@ -112,9 +112,7 @@ public class SqlSessionFactoryHelper {
       // Initialize the configuration
       Configuration configuration = new Configuration(environment);
       configuration.setDatabaseId(jdbcType.name().toLowerCase());
-      configuration
-          .getTypeHandlerRegistry()
-          .register(OperateType.class, new OperateTypeTypeHandler());
+      configuration.getTypeHandlerRegistry().register(OperateType.class, new OperateTypeHandler());
       ServiceLoader<MapperPackageProvider> loader = ServiceLoader.load(MapperPackageProvider.class);
       for (MapperPackageProvider provider : loader) {
         provider.getMapperClasses().forEach(configuration::addMapper);

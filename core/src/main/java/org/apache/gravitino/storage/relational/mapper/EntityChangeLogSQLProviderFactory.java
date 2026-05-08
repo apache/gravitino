@@ -18,12 +18,11 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
-import static org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper.ENTITY_CHANGE_LOG_TABLE_NAME;
-
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.EntityChangeLogBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.EntityChangeLogPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -50,30 +49,6 @@ public class EntityChangeLogSQLProviderFactory {
   static class EntityChangeLogMySQLProvider extends EntityChangeLogBaseSQLProvider {}
 
   static class EntityChangeLogH2Provider extends EntityChangeLogBaseSQLProvider {}
-
-  static class EntityChangeLogPostgreSQLProvider extends EntityChangeLogBaseSQLProvider {
-    @Override
-    public String insertEntityChange(
-        @Param("metalakeName") String metalakeName,
-        @Param("entityType") String entityType,
-        @Param("fullName") String fullName,
-        @Param("operateType") OperateType operateType) {
-      return "INSERT INTO "
-          + ENTITY_CHANGE_LOG_TABLE_NAME
-          + " (metalake_name, entity_type, entity_full_name, operate_type, created_at)"
-          + " VALUES (#{metalakeName}, #{entityType}, #{fullName}, #{operateType},"
-          + " CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT))";
-    }
-
-    @Override
-    public String pruneOldEntityChanges(@Param("before") long before) {
-      return "DELETE FROM "
-          + ENTITY_CHANGE_LOG_TABLE_NAME
-          + " WHERE id IN (SELECT id FROM "
-          + ENTITY_CHANGE_LOG_TABLE_NAME
-          + " WHERE created_at < #{before} ORDER BY created_at LIMIT 1000)";
-    }
-  }
 
   public static String selectEntityChanges(
       @Param("createdAtFrom") long createdAtFrom, @Param("maxRows") int maxRows) {

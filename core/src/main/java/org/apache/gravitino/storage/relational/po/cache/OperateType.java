@@ -18,6 +18,11 @@
  */
 package org.apache.gravitino.storage.relational.po.cache;
 
+import java.util.Arrays;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
 /**
  * Operate type emitted into {@code entity_change_log.operate_type}.
  *
@@ -28,8 +33,10 @@ package org.apache.gravitino.storage.relational.po.cache;
  */
 public enum OperateType {
   ALTER(1),
-  DROP(2),
-  INSERT(3);
+  DROP(2);
+
+  private static final Map<Integer, OperateType> BY_CODE =
+      Arrays.stream(values()).collect(Collectors.toMap(OperateType::getCode, Function.identity()));
 
   private final int code;
 
@@ -42,11 +49,10 @@ public enum OperateType {
   }
 
   public static OperateType fromCode(int code) {
-    for (OperateType type : values()) {
-      if (type.code == code) {
-        return type;
-      }
+    OperateType type = BY_CODE.get(code);
+    if (type == null) {
+      throw new IllegalArgumentException("Unknown OperateType code: " + code);
     }
-    throw new IllegalArgumentException("Unknown OperateType code: " + code);
+    return type;
   }
 }
