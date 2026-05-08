@@ -37,7 +37,7 @@ import software.amazon.awssdk.services.glue.model.Table;
  * <p>Subclasses supply the {@link Table} object — either via SDK builder (synthetic) or via the
  * real Glue API — while the test scenarios are defined once here.
  */
-abstract class AbstractGlueTableTest {
+abstract class GlueTableTestBase {
 
   private static final GlueTypeConverter TYPE_CONVERTER = new GlueTypeConverter();
 

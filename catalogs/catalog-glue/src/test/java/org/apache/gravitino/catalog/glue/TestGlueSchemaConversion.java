@@ -23,13 +23,13 @@ import java.util.Map;
 import software.amazon.awssdk.services.glue.model.Database;
 
 /**
- * Runs {@link AbstractGlueSchemaTest} scenarios using AWS SDK builders to create {@link Database}
+ * Runs {@link GlueSchemaTestBase} scenarios using AWS SDK builders to create {@link Database}
  * objects directly — no network or AWS credentials required.
  *
  * <p>This verifies that the {@link GlueSchema#fromGlueDatabase} conversion logic works correctly
  * for typical Glue API response shapes.
  */
-class TestSyntheticGlueSchema extends AbstractGlueSchemaTest {
+class TestGlueSchemaConversion extends GlueSchemaTestBase {
 
   @Override
   protected Database provideDatabase(String name, String description, Map<String, String> params) {
