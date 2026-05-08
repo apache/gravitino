@@ -25,6 +25,17 @@ import org.apache.ibatis.annotations.Param;
 
 public class EntityChangeLogBaseSQLProvider {
 
+  /**
+   * Cursor-advance contract for the entity change poller:
+   *
+   * <p>The {@code created_at >= #{createdAtFrom}} predicate is <b>inclusive</b>. Combined with
+   * {@code ORDER BY created_at, id}, callers must remember the {@code (lastCreatedAt, lastId)} of
+   * the last consumed row and on the next poll: pass {@code createdAtFrom = lastCreatedAt} and
+   * client-side skip rows whose {@code id <= lastId} until they encounter a row with {@code
+   * created_at > lastCreatedAt}. Naively advancing by {@code lastCreatedAt + 1} would miss rows
+   * sharing the same millisecond boundary; advancing by {@code lastCreatedAt} re-reads the boundary
+   * row and relies on the client-side id filter.
+   */
   public String selectEntityChanges(
       @Param("createdAtFrom") long createdAtFrom, @Param("maxRows") int maxRows) {
     return "SELECT id, metalake_name as metalakeName, entity_type as entityType,"
@@ -34,6 +45,15 @@ public class EntityChangeLogBaseSQLProvider {
         + " WHERE created_at >= #{createdAtFrom} ORDER BY created_at, id LIMIT #{maxRows}";
   }
 
+  /**
+   * The {@code (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000}
+   * expression is the established codebase convention for DB-generated millisecond timestamps,
+   * shared with 27+ other base providers (TableMetaBaseSQLProvider, FilesetVersionBaseSQLProvider,
+   * etc.). It works on MySQL natively and on H2 in {@code MODE=MYSQL}; PostgreSQL overrides this
+   * method in its own provider. Round-trip behaviour is verified by {@code
+   * TestEntityChangeLogMapper#testEntityChangeLogInsertAndSelect}, which asserts the persisted
+   * value is within 1 s of the JVM clock.
+   */
   public String insertEntityChange(
       @Param("metalakeName") String metalakeName,
       @Param("entityType") String entityType,
