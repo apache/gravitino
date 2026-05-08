@@ -412,50 +412,24 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     if (mode == null) {
       return CreateMode.CREATE;
     }
-    String normalized = CommonUtil.normalizeToken(mode);
-    if ("CREATE".equals(normalized)) {
-      return CreateMode.CREATE;
-    }
-    if ("EXISTOK".equals(normalized)) {
-      return CreateMode.EXIST_OK;
-    }
-    if ("OVERWRITE".equals(normalized)) {
-      return CreateMode.OVERWRITE;
-    }
-    throw new InvalidInputException(
-        "Unknown create namespace mode: " + mode, CommonUtil.formatCurrentStackTrace(), instance);
+    return CommonUtil.parseEnumToken(
+        CreateMode.class, mode, "Unknown create namespace mode: ", instance);
   }
 
   private static DropMode parseDropMode(String instance, String mode) {
     if (mode == null) {
       return DropMode.FAIL;
     }
-    String normalized = CommonUtil.normalizeToken(mode);
-    if ("FAIL".equals(normalized)) {
-      return DropMode.FAIL;
-    }
-    if ("SKIP".equals(normalized)) {
-      return DropMode.SKIP;
-    }
-    throw new InvalidInputException(
-        "Unknown drop namespace mode: " + mode, CommonUtil.formatCurrentStackTrace(), instance);
+    return CommonUtil.parseEnumToken(
+        DropMode.class, mode, "Unknown drop namespace mode: ", instance);
   }
 
   private static DropBehavior parseDropBehavior(String instance, String behavior) {
     if (behavior == null) {
       return DropBehavior.RESTRICT;
     }
-    String normalized = CommonUtil.normalizeToken(behavior);
-    if ("RESTRICT".equals(normalized)) {
-      return DropBehavior.RESTRICT;
-    }
-    if ("CASCADE".equals(normalized)) {
-      return DropBehavior.CASCADE;
-    }
-    throw new InvalidInputException(
-        "Unknown drop namespace behavior: " + behavior,
-        CommonUtil.formatCurrentStackTrace(),
-        instance);
+    return CommonUtil.parseEnumToken(
+        DropBehavior.class, behavior, "Unknown drop namespace behavior: ", instance);
   }
 
   @Override

@@ -97,6 +97,9 @@ public interface GravitinoLanceTableAlterHandler<REQUEST, RESPONSE> {
       implements GravitinoLanceTableAlterHandler<
           AlterTableAlterColumnsRequest, AlterTableAlterColumnsResponse> {
 
+    private static final String RENAME_ONLY_ERROR =
+        "Only RENAME alteration is supported currently.";
+
     @Override
     public TableChange[] buildGravitinoTableChange(AlterTableAlterColumnsRequest request) {
       return buildAlterColumnChanges(request);
@@ -126,14 +129,17 @@ public interface GravitinoLanceTableAlterHandler<REQUEST, RESPONSE> {
           changes.add(TableChange.renameColumn(new String[] {columnName}, newName));
         }
 
-        if (column.getDataType() != null
-            || column.getNullable() != null
-            || column.getVirtualColumn() != null) {
-          throw new UnsupportedOperationException(
-              "Altering column data type is not supported yet.");
+        if (hasUnsupportedAlterColumnFields(column)) {
+          throw new UnsupportedOperationException(RENAME_ONLY_ERROR);
         }
       }
       return changes.stream().toArray(TableChange[]::new);
+    }
+
+    private boolean hasUnsupportedAlterColumnFields(AlterColumnsEntry column) {
+      return column.getDataType() != null
+          || column.getNullable() != null
+          || column.getVirtualColumn() != null;
     }
   }
 }

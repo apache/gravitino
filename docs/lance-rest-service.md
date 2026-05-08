@@ -90,6 +90,9 @@ More details, please refer to the [Lance REST API specification](https://lance.o
 
 Some operations have specific behaviors and modes. Below are important details to consider:
 
+Mode values are parsed case-insensitively. The examples below use lowercase values as the
+REST-style canonical form.
+
 #### Namespace Operations
 
 **CreateNamespace** supports three modes:

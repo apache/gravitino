@@ -50,7 +50,6 @@ import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
-import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
@@ -69,12 +68,31 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
   public static final Logger LOG = LoggerFactory.getLogger(GravitinoLanceTableOperations.class);
 
-  private final GravitinoLanceNamespaceWrapper namespaceWrapper;
-
   private static final Map<Class<?>, GravitinoLanceTableAlterHandler<?, ?>> ALTER_HANDLERS =
       Map.of(
           AlterTableDropColumnsRequest.class, new DropColumns(),
           AlterTableAlterColumnsRequest.class, new AlterColumnsGravitinoLance());
+
+  private final GravitinoLanceNamespaceWrapper namespaceWrapper;
+
+  private enum CreateMode {
+    CREATE,
+    EXIST_OK,
+    OVERWRITE
+  }
+
+  private enum RegisterMode {
+    CREATE,
+    REGISTER,
+    OVERWRITE;
+
+    String toCreationMode() {
+      if (this == REGISTER) {
+        return CREATE.name();
+      }
+      return name();
+    }
+  }
 
   public GravitinoLanceTableOperations(GravitinoLanceNamespaceWrapper namespaceWrapper) {
     this.namespaceWrapper = namespaceWrapper;
@@ -380,34 +398,18 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
   private static String normalizeCreateMode(String mode, String tableId) {
     if (mode == null) {
-      return "CREATE";
+      return CreateMode.CREATE.name();
     }
-    String normalized = CommonUtil.normalizeToken(mode);
-    if ("CREATE".equals(normalized)) {
-      return "CREATE";
-    }
-    if ("EXISTOK".equals(normalized)) {
-      return "EXIST_OK";
-    }
-    if ("OVERWRITE".equals(normalized)) {
-      return "OVERWRITE";
-    }
-    throw new InvalidInputException(
-        "Unknown create table mode: " + mode, CommonUtil.formatCurrentStackTrace(), tableId);
+    return CommonUtil.parseEnumToken(CreateMode.class, mode, "Unknown create table mode: ", tableId)
+        .name();
   }
 
   private static String normalizeRegisterMode(String mode, String tableId) {
     if (mode == null) {
-      return "CREATE";
+      return RegisterMode.CREATE.toCreationMode();
     }
-    String normalized = CommonUtil.normalizeToken(mode);
-    if ("CREATE".equals(normalized) || "REGISTER".equals(normalized)) {
-      return "CREATE";
-    }
-    if ("OVERWRITE".equals(normalized)) {
-      return "OVERWRITE";
-    }
-    throw new InvalidInputException(
-        "Unknown register table mode: " + mode, CommonUtil.formatCurrentStackTrace(), tableId);
+    return CommonUtil.parseEnumToken(
+            RegisterMode.class, mode, "Unknown register table mode: ", tableId)
+        .toCreationMode();
   }
 }

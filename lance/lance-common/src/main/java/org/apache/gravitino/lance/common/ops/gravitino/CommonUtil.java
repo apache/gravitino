@@ -20,6 +20,7 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 
 import com.google.common.base.Throwables;
 import java.util.Locale;
+import org.lance.namespace.errors.InvalidInputException;
 
 /** Utility methods used by Gravitino Lance namespace operations. */
 class CommonUtil {
@@ -31,6 +32,16 @@ class CommonUtil {
   }
 
   static String normalizeToken(String value) {
-    return value == null ? "" : value.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
+    return value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
+  }
+
+  static <E extends Enum<E>> E parseEnumToken(
+      Class<E> enumClass, String value, String errorMessagePrefix, String instance) {
+    try {
+      return Enum.valueOf(enumClass, normalizeToken(value));
+    } catch (IllegalArgumentException e) {
+      throw new InvalidInputException(
+          errorMessagePrefix + value, formatCurrentStackTrace(), instance);
+    }
   }
 }

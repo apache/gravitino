@@ -74,4 +74,22 @@ class TestGravitinoLanceTableOperations {
     AlterTableAlterColumnsResponse response = handler.handle(table, request);
     Assertions.assertEquals(3L, response.getVersion());
   }
+
+  @Test
+  void testAlterColumnsHandlerRejectsUnsupportedFields() {
+    AlterTableAlterColumnsRequest request = new AlterTableAlterColumnsRequest();
+    AlterColumnsEntry alteration = new AlterColumnsEntry();
+    alteration.setPath("c1");
+    alteration.setRename("c1_new");
+    alteration.setNullable(Boolean.TRUE);
+    request.setAlterations(List.of(alteration));
+
+    AlterColumnsGravitinoLance handler = new AlterColumnsGravitinoLance();
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> handler.buildGravitinoTableChange(request));
+    Assertions.assertEquals(
+        "Only RENAME alteration is supported currently.", exception.getMessage());
+  }
 }
