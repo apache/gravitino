@@ -27,15 +27,9 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
-import org.apache.gravitino.credential.OSSSecretKeyCredential;
-import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.rel.ViewCatalog;
-import org.apache.gravitino.storage.AzureProperties;
-import org.apache.gravitino.storage.OSSProperties;
-import org.apache.gravitino.storage.S3Properties;
 
 /** Implementation of an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
@@ -118,26 +112,7 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
       }
     }
 
-    // Add S3 secret key credential provider if S3 access key and secret key are set
-    String s3AccessKeyId = properties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID);
-    String s3SecretAccessKey = properties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
-    if (StringUtils.isNotBlank(s3AccessKeyId) && StringUtils.isNotBlank(s3SecretAccessKey)) {
-      credentialProviders.add(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
-    }
-
-    // Add OSS secret key credential provider if OSS access key and secret key are set
-    String ossAccessKeyId = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID);
-    String ossSecretAccessKey = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
-    if (StringUtils.isNotBlank(ossAccessKeyId) && StringUtils.isNotBlank(ossSecretAccessKey)) {
-      credentialProviders.add(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE);
-    }
-
-    // Add Azure account key credential provider if Azure account name and key are set
-    String azureAccountName = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
-    String azureAccountKey = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
-    if (StringUtils.isNotBlank(azureAccountName) && StringUtils.isNotBlank(azureAccountKey)) {
-      credentialProviders.add(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
-    }
+    addStorageCredentialProviders(properties, credentialProviders);
 
     if (!credentialProviders.isEmpty()) {
       properties.put(

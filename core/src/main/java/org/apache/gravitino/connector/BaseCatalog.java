@@ -24,8 +24,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogProvider;
@@ -33,10 +35,16 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -432,6 +440,37 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    */
   public Map<String, String> propertiesWithCredentialProviders() {
     return properties();
+  }
+
+  /**
+   * Detects storage credential providers (S3, OSS, Azure) from catalog properties and appends them
+   * to the provided list. Subclasses can call this method in their {@link
+   * #propertiesWithCredentialProviders()} implementation to avoid duplicating storage credential
+   * detection logic.
+   *
+   * @param properties The catalog properties map to scan for storage credentials.
+   * @param credentialProviders The list to append detected storage credential providers to.
+   */
+  @Evolving
+  protected void addStorageCredentialProviders(
+      Map<String, String> properties, List<String> credentialProviders) {
+    String s3AccessKeyId = properties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID);
+    String s3SecretAccessKey = properties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
+    if (StringUtils.isNotBlank(s3AccessKeyId) && StringUtils.isNotBlank(s3SecretAccessKey)) {
+      credentialProviders.add(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
+    }
+
+    String ossAccessKeyId = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID);
+    String ossSecretAccessKey = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
+    if (StringUtils.isNotBlank(ossAccessKeyId) && StringUtils.isNotBlank(ossSecretAccessKey)) {
+      credentialProviders.add(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE);
+    }
+
+    String azureAccountName = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
+    String azureAccountKey = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
+    if (StringUtils.isNotBlank(azureAccountName) && StringUtils.isNotBlank(azureAccountKey)) {
+      credentialProviders.add(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
+    }
   }
 
   @Override
