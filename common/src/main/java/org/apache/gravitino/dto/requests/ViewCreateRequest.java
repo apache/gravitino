@@ -119,6 +119,14 @@ public class ViewCreateRequest implements RESTRequest {
               Preconditions.checkArgument(rep != null, "representation must not be null");
               rep.validate();
             });
+    if (columns != null) {
+      Arrays.stream(columns)
+          .forEach(
+              column -> {
+                Preconditions.checkArgument(column != null, "column must not be null");
+                column.validate();
+              });
+    }
 
     Set<String> seenDialects = new HashSet<>();
     Arrays.stream(representations)

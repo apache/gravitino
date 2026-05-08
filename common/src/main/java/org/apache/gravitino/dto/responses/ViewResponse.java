@@ -57,7 +57,7 @@ public class ViewResponse extends BaseResponse {
 
     Preconditions.checkArgument(view != null, "view must not be null");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(view.name()), "view 'name' must not be null and empty");
+        StringUtils.isNotBlank(view.name()), "view 'name' must not be null or empty");
     Preconditions.checkArgument(view.auditInfo() != null, "view 'audit' must not be null");
     Preconditions.checkArgument(
         view.representations() != null && view.representations().length > 0,

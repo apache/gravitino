@@ -52,20 +52,43 @@ public class TestViewResponse {
   }
 
   @Test
-  public void testViewResponseValidateWithMissingRepresentations() {
-    ViewDTO view =
-        ViewDTO.builder()
-            .withName("v1")
-            .withColumns(new ColumnDTO[0])
-            .withRepresentations(new RepresentationDTO[0])
-            .withAudit(audit())
-            .build();
-    ViewResponse response = new ViewResponse(view);
+  public void testViewResponseValidateWithMissingRepresentations() throws JsonProcessingException {
+    String rawJson =
+        "{"
+            + "\"code\":0,"
+            + "\"view\":{"
+            + "\"name\":\"v1\","
+            + "\"columns\":[],"
+            + "\"representations\":[],"
+            + "\"audit\":{}"
+            + "}"
+            + "}";
+    ViewResponse response = JsonUtils.objectMapper().readValue(rawJson, ViewResponse.class);
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, response::validate);
     Assertions.assertEquals(
         "view 'representations' must not be null or empty", exception.getMessage());
+  }
+
+  @Test
+  public void testViewResponseValidateWithMissingNameMessage() throws JsonProcessingException {
+    String rawJson =
+        "{"
+            + "\"code\":0,"
+            + "\"view\":{"
+            + "\"name\":\"\","
+            + "\"columns\":[],"
+            + "\"representations\":[{\"type\":\"sql\",\"dialect\":\"trino\",\"sql\":\"SELECT 1\"}],"
+            + "\"audit\":{}"
+            + "}"
+            + "}";
+
+    ViewResponse malformed = JsonUtils.objectMapper().readValue(rawJson, ViewResponse.class);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, malformed::validate);
+    Assertions.assertEquals("view 'name' must not be null or empty", exception.getMessage());
   }
 
   @Test

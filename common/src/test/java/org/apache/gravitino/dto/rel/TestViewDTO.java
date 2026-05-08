@@ -99,6 +99,12 @@ public class TestViewDTO {
                     .withRepresentations(new RepresentationDTO[0])
                     .build());
     Assertions.assertEquals("audit cannot be null", exception2.getMessage());
+
+    IllegalArgumentException exception3 =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ViewDTO.builder().withName("v1").withAudit(audit()).build());
+    Assertions.assertEquals("representations cannot be null or empty", exception3.getMessage());
   }
 
   @Test
@@ -124,6 +130,22 @@ public class TestViewDTO {
     Assertions.assertEquals("cat", dto.defaultCatalog());
     Assertions.assertEquals("sch", dto.defaultSchema());
     Assertions.assertEquals("v", dto.properties().get("k"));
+  }
+
+  @Test
+  public void testViewDTOColumnsFallbackToEmptyArrayWhenMissingInJson()
+      throws JsonProcessingException {
+    String rawJson =
+        "{"
+            + "\"name\":\"v_raw\","
+            + "\"representations\":[{\"type\":\"sql\",\"dialect\":\"spark\",\"sql\":\"SELECT 2\"}],"
+            + "\"audit\":{}"
+            + "}";
+
+    ViewDTO dto = JsonUtils.objectMapper().readValue(rawJson, ViewDTO.class);
+
+    Assertions.assertNotNull(dto.columns());
+    Assertions.assertEquals(0, dto.columns().length);
   }
 
   private AuditDTO audit() {

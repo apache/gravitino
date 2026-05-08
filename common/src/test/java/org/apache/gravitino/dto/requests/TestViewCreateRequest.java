@@ -96,6 +96,40 @@ public class TestViewCreateRequest {
   }
 
   @Test
+  public void testViewCreateRequestValidateNullColumn() {
+    ViewCreateRequest request =
+        ViewCreateRequest.builder()
+            .name("v1")
+            .columns(new ColumnDTO[] {null})
+            .representations(
+                new RepresentationDTO[] {
+                  SQLRepresentationDTO.builder().withDialect("trino").withSql("SELECT 1").build()
+                })
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertEquals("column must not be null", exception.getMessage());
+  }
+
+  @Test
+  public void testViewCreateRequestValidateInvalidColumn() throws JsonProcessingException {
+    String rawJson =
+        "{"
+            + "\"name\":\"v1\","
+            + "\"columns\":[{}],"
+            + "\"representations\":[{\"type\":\"sql\",\"dialect\":\"trino\",\"sql\":\"SELECT 1\"}]"
+            + "}";
+
+    ViewCreateRequest request =
+        JsonUtils.objectMapper().readValue(rawJson, ViewCreateRequest.class);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertEquals("Column name cannot be null or empty.", exception.getMessage());
+  }
+
+  @Test
   public void testViewCreateRequestDeserializeFromRawJson() throws JsonProcessingException {
     String rawJson =
         "{"

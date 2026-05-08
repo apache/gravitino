@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.rel;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -98,12 +99,12 @@ public class ViewDTO implements View {
 
   @Override
   public Column[] columns() {
-    return columns;
+    return columns == null ? new ColumnDTO[0] : columns;
   }
 
   @Override
   public Representation[] representations() {
-    return representations;
+    return representations == null ? new RepresentationDTO[0] : representations;
   }
 
   @Override
@@ -246,6 +247,15 @@ public class ViewDTO implements View {
     public ViewDTO build() {
       Preconditions.checkArgument(name != null && !name.isEmpty(), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
+      Preconditions.checkArgument(
+          representations != null && representations.length > 0,
+          "representations cannot be null or empty");
+      Arrays.stream(representations)
+          .forEach(
+              rep -> {
+                Preconditions.checkArgument(rep != null, "representation must not be null");
+                rep.validate();
+              });
       return new ViewDTO(
           name,
           comment,

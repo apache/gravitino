@@ -104,6 +104,41 @@ public class TestViewUpdateRequest {
   }
 
   @Test
+  public void testReplaceViewRequestValidateNullColumn() {
+    ViewUpdateRequest.ReplaceViewRequest request =
+        new ViewUpdateRequest.ReplaceViewRequest(
+            new ColumnDTO[] {null},
+            new RepresentationDTO[] {
+              SQLRepresentationDTO.builder().withDialect("spark").withSql("SELECT 2").build()
+            },
+            null,
+            null,
+            null);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertEquals("column must not be null", exception.getMessage());
+  }
+
+  @Test
+  public void testReplaceViewRequestValidateInvalidColumn() throws JsonProcessingException {
+    String rawJson =
+        "{"
+            + "\"@type\":\"replaceView\","
+            + "\"columns\":[{}],"
+            + "\"representations\":[{\"type\":\"sql\",\"dialect\":\"spark\",\"sql\":\"SELECT 2\"}]"
+            + "}";
+
+    ViewUpdateRequest.ReplaceViewRequest request =
+        (ViewUpdateRequest.ReplaceViewRequest)
+            JsonUtils.objectMapper().readValue(rawJson, ViewUpdateRequest.class);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, request::validate);
+    Assertions.assertEquals("Column name cannot be null or empty.", exception.getMessage());
+  }
+
+  @Test
   public void testViewUpdatesRequestSerDeAndValidate() throws JsonProcessingException {
     ViewUpdatesRequest request =
         new ViewUpdatesRequest(
