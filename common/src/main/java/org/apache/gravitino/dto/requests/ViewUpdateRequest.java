@@ -24,8 +24,6 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -33,7 +31,6 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.RepresentationDTO;
-import org.apache.gravitino.dto.rel.SQLRepresentationDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rest.RESTRequest;
@@ -243,16 +240,7 @@ public interface ViewUpdateRequest extends RESTRequest {
                 });
       }
 
-      Set<String> seenDialects = new HashSet<>();
-      Arrays.stream(representations)
-          .filter(rep -> rep instanceof SQLRepresentationDTO)
-          .map(rep -> ((SQLRepresentationDTO) rep).dialect())
-          .forEach(
-              dialect ->
-                  Preconditions.checkArgument(
-                      seenDialects.add(dialect),
-                      "Duplicate SQL representation dialect: %s",
-                      dialect));
+      ViewCreateRequest.validateNoDuplicateDialects(representations);
     }
 
     @Override

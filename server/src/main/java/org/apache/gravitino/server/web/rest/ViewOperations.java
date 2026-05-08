@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.server.web.rest;
 
-import static org.apache.gravitino.dto.util.DTOConverters.fromDTOs;
-
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import javax.inject.Inject;
@@ -115,7 +113,7 @@ public class ViewOperations {
                 dispatcher.createView(
                     ident,
                     request.getComment(),
-                    fromDTOs(request.getColumns()),
+                    DTOConverters.fromDTOs(request.getColumns()),
                     DTOConverters.fromDTOs(request.getRepresentations()),
                     request.getDefaultCatalog(),
                     request.getDefaultSchema(),
@@ -207,13 +205,12 @@ public class ViewOperations {
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofView(metalake, catalog, schema, view);
             boolean dropped = dispatcher.dropView(ident);
-            if (!dropped) {
+            if (dropped) {
+              LOG.info("View dropped: {}.{}.{}.{}", metalake, catalog, schema, view);
+            } else {
               LOG.warn("Cannot find to be dropped view {} under schema {}", view, schema);
             }
-
-            Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("View dropped: {}.{}.{}.{}", metalake, catalog, schema, view);
-            return response;
+            return Utils.ok(new DropResponse(dropped));
           });
 
     } catch (Exception e) {

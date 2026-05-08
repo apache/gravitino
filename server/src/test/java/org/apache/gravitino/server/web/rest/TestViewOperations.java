@@ -76,6 +76,8 @@ import org.mockito.Mockito;
 
 public class TestViewOperations extends BaseOperationsTest {
 
+  private static final String VND_V1_JSON = "application/vnd.gravitino.v1+json";
+
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
     @Override
     public HttpServletRequest get() {
@@ -242,8 +244,8 @@ public class TestViewOperations extends BaseOperationsTest {
     Response resp =
         target(viewPath(metalake, catalog, schema))
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+            .accept(VND_V1_JSON)
+            .post(Entity.entity(req, VND_V1_JSON));
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 
     ViewResponse viewResp = resp.readEntity(ViewResponse.class);
@@ -257,8 +259,8 @@ public class TestViewOperations extends BaseOperationsTest {
     Response resp1 =
         target(viewPath(metalake, catalog, schema))
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+            .accept(VND_V1_JSON)
+            .post(Entity.entity(req, VND_V1_JSON));
     Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), resp1.getStatus());
 
     ErrorResponse errorResp1 = resp1.readEntity(ErrorResponse.class);
@@ -272,8 +274,8 @@ public class TestViewOperations extends BaseOperationsTest {
     Response resp2 =
         target(viewPath(metalake, catalog, schema))
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+            .accept(VND_V1_JSON)
+            .post(Entity.entity(req, VND_V1_JSON));
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp2.getStatus());
 
     // Test duplicate SQL representation dialects → 400 BAD_REQUEST
@@ -290,8 +292,8 @@ public class TestViewOperations extends BaseOperationsTest {
     Response resp3 =
         target(viewPath(metalake, catalog, schema))
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(dupReq, MediaType.APPLICATION_JSON_TYPE));
+            .accept(VND_V1_JSON)
+            .post(Entity.entity(dupReq, VND_V1_JSON));
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp3.getStatus());
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
@@ -333,11 +335,8 @@ public class TestViewOperations extends BaseOperationsTest {
     Response resp =
         target(viewPath(metalake, catalog, schema) + "/view1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .put(
-                Entity.entity(
-                    new ViewUpdatesRequest(ImmutableList.of(dupReplace)),
-                    MediaType.APPLICATION_JSON_TYPE));
+            .accept(VND_V1_JSON)
+            .put(Entity.entity(new ViewUpdatesRequest(ImmutableList.of(dupReplace)), VND_V1_JSON));
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
@@ -389,8 +388,8 @@ public class TestViewOperations extends BaseOperationsTest {
     Response resp =
         target(viewPath(metalake, catalog, schema) + "/view1")
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+            .accept(VND_V1_JSON)
+            .put(Entity.entity(req, VND_V1_JSON));
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 
     ViewResponse viewResp = resp.readEntity(ViewResponse.class);

@@ -339,10 +339,7 @@ public class DTOConverters {
    * @return The SQL representation DTO.
    */
   public static SQLRepresentationDTO toDTO(SQLRepresentation sqlRepresentation) {
-    return SQLRepresentationDTO.builder()
-        .withDialect(sqlRepresentation.dialect())
-        .withSql(sqlRepresentation.sql())
-        .build();
+    return (SQLRepresentationDTO) RepresentationDTO.fromRepresentation(sqlRepresentation);
   }
 
   /**

@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rel.Representation;
-import org.apache.gravitino.rel.SQLRepresentation;
 
 /**
  * A DTO mirroring {@link org.apache.gravitino.rel.SQLRepresentation}. Represents a SQL-based view
@@ -60,19 +59,6 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
     return new Builder();
   }
 
-  /**
-   * Creates a new {@link SQLRepresentationDTO} from a {@link SQLRepresentation} domain object.
-   *
-   * @param sqlRepresentation The SQL representation domain object.
-   * @return The SQL representation DTO.
-   */
-  public static SQLRepresentationDTO fromSQLRepresentation(SQLRepresentation sqlRepresentation) {
-    return builder()
-        .withDialect(sqlRepresentation.dialect())
-        .withSql(sqlRepresentation.sql())
-        .build();
-  }
-
   @Override
   public String type() {
     return type;
@@ -88,29 +74,11 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
   }
 
   /**
-   * Returns the SQL dialect of this representation.
-   *
-   * @return The dialect identifier.
-   */
-  public String getDialect() {
-    return dialect;
-  }
-
-  /**
    * Returns the SQL text of this representation.
    *
    * @return The SQL text.
    */
   public String sql() {
-    return sql;
-  }
-
-  /**
-   * Returns the SQL text of this representation.
-   *
-   * @return The SQL text.
-   */
-  public String getSql() {
     return sql;
   }
 
@@ -120,11 +88,6 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
         StringUtils.isNotBlank(dialect), "\"dialect\" field is required and cannot be empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sql), "\"sql\" field is required and cannot be empty");
-  }
-
-  @Override
-  public Representation toRepresentation() {
-    return SQLRepresentation.builder().withDialect(dialect).withSql(sql).build();
   }
 
   @Override

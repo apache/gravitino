@@ -51,21 +51,21 @@ public abstract class RepresentationDTO implements Representation {
   public abstract void validate() throws IllegalArgumentException;
 
   /**
-   * Converts this DTO to a {@link Representation} domain object.
-   *
-   * @return The representation domain object.
-   */
-  public abstract Representation toRepresentation();
-
-  /**
    * Creates a {@link RepresentationDTO} from a {@link Representation} domain object.
    *
    * @param representation The representation domain object.
    * @return The representation DTO.
    */
   public static RepresentationDTO fromRepresentation(Representation representation) {
+    if (representation instanceof RepresentationDTO) {
+      return (RepresentationDTO) representation;
+    }
     if (representation instanceof SQLRepresentation) {
-      return SQLRepresentationDTO.fromSQLRepresentation((SQLRepresentation) representation);
+      SQLRepresentation sqlRepresentation = (SQLRepresentation) representation;
+      return SQLRepresentationDTO.builder()
+          .withDialect(sqlRepresentation.dialect())
+          .withSql(sqlRepresentation.sql())
+          .build();
     }
     throw new IllegalArgumentException(
         "Unsupported representation type: " + representation.getClass().getName());

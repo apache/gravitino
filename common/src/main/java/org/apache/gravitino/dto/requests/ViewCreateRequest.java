@@ -128,6 +128,10 @@ public class ViewCreateRequest implements RESTRequest {
               });
     }
 
+    validateNoDuplicateDialects(representations);
+  }
+
+  static void validateNoDuplicateDialects(RepresentationDTO[] representations) {
     Set<String> seenDialects = new HashSet<>();
     Arrays.stream(representations)
         .filter(rep -> rep instanceof SQLRepresentationDTO)
