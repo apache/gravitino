@@ -55,4 +55,24 @@ public class TestRepresentationDTO {
 
     Assertions.assertEquals(representation, converted);
   }
+
+  @Test
+  public void testSQLRepresentationDTOBuilderRejectsMissingDialect() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SQLRepresentationDTO.builder().withSql("SELECT 1").build());
+    Assertions.assertEquals(
+        "\"dialect\" field is required and cannot be empty", exception.getMessage());
+  }
+
+  @Test
+  public void testSQLRepresentationDTOBuilderRejectsBlankSql() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SQLRepresentationDTO.builder().withDialect("spark").withSql(" ").build());
+    Assertions.assertEquals(
+        "\"sql\" field is required and cannot be empty", exception.getMessage());
+  }
 }

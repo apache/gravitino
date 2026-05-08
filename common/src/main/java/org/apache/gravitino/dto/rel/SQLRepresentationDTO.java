@@ -144,7 +144,9 @@ public final class SQLRepresentationDTO extends RepresentationDTO {
      * @return The constructed instance.
      */
     public SQLRepresentationDTO build() {
-      return new SQLRepresentationDTO(dialect, sql);
+      SQLRepresentationDTO representation = new SQLRepresentationDTO(dialect, sql);
+      representation.validate();
+      return representation;
     }
   }
 }
