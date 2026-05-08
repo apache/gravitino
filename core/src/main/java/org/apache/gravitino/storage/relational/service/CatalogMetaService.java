@@ -347,6 +347,9 @@ public class CatalogMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByCatalogId(catalogId)),
+          // Only one CATALOG DROP record is written here; the cache layer performs prefix
+          // eviction on '<metalake>.<catalog>.*', covering all descendants automatically.
+          // Writing per-child DROP rows would multiply changelog volume without benefit.
           () -> {
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,

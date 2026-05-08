@@ -29,9 +29,8 @@ import org.apache.ibatis.annotations.SelectProvider;
 /**
  * A MyBatis Mapper for entity_change_log table operations.
  *
- * <p>This append-only log tracks structural changes to entities (create, alter, drop) and is used
- * by the entity change poller to drive targeted invalidation of the metadataIdCache on HA peer
- * nodes.
+ * <p>This append-only log tracks structural changes to entities (alter, drop) and is used by the
+ * entity change poller to drive targeted invalidation of the metadataIdCache on HA peer nodes.
  */
 public interface EntityChangeLogMapper {
 

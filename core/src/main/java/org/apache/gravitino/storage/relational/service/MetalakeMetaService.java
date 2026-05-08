@@ -194,7 +194,7 @@ public class MetalakeMetaService {
                   EntityChangeLogMapper.class,
                   mapper ->
                       mapper.insertEntityChange(
-                          oldFullName,
+                          oldMetalakeEntity.name(),
                           Entity.EntityType.METALAKE.name(),
                           oldFullName,
                           OperateType.ALTER));
