@@ -209,6 +209,37 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testNestedSchemaInsertMaterializesAncestorsInOneCall() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String logicalLeaf = "p:q:r";
+    long leafId = RandomIdGenerator.INSTANCE.nextId();
+    SchemaEntity leaf =
+        createSchemaEntity(
+            leafId, NamespaceUtil.ofSchema(metalakeName, catalogName), logicalLeaf, AUDIT_INFO);
+    schemaMetaService.insertSchema(leaf, false);
+
+    SchemaEntity levelP =
+        schemaMetaService.getSchemaByIdentifier(
+            NameIdentifierUtil.ofSchema(metalakeName, catalogName, "p"));
+    SchemaEntity levelPQ =
+        schemaMetaService.getSchemaByIdentifier(
+            NameIdentifierUtil.ofSchema(metalakeName, catalogName, "p:q"));
+    SchemaEntity loadedLeaf =
+        schemaMetaService.getSchemaByIdentifier(
+            NameIdentifierUtil.ofSchema(metalakeName, catalogName, logicalLeaf));
+
+    Assertions.assertEquals("p", readRawSchemaNameFromDb(levelP.id()));
+    Assertions.assertEquals("p" + PHYSICAL_SEPARATOR + "q", readRawSchemaNameFromDb(levelPQ.id()));
+    Assertions.assertEquals(
+        "p" + PHYSICAL_SEPARATOR + "q" + PHYSICAL_SEPARATOR + "r",
+        readRawSchemaNameFromDb(loadedLeaf.id()));
+    Assertions.assertEquals(leafId, loadedLeaf.id());
+  }
+
+  @TestTemplate
   public void testFlatSchemaNameStoredAndReturnedUnchanged() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);

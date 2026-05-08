@@ -22,8 +22,11 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -170,20 +173,79 @@ public class SchemaMetaService {
   public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) throws IOException {
     try {
       // Convert the logical entity name to physical before building and storing the PO.
-      SchemaEntity physicalEntity = toPhysicalEntity(schemaEntity);
-      NameIdentifierUtil.checkSchema(physicalEntity.nameIdentifier());
+      SchemaEntity physicalLeaf = toPhysicalEntity(schemaEntity);
+      NameIdentifierUtil.checkSchema(physicalLeaf.nameIdentifier());
 
-      SchemaPO.Builder builder = SchemaPO.builder();
-      fillSchemaPOBuilderParentEntityId(builder, physicalEntity.namespace());
+      String separator = HierarchicalSchemaUtil.schemaSeparator();
+      String logicalLeaf = normalizeToLogicalSchemaName(schemaEntity.name());
+      List<SchemaEntity> rowsToInsert = new ArrayList<>();
+      if (!HierarchicalSchemaUtil.isHierarchical(logicalLeaf, separator)) {
+        rowsToInsert.add(physicalLeaf);
+      } else {
+        for (String ancestorLogical :
+            HierarchicalSchemaUtil.getAncestorNames(logicalLeaf, separator)) {
+          SchemaEntity ancestor =
+              SchemaEntity.builder()
+                  .withId(GravitinoEnv.getInstance().idGenerator().nextId())
+                  .withName(ancestorLogical)
+                  .withNamespace(schemaEntity.namespace())
+                  .withComment(null)
+                  .withProperties(Collections.emptyMap())
+                  .withAuditInfo(schemaEntity.auditInfo())
+                  .build();
+          rowsToInsert.add(toPhysicalEntity(ancestor));
+        }
+        SchemaEntity leafWithLogicalName =
+            SchemaEntity.builder()
+                .withId(schemaEntity.id())
+                .withName(logicalLeaf)
+                .withNamespace(schemaEntity.namespace())
+                .withComment(schemaEntity.comment())
+                .withProperties(
+                    schemaEntity.properties() == null
+                        ? Collections.emptyMap()
+                        : schemaEntity.properties())
+                .withAuditInfo(schemaEntity.auditInfo())
+                .build();
+        rowsToInsert.add(toPhysicalEntity(leafWithLogicalName));
+      }
 
+      Namespace namespace = physicalLeaf.namespace();
       SessionUtils.doWithCommit(
           SchemaMetaMapper.class,
           mapper -> {
-            SchemaPO po = POConverters.initializeSchemaPOWithVersion(physicalEntity, builder);
+            String metalakeName = namespace.level(0);
+            String catalogName = namespace.level(1);
+            List<SchemaPO> posToInsert = new ArrayList<>();
+            int n = rowsToInsert.size();
+            if (n > 1) {
+              List<SchemaEntity> ancestors = rowsToInsert.subList(0, n - 1);
+              List<String> ancestorPhysicalNames =
+                  ancestors.stream().map(SchemaEntity::name).collect(Collectors.toList());
+              List<SchemaPO> existingAncestors =
+                  mapper.batchSelectSchemaByIdentifier(
+                      metalakeName, catalogName, ancestorPhysicalNames);
+              Set<String> existingNames =
+                  existingAncestors.stream()
+                      .map(SchemaPO::getSchemaName)
+                      .collect(Collectors.toSet());
+              for (SchemaEntity row : ancestors) {
+                if (existingNames.contains(row.name())) {
+                  continue;
+                }
+                SchemaPO.Builder builder = SchemaPO.builder();
+                fillSchemaPOBuilderParentEntityId(builder, row.namespace());
+                posToInsert.add(POConverters.initializeSchemaPOWithVersion(row, builder));
+              }
+            }
+            SchemaEntity leafRow = rowsToInsert.get(n - 1);
+            SchemaPO.Builder leafBuilder = SchemaPO.builder();
+            fillSchemaPOBuilderParentEntityId(leafBuilder, leafRow.namespace());
+            posToInsert.add(POConverters.initializeSchemaPOWithVersion(leafRow, leafBuilder));
             if (overwrite) {
-              mapper.insertSchemaMetaOnDuplicateKeyUpdate(po);
+              mapper.batchInsertSchemaMetaOnDuplicateKeyUpdate(posToInsert);
             } else {
-              mapper.insertSchemaMeta(po);
+              mapper.batchInsertSchemaMeta(posToInsert);
             }
           });
     } catch (RuntimeException re) {
@@ -537,6 +599,22 @@ public class SchemaMetaService {
   // ---------------------------------------------------------------------------
   // Helpers: logical ↔ physical schema name conversion at the PO boundary
   // ---------------------------------------------------------------------------
+
+  /**
+   * Returns the logical schema path for hierarchy expansion. Values already using the external
+   * separator are unchanged; values stored with only the internal physical separator are converted
+   * to logical form.
+   */
+  private String normalizeToLogicalSchemaName(String schemaName) {
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    if (HierarchicalSchemaUtil.isHierarchical(schemaName, separator)) {
+      return schemaName;
+    }
+    if (schemaName != null && schemaName.contains(HierarchicalSchemaUtil.physicalSeparator())) {
+      return toLogicalSchemaName(schemaName);
+    }
+    return schemaName;
+  }
 
   /**
    * Converts a logical schema name (e.g. {@code "A:B:C"}) to the physical internal form (e.g.

@@ -742,6 +742,24 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public void batchInsertOwnerRelations(
+      List<NameIdentifier> ownedObjectIdents,
+      Entity.EntityType ownedObjectType,
+      NameIdentifier ownerIdent,
+      Entity.EntityType ownerType,
+      boolean override)
+      throws IOException {
+    if (ownedObjectIdents == null || ownedObjectIdents.isEmpty()) {
+      return;
+    }
+    Preconditions.checkNotNull(ownedObjectType, "ownedObjectType must not be null");
+    Preconditions.checkNotNull(ownerIdent, "ownerIdent must not be null");
+    Preconditions.checkNotNull(ownerType, "ownerType must not be null");
+    OwnerMetaService.getInstance()
+        .batchSetOwners(ownedObjectIdents, ownedObjectType, ownerIdent, ownerType);
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
       Type relType,
       NameIdentifier srcEntityIdent,

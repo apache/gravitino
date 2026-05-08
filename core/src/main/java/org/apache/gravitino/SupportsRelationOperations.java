@@ -20,6 +20,7 @@ package org.apache.gravitino;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 
 /**
@@ -164,6 +165,35 @@ public interface SupportsRelationOperations {
       Entity.EntityType dstType,
       boolean override)
       throws IOException;
+
+  /**
+   * Batch sets the same owner (destination) on multiple metadata objects (sources) for {@link
+   * Type#OWNER_REL}. All sources share one {@code ownedObjectType}. Semantics match repeated {@link
+   * #insertRelation} with {@code OWNER_REL}; a relational backend may implement this as fewer
+   * round-trips.
+   *
+   * @param ownedObjectIdents identifiers of metadata objects to attach the owner to
+   * @param ownedObjectType entity type shared by every identifier in {@code ownedObjectIdents}
+   * @param ownerIdent owner user or group identifier
+   * @param ownerType USER or GROUP
+   * @param override if true, replace existing owner rows per metadata object first
+   * @throws IOException if the storage operation fails
+   */
+  default void batchInsertOwnerRelations(
+      List<NameIdentifier> ownedObjectIdents,
+      Entity.EntityType ownedObjectType,
+      NameIdentifier ownerIdent,
+      Entity.EntityType ownerType,
+      boolean override)
+      throws IOException {
+    Objects.requireNonNull(ownedObjectIdents, "ownedObjectIdents must not be null");
+    Objects.requireNonNull(ownedObjectType, "ownedObjectType must not be null");
+    Objects.requireNonNull(ownerIdent, "ownerIdent must not be null");
+    Objects.requireNonNull(ownerType, "ownerType must not be null");
+    for (NameIdentifier ident : ownedObjectIdents) {
+      insertRelation(Type.OWNER_REL, ident, ownedObjectType, ownerIdent, ownerType, override);
+    }
+  }
 
   /**
    * Updates the relations for a given entity by adding a set of new relations and removing another

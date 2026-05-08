@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.authorization;
 
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 
@@ -35,6 +37,30 @@ public interface OwnerDispatcher {
    */
   void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType);
+
+  /**
+   * Sets the same owner on multiple metadata objects in iteration order. Semantics match repeated
+   * {@link #setOwner} calls; relational {@link org.apache.gravitino.EntityStore} implementations
+   * may persist using {@link
+   * org.apache.gravitino.SupportsRelationOperations#batchInsertOwnerRelations}. The default
+   * implementation delegates per object so implementations that wrap {@code setOwner} (e.g. for
+   * events) apply consistently.
+   *
+   * @param metalake the name of the metalake
+   * @param metadataObjects the objects to update; must not be null (may be empty)
+   * @param ownerName the name of the owner
+   * @param ownerType the type of the owner (e.g., USER, GROUP)
+   */
+  default void setOwners(
+      String metalake,
+      List<MetadataObject> metadataObjects,
+      String ownerName,
+      Owner.Type ownerType) {
+    Objects.requireNonNull(metadataObjects, "metadataObjects must not be null");
+    for (MetadataObject metadataObject : metadataObjects) {
+      setOwner(metalake, metadataObject, ownerName, ownerType);
+    }
+  }
 
   /**
    * Retrieves the owner of a metadata object.
