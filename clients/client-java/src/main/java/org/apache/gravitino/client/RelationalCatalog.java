@@ -378,7 +378,7 @@ class RelationalCatalog extends BaseSchemaCatalog implements TableCatalog, ViewC
       throws NoSuchSchemaException, ViewAlreadyExistsException {
     checkViewNameIdentifier(ident);
 
-    ColumnDTO[] columnDTOs = columns == null ? new ColumnDTO[0] : toDTOs(columns);
+    ColumnDTO[] columnDTOs = toDTOs(columns);
     RepresentationDTO[] representationDTOs = toDTOs(representations);
 
     ViewCreateRequest req =
