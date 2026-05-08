@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import static org.apache.gravitino.catalog.glue.GlueConstants.LOCATION;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
@@ -38,6 +40,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -101,6 +104,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   private static final Set<String> SD_TABLE_PROPERTY_KEYS =
       ImmutableSet.of(
           GlueConstants.LOCATION,
+          GlueConstants.FORMAT,
           GlueConstants.INPUT_FORMAT,
           GlueConstants.OUTPUT_FORMAT,
           GlueConstants.SERDE_LIB,
@@ -190,8 +194,15 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     Map<String, String> params = properties != null ? properties : Collections.emptyMap();
 
-    DatabaseInput input =
-        DatabaseInput.builder().name(ident.name()).description(comment).parameters(params).build();
+    DatabaseInput.Builder inputBuilder =
+        DatabaseInput.builder().name(ident.name()).description(comment).parameters(params);
+
+    String location = params.get(LOCATION);
+    if (location != null) {
+      inputBuilder.locationUri(location);
+    }
+
+    DatabaseInput input = inputBuilder.build();
 
     CreateDatabaseRequest.Builder req = CreateDatabaseRequest.builder().databaseInput(input);
     applyCatalogId(catalogId, req::catalogId);
@@ -250,12 +261,18 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       }
     }
 
-    DatabaseInput input =
+    DatabaseInput.Builder inputBuilder =
         DatabaseInput.builder()
             .name(ident.name())
             .description(current.comment())
-            .parameters(newProps)
-            .build();
+            .parameters(newProps);
+
+    String location = newProps.get(LOCATION);
+    if (location != null) {
+      inputBuilder.locationUri(location);
+    }
+
+    DatabaseInput input = inputBuilder.build();
 
     UpdateDatabaseRequest.Builder req =
         UpdateDatabaseRequest.builder().name(ident.name()).databaseInput(input);
@@ -572,9 +589,25 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       }
     }
 
+    // Translate format name to input/output/serde class names if not explicitly set
+    String format = properties.get(GlueConstants.FORMAT);
+    String inputFormat = properties.get(GlueConstants.INPUT_FORMAT);
+    String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
+    String serdeLib = properties.get(GlueConstants.SERDE_LIB);
+
+    if (inputFormat == null && format != null) {
+      inputFormat = getInputFormatClass(format.toLowerCase(Locale.ROOT));
+    }
+    if (outputFormat == null && format != null) {
+      outputFormat = getOutputFormatClass(format.toLowerCase(Locale.ROOT));
+    }
+    if (serdeLib == null && format != null) {
+      serdeLib = getSerdeClass(format.toLowerCase(Locale.ROOT));
+    }
+
     SerDeInfo serDe =
         SerDeInfo.builder()
-            .serializationLibrary(properties.get(GlueConstants.SERDE_LIB))
+            .serializationLibrary(serdeLib)
             .name(properties.get(GlueConstants.SERDE_NAME))
             .parameters(serdeParams)
             .build();
@@ -606,8 +639,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         StorageDescriptor.builder()
             .columns(glueDataCols)
             .location(properties.get(GlueConstants.LOCATION))
-            .inputFormat(properties.get(GlueConstants.INPUT_FORMAT))
-            .outputFormat(properties.get(GlueConstants.OUTPUT_FORMAT))
+            .inputFormat(inputFormat)
+            .outputFormat(outputFormat)
             .serdeInfo(serDe)
             .bucketColumns(bucketCols)
             .numberOfBuckets(numBuckets)
@@ -630,6 +663,77 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         .type(typeConverter.fromGravitino(col.dataType()))
         .comment(col.comment())
         .build();
+  }
+
+  /** Translates a format name (e.g., "parquet", "orc") to the Hive input format class. */
+  private static String getInputFormatClass(String format) {
+    switch (format) {
+      case "parquet":
+        return HiveStorageConstants.PARQUET_INPUT_FORMAT_CLASS;
+      case "orc":
+        return HiveStorageConstants.ORC_INPUT_FORMAT_CLASS;
+      case "textfile":
+      case "csv":
+        return HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS;
+      case "rcfile":
+        return HiveStorageConstants.RCFILE_INPUT_FORMAT_CLASS;
+      case "avro":
+        return HiveStorageConstants.AVRO_INPUT_FORMAT_CLASS;
+      case "sequencefile":
+        return HiveStorageConstants.SEQUENCEFILE_INPUT_FORMAT_CLASS;
+      case "json":
+      case "regex":
+      default:
+        return HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS;
+    }
+  }
+
+  /** Translates a format name to the Hive output format class. */
+  private static String getOutputFormatClass(String format) {
+    switch (format) {
+      case "parquet":
+        return HiveStorageConstants.PARQUET_OUTPUT_FORMAT_CLASS;
+      case "orc":
+        return HiveStorageConstants.ORC_OUTPUT_FORMAT_CLASS;
+      case "textfile":
+      case "csv":
+        return HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS;
+      case "rcfile":
+        return HiveStorageConstants.RCFILE_OUTPUT_FORMAT_CLASS;
+      case "avro":
+        return HiveStorageConstants.AVRO_OUTPUT_FORMAT_CLASS;
+      case "sequencefile":
+        return HiveStorageConstants.SEQUENCEFILE_OUTPUT_FORMAT_CLASS;
+      case "json":
+      case "regex":
+      default:
+        return HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS;
+    }
+  }
+
+  /** Translates a format name to the Hive SerDe class. */
+  private static String getSerdeClass(String format) {
+    switch (format) {
+      case "parquet":
+        return HiveStorageConstants.PARQUET_SERDE_CLASS;
+      case "orc":
+        return HiveStorageConstants.ORC_SERDE_CLASS;
+      case "textfile":
+        return HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS;
+      case "csv":
+        return HiveStorageConstants.OPENCSV_SERDE_CLASS;
+      case "rcfile":
+        return HiveStorageConstants.COLUMNAR_SERDE_CLASS;
+      case "avro":
+        return HiveStorageConstants.AVRO_SERDE_CLASS;
+      case "json":
+        return HiveStorageConstants.JSON_SERDE_CLASS;
+      case "regex":
+        return HiveStorageConstants.REGEX_SERDE_CLASS;
+      case "sequencefile":
+      default:
+        return HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS;
+    }
   }
 
   private static void applyColumnChange(

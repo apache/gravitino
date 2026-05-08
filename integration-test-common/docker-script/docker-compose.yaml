@@ -91,6 +91,10 @@ services:
       - HIVE_HOST_IP=hive
       - TRINO_WORKER_NUM=${TRINO_WORKER_NUM:-0}
       - TRINO_ROLE=coordinator
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-northeast-1}
+      - AWS_GLUE_CATALOG_ID=${AWS_GLUE_CATALOG_ID:-730335553010}
     entrypoint:  /bin/bash /tmp/trino/init.sh
     volumes:
       - ./init/trino:/tmp/trino
