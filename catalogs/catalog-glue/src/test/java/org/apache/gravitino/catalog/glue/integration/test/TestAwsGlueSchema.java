@@ -16,10 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.glue;
+package org.apache.gravitino.catalog.glue.integration.test;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.glue.AbstractGlueSchemaTest;
+import org.apache.gravitino.catalog.glue.GlueClientProvider;
+import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -45,8 +48,8 @@ import software.amazon.awssdk.services.glue.model.GlueException;
  * </ul>
  *
  * <p>Each test creates a real Glue database, retrieves it via the API (getting a real serialized
- * response), converts it to a {@link GlueSchema}, and asserts the field mapping. The database is
- * deleted in {@link #cleanup} regardless of test outcome.
+ * response), converts it to a {@link org.apache.gravitino.catalog.glue.GlueSchema}, and asserts the
+ * field mapping. The database is deleted in {@link #cleanup} regardless of test outcome.
  */
 @EnabledIfEnvironmentVariable(named = "AWS_ACCESS_KEY_ID", matches = ".+")
 class TestAwsGlueSchema extends AbstractGlueSchemaTest {
