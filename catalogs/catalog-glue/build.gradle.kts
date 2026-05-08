@@ -52,6 +52,9 @@ dependencies {
   testImplementation(libs.slf4j.api)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+
+  testImplementation(libs.testcontainers)
+  testImplementation(project(":integration-test-common", "testArtifacts"))
 }
 
 tasks {
