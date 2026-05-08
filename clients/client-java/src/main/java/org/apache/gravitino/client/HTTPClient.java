@@ -38,6 +38,7 @@ import org.apache.gravitino.Version;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.RESTException;
+import org.apache.gravitino.hive.dyn.DynConstructors;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.rest.RESTResponse;
 import org.apache.gravitino.rest.RESTUtils;
@@ -50,6 +51,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.client5.http.ssl.DefaultClientTlsStrategy;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -62,6 +64,7 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.net.URIBuilder;
+import org.apache.hc.core5.reactor.ssl.SSLBufferMode;
 
 /**
  * An HttpClient for usage with the REST catalog.
@@ -73,6 +76,8 @@ import org.apache.hc.core5.net.URIBuilder;
  * <p>Referred from core/src/main/java/org/apache/iceberg/rest/HTTPClient.java
  */
 public class HTTPClient implements RESTClient {
+
+  private static final String REST_TLS_CONFIGURER = "rest.client.tls.configurer-impl";
 
   private static final String VERSION_HEADER = "application/vnd.gravitino.v1+json";
 
@@ -730,7 +735,53 @@ public class HTTPClient implements RESTClient {
 
     ConnectionConfig connectionConfig = configureConnectionConfig(clientConfiguration);
     connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
+
+    TLSConfigurer tlsConfigurer = loadTlsConfigurer(properties);
+    if (tlsConfigurer != null) {
+      connectionManagerBuilder.setTlsSocketStrategy(
+          new DefaultClientTlsStrategy(
+              tlsConfigurer.sslContext(),
+              tlsConfigurer.supportedProtocols(),
+              tlsConfigurer.supportedCipherSuites(),
+              SSLBufferMode.STATIC,
+              tlsConfigurer.hostnameVerifier()));
+    }
+
     return connectionManagerBuilder.build();
+  }
+
+  private static TLSConfigurer loadTlsConfigurer(Map<String, String> properties) {
+    String impl = properties.get(REST_TLS_CONFIGURER);
+    if (impl == null) {
+      return null;
+    }
+    DynConstructors.Ctor<TLSConfigurer> ctor;
+    try {
+      ctor =
+          DynConstructors.builder(TLSConfigurer.class)
+              .loader(HTTPClient.class.getClassLoader())
+              .impl(impl)
+              .buildChecked();
+    } catch (NoSuchMethodException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot initialize TLSConfigurer implementation %s: %s", impl, e.getMessage()),
+          e);
+    }
+
+    TLSConfigurer configurer;
+    try {
+      configurer = ctor.newInstance();
+    } catch (ClassCastException e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot initialize TLSConfigurer, %s does not implement TLSConfigurer.", impl),
+          e);
+    }
+
+    configurer.initialize(properties);
+
+    return configurer;
   }
 
   @VisibleForTesting
