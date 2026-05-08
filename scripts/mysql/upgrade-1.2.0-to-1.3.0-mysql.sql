@@ -112,5 +112,6 @@ CREATE TABLE IF NOT EXISTS `idp_group_user_rel` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp relation deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_igiu_del` (`group_id`, `user_id`, `deleted_at`),
+    KEY `idx_iug_gid` (`group_id`),
     KEY `idx_iug_uid` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local IdP group user relation';

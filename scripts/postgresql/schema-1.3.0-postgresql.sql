@@ -478,6 +478,7 @@ CREATE TABLE IF NOT EXISTS idp_group_user_rel (
     PRIMARY KEY (id),
     UNIQUE (group_id, user_id, deleted_at)
 );
+CREATE INDEX IF NOT EXISTS idp_group_user_rel_idx_group_id ON idp_group_user_rel (group_id);
 CREATE INDEX IF NOT EXISTS idp_group_user_rel_idx_user_id ON idp_group_user_rel (user_id);
 COMMENT ON TABLE idp_group_user_rel IS 'local IdP group user relation';
 
