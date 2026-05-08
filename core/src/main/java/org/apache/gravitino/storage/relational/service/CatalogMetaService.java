@@ -245,7 +245,7 @@ public class CatalogMetaService {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
-                      mapper.insertChange(
+                      mapper.insertEntityChange(
                           metalakeName,
                           Entity.EntityType.CATALOG.name(),
                           oldFullName,
@@ -351,7 +351,7 @@ public class CatalogMetaService {
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
-                    mapper.insertChange(
+                    mapper.insertEntityChange(
                         metalakeName,
                         Entity.EntityType.CATALOG.name(),
                         NameIdentifierUtil.ofCatalog(metalakeName, catalogName).toString(),
@@ -403,7 +403,7 @@ public class CatalogMetaService {
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
-                    mapper.insertChange(
+                    mapper.insertEntityChange(
                         metalakeName,
                         Entity.EntityType.CATALOG.name(),
                         NameIdentifierUtil.ofCatalog(metalakeName, catalogName).toString(),

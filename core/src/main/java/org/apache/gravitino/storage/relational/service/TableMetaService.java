@@ -224,7 +224,7 @@ public class TableMetaService {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
-                      mapper.insertChange(
+                      mapper.insertEntityChange(
                           metalakeName,
                           Entity.EntityType.TABLE.name(),
                           oldFullName,
@@ -303,7 +303,7 @@ public class TableMetaService {
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
-                    mapper.insertChange(
+                    mapper.insertEntityChange(
                         metalakeName,
                         Entity.EntityType.TABLE.name(),
                         tableFullName,

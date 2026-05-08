@@ -49,7 +49,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
 
   private List<EntityChangeRecord> listEntityChanges(long createdAtFrom) {
     return SessionUtils.doWithCommitAndFetchResult(
-        EntityChangeLogMapper.class, mapper -> mapper.selectChanges(createdAtFrom, 100));
+        EntityChangeLogMapper.class, mapper -> mapper.selectEntityChanges(createdAtFrom, 100));
   }
 
   private void assertEntityChange(

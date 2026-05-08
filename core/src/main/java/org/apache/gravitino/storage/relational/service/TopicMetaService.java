@@ -137,7 +137,7 @@ public class TopicMetaService {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
-                      mapper.insertChange(
+                      mapper.insertEntityChange(
                           metalakeName,
                           Entity.EntityType.TOPIC.name(),
                           oldFullName,
@@ -336,7 +336,7 @@ public class TopicMetaService {
           SessionUtils.doWithoutCommit(
               EntityChangeLogMapper.class,
               mapper ->
-                  mapper.insertChange(
+                  mapper.insertEntityChange(
                       metalakeName,
                       Entity.EntityType.TOPIC.name(),
                       topicFullName,

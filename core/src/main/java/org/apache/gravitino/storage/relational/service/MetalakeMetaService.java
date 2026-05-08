@@ -193,7 +193,7 @@ public class MetalakeMetaService {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
-                      mapper.insertChange(
+                      mapper.insertEntityChange(
                           oldFullName,
                           Entity.EntityType.METALAKE.name(),
                           oldFullName,
@@ -338,7 +338,7 @@ public class MetalakeMetaService {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
-                      mapper.insertChange(
+                      mapper.insertEntityChange(
                           ident.name(),
                           Entity.EntityType.METALAKE.name(),
                           ident.name(),
@@ -409,7 +409,7 @@ public class MetalakeMetaService {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
-                      mapper.insertChange(
+                      mapper.insertEntityChange(
                           ident.name(),
                           Entity.EntityType.METALAKE.name(),
                           ident.name(),

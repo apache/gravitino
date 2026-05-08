@@ -220,7 +220,7 @@ public class SchemaMetaService {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
-                      mapper.insertChange(
+                      mapper.insertEntityChange(
                           metalakeName,
                           Entity.EntityType.SCHEMA.name(),
                           oldFullName,
@@ -322,7 +322,7 @@ public class SchemaMetaService {
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
-                    mapper.insertChange(
+                    mapper.insertEntityChange(
                         metalakeName,
                         Entity.EntityType.SCHEMA.name(),
                         schemaFullName,
@@ -412,7 +412,7 @@ public class SchemaMetaService {
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
-                    mapper.insertChange(
+                    mapper.insertEntityChange(
                         metalakeName,
                         Entity.EntityType.SCHEMA.name(),
                         schemaFullName,

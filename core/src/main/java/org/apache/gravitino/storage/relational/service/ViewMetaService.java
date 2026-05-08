@@ -181,7 +181,7 @@ public class ViewMetaService {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
-                      mapper.insertChange(
+                      mapper.insertEntityChange(
                           metalakeName,
                           Entity.EntityType.VIEW.name(),
                           oldFullName,
@@ -261,7 +261,7 @@ public class ViewMetaService {
             SessionUtils.doWithoutCommit(
                 EntityChangeLogMapper.class,
                 mapper ->
-                    mapper.insertChange(
+                    mapper.insertEntityChange(
                         metalakeName,
                         Entity.EntityType.VIEW.name(),
                         viewFullName,

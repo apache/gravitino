@@ -250,7 +250,7 @@ public class FilesetMetaService {
                   SessionUtils.doWithoutCommit(
                       EntityChangeLogMapper.class,
                       mapper ->
-                          mapper.insertChange(
+                          mapper.insertEntityChange(
                               metalakeName,
                               Entity.EntityType.FILESET.name(),
                               oldFullName,
@@ -282,7 +282,7 @@ public class FilesetMetaService {
                 SessionUtils.doWithoutCommit(
                     EntityChangeLogMapper.class,
                     mapper ->
-                        mapper.insertChange(
+                        mapper.insertEntityChange(
                             metalakeName,
                             Entity.EntityType.FILESET.name(),
                             oldFullName,
@@ -360,7 +360,7 @@ public class FilesetMetaService {
           SessionUtils.doWithoutCommit(
               EntityChangeLogMapper.class,
               mapper ->
-                  mapper.insertChange(
+                  mapper.insertEntityChange(
                       metalakeName,
                       Entity.EntityType.FILESET.name(),
                       filesetFullName,

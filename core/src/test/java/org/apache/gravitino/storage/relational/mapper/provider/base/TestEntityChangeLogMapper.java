@@ -101,11 +101,12 @@ public class TestEntityChangeLogMapper {
   @Test
   void testEntityChangeLogInsertAndSelect() {
     long jvmBefore = System.currentTimeMillis();
-    entityChangeLogMapper.insertChange(
+    entityChangeLogMapper.insertEntityChange(
         "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.ALTER);
     long jvmAfter = System.currentTimeMillis();
 
-    List<EntityChangeRecord> records = entityChangeLogMapper.selectChanges(jvmBefore - 1000L, 10);
+    List<EntityChangeRecord> records =
+        entityChangeLogMapper.selectEntityChanges(jvmBefore - 1000L, 10);
     Assertions.assertEquals(1, records.size());
     EntityChangeRecord record = records.get(0);
     Assertions.assertEquals("metalake1", record.getMetalakeName());
@@ -121,35 +122,35 @@ public class TestEntityChangeLogMapper {
 
   @Test
   void testEntityChangeLogPruneOldEntries() throws SQLException {
-    entityChangeLogMapper.insertChange(
+    entityChangeLogMapper.insertEntityChange(
         "metalake1", "SCHEMA", "metalake1.cat.schema", OperateType.INSERT);
     forceCreatedAt("metalake1.cat.schema", 1000L);
-    entityChangeLogMapper.insertChange(
+    entityChangeLogMapper.insertEntityChange(
         "metalake1", "TABLE", "metalake1.cat.schema.tbl", OperateType.DROP);
     long recent =
-        entityChangeLogMapper.selectChanges(0L, 100).stream()
+        entityChangeLogMapper.selectEntityChanges(0L, 100).stream()
             .filter(r -> r.getFullName().equals("metalake1.cat.schema.tbl"))
             .mapToLong(EntityChangeRecord::getCreatedAt)
             .findFirst()
             .orElseThrow(() -> new AssertionError("recent row missing"));
 
-    entityChangeLogMapper.pruneOldEntries(1001L);
+    entityChangeLogMapper.pruneOldEntityChanges(1001L);
 
-    List<EntityChangeRecord> after = entityChangeLogMapper.selectChanges(0L, 100);
+    List<EntityChangeRecord> after = entityChangeLogMapper.selectEntityChanges(0L, 100);
     Assertions.assertEquals(1, after.size());
     Assertions.assertEquals(recent, after.get(0).getCreatedAt());
   }
 
   @Test
   void testEntityChangeLogSameTimestampOrderedById() throws SQLException {
-    entityChangeLogMapper.insertChange("metalake1", "TABLE", "a", OperateType.INSERT);
-    entityChangeLogMapper.insertChange("metalake1", "TABLE", "b", OperateType.INSERT);
-    entityChangeLogMapper.insertChange("metalake1", "TABLE", "c", OperateType.INSERT);
+    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "a", OperateType.INSERT);
+    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "b", OperateType.INSERT);
+    entityChangeLogMapper.insertEntityChange("metalake1", "TABLE", "c", OperateType.INSERT);
     forceCreatedAt("a", 5_000_000L);
     forceCreatedAt("b", 5_000_000L);
     forceCreatedAt("c", 5_000_000L);
 
-    List<EntityChangeRecord> rows = entityChangeLogMapper.selectChanges(0L, 100);
+    List<EntityChangeRecord> rows = entityChangeLogMapper.selectEntityChanges(0L, 100);
     Assertions.assertEquals(3, rows.size());
     Assertions.assertTrue(rows.get(0).getId() < rows.get(1).getId());
     Assertions.assertTrue(rows.get(1).getId() < rows.get(2).getId());

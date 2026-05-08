@@ -38,16 +38,16 @@ public interface EntityChangeLogMapper {
   String ENTITY_CHANGE_LOG_TABLE_NAME = "entity_change_log";
 
   @SelectProvider(type = EntityChangeLogSQLProviderFactory.class, method = "selectEntityChanges")
-  List<EntityChangeRecord> selectChanges(
+  List<EntityChangeRecord> selectEntityChanges(
       @Param("createdAtFrom") long createdAtFrom, @Param("maxRows") int maxRows);
 
   @InsertProvider(type = EntityChangeLogSQLProviderFactory.class, method = "insertEntityChange")
-  void insertChange(
+  void insertEntityChange(
       @Param("metalakeName") String metalakeName,
       @Param("entityType") String entityType,
       @Param("fullName") String fullName,
       @Param("operateType") OperateType operateType);
 
   @DeleteProvider(type = EntityChangeLogSQLProviderFactory.class, method = "pruneOldEntityChanges")
-  void pruneOldEntries(@Param("before") long before);
+  void pruneOldEntityChanges(@Param("before") long before);
 }
