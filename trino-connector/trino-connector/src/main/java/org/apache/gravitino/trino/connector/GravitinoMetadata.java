@@ -270,7 +270,11 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       return new GravitinoOutputTableHandle(insertTableHandle, tableName);
     } catch (Exception e) {
       // Clean up the table created in the Gravitino catalog on failure
-      catalogConnectorMetadata.dropTable(tableName);
+      try {
+        catalogConnectorMetadata.dropTable(tableName);
+      } catch (Exception dropException) {
+        LOG.warn("Failed to drop table {} during CTAS cleanup", tableName, dropException);
+      }
       throw e;
     }
   }
