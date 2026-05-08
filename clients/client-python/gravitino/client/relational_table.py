@@ -246,3 +246,6 @@ class RelationalTable(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
         return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
+
+    def supports_tags(self) -> SupportsTags:
+        return self
