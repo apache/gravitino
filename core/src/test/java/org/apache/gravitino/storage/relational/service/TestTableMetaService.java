@@ -262,7 +262,33 @@ public class TestTableMetaService extends TestJDBCBackend {
             newSchemaName,
             AUDIT_INFO);
     backend.insert(newSchema, false);
-    TableMetaService.getInstance().updateTable(updatedTable.nameIdentifier(), updater2);
+
+    long beforeSchemaMove = System.currentTimeMillis() - 1;
+    TableEntity movedTable =
+        TableEntity.builder()
+            .withId(updatedTable.id())
+            .withName(updatedTable.name())
+            .withNamespace(Namespace.of(metalakeName, catalogName, newSchemaName))
+            .withColumns(updatedTable.columns())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance()
+        .updateTable(updatedTable.nameIdentifier(), oldTable -> movedTable);
+    Assertions.assertTrue(
+        listEntityChanges(beforeSchemaMove).stream()
+            .anyMatch(
+                record ->
+                    record.getMetalakeName().equals(metalakeName)
+                        && record.getEntityType().equals(Entity.EntityType.TABLE.name())
+                        && record
+                            .getFullName()
+                            .equals(
+                                NameIdentifierUtil.ofTable(
+                                        metalakeName, catalogName, schemaName, "table2")
+                                    .toString())
+                        && record.getOperateType() == OperateType.ALTER));
+
+    TableMetaService.getInstance().updateTable(movedTable.nameIdentifier(), updater2);
 
     TableEntity retrievedTable2 =
         TableMetaService.getInstance().getTableByIdentifier(updatedTable2.nameIdentifier());

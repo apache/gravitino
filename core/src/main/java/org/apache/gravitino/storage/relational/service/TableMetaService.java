@@ -194,7 +194,8 @@ public class TableMetaService {
     String oldFullName =
         NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, oldTableEntity.name())
             .toString();
-    boolean isRenamed = !Objects.equals(oldTableEntity.name(), newTableEntity.name());
+    boolean isFullNameChanged =
+        isSchemaChanged || !Objects.equals(oldTableEntity.name(), newTableEntity.name());
 
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
@@ -219,7 +220,7 @@ public class TableMetaService {
             }
           },
           () -> {
-            if (isRenamed && updateResult.get() > 0) {
+            if (isFullNameChanged && updateResult.get() > 0) {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
