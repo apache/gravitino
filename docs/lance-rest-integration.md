@@ -158,7 +158,6 @@ pip install lance-ray
 
 :::info
 - Ray will be automatically installed if not already present
-- lance-ray is currently tested with Ray versions 2.41.0 to 2.50.0
 - The lance-namespace version must be less than or equal to 0.4.5.
 - Ensure Ray version compatibility in your environment before deployment
 :::
