@@ -784,7 +784,6 @@ tasks {
         "copyCatalogLibAndConfigs",
         "copySubprojectDependencies",
         "copySubprojectLib",
-        "copyPluginLib",
         "copyCliLib",
         "copyJobsLib",
         ":authorizations:copyLibAndConfig",
@@ -1130,15 +1129,6 @@ tasks {
     include("gravitino-jobs-*.jar")
     exclude("*-empty.jar")
     setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
-  }
-
-  register("copyPluginLib", Copy::class) {
-    dependsOn(":plugins:idp-basic:build")
-    from("plugins/idp-basic/build/libs")
-    into("distribution/package/libs")
-    include("*.jar")
-    exclude("*-jcstress.jar", "*-jmh.jar", "error_prone_annotations-*.jar")
-    setDuplicatesStrategy(DuplicatesStrategy.INCLUDE)
   }
 
   register("copySubprojectLib", Copy::class) {
