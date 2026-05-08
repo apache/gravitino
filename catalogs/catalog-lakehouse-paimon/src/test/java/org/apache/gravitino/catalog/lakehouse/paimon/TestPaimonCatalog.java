@@ -37,11 +37,15 @@ import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -288,6 +292,82 @@ public class TestPaimonCatalog {
     // Should not have credential providers for non-JDBC backend
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
     Assertions.assertNull(credentialProviders);
+  }
+
+  @Test
+  void testJdbcBackendWithOSSCredentialProviders() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test JDBC backend with jdbc-user, jdbc-password, and OSS credentials
+    Map<String, String> jdbcOssProps = Maps.newHashMap();
+    jdbcOssProps.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    jdbcOssProps.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    jdbcOssProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    jdbcOssProps.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    jdbcOssProps.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+    jdbcOssProps.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, "oss-access-key");
+    jdbcOssProps.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, "oss-secret-key");
+
+    CatalogEntity jdbcOssEntity =
+        CatalogEntity.builder()
+            .withId(5L)
+            .withName("jdbc-oss-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcOssProps)
+            .build();
+
+    PaimonCatalog jdbcOssCatalog =
+        new PaimonCatalog().withCatalogConf(jdbcOssProps).withCatalogEntity(jdbcOssEntity);
+    Map<String, String> properties = jdbcOssCatalog.propertiesWithCredentialProviders();
+
+    // Should have both jdbc and oss-secret-key credential providers
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNotNull(credentialProviders);
+    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+    Assertions.assertTrue(
+        credentialProviders.contains(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testJdbcBackendWithAzureCredentialProviders() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test JDBC backend with jdbc-user, jdbc-password, and Azure credentials
+    Map<String, String> jdbcAzureProps = Maps.newHashMap();
+    jdbcAzureProps.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    jdbcAzureProps.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    jdbcAzureProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    jdbcAzureProps.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    jdbcAzureProps.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+    jdbcAzureProps.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, "azure-account-name");
+    jdbcAzureProps.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY, "azure-account-key");
+
+    CatalogEntity jdbcAzureEntity =
+        CatalogEntity.builder()
+            .withId(6L)
+            .withName("jdbc-azure-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcAzureProps)
+            .build();
+
+    PaimonCatalog jdbcAzureCatalog =
+        new PaimonCatalog().withCatalogConf(jdbcAzureProps).withCatalogEntity(jdbcAzureEntity);
+    Map<String, String> properties = jdbcAzureCatalog.propertiesWithCredentialProviders();
+
+    // Should have both jdbc and azure-account-key credential providers
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNotNull(credentialProviders);
+    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+    Assertions.assertTrue(
+        credentialProviders.contains(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE));
   }
 
   @Test

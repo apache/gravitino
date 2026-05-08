@@ -423,8 +423,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
-   * Retrieves the properties of the catalog including credential providers. This method is used
-   * when we need to expose credential-related properties.
+   * Retrieves the properties of the catalog including credential providers. Subclasses should
+   * override this method to inject auto-detected credential provider names into the properties map
+   * before the {@link CatalogCredentialManager} is initialized. The default implementation returns
+   * {@link #properties()} unchanged.
    *
    * @return A map of properties including credential providers.
    */

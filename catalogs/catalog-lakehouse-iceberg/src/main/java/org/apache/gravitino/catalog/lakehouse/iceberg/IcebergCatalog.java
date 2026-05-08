@@ -21,7 +21,6 @@ package org.apache.gravitino.catalog.lakehouse.iceberg;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -107,26 +106,16 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
       return properties;
     }
 
-    String catalogBackend = properties.get(IcebergConstants.CATALOG_BACKEND);
-    if (catalogBackend == null) {
-      return properties;
-    }
-
-    // Check if it's JDBC backend
-    if (!IcebergCatalogBackend.JDBC
-        .name()
-        .equalsIgnoreCase(catalogBackend.toUpperCase(Locale.ROOT))) {
-      return properties;
-    }
-
-    // Build default credential providers for JDBC backend
     List<String> credentialProviders = new ArrayList<>();
 
-    // Add JDBC credential provider if jdbc-user and jdbc-password are set
-    String jdbcUser = properties.get(IcebergConstants.GRAVITINO_JDBC_USER);
-    String jdbcPassword = properties.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD);
-    if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {
-      credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
+    // Add JDBC credential provider if backend is JDBC and jdbc-user/jdbc-password are set
+    String catalogBackend = properties.get(IcebergConstants.CATALOG_BACKEND);
+    if (IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
+      String jdbcUser = properties.get(IcebergConstants.GRAVITINO_JDBC_USER);
+      String jdbcPassword = properties.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD);
+      if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {
+        credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
+      }
     }
 
     // Add S3 secret key credential provider if S3 access key and secret key are set

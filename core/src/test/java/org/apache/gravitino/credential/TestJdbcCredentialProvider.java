@@ -99,4 +99,95 @@ public class TestJdbcCredentialProvider {
     Assertions.assertEquals(jdbcUser, jdbcCredential.jdbcUser());
     Assertions.assertEquals(jdbcPassword, jdbcCredential.jdbcPassword());
   }
+
+  @Test
+  void testPartialCredentials() {
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(JdbcCredential.GRAVITINO_JDBC_USER, "test-user");
+
+    CredentialProvider credentialProvider =
+        CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
+
+    CatalogCredentialContext context = new CatalogCredentialContext("test-user");
+    Credential credential = credentialProvider.getCredential(context);
+
+    Assertions.assertNull(credential);
+  }
+
+  @Test
+  void testEmptyStringCredentials() {
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(
+            JdbcCredential.GRAVITINO_JDBC_USER, "",
+            JdbcCredential.GRAVITINO_JDBC_PASSWORD, "test-password");
+
+    CredentialProvider credentialProvider =
+        CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
+
+    CatalogCredentialContext context = new CatalogCredentialContext("test-user");
+    Credential credential = credentialProvider.getCredential(context);
+
+    Assertions.assertNull(credential);
+  }
+
+  @Test
+  void testNullProperties() {
+    CredentialProvider credentialProvider =
+        CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, null);
+
+    CatalogCredentialContext context = new CatalogCredentialContext("test-user");
+    Credential credential = credentialProvider.getCredential(context);
+
+    Assertions.assertNull(credential);
+  }
+
+  @Test
+  void testEmptyPasswordReturnsNull() {
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(
+            JdbcCredential.GRAVITINO_JDBC_USER,
+            "test-user",
+            JdbcCredential.GRAVITINO_JDBC_PASSWORD,
+            "");
+
+    CredentialProvider credentialProvider =
+        CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
+
+    CatalogCredentialContext context = new CatalogCredentialContext("test-user");
+    Credential credential = credentialProvider.getCredential(context);
+
+    Assertions.assertNull(credential);
+  }
+
+  @Test
+  void testJdbcCredentialConstructorBlankUserThrows() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new JdbcCredential("", "password"));
+  }
+
+  @Test
+  void testJdbcCredentialConstructorBlankPasswordThrows() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new JdbcCredential("user", ""));
+  }
+
+  @Test
+  void testJdbcCredentialInitializeNonZeroExpireTimeThrows() {
+    Map<String, String> credentialInfo =
+        ImmutableMap.of(
+            JdbcCredential.GRAVITINO_JDBC_USER,
+            "user",
+            JdbcCredential.GRAVITINO_JDBC_PASSWORD,
+            "pass");
+    JdbcCredential jdbcCredential = new JdbcCredential();
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> jdbcCredential.initialize(credentialInfo, 1000L));
+  }
+
+  @Test
+  void testToStringDoesNotContainPassword() {
+    JdbcCredential jdbcCredential = new JdbcCredential("user", "secret");
+    String str = jdbcCredential.toString();
+    Assertions.assertTrue(str.contains("user"));
+    Assertions.assertFalse(str.contains("secret"));
+  }
 }
