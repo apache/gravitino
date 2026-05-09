@@ -703,6 +703,6 @@ public class GravitinoEnv {
         new BuiltInJobTemplateEventListener(jobManager, entityStore, idGenerator);
     eventListenerManager.addEventListener("builtin-job-template", builtInJobTemplateListener);
 
-    this.idpManager = IdpManagerFactory.create();
+    this.idpManager = IdpManagerFactory.createOrDefault();
   }
 }

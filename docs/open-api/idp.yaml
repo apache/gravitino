@@ -46,6 +46,12 @@ paths:
                   $ref: "#/components/examples/IdpUserResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: Forbidden - Only service admins can add built-in IdP users
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
           description: Conflict - The target built-in IdP user already exists
           content:
@@ -86,6 +92,12 @@ paths:
               examples:
                 NoSuchUserException:
                   $ref: "#/components/examples/NoSuchUserException"
+        "403":
+          description: Forbidden - Only service admins or the user itself can view the built-in IdP user
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -115,6 +127,12 @@ paths:
                   $ref: "#/components/examples/IdpUserResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: Forbidden - Only service admins can reset built-in IdP user passwords
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
           description: Not Found - The specified built-in IdP user does not exist
           content:
@@ -134,16 +152,27 @@ paths:
       operationId: removeIdpUser
       responses:
         "200":
-          $ref: "./openapi.yaml#/components/responses/RemoveResponse"
-        "404":
-          description: Not Found - The specified built-in IdP user does not exist
+          description: Returns whether the built-in IdP user was removed. If the user does not exist, `removed` is `false`.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    description: Status code of the response
+                    enum:
+                      - 0
+                  removed:
+                    type: boolean
+                    description: Whether the remove operation was successful
+        "403":
+          description: Forbidden - Only service admins can remove built-in IdP users
           content:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchUserException:
-                  $ref: "#/components/examples/NoSuchUserException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -174,6 +203,12 @@ paths:
                   $ref: "#/components/examples/IdpGroupResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: Forbidden - Only service admins can add built-in IdP groups
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
           description: Conflict - The target built-in IdP group already exists
           content:
@@ -214,6 +249,12 @@ paths:
               examples:
                 NoSuchGroupException:
                   $ref: "#/components/examples/NoSuchGroupException"
+        "403":
+          description: Forbidden - Only service admins can view built-in IdP groups
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -232,16 +273,33 @@ paths:
           description: Whether to force removal of the built-in IdP group
       responses:
         "200":
-          $ref: "./openapi.yaml#/components/responses/RemoveResponse"
-        "404":
-          description: Not Found - The specified built-in IdP group does not exist
+          description: Returns whether the built-in IdP group was removed. If the group does not exist, `removed` is `false`.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    description: Status code of the response
+                    enum:
+                      - 0
+                  removed:
+                    type: boolean
+                    description: Whether the remove operation was successful
+        "403":
+          description: Forbidden - Only service admins can remove built-in IdP groups
           content:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchGroupException:
-                  $ref: "#/components/examples/NoSuchGroupException"
+        "405":
+          description: Method Not Allowed - The specified built-in IdP group still has users and force is false
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -275,6 +333,12 @@ paths:
                   $ref: "#/components/examples/IdpGroupResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: Forbidden - Only service admins can add users to built-in IdP groups
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
           description: Not Found - The specified built-in IdP group or user does not exist
           content:
@@ -319,6 +383,12 @@ paths:
                   $ref: "#/components/examples/IdpGroupResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: Forbidden - Only service admins can remove users from built-in IdP groups
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
           description: Not Found - The specified built-in IdP group or user does not exist
           content:
