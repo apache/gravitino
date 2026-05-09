@@ -163,6 +163,8 @@ final class GlueIcebergHelper {
 
       } else if (change instanceof TableChange.DeleteColumn) {
         TableChange.DeleteColumn del = (TableChange.DeleteColumn) change;
+        Preconditions.checkArgument(
+            del.fieldName().length == 1, "Nested column deletions are not supported");
         String name = del.fieldName()[0];
         boolean removed = fields.removeIf(f -> f.name().equals(name));
         if (!removed && !del.getIfExists()) {
@@ -172,19 +174,27 @@ final class GlueIcebergHelper {
 
       } else if (change instanceof TableChange.RenameColumn) {
         TableChange.RenameColumn rename = (TableChange.RenameColumn) change;
+        Preconditions.checkArgument(
+            rename.fieldName().length == 1, "Nested column renames are not supported");
         updateField(fields, rename.fieldName()[0], b -> b.name(rename.getNewName()));
 
       } else if (change instanceof TableChange.UpdateColumnType) {
         TableChange.UpdateColumnType upd = (TableChange.UpdateColumnType) change;
+        Preconditions.checkArgument(
+            upd.fieldName().length == 1, "Nested column type updates are not supported");
         Document newTypeDoc = gravitinoTypeToDoc(upd.getNewDataType());
         updateField(fields, upd.fieldName()[0], b -> b.type(newTypeDoc));
 
       } else if (change instanceof TableChange.UpdateColumnComment) {
         TableChange.UpdateColumnComment upd = (TableChange.UpdateColumnComment) change;
+        Preconditions.checkArgument(
+            upd.fieldName().length == 1, "Nested column comment updates are not supported");
         updateField(fields, upd.fieldName()[0], b -> b.doc(upd.getNewComment()));
 
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         TableChange.UpdateColumnNullability upd = (TableChange.UpdateColumnNullability) change;
+        Preconditions.checkArgument(
+            upd.fieldName().length == 1, "Nested column nullability updates are not supported");
         updateField(fields, upd.fieldName()[0], b -> b.required(!upd.nullable()));
 
       } else {
