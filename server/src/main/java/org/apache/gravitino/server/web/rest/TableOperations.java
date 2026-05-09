@@ -55,6 +55,8 @@ import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.authorization.annotations.ExpressionAction;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -166,9 +168,13 @@ public class TableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+      firstExpressionCondition = ExpressionCondition.NOT_CONTAIN_REQUIRED_PRIVILEGES,
       secondaryExpression = AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
-      secondaryExpressionCondition =
-          AuthorizationExpressionConstants.REQUEST_REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE,
+      secondaryExpressionCondition = ExpressionCondition.CONTAIN_REQUIRED_PRIVILEGES,
+      thirdExpression =
+          "ANY_USE_CATALOG && ANY_USE_SCHEMA && (ANY_CREATE_TABLE || ANY_CREATE_VIEW || ANY_SELECT_VIEW)",
+      thirdExpressionCondition = ExpressionCondition.PREVIOUS_EXPRESSION_FORBIDDEN,
+      thirdExpressionAction = ExpressionAction.CHECK_METADATA_OBJECT_EXISTS,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

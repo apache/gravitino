@@ -23,6 +23,8 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.authorization.annotations.ExpressionAction;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 
 public class AuthorizeExecutorFactory {
 
@@ -34,8 +36,14 @@ public class AuthorizeExecutorFactory {
       Optional<String> entityType,
       Parameter[] parameters,
       Object[] args,
+      ExpressionCondition firstExpressionCondition,
+      ExpressionAction firstExpressionAction,
       String secondaryExpression,
-      String secondaryExpressionCondition) {
+      ExpressionCondition secondaryExpressionCondition,
+      ExpressionAction secondaryExpressionAction,
+      String thirdExpression,
+      ExpressionCondition thirdExpressionCondition,
+      ExpressionAction thirdExpressionAction) {
     return switch (requestType) {
       case COMMON -> new CommonAuthorizerExecutor(
           expression, metadataContext, pathParams, entityType);
@@ -52,8 +60,14 @@ public class AuthorizeExecutorFactory {
           metadataContext,
           pathParams,
           entityType,
+          firstExpressionCondition,
+          firstExpressionAction,
           secondaryExpression,
-          secondaryExpressionCondition);
+          secondaryExpressionCondition,
+          secondaryExpressionAction,
+          thirdExpression,
+          thirdExpressionCondition,
+          thirdExpressionAction);
     };
   }
 }

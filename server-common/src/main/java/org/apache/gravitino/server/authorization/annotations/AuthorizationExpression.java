@@ -27,19 +27,60 @@ import org.apache.gravitino.MetadataObject;
 /**
  * This annotation is used to implement unified authentication in AOP. Use Expressions to define the
  * required privileges for an API.
+ *
+ * <p>An annotated method may define up to three authorization expressions. The executor selects
+ * which expression to evaluate based on the associated {@link ExpressionCondition} and then
+ * performs the operation described by the associated {@link ExpressionAction}. The overall logic
+ * follows this pseudo-code:
+ *
+ * <pre>{@code
+ * if (firstExpressionCondition) {
+ *   action(firstExpression)           // default: ALWAYS → EVALUATE
+ * }
+ * if (secondaryExpressionCondition) { // default: NONE → not evaluated
+ *   action(secondaryExpression)
+ * }
+ * if (thirdExpressionCondition) {     // default: NONE → not evaluated
+ *   action(thirdExpression)
+ * }
+ * }</pre>
+ *
+ * <p>Typical usage for a load-table endpoint:
+ *
+ * <pre>{@code
+ * // if (NOT_CONTAIN_REQUIRED_PRIVILEGES) { EVALUATE(LOAD_TABLE_EXPRESSION) }
+ * // if (CONTAIN_REQUIRED_PRIVILEGES)     { EVALUATE(MODIFY_TABLE_EXPRESSION) }
+ * // if (PREVIOUS_EXPRESSION_FORBIDDEN)   { CHECK_METADATA_OBJECT_EXISTS(thirdExpression) }
+ * }</pre>
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface AuthorizationExpression {
   /**
-   * The expression to evaluate for authorization, which represents multiple privileges.
+   * The primary expression to evaluate for authorization, which represents multiple privileges.
    *
    * @return the expression to evaluate for authorization.
    */
   String expression() default "";
 
   /**
-   * Used to identify the type of metadata that needs to be accessed
+   * The condition under which the primary expression is evaluated. Defaults to {@link
+   * ExpressionCondition#ALWAYS} so that the primary check runs on every request unless a more
+   * specific condition (e.g. {@link ExpressionCondition#NOT_CONTAIN_REQUIRED_PRIVILEGES}) is set.
+   *
+   * @return the condition for evaluating the primary expression.
+   */
+  ExpressionCondition firstExpressionCondition() default ExpressionCondition.ALWAYS;
+
+  /**
+   * The action to take when the primary expression is evaluated.
+   *
+   * @return the action for the primary expression evaluation.
+   */
+  ExpressionAction firstExpressionAction() default ExpressionAction.EVALUATE;
+
+  /**
+   * Used to identify the type of metadata that needs to be accessed.
    *
    * @return accessMetadataType
    */
@@ -54,15 +95,46 @@ public @interface AuthorizationExpression {
 
   /**
    * The secondary expression to evaluate for authorization, which represents multiple privileges.
+   * Only evaluated when {@link #secondaryExpressionCondition()} is met.
    *
    * @return the secondary expression to evaluate for authorization.
    */
   String secondaryExpression() default "";
 
   /**
-   * The condition under which the secondary expression is evaluated.
+   * The condition under which the secondary expression is evaluated instead of the primary
+   * expression.
    *
    * @return the condition for evaluating the secondary expression.
    */
-  String secondaryExpressionCondition() default "";
+  ExpressionCondition secondaryExpressionCondition() default ExpressionCondition.NONE;
+
+  /**
+   * The action to take when the secondary expression is evaluated.
+   *
+   * @return the action for the secondary expression evaluation.
+   */
+  ExpressionAction secondaryExpressionAction() default ExpressionAction.EVALUATE;
+
+  /**
+   * An optional third expression to evaluate. Only evaluated when {@link
+   * #thirdExpressionCondition()} is met.
+   *
+   * @return the third expression to evaluate for authorization.
+   */
+  String thirdExpression() default "";
+
+  /**
+   * The condition under which the third expression is evaluated.
+   *
+   * @return the condition for evaluating the third expression.
+   */
+  ExpressionCondition thirdExpressionCondition() default ExpressionCondition.NONE;
+
+  /**
+   * The action to take when the third expression is evaluated.
+   *
+   * @return the action for the third expression evaluation.
+   */
+  ExpressionAction thirdExpressionAction() default ExpressionAction.EVALUATE;
 }
