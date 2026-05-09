@@ -25,8 +25,6 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Singleton;
 import javax.servlet.Servlet;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerRequestFilter;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auth.AuthenticatorType;
@@ -56,10 +54,10 @@ import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
-import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
+import org.apache.gravitino.server.web.filter.IdpInterfaceNotFoundFilter;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
@@ -80,8 +78,6 @@ public class GravitinoServer extends ResourceConfig {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoServer.class);
 
   private static final String API_ANY_PATH = "/api/*";
-  private static final String IDP_PATH_PREFIX = "idp";
-
   public static final String CONF_FILE = "gravitino.conf";
 
   public static final String WEBSERVER_CONF_PREFIX = "gravitino.server.webserver.";
@@ -178,18 +174,7 @@ public class GravitinoServer extends ResourceConfig {
       register(AccessControlNotAllowedFilter.class);
     }
     if (!enableBasicAuthenticator) {
-      register(
-          new ContainerRequestFilter() {
-            @Override
-            public void filter(ContainerRequestContext requestContext) throws IOException {
-              String path = requestContext.getUriInfo().getPath(false);
-              if (path.equals(IDP_PATH_PREFIX) || path.startsWith(IDP_PATH_PREFIX + "/")) {
-                requestContext.abortWith(
-                    Utils.notFound(
-                        "NotFoundException", "The requested IdP interface does not exist."));
-              }
-            }
-          });
+      register(IdpInterfaceNotFoundFilter.class);
     }
 
     HttpServerMetricsSource httpServerMetricsSource =
