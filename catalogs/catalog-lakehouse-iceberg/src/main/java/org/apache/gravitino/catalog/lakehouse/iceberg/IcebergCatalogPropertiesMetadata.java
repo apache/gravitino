@@ -100,6 +100,12 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 null /* defaultValue */,
                 false /* hidden */),
             stringOptionalPropertyEntry(
+                S3Properties.GRAVITINO_S3_PROXY_ENDPOINT,
+                "The proxy endpoint for S3 requests",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
                 OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
                 "OSS access key ID",
                 false /* immutable */,

@@ -129,6 +129,9 @@ public class IcebergRestTestUtil {
           String.format(
               "%s.%s", catalogConfigPrefix, IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS),
           "true");
+      catalogConf.put(
+          String.format("%s.%s", catalogConfigPrefix, IcebergConstants.ICEBERG_S3_PROXY_ENDPOINT),
+          "http://proxy:8080");
       IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(catalogConf);
       configProvider.initialize(catalogConf);
       // used to override register table interface

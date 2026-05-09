@@ -384,6 +384,7 @@ Please refer to [Access Control](./security/access-control.md) for the complete 
 | `gravitino.iceberg-rest.s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)        | No                                             | 0.6.0-incubating |
 | `gravitino.iceberg-rest.s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)        | No                                             | 0.6.0-incubating |
 | `gravitino.iceberg-rest.s3-path-style-access` | Whether to use path style access for S3.                                                                                                                                                                            | false         | No                                             | 0.9.0-incubating |
+| `gravitino.iceberg-rest.s3-proxy-endpoint`    | The proxy endpoint for S3 requests, e.g. `http://proxy-host:8080`.                                                                                                                                                  | (none)        | No                                             | 1.3.0            |
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
 
@@ -610,6 +611,7 @@ Gravitino Iceberg REST server in docker image could access local storage by defa
 | `GRAVITINO_S3_EXTERNAL_ID`             | `gravitino.iceberg-rest.s3-external-id`             | 0.7.0-incubating |
 | `GRAVITINO_S3_TOKEN_SERVICE_ENDPOINT`  | `gravitino.iceberg-rest.s3-token-service-endpoint`  | 0.8.0-incubating |
 | `GRAVITINO_S3_PATH_STYLE_ACCESS`       | `gravitino.iceberg-rest.s3-path-style-access`       | 1.0.0            |
+| `GRAVITINO_S3_PROXY_ENDPOINT`          | `gravitino.iceberg-rest.s3-proxy-endpoint`          | 1.3.0            |
 | `GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME` | `gravitino.iceberg-rest.azure-storage-account-name` | 0.8.0-incubating |
 | `GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY`  | `gravitino.iceberg-rest.azure-storage-account-key`  | 0.8.0-incubating |
 | `GRAVITINO_AZURE_TENANT_ID`            | `gravitino.iceberg-rest.azure-tenant-id`            | 0.8.0-incubating |
