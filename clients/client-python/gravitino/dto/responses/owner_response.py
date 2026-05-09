@@ -23,6 +23,7 @@ from dataclasses_json import config
 from gravitino.dto.authorization.owner_dto import OwnerDTO
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.exceptions.base import IllegalArgumentException
+from gravitino.utils.precondition import Precondition
 
 
 @dataclass
@@ -39,7 +40,8 @@ class OwnerResponse(BaseResponse):
     def validate(self) -> None:
         super().validate()
         if self._owner is not None:
-            if not self._owner.name():
-                raise IllegalArgumentException("owner name must not be empty")
+            Precondition.check_string_not_empty(
+                self._owner.name(), "owner name must not be empty"
+            )
             if self._owner.type() is None:
                 raise IllegalArgumentException("owner type must not be None")

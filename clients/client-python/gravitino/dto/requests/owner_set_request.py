@@ -22,6 +22,7 @@ from dataclasses_json import config, dataclass_json
 from gravitino.api.authorization.owner import Owner
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.rest.rest_message import RESTRequest
+from gravitino.utils.precondition import Precondition
 
 
 @dataclass_json
@@ -37,7 +38,8 @@ class OwnerSetRequest(RESTRequest):
         self._type = owner_type
 
     def validate(self) -> None:
-        if not self._name:
-            raise IllegalArgumentException('"name" field is required')
+        Precondition.check_string_not_empty(
+            self._name, '"name" field is required'
+        )
         if self._type is None:
             raise IllegalArgumentException('"type" field is required')

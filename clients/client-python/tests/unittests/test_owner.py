@@ -236,10 +236,23 @@ class TestOwnerSetRequestValidation(unittest.TestCase):
         req = OwnerSetRequest("alice", Owner.Type.USER)
         req.validate()
 
+    def test_validate_whitespace_name(self):
+        req = OwnerSetRequest.__new__(OwnerSetRequest)
+        req._name = "   "
+        req._type = Owner.Type.USER
+        with self.assertRaises(ValueError):
+            req.validate()
+
 
 class TestOwnerResponseValidation(unittest.TestCase):
     def test_validate_owner_with_empty_name(self):
         owner_dto = OwnerDTO(_name="", _type=Owner.Type.USER)
+        resp = OwnerResponse(0, owner_dto)
+        with self.assertRaises(ValueError):
+            resp.validate()
+
+    def test_validate_owner_with_whitespace_name(self):
+        owner_dto = OwnerDTO(_name="   ", _type=Owner.Type.USER)
         resp = OwnerResponse(0, owner_dto)
         with self.assertRaises(ValueError):
             resp.validate()
