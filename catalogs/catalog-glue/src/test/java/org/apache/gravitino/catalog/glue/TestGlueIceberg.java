@@ -28,7 +28,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.rel.Column;
@@ -47,7 +46,6 @@ import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.IcebergSchema;
 import software.amazon.awssdk.services.glue.model.IcebergStructField;
-import software.amazon.awssdk.services.glue.model.IcebergTableUpdate;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
@@ -172,19 +170,16 @@ class TestGlueIceberg {
   }
 
   // ---------------------------------------------------------------------------
-  // buildIcebergTableUpdates
+  // buildSchemaUpdate / extractSetProperties / validateChanges
   // ---------------------------------------------------------------------------
 
   @Test
-  void testBuildIcebergTableUpdates_addColumn() {
+  void testBuildSchemaUpdate_addColumn() {
     Table raw = icebergTable(icebergColumn("id", "long", 1, false));
 
     TableChange add = TableChange.addColumn(new String[] {"score"}, Types.FloatType.get(), true);
-    List<IcebergTableUpdate> updates = GlueIcebergHelper.buildIcebergTableUpdates(raw, add);
+    IcebergSchema schema = GlueIcebergHelper.buildSchemaUpdate(raw, add).orElseThrow().schema();
 
-    assertEquals(1, updates.size());
-    IcebergSchema schema = updates.get(0).schema();
-    assertNotNull(schema);
     assertEquals(2, schema.fields().size());
     IcebergStructField newField = schema.fields().get(1);
     assertEquals("score", newField.name());
@@ -194,60 +189,55 @@ class TestGlueIceberg {
   }
 
   @Test
-  void testBuildIcebergTableUpdates_deleteColumn() {
+  void testBuildSchemaUpdate_deleteColumn() {
     Table raw =
         icebergTable(
             icebergColumn("id", "long", 1, false), icebergColumn("name", "string", 2, true));
 
     TableChange delete = TableChange.deleteColumn(new String[] {"name"}, true);
-    List<IcebergTableUpdate> updates = GlueIcebergHelper.buildIcebergTableUpdates(raw, delete);
+    IcebergSchema schema = GlueIcebergHelper.buildSchemaUpdate(raw, delete).orElseThrow().schema();
 
-    assertEquals(1, updates.size());
-    IcebergSchema schema = updates.get(0).schema();
-    assertNotNull(schema);
     assertEquals(1, schema.fields().size());
     assertEquals("id", schema.fields().get(0).name());
   }
 
   @Test
-  void testBuildIcebergTableUpdates_renameColumn() {
+  void testBuildSchemaUpdate_renameColumn() {
     Table raw = icebergTable(icebergColumn("old_name", "string", 1, true));
 
     TableChange rename = TableChange.renameColumn(new String[] {"old_name"}, "new_name");
-    List<IcebergTableUpdate> updates = GlueIcebergHelper.buildIcebergTableUpdates(raw, rename);
+    IcebergSchema schema = GlueIcebergHelper.buildSchemaUpdate(raw, rename).orElseThrow().schema();
 
-    assertEquals(1, updates.size());
-    IcebergSchema schema = updates.get(0).schema();
-    assertNotNull(schema);
     assertEquals("new_name", schema.fields().get(0).name());
     assertEquals(1, schema.fields().get(0).id()); // ID preserved
   }
 
   @Test
-  void testBuildIcebergTableUpdates_setProperty() {
-    Table raw = icebergTable();
-
+  void testExtractSetProperties_singleProperty() {
     TableChange set = TableChange.setProperty("write.format.default", "parquet");
-    List<IcebergTableUpdate> updates = GlueIcebergHelper.buildIcebergTableUpdates(raw, set);
-
-    assertEquals(1, updates.size());
-    Map<String, String> props = updates.get(0).properties();
-    assertNotNull(props);
+    Map<String, String> props = GlueIcebergHelper.extractSetProperties(set);
+    assertEquals(1, props.size());
     assertEquals("parquet", props.get("write.format.default"));
   }
 
   @Test
-  void testBuildIcebergTableUpdates_removePropertyThrows() {
-    Table raw = icebergTable();
-    assertThrows(
-        UnsupportedOperationException.class,
-        () ->
-            GlueIcebergHelper.buildIcebergTableUpdates(
-                raw, TableChange.removeProperty("some.prop")));
+  void testExtractSetProperties_empty() {
+    Map<String, String> props =
+        GlueIcebergHelper.extractSetProperties(
+            TableChange.addColumn(
+                new String[] {"col"}, org.apache.gravitino.rel.types.Types.LongType.get()));
+    assertTrue(props.isEmpty());
   }
 
   @Test
-  void testBuildIcebergTableUpdates_schemaIdIncrement() {
+  void testValidateChanges_removePropertyThrows() {
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> GlueIcebergHelper.validateChanges(TableChange.removeProperty("some.prop")));
+  }
+
+  @Test
+  void testBuildSchemaUpdate_schemaIdIncrement() {
     Table raw =
         Table.builder()
             .parameters(Map.of("table_type", "ICEBERG", "current-schema-id", "3"))
@@ -255,81 +245,70 @@ class TestGlueIceberg {
             .build();
 
     TableChange add = TableChange.addColumn(new String[] {"ts"}, Types.DateType.get(), true);
-    List<IcebergTableUpdate> updates = GlueIcebergHelper.buildIcebergTableUpdates(raw, add);
-
-    IcebergSchema schema = updates.get(0).schema();
+    IcebergSchema schema = GlueIcebergHelper.buildSchemaUpdate(raw, add).orElseThrow().schema();
     assertEquals(4, schema.schemaId());
   }
 
   @Test
-  void testBuildIcebergTableUpdates_mixedChanges() {
+  void testBuildSchemaUpdate_andExtractSetProperties_mixedChanges() {
     Table raw = icebergTable(icebergColumn("id", "long", 1, false));
+    TableChange colChange = TableChange.addColumn(new String[] {"ts"}, Types.DateType.get(), true);
+    TableChange propChange = TableChange.setProperty("write.target-file-size-bytes", "134217728");
 
-    List<IcebergTableUpdate> updates =
-        GlueIcebergHelper.buildIcebergTableUpdates(
-            raw,
-            TableChange.addColumn(new String[] {"ts"}, Types.DateType.get(), true),
-            TableChange.setProperty("write.target-file-size-bytes", "134217728"));
-
-    assertEquals(2, updates.size());
-    IcebergSchema schema = updates.get(0).schema();
-    assertNotNull(schema);
+    IcebergSchema schema =
+        GlueIcebergHelper.buildSchemaUpdate(raw, colChange, propChange).orElseThrow().schema();
     assertEquals(2, schema.fields().size());
     assertEquals("ts", schema.fields().get(1).name());
-    Map<String, String> props = updates.get(1).properties();
-    assertNotNull(props);
+
+    Map<String, String> props = GlueIcebergHelper.extractSetProperties(colChange, propChange);
     assertEquals("134217728", props.get("write.target-file-size-bytes"));
   }
 
   @Test
-  void testBuildIcebergTableUpdates_updateColumnType() {
+  void testBuildSchemaUpdate_updateColumnType() {
     Table raw = icebergTable(icebergColumn("id", "int", 1, false));
 
-    List<IcebergTableUpdate> updates =
-        GlueIcebergHelper.buildIcebergTableUpdates(
-            raw, TableChange.updateColumnType(new String[] {"id"}, Types.LongType.get()));
-
-    IcebergSchema schema = updates.get(0).schema();
+    IcebergSchema schema =
+        GlueIcebergHelper.buildSchemaUpdate(
+                raw, TableChange.updateColumnType(new String[] {"id"}, Types.LongType.get()))
+            .orElseThrow()
+            .schema();
     assertEquals("long", schema.fields().get(0).type().asString());
     assertEquals(1, schema.fields().get(0).id()); // field ID preserved
   }
 
   @Test
-  void testBuildIcebergTableUpdates_emptyChanges() {
+  void testBuildSchemaUpdate_emptyChanges() {
     Table raw = icebergTable(icebergColumn("id", "long", 1, false));
-
-    List<IcebergTableUpdate> updates = GlueIcebergHelper.buildIcebergTableUpdates(raw);
-
-    assertEquals(0, updates.size());
+    assertFalse(GlueIcebergHelper.buildSchemaUpdate(raw).isPresent());
   }
 
   @Test
-  void testBuildIcebergTableUpdates_nonSequentialFieldIds() {
-    // Simulate a table after column deletions: IDs 1, 5, 10 (non-contiguous)
+  void testBuildSchemaUpdate_nonSequentialFieldIds() {
     Table raw =
         icebergTable(
             icebergColumn("a", "long", 1, false),
             icebergColumn("b", "string", 5, true),
             icebergColumn("c", "date", 10, true));
 
-    List<IcebergTableUpdate> updates =
-        GlueIcebergHelper.buildIcebergTableUpdates(
-            raw, TableChange.addColumn(new String[] {"d"}, Types.IntegerType.get(), true));
-
-    IcebergSchema schema = updates.get(0).schema();
+    IcebergSchema schema =
+        GlueIcebergHelper.buildSchemaUpdate(
+                raw, TableChange.addColumn(new String[] {"d"}, Types.IntegerType.get(), true))
+            .orElseThrow()
+            .schema();
     IcebergStructField newField = schema.fields().get(3);
     assertEquals("d", newField.name());
     assertEquals(11, newField.id()); // max(1,5,10) + 1 = 11, not fields.size()+1 = 4
   }
 
   @Test
-  void testBuildIcebergTableUpdates_columnNotFoundThrows() {
+  void testBuildSchemaUpdate_columnNotFoundThrows() {
     Table raw = icebergTable(icebergColumn("id", "long", 1, false));
 
     assertThrows(
         IllegalArgumentException.class,
         () ->
-            GlueIcebergHelper.buildIcebergTableUpdates(
+            GlueIcebergHelper.buildSchemaUpdate(
                 raw, TableChange.renameColumn(new String[] {"nonexistent"}, "new_name")));
   }
 
@@ -456,26 +435,26 @@ class TestGlueIceberg {
   }
 
   @Test
-  void testBuildIcebergTableUpdates_updateColumnNullability() {
+  void testBuildSchemaUpdate_updateColumnNullability() {
     Table raw = icebergTable(icebergColumn("id", "long", 1, true));
 
-    List<IcebergTableUpdate> updates =
-        GlueIcebergHelper.buildIcebergTableUpdates(
-            raw, TableChange.updateColumnNullability(new String[] {"id"}, false));
-
-    IcebergSchema schema = updates.get(0).schema();
+    IcebergSchema schema =
+        GlueIcebergHelper.buildSchemaUpdate(
+                raw, TableChange.updateColumnNullability(new String[] {"id"}, false))
+            .orElseThrow()
+            .schema();
     assertTrue(schema.fields().get(0).required());
   }
 
   @Test
-  void testBuildIcebergTableUpdates_updateColumnComment() {
+  void testBuildSchemaUpdate_updateColumnComment() {
     Table raw = icebergTable(icebergColumn("id", "long", 1, false));
 
-    List<IcebergTableUpdate> updates =
-        GlueIcebergHelper.buildIcebergTableUpdates(
-            raw, TableChange.updateColumnComment(new String[] {"id"}, "primary key"));
-
-    IcebergSchema schema = updates.get(0).schema();
+    IcebergSchema schema =
+        GlueIcebergHelper.buildSchemaUpdate(
+                raw, TableChange.updateColumnComment(new String[] {"id"}, "primary key"))
+            .orElseThrow()
+            .schema();
     assertEquals("primary key", schema.fields().get(0).doc());
   }
 

@@ -66,51 +66,54 @@ final class GlueIcebergHelper {
   }
 
   /**
-   * Builds a list of {@link IcebergTableUpdate} objects from Gravitino {@link TableChange} entries.
-   *
-   * <p>Schema changes (add/rename/delete/update column) are consolidated into a single {@code
-   * add-schema} update carrying the complete new schema. Property changes are emitted as a separate
-   * {@code set-properties} update.
-   *
-   * @param rawGlueTable the current Glue table (used to read existing column field IDs)
-   * @param changes the changes to apply
-   * @return list of {@link IcebergTableUpdate} to apply; empty if {@code changes} contains no
-   *     applicable entries, otherwise one entry for schema changes and/or one for property changes
+   * Validates that all {@code changes} are supported for Iceberg tables. Throws {@link
+   * IllegalArgumentException} for unsupported change types (e.g., rename table) and {@link
+   * UnsupportedOperationException} for {@link TableChange.RemoveProperty}.
    */
-  static List<IcebergTableUpdate> buildIcebergTableUpdates(
-      Table rawGlueTable, TableChange... changes) {
-
-    List<TableChange> schemaChanges = new ArrayList<>();
-    Map<String, String> setProperties = new HashMap<>();
-
+  static void validateChanges(TableChange... changes) {
     for (TableChange change : changes) {
-      if (change instanceof TableChange.ColumnChange) {
-        schemaChanges.add(change);
-      } else if (change instanceof TableChange.SetProperty) {
-        TableChange.SetProperty sp = (TableChange.SetProperty) change;
-        setProperties.put(sp.getProperty(), sp.getValue());
-      } else if (change instanceof TableChange.RemoveProperty) {
+      if (change instanceof TableChange.ColumnChange || change instanceof TableChange.SetProperty) {
+        continue;
+      }
+      if (change instanceof TableChange.RemoveProperty) {
         throw new UnsupportedOperationException(
-            "Removing properties from Iceberg tables is not supported via the Glue SDK. "
-                + "Use an Iceberg-native client (Spark/Athena) to modify table properties.");
-      } else {
-        throw new IllegalArgumentException(
-            "Unsupported table change for Iceberg table: " + change.getClass().getSimpleName());
+            "Removing properties from Iceberg tables is not supported via the Glue SDK.");
+      }
+      throw new IllegalArgumentException(
+          "Unsupported table change for Iceberg table: " + change.getClass().getSimpleName());
+    }
+  }
+
+  /**
+   * Filters {@code changes} to column-schema changes and builds a single {@link IcebergTableUpdate}
+   * carrying the updated schema. Returns empty if there are no column changes.
+   */
+  static java.util.Optional<IcebergTableUpdate> buildSchemaUpdate(
+      Table rawGlueTable, TableChange... changes) {
+    List<TableChange> schemaChanges = new ArrayList<>();
+    for (TableChange c : changes) {
+      if (c instanceof TableChange.ColumnChange) schemaChanges.add(c);
+    }
+    if (schemaChanges.isEmpty()) return java.util.Optional.empty();
+    return java.util.Optional.of(
+        IcebergTableUpdate.builder()
+            .schema(buildUpdatedSchema(rawGlueTable, schemaChanges))
+            .build());
+  }
+
+  /**
+   * Extracts {@link TableChange.SetProperty} entries from {@code changes} into a key-value map.
+   * Returns an empty map if there are no property-set changes.
+   */
+  static Map<String, String> extractSetProperties(TableChange... changes) {
+    Map<String, String> props = new HashMap<>();
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.SetProperty) {
+        TableChange.SetProperty sp = (TableChange.SetProperty) change;
+        props.put(sp.getProperty(), sp.getValue());
       }
     }
-
-    List<IcebergTableUpdate> updates = new ArrayList<>();
-
-    if (!schemaChanges.isEmpty()) {
-      IcebergSchema newSchema = buildUpdatedSchema(rawGlueTable, schemaChanges);
-      updates.add(IcebergTableUpdate.builder().schema(newSchema).build());
-    }
-
-    if (!setProperties.isEmpty()) {
-      updates.add(IcebergTableUpdate.builder().properties(setProperties).build());
-    }
-
-    return updates;
+    return props;
   }
 
   /**
