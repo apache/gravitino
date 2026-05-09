@@ -32,6 +32,7 @@ import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
@@ -123,6 +124,14 @@ public class TestSqlSession {
   }
 
   @Test
+  public void testSingleFactoryWhenNoReadOnlyConfigSet() {
+    // config does not stub any read-only URL/user/password/pool; single factory is used
+    assertSame(
+        SqlSessionFactoryHelper.getInstance().getWriteSqlSessionFactory(),
+        SqlSessionFactoryHelper.getInstance().getReadSqlSessionFactory());
+  }
+
+  @Test
   public void testGetSqlSessionFactoryWithoutInit() {
     SqlSessionFactoryHelper.getInstance().close();
     assertThrows(
@@ -136,7 +145,7 @@ public class TestSqlSession {
     assertNotNull(session);
     assertEquals(1, SqlSessions.getSessionCount());
     SqlSessions.closeSqlSession();
-    assertNull(SqlSessions.getSessions().get());
+    assertNull(SqlSessions.getWriteSessions().get());
     assertEquals(0, SqlSessions.getSessionCount());
   }
 
@@ -146,7 +155,7 @@ public class TestSqlSession {
     assertNotNull(session);
     assertEquals(1, SqlSessions.getSessionCount());
     SqlSessions.commitAndCloseSqlSession();
-    assertNull(SqlSessions.getSessions().get());
+    assertNull(SqlSessions.getWriteSessions().get());
     assertEquals(0, SqlSessions.getSessionCount());
   }
 
@@ -156,7 +165,7 @@ public class TestSqlSession {
     assertNotNull(session);
     assertEquals(1, SqlSessions.getSessionCount());
     SqlSessions.rollbackAndCloseSqlSession();
-    assertNull(SqlSessions.getSessions().get());
+    assertNull(SqlSessions.getWriteSessions().get());
     assertEquals(0, SqlSessions.getSessionCount());
   }
 }
