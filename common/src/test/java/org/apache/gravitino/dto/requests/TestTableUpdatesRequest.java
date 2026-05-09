@@ -26,6 +26,7 @@ import java.util.List;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.TableChange.AddIndex;
 import org.apache.gravitino.rel.TableChange.DeleteIndex;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
@@ -318,6 +319,18 @@ public class TestTableUpdatesRequest {
     DeleteIndex deleteIndex = (DeleteIndex) deleteTableIndexRequest.tableChange();
     Assertions.assertEquals("uk_3", deleteIndex.getName());
     Assertions.assertFalse(deleteIndex.isIfExists());
+
+    // check add index request with properties deserialization
+    TableUpdateRequest.AddTableIndexRequest addTableIndexRequestWithProperties =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"@type\":\"addTableIndex\",\"index\":{\"indexType\":\"PRIMARY_KEY\","
+                    + "\"name\":\"idx_1\",\"fieldNames\":[[\"column1\"]],"
+                    + "\"properties\":{\"granularity\":\"9\"}}}",
+                TableUpdateRequest.AddTableIndexRequest.class);
+    AddIndex addIndex = (AddIndex) addTableIndexRequestWithProperties.tableChange();
+    Assertions.assertEquals("idx_1", addIndex.getName());
+    Assertions.assertEquals("9", addIndex.getProperties().get("granularity"));
   }
 
   @Test

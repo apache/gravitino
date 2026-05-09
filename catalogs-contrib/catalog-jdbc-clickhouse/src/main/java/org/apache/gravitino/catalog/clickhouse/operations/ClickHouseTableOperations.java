@@ -20,6 +20,9 @@ package org.apache.gravitino.catalog.clickhouse.operations;
 
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DEFAULT_BLOOM_FILTER_GRANULARITY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DEFAULT_MINMAX_GRANULARITY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.CLICKHOUSE_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE_PROPERTY_ENTRY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
@@ -28,6 +31,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -495,21 +499,19 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         case DATA_SKIPPING_MINMAX:
           Preconditions.checkArgument(
               StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
-          // The GRANULARITY value is always 1 here currently as we can't set it by Index: there is
-          // no field for it.
-          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
+          int minmaxGranularity = getGranularity(index.properties(), index.type(), index.name());
           sqlBuilder.append(
-              " INDEX %s %s TYPE minmax GRANULARITY 1"
-                  .formatted(quoteIdentifier(index.name()), fieldStr));
+              " INDEX %s %s TYPE minmax GRANULARITY %d"
+                  .formatted(quoteIdentifier(index.name()), fieldStr, minmaxGranularity));
           break;
         case DATA_SKIPPING_BLOOM_FILTER:
-          // The GRANULARITY value is always 3 here currently.
-          // TODO(yuqi) add a properties field to Index to support user defined GRANULARITY value.
           Preconditions.checkArgument(
               StringUtils.isNotBlank(index.name()), "Data skipping index name must not be blank");
+          int bloomFilterGranularity =
+              getGranularity(index.properties(), index.type(), index.name());
           sqlBuilder.append(
-              " INDEX %s %s TYPE bloom_filter GRANULARITY 3"
-                  .formatted(quoteIdentifier(index.name()), fieldStr));
+              " INDEX %s %s TYPE bloom_filter GRANULARITY %d"
+                  .formatted(quoteIdentifier(index.name()), fieldStr, bloomFilterGranularity));
           break;
         default:
           throw new IllegalArgumentException(
@@ -854,12 +856,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String fieldStr = getIndexFieldStr(addIndex.getFieldNames());
     switch (addIndex.getType()) {
       case DATA_SKIPPING_MINMAX:
-        return "ADD INDEX %s %s TYPE minmax GRANULARITY 1"
-            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+        int minmaxGranularity =
+            getGranularity(addIndex.getProperties(), addIndex.getType(), addIndex.getName());
+        return "ADD INDEX %s %s TYPE minmax GRANULARITY %d"
+            .formatted(quoteIdentifier(addIndex.getName()), fieldStr, minmaxGranularity);
 
       case DATA_SKIPPING_BLOOM_FILTER:
-        return "ADD INDEX %s %s TYPE bloom_filter GRANULARITY 3"
-            .formatted(quoteIdentifier(addIndex.getName()), fieldStr);
+        int bloomFilterGranularity =
+            getGranularity(addIndex.getProperties(), addIndex.getType(), addIndex.getName());
+        return "ADD INDEX %s %s TYPE bloom_filter GRANULARITY %d"
+            .formatted(quoteIdentifier(addIndex.getName()), fieldStr, bloomFilterGranularity);
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(
@@ -1256,7 +1262,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     List<Index> secondaryIndexes = new ArrayList<>();
     try (PreparedStatement preparedStatement =
         connection.prepareStatement(
-            "SELECT name, type, expr FROM system.data_skipping_indices "
+            "SELECT name, type, expr, granularity FROM system.data_skipping_indices "
                 + "WHERE database = ? AND table = ? ORDER BY name")) {
       preparedStatement.setString(1, databaseName);
       preparedStatement.setString(2, tableName);
@@ -1265,12 +1271,27 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           String name = resultSet.getString("name");
           String type = resultSet.getString("type");
           String expression = resultSet.getString("expr");
+          String granularity = resultSet.getString("granularity");
           try {
             String[][] fields = parseIndexFields(expression);
             if (ArrayUtils.isEmpty(fields)) {
               continue;
             }
-            secondaryIndexes.add(Indexes.of(getClickHouseIndexType(type), name, fields));
+            Map<String, String> indexProperties = ImmutableMap.of();
+            if (StringUtils.isNotBlank(granularity)) {
+              indexProperties = ImmutableMap.of(GRANULARITY, granularity);
+            } else {
+              LOG.warn(
+                  "Found blank {} for data skipping index {} (type {}) on {}.{}, skip loading {} property.",
+                  GRANULARITY,
+                  name,
+                  type,
+                  databaseName,
+                  tableName,
+                  GRANULARITY);
+            }
+            secondaryIndexes.add(
+                Indexes.of(getClickHouseIndexType(type), name, fields, indexProperties));
           } catch (IllegalArgumentException e) {
             LOG.warn(
                 "Skip unsupported data skipping index {} for {}.{} with expression {}",
@@ -1284,6 +1305,74 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     }
 
     return secondaryIndexes;
+  }
+
+  private int getGranularity(
+      Map<String, String> indexProperties, Index.IndexType indexType, String indexName) {
+    int defaultGranularity = getDefaultGranularity(indexType);
+    if (shouldReturnDefaultGranularity(indexProperties)) {
+      return defaultGranularity;
+    }
+
+    validateGranularityKeyCase(indexProperties, indexName);
+    return parsePositiveGranularity(indexProperties.get(GRANULARITY), indexName);
+  }
+
+  private boolean shouldReturnDefaultGranularity(Map<String, String> indexProperties) {
+    if (MapUtils.isEmpty(indexProperties)) {
+      return true;
+    }
+
+    for (String key : indexProperties.keySet()) {
+      if (StringUtils.equalsIgnoreCase(key, GRANULARITY)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private void validateGranularityKeyCase(Map<String, String> indexProperties, String indexName) {
+    for (String key : indexProperties.keySet()) {
+      if (StringUtils.equalsIgnoreCase(key, GRANULARITY) && !StringUtils.equals(key, GRANULARITY)) {
+        throw new IllegalArgumentException(
+            "Index '%s' has unsupported property key '%s'. Use lowercase '%s'."
+                .formatted(indexName, key, GRANULARITY));
+      }
+    }
+  }
+
+  private int parsePositiveGranularity(String granularityValue, String indexName) {
+    String message =
+        "Invalid %s value '%s' for index '%s'. It must be a positive integer."
+            .formatted(GRANULARITY, granularityValue, indexName);
+
+    if (StringUtils.isBlank(granularityValue)) {
+      throw new IllegalArgumentException(message);
+    }
+
+    final int parsed;
+    try {
+      parsed = Integer.parseInt(granularityValue.trim());
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(message, e);
+    }
+
+    if (parsed <= 0) {
+      throw new IllegalArgumentException(message);
+    }
+
+    return parsed;
+  }
+
+  private int getDefaultGranularity(Index.IndexType indexType) {
+    switch (indexType) {
+      case DATA_SKIPPING_MINMAX:
+        return DEFAULT_MINMAX_GRANULARITY;
+      case DATA_SKIPPING_BLOOM_FILTER:
+        return DEFAULT_BLOOM_FILTER_GRANULARITY;
+      default:
+        throw new IllegalArgumentException("Unsupported index type for granularity: " + indexType);
+    }
   }
 
   private Index.IndexType getClickHouseIndexType(String rawType) {

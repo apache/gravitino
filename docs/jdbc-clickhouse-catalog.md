@@ -172,7 +172,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 | Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Engines             | **MergeTree family** (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`): fully supported, data persists across restarts. **Log family** (`TinyLog`, `StripeLog`, `Log`): supported, data and table definition persist across restarts. **`Null`**: supported, table persists, data is always discarded by design. **`Set`**: supported, table definition persists. **`Memory`**: ⚠️ table definition persists but data is lost on ClickHouse restart (volatile). **Distributed**: cluster mode with remote database/table and sharding key. **Not directly creatable via Gravitino** (`Join`, `Buffer`, `View`, `KeeperMap`, `File`): require parameterized ENGINE clauses or external dependencies not supported by the CREATE TABLE API. |
 | Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY`/`PARTITION BY`.                                                                                                                                                                                                                                                                                    |
-| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` (fixed granularities).                                                                                                                                                                                                                                                                                                                                                         |
+| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` with configurable `granularity` via index properties.                                                                                                                                                                                                                                                                                                                           |
 | Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                                                                                                                               |
 | Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -240,8 +240,31 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 
 - `PRIMARY_KEY`
 - Data-skipping indexes:
-  - `DATA_SKIPPING_MINMAX` (`GRANULARITY` fixed to 1)
-  - `DATA_SKIPPING_BLOOM_FILTER` (`GRANULARITY` fixed to 3)
+  - `DATA_SKIPPING_MINMAX`
+  - `DATA_SKIPPING_BLOOM_FILTER`
+
+#### Properties
+
+For data-skipping indexes, Gravitino supports catalog-specific index `properties`.
+
+##### `granularity`
+
+| Property Name  | Description                             | Validation                                                                 |
+|----------------|-----------------------------------------|----------------------------------------------------------------------------|
+| `granularity`  | Maps to ClickHouse `GRANULARITY` clause | Property key must be lowercase `granularity`; value must be a positive integer |
+
+Defaults by index type:
+
+| Index Type                     | Default `granularity` | Notes                                              |
+|--------------------------------|------------------------|----------------------------------------------------|
+| `DATA_SKIPPING_MINMAX`         | `1`                    | Used when `properties.granularity` is not provided |
+| `DATA_SKIPPING_BLOOM_FILTER`   | `3`                    | Used when `properties.granularity` is not provided |
+
+Behavior:
+
+- If `properties.granularity` is provided, the configured value is used for `CREATE TABLE` and `ALTER TABLE ... ADD INDEX`.
+- If `properties.granularity` is not provided, Gravitino uses the default value for each index type.
+- On table load, Gravitino reads ClickHouse index metadata and returns the effective `granularity` in index properties for supported data-skipping indexes.
 
 ### Partitioning, sorting, and distribution
 
@@ -269,6 +292,7 @@ CREATE TABLE sales.orders ON CLUSTER ck_cluster (
   amount Decimal(18,2),
   created_at DateTime,
   primary key (order_id),
+  INDEX idx_amount_mm amount TYPE minmax GRANULARITY 9
 ) ENGINE = MergeTree order BY order_id PARTITION BY created_at;
 
 ```
@@ -299,7 +323,15 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   ],
   "partitioning": ["created_at"],
   "indexes": [
-    {"indexType": "primary_key", "name": "pk_order", "fieldNames": [["order_id"]]}
+    {"indexType": "primary_key", "name": "pk_order", "fieldNames": [["order_id"]]},
+    {
+      "indexType": "data_skipping_minmax",
+      "name": "idx_amount_mm",
+      "fieldNames": [["amount"]],
+      "properties": {
+        "granularity": "9"
+      }
+    }
   ]
 }' http://localhost:8090/api/metalakes/metalake/catalogs/ck/schemas/sales/tables
 ```
@@ -318,7 +350,14 @@ Column[] columns = new Column[] {
 };
 
 Index[] indexes =
-    new Index[] {Indexes.of(Index.IndexType.PRIMARY_KEY, "pk_order", new String[][] {{"order_id"}})};
+    new Index[] {
+      Indexes.of(Index.IndexType.PRIMARY_KEY, "pk_order", new String[][] {{"order_id"}}),
+      Indexes.of(
+          Index.IndexType.DATA_SKIPPING_MINMAX,
+          "idx_amount_mm",
+          new String[][] {{"amount"}},
+          Map.of("granularity", "9"))
+    };
 
 SortOrder[] sortOrders =
     new SortOrder[] {SortOrder.builder("order_id").withDirection(SortDirection.ASCENDING).build()};
@@ -334,6 +373,98 @@ tableCatalog.createTable(
     Distributions.NONE,
     indexes,
     sortOrders);
+```
+
+</TabItem>
+</Tabs>
+
+### Alter a table
+
+The following examples show multiple ALTER operations, including column changes and index changes with `granularity`.
+
+This is the SQL that would be executed in ClickHouse for equivalent operations:
+
+```sql
+ALTER TABLE sales.orders ADD COLUMN order_status String;
+ALTER TABLE sales.orders ADD INDEX idx_note_bf note TYPE bloom_filter GRANULARITY 7;
+ALTER TABLE sales.orders DROP INDEX idx_note_bf;
+```
+
+The same changes can be applied through the API as follows:
+
+Example: add a column and add a data-skipping index with granularity
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "updates": [
+    {
+      "@type": "addColumn",
+      "fieldName": ["order_status"],
+      "type": "string",
+      "comment": "Order status",
+      "nullable": true
+    },
+    {
+      "@type": "addTableIndex",
+      "index": {
+        "indexType": "data_skipping_bloom_filter",
+        "name": "idx_note_bf",
+        "fieldNames": [["note"]],
+        "properties": {
+          "granularity": "7"
+        }
+      }
+    }
+  ]
+}' http://localhost:8090/api/metalakes/metalake/catalogs/ck/schemas/sales/tables/orders
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+tableCatalog.alterTable(
+    NameIdentifier.of("sales", "orders"),
+    TableChange.addColumn(new String[] {"order_status"}, Types.StringType.get(), "Order status"),
+    TableChange.addIndex(
+        Index.IndexType.DATA_SKIPPING_BLOOM_FILTER,
+        "idx_note_bf",
+        new String[][] {{"note"}},
+        Map.of("granularity", "7")));
+```
+
+</TabItem>
+</Tabs>
+
+Example: drop a data-skipping index
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "updates": [
+    {
+      "@type": "deleteTableIndex",
+      "name": "idx_note_bf",
+      "ifExists": true
+    }
+  ]
+}' http://localhost:8090/api/metalakes/metalake/catalogs/ck/schemas/sales/tables/orders
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+tableCatalog.alterTable(
+    NameIdentifier.of("sales", "orders"),
+    TableChange.deleteIndex("idx_note_bf", true));
 ```
 
 </TabItem>

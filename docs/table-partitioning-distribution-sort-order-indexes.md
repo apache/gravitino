@@ -241,9 +241,9 @@ tableCatalog.createTable(
 
 ## Indexes
 
-To define an indexed table, you should utilize the following three components to construct a valid indexed table.
+To define an indexed table, you should utilize the following components to construct a valid indexed table.
 
-- IndexType. Represents the type of index, such as primary key or unique key.
+- IndexType. Represents the type of index. Common relational index types are listed below.
 
 | IndexType     | Description                                                                                                                                                                                                                                                                                            | JSON            | Java                      |
 |---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|---------------------------|
@@ -254,6 +254,8 @@ To define an indexed table, you should utilize the following three components to
 
 - FieldNames. It defines which table fields Gravitino uses to index the table.
 
+- Properties (optional). A map of index properties.
+
 <Tabs groupId='language' queryString>
 <TabItem value="Json" label="Json">
 
@@ -261,7 +263,8 @@ To define an indexed table, you should utilize the following three components to
  {
   "indexType": "PRIMARY_KEY",
   "name": "PRIMARY",
-  "fieldNames": [["col_1"],["col_2"]]
+  "fieldNames": [["col_1"],["col_2"]],
+  "properties": {}
 }
 ```
 

@@ -27,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -36,6 +37,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -95,6 +97,7 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestTableOperations extends BaseOperationsTest {
@@ -356,6 +359,51 @@ public class TestTableOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateTableWithIndexProperties() {
+    Column[] columns =
+        new Column[] {
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
+        };
+    Table table = mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"));
+    when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(table);
+
+    TableCreateRequest req =
+        new TableCreateRequest(
+            "table1",
+            "mock comment",
+            Arrays.stream(columns).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new),
+            ImmutableMap.of("k1", "v1"),
+            SortOrderDTO.EMPTY_SORT,
+            DistributionDTO.NONE,
+            Partitioning.EMPTY_PARTITIONING,
+            new IndexDTO[] {
+              IndexDTO.builder()
+                  .withIndexType(Index.IndexType.PRIMARY_KEY)
+                  .withName("idx_col1")
+                  .withFieldNames(new String[][] {{"col1"}})
+                  .withProperties(ImmutableMap.of("granularity", "9"))
+                  .build()
+            });
+
+    Response resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    verifyCreateTableIndexes(
+        indexes -> {
+          Assertions.assertNotNull(indexes);
+          Assertions.assertEquals(1, indexes.length);
+          Assertions.assertEquals("idx_col1", indexes[0].name());
+          Assertions.assertEquals("9", indexes[0].properties().get("granularity"));
+        });
+  }
+
+  @Test
   public void testCreatePartitionedTable() {
     Column[] columns =
         new Column[] {
@@ -568,6 +616,37 @@ public class TestTableOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testLoadTableWithIndexPropertiesInResponse() {
+    Column[] columns =
+        new Column[] {
+          mockColumn("col1", Types.StringType.get()), mockColumn("col2", Types.ByteType.get())
+        };
+    Table table =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    when(table.index())
+        .thenReturn(
+            new Index[] {
+              Indexes.of(
+                  Index.IndexType.PRIMARY_KEY,
+                  Indexes.DEFAULT_PRIMARY_KEY_NAME,
+                  new String[][] {{"col1"}},
+                  ImmutableMap.of("granularity", "9"))
+            });
+    when(dispatcher.loadTable(any())).thenReturn(table);
+
+    Response resp =
+        target(tablePath(metalake, catalog, schema) + "table1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    TableResponse tableResp = resp.readEntity(TableResponse.class);
+    Assertions.assertEquals(1, tableResp.getTable().index().length);
+    Assertions.assertEquals("9", tableResp.getTable().index()[0].properties().get("granularity"));
+  }
+
+  @Test
   public void testRenameTable() {
     TableUpdateRequest.RenameTableRequest req = new TableUpdateRequest.RenameTableRequest("table2");
     Column[] columns =
@@ -735,6 +814,40 @@ public class TestTableOperations extends BaseOperationsTest {
     Table table =
         mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
     testAlterTableRequest(req, table);
+  }
+
+  @Test
+  public void testAlterTableAddIndexWithProperties() {
+    TableChange expectedChange =
+        TableChange.addIndex(
+            Index.IndexType.PRIMARY_KEY,
+            "idx_col1",
+            new String[][] {{"col1"}},
+            ImmutableMap.of("granularity", "7"));
+    Column[] columns =
+        new Column[] {
+          mockColumn("col2", Types.ByteType.get()), mockColumn("col1", Types.StringType.get())
+        };
+    Table updatedTable =
+        mockTable("table1", columns, "mock comment", ImmutableMap.of("k1", "v1"), new Transform[0]);
+    when(dispatcher.alterTable(any(), eq(expectedChange))).thenReturn(updatedTable);
+
+    TableUpdateRequest.AddTableIndexRequest request =
+        new TableUpdateRequest.AddTableIndexRequest(
+            Index.IndexType.PRIMARY_KEY,
+            "idx_col1",
+            new String[][] {{"col1"}},
+            ImmutableMap.of("granularity", "7"));
+    TableUpdatesRequest updatesRequest = new TableUpdatesRequest(ImmutableList.of(request));
+
+    Response resp =
+        target(tablePath(metalake, catalog, schema) + "table1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(updatesRequest, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    verify(dispatcher).alterTable(any(), eq(expectedChange));
   }
 
   @Test
@@ -909,6 +1022,13 @@ public class TestTableOperations extends BaseOperationsTest {
     Assertions.assertEquals(tableDTO.distribution(), updatedTable.distribution());
     Assertions.assertArrayEquals(tableDTO.sortOrder(), updatedTable.sortOrder());
     Assertions.assertArrayEquals(tableDTO.index(), updatedTable.index());
+  }
+
+  private void verifyCreateTableIndexes(Consumer<Index[]> indexAssertions) {
+    ArgumentCaptor<Index[]> indexCaptor = ArgumentCaptor.forClass(Index[].class);
+    verify(dispatcher)
+        .createTable(any(), any(), any(), any(), any(), any(), any(), indexCaptor.capture());
+    indexAssertions.accept(indexCaptor.getValue());
   }
 
   private static String tablePath(String metalake, String catalog, String schema) {
