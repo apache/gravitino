@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -549,7 +550,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     GlueIcebergHelper.validateChanges(changes);
 
-    java.util.Optional<IcebergTableUpdate> schemaUpdate =
+    Optional<IcebergTableUpdate> schemaUpdate =
         GlueIcebergHelper.buildSchemaUpdate(rawGlueTable, changes);
     Map<String, String> propUpdates = GlueIcebergHelper.extractSetProperties(changes);
 
@@ -574,6 +575,12 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
                               .build())
                       .build()));
       LOG.info("Altered Iceberg table {}.{} schema via Glue native API", dbName, ident.name());
+      // Re-fetch to pick up server-side parameter changes (e.g., current-schema-id update)
+      // before using rawGlueTable.parameters() for the property update below.
+      GetTableRequest.Builder rawReq =
+          GetTableRequest.builder().databaseName(dbName).name(ident.name());
+      applyCatalogId(catalogId, rawReq::catalogId);
+      rawGlueTable = glueClient.getTable(rawReq.build()).table();
     }
 
     if (!propUpdates.isEmpty()) {

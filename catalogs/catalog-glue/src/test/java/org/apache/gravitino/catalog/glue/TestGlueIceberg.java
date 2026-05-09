@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import static org.apache.gravitino.catalog.glue.GlueConstants.CURRENT_SCHEMA_ID_PARAM;
+import static org.apache.gravitino.catalog.glue.GlueConstants.ICEBERG_TABLE_TYPE_VALUE;
+import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE_PARAM;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -30,7 +33,6 @@ import static org.mockito.Mockito.when;
 
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -40,6 +42,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import software.amazon.awssdk.services.glue.GlueClient;
+import software.amazon.awssdk.services.glue.model.Column;
 import software.amazon.awssdk.services.glue.model.CreateTableRequest;
 import software.amazon.awssdk.services.glue.model.CreateTableResponse;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
@@ -76,7 +79,8 @@ class TestGlueIceberg {
 
   @Test
   void testIsIcebergTable_withIcebergType() {
-    Table t = Table.builder().parameters(Map.of("table_type", "ICEBERG")).build();
+    Table t =
+        Table.builder().parameters(Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE)).build();
     assertTrue(GlueIcebergHelper.isIcebergTable(t));
   }
 
@@ -224,15 +228,14 @@ class TestGlueIceberg {
   void testExtractSetProperties_empty() {
     Map<String, String> props =
         GlueIcebergHelper.extractSetProperties(
-            TableChange.addColumn(
-                new String[] {"col"}, org.apache.gravitino.rel.types.Types.LongType.get()));
+            TableChange.addColumn(new String[] {"col"}, Types.LongType.get()));
     assertTrue(props.isEmpty());
   }
 
   @Test
   void testValidateChanges_removePropertyThrows() {
     assertThrows(
-        UnsupportedOperationException.class,
+        IllegalArgumentException.class,
         () -> GlueIcebergHelper.validateChanges(TableChange.removeProperty("some.prop")));
   }
 
@@ -240,7 +243,8 @@ class TestGlueIceberg {
   void testBuildSchemaUpdate_schemaIdIncrement() {
     Table raw =
         Table.builder()
-            .parameters(Map.of("table_type", "ICEBERG", "current-schema-id", "3"))
+            .parameters(
+                Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE, CURRENT_SCHEMA_ID_PARAM, "3"))
             .storageDescriptor(StorageDescriptor.builder().build())
             .build();
 
@@ -313,14 +317,16 @@ class TestGlueIceberg {
   }
 
   @Test
-  void testHiveTypeToDoc_unknownTypeFallsBackToString() {
-    // Complex types (array, map, struct) are not supported — should warn and return string
-    assertEquals("string", GlueIcebergHelper.hiveTypeToDoc("array<string>").asString());
+  void testHiveTypeToDoc_unknownTypeThrows() {
+    // Complex types (array, map, struct) in existing Iceberg schema must abort, not silently retype
+    assertThrows(
+        IllegalStateException.class, () -> GlueIcebergHelper.hiveTypeToDoc("array<string>"));
   }
 
   @Test
-  void testHiveTypeToDoc_malformedDecimalFallsBackToString() {
-    assertEquals("string", GlueIcebergHelper.hiveTypeToDoc("decimal(abc,2)").asString());
+  void testHiveTypeToDoc_malformedDecimalThrows() {
+    assertThrows(
+        IllegalStateException.class, () -> GlueIcebergHelper.hiveTypeToDoc("decimal(abc,2)"));
   }
 
   // ---------------------------------------------------------------------------
@@ -347,7 +353,7 @@ class TestGlueIceberg {
         .thenReturn(GetTableResponse.builder().table(created).build());
 
     NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, TABLE);
-    Column[] cols = {
+    GlueColumn[] cols = {
       GlueColumn.builder().withName("id").withType(Types.LongType.get()).withNullable(false).build()
     };
 
@@ -377,6 +383,7 @@ class TestGlueIceberg {
   void testAlterTable_icebergRoutesUpdateOpenTableFormatInput() {
     Table rawTable = icebergTable(icebergColumn("id", "long", 1, false));
 
+    // getTable is called multiple times: initial load, re-fetch after schema update, loadTable
     when(mockClient.getTable(any(GetTableRequest.class)))
         .thenReturn(GetTableResponse.builder().table(rawTable).build());
     when(mockClient.updateTable(any(UpdateTableRequest.class)))
@@ -398,7 +405,7 @@ class TestGlueIceberg {
   @Test
   void testCreateTable_icebergMissingLocationThrows() {
     NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, TABLE);
-    Column[] cols = {
+    GlueColumn[] cols = {
       GlueColumn.builder().withName("id").withType(Types.LongType.get()).withNullable(false).build()
     };
 
@@ -462,9 +469,8 @@ class TestGlueIceberg {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  private static software.amazon.awssdk.services.glue.model.Column icebergColumn(
-      String name, String type, int fieldId, boolean optional) {
-    return software.amazon.awssdk.services.glue.model.Column.builder()
+  private static Column icebergColumn(String name, String type, int fieldId, boolean optional) {
+    return Column.builder()
         .name(name)
         .type(type)
         .parameters(
@@ -476,10 +482,10 @@ class TestGlueIceberg {
         .build();
   }
 
-  private static Table icebergTable(software.amazon.awssdk.services.glue.model.Column... columns) {
+  private static Table icebergTable(Column... columns) {
     return Table.builder()
         .name(TABLE)
-        .parameters(Map.of("table_type", "ICEBERG"))
+        .parameters(Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE))
         .storageDescriptor(StorageDescriptor.builder().columns(columns).build())
         .build();
   }
