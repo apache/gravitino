@@ -458,9 +458,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   /**
-   * Builds the logical schema inheritance chain for a SCHEMA MetadataObject. For a schema named
-   * {@code "catalog.A:B:C"} this returns MetadataObjects for {@code catalog.A:B:C}, {@code
-   * catalog.A:B}, and {@code catalog.A} in that order.
+   * Builds the logical schema inheritance chain for a SCHEMA MetadataObject. For a schema object
+   * whose parent is {@code catalog} and whose name is {@code "A:B:C"}, this returns
+   * MetadataObjects for parent {@code catalog} with schema names {@code A:B:C}, {@code A:B}, and
+   * {@code A} in that order.
    *
    * <p>For flat (non-HierarchicalSchema) schemas the list contains only the original object.
    */
@@ -508,14 +509,15 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
       loadRolePrivilege(metalake, username, userId, requestContext);
 
-      // when checking CREATE SCHEMA, the metadata object may be null, we can just
-      // skip the check
+      // For requests such as CREATE SCHEMA, the metadata object may be null. This method
+      // performs object-scoped authorization, so without a metadata object it cannot evaluate
+      // the request and must deny authorization here.
       if (metadataObject == null) {
         return false;
       }
-      // For SCHEMA objects with hierarchical names (e.g. "catalog.A:B:C"), walk the logical
-      // parent chain so that a privilege granted on an ancestor schema is inherited by all
-      // descendant schemas.
+      // For SCHEMA objects with hierarchical schema names (for example, parent=catalog and
+      // name="A:B:C"), walk the logical parent chain over the schema name segments so that a
+      // privilege granted on an ancestor schema is inherited by all descendant schemas.
       if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
         List<MetadataObject> chain = buildSchemaInheritanceChain(metadataObject);
         for (MetadataObject scopeObject : chain) {
