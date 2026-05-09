@@ -44,6 +44,7 @@ import org.apache.gravitino.server.web.Utils;
 @Path("/idp/groups")
 public class IdpGroupOperations {
 
+  private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";
   private final IdpGroupManager groupManager;
 
   @Context private HttpServletRequest httpRequest;
@@ -66,7 +67,7 @@ public class IdpGroupOperations {
       return Utils.doAs(
           httpRequest, () -> Utils.ok(new IdpGroupResponse(groupManager.getGroup(group))));
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(OperationType.GET, group, "", e);
+      return ExceptionHandlers.handleIdpGroupException(OperationType.GET, group, e);
     }
   }
 
@@ -75,6 +76,12 @@ public class IdpGroupOperations {
   @Timed(name = "add-idp-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-group", absolute = true)
   public Response addGroup(CreateGroupRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleIdpGroupException(
+          OperationType.ADD, "", new IllegalArgumentException(NULL_REQUEST_BODY_ERROR));
+    }
+
+    String group = request.getGroup();
     try {
       return Utils.doAs(
           httpRequest,
@@ -83,7 +90,7 @@ public class IdpGroupOperations {
             return Utils.ok(new IdpGroupResponse(groupManager.createGroup(request.getGroup())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(OperationType.ADD, request.getGroup(), "", e);
+      return ExceptionHandlers.handleIdpGroupException(OperationType.ADD, group, e);
     }
   }
 
@@ -102,7 +109,7 @@ public class IdpGroupOperations {
             return Utils.ok(new RemoveResponse(removed));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(OperationType.REMOVE, group, "", e);
+      return ExceptionHandlers.handleIdpGroupException(OperationType.REMOVE, group, e);
     }
   }
 
@@ -112,6 +119,11 @@ public class IdpGroupOperations {
   @Timed(name = "add-idp-group-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-group-user", absolute = true)
   public Response addUsers(@PathParam("group") String group, UpdateGroupUsersRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleIdpGroupException(
+          OperationType.ADD, group, new IllegalArgumentException(NULL_REQUEST_BODY_ERROR));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
@@ -121,7 +133,7 @@ public class IdpGroupOperations {
                 new IdpGroupResponse(groupManager.addUsersToGroup(group, request.getUsers())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(OperationType.ADD, group, "", e);
+      return ExceptionHandlers.handleIdpGroupException(OperationType.ADD, group, e);
     }
   }
 
@@ -131,6 +143,11 @@ public class IdpGroupOperations {
   @Timed(name = "remove-idp-group-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-idp-group-user", absolute = true)
   public Response removeUsers(@PathParam("group") String group, UpdateGroupUsersRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleIdpGroupException(
+          OperationType.REMOVE, group, new IllegalArgumentException(NULL_REQUEST_BODY_ERROR));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
@@ -140,7 +157,7 @@ public class IdpGroupOperations {
                 new IdpGroupResponse(groupManager.removeUsersFromGroup(group, request.getUsers())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(OperationType.REMOVE, group, "", e);
+      return ExceptionHandlers.handleIdpGroupException(OperationType.REMOVE, group, e);
     }
   }
 }

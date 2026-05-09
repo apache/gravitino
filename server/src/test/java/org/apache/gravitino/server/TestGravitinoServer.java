@@ -50,6 +50,7 @@ import org.apache.gravitino.catalog.PartitionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.IdpUserDTO;
@@ -277,6 +278,7 @@ public class TestGravitinoServer {
         .thenReturn(Mockito.mock(CatalogDispatcher.class));
     Mockito.when(gravitinoEnv.schemaDispatcher()).thenReturn(Mockito.mock(SchemaDispatcher.class));
     Mockito.when(gravitinoEnv.tableDispatcher()).thenReturn(Mockito.mock(TableDispatcher.class));
+    Mockito.when(gravitinoEnv.viewDispatcher()).thenReturn(Mockito.mock(ViewDispatcher.class));
     Mockito.when(gravitinoEnv.partitionDispatcher())
         .thenReturn(Mockito.mock(PartitionDispatcher.class));
     Mockito.when(gravitinoEnv.filesetDispatcher())

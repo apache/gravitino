@@ -42,6 +42,7 @@ import org.apache.gravitino.server.web.Utils;
 @Path("/idp/users")
 public class IdpUserOperations {
 
+  private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";
   private final IdpUserManager userManager;
 
   @Context private HttpServletRequest httpRequest;
@@ -64,7 +65,7 @@ public class IdpUserOperations {
       return Utils.doAs(
           httpRequest, () -> Utils.ok(new IdpUserResponse(userManager.getUser(user))));
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.GET, user, "", e);
+      return ExceptionHandlers.handleIdpUserException(OperationType.GET, user, e);
     }
   }
 
@@ -73,6 +74,12 @@ public class IdpUserOperations {
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-user", absolute = true)
   public Response addUser(CreateUserRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleIdpUserException(
+          OperationType.ADD, "", new IllegalArgumentException(NULL_REQUEST_BODY_ERROR));
+    }
+
+    String user = request.getUser();
     try {
       return Utils.doAs(
           httpRequest,
@@ -83,7 +90,7 @@ public class IdpUserOperations {
                     userManager.createUser(request.getUser(), request.getPassword())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.ADD, request.getUser(), "", e);
+      return ExceptionHandlers.handleIdpUserException(OperationType.ADD, user, e);
     }
   }
 
@@ -93,6 +100,11 @@ public class IdpUserOperations {
   @Timed(name = "update-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-idp-user", absolute = true)
   public Response resetPassword(@PathParam("user") String user, ResetPasswordRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleIdpUserException(
+          OperationType.UPDATE, user, new IllegalArgumentException(NULL_REQUEST_BODY_ERROR));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
@@ -102,7 +114,7 @@ public class IdpUserOperations {
                 new IdpUserResponse(userManager.resetPassword(user, request.getPassword())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.UPDATE, user, "", e);
+      return ExceptionHandlers.handleIdpUserException(OperationType.UPDATE, user, e);
     }
   }
 
@@ -120,7 +132,7 @@ public class IdpUserOperations {
             return Utils.ok(new RemoveResponse(removed));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.REMOVE, user, "", e);
+      return ExceptionHandlers.handleIdpUserException(OperationType.REMOVE, user, e);
     }
   }
 }

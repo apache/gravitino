@@ -104,9 +104,17 @@ public class ExceptionHandlers {
     return UserExceptionHandler.INSTANCE.handle(op, user, metalake, e);
   }
 
+  public static Response handleIdpUserException(OperationType op, String user, Exception e) {
+    return IdpUserExceptionHandler.INSTANCE.handle(op, user, "", e);
+  }
+
   public static Response handleGroupException(
       OperationType op, String group, String metalake, Exception e) {
     return GroupExceptionHandler.INSTANCE.handle(op, group, metalake, e);
+  }
+
+  public static Response handleIdpGroupException(OperationType op, String group, Exception e) {
+    return IdpGroupExceptionHandler.INSTANCE.handle(op, group, "", e);
   }
 
   public static Response handleRoleException(
@@ -572,6 +580,74 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, group, metalake, e);
+      }
+    }
+  }
+
+  private static class IdpUserExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new IdpUserExceptionHandler();
+
+    private static String getUserErrorMsg(String user, String operation, String reason) {
+      return String.format(
+          "Failed to operate built-in IdP user %s operation [%s], reason [%s]",
+          user, operation, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String user, String ignored, Exception e) {
+      String formatted = StringUtil.isBlank(user) ? "" : " [" + user + "]";
+      String errorMsg = getUserErrorMsg(formatted, op.name(), getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof UserAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return Utils.internalError(errorMsg, e);
+      }
+    }
+  }
+
+  private static class IdpGroupExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new IdpGroupExceptionHandler();
+
+    private static String getGroupErrorMsg(String group, String operation, String reason) {
+      return String.format(
+          "Failed to operate built-in IdP group %s operation [%s], reason [%s]",
+          group, operation, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String group, String ignored, Exception e) {
+      String formatted = StringUtil.isBlank(group) ? "" : " [" + group + "]";
+      String errorMsg = getGroupErrorMsg(formatted, op.name(), getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof GroupAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return Utils.internalError(errorMsg, e);
       }
     }
   }

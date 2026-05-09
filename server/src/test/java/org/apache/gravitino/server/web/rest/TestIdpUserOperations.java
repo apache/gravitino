@@ -166,6 +166,25 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+    Assertions.assertFalse(errorResponse1.getMessage().contains("under metalake"));
+    Assertions.assertTrue(errorResponse1.getMessage().contains("built-in IdP user"));
+  }
+
+  @Test
+  public void testAddUserWithNullRequest() {
+    Response resp =
+        target("/idp/users")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(null, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("Request body cannot be null"));
   }
 
   @Test
@@ -290,6 +309,21 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+    Assertions.assertFalse(errorResponse1.getMessage().contains("under metalake"));
+    Assertions.assertTrue(errorResponse1.getMessage().contains("built-in IdP user"));
+  }
+
+  @Test
+  public void testResetPasswordWithNullRequest() {
+    Response resp = new TestableIdpUserOperations().resetPassword("user1", null);
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = (ErrorResponse) resp.getEntity();
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("Request body cannot be null"));
   }
 
   @Test
