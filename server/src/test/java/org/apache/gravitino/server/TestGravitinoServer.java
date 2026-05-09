@@ -31,7 +31,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
-import java.util.List;
 import java.util.Set;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
@@ -64,10 +63,13 @@ import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
+import org.apache.gravitino.server.web.rest.IdpGroupOperations;
 import org.apache.gravitino.server.web.rest.IdpUserOperations;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.eclipse.jetty.util.thread.ThreadPool;
+import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.test.JerseyTest;
 import org.junit.jupiter.api.AfterAll;
@@ -181,48 +183,58 @@ public class TestGravitinoServer {
     serverConfig.loadFromMap(
         ImmutableMap.of(
             Configs.AUTHENTICATORS.getKey(), "oauth",
+            Configs.ENABLE_AUTHORIZATION.getKey(), "true",
+            Configs.SERVICE_ADMINS.getKey(), "admin",
             Configs.REST_API_EXTENSION_PACKAGES.getKey(), "org.apache.gravitino.test.extension"),
         t -> true);
-
-    GravitinoServer restServer = newRestApiTestServer(serverConfig, Collections.emptySet());
-    invokeInitializeRestApi(restServer);
 
     IdpManager idpManager = Mockito.mock(IdpManager.class);
     Mockito.when(idpManager.getUser("user1"))
         .thenReturn(
             IdpUserDTO.builder().withName("user1").withGroups(Collections.emptyList()).build());
 
-    restServer.register(newIdpUserOperations(idpManager));
-    restServer.register(
-        new AbstractBinder() {
-          @Override
-          protected void configure() {
-            HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
-            Mockito.when(request.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME))
-                .thenReturn(new UserPrincipal("admin"));
-            bind(request).to(HttpServletRequest.class);
-          }
-        });
-
-    JerseyTest jerseyTest =
-        new JerseyTest() {
-          @Override
-          protected Application configure() {
-            return restServer;
-          }
-        };
-
-    try {
-      jerseyTest.setUp();
+    try (IdpUserServerTestContext adminContext =
+        newIdpUserServerTestContext(serverConfig, idpManager, "admin")) {
       Response response =
-          jerseyTest.target("/idp/users/user1").request("application/vnd.gravitino.v1+json").get();
+          adminContext
+              .jerseyTest()
+              .target("/idp/users/user1")
+              .request("application/vnd.gravitino.v1+json")
+              .get();
       assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
 
       IdpUserResponse userResponse = response.readEntity(IdpUserResponse.class);
       assertEquals("user1", userResponse.getUser().name());
-    } finally {
-      jerseyTest.tearDown();
     }
+
+    try (IdpUserServerTestContext nonAdminContext =
+        newIdpUserServerTestContext(serverConfig, idpManager, "non-admin")) {
+      Response response =
+          nonAdminContext
+              .jerseyTest()
+              .target("/idp/users/user1")
+              .request("application/vnd.gravitino.v1+json")
+              .get();
+      assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    }
+  }
+
+  @Test
+  public void testInterceptionServiceIncludesIdpOperations() {
+    GravitinoInterceptionService interceptionService = new GravitinoInterceptionService();
+    Descriptor idpUserDescriptor = Mockito.mock(Descriptor.class);
+    Descriptor idpGroupDescriptor = Mockito.mock(Descriptor.class);
+    Descriptor otherDescriptor = Mockito.mock(Descriptor.class);
+
+    Mockito.when(idpUserDescriptor.getImplementation())
+        .thenReturn(IdpUserOperations.class.getName());
+    Mockito.when(idpGroupDescriptor.getImplementation())
+        .thenReturn(IdpGroupOperations.class.getName());
+    Mockito.when(otherDescriptor.getImplementation()).thenReturn(String.class.getName());
+
+    assertTrue(interceptionService.getDescriptorFilter().matches(idpUserDescriptor));
+    assertTrue(interceptionService.getDescriptorFilter().matches(idpGroupDescriptor));
+    assertTrue(!interceptionService.getDescriptorFilter().matches(otherDescriptor));
   }
 
   private GravitinoServer newRestApiTestServer(
@@ -286,8 +298,52 @@ public class TestGravitinoServer {
 
   private IdpUserOperations newIdpUserOperations(IdpManager idpManager) throws Exception {
     Constructor<IdpUserOperations> constructor =
-        IdpUserOperations.class.getDeclaredConstructor(IdpManager.class, List.class);
+        IdpUserOperations.class.getDeclaredConstructor(IdpManager.class);
     constructor.setAccessible(true);
-    return constructor.newInstance(idpManager, Collections.singletonList("admin"));
+    return constructor.newInstance(idpManager);
+  }
+
+  private IdpUserServerTestContext newIdpUserServerTestContext(
+      ServerConfig serverConfig, IdpManager idpManager, String user) throws Exception {
+    GravitinoServer restServer = newRestApiTestServer(serverConfig, Collections.emptySet());
+    invokeInitializeRestApi(restServer);
+    restServer.register(newIdpUserOperations(idpManager));
+    restServer.register(
+        new AbstractBinder() {
+          @Override
+          protected void configure() {
+            HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+            Mockito.when(request.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME))
+                .thenReturn(new UserPrincipal(user));
+            bind(request).to(HttpServletRequest.class);
+          }
+        });
+
+    JerseyTest jerseyTest =
+        new JerseyTest() {
+          @Override
+          protected Application configure() {
+            return restServer;
+          }
+        };
+    jerseyTest.setUp();
+    return new IdpUserServerTestContext(jerseyTest);
+  }
+
+  private static class IdpUserServerTestContext implements AutoCloseable {
+    private final JerseyTest jerseyTest;
+
+    private IdpUserServerTestContext(JerseyTest jerseyTest) {
+      this.jerseyTest = jerseyTest;
+    }
+
+    private JerseyTest jerseyTest() {
+      return jerseyTest;
+    }
+
+    @Override
+    public void close() throws Exception {
+      jerseyTest.tearDown();
+    }
   }
 }

@@ -24,14 +24,14 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.dto.requests.CreateUserRequest;
@@ -40,10 +40,12 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.IdpUserResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.authorization.NameBindings;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
@@ -54,11 +56,10 @@ import org.junit.jupiter.api.Test;
 public class TestIdpUserOperations extends BaseOperationsTest {
 
   private static final IdpManager MANAGER = mock(IdpManager.class);
-  private static String currentUser = "admin";
 
   public static class TestableIdpUserOperations extends IdpUserOperations {
     public TestableIdpUserOperations() {
-      super(MANAGER, Collections.singletonList("admin"));
+      super(MANAGER);
     }
   }
 
@@ -67,8 +68,6 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     public HttpServletRequest get() {
       HttpServletRequest request = mock(HttpServletRequest.class);
       when(request.getRemoteUser()).thenReturn(null);
-      when(request.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME))
-          .thenReturn(new UserPrincipal(currentUser));
       return request;
     }
   }
@@ -76,7 +75,6 @@ public class TestIdpUserOperations extends BaseOperationsTest {
   @BeforeEach
   public void resetManager() {
     reset(MANAGER);
-    currentUser = "admin";
   }
 
   @Override
@@ -177,24 +175,6 @@ public class TestIdpUserOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testAddUserForbidden() {
-    currentUser = "user";
-    CreateUserRequest req = new CreateUserRequest("user1", "Passw0rd-For-User");
-
-    Response resp =
-        target("/idp/users")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp.getStatus());
-
-    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
-    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse.getType());
-  }
-
-  @Test
   public void testAddUserWithNullRequest() {
     Response resp =
         target("/idp/users")
@@ -209,6 +189,32 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     Assertions.assertEquals(
         IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
     Assertions.assertTrue(errorResponse.getMessage().contains("Request body cannot be null"));
+  }
+
+  @Test
+  public void testServiceAdminAuthorizationAnnotations() throws Exception {
+    Assertions.assertTrue(
+        IdpUserOperations.class.isAnnotationPresent(NameBindings.AccessControlInterfaces.class));
+
+    Method getUserMethod = IdpUserOperations.class.getMethod("getUser", String.class);
+    AuthorizationExpression getUserAuthorization =
+        getUserMethod.getAnnotation(AuthorizationExpression.class);
+    Assertions.assertNotNull(getUserAuthorization);
+    Assertions.assertEquals("SERVICE_ADMIN || USER::SELF", getUserAuthorization.expression());
+    Assertions.assertTrue(getUserAuthorization.errorMessage().contains("user itself"));
+
+    Parameter userParameter = getUserMethod.getParameters()[0];
+    AuthorizationMetadata authorizationMetadata =
+        userParameter.getAnnotation(AuthorizationMetadata.class);
+    Assertions.assertNotNull(authorizationMetadata);
+    Assertions.assertEquals(EntityType.USER, authorizationMetadata.type());
+
+    assertServiceAdminAuthorization(
+        IdpUserOperations.class.getMethod("addUser", CreateUserRequest.class));
+    assertServiceAdminAuthorization(
+        IdpUserOperations.class.getMethod(
+            "resetPassword", String.class, ResetPasswordRequest.class));
+    assertServiceAdminAuthorization(IdpUserOperations.class.getMethod("removeUser", String.class));
   }
 
   @Test
@@ -262,23 +268,6 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
-  }
-
-  @Test
-  public void testGetUserForbidden() {
-    currentUser = "user";
-
-    Response resp =
-        target("/idp/users/user1")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp.getStatus());
-
-    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
-    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test
@@ -418,5 +407,13 @@ public class TestIdpUserOperations extends BaseOperationsTest {
 
   private IdpUserDTO buildUser(String user) {
     return IdpUserDTO.builder().withName(user).build();
+  }
+
+  private void assertServiceAdminAuthorization(Method method) {
+    AuthorizationExpression authorizationExpression =
+        method.getAnnotation(AuthorizationExpression.class);
+    Assertions.assertNotNull(authorizationExpression);
+    Assertions.assertEquals("SERVICE_ADMIN", authorizationExpression.expression());
+    Assertions.assertTrue(authorizationExpression.errorMessage().contains("service admins"));
   }
 }

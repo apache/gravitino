@@ -21,8 +21,6 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import java.util.Collections;
-import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -33,38 +31,39 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.requests.CreateUserRequest;
 import org.apache.gravitino.dto.requests.ResetPasswordRequest;
 import org.apache.gravitino.dto.responses.IdpUserResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.NameBindings;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
-import org.apache.gravitino.utils.PrincipalUtils;
 
+@NameBindings.AccessControlInterfaces
 @Path("/idp/users")
 public class IdpUserOperations {
 
+  private static final String LOAD_IDP_USER_PRIVILEGE = "SERVICE_ADMIN || USER::SELF";
   private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";
+  private static final String VIEW_IDP_USER_ERROR =
+      "Only Gravitino service admins or the user itself can view built-in IdP identities";
   private static final String SERVICE_ADMIN_ERROR =
       "Only Gravitino service admins can manage built-in IdP identities";
   private final IdpManager idpManager;
-  private final List<String> serviceAdmins;
 
   @Context private HttpServletRequest httpRequest;
 
   public IdpUserOperations() {
-    this(
-        GravitinoEnv.getInstance().idpManager(),
-        GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS));
+    this(GravitinoEnv.getInstance().idpManager());
   }
 
-  IdpUserOperations(IdpManager idpManager, List<String> serviceAdmins) {
+  IdpUserOperations(IdpManager idpManager) {
     this.idpManager = idpManager;
-    this.serviceAdmins = serviceAdmins != null ? serviceAdmins : Collections.emptyList();
   }
 
   @GET
@@ -72,14 +71,11 @@ public class IdpUserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-idp-user", absolute = true)
-  public Response getUser(@PathParam("user") String user) {
+  @AuthorizationExpression(expression = LOAD_IDP_USER_PRIVILEGE, errorMessage = VIEW_IDP_USER_ERROR)
+  public Response getUser(
+      @PathParam("user") @AuthorizationMetadata(type = Entity.EntityType.USER) String user) {
     try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            ensureServiceAdmin();
-            return Utils.ok(new IdpUserResponse(idpManager.getUser(user)));
-          });
+      return Utils.doAs(httpRequest, () -> Utils.ok(new IdpUserResponse(idpManager.getUser(user))));
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpUserException(OperationType.GET, user, e);
     }
@@ -89,6 +85,7 @@ public class IdpUserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-user", absolute = true)
+  @AuthorizationExpression(expression = "SERVICE_ADMIN", errorMessage = SERVICE_ADMIN_ERROR)
   public Response addUser(CreateUserRequest request) {
     if (request == null) {
       return ExceptionHandlers.handleIdpUserException(
@@ -100,7 +97,6 @@ public class IdpUserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            ensureServiceAdmin();
             request.validate();
             return Utils.ok(
                 new IdpUserResponse(
@@ -116,6 +112,7 @@ public class IdpUserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "update-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-idp-user", absolute = true)
+  @AuthorizationExpression(expression = "SERVICE_ADMIN", errorMessage = SERVICE_ADMIN_ERROR)
   public Response resetPassword(@PathParam("user") String user, ResetPasswordRequest request) {
     if (request == null) {
       return ExceptionHandlers.handleIdpUserException(
@@ -126,7 +123,6 @@ public class IdpUserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            ensureServiceAdmin();
             request.validate();
             return Utils.ok(
                 new IdpUserResponse(idpManager.resetPassword(user, request.getPassword())));
@@ -141,22 +137,13 @@ public class IdpUserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "remove-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-idp-user", absolute = true)
+  @AuthorizationExpression(expression = "SERVICE_ADMIN", errorMessage = SERVICE_ADMIN_ERROR)
   public Response removeUser(@PathParam("user") String user) {
     try {
       return Utils.doAs(
-          httpRequest,
-          () -> {
-            ensureServiceAdmin();
-            return Utils.ok(new RemoveResponse(idpManager.deleteUser(user)));
-          });
+          httpRequest, () -> Utils.ok(new RemoveResponse(idpManager.deleteUser(user))));
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpUserException(OperationType.REMOVE, user, e);
-    }
-  }
-
-  private void ensureServiceAdmin() {
-    if (!serviceAdmins.contains(PrincipalUtils.getCurrentUserName())) {
-      throw new ForbiddenException(SERVICE_ADMIN_ERROR);
     }
   }
 }
