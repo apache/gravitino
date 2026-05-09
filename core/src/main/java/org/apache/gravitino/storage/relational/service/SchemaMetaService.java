@@ -90,12 +90,10 @@ public class SchemaMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSchemaPOByCatalogIdAndName")
   public SchemaPO getSchemaPOByCatalogIdAndName(Long catalogId, String schemaName) {
-    // Convert logical name to physical for DB lookup (e.g. "A:B:C" → "A\u0001B\u0001C").
-    String physicalName = toPhysicalSchemaName(schemaName);
     SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaMetaByCatalogIdAndName(catalogId, physicalName));
+            mapper -> mapper.selectSchemaMetaByCatalogIdAndName(catalogId, schemaName));
 
     if (schemaPO == null) {
       throw new NoSuchEntityException(
@@ -111,14 +109,12 @@ public class SchemaMetaService {
       baseMetricName = "getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName")
   public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
       String metalakeName, String catalogName, String schemaName) {
-    // Convert logical name to physical for DB lookup.
-    String physicalName = toPhysicalSchemaName(schemaName);
     SchemaIds schemaIds =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
             mapper ->
                 mapper.selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-                    metalakeName, catalogName, physicalName));
+                    metalakeName, catalogName, schemaName));
 
     if (schemaIds == null) {
       throw new NoSuchEntityException(
@@ -134,12 +130,10 @@ public class SchemaMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSchemaIdByCatalogIdAndName")
   public Long getSchemaIdByCatalogIdAndName(Long catalogId, String schemaName) {
-    // Convert logical name to physical for DB lookup.
-    String physicalName = toPhysicalSchemaName(schemaName);
     Long schemaId =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, physicalName));
+            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
 
     if (schemaId == null) {
       throw new NoSuchEntityException(
@@ -154,9 +148,8 @@ public class SchemaMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSchemaByIdentifier")
   public SchemaEntity getSchemaByIdentifier(NameIdentifier identifier) {
-    // Use physical identifier for DB lookup; convert returned entity name back to logical.
-    SchemaPO schemaPO = getSchemaPOByIdentifier(toPhysicalIdentifier(identifier));
-    return toLogicalEntity(POConverters.fromSchemaPO(schemaPO, identifier.namespace()));
+    SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
+    return POConverters.fromSchemaPO(schemaPO, identifier.namespace());
   }
 
   @Monitored(
@@ -166,10 +159,7 @@ public class SchemaMetaService {
     NamespaceUtil.checkSchema(namespace);
 
     List<SchemaPO> schemaPOs = listSchemaPOs(namespace);
-    // PO names are physical (e.g. "A\u0001B\u0001C"); convert back to logical (e.g. "A:B:C").
-    return POConverters.fromSchemaPOs(schemaPOs, namespace).stream()
-        .map(this::toLogicalEntity)
-        .collect(Collectors.toList());
+    return POConverters.fromSchemaPOs(schemaPOs, namespace);
   }
 
   @Monitored(
@@ -265,11 +255,12 @@ public class SchemaMetaService {
       baseMetricName = "updateSchema")
   public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    // Use physical identifier for DB lookup; expose logical entity to the updater.
-    SchemaPO oldSchemaPO = getSchemaPOByIdentifier(toPhysicalIdentifier(identifier));
+    // Identifier carries storage-form schema segment at JDBCBackend boundary; expose logical entity
+    // to updater.
+    SchemaPO oldSchemaPO = getSchemaPOByIdentifier(identifier);
     SchemaEntity oldSchemaEntity =
         toLogicalEntity(POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace()));
-    SchemaEntity newEntity = toLogicalEntity((SchemaEntity) updater.apply((E) oldSchemaEntity));
+    SchemaEntity newEntity = (SchemaEntity) updater.apply((E) oldSchemaEntity);
     Preconditions.checkArgument(
         Objects.equals(oldSchemaEntity.id(), newEntity.id()),
         "The updated schema entity id: %s should be same with the schema entity id before: %s",
@@ -328,13 +319,14 @@ public class SchemaMetaService {
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
     NameIdentifierUtil.checkSchema(identifier);
 
-    String schemaName = identifier.name();
+    String schemaSegmentPhysical = identifier.name();
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
     Long schemaId = schemaPO.getSchemaId();
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
+    String auditSchemaName = normalizeToLogicalSchemaName(schemaSegmentPhysical);
     String schemaFullName =
-        NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName).toString();
+        NameIdentifierUtil.ofSchema(metalakeName, catalogName, auditSchemaName).toString();
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
@@ -417,7 +409,7 @@ public class SchemaMetaService {
                   NamespaceUtil.ofTable(
                       identifier.namespace().level(0),
                       identifier.namespace().level(1),
-                      schemaName));
+                      schemaSegmentPhysical));
       if (!tableEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
@@ -428,7 +420,7 @@ public class SchemaMetaService {
                   NamespaceUtil.ofFileset(
                       identifier.namespace().level(0),
                       identifier.namespace().level(1),
-                      schemaName));
+                      schemaSegmentPhysical));
       if (!filesetEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
@@ -439,7 +431,7 @@ public class SchemaMetaService {
                   NamespaceUtil.ofModel(
                       identifier.namespace().level(0),
                       identifier.namespace().level(1),
-                      schemaName));
+                      schemaSegmentPhysical));
       if (!modelEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
@@ -451,7 +443,7 @@ public class SchemaMetaService {
                   NamespaceUtil.ofTopic(
                       identifier.namespace().level(0),
                       identifier.namespace().level(1),
-                      schemaName));
+                      schemaSegmentPhysical));
       if (!topicEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
@@ -522,13 +514,11 @@ public class SchemaMetaService {
 
   private SchemaPO getSchemaByFullQualifiedName(
       String metalakeName, String catalogName, String schemaName) {
-    // Convert logical name to physical for DB query.
-    String physicalName = toPhysicalSchemaName(schemaName);
     SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
             mapper ->
-                mapper.selectSchemaByFullQualifiedName(metalakeName, catalogName, physicalName));
+                mapper.selectSchemaByFullQualifiedName(metalakeName, catalogName, schemaName));
     if (schemaPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -627,22 +617,16 @@ public class SchemaMetaService {
 
     NameIdentifier firstIdent = identifiers.get(0);
     NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(firstIdent);
-    // Convert logical schema names to physical for DB batch query.
-    List<String> physicalSchemaNames =
-        identifiers.stream()
-            .map(id -> toPhysicalSchemaName(id.name()))
-            .collect(Collectors.toList());
+    List<String> schemaNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
 
     return SessionUtils.doWithCommitAndFetchResult(
         SchemaMetaMapper.class,
         mapper -> {
           List<SchemaPO> schemaPOs =
               mapper.batchSelectSchemaByIdentifier(
-                  catalogIdent.namespace().level(0), catalogIdent.name(), physicalSchemaNames);
-          // Convert physical PO names back to logical for callers.
-          return POConverters.fromSchemaPOs(schemaPOs, firstIdent.namespace()).stream()
-              .map(this::toLogicalEntity)
-              .collect(Collectors.toList());
+                  catalogIdent.namespace().level(0), catalogIdent.name(), schemaNames);
+          return POConverters.fromSchemaPOs(schemaPOs, firstIdent.namespace());
         });
   }
 
@@ -683,18 +667,6 @@ public class SchemaMetaService {
   private String toLogicalSchemaName(String physicalName) {
     return HierarchicalSchemaUtil.physicalToLogical(
         physicalName, HierarchicalSchemaUtil.schemaSeparator());
-  }
-
-  /**
-   * Builds a new {@link NameIdentifier} with the physical schema name while keeping the original
-   * namespace unchanged.
-   */
-  private NameIdentifier toPhysicalIdentifier(NameIdentifier identifier) {
-    String physicalName = toPhysicalSchemaName(identifier.name());
-    if (physicalName.equals(identifier.name())) {
-      return identifier;
-    }
-    return NameIdentifier.of(identifier.namespace(), physicalName);
   }
 
   /**

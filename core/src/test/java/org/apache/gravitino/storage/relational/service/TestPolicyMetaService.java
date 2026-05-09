@@ -854,6 +854,77 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testListAssociatedMetadataObjectsForPolicy() throws IOException {
+    testAssociateAndDisassociatePoliciesWithMetadataObject();
+
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+
+    List<GenericEntity> metadataObjects =
+        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"));
+
+    assertEquals(3, metadataObjects.size());
+    Assertions.assertTrue(
+        containsGenericEntity(metadataObjects, "catalog1", Entity.EntityType.CATALOG));
+    Assertions.assertTrue(
+        containsGenericEntity(metadataObjects, "catalog1.schema1", Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(
+        containsGenericEntity(metadataObjects, "catalog1.schema1.table1", Entity.EntityType.TABLE));
+
+    List<GenericEntity> metadataObjects1 =
+        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy3"));
+
+    assertEquals(3, metadataObjects1.size());
+    Assertions.assertTrue(
+        containsGenericEntity(metadataObjects1, "catalog1", Entity.EntityType.CATALOG));
+    Assertions.assertTrue(
+        containsGenericEntity(metadataObjects1, "catalog1.schema1", Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(
+        containsGenericEntity(
+            metadataObjects1, "catalog1.schema1.table1", Entity.EntityType.TABLE));
+
+    List<GenericEntity> metadataObjects2 =
+        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy4"));
+    assertEquals(0, metadataObjects2.size());
+
+    backend.delete(
+        NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1", "table1"),
+        Entity.EntityType.TABLE,
+        false);
+
+    List<GenericEntity> metadataObjects3 =
+        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"));
+
+    assertEquals(2, metadataObjects3.size());
+    Assertions.assertTrue(
+        containsGenericEntity(metadataObjects3, "catalog1", Entity.EntityType.CATALOG));
+    Assertions.assertTrue(
+        containsGenericEntity(metadataObjects3, "catalog1.schema1", Entity.EntityType.SCHEMA));
+
+    backend.delete(
+        NameIdentifier.of(METALAKE_NAME, "catalog1", "schema1"), Entity.EntityType.SCHEMA, false);
+
+    List<GenericEntity> metadataObjects4 =
+        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"));
+
+    assertEquals(1, metadataObjects4.size());
+    Assertions.assertTrue(
+        containsGenericEntity(metadataObjects4, "catalog1", Entity.EntityType.CATALOG));
+
+    backend.delete(NameIdentifier.of(METALAKE_NAME, "catalog1"), Entity.EntityType.CATALOG, false);
+
+    List<GenericEntity> metadataObjects5 =
+        policyMetaService.listAssociatedMetadataObjectsForPolicy(
+            NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy2"));
+
+    assertEquals(0, metadataObjects5.size());
+  }
+
+  @TestTemplate
   public void testDeleteMetadataObjectForPolicy() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
 
@@ -1077,5 +1148,10 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     } catch (SQLException se) {
       throw new RuntimeException("SQL execution failed", se);
     }
+  }
+
+  private boolean containsGenericEntity(
+      List<GenericEntity> genericEntities, String name, Entity.EntityType entityType) {
+    return genericEntities.stream().anyMatch(e -> e.name().equals(name) && e.type() == entityType);
   }
 }

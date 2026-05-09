@@ -108,7 +108,6 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
-    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -116,10 +115,11 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
             .withAuditInfo(AUDIT_INFO)
             .build();
-    schemaMetaService.insertSchema(schemaEntity, false);
+    backend.insert(schemaEntity, false);
 
-    schemaMetaService.updateSchema(
+    backend.update(
         schemaEntity.nameIdentifier(),
+        Entity.EntityType.SCHEMA,
         entity -> {
           SchemaEntity schema = (SchemaEntity) entity;
           return SchemaEntity.builder()
@@ -133,7 +133,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
         });
 
     SchemaEntity updatedSchema =
-        schemaMetaService.getSchemaByIdentifier(schemaEntity.nameIdentifier());
+        backend.get(schemaEntity.nameIdentifier(), Entity.EntityType.SCHEMA);
     Assertions.assertEquals("schema comment updated", updatedSchema.comment());
   }
 
@@ -196,10 +196,11 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     schemaMetaService.insertSchema(schema, false);
 
-    // Reading back via getSchemaByIdentifier must return the logical name.
+    // Reading back via JDBCBackend must return the logical name.
     SchemaEntity loaded =
-        schemaMetaService.getSchemaByIdentifier(
-            NameIdentifierUtil.ofSchema(metalakeName, catalogName, logicalName));
+        backend.get(
+            NameIdentifierUtil.ofSchema(metalakeName, catalogName, logicalName),
+            Entity.EntityType.SCHEMA);
     Assertions.assertEquals(logicalName, loaded.name());
 
     // The raw row stored in the DB must use the internal physical separator.
@@ -222,14 +223,16 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     schemaMetaService.insertSchema(leaf, false);
 
     SchemaEntity levelP =
-        schemaMetaService.getSchemaByIdentifier(
-            NameIdentifierUtil.ofSchema(metalakeName, catalogName, "p"));
+        backend.get(
+            NameIdentifierUtil.ofSchema(metalakeName, catalogName, "p"), Entity.EntityType.SCHEMA);
     SchemaEntity levelPQ =
-        schemaMetaService.getSchemaByIdentifier(
-            NameIdentifierUtil.ofSchema(metalakeName, catalogName, "p:q"));
+        backend.get(
+            NameIdentifierUtil.ofSchema(metalakeName, catalogName, "p:q"),
+            Entity.EntityType.SCHEMA);
     SchemaEntity loadedLeaf =
-        schemaMetaService.getSchemaByIdentifier(
-            NameIdentifierUtil.ofSchema(metalakeName, catalogName, logicalLeaf));
+        backend.get(
+            NameIdentifierUtil.ofSchema(metalakeName, catalogName, logicalLeaf),
+            Entity.EntityType.SCHEMA);
 
     Assertions.assertEquals("p", readRawSchemaNameFromDb(levelP.id()));
     Assertions.assertEquals("p" + PHYSICAL_SEPARATOR + "q", readRawSchemaNameFromDb(levelPQ.id()));
@@ -255,8 +258,9 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     schemaMetaService.insertSchema(schema, false);
 
     SchemaEntity loaded =
-        schemaMetaService.getSchemaByIdentifier(
-            NameIdentifierUtil.ofSchema(metalakeName, catalogName, flatName));
+        backend.get(
+            NameIdentifierUtil.ofSchema(metalakeName, catalogName, flatName),
+            Entity.EntityType.SCHEMA);
     Assertions.assertEquals(flatName, loaded.name());
 
     // Flat name: raw DB value must equal the name as-is.
@@ -293,7 +297,8 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     schemaMetaService.insertSchema(nested3, false);
 
     List<SchemaEntity> listed =
-        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName));
+        backend.list(
+            NamespaceUtil.ofSchema(metalakeName, catalogName), Entity.EntityType.SCHEMA, true);
 
     List<String> names = listed.stream().map(SchemaEntity::name).collect(Collectors.toList());
     Assertions.assertTrue(names.contains("flat"), "flat name must be present");
@@ -325,10 +330,10 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     NameIdentifier ident = NameIdentifierUtil.ofSchema(metalakeName, catalogName, logicalName);
     AtomicReference<String> updaterInputName = new AtomicReference<>();
     SchemaEntity returned =
-        schemaMetaService.updateSchema(
+        backend.update(
             ident,
-            entity -> {
-              SchemaEntity s = (SchemaEntity) entity;
+            Entity.EntityType.SCHEMA,
+            s -> {
               updaterInputName.set(s.name());
               return SchemaEntity.builder()
                   .withId(s.id())
@@ -340,7 +345,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
                   .build();
             });
 
-    SchemaEntity updated = schemaMetaService.getSchemaByIdentifier(ident);
+    SchemaEntity updated = backend.get(ident, Entity.EntityType.SCHEMA);
     Assertions.assertEquals(
         logicalName, updaterInputName.get(), "updater should receive logical schema name");
     Assertions.assertEquals(
@@ -409,9 +414,6 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
-    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
-    TopicMetaService topicMetaService = TopicMetaService.getInstance();
-
     final String schemaName = "schema_with_topic";
     SchemaEntity schema =
         createSchemaEntity(
@@ -419,7 +421,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             NamespaceUtil.ofSchema(metalakeName, catalogName),
             schemaName,
             AUDIT_INFO);
-    schemaMetaService.insertSchema(schema, false);
+    backend.insert(schema, false);
 
     final String topicName = "test_topic_dependency";
     TopicEntity topic =
@@ -428,14 +430,14 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             NamespaceUtil.ofTopic(metalakeName, catalogName, schemaName),
             topicName,
             AUDIT_INFO);
-    topicMetaService.insertTopic(topic, false);
+    backend.insert(topic, false);
 
     Assertions.assertThrows(
         NonEmptyEntityException.class,
-        () -> schemaMetaService.deleteSchema(schema.nameIdentifier(), false),
+        () -> backend.delete(schema.nameIdentifier(), Entity.EntityType.SCHEMA, false),
         "Non-cascading delete must fail when dependent topics exist.");
 
-    topicMetaService.deleteTopic(topic.nameIdentifier());
-    schemaMetaService.deleteSchema(schema.nameIdentifier(), false);
+    backend.delete(topic.nameIdentifier(), Entity.EntityType.TOPIC, false);
+    backend.delete(schema.nameIdentifier(), Entity.EntityType.SCHEMA, false);
   }
 }

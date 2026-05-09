@@ -25,6 +25,8 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.StatisticEntity;
@@ -55,13 +57,17 @@ public class StatisticPO {
     return new Builder();
   }
 
-  public static StatisticEntity fromStatisticPO(StatisticPO statisticPO) {
+  public static StatisticEntity fromStatisticPO(
+      StatisticPO statisticPO, NameIdentifier metadataObjectIdentifier) {
+    Preconditions.checkArgument(
+        metadataObjectIdentifier != null, "`metadataObjectIdentifier` is required");
     try {
       return StatisticEntity.builder(
               StatisticEntity.getStatisticType(
                   MetadataObject.Type.valueOf(statisticPO.metadataObjectType)))
           .withId(statisticPO.getStatisticId())
           .withName(statisticPO.getStatisticName())
+          .withNamespace(Namespace.fromString(metadataObjectIdentifier.toString()))
           .withValue(
               JsonUtils.anyFieldMapper()
                   .readValue(statisticPO.getStatisticValue(), StatisticValue.class))
