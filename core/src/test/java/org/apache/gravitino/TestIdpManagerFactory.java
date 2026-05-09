@@ -42,20 +42,15 @@ public class TestIdpManagerFactory {
   }
 
   @Test
-  public void testCreateIdpManagerOrDefaultReturnsUnavailableManagerWhenNoProviderFound() {
+  public void testCreateIdpManagerFailsWhenNoProviderFound() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpManager> serviceLoader = mock(ServiceLoader.class);
       mockedLoader.when(() -> ServiceLoader.load(IdpManager.class)).thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(Collections.emptyIterator());
 
-      IdpManager idpManager = IdpManagerFactory.createIdpManagerOrDefault();
-
-      UnsupportedOperationException exception =
-          assertThrows(UnsupportedOperationException.class, () -> idpManager.getUser("user1"));
-      assertEquals(
-          "Built-in IdP management is unavailable because no IdpManager plugin implementation"
-              + " was found on the runtime classpath.",
-          exception.getMessage());
+      IllegalStateException exception =
+          assertThrows(IllegalStateException.class, IdpManagerFactory::createIdpManager);
+      assertEquals("No IdpManager implementation found", exception.getMessage());
     }
   }
 
