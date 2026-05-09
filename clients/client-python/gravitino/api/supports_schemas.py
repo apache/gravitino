@@ -16,16 +16,11 @@
 # under the License.
 
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import Dict, List
 
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
-
-
-class NoSuchSchemaException(Exception):
-    """Exception raised if the schema does not exist."""
-
-    pass
+from gravitino.exceptions.base import NoSuchSchemaException
 
 
 class SupportsSchemas(ABC):

@@ -16,28 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.glue;
 
-import java.time.Instant;
-import java.util.Map;
-import software.amazon.awssdk.services.glue.model.Database;
+package org.apache.gravitino.idp.basic.password;
 
-/**
- * Runs {@link AbstractGlueSchemaTest} scenarios using AWS SDK builders to create {@link Database}
- * objects directly — no network or AWS credentials required.
- *
- * <p>This verifies that the {@link GlueSchema#fromGlueDatabase} conversion logic works correctly
- * for typical Glue API response shapes.
- */
-class TestSyntheticGlueSchema extends AbstractGlueSchemaTest {
+/** Factory for password hasher implementations. */
+public final class PasswordHasherFactory {
 
-  @Override
-  protected Database provideDatabase(String name, String description, Map<String, String> params) {
-    return Database.builder()
-        .name(name)
-        .description(description)
-        .parameters(params)
-        .createTime(Instant.now())
-        .build();
+  private PasswordHasherFactory() {}
+
+  /** Create the built-in password hasher. */
+  public static PasswordHasher create() {
+    return new Argon2idPasswordHasher();
   }
 }

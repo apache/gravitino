@@ -36,6 +36,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.RepresentationDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.NamespacedEntityId;
@@ -222,7 +223,7 @@ public class ViewPO {
             .getTypeFactory()
             .constructCollectionType(List.class, RepresentationDTO.class);
     List<RepresentationDTO> list = JsonUtils.anyFieldMapper().readValue(json, type);
-    return list.stream().map(RepresentationDTO::toRepresentation).toArray(Representation[]::new);
+    return list.stream().map(DTOConverters::fromDTO).toArray(Representation[]::new);
   }
 
   private static ColumnDTO toColumnDTO(Column column) {

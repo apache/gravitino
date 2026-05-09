@@ -34,7 +34,7 @@ import software.amazon.awssdk.services.glue.model.Database;
  * <p>Subclasses provide a {@link Database} object however they like (SDK builder, real AWS API,
  * etc.). The test scenarios are defined once here and shared across all implementations.
  */
-abstract class AbstractGlueSchemaTest {
+abstract class GlueSchemaTestBase {
 
   /**
    * Returns a Glue {@link Database} with the given fields. Subclasses may create this via the SDK
