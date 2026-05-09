@@ -37,7 +37,7 @@ Apache Gravitino, as a unified metadata management system, is well-positioned to
 2. **Unified View Management**: Provide standard CRUD operations for views:
    - Create view
    - Get/List views
-    - Alter view (rename, update SQL, add/remove representations, replace the view body, modify properties)
+   - Alter view (rename, update SQL, add/remove representations, replace the view body, modify properties)
    - Drop view
 
 3. **Capability-Driven Storage Strategy**: Automatically select the optimal storage strategy based on each catalog's capabilities — no user-facing storage mode configuration needed. Gravitino transparently handles delegation, extension, and full management per catalog type.
@@ -549,21 +549,21 @@ POST /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views
 {
   "name": "customer_summary",
   "comment": "Aggregated customer data view",
-    "columns": [],
+  "columns": [],
   "representations": [
     {
-            "type": "sql",
+      "type": "sql",
       "dialect": "trino",
-            "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
+      "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
     },
     {
-            "type": "sql",
+      "type": "sql",
       "dialect": "spark",
-            "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
+      "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
     }
   ],
-    "defaultCatalog": "iceberg_prod",
-    "defaultSchema": "sales",
+  "defaultCatalog": "iceberg_prod",
+  "defaultSchema": "sales",
   "properties": {
     "description": "Customer order summary for analytics"
   }
@@ -574,30 +574,30 @@ POST /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views
 
 ```json
 {
-    "code": 0,
-    "view": {
-        "name": "customer_summary",
-        "comment": "Aggregated customer data view",
-        "columns": [],
-        "representations": [
-            {
-                "type": "sql",
-                "dialect": "trino",
-                "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
-            }
-        ],
-        "defaultCatalog": "iceberg_prod",
-        "defaultSchema": "sales",
-        "properties": {
-            "description": "Customer order summary for analytics"
-        },
-        "audit": {
-            "creator": "admin",
-            "createTime": "2026-01-31T10:00:00Z",
-            "lastModifier": "admin",
-            "lastModifiedTime": "2026-01-31T10:00:00Z"
-        }
+  "code": 0,
+  "view": {
+    "name": "customer_summary",
+    "comment": "Aggregated customer data view",
+    "columns": [],
+    "representations": [
+      {
+        "type": "sql",
+        "dialect": "trino",
+        "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
+      }
+    ],
+    "defaultCatalog": "iceberg_prod",
+    "defaultSchema": "sales",
+    "properties": {
+      "description": "Customer order summary for analytics"
+    },
+    "audit": {
+      "creator": "admin",
+      "createTime": "2026-01-31T10:00:00Z",
+      "lastModifier": "admin",
+      "lastModifiedTime": "2026-01-31T10:00:00Z"
     }
+  }
 }
 ```
 
@@ -613,30 +613,30 @@ GET /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}
 
 ```json
 {
-    "code": 0,
-    "view": {
-        "name": "customer_summary",
-        "comment": "Aggregated customer data view",
-        "columns": [],
-        "representations": [
-            {
-                "type": "sql",
-                "dialect": "trino",
-                "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
-            }
-        ],
-        "defaultCatalog": "iceberg_prod",
-        "defaultSchema": "sales",
-        "properties": {
-            "description": "Customer order summary for analytics"
-        },
-        "audit": {
-            "creator": "admin",
-            "createTime": "2026-01-31T10:00:00Z",
-            "lastModifier": "admin",
-            "lastModifiedTime": "2026-01-31T10:00:00Z"
-        }
+  "code": 0,
+  "view": {
+    "name": "customer_summary",
+    "comment": "Aggregated customer data view",
+    "columns": [],
+    "representations": [
+      {
+        "type": "sql",
+        "dialect": "trino",
+        "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
+      }
+    ],
+    "defaultCatalog": "iceberg_prod",
+    "defaultSchema": "sales",
+    "properties": {
+      "description": "Customer order summary for analytics"
+    },
+    "audit": {
+      "creator": "admin",
+      "createTime": "2026-01-31T10:00:00Z",
+      "lastModifier": "admin",
+      "lastModifiedTime": "2026-01-31T10:00:00Z"
     }
+  }
 }
 ```
 
@@ -650,11 +650,11 @@ GET /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views
 
 ```json
 {
-        "code": 0,
-        "identifiers": [
-        {"namespace": ["metalake", "catalog", "schema"], "name": "customer_summary"},
-        {"namespace": ["metalake", "catalog", "schema"], "name": "order_details"}
-        ]
+  "code": 0,
+  "identifiers": [
+    {"namespace": ["metalake", "catalog", "schema"], "name": "customer_summary"},
+    {"namespace": ["metalake", "catalog", "schema"], "name": "order_details"}
+  ]
 }
 ```
 
@@ -691,32 +691,32 @@ The example below uses only the update types that are currently implemented in t
 {
   "updates": [
     {
-            "@type": "replaceView",
-            "columns": [],
-            "representations": [
-                {
-                    "type": "sql",
-                    "dialect": "trino",
-                    "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount, MAX(order_date) AS last_order FROM orders GROUP BY customer_id"
-                },
-                {
-                    "type": "sql",
-                    "dialect": "spark",
-                    "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount, MAX(order_date) AS last_order FROM orders GROUP BY customer_id"
-                }
-            ],
-            "defaultCatalog": "iceberg_prod",
-            "defaultSchema": "sales",
-            "comment": "Updated customer summary view"
+      "@type": "replaceView",
+      "columns": [],
+      "representations": [
+        {
+          "type": "sql",
+          "dialect": "trino",
+          "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount, MAX(order_date) AS last_order FROM orders GROUP BY customer_id"
+        },
+        {
+          "type": "sql",
+          "dialect": "spark",
+          "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount, MAX(order_date) AS last_order FROM orders GROUP BY customer_id"
+        }
+      ],
+      "defaultCatalog": "iceberg_prod",
+      "defaultSchema": "sales",
+      "comment": "Updated customer summary view"
     },
     {
       "@type": "setProperty",
-            "property": "description",
-            "value": "Customer order summary for analytics"
+      "property": "description",
+      "value": "Customer order summary for analytics"
     },
     {
       "@type": "removeProperty",
-            "property": "deprecatedKey"
+      "property": "deprecatedKey"
     }
   ]
 }
@@ -732,8 +732,8 @@ DELETE /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view
 
 ```json
 {
-    "code": 0,
-    "dropped": true
+  "code": 0,
+  "dropped": true
 }
 ```
 
