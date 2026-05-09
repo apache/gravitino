@@ -18,12 +18,13 @@
  */
 package org.apache.gravitino.authorization;
 
+import java.io.Closeable;
 import java.util.List;
 import org.apache.gravitino.dto.IdpGroupDTO;
 import org.apache.gravitino.dto.IdpUserDTO;
 
 /** Manager for built-in IdP user and group management APIs. */
-public interface IdpManager {
+public interface IdpManager extends Closeable {
 
   /**
    * Create a built-in IdP user.
@@ -113,5 +114,6 @@ public interface IdpManager {
   IdpGroupDTO removeUsersFromGroup(String groupName, List<String> userNames);
 
   /** Release any resources held by this manager. */
+  @Override
   default void close() {}
 }
