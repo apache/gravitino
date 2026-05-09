@@ -31,7 +31,8 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.authorization.IdpUserManager;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.requests.CreateUserRequest;
 import org.apache.gravitino.dto.requests.ResetPasswordRequest;
 import org.apache.gravitino.dto.responses.IdpUserResponse;
@@ -43,16 +44,16 @@ import org.apache.gravitino.server.web.Utils;
 public class IdpUserOperations {
 
   private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";
-  private final IdpUserManager userManager;
+  private final IdpManager idpManager;
 
   @Context private HttpServletRequest httpRequest;
 
   public IdpUserOperations() {
-    this(IdpUserManager.fromEnvironment());
+    this(GravitinoEnv.getInstance().idpManager());
   }
 
-  IdpUserOperations(IdpUserManager userManager) {
-    this.userManager = userManager;
+  IdpUserOperations(IdpManager idpManager) {
+    this.idpManager = idpManager;
   }
 
   @GET
@@ -62,8 +63,7 @@ public class IdpUserOperations {
   @ResponseMetered(name = "get-idp-user", absolute = true)
   public Response getUser(@PathParam("user") String user) {
     try {
-      return Utils.doAs(
-          httpRequest, () -> Utils.ok(new IdpUserResponse(userManager.getUser(user))));
+      return Utils.doAs(httpRequest, () -> Utils.ok(new IdpUserResponse(idpManager.getUser(user))));
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpUserException(OperationType.GET, user, e);
     }
@@ -87,7 +87,7 @@ public class IdpUserOperations {
             request.validate();
             return Utils.ok(
                 new IdpUserResponse(
-                    userManager.createUser(request.getUser(), request.getPassword())));
+                    idpManager.createUser(request.getUser(), request.getPassword())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpUserException(OperationType.ADD, user, e);
@@ -111,7 +111,7 @@ public class IdpUserOperations {
           () -> {
             request.validate();
             return Utils.ok(
-                new IdpUserResponse(userManager.resetPassword(user, request.getPassword())));
+                new IdpUserResponse(idpManager.resetPassword(user, request.getPassword())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpUserException(OperationType.UPDATE, user, e);
@@ -126,11 +126,7 @@ public class IdpUserOperations {
   public Response removeUser(@PathParam("user") String user) {
     try {
       return Utils.doAs(
-          httpRequest,
-          () -> {
-            boolean removed = userManager.deleteUser(user);
-            return Utils.ok(new RemoveResponse(removed));
-          });
+          httpRequest, () -> Utils.ok(new RemoveResponse(idpManager.deleteUser(user))));
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpUserException(OperationType.REMOVE, user, e);
     }

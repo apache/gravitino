@@ -16,8 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.idp.basic.authorization;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -31,10 +30,14 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.IdpGroupDTO;
+import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.idp.basic.password.PasswordHasher;
+import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.po.IdpGroupPO;
 import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
@@ -43,34 +46,109 @@ import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 
-/** Manager for built-in IdP group management APIs. */
-public class IdpGroupManager {
+/**
+ * Built-in IdP manager implementation loaded from the {@code idp-basic} plugin.
+ *
+ * <p>This implementation manages both built-in IdP users and groups and restricts mutation
+ * operations to Gravitino service admins.
+ */
+public class IdpManager implements org.apache.gravitino.authorization.IdpManager {
   private static final long INITIAL_VERSION = 1L;
 
   private final Config config;
   private final IdGenerator idGenerator;
   private final IdpUserMetaService userMetaService;
   private final IdpGroupMetaService groupMetaService;
+  private final PasswordHasher passwordHasher;
 
-  public static IdpGroupManager fromEnvironment() {
-    return new IdpGroupManager(
+  public IdpManager() {
+    this(
         GravitinoEnv.getInstance().config(),
         GravitinoEnv.getInstance().idGenerator(),
         IdpUserMetaService.getInstance(),
-        IdpGroupMetaService.getInstance());
+        IdpGroupMetaService.getInstance(),
+        PasswordHasherFactory.create());
   }
 
-  IdpGroupManager(
+  IdpManager(
       Config config,
       IdGenerator idGenerator,
       IdpUserMetaService userMetaService,
-      IdpGroupMetaService groupMetaService) {
+      IdpGroupMetaService groupMetaService,
+      PasswordHasher passwordHasher) {
     this.config = config;
     this.idGenerator = idGenerator;
     this.userMetaService = userMetaService;
     this.groupMetaService = groupMetaService;
+    this.passwordHasher = passwordHasher;
   }
 
+  @Override
+  public IdpUserDTO createUser(String userName, String password) {
+    ensureServiceAdmin();
+    validateUserName(userName);
+    validatePassword(password);
+    if (userMetaService().findUser(userName).isPresent()) {
+      throw new UserAlreadyExistsException("Built-in IdP user %s already exists", userName);
+    }
+
+    userMetaService()
+        .createUser(
+            IdpUserPO.builder()
+                .withUserId(nextId())
+                .withUserName(userName)
+                .withPasswordHash(passwordHasher.hash(password))
+                .withCurrentVersion(INITIAL_VERSION)
+                .withLastVersion(INITIAL_VERSION)
+                .withDeletedAt(0L)
+                .build());
+    return getUser(userName);
+  }
+
+  @Override
+  public IdpUserDTO getUser(String userName) {
+    validateUserName(userName);
+    IdpUserPO userPO =
+        userMetaService()
+            .findUser(userName)
+            .orElseThrow(
+                () -> new NoSuchUserException("Built-in IdP user %s does not exist", userName));
+    return toUserDTO(userPO);
+  }
+
+  @Override
+  public boolean deleteUser(String userName) {
+    ensureServiceAdmin();
+    validateUserName(userName);
+    Optional<IdpUserPO> user = userMetaService().findUser(userName);
+    if (!user.isPresent()) {
+      return false;
+    }
+
+    return userMetaService().deleteUser(user.get(), System.currentTimeMillis());
+  }
+
+  @Override
+  public IdpUserDTO resetPassword(String userName, String password) {
+    ensureServiceAdmin();
+    validateUserName(userName);
+    validatePassword(password);
+    IdpUserPO userPO =
+        userMetaService()
+            .findUser(userName)
+            .orElseThrow(
+                () -> new NoSuchUserException("Built-in IdP user %s does not exist", userName));
+    if (passwordHasher.verify(password, userPO.getPasswordHash())) {
+      throw new IllegalArgumentException(
+          "The new password must be different from the old password");
+    }
+
+    userMetaService()
+        .updatePassword(userPO, passwordHasher.hash(password), userPO.getCurrentVersion() + 1);
+    return getUser(userName);
+  }
+
+  @Override
   public IdpGroupDTO createGroup(String groupName) {
     ensureServiceAdmin();
     validateGroupName(groupName);
@@ -90,6 +168,7 @@ public class IdpGroupManager {
     return getGroup(groupName);
   }
 
+  @Override
   public IdpGroupDTO getGroup(String groupName) {
     validateGroupName(groupName);
     IdpGroupPO groupPO =
@@ -100,10 +179,7 @@ public class IdpGroupManager {
     return toGroupDTO(groupPO);
   }
 
-  public boolean deleteGroup(String groupName) {
-    return deleteGroup(groupName, false);
-  }
-
+  @Override
   public boolean deleteGroup(String groupName, boolean force) {
     ensureServiceAdmin();
     validateGroupName(groupName);
@@ -116,6 +192,7 @@ public class IdpGroupManager {
     return groupMetaService().deleteGroup(group.get(), System.currentTimeMillis());
   }
 
+  @Override
   public IdpGroupDTO addUsersToGroup(String groupName, List<String> userNames) {
     ensureServiceAdmin();
     IdpGroupPO groupPO = requireGroup(groupName);
@@ -149,6 +226,7 @@ public class IdpGroupManager {
     return getGroup(groupName);
   }
 
+  @Override
   public IdpGroupDTO removeUsersFromGroup(String groupName, List<String> userNames) {
     ensureServiceAdmin();
     IdpGroupPO groupPO = requireGroup(groupName);
@@ -184,8 +262,23 @@ public class IdpGroupManager {
     Preconditions.checkArgument(!userName.contains(":"), "User name cannot contain ':'");
   }
 
+  private void validatePassword(String password) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(password), "Password is required");
+    Preconditions.checkArgument(
+        password.length() >= 12, "Password length must be at least 12 characters");
+    Preconditions.checkArgument(
+        password.length() <= 64, "Password length must be at most 64 characters");
+  }
+
   private void validateGroupName(String groupName) {
     Preconditions.checkArgument(StringUtils.isNotBlank(groupName), "Group name is required");
+  }
+
+  private IdpUserDTO toUserDTO(IdpUserPO userPO) {
+    return IdpUserDTO.builder()
+        .withName(userPO.getUserName())
+        .withGroups(userMetaService().listGroupNames(userPO.getUserName()))
+        .build();
   }
 
   private IdpGroupDTO toGroupDTO(IdpGroupPO groupPO) {

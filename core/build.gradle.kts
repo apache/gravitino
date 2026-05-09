@@ -31,7 +31,6 @@ dependencies {
   implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":plugins:idp-basic"))
   implementation(libs.aspectj.aspectjrt)
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
@@ -78,6 +77,7 @@ dependencies {
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 
+  testRuntimeOnly(project(":plugins:idp-basic"))
   testRuntimeOnly(libs.junit.jupiter.engine)
 
   jcstressImplementation(libs.mockito.core)

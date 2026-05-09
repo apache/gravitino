@@ -24,14 +24,32 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":api"))
+  implementation(project(":common"))
+  implementation(project(":core"))
   implementation(libs.bcprov.jdk18on)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks {
+  val copyPluginLib by registering(Copy::class) {
+    dependsOn("jar")
+    from("build/libs") {
+      include("*.jar")
+      exclude("*-tests.jar", "*-jcstress.jar", "*-jmh.jar")
+    }
+    into("$rootDir/distribution/package/libs")
+    setDuplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+  }
+
+  register("copyLibAndConfig", Copy::class) {
+    dependsOn(copyPluginLib)
+  }
+
   test {
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")

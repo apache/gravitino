@@ -33,7 +33,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.authorization.IdpGroupManager;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.requests.CreateGroupRequest;
 import org.apache.gravitino.dto.requests.UpdateGroupUsersRequest;
 import org.apache.gravitino.dto.responses.IdpGroupResponse;
@@ -45,16 +46,16 @@ import org.apache.gravitino.server.web.Utils;
 public class IdpGroupOperations {
 
   private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";
-  private final IdpGroupManager groupManager;
+  private final IdpManager idpManager;
 
   @Context private HttpServletRequest httpRequest;
 
   public IdpGroupOperations() {
-    this(IdpGroupManager.fromEnvironment());
+    this(GravitinoEnv.getInstance().idpManager());
   }
 
-  IdpGroupOperations(IdpGroupManager groupManager) {
-    this.groupManager = groupManager;
+  IdpGroupOperations(IdpManager idpManager) {
+    this.idpManager = idpManager;
   }
 
   @GET
@@ -65,7 +66,7 @@ public class IdpGroupOperations {
   public Response getGroup(@PathParam("group") String group) {
     try {
       return Utils.doAs(
-          httpRequest, () -> Utils.ok(new IdpGroupResponse(groupManager.getGroup(group))));
+          httpRequest, () -> Utils.ok(new IdpGroupResponse(idpManager.getGroup(group))));
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpGroupException(OperationType.GET, group, e);
     }
@@ -87,7 +88,7 @@ public class IdpGroupOperations {
           httpRequest,
           () -> {
             request.validate();
-            return Utils.ok(new IdpGroupResponse(groupManager.createGroup(request.getGroup())));
+            return Utils.ok(new IdpGroupResponse(idpManager.createGroup(request.getGroup())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpGroupException(OperationType.ADD, group, e);
@@ -103,11 +104,7 @@ public class IdpGroupOperations {
       @PathParam("group") String group, @DefaultValue("false") @QueryParam("force") boolean force) {
     try {
       return Utils.doAs(
-          httpRequest,
-          () -> {
-            boolean removed = groupManager.deleteGroup(group, force);
-            return Utils.ok(new RemoveResponse(removed));
-          });
+          httpRequest, () -> Utils.ok(new RemoveResponse(idpManager.deleteGroup(group, force))));
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpGroupException(OperationType.REMOVE, group, e);
     }
@@ -130,7 +127,7 @@ public class IdpGroupOperations {
           () -> {
             request.validate();
             return Utils.ok(
-                new IdpGroupResponse(groupManager.addUsersToGroup(group, request.getUsers())));
+                new IdpGroupResponse(idpManager.addUsersToGroup(group, request.getUsers())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpGroupException(OperationType.ADD, group, e);
@@ -154,7 +151,7 @@ public class IdpGroupOperations {
           () -> {
             request.validate();
             return Utils.ok(
-                new IdpGroupResponse(groupManager.removeUsersFromGroup(group, request.getUsers())));
+                new IdpGroupResponse(idpManager.removeUsersFromGroup(group, request.getUsers())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpGroupException(OperationType.REMOVE, group, e);

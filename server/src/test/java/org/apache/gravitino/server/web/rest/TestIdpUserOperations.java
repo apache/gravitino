@@ -29,7 +29,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.authorization.IdpUserManager;
+import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.dto.requests.CreateUserRequest;
 import org.apache.gravitino.dto.requests.ResetPasswordRequest;
@@ -50,7 +50,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestIdpUserOperations extends BaseOperationsTest {
 
-  private static final IdpUserManager MANAGER = mock(IdpUserManager.class);
+  private static final IdpManager MANAGER = mock(IdpManager.class);
 
   public static class TestableIdpUserOperations extends IdpUserOperations {
     public TestableIdpUserOperations() {

@@ -30,7 +30,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.authorization.IdpGroupManager;
+import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.IdpGroupDTO;
 import org.apache.gravitino.dto.requests.CreateGroupRequest;
 import org.apache.gravitino.dto.requests.UpdateGroupUsersRequest;
@@ -52,7 +52,7 @@ import org.junit.jupiter.api.Test;
 
 public class TestIdpGroupOperations extends BaseOperationsTest {
 
-  private static final IdpGroupManager MANAGER = mock(IdpGroupManager.class);
+  private static final IdpManager MANAGER = mock(IdpManager.class);
 
   public static class TestableIdpGroupOperations extends IdpGroupOperations {
     public TestableIdpGroupOperations() {

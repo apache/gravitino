@@ -39,7 +39,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.authorization.IdpUserManager;
+import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
@@ -184,12 +184,12 @@ public class TestGravitinoServer {
     GravitinoServer restServer = newRestApiTestServer(serverConfig, Collections.emptySet());
     invokeInitializeRestApi(restServer);
 
-    IdpUserManager userManager = Mockito.mock(IdpUserManager.class);
-    Mockito.when(userManager.getUser("user1"))
+    IdpManager idpManager = Mockito.mock(IdpManager.class);
+    Mockito.when(idpManager.getUser("user1"))
         .thenReturn(
             IdpUserDTO.builder().withName("user1").withGroups(Collections.emptyList()).build());
 
-    restServer.register(newIdpUserOperations(userManager));
+    restServer.register(newIdpUserOperations(idpManager));
     restServer.register(
         new AbstractBinder() {
           @Override
@@ -278,10 +278,10 @@ public class TestGravitinoServer {
     }
   }
 
-  private IdpUserOperations newIdpUserOperations(IdpUserManager userManager) throws Exception {
+  private IdpUserOperations newIdpUserOperations(IdpManager idpManager) throws Exception {
     Constructor<IdpUserOperations> constructor =
-        IdpUserOperations.class.getDeclaredConstructor(IdpUserManager.class);
+        IdpUserOperations.class.getDeclaredConstructor(IdpManager.class);
     constructor.setAccessible(true);
-    return constructor.newInstance(userManager);
+    return constructor.newInstance(idpManager);
   }
 }
