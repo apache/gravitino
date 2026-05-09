@@ -257,6 +257,23 @@ public class TestIdpGroupOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testGetGroupForbidden() {
+    doThrow(new ForbiddenException("mock forbidden")).when(MANAGER).getGroup("group1");
+
+    Response resp =
+        target("/idp/groups/group1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
   public void testRemoveGroup() {
     when(MANAGER.deleteGroup("group1", false)).thenReturn(true);
 

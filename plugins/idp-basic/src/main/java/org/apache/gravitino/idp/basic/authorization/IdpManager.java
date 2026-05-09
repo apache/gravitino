@@ -107,6 +107,7 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public IdpUserDTO getUser(String userName) {
+    ensureServiceAdmin();
     validateUserName(userName);
     IdpUserPO userPO =
         userMetaService()
@@ -170,6 +171,7 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public IdpGroupDTO getGroup(String groupName) {
+    ensureServiceAdmin();
     validateGroupName(groupName);
     IdpGroupPO groupPO =
         groupMetaService()

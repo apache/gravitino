@@ -62,4 +62,18 @@ public class TestIdpGroupResponse {
     IdpGroupResponse response = new IdpGroupResponse();
     Assertions.assertThrows(IllegalArgumentException.class, response::validate);
   }
+
+  @Test
+  public void testIdpGroupResponseBlankNameMessage() throws JsonProcessingException {
+    IdpGroupResponse response =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"code\":0,\"group\":{\"name\":\" \",\"users\":[\"user1\"]}}",
+                IdpGroupResponse.class);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, response::validate);
+
+    Assertions.assertEquals("group 'name' must not be null or empty", exception.getMessage());
+  }
 }

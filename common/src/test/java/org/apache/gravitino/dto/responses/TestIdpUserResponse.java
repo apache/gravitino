@@ -62,4 +62,18 @@ public class TestIdpUserResponse {
     IdpUserResponse response = new IdpUserResponse();
     Assertions.assertThrows(IllegalArgumentException.class, response::validate);
   }
+
+  @Test
+  public void testIdpUserResponseBlankNameMessage() throws JsonProcessingException {
+    IdpUserResponse response =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"code\":0,\"user\":{\"name\":\" \",\"groups\":[\"group1\"]}}",
+                IdpUserResponse.class);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(IllegalArgumentException.class, response::validate);
+
+    Assertions.assertEquals("user 'name' must not be null or empty", exception.getMessage());
+  }
 }

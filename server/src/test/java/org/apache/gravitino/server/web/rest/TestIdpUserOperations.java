@@ -96,13 +96,13 @@ public class TestIdpUserOperations extends BaseOperationsTest {
 
   @Test
   public void testAddUser() {
-    CreateUserRequest req = new CreateUserRequest("user1", "Passw0rd");
+    CreateUserRequest req = new CreateUserRequest("user1", "Passw0rd-For-User");
     IdpUserDTO user = buildUser("user1");
 
-    when(MANAGER.createUser("user1", "Passw0rd")).thenReturn(user);
+    when(MANAGER.createUser("user1", "Passw0rd-For-User")).thenReturn(user);
 
     // test with IllegalRequest
-    CreateUserRequest illegalReq = new CreateUserRequest("", "Passw0rd");
+    CreateUserRequest illegalReq = new CreateUserRequest("", "Passw0rd-For-User");
     Response illegalResp =
         target("/idp/users")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -134,7 +134,7 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     // Test to throw UserAlreadyExistsException
     doThrow(new UserAlreadyExistsException("mock error"))
         .when(MANAGER)
-        .createUser("user1", "Passw0rd");
+        .createUser("user1", "Passw0rd-For-User");
     Response resp1 =
         target("/idp/users")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -151,7 +151,8 @@ public class TestIdpUserOperations extends BaseOperationsTest {
 
     // Test to throw internal RuntimeException
     reset(MANAGER);
-    when(MANAGER.createUser("user1", "Passw0rd")).thenThrow(new RuntimeException("mock error"));
+    when(MANAGER.createUser("user1", "Passw0rd-For-User"))
+        .thenThrow(new RuntimeException("mock error"));
     Response resp2 =
         target("/idp/users")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -170,8 +171,10 @@ public class TestIdpUserOperations extends BaseOperationsTest {
 
   @Test
   public void testAddUserForbidden() {
-    CreateUserRequest req = new CreateUserRequest("user1", "Passw0rd");
-    doThrow(new ForbiddenException("mock forbidden")).when(MANAGER).createUser("user1", "Passw0rd");
+    CreateUserRequest req = new CreateUserRequest("user1", "Passw0rd-For-User");
+    doThrow(new ForbiddenException("mock forbidden"))
+        .when(MANAGER)
+        .createUser("user1", "Passw0rd-For-User");
 
     Response resp =
         target("/idp/users")
@@ -257,11 +260,28 @@ public class TestIdpUserOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testGetUserForbidden() {
+    doThrow(new ForbiddenException("mock forbidden")).when(MANAGER).getUser("user1");
+
+    Response resp =
+        target("/idp/users/user1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
   public void testResetPassword() {
-    ResetPasswordRequest req = new ResetPasswordRequest("Passw0rd1");
+    ResetPasswordRequest req = new ResetPasswordRequest("Passw0rd-For-User");
     IdpUserDTO user = buildUser("user1");
 
-    when(MANAGER.resetPassword("user1", "Passw0rd1")).thenReturn(user);
+    when(MANAGER.resetPassword("user1", "Passw0rd-For-User")).thenReturn(user);
 
     // test with IllegalRequest
     ResetPasswordRequest illegalReq = new ResetPasswordRequest("");
@@ -296,7 +316,7 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     // Test to throw NoSuchUserException
     doThrow(new NoSuchUserException("mock error"))
         .when(MANAGER)
-        .resetPassword("user1", "Passw0rd1");
+        .resetPassword("user1", "Passw0rd-For-User");
     Response resp1 =
         target("/idp/users/user1")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -312,7 +332,8 @@ public class TestIdpUserOperations extends BaseOperationsTest {
 
     // Test to throw internal RuntimeException
     reset(MANAGER);
-    when(MANAGER.resetPassword("user1", "Passw0rd1")).thenThrow(new RuntimeException("mock error"));
+    when(MANAGER.resetPassword("user1", "Passw0rd-For-User"))
+        .thenThrow(new RuntimeException("mock error"));
     Response resp2 =
         target("/idp/users/user1")
             .request(MediaType.APPLICATION_JSON_TYPE)

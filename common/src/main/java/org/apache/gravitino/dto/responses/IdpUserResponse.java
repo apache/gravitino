@@ -63,6 +63,6 @@ public class IdpUserResponse extends BaseResponse {
 
     Preconditions.checkArgument(user != null, "user must not be null");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(user.name()), "user 'name' must not be null and empty");
+        StringUtils.isNotBlank(user.name()), "user 'name' must not be null or empty");
   }
 }

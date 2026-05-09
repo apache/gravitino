@@ -153,6 +153,32 @@ public class TestIdpManager {
   }
 
   @Test
+  public void testGetUserRequiresServiceAdmin() throws Exception {
+    ForbiddenException exception =
+        PrincipalUtils.doAs(
+            new UserPrincipal("user"),
+            () -> assertThrows(ForbiddenException.class, () -> manager.getUser("alice")));
+
+    assertEquals(
+        "Only Gravitino service admins can manage built-in IdP identities", exception.getMessage());
+    verify(userMetaService, never()).findUser("alice");
+  }
+
+  @Test
+  public void testGetUserAsServiceAdmin() throws Exception {
+    IdpUserPO userPO = user("alice", "hash-1");
+    when(userMetaService.findUser("alice")).thenReturn(Optional.of(userPO));
+    when(userMetaService.listGroupNames("alice"))
+        .thenReturn(Collections.singletonList("engineering"));
+
+    IdpUserDTO user =
+        PrincipalUtils.doAs(new UserPrincipal("admin"), () -> manager.getUser("alice"));
+
+    assertEquals("alice", user.name());
+    assertEquals(Collections.singletonList("engineering"), user.groups());
+  }
+
+  @Test
   public void testCreateGroup() throws Exception {
     IdpGroupPO groupPO = group("engineering");
     when(groupMetaService.findGroup("engineering"))
@@ -164,6 +190,32 @@ public class TestIdpManager {
 
     assertEquals("engineering", group.name());
     verify(groupMetaService).createGroup(any(IdpGroupPO.class));
+  }
+
+  @Test
+  public void testGetGroupRequiresServiceAdmin() throws Exception {
+    ForbiddenException exception =
+        PrincipalUtils.doAs(
+            new UserPrincipal("user"),
+            () -> assertThrows(ForbiddenException.class, () -> manager.getGroup("engineering")));
+
+    assertEquals(
+        "Only Gravitino service admins can manage built-in IdP identities", exception.getMessage());
+    verify(groupMetaService, never()).findGroup("engineering");
+  }
+
+  @Test
+  public void testGetGroupAsServiceAdmin() throws Exception {
+    IdpGroupPO groupPO = group("engineering");
+    when(groupMetaService.findGroup("engineering")).thenReturn(Optional.of(groupPO));
+    when(groupMetaService.listUserNames("engineering"))
+        .thenReturn(Collections.singletonList("alice"));
+
+    IdpGroupDTO group =
+        PrincipalUtils.doAs(new UserPrincipal("admin"), () -> manager.getGroup("engineering"));
+
+    assertEquals("engineering", group.name());
+    assertEquals(Collections.singletonList("alice"), group.users());
   }
 
   @Test
