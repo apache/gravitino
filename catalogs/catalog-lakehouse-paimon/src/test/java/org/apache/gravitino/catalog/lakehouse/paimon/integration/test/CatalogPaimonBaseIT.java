@@ -56,9 +56,13 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -84,6 +88,7 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.commons.util.StringUtils;
@@ -859,6 +864,72 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
   }
 
   @Test
+  void testSparkCreateViewAndLoadByGravitino() {
+    Assumptions.assumeTrue(
+        isSparkViewInteropSupported(),
+        String.format("Paimon backend %s does not support Spark-View interoperability", TYPE));
+
+    NameIdentifier baseTableIdentifier =
+        createSimplePaimonTableForViewInterop("spark_create_view_source_table");
+    String viewName = GravitinoITUtils.genRandomName("spark_create_view");
+    String viewIdentifier = String.join(".", schemaName, viewName);
+    String tableIdentifier = String.join(".", schemaName, baseTableIdentifier.name());
+
+    spark.sql(
+        String.format(
+            "CREATE VIEW paimon.%s AS SELECT id, name FROM paimon.%s",
+            viewIdentifier, tableIdentifier));
+
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    View loadedView = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+    Assertions.assertEquals(viewName, loadedView.name());
+    Assertions.assertEquals(2, loadedView.columns().length);
+    Assertions.assertEquals("id", loadedView.columns()[0].name());
+    Assertions.assertEquals("name", loadedView.columns()[1].name());
+    Assertions.assertTrue(loadedView.representations().length > 0);
+  }
+
+  @Test
+  void testGravitinoCreateViewAndReadBySpark() {
+    Assumptions.assumeTrue(
+        isSparkViewInteropSupported(),
+        String.format("Paimon backend %s does not support Spark-View interoperability", TYPE));
+
+    NameIdentifier baseTableIdentifier =
+        createSimplePaimonTableForViewInterop("gravitino_create_view_source_table");
+    String viewName = GravitinoITUtils.genRandomName("gravitino_create_view");
+    NameIdentifier viewIdentifier = NameIdentifier.of(schemaName, viewName);
+
+    String query =
+        String.format("SELECT id, name FROM paimon.%s.%s", schemaName, baseTableIdentifier.name());
+    Representation[] representations =
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("spark").withSql(query).build()
+        };
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    viewCatalog.createView(
+        viewIdentifier,
+        "view_for_spark_read",
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id column"),
+          Column.of("name", Types.StringType.get(), "name column")
+        },
+        representations,
+        "paimon",
+        schemaName,
+        Collections.emptyMap());
+
+    Dataset<Row> rows =
+        spark.sql(String.format("SELECT * FROM paimon.%s.%s ORDER BY id", schemaName, viewName));
+    List<Row> results = rows.collectAsList();
+    Assertions.assertEquals(2, results.size());
+    Assertions.assertEquals(1, results.get(0).getInt(0));
+    Assertions.assertEquals("name_1", results.get(0).getString(1));
+    Assertions.assertEquals(2, results.get(1).getInt(0));
+    Assertions.assertEquals("name_2", results.get(1).getString(1));
+  }
+
+  @Test
   void testTimeTypePrecision() throws org.apache.paimon.catalog.Catalog.TableNotExistException {
     String tableName = GravitinoITUtils.genRandomName("test_time_precision");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
@@ -1038,6 +1109,30 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
           String.format("(%d, date_sub(current_date(), %d), 'data%d', %s)", i, i, i, structValue));
     }
     return values;
+  }
+
+  private boolean isSparkViewInteropSupported() {
+    return "hive".equalsIgnoreCase(TYPE);
+  }
+
+  private NameIdentifier createSimplePaimonTableForViewInterop(String tablePrefix) {
+    String tableName = GravitinoITUtils.genRandomName(tablePrefix);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            new Column[] {
+              Column.of("id", Types.IntegerType.get(), "id column"),
+              Column.of("name", Types.StringType.get(), "name column")
+            },
+            table_comment,
+            createProperties());
+
+    spark.sql(
+        String.format(
+            "INSERT INTO paimon.%s.%s VALUES (1, 'name_1'), (2, 'name_2')", schemaName, tableName));
+    return tableIdentifier;
   }
 
   private void clearTableAndSchema() {

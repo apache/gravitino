@@ -27,6 +27,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMeta
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.paimon.catalog.Catalog;
+import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,24 @@ public class CatalogPaimonHiveIT extends CatalogPaimonBaseIT {
     catalogProperties.put(PaimonCatalogPropertiesMetadata.URI, URI);
 
     return catalogProperties;
+  }
+
+  @Override
+  protected void initSparkEnv() {
+    spark =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("Paimon Catalog integration test")
+            .config("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
+            .config("spark.sql.catalog.paimon.metastore", "hive")
+            .config("spark.sql.catalog.paimon.uri", URI)
+            .config("spark.sql.catalog.paimon.warehouse", WAREHOUSE)
+            .config("spark.sql.catalog.paimon.cache-enabled", "false")
+            .config(
+                "spark.sql.extensions",
+                "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
+            .enableHiveSupport()
+            .getOrCreate();
   }
 
   @Test
