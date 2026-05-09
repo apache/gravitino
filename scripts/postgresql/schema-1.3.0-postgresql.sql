@@ -391,6 +391,7 @@ CREATE TABLE IF NOT EXISTS group_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
+    updated_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (group_id),
     UNIQUE (metalake_id, group_name, deleted_at)
 );
@@ -403,6 +404,7 @@ COMMENT ON COLUMN group_meta.audit_info IS 'group audit info';
 COMMENT ON COLUMN group_meta.current_version IS 'group current version';
 COMMENT ON COLUMN group_meta.last_version IS 'group last version';
 COMMENT ON COLUMN group_meta.deleted_at IS 'group deleted at';
+COMMENT ON COLUMN group_meta.updated_at IS 'updated at';
 
 
 CREATE TABLE IF NOT EXISTS group_role_rel (
@@ -555,6 +557,8 @@ CREATE INDEX IF NOT EXISTS idx_user_meta_name_del_upd
     ON user_meta (metalake_id, user_name, deleted_at, updated_at);
 CREATE INDEX IF NOT EXISTS idx_owner_meta_del_upd_obj
     ON owner_meta (deleted_at, updated_at, metadata_object_id);
+CREATE INDEX IF NOT EXISTS idx_group_meta_name_del_upd
+    ON group_meta (metalake_id, group_name, deleted_at, updated_at);
 
 COMMENT ON TABLE owner_meta IS 'owner relation';
 COMMENT ON COLUMN owner_meta.id IS 'auto increment id';

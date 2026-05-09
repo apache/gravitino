@@ -47,6 +47,7 @@ import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
+import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
@@ -238,6 +239,51 @@ public class TestAuthMappers {
     UserUpdatedAt info = userMetaMapper.getUserUpdatedAt("metalake1", "user21");
     Assertions.assertNotNull(info);
     Assertions.assertEquals(21L, info.getUserId());
+    Assertions.assertEquals(expected, info.getUpdatedAt());
+  }
+
+  @Test
+  void testGroupMetaTouchUpdatedAt() {
+    insertMetalake(1L, "metalake1");
+    insertGroup(30L, "group30", 1L);
+
+    long before = queryUpdatedAt("group_meta", "group_id", 30L);
+    Assertions.assertEquals(0L, before);
+
+    long jvmBefore = System.currentTimeMillis();
+    groupMetaMapper.touchGroupUpdatedAt(30L);
+    long jvmAfter = System.currentTimeMillis();
+
+    long after = queryUpdatedAt("group_meta", "group_id", 30L);
+    Assertions.assertTrue(
+        after >= jvmBefore - 1000L && after <= jvmAfter + 1000L,
+        "expected DB-time updated_at within 1s of JVM clock, got " + after);
+  }
+
+  @Test
+  void testGroupMetaTouchUpdatedAtSkipsSoftDeleted() {
+    insertMetalake(1L, "metalake1");
+    insertGroup(31L, "group31", 1L);
+    groupMetaMapper.softDeleteGroupMetaByGroupId(31L);
+
+    long beforeUpdatedAt = queryUpdatedAt("group_meta", "group_id", 31L);
+    groupMetaMapper.touchGroupUpdatedAt(31L);
+    long afterUpdatedAt = queryUpdatedAt("group_meta", "group_id", 31L);
+
+    Assertions.assertEquals(beforeUpdatedAt, afterUpdatedAt);
+  }
+
+  @Test
+  void testGroupMetaGetGroupUpdatedAt() {
+    insertMetalake(1L, "metalake1");
+    insertGroup(32L, "group32", 1L);
+
+    groupMetaMapper.touchGroupUpdatedAt(32L);
+    long expected = queryUpdatedAt("group_meta", "group_id", 32L);
+
+    GroupUpdatedAt info = groupMetaMapper.getGroupUpdatedAt("metalake1", "group32");
+    Assertions.assertNotNull(info);
+    Assertions.assertEquals(32L, info.getGroupId());
     Assertions.assertEquals(expected, info.getUpdatedAt());
   }
 

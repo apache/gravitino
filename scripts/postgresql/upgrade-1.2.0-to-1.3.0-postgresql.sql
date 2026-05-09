@@ -20,12 +20,15 @@
 ALTER TABLE user_meta  ADD COLUMN IF NOT EXISTS updated_at BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE role_meta ADD COLUMN IF NOT EXISTS updated_at BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE owner_meta ADD COLUMN IF NOT EXISTS updated_at BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE group_meta ADD COLUMN IF NOT EXISTS updated_at BIGINT NOT NULL DEFAULT 0;
 COMMENT ON COLUMN user_meta.updated_at IS 'updated at';
 COMMENT ON COLUMN role_meta.updated_at IS 'updated at';
 COMMENT ON COLUMN owner_meta.updated_at IS 'updated at';
+COMMENT ON COLUMN group_meta.updated_at IS 'updated at';
 
 CREATE INDEX IF NOT EXISTS idx_user_meta_name_del_upd ON user_meta (metalake_id, user_name, deleted_at, updated_at);
 CREATE INDEX IF NOT EXISTS idx_owner_meta_del_upd_obj ON owner_meta (deleted_at, updated_at, metadata_object_id);
+CREATE INDEX IF NOT EXISTS idx_group_meta_name_del_upd ON group_meta (metalake_id, group_name, deleted_at, updated_at);
 
 CREATE TABLE IF NOT EXISTS entity_change_log (
     id BIGSERIAL PRIMARY KEY,
