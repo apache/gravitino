@@ -40,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -49,6 +50,7 @@ import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -186,6 +188,15 @@ public class TableMetaService {
     TablePO newTablePO =
         POConverters.updateTablePOWithVersionAndSchemaId(oldTablePO, newTableEntity, newSchemaId);
 
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String oldFullName =
+        NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, oldTableEntity.name())
+            .toString();
+    boolean isFullNameChanged =
+        isSchemaChanged || !Objects.equals(oldTableEntity.name(), newTableEntity.name());
+
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
@@ -207,6 +218,18 @@ public class TableMetaService {
               TableColumnMetaService.getInstance()
                   .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
             }
+          },
+          () -> {
+            if (isFullNameChanged && updateResult.get() > 0) {
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertEntityChange(
+                          metalakeName,
+                          Entity.EntityType.TABLE.name(),
+                          oldFullName,
+                          OperateType.ALTER));
+            }
           });
 
     } catch (RuntimeException re) {
@@ -225,6 +248,13 @@ public class TableMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
   public boolean deleteTable(NameIdentifier identifier) {
     TablePO tablePO = getTablePOByIdentifier(identifier);
+
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String tableFullName =
+        NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, identifier.name())
+            .toString();
 
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
@@ -266,6 +296,18 @@ public class TableMetaService {
                 mapper ->
                     mapper.softDeleteTableVersionByTableIdAndVersion(
                         tablePO.getTableId(), tablePO.getCurrentVersion()));
+          }
+        },
+        () -> {
+          if (deleteResult.get() > 0) {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.TABLE.name(),
+                        tableFullName,
+                        OperateType.DROP));
           }
         });
 

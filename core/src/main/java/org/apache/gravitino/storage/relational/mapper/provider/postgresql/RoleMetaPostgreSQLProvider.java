@@ -76,4 +76,12 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
         + ROLE_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
+
+  @Override
+  public String touchRoleUpdatedAt(@Param("roleId") long roleId) {
+    return "UPDATE "
+        + ROLE_TABLE_NAME
+        + " SET updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+  }
 }

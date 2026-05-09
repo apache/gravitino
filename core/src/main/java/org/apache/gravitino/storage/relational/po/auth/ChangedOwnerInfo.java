@@ -16,28 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.glue;
+package org.apache.gravitino.storage.relational.po.auth;
 
-import java.time.Instant;
-import java.util.Map;
-import software.amazon.awssdk.services.glue.model.Database;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-/**
- * Runs {@link AbstractGlueSchemaTest} scenarios using AWS SDK builders to create {@link Database}
- * objects directly — no network or AWS credentials required.
- *
- * <p>This verifies that the {@link GlueSchema#fromGlueDatabase} conversion logic works correctly
- * for typical Glue API response shapes.
- */
-class TestSyntheticGlueSchema extends AbstractGlueSchemaTest {
-
-  @Override
-  protected Database provideDatabase(String name, String description, Map<String, String> params) {
-    return Database.builder()
-        .name(name)
-        .description(description)
-        .parameters(params)
-        .createTime(Instant.now())
-        .build();
-  }
+/** Owner change poller result -- one row per changed owner_meta entry. */
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class ChangedOwnerInfo {
+  private long metadataObjectId;
+  private String metadataObjectType;
+  private long updatedAt;
 }

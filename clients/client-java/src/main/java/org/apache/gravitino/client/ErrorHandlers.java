@@ -67,6 +67,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -85,6 +86,7 @@ import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 
 /**
  * Utility class providing error handling for REST requests and specific to Metalake errors.
@@ -127,6 +129,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> tableErrorHandler() {
     return TableErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to View operations.
+   *
+   * @return A Consumer representing the View error handler.
+   */
+  public static Consumer<ErrorResponse> viewErrorHandler() {
+    return ViewErrorHandler.INSTANCE;
   }
 
   /**
@@ -395,6 +406,61 @@ public class ErrorHandlers {
 
         case ErrorConstants.ALREADY_EXISTS_CODE:
           throw new TableAlreadyExistsException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          if (errorResponse.getType().equals(CatalogNotInUseException.class.getSimpleName())) {
+            throw new CatalogNotInUseException(errorMessage);
+
+          } else if (errorResponse
+              .getType()
+              .equals(MetalakeNotInUseException.class.getSimpleName())) {
+            throw new MetalakeNotInUseException(errorMessage);
+
+          } else {
+            throw new NotInUseException(errorMessage);
+          }
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to View operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class ViewErrorHandler extends RestErrorHandler {
+    private static final ErrorHandler INSTANCE = new ViewErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchSchemaException.class.getSimpleName())) {
+            throw new NoSuchSchemaException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchCatalogException.class.getSimpleName())) {
+            throw new NoSuchCatalogException(errorMessage);
+          } else if (errorResponse.getType().equals(NoSuchViewException.class.getSimpleName())) {
+            throw new NoSuchViewException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          throw new ViewAlreadyExistsException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);

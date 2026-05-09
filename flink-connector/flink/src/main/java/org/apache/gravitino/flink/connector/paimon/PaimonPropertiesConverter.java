@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.flink.connector.paimon;
 
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
 import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
@@ -45,6 +48,27 @@ public class PaimonPropertiesConverter
       return PaimonConstants.METASTORE;
     }
     return PaimonPropertiesUtils.GRAVITINO_CONFIG_TO_PAIMON.get(configKey);
+  }
+
+  @Override
+  public Map<String, String> toGravitinoTableProperties(Map<String, String> flinkProperties) {
+    Map<String, String> properties = new HashMap<>(flinkProperties);
+    properties.remove(PaimonConstants.BUCKET_KEY);
+    properties.remove(PaimonConstants.BUCKET_NUM);
+    return properties;
+  }
+
+  @Override
+  public Map<String, String> toFlinkTableProperties(
+      Map<String, String> flinkCatalogProperties,
+      Map<String, String> gravitinoTableProperties,
+      ObjectPath tablePath) {
+    Map<String, String> properties = new HashMap<>(gravitinoTableProperties);
+    // Strip bucket properties from raw table properties; Distribution is the single source
+    // of truth and will be merged separately via fromGravitinoDistribution().
+    properties.remove(PaimonConstants.BUCKET_KEY);
+    properties.remove(PaimonConstants.BUCKET_NUM);
+    return properties;
   }
 
   @Override
