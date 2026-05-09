@@ -27,7 +27,6 @@ import javax.inject.Singleton;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.FunctionDispatcher;
@@ -57,7 +56,6 @@ import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.VersioningFilter;
 import org.apache.gravitino.server.web.filter.AccessControlNotAllowedFilter;
 import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
-import org.apache.gravitino.server.web.filter.IdpInterfaceNotFoundFilter;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
@@ -124,10 +122,6 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   private void initializeRestApi() {
-    boolean enableBasicAuthenticator =
-        serverConfig
-            .get(Configs.AUTHENTICATORS)
-            .contains(AuthenticatorType.BASIC.name().toLowerCase());
     HashSet<String> restApiPackagesSet = new HashSet<>();
     restApiPackagesSet.add("org.apache.gravitino.server.web.rest");
     restApiPackagesSet.addAll(serverConfig.get(Configs.REST_API_EXTENSION_PACKAGES));
@@ -172,9 +166,6 @@ public class GravitinoServer extends ResourceConfig {
 
     if (!enableAuthorization) {
       register(AccessControlNotAllowedFilter.class);
-    }
-    if (!enableBasicAuthenticator) {
-      register(IdpInterfaceNotFoundFilter.class);
     }
 
     HttpServerMetricsSource httpServerMetricsSource =

@@ -70,7 +70,6 @@ public class IdpUserManager {
   }
 
   public IdpUserDTO createUser(String userName, String password) {
-    ensureBasicEnabled();
     ensureServiceAdmin();
     validateUserName(userName);
     validatePassword(password);
@@ -92,7 +91,6 @@ public class IdpUserManager {
   }
 
   public IdpUserDTO getUser(String userName) {
-    ensureBasicEnabled();
     validateUserName(userName);
     IdpUserPO userPO =
         userMetaService()
@@ -103,7 +101,6 @@ public class IdpUserManager {
   }
 
   public boolean deleteUser(String userName) {
-    ensureBasicEnabled();
     ensureServiceAdmin();
     validateUserName(userName);
     Optional<IdpUserPO> user = userMetaService().findUser(userName);
@@ -115,7 +112,6 @@ public class IdpUserManager {
   }
 
   public IdpUserDTO resetPassword(String userName, String password) {
-    ensureBasicEnabled();
     ensureServiceAdmin();
     validateUserName(userName);
     validatePassword(password);
@@ -140,12 +136,6 @@ public class IdpUserManager {
 
   private IdpUserMetaService userMetaService() {
     return userMetaService;
-  }
-
-  private void ensureBasicEnabled() {
-    Preconditions.checkState(
-        config.get(Configs.AUTHENTICATORS).contains("basic"),
-        "Built-in IdP authentication is disabled");
   }
 
   private void ensureServiceAdmin() {

@@ -173,9 +173,13 @@ public class TestGravitinoServer {
   }
 
   @Test
-  public void testInitializeRestApiWithBasicAuthenticator() throws Exception {
+  public void testInitializeRestApiExposesIdpInterfaces() throws Exception {
     ServerConfig serverConfig = new ServerConfig();
-    serverConfig.loadFromMap(ImmutableMap.of(Configs.AUTHENTICATORS.getKey(), "basic"), t -> true);
+    serverConfig.loadFromMap(
+        ImmutableMap.of(
+            Configs.AUTHENTICATORS.getKey(), "oauth",
+            Configs.REST_API_EXTENSION_PACKAGES.getKey(), "org.apache.gravitino.test.extension"),
+        t -> true);
 
     GravitinoServer restServer = newRestApiTestServer(serverConfig, Collections.emptySet());
     invokeInitializeRestApi(restServer);
@@ -210,37 +214,6 @@ public class TestGravitinoServer {
 
       IdpUserResponse userResponse = response.readEntity(IdpUserResponse.class);
       assertEquals("user1", userResponse.getUser().name());
-    } finally {
-      jerseyTest.tearDown();
-    }
-  }
-
-  @Test
-  public void testInitializeRestApiWithoutBasicAuthenticator() throws Exception {
-    ServerConfig serverConfig = new ServerConfig();
-    serverConfig.loadFromMap(
-        ImmutableMap.of(
-            Configs.AUTHENTICATORS.getKey(), "oauth",
-            Configs.REST_API_EXTENSION_PACKAGES.getKey(), "org.apache.gravitino.test.extension"),
-        t -> true);
-
-    GravitinoServer restServer =
-        newRestApiTestServer(serverConfig, Set.of("org.apache.gravitino.test.lineage"));
-
-    invokeInitializeRestApi(restServer);
-
-    JerseyTest jerseyTest =
-        new JerseyTest() {
-          @Override
-          protected Application configure() {
-            return restServer;
-          }
-        };
-
-    try {
-      jerseyTest.setUp();
-      assertIdpInterfaceNotFound(jerseyTest, "/idp/users/user1");
-      assertIdpInterfaceNotFound(jerseyTest, "/idp/groups/group1");
     } finally {
       jerseyTest.tearDown();
     }
@@ -310,10 +283,5 @@ public class TestGravitinoServer {
         IdpUserOperations.class.getDeclaredConstructor(IdpUserManager.class);
     constructor.setAccessible(true);
     return constructor.newInstance(userManager);
-  }
-
-  private void assertIdpInterfaceNotFound(JerseyTest jerseyTest, String path) {
-    Response response = jerseyTest.target(path).request("application/vnd.gravitino.v1+json").get();
-    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
   }
 }

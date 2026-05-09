@@ -51,7 +51,6 @@ public class TestIdpGroupManager {
   @BeforeEach
   public void setUp() {
     Config config = new Config(false) {};
-    config.set(Configs.AUTHENTICATORS, Collections.singletonList("basic"));
     config.set(Configs.SERVICE_ADMINS, Collections.singletonList("admin"));
     userMetaService = mock(IdpUserMetaService.class);
     groupMetaService = mock(IdpGroupMetaService.class);
