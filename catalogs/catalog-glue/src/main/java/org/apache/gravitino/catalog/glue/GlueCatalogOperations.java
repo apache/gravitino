@@ -406,8 +406,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     String tableFormat = props.getOrDefault(GlueConstants.TABLE_FORMAT, defaultTableFormat);
     if (GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(tableFormat)) {
-      return createIcebergTable(
-          ident, dbName, columns, comment, props, partitions, distribution, sortOrders);
+      return createIcebergTable(ident, dbName, columns, comment, props);
     }
 
     TableInput input =
@@ -452,22 +451,18 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       String dbName,
       Column[] columns,
       String comment,
-      Map<String, String> props,
-      Transform[] partitions,
-      Distribution distribution,
-      SortOrder[] sortOrders) {
+      Map<String, String> props) {
 
     Preconditions.checkArgument(
         props.containsKey(GlueConstants.LOCATION),
         "Property '%s' is required for Iceberg tables",
         GlueConstants.LOCATION);
 
-    Map<String, String> icebergProps = new HashMap<>(props);
-    icebergProps.put(GlueConstants.TABLE_TYPE_PARAM, GlueConstants.ICEBERG_TABLE_TYPE_VALUE);
-
-    TableInput input =
-        buildTableInput(
-            ident.name(), comment, columns, icebergProps, partitions, distribution, sortOrders);
+    // Iceberg tables in Glue cannot have Hive-style partitionKeys — partitioning is managed
+    // by the Iceberg metadata written by the OpenTableFormatInput API.
+    // Also, table_type and metadata_location are reserved by Glue's native Iceberg API and
+    // must not be set manually in parameters.
+    TableInput input = buildIcebergTableInput(ident.name(), comment, columns, props);
 
     CreateTableRequest.Builder req =
         CreateTableRequest.builder()
@@ -498,6 +493,14 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public GlueTable alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
+
+    // AWS Glue UpdateTable identifies the target table by TableInput.Name, so it cannot
+    // be used to rename — passing a new name causes EntityNotFoundException.
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.RenameTable) {
+        throw new UnsupportedOperationException("Glue does not support table rename");
+      }
+    }
 
     String dbName = schemaName(ident.namespace());
 
@@ -531,15 +534,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
-        TableChange.RenameTable renameTable = (TableChange.RenameTable) change;
-        renameTable
-            .getNewSchemaName()
-            .ifPresent(
-                s -> {
-                  throw new UnsupportedOperationException(
-                      "Glue does not support cross-schema table rename");
-                });
-        newName = renameTable.getNewName();
+        // Already handled above; this branch is never reached.
+        throw new UnsupportedOperationException("Glue does not support table rename");
       } else if (change instanceof TableChange.UpdateComment) {
         newComment = ((TableChange.UpdateComment) change).getNewComment();
       } else if (change instanceof TableChange.SetProperty) {
@@ -668,6 +664,39 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     String normalized =
         fmt != null ? fmt.toLowerCase(Locale.ROOT) : GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
     return tableFormatFilter.contains(normalized);
+  }
+
+  private TableInput buildIcebergTableInput(
+      String name, String comment, Column[] columns, Map<String, String> properties) {
+    // table_type and metadata_location are reserved by Glue's native Iceberg API.
+    // They are set automatically; passing them causes a 400 error.
+    Set<String> icebergReservedKeys =
+        ImmutableSet.of(GlueConstants.TABLE_TYPE_PARAM, GlueConstants.METADATA_LOCATION);
+    Map<String, String> tableParams = new HashMap<>();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      if (!SD_TABLE_PROPERTY_KEYS.contains(key)
+          && !TABLE_LEVEL_KEYS.contains(key)
+          && !icebergReservedKeys.contains(key)) {
+        tableParams.put(key, entry.getValue());
+      }
+    }
+    List<software.amazon.awssdk.services.glue.model.Column> glueCols = new ArrayList<>();
+    for (Column col : columns) {
+      glueCols.add(toGlueColumn(col));
+    }
+    StorageDescriptor sd =
+        StorageDescriptor.builder()
+            .columns(glueCols)
+            .location(properties.get(GlueConstants.LOCATION))
+            .build();
+    return TableInput.builder()
+        .name(name)
+        .description(comment)
+        .tableType("EXTERNAL_TABLE")
+        .parameters(tableParams)
+        .storageDescriptor(sd)
+        .build();
   }
 
   private TableInput buildTableInput(

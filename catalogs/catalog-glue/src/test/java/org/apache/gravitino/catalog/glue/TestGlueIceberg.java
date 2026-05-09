@@ -446,7 +446,7 @@ class TestGlueIceberg {
 
     NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, TABLE);
     assertThrows(
-        IllegalArgumentException.class,
+        UnsupportedOperationException.class,
         () -> ops.alterTable(ident, TableChange.rename("new_table_name")));
   }
 

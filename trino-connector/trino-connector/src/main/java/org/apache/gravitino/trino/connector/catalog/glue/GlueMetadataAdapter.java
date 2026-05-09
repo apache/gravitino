@@ -24,7 +24,11 @@ import static io.trino.spi.type.VarcharType.VARCHAR;
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.type.ArrayType;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.trino.connector.catalog.hive.HiveMetadataAdapter;
 
 /**
@@ -73,6 +77,8 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
               "format", "The format of the data files (PARQUET, ORC, etc.)", null, false),
           stringProperty("location", "The S3 storage location for the table", null, false));
 
+  private final PropertyConverter tableConverter = new GlueTablePropertyConverter();
+
   /**
    * Constructs a new GlueMetadataAdapter.
    *
@@ -80,6 +86,33 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
    */
   public GlueMetadataAdapter(List<PropertyMetadata<?>> schemaProperties) {
     super(schemaProperties, GLUE_TABLE_PROPERTY_META, ImmutableList.of());
+  }
+
+  @Override
+  public Map<String, Object> toTrinoTableProperties(Map<String, String> properties) {
+    // Convert Gravitino keys (e.g. table-format) to Trino keys (e.g. type),
+    // then filter to only properties declared in GLUE_TABLE_PROPERTY_META.
+    // We must NOT call super here because HiveMetadataAdapter would apply
+    // HiveTablePropertyConverter a second time, corrupting the already-converted keys.
+    Map<String, String> converted = tableConverter.gravitinoToEngineProperties(properties);
+    Map<String, Object> result = new HashMap<>();
+    for (PropertyMetadata<?> meta : GLUE_TABLE_PROPERTY_META) {
+      String key = meta.getName();
+      if (converted.containsKey(key)) {
+        result.put(key, converted.get(key));
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public Map<String, String> toGravitinoTableProperties(Map<String, Object> properties) {
+    // Convert Trino keys (e.g. type) to Gravitino keys (e.g. table-format),
+    // then drop null values. Must NOT call super for the same reason as above.
+    Map<String, Object> converted = tableConverter.engineToGravitinoProperties(properties);
+    return converted.entrySet().stream()
+        .filter(e -> e.getValue() != null)
+        .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
   }
 
   /** Returns the table property metadata for Glue catalogs. */
