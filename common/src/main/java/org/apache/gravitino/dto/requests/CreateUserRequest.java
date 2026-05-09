@@ -41,6 +41,7 @@ public class CreateUserRequest implements RESTRequest {
   private final String user;
 
   @JsonProperty("password")
+  @ToString.Exclude
   private final String password;
 
   /** Default constructor for CreateUserRequest. (Used for Jackson deserialization.) */

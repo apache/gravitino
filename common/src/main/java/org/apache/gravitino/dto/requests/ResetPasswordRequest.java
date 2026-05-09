@@ -38,6 +38,7 @@ import org.apache.gravitino.rest.RESTRequest;
 public class ResetPasswordRequest implements RESTRequest {
 
   @JsonProperty("password")
+  @ToString.Exclude
   private final String password;
 
   /** Default constructor for ResetPasswordRequest. (Used for Jackson deserialization.) */

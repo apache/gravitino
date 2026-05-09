@@ -56,4 +56,13 @@ public class TestResetPasswordRequest {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new ResetPasswordRequest(" ").validate());
   }
+
+  @Test
+  public void testResetPasswordRequestToStringDoesNotExposePassword() {
+    String requestString = new ResetPasswordRequest("new_password").toString();
+
+    Assertions.assertFalse(requestString.contains("new_password"));
+    Assertions.assertFalse(requestString.contains("password="));
+    Assertions.assertFalse(requestString.contains("\"password\""));
+  }
 }

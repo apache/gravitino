@@ -60,4 +60,14 @@ public class TestCreateUserRequest {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new CreateUserRequest("test_user", " ").validate());
   }
+
+  @Test
+  public void testCreateUserRequestToStringDoesNotExposePassword() {
+    String requestString = new CreateUserRequest("test_user", "password").toString();
+
+    Assertions.assertTrue(requestString.contains("test_user"));
+    Assertions.assertFalse(requestString.contains("password="));
+    Assertions.assertFalse(requestString.contains("password)"));
+    Assertions.assertFalse(requestString.contains("\"password\""));
+  }
 }
