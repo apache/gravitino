@@ -62,8 +62,11 @@ import org.apache.gravitino.dto.model.ModelVersionDTO;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.DistributionDTO;
+import org.apache.gravitino.dto.rel.RepresentationDTO;
+import org.apache.gravitino.dto.rel.SQLRepresentationDTO;
 import org.apache.gravitino.dto.rel.SortOrderDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
+import org.apache.gravitino.dto.rel.ViewDTO;
 import org.apache.gravitino.dto.rel.expressions.FieldReferenceDTO;
 import org.apache.gravitino.dto.rel.expressions.FuncExpressionDTO;
 import org.apache.gravitino.dto.rel.expressions.FunctionArg;
@@ -97,10 +100,14 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
@@ -289,6 +296,69 @@ public class DTOConverters {
   }
 
   /**
+   * Converts a {@link View} implementation to a {@link ViewDTO}.
+   *
+   * @param view The view implementation.
+   * @return The view DTO.
+   */
+  public static ViewDTO toDTO(View view) {
+    return ViewDTO.builder()
+        .withName(view.name())
+        .withComment(view.comment())
+        .withColumns(
+            Arrays.stream(view.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
+        .withRepresentations(toDTOs(view.representations()))
+        .withDefaultCatalog(view.defaultCatalog())
+        .withDefaultSchema(view.defaultSchema())
+        .withProperties(view.properties())
+        .withAudit(toDTO(view.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a {@link Representation} implementation to a {@link RepresentationDTO}.
+   *
+   * @param representation The representation implementation.
+   * @return The representation DTO.
+   */
+  public static RepresentationDTO toDTO(Representation representation) {
+    if (representation instanceof RepresentationDTO) {
+      return (RepresentationDTO) representation;
+    }
+    if (representation instanceof SQLRepresentation) {
+      return toDTO((SQLRepresentation) representation);
+    }
+    throw new IllegalArgumentException(
+        "Unsupported representation type: " + representation.getClass().getName());
+  }
+
+  /**
+   * Converts a {@link SQLRepresentation} implementation to a {@link SQLRepresentationDTO}.
+   *
+   * @param sqlRepresentation The SQL representation implementation.
+   * @return The SQL representation DTO.
+   */
+  public static SQLRepresentationDTO toDTO(SQLRepresentation sqlRepresentation) {
+    return (SQLRepresentationDTO) RepresentationDTO.fromRepresentation(sqlRepresentation);
+  }
+
+  /**
+   * Converts an array of {@link Representation} implementations to an array of {@link
+   * RepresentationDTO}.
+   *
+   * @param representations The representation implementations.
+   * @return The representation DTOs.
+   */
+  public static RepresentationDTO[] toDTOs(Representation[] representations) {
+    if (representations == null) {
+      return new RepresentationDTO[0];
+    }
+    return Arrays.stream(representations)
+        .map(DTOConverters::toDTO)
+        .toArray(RepresentationDTO[]::new);
+  }
+
+  /**
    * Converts a Distribution implementation to a DistributionDTO.
    *
    * @param distribution The distribution implementation.
@@ -407,6 +477,7 @@ public class DTOConverters {
         .withIndexType(index.type())
         .withName(index.name())
         .withFieldNames(index.fieldNames())
+        .withProperties(index.properties())
         .build();
   }
 
@@ -560,6 +631,19 @@ public class DTOConverters {
           .withCustomRules(customContent.customRules())
           .withSupportedObjectTypes(customContent.supportedObjectTypes())
           .withProperties(customContent.properties())
+          .build();
+    }
+
+    if (policyContent instanceof IcebergDataCompactionContent) {
+      IcebergDataCompactionContent icebergCompactionContent =
+          (IcebergDataCompactionContent) policyContent;
+      return PolicyContentDTO.IcebergCompactionContentDTO.builder()
+          .withMinDataFileMse(icebergCompactionContent.minDataFileMse())
+          .withMinDeleteFileNumber(icebergCompactionContent.minDeleteFileNumber())
+          .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
+          .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
+          .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
+          .withRewriteOptions(icebergCompactionContent.rewriteOptions())
           .build();
     }
 
@@ -961,7 +1045,8 @@ public class DTOConverters {
    * @return The index.
    */
   public static Index fromDTO(IndexDTO indexDTO) {
-    return Indexes.of(indexDTO.type(), indexDTO.name(), indexDTO.fieldNames());
+    return Indexes.of(
+        indexDTO.type(), indexDTO.name(), indexDTO.fieldNames(), indexDTO.properties());
   }
 
   /**
@@ -1114,6 +1199,36 @@ public class DTOConverters {
         column.nullable(),
         column.autoIncrement(),
         fromFunctionArg((FunctionArg) column.defaultValue()));
+  }
+
+  /**
+   * Converts a {@link RepresentationDTO} to a {@link Representation}.
+   *
+   * @param representationDTO The representation DTO to be converted.
+   * @return The representation implementation.
+   */
+  public static Representation fromDTO(RepresentationDTO representationDTO) {
+    if (representationDTO instanceof SQLRepresentationDTO) {
+      SQLRepresentationDTO dto = (SQLRepresentationDTO) representationDTO;
+      return SQLRepresentation.builder().withDialect(dto.dialect()).withSql(dto.sql()).build();
+    }
+    throw new IllegalArgumentException(
+        "Unsupported representation DTO type: " + representationDTO.getClass().getName());
+  }
+
+  /**
+   * Converts an array of {@link RepresentationDTO} to an array of {@link Representation}.
+   *
+   * @param representationDTOs The representation DTOs to be converted.
+   * @return The representation implementations.
+   */
+  public static Representation[] fromDTOs(RepresentationDTO[] representationDTOs) {
+    if (representationDTOs == null) {
+      return new Representation[0];
+    }
+    return Arrays.stream(representationDTOs)
+        .map(DTOConverters::fromDTO)
+        .toArray(Representation[]::new);
   }
 
   /**
@@ -1293,6 +1408,18 @@ public class DTOConverters {
           customContentDTO.customRules(),
           customContentDTO.supportedObjectTypes(),
           customContentDTO.properties());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
+      PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
+          (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
+      return PolicyContents.icebergDataCompaction(
+          icebergCompactionContentDTO.minDataFileMse(),
+          icebergCompactionContentDTO.minDeleteFileNumber(),
+          icebergCompactionContentDTO.dataFileMseWeight(),
+          icebergCompactionContentDTO.deleteFileNumberWeight(),
+          icebergCompactionContentDTO.maxPartitionNum(),
+          icebergCompactionContentDTO.rewriteOptions());
     }
 
     throw new IllegalArgumentException(

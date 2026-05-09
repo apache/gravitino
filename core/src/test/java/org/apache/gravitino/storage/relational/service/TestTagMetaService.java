@@ -1112,6 +1112,18 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertEquals(21, countAllTagRel(tagEntity1.id()));
   }
 
+  @TestTemplate
+  public void testGetTagIdByTagNameWhenTagNotFound() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(METALAKE_NAME);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> tagMetaService.getTagIdByTagName(metalakeId, "missing_tag"));
+  }
+
   private boolean containsGenericEntity(
       List<GenericEntity> genericEntities, String name, Entity.EntityType entityType) {
     return genericEntities.stream().anyMatch(e -> e.name().equals(name) && e.type() == entityType);

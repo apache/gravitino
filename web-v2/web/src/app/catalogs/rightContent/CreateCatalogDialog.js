@@ -294,6 +294,17 @@ export default function CreateCatalogDialog({ ...props }) {
         setConfirmLoading(true)
         const submitData = getSubmitData()
         if (editCatalog) {
+          // Backfill hidden default props that the form doesn't render during edit
+          const allDefaultProps =
+            (catalogType === 'model'
+              ? providerBase['model'].defaultProps
+              : providerBase[currentProvider]?.defaultProps) || []
+          allDefaultProps.forEach(prop => {
+            if (isHidden(prop) && !(prop.key in submitData.properties) && cacheData?.properties?.[prop.key] != null) {
+              submitData.properties[prop.key] = cacheData.properties[prop.key]
+            }
+          })
+
           // update catalog
           const reqData = { updates: genUpdates(cacheData, submitData) }
           if (reqData.updates.length) {
@@ -343,6 +354,8 @@ export default function CreateCatalogDialog({ ...props }) {
           return <Icons.paimon className={small ? 'size-6' : 'size-12'}></Icons.paimon>
         case 'custom-icons-hudi':
           return <Icons.hudi className={small ? 'size-6' : 'size-12'}></Icons.hudi>
+        case 'custom-icons-hologres':
+          return <Icons.hologres className={small ? 'size-6' : 'size-12'}></Icons.hologres>
         case 'custom-icons-oceanbase':
           return <Icons.oceanbase className={small ? 'size-6' : 'size-12'}></Icons.oceanbase>
         case 'custom-icons-starrocks':
@@ -494,7 +507,7 @@ export default function CreateCatalogDialog({ ...props }) {
                       messageVariables={{ label: 'catalog name' }}
                       data-refer='catalog-name-field'
                     >
-                      <Input placeholder={mismatchName} disabled={!init} />
+                      <Input placeholder={mismatchName} disabled={init} />
                     </Form.Item>
                     {providerBase[catalogType === 'model' ? 'model' : currentProvider]?.defaultProps
                       ?.filter(p => !isHidden(p))

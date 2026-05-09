@@ -27,6 +27,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.IcebergAuthenticationFilter;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
@@ -79,7 +80,13 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   private void initServer(IcebergConfig icebergConfig) {
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
-    server = new JettyServer();
+    server =
+        new JettyServer() {
+          @Override
+          protected javax.servlet.Filter createAuthenticationFilter() {
+            return new IcebergAuthenticationFilter();
+          }
+        };
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
 
@@ -96,6 +103,8 @@ public class RESTService implements GravitinoAuxiliaryService {
     this.configProvider = IcebergConfigProviderFactory.create(configProperties);
     configProvider.initialize(configProperties);
     String metalakeName = configProvider.getMetalakeName();
+    boolean skipAuthorizationForRestBackend =
+        icebergConfig.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ);
 
     Boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
@@ -103,33 +112,44 @@ public class RESTService implements GravitinoAuxiliaryService {
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
     IcebergRESTServerContext authorizationContext =
         IcebergRESTServerContext.create(
-            configProvider, enableAuth, auxMode, icebergCatalogWrapperManager);
+            configProvider,
+            enableAuth,
+            auxMode,
+            skipAuthorizationForRestBackend,
+            icebergCatalogWrapperManager);
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    // Table: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
         new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
-    if (authorizationContext.isAuthorizationEnabled()) {
-      icebergTableOperationDispatcher =
-          new IcebergTableHookDispatcher(icebergTableOperationDispatcher);
-    }
-    IcebergTableEventDispatcher icebergTableEventDispatcher =
+    IcebergTableOperationDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
+    if (authorizationContext.isAuthorizationEnabled()) {
+      icebergTableEventDispatcher = new IcebergTableHookDispatcher(icebergTableEventDispatcher);
+    }
+    IcebergTableOperationDispatcher icebergTableDispatcher = icebergTableEventDispatcher;
+
+    // View: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergViewOperationDispatcher icebergViewOperationDispatcher =
         new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
-    if (authorizationContext.isAuthorizationEnabled()) {
-      icebergViewOperationDispatcher =
-          new IcebergViewHookDispatcher(icebergViewOperationDispatcher, metalakeName);
-    }
-    IcebergViewEventDispatcher icebergViewEventDispatcher =
+    IcebergViewOperationDispatcher icebergViewEventDispatcher =
         new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
+    if (authorizationContext.isAuthorizationEnabled()) {
+      icebergViewEventDispatcher =
+          new IcebergViewHookDispatcher(icebergViewEventDispatcher, metalakeName);
+    }
+    IcebergViewOperationDispatcher icebergViewDispatcher = icebergViewEventDispatcher;
 
+    // Namespace: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
         new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
-    if (authorizationContext.isAuthorizationEnabled()) {
-      namespaceOperationDispatcher =
-          new IcebergNamespaceHookDispatcher(namespaceOperationDispatcher);
-    }
-    IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
+    IcebergNamespaceOperationDispatcher icebergNamespaceEventDispatcher =
         new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
+    if (authorizationContext.isAuthorizationEnabled()) {
+      icebergNamespaceEventDispatcher =
+          new IcebergNamespaceHookDispatcher(icebergNamespaceEventDispatcher);
+    }
+    IcebergNamespaceOperationDispatcher icebergNamespaceDispatcher =
+        icebergNamespaceEventDispatcher;
 
     config.register(
         new AbstractBinder() {
@@ -142,9 +162,9 @@ public class RESTService implements GravitinoAuxiliaryService {
             }
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
-            bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
-            bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
-            bind(icebergNamespaceEventDispatcher)
+            bind(icebergTableDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
+            bind(icebergViewDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
+            bind(icebergNamespaceDispatcher)
                 .to(IcebergNamespaceOperationDispatcher.class)
                 .ranked(1);
           }

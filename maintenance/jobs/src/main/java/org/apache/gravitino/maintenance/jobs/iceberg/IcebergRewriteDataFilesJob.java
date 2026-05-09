@@ -28,6 +28,7 @@ import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
@@ -497,26 +498,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    * @return map of Spark configuration keys to template values
    */
   private static Map<String, String> buildSparkConfigs() {
-    Map<String, String> configs = new HashMap<>();
-
-    // Spark runtime configs
-    configs.put("spark.master", "{{spark_master}}");
-    configs.put("spark.executor.instances", "{{spark_executor_instances}}");
-    configs.put("spark.executor.cores", "{{spark_executor_cores}}");
-    configs.put("spark.executor.memory", "{{spark_executor_memory}}");
-    configs.put("spark.driver.memory", "{{spark_driver_memory}}");
-
-    // Iceberg catalog configuration
-    configs.put("spark.sql.catalog.{{catalog_name}}", "org.apache.iceberg.spark.SparkCatalog");
-    configs.put("spark.sql.catalog.{{catalog_name}}.type", "{{catalog_type}}");
-    configs.put("spark.sql.catalog.{{catalog_name}}.uri", "{{catalog_uri}}");
-    configs.put("spark.sql.catalog.{{catalog_name}}.warehouse", "{{warehouse_location}}");
-
-    // Iceberg extensions
-    configs.put(
-        "spark.sql.extensions",
-        "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions");
-
-    return Collections.unmodifiableMap(configs);
+    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
   }
 }

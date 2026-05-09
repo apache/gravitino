@@ -20,6 +20,8 @@ package org.apache.gravitino.catalog.jdbc;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.sql.Driver;
+import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.HashMap;
 import javax.sql.DataSource;
@@ -27,6 +29,8 @@ import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
@@ -74,5 +78,79 @@ public class TestJdbcCatalogOperations {
     Assertions.assertInstanceOf(BasicDataSource.class, dataSource);
     Assertions.assertFalse(((BasicDataSource) dataSource).getTestOnBorrow());
     ((BasicDataSource) dataSource).close();
+  }
+
+  @Test
+  public void testCloseDeregisterDriver() throws SQLException {
+    TestableJdbcCatalogOperations catalogOperations =
+        new TestableJdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            new SqliteDatabaseOperations("/illegal/path"),
+            new SqliteTableOperations(),
+            new SqliteColumnDefaultValueConverter());
+    catalogOperations.setDriver(DriverManager.getDriver("jdbc:sqlite::memory:"));
+
+    Assertions.assertDoesNotThrow(catalogOperations::close);
+    Assertions.assertTrue(catalogOperations.isDeregisterCalled());
+  }
+
+  @Test
+  public void testCloseIgnoreGetDriverException() {
+    TestableJdbcCatalogOperations catalogOperations =
+        new TestableJdbcCatalogOperations(
+            new SqliteExceptionConverter(),
+            new SqliteTypeConverter(),
+            new SqliteDatabaseOperations("/illegal/path"),
+            new SqliteTableOperations(),
+            new SqliteColumnDefaultValueConverter());
+    catalogOperations.setThrowExceptionInGetDriver(true);
+
+    Assertions.assertDoesNotThrow(catalogOperations::close);
+  }
+
+  private static class TestableJdbcCatalogOperations extends JdbcCatalogOperations {
+    private Driver driver;
+    private boolean deregisterCalled;
+    private boolean throwExceptionInGetDriver;
+
+    private TestableJdbcCatalogOperations(
+        JdbcExceptionConverter exceptionConverter,
+        JdbcTypeConverter jdbcTypeConverter,
+        SqliteDatabaseOperations databaseOperation,
+        SqliteTableOperations tableOperation,
+        SqliteColumnDefaultValueConverter columnDefaultValueConverter) {
+      super(
+          exceptionConverter,
+          jdbcTypeConverter,
+          databaseOperation,
+          tableOperation,
+          columnDefaultValueConverter);
+    }
+
+    @Override
+    protected Driver getDriver() throws SQLException {
+      if (throwExceptionInGetDriver) {
+        throw new SQLException("failed to get driver");
+      }
+      return driver;
+    }
+
+    @Override
+    public void deregisterDriver(Driver driver) {
+      this.deregisterCalled = true;
+    }
+
+    private void setDriver(Driver driver) {
+      this.driver = driver;
+    }
+
+    private void setThrowExceptionInGetDriver(boolean throwExceptionInGetDriver) {
+      this.throwExceptionInGetDriver = throwExceptionInGetDriver;
+    }
+
+    private boolean isDeregisterCalled() {
+      return deregisterCalled;
+    }
   }
 }

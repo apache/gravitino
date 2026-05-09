@@ -26,7 +26,7 @@ SELECT val1 + val2 FROM tb03;
 
 SELECT val1 * val2 FROM tb03;
 
-SELECT val1 / val2 FROM tb03;
+SELECT CAST(val1 / val2 AS DECIMAL(38, 2)) FROM tb03;
 
 CREATE TABLE tb04 (max_min_val DECIMAL(18, 4));
 

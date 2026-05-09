@@ -372,6 +372,7 @@ public class TestTagEvent {
         ((GetTagForMetadataObjectFailureEvent) event).exception().getClass());
     Assertions.assertEquals(OperationType.GET_TAG_FOR_METADATA_OBJECT, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(tag.name(), ((GetTagForMetadataObjectFailureEvent) event).tagName());
   }
 
   @Test

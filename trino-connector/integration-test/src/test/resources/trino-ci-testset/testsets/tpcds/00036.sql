@@ -1,9 +1,9 @@
 SELECT
-  ("sum"("ss_net_profit") / "sum"("ss_ext_sales_price")) "gross_margin"
+  CAST("sum"("ss_net_profit") / "sum"("ss_ext_sales_price") AS DECIMAL(38,2)) "gross_margin"
 , "i_category"
 , "i_class"
 , (GROUPING ("i_category") + GROUPING ("i_class")) "lochierarchy"
-, "rank"() OVER (PARTITION BY (GROUPING ("i_category") + GROUPING ("i_class")), (CASE WHEN (GROUPING ("i_class") = 0) THEN "i_category" END) ORDER BY ("sum"("ss_net_profit") / "sum"("ss_ext_sales_price")) ASC) "rank_within_parent"
+, "rank"() OVER (PARTITION BY (GROUPING ("i_category") + GROUPING ("i_class")), (CASE WHEN (GROUPING ("i_class") = 0) THEN "i_category" END) ORDER BY CAST(("sum"("ss_net_profit") / "sum"("ss_ext_sales_price")) AS DECIMAL(38, 2)) ASC) "rank_within_parent"
 FROM
   store_sales
 , date_dim d1

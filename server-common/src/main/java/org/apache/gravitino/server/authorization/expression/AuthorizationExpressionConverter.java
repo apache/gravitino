@@ -19,6 +19,7 @@ package org.apache.gravitino.server.authorization.expression;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_FILESET_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_FUNCTION_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_JOB_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION;
@@ -182,7 +183,8 @@ public class AuthorizationExpressionConverter {
               ( entityType == 'TAG' && (%s)) ||
               ( entityType == 'JOB' && (%s)) ||
               ( entityType == 'JOB_TEMPLATE' && (%s)) ||
-              ( entityType == 'COLUMN' && (%s))
+              ( entityType == 'COLUMN' && (%s)) ||
+              ( entityType == 'FUNCTION' && (%s))
               """
             .formatted(
                 LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
@@ -198,7 +200,8 @@ public class AuthorizationExpressionConverter {
                 LOAD_TAG_AUTHORIZATION_EXPRESSION,
                 LOAD_JOB_AUTHORIZATION_EXPRESSION,
                 LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
-                LOAD_TABLE_AUTHORIZATION_EXPRESSION));
+                LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+                LOAD_FUNCTION_AUTHORIZATION_EXPRESSION));
   }
 
   /**
@@ -291,6 +294,21 @@ public class AuthorizationExpressionConverter {
             "ANY_REGISTER_MODEL",
             "((ANY(REGISTER_MODEL, METALAKE, CATALOG, SCHEMA)) "
                 + "&& !(ANY(DENY_REGISTER_MODEL, METALAKE, CATALOG, SCHEMA)))");
+    expression =
+        expression.replaceAll(
+            "ANY_REGISTER_FUNCTION",
+            "((ANY(REGISTER_FUNCTION, METALAKE, CATALOG, SCHEMA)) "
+                + "&& !(ANY(DENY_REGISTER_FUNCTION, METALAKE, CATALOG, SCHEMA)))");
+    expression =
+        expression.replaceAll(
+            "ANY_EXECUTE_FUNCTION",
+            "((ANY(EXECUTE_FUNCTION, METALAKE, CATALOG, SCHEMA, FUNCTION)) "
+                + "&& !(ANY(DENY_EXECUTE_FUNCTION, METALAKE, CATALOG, SCHEMA, FUNCTION)))");
+    expression =
+        expression.replaceAll(
+            "ANY_MODIFY_FUNCTION",
+            "((ANY(MODIFY_FUNCTION, METALAKE, CATALOG, SCHEMA, FUNCTION)) "
+                + "&& !(ANY(DENY_MODIFY_FUNCTION, METALAKE, CATALOG, SCHEMA, FUNCTION)))");
     expression =
         expression.replaceAll(
             "ANY_CREATE_TOPIC",

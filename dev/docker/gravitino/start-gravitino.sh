@@ -24,7 +24,30 @@ gravitino_dir="$(cd "${bin_dir}/../">/dev/null; pwd)"
 
 cd ${gravitino_dir}
 
-python bin/rewrite_gravitino_server_config.py
+# Skip config rewrite if SKIP_CONFIG_REWRITE is set (e.g., in Kubernetes)
+if [ "${SKIP_CONFIG_REWRITE}" != "true" ]; then
+  python bin/rewrite_gravitino_server_config.py
+fi
+
+# Create soft links for JDBC drivers
+jdbc_driver_dir="${gravitino_dir}/jdbc-drivers"
+
+if [ -d "${jdbc_driver_dir}" ]; then
+  mkdir -p "${gravitino_dir}/libs"
+  find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
+  find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
+fi
+
+# Create soft links for Iceberg bundle jars
+iceberg_bundle_dir="${gravitino_dir}/iceberg-bundles"
+lakehouse_iceberg_lib_dir="${gravitino_dir}/catalogs/lakehouse-iceberg/libs"
+iceberg_rest_lib_dir="${gravitino_dir}/iceberg-rest-server/libs"
+
+if [ -d "${iceberg_bundle_dir}" ]; then
+  mkdir -p "${lakehouse_iceberg_lib_dir}"
+  mkdir -p "${iceberg_rest_lib_dir}"
+  find "${iceberg_bundle_dir}" -name '*.jar' -exec ln -sfv {} "${lakehouse_iceberg_lib_dir}" \; -exec ln -sfv {} "${iceberg_rest_lib_dir}" \;
+fi
 
 JAVA_OPTS+=" -XX:-UseContainerSupport"
 export JAVA_OPTS

@@ -122,6 +122,7 @@ export default function AssociatedTable({ ...props }) {
   return (
     <Spin spinning={store.rolesForObjectLoading}>
       <Table
+        size='small'
         dataSource={tableData}
         columns={resizableColumns}
         components={components}

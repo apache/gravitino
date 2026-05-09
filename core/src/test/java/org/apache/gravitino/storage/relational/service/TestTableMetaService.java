@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -30,6 +31,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -37,10 +39,27 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.expressions.sorts.SortDirection;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -49,6 +68,11 @@ public class TestTableMetaService extends TestJDBCBackend {
   private final String metalakeName = "metalake_for_table_test";
   private final String catalogName = "catalog_for_table_test";
   private final String schemaName = "schema_for_table_test";
+
+  private List<EntityChangeRecord> listEntityChanges(long createdAtFrom) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        EntityChangeLogMapper.class, mapper -> mapper.selectEntityChanges(createdAtFrom, 100));
+  }
 
   @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {
@@ -177,6 +201,7 @@ public class TestTableMetaService extends TestJDBCBackend {
     TableMetaService.getInstance().insertTable(createdTable, false);
 
     // test update table without changing schema name
+    long beforeRename = System.currentTimeMillis() - 1;
     TableEntity updatedTable =
         TableEntity.builder()
             .withId(createdTable.id())
@@ -196,6 +221,19 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertEquals(updatedTable.auditInfo(), retrievedTable.auditInfo());
     compareTwoColumns(updatedTable.columns(), retrievedTable.columns());
     compareTwoColumns(updatedTable.columns(), retrievedTable.columns());
+    Assertions.assertTrue(
+        listEntityChanges(beforeRename).stream()
+            .anyMatch(
+                record ->
+                    record.getMetalakeName().equals(metalakeName)
+                        && record.getEntityType().equals(Entity.EntityType.TABLE.name())
+                        && record
+                            .getFullName()
+                            .equals(
+                                NameIdentifierUtil.ofTable(
+                                        metalakeName, catalogName, schemaName, "table1")
+                                    .toString())
+                        && record.getOperateType() == OperateType.ALTER));
 
     // test update table with changing schema name to a non-existing schema
     String newSchemaName = "schema2";
@@ -224,7 +262,33 @@ public class TestTableMetaService extends TestJDBCBackend {
             newSchemaName,
             AUDIT_INFO);
     backend.insert(newSchema, false);
-    TableMetaService.getInstance().updateTable(updatedTable.nameIdentifier(), updater2);
+
+    long beforeSchemaMove = System.currentTimeMillis() - 1;
+    TableEntity movedTable =
+        TableEntity.builder()
+            .withId(updatedTable.id())
+            .withName(updatedTable.name())
+            .withNamespace(Namespace.of(metalakeName, catalogName, newSchemaName))
+            .withColumns(updatedTable.columns())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance()
+        .updateTable(updatedTable.nameIdentifier(), oldTable -> movedTable);
+    Assertions.assertTrue(
+        listEntityChanges(beforeSchemaMove).stream()
+            .anyMatch(
+                record ->
+                    record.getMetalakeName().equals(metalakeName)
+                        && record.getEntityType().equals(Entity.EntityType.TABLE.name())
+                        && record
+                            .getFullName()
+                            .equals(
+                                NameIdentifierUtil.ofTable(
+                                        metalakeName, catalogName, schemaName, "table2")
+                                    .toString())
+                        && record.getOperateType() == OperateType.ALTER));
+
+    TableMetaService.getInstance().updateTable(movedTable.nameIdentifier(), updater2);
 
     TableEntity retrievedTable2 =
         TableMetaService.getInstance().getTableByIdentifier(updatedTable2.nameIdentifier());
@@ -233,6 +297,134 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertEquals(updatedTable2.namespace(), retrievedTable2.namespace());
     Assertions.assertEquals(updatedTable2.auditInfo(), retrievedTable2.auditInfo());
     compareTwoColumns(updatedTable2.columns(), retrievedTable2.columns());
+
+    long beforeDelete = System.currentTimeMillis() - 1;
+    Assertions.assertTrue(
+        TableMetaService.getInstance().deleteTable(updatedTable2.nameIdentifier()));
+    Assertions.assertTrue(
+        listEntityChanges(beforeDelete).stream()
+            .anyMatch(
+                record ->
+                    record.getMetalakeName().equals(metalakeName)
+                        && record.getEntityType().equals(Entity.EntityType.TABLE.name())
+                        && record
+                            .getFullName()
+                            .equals(
+                                NameIdentifierUtil.ofTable(
+                                        metalakeName, catalogName, newSchemaName, "table3")
+                                    .toString())
+                        && record.getOperateType() == OperateType.DROP));
+  }
+
+  @TestTemplate
+  public void testBatchGetTableByIdentifierIncludesVersionInfoFields() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+
+    Map<String, String> tableProps =
+        ImmutableMap.of(Table.PROPERTY_TABLE_FORMAT, "delta", "location", "s3://bucket/path");
+    Distribution distribution = Distributions.of(Strategy.HASH, 4, NamedReference.field("col1"));
+    SortOrder[] sortOrders =
+        new SortOrder[] {SortOrders.of(NamedReference.field("col1"), SortDirection.ASCENDING)};
+    Transform[] partitioning = new Transform[] {Transforms.identity("col2")};
+    Index[] indexes = new Index[] {Indexes.primary("pk", new String[][] {{"col1"}})};
+
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("delta_table")
+            .withNamespace(NamespaceUtil.ofTable(metalakeName, catalogName, schemaName))
+            .withProperties(tableProps)
+            .withComment("test table comment")
+            .withDistribution(distribution)
+            .withSortOrders(sortOrders)
+            .withPartitioning(partitioning)
+            .withIndexes(indexes)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+
+    NameIdentifier tableIdent =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, "delta_table");
+    List<TableEntity> results =
+        TableMetaService.getInstance().batchGetTableByIdentifier(List.of(tableIdent));
+
+    Assertions.assertEquals(1, results.size());
+    TableEntity result = results.get(0);
+
+    // Verify properties (including format) are returned
+    Assertions.assertNotNull(result.properties());
+    Assertions.assertEquals("delta", result.properties().get(Table.PROPERTY_TABLE_FORMAT));
+    Assertions.assertEquals("s3://bucket/path", result.properties().get("location"));
+
+    // Verify comment is returned
+    Assertions.assertEquals("test table comment", result.comment());
+
+    // Verify distribution is returned
+    Assertions.assertNotNull(result.distribution());
+    Assertions.assertEquals(distribution, result.distribution());
+
+    // Verify sort orders are returned
+    Assertions.assertNotNull(result.sortOrders());
+    Assertions.assertArrayEquals(sortOrders, result.sortOrders());
+
+    // Verify partitioning is returned — compare field references since serialization may change
+    // the concrete implementation class (e.g., IdentityTransform -> IdentityPartitioningDTO)
+    Assertions.assertNotNull(result.partitioning());
+    Assertions.assertEquals(partitioning.length, result.partitioning().length);
+    Assertions.assertEquals(
+        ((NamedReference.FieldReference) partitioning[0].references()[0]).fieldName()[0],
+        ((NamedReference.FieldReference) result.partitioning()[0].references()[0]).fieldName()[0]);
+
+    // Verify indexes are returned
+    Assertions.assertNotNull(result.indexes());
+    Assertions.assertArrayEquals(indexes, result.indexes());
+  }
+
+  @TestTemplate
+  public void testBatchGetTableByIdentifierDoesNotIncludeColumns() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("col1")
+            .withPosition(0)
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_with_columns")
+            .withNamespace(NamespaceUtil.ofTable(metalakeName, catalogName, schemaName))
+            .withColumns(List.of(column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+
+    // Verify getTableByIdentifier (single-get path) returns columns
+    TableEntity singleGetResult =
+        TableMetaService.getInstance()
+            .getTableByIdentifier(
+                NameIdentifier.of(metalakeName, catalogName, schemaName, "table_with_columns"));
+    Assertions.assertEquals(1, singleGetResult.columns().size());
+
+    // batchGetTableByIdentifier does not fetch columns (separate table_column_meta table)
+    NameIdentifier tableIdent =
+        NameIdentifier.of(metalakeName, catalogName, schemaName, "table_with_columns");
+    List<TableEntity> results =
+        TableMetaService.getInstance().batchGetTableByIdentifier(List.of(tableIdent));
+
+    Assertions.assertEquals(1, results.size());
+    Assertions.assertTrue(
+        results.get(0).columns().isEmpty(),
+        "batchGetTableByIdentifier does not fetch columns from table_column_meta");
   }
 
   private void compareTwoColumns(

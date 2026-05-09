@@ -20,6 +20,7 @@ package org.apache.gravitino.storage;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -33,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
@@ -59,7 +59,10 @@ public class TestSQLScripts extends TestJDBCBackend {
     Pattern upgradePattern =
         Pattern.compile("upgrade-([\\d.]+)-to-([\\d.]+)-" + backendType.toLowerCase() + "\\.sql");
     Pattern metricsPattern =
-        Pattern.compile("iceberg-metrics-schema-([\\d.]+)-" + backendType.toLowerCase() + "\\.sql");
+        Pattern.compile(
+            "(?:iceberg|optimizer)-metrics-schema-([\\d.]+)-"
+                + backendType.toLowerCase()
+                + "\\.sql");
 
     Map<String, List<File>> versionScrips = new HashMap<>();
     for (File scriptFile : scriptFiles) {
@@ -88,12 +91,7 @@ public class TestSQLScripts extends TestJDBCBackend {
     for (List<File> scripts : versionScrips.values()) {
       dropAllTables();
       for (File scriptFile : scripts) {
-        String sqlContent = FileUtils.readFileToString(scriptFile, "UTF-8");
-        List<String> ddls =
-            Arrays.stream(sqlContent.split(";"))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
+        List<String> ddls = extractStatements(scriptFile.toPath());
 
         try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
@@ -109,6 +107,21 @@ public class TestSQLScripts extends TestJDBCBackend {
         }
       }
     }
+  }
+
+  private List<String> extractStatements(Path sqlFile) throws IOException {
+    String executableSql =
+        Files.readAllLines(sqlFile).stream()
+            .map(String::trim)
+            .filter(line -> !line.isEmpty())
+            .filter(line -> !line.startsWith("--"))
+            .reduce((left, right) -> left + "\n" + right)
+            .orElse("");
+
+    return Arrays.stream(executableSql.split(";"))
+        .map(String::trim)
+        .filter(s -> !s.isEmpty())
+        .toList();
   }
 
   private void dropAllTables() throws SQLException {

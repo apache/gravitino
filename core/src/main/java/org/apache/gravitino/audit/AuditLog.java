@@ -45,6 +45,10 @@ import org.apache.gravitino.listener.api.event.CreateTableEvent;
 import org.apache.gravitino.listener.api.event.CreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetEvent;
@@ -57,6 +61,10 @@ import org.apache.gravitino.listener.api.event.DropTableEvent;
 import org.apache.gravitino.listener.api.event.DropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.DropTopicEvent;
 import org.apache.gravitino.listener.api.event.DropTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
@@ -201,6 +209,10 @@ public interface AuditLog {
 
     LIST_METALAKE,
 
+    ENABLE_METALAKE,
+
+    DISABLE_METALAKE,
+
     CREATE_CATALOG,
 
     LOAD_CATALOG,
@@ -210,6 +222,10 @@ public interface AuditLog {
     DROP_CATALOG,
 
     LIST_CATALOG,
+
+    ENABLE_CATALOG,
+
+    DISABLE_CATALOG,
 
     CREATE_SCHEMA,
 
@@ -221,6 +237,8 @@ public interface AuditLog {
 
     LIST_SCHEMA,
 
+    SCHEMA_EXISTS,
+
     CREATE_TABLE,
 
     ALTER_TABLE,
@@ -229,11 +247,25 @@ public interface AuditLog {
 
     LOAD_TABLE,
 
+    LOAD_TABLE_CREDENTIAL,
+
+    PLAN_TABLE_SCAN,
+
     PURGE_TABLE,
 
     LIST_TABLE,
 
+    RENAME_TABLE,
+
+    REGISTER_TABLE,
+
+    TABLE_EXISTS,
+
     PARTITION_EXIST,
+
+    ADD_PARTITION,
+
+    DROP_PARTITION,
 
     PURGE_PARTITION,
 
@@ -263,6 +295,182 @@ public interface AuditLog {
 
     LIST_FILESET,
 
+    LIST_FILESET_FILES,
+
+    CREATE_TAG,
+
+    GET_TAG,
+
+    GET_TAG_FOR_METADATA_OBJECT,
+
+    DELETE_TAG,
+
+    ALTER_TAG,
+
+    LIST_TAG,
+
+    ASSOCIATE_TAGS_FOR_METADATA_OBJECT,
+
+    LIST_TAGS_FOR_METADATA_OBJECT,
+
+    LIST_TAGS_INFO_FOR_METADATA_OBJECT,
+
+    LIST_METADATA_OBJECTS_FOR_TAG,
+
+    LIST_TAGS_INFO,
+
+    CREATE_VIEW,
+
+    ALTER_VIEW,
+
+    DROP_VIEW,
+
+    LOAD_VIEW,
+
+    VIEW_EXISTS,
+
+    RENAME_VIEW,
+
+    LIST_VIEW,
+
+    REGISTER_MODEL,
+
+    DELETE_MODEL,
+
+    GET_MODEL,
+
+    LIST_MODEL,
+
+    ALTER_MODEL,
+
+    LINK_MODEL_VERSION,
+
+    DELETE_MODEL_VERSION,
+
+    GET_MODEL_VERSION,
+
+    GET_MODEL_VERSION_URI,
+
+    LIST_MODEL_VERSIONS,
+
+    LIST_MODEL_VERSION_INFOS,
+
+    REGISTER_AND_LINK_MODEL_VERSION,
+
+    ALTER_MODEL_VERSION,
+
+    ADD_USER,
+
+    REMOVE_USER,
+
+    GET_USER,
+
+    LIST_USERS,
+
+    LIST_USER_NAMES,
+
+    GRANT_USER_ROLES,
+
+    REVOKE_USER_ROLES,
+
+    ADD_GROUP,
+
+    REMOVE_GROUP,
+
+    GET_GROUP,
+
+    LIST_GROUPS,
+
+    LIST_GROUP_NAMES,
+
+    GRANT_GROUP_ROLES,
+
+    REVOKE_GROUP_ROLES,
+
+    CREATE_ROLE,
+
+    DELETE_ROLE,
+
+    GET_ROLE,
+
+    LIST_ROLE_NAMES,
+
+    GRANT_PRIVILEGES,
+
+    REVOKE_PRIVILEGES,
+
+    OVERRIDE_PRIVILEGES,
+
+    GET_OWNER,
+
+    SET_OWNER,
+
+    LIST_JOB_TEMPLATES,
+
+    REGISTER_JOB_TEMPLATE,
+
+    GET_JOB_TEMPLATE,
+
+    ALTER_JOB_TEMPLATE,
+
+    DELETE_JOB_TEMPLATE,
+
+    LIST_JOBS,
+
+    RUN_JOB,
+
+    GET_JOB,
+
+    CANCEL_JOB,
+
+    LIST_STATISTICS,
+
+    LIST_PARTITION_STATISTICS,
+
+    DROP_STATISTICS,
+
+    DROP_PARTITION_STATISTICS,
+
+    UPDATE_STATISTICS,
+
+    UPDATE_PARTITION_STATISTICS,
+
+    CREATE_POLICY,
+
+    GET_POLICY,
+
+    ALTER_POLICY,
+
+    DELETE_POLICY,
+
+    ENABLE_POLICY,
+
+    DISABLE_POLICY,
+
+    LIST_POLICY,
+
+    LIST_POLICY_INFO,
+
+    LIST_METADATA_OBJECTS_FOR_POLICY,
+
+    LIST_POLICY_INFOS_FOR_METADATA_OBJECT,
+
+    ASSOCIATE_POLICIES_FOR_METADATA_OBJECT,
+
+    GET_POLICY_FOR_METADATA_OBJECT,
+
+    REGISTER_FUNCTION,
+
+    GET_FUNCTION,
+
+    ALTER_FUNCTION,
+
+    DROP_FUNCTION,
+
+    LIST_FUNCTION,
+
+    LIST_FUNCTION_INFOS,
+
     UNKNOWN_OPERATION;
 
     public static Operation fromEvent(Event event) {
@@ -277,6 +485,12 @@ public interface AuditLog {
         return LOAD_METALAKE;
       } else if (event instanceof ListMetalakeEvent || event instanceof ListMetalakeFailureEvent) {
         return LIST_METALAKE;
+      } else if (event instanceof EnableMetalakeEvent
+          || event instanceof EnableMetalakeFailureEvent) {
+        return ENABLE_METALAKE;
+      } else if (event instanceof DisableMetalakeEvent
+          || event instanceof DisableMetalakeFailureEvent) {
+        return DISABLE_METALAKE;
       } else if (event instanceof CreateCatalogEvent
           || event instanceof CreateCatalogFailureEvent) {
         return CREATE_CATALOG;
@@ -288,6 +502,12 @@ public interface AuditLog {
         return LOAD_CATALOG;
       } else if (event instanceof ListCatalogEvent || event instanceof ListCatalogFailureEvent) {
         return LIST_CATALOG;
+      } else if (event instanceof EnableCatalogEvent
+          || event instanceof EnableCatalogFailureEvent) {
+        return ENABLE_CATALOG;
+      } else if (event instanceof DisableCatalogEvent
+          || event instanceof DisableCatalogFailureEvent) {
+        return DISABLE_CATALOG;
       } else if (event instanceof CreateSchemaEvent || event instanceof CreateSchemaFailureEvent) {
         return CREATE_SCHEMA;
       } else if (event instanceof AlterSchemaEvent || event instanceof AlterSchemaFailureEvent) {

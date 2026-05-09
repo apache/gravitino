@@ -410,10 +410,18 @@ public class TagMetaService {
   }
 
   public Long getTagIdByTagName(Long metalakeId, String tagName) {
-    return SessionUtils.getWithoutCommit(
+    TagPO tagPO =
+        SessionUtils.getWithoutCommit(
             TagMetaMapper.class,
-            mapper -> mapper.selectTagMetaByMetalakeIdAndName(metalakeId, tagName))
-        .getTagId();
+            mapper -> mapper.selectTagMetaByMetalakeIdAndName(metalakeId, tagName));
+
+    if (tagPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.TAG.name().toLowerCase(),
+          tagName);
+    }
+    return tagPO.getTagId();
   }
 
   private List<TagPO> getTagPOsByMetalakeAndNames(String metalakeName, List<String> tagNames) {

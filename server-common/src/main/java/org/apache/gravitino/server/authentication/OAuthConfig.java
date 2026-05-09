@@ -138,6 +138,15 @@ public interface OAuthConfig {
           .toSequence()
           .createWithDefault(java.util.Arrays.asList("sub"));
 
+  ConfigEntry<List<String>> GROUPS_FIELDS =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "groupsFields")
+          .doc(
+              "JWT claim field(s) to use as groups. Comma-separated list for fallback in order (e.g., 'groups,roles').")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .toSequence()
+          .createWithDefault(java.util.Arrays.asList("groups"));
+
   ConfigEntry<String> TOKEN_VALIDATOR_CLASS =
       new ConfigBuilder(OAUTH_CONFIG_PREFIX + "tokenValidatorClass")
           .doc("Fully qualified class name of the OAuth token validator implementation")
@@ -164,6 +173,28 @@ public interface OAuthConfig {
                   + "The pattern should contain at least one capturing group. "
                   + "Default pattern '^(.*)$' matches the entire principal.")
           .version(ConfigConstants.VERSION_1_2_0)
+          .stringConf()
+          .createWithDefault("^(.*)$");
+
+  ConfigEntry<String> GROUP_MAPPER =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "groupMapper")
+          .doc(
+              "Type of group mapper to use for OAuth/JWT groups. "
+                  + "Built-in value: 'regex' (uses regex pattern to extract group). "
+                  + "Default pattern '^(.*)$' keeps the group unchanged. "
+                  + "Can also be a fully qualified class name implementing GroupMapper for custom logic.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .createWithDefault("regex");
+
+  ConfigEntry<String> GROUP_MAPPER_REGEX_PATTERN =
+      new ConfigBuilder(OAUTH_CONFIG_PREFIX + "groupMapper.regex.pattern")
+          .doc(
+              "Regex pattern to extract the group from the OAuth group field. "
+                  + "Only used when groupMapper is 'regex'. "
+                  + "The pattern should contain at least one capturing group. "
+                  + "Default pattern '^(.*)$' matches the entire group.")
+          .version(ConfigConstants.VERSION_1_3_0)
           .stringConf()
           .createWithDefault("^(.*)$");
 }

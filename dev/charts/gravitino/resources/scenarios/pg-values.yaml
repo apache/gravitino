@@ -21,6 +21,5 @@ postgresql:
 
 initScript: |
   cp /tmp/conf/* ${GRAVITINO_HOME}/conf
-  wget https://jdbc.postgresql.org/download/postgresql-42.7.0.jar -O /root/gravitino/libs/postgresql-42.7.0.jar
   echo "Start the Gravitino Server"
-  /bin/bash ${GRAVITINO_HOME}/bin/gravitino.sh run
+  /bin/bash ${GRAVITINO_HOME}/bin/start-gravitino.sh

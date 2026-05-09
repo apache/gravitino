@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.clickhouse.operations;
 
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -45,17 +46,7 @@ public class ClickHouseCatalogOperations extends JdbcCatalogOperations {
   }
 
   @Override
-  public void close() {
-    super.close();
-
-    // deregister ClickHouse JDBC driver to prevent memory leak in long-running applications
-    try {
-      Driver clickhouseDriver =
-          DriverManager.getDriver("jdbc:clickhouse://dummy_address:8443/default");
-      deregisterDriver(clickhouseDriver);
-    } catch (java.sql.SQLException e) {
-      // log and ignore
-      System.err.println("Failed to deregister ClickHouse JDBC driver: " + e.getMessage());
-    }
+  protected Driver getDriver() throws SQLException {
+    return DriverManager.getDriver("jdbc:clickhouse://dummy_address:8443/default");
   }
 }

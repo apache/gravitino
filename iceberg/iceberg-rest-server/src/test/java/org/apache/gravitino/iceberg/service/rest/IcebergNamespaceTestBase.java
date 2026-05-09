@@ -52,10 +52,22 @@ public class IcebergNamespaceTestBase extends IcebergTestBase {
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
-  private Response doRegisterTable(String tableName, Namespace ns) {
+  protected Response doRegisterTable(String tableName, Namespace ns) {
     RegisterTableRequest request =
         ImmutableRegisterTableRequest.builder().name(tableName).metadataLocation("mock").build();
     return getNamespaceClientBuilder(Optional.of(ns), Optional.of("register"), Optional.empty())
+        .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  protected Response doRegisterTableWithCredentialVending(
+      String tableName, Namespace ns, String metadataLocation) {
+    RegisterTableRequest request =
+        ImmutableRegisterTableRequest.builder()
+            .name(tableName)
+            .metadataLocation(metadataLocation)
+            .build();
+    return getNamespaceClientBuilder(Optional.of(ns), Optional.of("register"), Optional.empty())
+        .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 

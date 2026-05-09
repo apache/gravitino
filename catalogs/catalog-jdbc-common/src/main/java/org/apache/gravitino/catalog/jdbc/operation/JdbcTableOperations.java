@@ -488,9 +488,9 @@ public abstract class JdbcTableOperations implements TableOperation {
                 .collect(Collectors.toList());
         String[][] colStrArrays = convertIndexFieldNames(colNames);
         if (entry.getKey() == Index.IndexType.PRIMARY_KEY) {
-          indexes.add(Indexes.primary(indexEntry.getKey(), colStrArrays));
+          indexes.add(Indexes.primary(indexEntry.getKey(), colStrArrays, Map.of()));
         } else {
-          indexes.add(Indexes.unique(indexEntry.getKey(), colStrArrays));
+          indexes.add(Indexes.unique(indexEntry.getKey(), colStrArrays, Map.of()));
         }
       }
     }

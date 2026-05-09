@@ -64,6 +64,31 @@ public class Privileges {
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.VIEW);
 
+  private static final Set<MetadataObject.Type> FUNCTION_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.FUNCTION);
+
+  /**
+   * Object types that {@link ManageGrants} can be bound to.
+   *
+   * <p>Binding at a parent level implicitly covers all children — for example, a grant on a SCHEMA
+   * lets the holder manage privileges on every TABLE, VIEW, TOPIC, FILESET, and MODEL inside it.
+   */
+  private static final Set<MetadataObject.Type> MANAGE_GRANTS_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW,
+          MetadataObject.Type.TOPIC,
+          MetadataObject.Type.FILESET,
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.FUNCTION);
+
   /**
    * Returns the Privilege with allow condition from the string representation.
    *
@@ -172,6 +197,14 @@ public class Privileges {
         return CreateView.allow();
       case SELECT_VIEW:
         return SelectView.allow();
+
+        // Function
+      case REGISTER_FUNCTION:
+        return RegisterFunction.allow();
+      case EXECUTE_FUNCTION:
+        return ExecuteFunction.allow();
+      case MODIFY_FUNCTION:
+        return ModifyFunction.allow();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -286,6 +319,14 @@ public class Privileges {
         return CreateView.deny();
       case SELECT_VIEW:
         return SelectView.deny();
+
+        // Function
+      case REGISTER_FUNCTION:
+        return RegisterFunction.deny();
+      case EXECUTE_FUNCTION:
+        return ExecuteFunction.deny();
+      case MODIFY_FUNCTION:
+        return ModifyFunction.deny();
 
       default:
         throw new IllegalArgumentException("Doesn't support the privilege: " + name);
@@ -836,7 +877,14 @@ public class Privileges {
     }
   }
 
-  /** The privilege to grant or revoke a role for the user or the group. */
+  /**
+   * The privilege to grant or revoke privileges on securable objects. If bound on the metalake, we
+   * can grant or revoke the role for users or groups.
+   *
+   * <p>Unlike most privileges, this can be bound at any level of the object hierarchy — METALAKE,
+   * CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, or MODEL. A grant at a parent level implicitly
+   * covers all descendants within it.
+   */
   public static class ManageGrants extends GenericPrivilege<ManageGrants> {
     private static final ManageGrants ALLOW_INSTANCE =
         new ManageGrants(Condition.ALLOW, Name.MANAGE_GRANTS);
@@ -863,7 +911,7 @@ public class Privileges {
 
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
-      return type == MetadataObject.Type.METALAKE;
+      return MANAGE_GRANTS_SUPPORTED_TYPES.contains(type);
     }
   }
 
@@ -1317,6 +1365,99 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return VIEW_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to register a function. */
+  public static class RegisterFunction extends GenericPrivilege<RegisterFunction> {
+    private static final RegisterFunction ALLOW_INSTANCE =
+        new RegisterFunction(Condition.ALLOW, Name.REGISTER_FUNCTION);
+    private static final RegisterFunction DENY_INSTANCE =
+        new RegisterFunction(Condition.DENY, Name.REGISTER_FUNCTION);
+
+    private RegisterFunction(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static RegisterFunction allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static RegisterFunction deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return SCHEMA_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to execute (invoke) a function and view its metadata. */
+  public static class ExecuteFunction extends GenericPrivilege<ExecuteFunction> {
+    private static final ExecuteFunction ALLOW_INSTANCE =
+        new ExecuteFunction(Condition.ALLOW, Name.EXECUTE_FUNCTION);
+    private static final ExecuteFunction DENY_INSTANCE =
+        new ExecuteFunction(Condition.DENY, Name.EXECUTE_FUNCTION);
+
+    private ExecuteFunction(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ExecuteFunction allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ExecuteFunction deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return FUNCTION_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to alter a function's metadata. */
+  public static class ModifyFunction extends GenericPrivilege<ModifyFunction> {
+    private static final ModifyFunction ALLOW_INSTANCE =
+        new ModifyFunction(Condition.ALLOW, Name.MODIFY_FUNCTION);
+    private static final ModifyFunction DENY_INSTANCE =
+        new ModifyFunction(Condition.DENY, Name.MODIFY_FUNCTION);
+
+    private ModifyFunction(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ModifyFunction allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ModifyFunction deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return FUNCTION_SUPPORTED_TYPES.contains(type);
     }
   }
 }

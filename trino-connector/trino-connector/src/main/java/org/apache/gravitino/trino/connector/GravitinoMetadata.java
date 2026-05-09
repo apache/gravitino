@@ -23,16 +23,19 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.connector.AggregationApplicationResult;
 import io.trino.spi.connector.Assignment;
+import io.trino.spi.connector.BeginTableExecuteResult;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorPartitioningHandle;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorTableExecuteHandle;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableLayout;
 import io.trino.spi.connector.ConnectorTableMetadata;
@@ -53,21 +56,35 @@ import io.trino.spi.connector.SystemTable;
 import io.trino.spi.connector.TopNApplicationResult;
 import io.trino.spi.expression.ConnectorExpression;
 import io.trino.spi.expression.Constant;
+import io.trino.spi.function.LanguageFunction;
+import io.trino.spi.function.SchemaFunctionName;
 import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.statistics.ColumnStatistics;
 import io.trino.spi.statistics.TableStatistics;
 import io.trino.spi.type.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.exceptions.NoSuchFunctionException;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.SQLImpl;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The GravitinoMetadata class provides operations for Apache Gravitino metadata on the Gravitino
@@ -75,6 +92,8 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
  * Additionally, it wraps the internal connector metadata for accessing data.
  */
 public abstract class GravitinoMetadata implements ConnectorMetadata {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoMetadata.class);
 
   // The column handle name that will generate row IDs for the merge operation.
   public static final String MERGE_ROW_ID = "$row_id";
@@ -313,7 +332,6 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       ColumnHandle column,
       Optional<String> comment) {
     String columnName = getColumnName(column);
-
     String commentString = "";
     if (comment.isPresent() && !StringUtils.isBlank(comment.get())) {
       commentString = comment.get();
@@ -660,6 +678,49 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
                     : new ConnectorTableLayout(result.getPartitionColumns()));
   }
 
+  @Override
+  public Optional<ConnectorTableLayout> getLayoutForTableExecute(
+      ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
+    return internalMetadata
+        .getLayoutForTableExecute(session, GravitinoHandle.unWrap(tableExecuteHandle))
+        .map(
+            result ->
+                result.getPartitioning().isPresent()
+                    ? new ConnectorTableLayout(
+                        new GravitinoPartitioningHandle(result.getPartitioning().get()),
+                        result.getPartitionColumns(),
+                        result.supportsMultipleWritersPerPartition())
+                    : new ConnectorTableLayout(result.getPartitionColumns()));
+  }
+
+  @Override
+  public BeginTableExecuteResult<ConnectorTableExecuteHandle, ConnectorTableHandle>
+      beginTableExecute(
+          ConnectorSession session,
+          ConnectorTableExecuteHandle tableExecuteHandle,
+          ConnectorTableHandle updatedSourceTableHandle) {
+    BeginTableExecuteResult<ConnectorTableExecuteHandle, ConnectorTableHandle> result =
+        internalMetadata.beginTableExecute(
+            session,
+            GravitinoHandle.unWrap(tableExecuteHandle),
+            GravitinoHandle.unWrap(updatedSourceTableHandle));
+    SchemaTableName tableName = getTableName(updatedSourceTableHandle);
+    return new BeginTableExecuteResult<>(
+        new GravitinoTableExecuteHandle(result.getTableExecuteHandle()),
+        new GravitinoTableHandle(
+            tableName.getSchemaName(), tableName.getTableName(), result.getSourceHandle()));
+  }
+
+  @Override
+  public void finishTableExecute(
+      ConnectorSession session,
+      ConnectorTableExecuteHandle tableExecuteHandle,
+      Collection<Slice> fragments,
+      List<Object> tableExecuteState) {
+    internalMetadata.finishTableExecute(
+        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
+  }
+
   protected SchemaTableName getTableName(ConnectorTableHandle tableHandle) {
     return ((GravitinoTableHandle) tableHandle).toSchemaTableName();
   }
@@ -678,5 +739,83 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
           String.format("Column %s does not exist in the internal connector", columnHandle));
     }
     return internalMetadataColumnMetadata.getName();
+  }
+
+  @Override
+  public Collection<LanguageFunction> listLanguageFunctions(
+      ConnectorSession session, String schemaName) {
+    if (!catalogConnectorMetadata.supportsFunctions()) {
+      return List.of();
+    }
+    return Arrays.stream(catalogConnectorMetadata.listFunctionInfos(schemaName))
+        .flatMap(function -> toLanguageFunctions(function).stream())
+        .toList();
+  }
+
+  @Override
+  public Collection<LanguageFunction> getLanguageFunctions(
+      ConnectorSession session, SchemaFunctionName name) {
+    if (!catalogConnectorMetadata.supportsFunctions()) {
+      return List.of();
+    }
+    try {
+      Function function =
+          catalogConnectorMetadata.getFunction(name.getSchemaName(), name.getFunctionName());
+      if (function == null) {
+        return List.of();
+      }
+      return toLanguageFunctions(function);
+    } catch (NoSuchFunctionException e) {
+      LOG.debug("Function {} not found in schema {}", name.getFunctionName(), name.getSchemaName());
+      return List.of();
+    }
+  }
+
+  /**
+   * Converts a Gravitino function to a collection of Trino LanguageFunction instances. Only SQL
+   * implementations with TRINO runtime are included. Each definition with a Trino SQL
+   * implementation produces one LanguageFunction. The signature token is generated from the
+   * function name and parameter types.
+   */
+  private Collection<LanguageFunction> toLanguageFunctions(Function function) {
+    List<LanguageFunction> result = new ArrayList<>();
+    for (FunctionDefinition definition : function.definitions()) {
+      for (FunctionImpl impl : definition.impls()) {
+        if (!isTrinoSqlImplementation(impl)) {
+          continue;
+        }
+        String sql = ((SQLImpl) impl).sql();
+        try {
+          String signatureToken = buildSignatureToken(function.name(), definition.parameters());
+          result.add(new LanguageFunction(signatureToken, sql, List.of(), Optional.empty()));
+        } catch (TrinoException e) {
+          LOG.warn("Failed to build signature token for function {}", function.name(), e);
+        }
+      }
+    }
+    return result;
+  }
+
+  private boolean isTrinoSqlImplementation(FunctionImpl impl) {
+    return FunctionImpl.RuntimeType.TRINO.equals(impl.runtime())
+        && FunctionImpl.Language.SQL.equals(impl.language());
+  }
+
+  /**
+   * Builds a signature token from function name and parameters. The token uses Trino type names
+   * (e.g., varchar instead of string) and is lowercase as required by Trino's LanguageFunction.
+   */
+  private String buildSignatureToken(String functionName, FunctionParam[] params) {
+    StringBuilder sb = new StringBuilder(functionName.toLowerCase(Locale.ENGLISH));
+    sb.append("(");
+    for (int i = 0; i < params.length; i++) {
+      if (i > 0) {
+        sb.append(",");
+      }
+      Type trinoType = metadataAdapter.getDataTypeTransformer().getTrinoType(params[i].dataType());
+      sb.append(trinoType.getDisplayName().toLowerCase(Locale.ENGLISH));
+    }
+    sb.append(")");
+    return sb.toString();
   }
 }

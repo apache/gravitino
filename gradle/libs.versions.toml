@@ -28,28 +28,30 @@ guava = "32.1.3-jre"
 lombok = "1.18.20"
 slf4j = "2.0.16"
 log4j = "2.24.3"
-lance = "0.39.0"
-lance-namespace = "0.0.20"
+lance = "2.0.1"
+lance-namespace = "0.4.5"
 delta-kernel = "3.3.0"
-jetty = "9.4.51.v20230217"
+jetty = "9.4.58.v20250814"
 jersey = "2.41"
 mockito = "4.11.0"
 airlift-json = "237"
 airlift-resolver = "1.6"
 hive2 = "2.3.9"
 hive3 = "3.1.3"
-hadoop2 = "2.10.2"
-hadoop3 = "3.3.1"
+hadoop3 = "3.3.6"
 hadoop3-gcs = "1.9.4-hadoop3"
-hadoop3-abs = "3.3.1"
-hadoop3-aliyun = "3.3.1"
-hadoop-minikdc = "3.3.1"
+hadoop3-abs = "3.3.6"
+hadoop3-aliyun = "3.3.6"
+hadoop3-thirdparty = "1.1.1"
+hadoop-minikdc = "3.3.6"
+re2j = "1.7"
 htrace-core4 = "4.1.0-incubating"
 httpclient = "4.4.1"
 httpclient5 = "5.4.4"
 httpcore5 = "5.3.4"
 micrometer-core = "1.12.2"
 mockserver = "5.15.0"
+commons-configuration2 = "2.8.0"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
 commons-lang = "2.6"
@@ -65,7 +67,7 @@ iceberg4connector = "1.6.1" # used for compile connectors like Spark, Flink, etc
 paimon = '1.2.0'
 spark33 = "3.3.4"
 spark34 = "3.4.3"
-spark35 = "3.5.1"
+spark35 = "3.5.3"
 kyuubi4spark = "1.11.0"
 kyuubi4authz = "1.10.2"
 trino = '435'
@@ -74,7 +76,7 @@ scala-java-compat = "1.0.2"
 sqlite-jdbc = "3.42.0.0"
 testcontainers = "1.21.4"
 jwt = "0.11.1"
-nimbus-jose-jwt = "9.37.3"
+nimbus-jose-jwt = "10.9"
 jline = "3.21.0"
 okhttp3 = "4.11.0"
 opencsv = "2.3"
@@ -93,6 +95,7 @@ kafka = "3.4.0"
 curator = "2.12.0"
 awaitility = "4.2.1"
 servlet = "3.1.0"
+bouncycastle = "1.84"
 jodd = "3.5.2"
 flink = "1.18.0"
 flinkjdbc = "3.2.0-1.18"
@@ -141,6 +144,7 @@ ql-expression = "4.0.3"
 
 [libraries]
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
+aws-glue = { group = "software.amazon.awssdk", name = "glue", version.ref = "awssdk" }
 aws-iam = { group = "software.amazon.awssdk", name = "iam", version.ref = "awssdk" }
 aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", version.ref = "awssdk" }
 aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awssdk" }
@@ -171,8 +175,8 @@ log4j-api = { group = "org.apache.logging.log4j", name = "log4j-api", version.re
 log4j-core = { group = "org.apache.logging.log4j", name = "log4j-core", version.ref = "log4j" }
 log4j-12-api = { group = "org.apache.logging.log4j", name = "log4j-1.2-api", version.ref = "log4j" }
 log4j-layout-template-json = { group = "org.apache.logging.log4j", name = "log4j-layout-template-json", version.ref = "log4j" }
-lance = { group = "com.lancedb", name = "lance-core", version.ref = "lance" }
-lance-namespace-core = { group = "com.lancedb", name = "lance-namespace-core", version.ref = "lance-namespace" }
+lance = { group = "org.lance", name = "lance-core", version.ref = "lance" }
+lance-namespace-core = { group = "org.lance", name = "lance-namespace-core", version.ref = "lance-namespace" }
 delta-kernel = { group = "io.delta", name = "delta-kernel-api", version.ref = "delta-kernel" }
 delta-kernel-defaults = { group = "io.delta", name = "delta-kernel-defaults", version.ref = "delta-kernel" }
 jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }
@@ -190,28 +194,29 @@ jersey-test-framework-provider-jetty = { group = "org.glassfish.jersey.test-fram
 jodd-core = { group = "org.jodd", name = "jodd-core", version.ref = "jodd" }
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
 mockito-inline = { group = "org.mockito", name = "mockito-inline", version.ref = "mockito" }
+bcprov-jdk18on = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
 hive2-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive2"}
 hive2-exec = { group = "org.apache.hive", name = "hive-exec", version.ref = "hive2"}
 hive2-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive2"}
 hive2-jdbc = { group = "org.apache.hive", name = "hive-jdbc", version.ref = "hive2"}
 hive3-metastore = { group = "org.apache.hive", name = "hive-metastore", version.ref = "hive3"}
 hive3-common = { group = "org.apache.hive", name = "hive-common", version.ref = "hive3"}
-hadoop2-auth = { group = "org.apache.hadoop", name = "hadoop-auth", version.ref = "hadoop2" }
-hadoop2-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop2" }
-hadoop2-hdfs-client = { group = "org.apache.hadoop", name = "hadoop-hdfs-client", version.ref = "hadoop2" }
-hadoop2-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop2"}
-hadoop2-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop2"}
-hadoop2-aws = { group = "org.apache.hadoop", name = "hadoop-aws", version.ref = "hadoop2"}
 hadoop3-aws = { group = "org.apache.hadoop", name = "hadoop-aws", version.ref = "hadoop3"}
+hadoop3-auth = { group = "org.apache.hadoop", name = "hadoop-auth", version.ref = "hadoop3" }
 hadoop3-hdfs = { group = "org.apache.hadoop", name = "hadoop-hdfs", version.ref = "hadoop3" }
+hadoop3-hdfs-client = { group = "org.apache.hadoop", name = "hadoop-hdfs-client", version.ref = "hadoop3" }
 hadoop3-common = { group = "org.apache.hadoop", name = "hadoop-common", version.ref = "hadoop3"}
 hadoop3-client = { group = "org.apache.hadoop", name = "hadoop-client", version.ref = "hadoop3"}
 hadoop3-client-api = { group = "org.apache.hadoop", name = "hadoop-client-api", version.ref = "hadoop3"}
 hadoop3-client-runtime = { group = "org.apache.hadoop", name = "hadoop-client-runtime", version.ref = "hadoop3"}
+hadoop3-mapreduce-client-core = { group = "org.apache.hadoop", name = "hadoop-mapreduce-client-core", version.ref = "hadoop3"}
 hadoop3-minicluster = { group = "org.apache.hadoop", name = "hadoop-minicluster", version.ref = "hadoop-minikdc"}
 hadoop3-gcs = { group = "com.google.cloud.bigdataoss", name = "gcs-connector", version.ref = "hadoop3-gcs"}
 hadoop3-oss = { group = "org.apache.hadoop", name = "hadoop-aliyun", version.ref = "hadoop3-aliyun"}
 hadoop3-abs = { group = "org.apache.hadoop", name = "hadoop-azure", version.ref = "hadoop3-abs"}
+hadoop3-shaded-guava = { group = "org.apache.hadoop.thirdparty", name = "hadoop-shaded-guava", version.ref = "hadoop3-thirdparty" }
+hadoop3-shaded-protobuf = { group = "org.apache.hadoop.thirdparty", name = "hadoop-shaded-protobuf_3_7", version.ref = "hadoop3-thirdparty" }
+re2j = { group = "com.google.re2j", name = "re2j", version.ref = "re2j" }
 htrace-core4 = { group = "org.apache.htrace", name = "htrace-core4", version.ref = "htrace-core4" }
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
@@ -231,6 +236,7 @@ caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }
+commons-configuration2 = { group = "org.apache.commons", name = "commons-configuration2", version.ref = "commons-configuration2" }
 iceberg-aliyun = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg" }
 iceberg-aws = { group = "org.apache.iceberg", name = "iceberg-aws", version.ref = "iceberg" }
 iceberg-aws-bundle = { group = "org.apache.iceberg", name = "iceberg-aws-bundle", version.ref = "iceberg" }

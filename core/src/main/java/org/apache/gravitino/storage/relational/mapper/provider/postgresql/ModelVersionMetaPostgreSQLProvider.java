@@ -92,7 +92,7 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
     return "DELETE FROM "
         + ModelVersionMetaMapper.TABLE_NAME
         + " WHERE id IN (SELECT id FROM "
-        + ModelMetaMapper.TABLE_NAME
+        + ModelVersionMetaMapper.TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 

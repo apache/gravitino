@@ -19,23 +19,11 @@
 
 package org.apache.gravitino.maintenance.optimizer.recommender.util;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.maintenance.optimizer.api.common.PartitionEntry;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
-import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.common.util.PartitionPathSerdeUtils;
 
 /** Helpers for converting between Gravitino partition names and {@link PartitionPath}. */
 public class PartitionUtils {
-  private static final TypeReference<List<Map<String, String>>> PARTITION_PATH_TYPE =
-      new TypeReference<List<Map<String, String>>>() {};
-
   private PartitionUtils() {}
 
   /**
@@ -48,26 +36,7 @@ public class PartitionUtils {
    * @return encoded JSON string
    */
   public static String encodePartitionPath(PartitionPath partitionPath) {
-    Preconditions.checkArgument(partitionPath != null, "partitionPath must not be null");
-    List<PartitionEntry> entries = partitionPath.entries();
-    Preconditions.checkArgument(entries != null && !entries.isEmpty(), "partitionPath is empty");
-
-    List<Map<String, String>> encoded = new ArrayList<>(entries.size());
-    for (PartitionEntry entry : entries) {
-      String name = entry.partitionName();
-      String value = entry.partitionValue();
-      Preconditions.checkArgument(StringUtils.isNotBlank(name), "partitionName cannot be blank");
-      Preconditions.checkArgument(StringUtils.isNotBlank(value), "partitionValue cannot be blank");
-      Map<String, String> item = new LinkedHashMap<>(1);
-      item.put(name, value);
-      encoded.add(item);
-    }
-
-    try {
-      return JsonUtils.objectMapper().writeValueAsString(encoded);
-    } catch (Exception e) {
-      throw new IllegalArgumentException("Failed to encode partition path", e);
-    }
+    return PartitionPathSerdeUtils.encode(partitionPath);
   }
 
   /**
@@ -79,28 +48,6 @@ public class PartitionUtils {
    * @return parsed partition path
    */
   public static PartitionPath decodePartitionPath(String encodedPartitionPath) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(encodedPartitionPath), "encodedPartitionPath must not be blank");
-    List<Map<String, String>> decoded;
-    try {
-      decoded = JsonUtils.objectMapper().readValue(encodedPartitionPath, PARTITION_PATH_TYPE);
-    } catch (Exception e) {
-      throw new IllegalArgumentException("Failed to decode partition path", e);
-    }
-    Preconditions.checkArgument(decoded != null && !decoded.isEmpty(), "partitionPath is empty");
-
-    List<PartitionEntry> entries = new ArrayList<>(decoded.size());
-    for (Map<String, String> item : decoded) {
-      Preconditions.checkArgument(
-          item != null && item.size() == 1, "partition entry must contain one key/value pair");
-      Map.Entry<String, String> kv = item.entrySet().iterator().next();
-      String name = kv.getKey();
-      String value = kv.getValue();
-      Preconditions.checkArgument(StringUtils.isNotBlank(name), "partitionName cannot be blank");
-      Preconditions.checkArgument(StringUtils.isNotBlank(value), "partitionValue cannot be blank");
-      entries.add(new PartitionEntryImpl(name, value));
-    }
-
-    return PartitionPath.of(entries);
+    return PartitionPathSerdeUtils.decode(encodedPartitionPath);
   }
 }

@@ -81,6 +81,8 @@ const renderIcon = catalog => {
         return <Icons.paimon className='size-8'></Icons.paimon>
       case 'custom-icons-hudi':
         return <Icons.hudi className='size-8'></Icons.hudi>
+      case 'custom-icons-hologres':
+        return <Icons.hologres className='size-8'></Icons.hologres>
       case 'custom-icons-oceanbase':
         return <Icons.oceanbase className='size-8'></Icons.oceanbase>
       case 'custom-icons-starrocks':
@@ -502,6 +504,7 @@ export default function CatalogDetailsPage() {
               locationProviders={store.activatedDetails?.properties?.['filesystem-providers']?.split(',') || []}
               catalogBackend={store.activatedDetails?.properties?.['catalog-backend']}
               editSchema={editSchema}
+              init={false}
             />
           )}
         </>
@@ -520,6 +523,7 @@ export default function CatalogDetailsPage() {
           editCatalog={catalog}
           catalogType={catalogType}
           systemConfig={systemConfig}
+          init={true}
         />
       )}
       {openOwner && (

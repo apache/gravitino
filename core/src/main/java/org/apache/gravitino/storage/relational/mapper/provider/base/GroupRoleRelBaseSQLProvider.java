@@ -88,16 +88,24 @@ public class GroupRoleRelBaseSQLProvider {
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE group_id = #{groupId} AND role_id in ("
+        + " WHERE group_id = #{groupId} "
+        + "<choose>"
+        + "<when test='roleIds != null and roleIds.size() > 0'>"
+        + "AND role_id IN ("
         + "<foreach collection='roleIds' item='roleId' separator=','>"
         + "#{roleId}"
         + "</foreach>"
         + ") "
+        + "</when>"
+        + "<otherwise>"
+        + "AND 1 = 0 "
+        + "</otherwise>"
+        + "</choose>"
         + "AND deleted_at = 0"
         + "</script>";
   }
 
-  public String softDeleteGroupRoleRelByMetalakeId(Long metalakeId) {
+  public String softDeleteGroupRoleRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
@@ -108,7 +116,7 @@ public class GroupRoleRelBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteGroupRoleRelByRoleId(Long roleId) {
+  public String softDeleteGroupRoleRelByRoleId(@Param("roleId") Long roleId) {
     return "UPDATE "
         + GROUP_ROLE_RELATION_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"

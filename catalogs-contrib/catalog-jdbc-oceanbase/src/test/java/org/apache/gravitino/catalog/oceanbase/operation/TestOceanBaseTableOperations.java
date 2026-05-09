@@ -906,7 +906,9 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     };
 
     final Index[] primaryIndex =
-        new Index[] {Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}})};
+        new Index[] {
+          Indexes.createMysqlPrimaryKey(new String[][] {{"col_1"}, {"col_4"}}, Map.of())
+        };
     exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,

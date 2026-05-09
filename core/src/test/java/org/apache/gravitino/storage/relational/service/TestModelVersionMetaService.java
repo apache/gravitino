@@ -23,12 +23,14 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
@@ -968,6 +970,77 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                     .updateModelVersion(modelVersionEntity.nameIdentifier(), updater));
 
     Assertions.assertEquals(updatedVersionAliases, altered.aliases());
+  }
+
+  @TestTemplate
+  void testDeleteModelVersionsByLegacyTimeline() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+
+    // Create a model entity
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model1",
+            "model1 comment",
+            0,
+            properties,
+            AUDIT_INFO);
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelMetaService.getInstance().insertModel(modelEntity, false));
+
+    // Create model version entities with aliases
+    ModelVersionEntity modelVersionEntity0 =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path_0"),
+            aliases,
+            "version 0 comment",
+            properties,
+            AUDIT_INFO);
+
+    ModelVersionEntity modelVersionEntity1 =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            1,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path_1"),
+            ImmutableList.of("alias3"),
+            "version 1 comment",
+            properties,
+            AUDIT_INFO);
+
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity0));
+    Assertions.assertDoesNotThrow(
+        () -> ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity1));
+
+    // Soft delete the model (cascade deletes model versions)
+    Assertions.assertTrue(ModelMetaService.getInstance().deleteModel(modelEntity.nameIdentifier()));
+
+    // Verify model versions are soft deleted (cannot be retrieved)
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .getModelVersionByIdentifier(
+                    getModelVersionIdent(modelEntity.nameIdentifier(), 0)));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .getModelVersionByIdentifier(
+                    getModelVersionIdent(modelEntity.nameIdentifier(), 1)));
+
+    // Hard delete legacy data for MODEL_VERSION entity type
+    int deletedCount =
+        backend.hardDeleteLegacyData(
+            Entity.EntityType.MODEL_VERSION, Instant.now().toEpochMilli() + 1000);
+
+    // Verify correct number of records deleted
+    // Expected: 2 model_version_info records + 3 model_version_alias_rel records = 5 total
+    Assertions.assertEquals(5, deletedCount, "Should have deleted 5 legacy records");
   }
 
   private NameIdentifier getModelVersionIdent(NameIdentifier modelIdent, int version) {

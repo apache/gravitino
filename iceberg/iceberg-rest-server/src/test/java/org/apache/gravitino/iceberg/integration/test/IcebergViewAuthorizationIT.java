@@ -488,6 +488,12 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
 
   private Set<String> listViewNames(String database) {
     List<Object[]> rows = sql("SHOW VIEWS in %s", database);
+    rows.forEach(
+        row -> {
+          if (row.length > 1) {
+            Assertions.assertEquals(database, row[0]);
+          }
+        });
     return rows.stream()
         .map(row -> row.length > 1 ? (String) row[1] : (String) row[0])
         .collect(Collectors.toSet());

@@ -44,6 +44,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.dto.policy.PolicyContentDTO;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
@@ -299,6 +300,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
     Policy respPolicy = policyResp.getPolicy();
     Assertions.assertEquals(policy1.name(), respPolicy.name());
     Assertions.assertEquals(policy1.comment(), respPolicy.comment());
+    Assertions.assertEquals("custom", respPolicy.policyType());
     Assertions.assertEquals(Optional.empty(), respPolicy.inherited());
 
     // Test throw PolicyAlreadyExistsException
@@ -335,6 +337,101 @@ public class TestPolicyOperations extends BaseOperationsTest {
     ErrorResponse errorResp1 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
+  }
+
+  @Test
+  public void testCreatePolicyWithIcebergCompactionType() {
+    PolicyContent content =
+        PolicyContents.icebergDataCompaction(
+            1000L,
+            1L,
+            ImmutableMap.of("target-file-size-bytes", "1048576", "min-input-files", "1"));
+    PolicyEntity policy1 =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("iceberg-compaction")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(
+            metalake,
+            "iceberg-compaction",
+            Policy.BuiltInType.ICEBERG_COMPACTION,
+            null,
+            true,
+            content))
+        .thenReturn(policy1);
+
+    PolicyCreateRequest request =
+        new PolicyCreateRequest(
+            "iceberg-compaction", "system_iceberg_compaction", null, true, toDTO(content));
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    PolicyResponse policyResp = resp.readEntity(PolicyResponse.class);
+    Assertions.assertEquals(0, policyResp.getCode());
+    Assertions.assertEquals("system_iceberg_compaction", policyResp.getPolicy().policyType());
+  }
+
+  @Test
+  public void testCreatePolicyWithIcebergCompactionTypeDefaults() {
+    PolicyContent content = PolicyContents.icebergDataCompaction();
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(1L)
+            .withName("iceberg-compaction-default")
+            .withPolicyType(Policy.BuiltInType.ICEBERG_COMPACTION)
+            .withEnabled(true)
+            .withContent(content)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(policyManager.createPolicy(
+            metalake,
+            "iceberg-compaction-default",
+            Policy.BuiltInType.ICEBERG_COMPACTION,
+            null,
+            true,
+            content))
+        .thenReturn(policy);
+
+    PolicyContentDTO.IcebergCompactionContentDTO minimalContent =
+        PolicyContentDTO.IcebergCompactionContentDTO.builder().build();
+    PolicyCreateRequest request =
+        new PolicyCreateRequest(
+            "iceberg-compaction-default", "system_iceberg_compaction", null, true, minimalContent);
+
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    PolicyResponse policyResp = resp.readEntity(PolicyResponse.class);
+    Assertions.assertEquals(0, policyResp.getCode());
+    Assertions.assertEquals("system_iceberg_compaction", policyResp.getPolicy().policyType());
+  }
+
+  @Test
+  public void testCreatePolicyWithIcebergCompactionEnumTypeRejected() {
+    PolicyContent content = PolicyContents.icebergDataCompaction();
+    PolicyCreateRequest request =
+        new PolicyCreateRequest(
+            "iceberg-compaction", "ICEBERG_COMPACTION", null, true, toDTO(content));
+
+    Response resp =
+        target(policyPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
   }
 
   @Test

@@ -433,7 +433,8 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
         Collections.singletonList(
                 primary(
                     PAIMON_PRIMARY_KEY_INDEX_NAME,
-                    new String[][] {new String[] {PAIMON_COL_NAME5}}))
+                    new String[][] {new String[] {PAIMON_COL_NAME5}},
+                    Map.of()))
             .toArray(new Index[0]);
 
     Map<String, String> properties = createProperties();

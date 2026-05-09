@@ -27,14 +27,17 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
@@ -45,6 +48,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.UserGroup;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
@@ -52,6 +57,7 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
@@ -87,7 +93,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Cache<Long, Boolean> loadedRoles;
 
-  private Cache<Long, Optional<Long>> ownerRel;
+  private Cache<Long, Optional<OwnerInfo>> ownerRel;
 
   private Executor executor = null;
 
@@ -218,15 +224,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       AuthorizationRequestContext requestContext) {
-    Long userId;
     boolean result;
     try {
       Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
       loadOwnerPolicy(metalake, metadataObject, metadataId);
-      UserEntity userEntity = getUserEntity(principal.getName(), metalake);
-      userId = userEntity.id();
-      metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      result = Objects.equals(Optional.of(userId), ownerRel.getIfPresent(metadataId));
+      result = checkOwnership(principal, metalake, metadataId);
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);
       result = false;
@@ -286,7 +288,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                     SupportsRelationOperations.Type.ROLE_USER_REL,
                     userNameIdentifier,
                     Entity.EntityType.USER);
-        return entities.stream().anyMatch(roleEntity -> Objects.equals(roleEntity.id(), roleId));
+        // Check direct user-role assignment
+        if (entities.stream().anyMatch(roleEntity -> Objects.equals(roleEntity.id(), roleId))) {
+          return true;
+        }
+        // Check group-role assignments.
+        for (GroupEntity groupEntity : resolveCurrentUserGroups(metalake, entityStore)) {
+          List<Long> groupRoleIds = groupEntity.roleIds();
+          if (groupRoleIds != null && groupRoleIds.contains(roleId)) {
+            return true;
+          }
+        }
+        return false;
 
       } catch (Exception e) {
         LOG.warn("can not get user id or role id.", e);
@@ -371,15 +384,32 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public boolean hasMetadataPrivilegePermission(
       String metalake, String type, String fullName, AuthorizationRequestContext requestContext) {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    MetadataObject metalakeMetadataObject =
-        MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE);
-    return authorize(
-            currentPrincipal,
-            metalake,
-            metalakeMetadataObject,
-            Privilege.Name.MANAGE_GRANTS,
-            requestContext)
-        || hasSetOwnerPermission(metalake, type, fullName, requestContext);
+    // Check whether the principal holds MANAGE_GRANTS on the target object or any ancestor.
+    // A grant at a broader level (e.g. CATALOG or SCHEMA) implicitly covers all objects beneath it.
+    MetadataObject.Type metadataType;
+    try {
+      metadataType = MetadataObject.Type.valueOf(type.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Unknown metadata object type: " + type, e);
+    }
+    // Build the full ancestor chain from the target object up to and including the metalake.
+    // MetadataObjects.parent(CATALOG) returns null (CATALOG is a root in the parent API), so the
+    // metalake is appended manually at the end.
+    List<MetadataObject> chain = new ArrayList<>();
+    for (MetadataObject obj = MetadataObjects.parse(fullName, metadataType);
+        obj != null;
+        obj = MetadataObjects.parent(obj)) {
+      chain.add(obj);
+    }
+    chain.add(MetadataObjects.of(ImmutableList.of(metalake), MetadataObject.Type.METALAKE));
+
+    for (MetadataObject obj : chain) {
+      if (authorize(
+          currentPrincipal, metalake, obj, Privilege.Name.MANAGE_GRANTS, requestContext)) {
+        return true;
+      }
+    }
+    return hasSetOwnerPermission(metalake, type, fullName, requestContext);
   }
 
   @Override
@@ -440,14 +470,17 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return false;
       }
       loadRolePrivilege(metalake, username, userId, requestContext);
-      return authorizeByJcasbin(userId, metadataObject, metadataId, privilege);
+      return authorizeByJcasbin(userId, metalake, metadataObject, metadataId, privilege);
     }
 
     private boolean authorizeByJcasbin(
-        Long userId, MetadataObject metadataObject, Long metadataId, String privilege) {
+        Long userId,
+        String metalake,
+        MetadataObject metadataObject,
+        Long metadataId,
+        String privilege) {
       if (AuthConstants.OWNER.equals(privilege)) {
-        Optional<Long> owner = ownerRel.getIfPresent(metadataId);
-        return Objects.equals(Optional.of(userId), owner);
+        return checkOwnership(PrincipalUtils.getCurrentPrincipal(), metalake, metadataId);
       }
       return enforcer.enforce(
           String.valueOf(userId),
@@ -483,39 +516,115 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                         userNameIdentifier,
                         Entity.EntityType.USER);
             List<CompletableFuture<Void>> loadRoleFutures = new ArrayList<>();
+            Set<String> desiredRoleIds = new HashSet<>();
             for (RoleEntity role : entities) {
-              Long roleId = role.id();
-              allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-              denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-              if (loadedRoles.getIfPresent(roleId) != null) {
+              desiredRoleIds.add(String.valueOf(role.id()));
+              addRoleForUserAndLoadPolicies(
+                  userId, metalake, role.id(), role.name(), loadRoleFutures, entityStore);
+            }
+
+            // Load roles inherited from the user's groups.
+            for (GroupEntity groupEntity : resolveCurrentUserGroups(metalake, entityStore)) {
+              List<Long> roleIds = groupEntity.roleIds();
+              List<String> roleNames = groupEntity.roleNames();
+              if (roleIds == null || roleNames == null) {
                 continue;
               }
-              CompletableFuture<Void> loadRoleFuture =
-                  CompletableFuture.supplyAsync(
-                          () -> {
-                            try {
-                              return entityStore.get(
-                                  NameIdentifierUtil.ofRole(metalake, role.name()),
-                                  Entity.EntityType.ROLE,
-                                  RoleEntity.class);
-                            } catch (Exception e) {
-                              throw new RuntimeException("Failed to load role: " + role.name(), e);
-                            }
-                          },
-                          executor)
-                      .thenAcceptAsync(
-                          roleEntity -> {
-                            loadPolicyByRoleEntity(roleEntity);
-                            loadedRoles.put(roleId, true);
-                          },
-                          executor);
-              loadRoleFutures.add(loadRoleFuture);
+              if (roleIds.size() != roleNames.size()) {
+                LOG.warn(
+                    "Group {} has mismatched roleIds ({}) and roleNames ({}) -- skipping",
+                    groupEntity.name(),
+                    roleIds.size(),
+                    roleNames.size());
+                continue;
+              }
+              for (int i = 0; i < roleIds.size(); i++) {
+                desiredRoleIds.add(String.valueOf(roleIds.get(i)));
+                addRoleForUserAndLoadPolicies(
+                    userId,
+                    metalake,
+                    roleIds.get(i),
+                    roleNames.get(i),
+                    loadRoleFutures,
+                    entityStore);
+              }
             }
+
             CompletableFuture.allOf(loadRoleFutures.toArray(new CompletableFuture[0])).join();
+
+            // Prune stale g-rows: remove role mappings that are no longer valid
+            // (e.g. user was removed from a group at the IdP level).
+            String userIdStr = String.valueOf(userId);
+            for (String currentRole : allowEnforcer.getRolesForUser(userIdStr)) {
+              if (!desiredRoleIds.contains(currentRole)) {
+                allowEnforcer.deleteRoleForUser(userIdStr, currentRole);
+                denyEnforcer.deleteRoleForUser(userIdStr, currentRole);
+              }
+            }
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  /**
+   * Resolves GroupEntity objects for the current principal's groups, skipping any that are stale or
+   * not found in the store.
+   */
+  private List<GroupEntity> resolveCurrentUserGroups(String metalake, EntityStore entityStore) {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    if (!(principal instanceof UserPrincipal)) {
+      return new ArrayList<>();
+    }
+    List<UserGroup> groups = ((UserPrincipal) principal).getGroups();
+    if (groups.isEmpty()) {
+      return new ArrayList<>();
+    }
+    List<NameIdentifier> groupIdents =
+        groups.stream()
+            .map(g -> NameIdentifierUtil.ofGroup(metalake, g.getGroupname()))
+            .collect(Collectors.toList());
+    return entityStore.batchGet(groupIdents, Entity.EntityType.GROUP, GroupEntity.class);
+  }
+
+  /**
+   * Adds a role mapping for the given user in both enforcers and asynchronously loads the role's
+   * policies if they are not already cached. When a role needs loading, the resulting {@link
+   * CompletableFuture} is appended to {@code loadRoleFutures} so the caller can join all futures
+   * after processing both direct and group-inherited roles.
+   */
+  private void addRoleForUserAndLoadPolicies(
+      Long userId,
+      String metalake,
+      Long roleId,
+      String roleName,
+      List<CompletableFuture<Void>> loadRoleFutures,
+      EntityStore entityStore) {
+    allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+    denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+    if (loadedRoles.getIfPresent(roleId) != null) {
+      return;
+    }
+    CompletableFuture<Void> loadRoleFuture =
+        CompletableFuture.supplyAsync(
+                () -> {
+                  try {
+                    return entityStore.get(
+                        NameIdentifierUtil.ofRole(metalake, roleName),
+                        Entity.EntityType.ROLE,
+                        RoleEntity.class);
+                  } catch (Exception e) {
+                    throw new RuntimeException("Failed to load role: " + roleName, e);
+                  }
+                },
+                executor)
+            .thenAcceptAsync(
+                roleEntity -> {
+                  loadPolicyByRoleEntity(roleEntity);
+                  loadedRoles.put(roleId, true);
+                },
+                executor);
+    loadRoleFutures.add(loadRoleFuture);
   }
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
@@ -539,7 +648,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         for (Entity ownerEntity : owners) {
           if (ownerEntity instanceof UserEntity) {
             UserEntity user = (UserEntity) ownerEntity;
-            ownerRel.put(metadataId, Optional.of(user.id()));
+            ownerRel.put(
+                metadataId,
+                Optional.of(new OwnerInfo(user.id(), Entity.EntityType.USER, user.name())));
+          } else if (ownerEntity instanceof GroupEntity) {
+            GroupEntity group = (GroupEntity) ownerEntity;
+            ownerRel.put(
+                metadataId,
+                Optional.of(new OwnerInfo(group.id(), Entity.EntityType.GROUP, group.name())));
           }
         }
       }
@@ -582,6 +698,67 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                 .toUpperCase(java.util.Locale.ROOT),
             condition.name().toLowerCase(java.util.Locale.ROOT));
       }
+    }
+  }
+
+  /**
+   * Checks whether the given principal is the owner of the metadata object identified by
+   * metadataId. Supports both user and group ownership.
+   */
+  private boolean checkOwnership(Principal principal, String metalake, Long metadataId) {
+    Optional<OwnerInfo> ownerOpt = ownerRel.getIfPresent(metadataId);
+    if (ownerOpt == null || !ownerOpt.isPresent()) {
+      return false;
+    }
+    OwnerInfo owner = ownerOpt.get();
+    // We compare by entity ID rather than name to guard against stale cache entries.
+    // If a user/group is deleted and recreated with the same name, the cached OwnerInfo
+    // still holds the old ID. A name-only comparison would incorrectly grant ownership
+    // to the new entity. The extra IO to fetch the current entity ensures correctness.
+    if (owner.type == Entity.EntityType.USER) {
+      try {
+        UserEntity userEntity = getUserEntity(principal.getName(), metalake);
+        return Objects.equals(userEntity.id(), owner.id);
+      } catch (Exception e) {
+        LOG.debug("Can not get user entity for ownership check", e);
+        return false;
+      }
+    } else if (owner.type == Entity.EntityType.GROUP) {
+      if (principal instanceof UserPrincipal) {
+        List<UserGroup> groups = ((UserPrincipal) principal).getGroups();
+        if (groups.isEmpty()) {
+          return false;
+        }
+        try {
+          List<NameIdentifier> groupIdents =
+              groups.stream()
+                  .map(g -> NameIdentifierUtil.ofGroup(metalake, g.getGroupname()))
+                  .collect(Collectors.toList());
+          List<GroupEntity> groupEntities =
+              GravitinoEnv.getInstance()
+                  .entityStore()
+                  .batchGet(groupIdents, Entity.EntityType.GROUP, GroupEntity.class);
+          return groupEntities.stream().anyMatch(ge -> Objects.equals(ge.id(), owner.id));
+        } catch (Exception e) {
+          LOG.debug("Can not get group entities for ownership check", e);
+          return false;
+        }
+      }
+      return false;
+    }
+    return false;
+  }
+
+  /** Holds the owner identity for a metadata object in the owner cache. */
+  static class OwnerInfo {
+    final Long id;
+    final Entity.EntityType type;
+    final String name;
+
+    OwnerInfo(Long id, Entity.EntityType type, String name) {
+      this.id = id;
+      this.type = type;
+      this.name = name;
     }
   }
 }

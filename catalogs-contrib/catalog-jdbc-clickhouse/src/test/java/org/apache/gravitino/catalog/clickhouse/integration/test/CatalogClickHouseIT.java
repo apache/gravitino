@@ -317,7 +317,7 @@ public class CatalogClickHouseIT extends BaseIT {
     // create failed check.
     NameIdentifier table = NameIdentifier.of(testSchemaName, "test_table");
     Assertions.assertThrows(
-        NotFoundException.class,
+        NoSuchSchemaException.class,
         () ->
             tableCatalog.createTable(
                 table,
@@ -652,6 +652,101 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, createdTable.columns()[3].defaultValue());
     Assertions.assertEquals(
         Literals.stringLiteral("now()"), createdTable.columns()[4].defaultValue());
+  }
+
+  @Test
+  void testCreateTableWithCommonTypeLiteralDefaults() {
+    String name = GravitinoITUtils.genRandomName("default_literal_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, name);
+
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              "int_col", Types.IntegerType.get(), "int", false, false, Literals.integerLiteral(7)),
+          Column.of(
+              "double_col",
+              Types.DoubleType.get(),
+              "double",
+              false,
+              false,
+              Literals.doubleLiteral(123.45)),
+          Column.of(
+              "string_col",
+              Types.VarCharType.of(255),
+              "string",
+              false,
+              false,
+              Literals.stringLiteral("hello")),
+          Column.of(
+              "date_col",
+              Types.DateType.get(),
+              "date",
+              false,
+              false,
+              Literals.dateLiteral(LocalDate.of(2024, 4, 1))),
+          Column.of(
+              "decimal_col",
+              Types.DecimalType.of(5, 2),
+              "decimal",
+              false,
+              false,
+              Literals.decimalLiteral(Decimal.of("9.99", 5, 2)))
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            getSortOrders("int_col"));
+
+    Table loadedTable = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(Literals.integerLiteral(7), loadedTable.columns()[0].defaultValue());
+    Assertions.assertEquals(
+        Literals.doubleLiteral(123.45), loadedTable.columns()[1].defaultValue());
+    Assertions.assertEquals(
+        Literals.stringLiteral("hello"), loadedTable.columns()[2].defaultValue());
+    Assertions.assertEquals(
+        Literals.dateLiteral(LocalDate.of(2024, 4, 1)), loadedTable.columns()[3].defaultValue());
+    Assertions.assertEquals(
+        Literals.decimalLiteral(Decimal.of("9.99", 5, 2)), loadedTable.columns()[4].defaultValue());
+  }
+
+  @Test
+  void testCreateTableWithQuotedStringDefaultLiteral() {
+    String name = GravitinoITUtils.genRandomName("quoted_default_table");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, name);
+
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              "status",
+              Types.StringType.get(),
+              "Status",
+              false,
+              false,
+              Literals.stringLiteral("'active'"))
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            table_comment,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loadedTable = catalog.asTableCatalog().loadTable(tableIdentifier);
+    Assertions.assertEquals(
+        Literals.stringLiteral("active"), loadedTable.columns()[1].defaultValue());
   }
 
   @Test
@@ -1184,6 +1279,186 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testAlterTableBranchCoverage() {
+    String branchTableName = GravitinoITUtils.genRandomName("alter_branch");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, branchTableName);
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              "id", Types.IntegerType.get(), "id column", false, false, Literals.integerLiteral(1)),
+          Column.of(
+              "score", Types.IntegerType.get(), "score", false, false, Literals.integerLiteral(10)),
+          Column.of("note", Types.StringType.get(), "note")
+        };
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(Index.IndexType.DATA_SKIPPING_MINMAX, "idx_note", new String[][] {{"note"}})
+        };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("id"),
+        indexes);
+
+    tableCatalog.alterTable(
+        tableIdentifier, TableChange.updateColumnNullability(new String[] {"score"}, true));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.updateColumnComment(new String[] {"score"}, "score column changed"));
+    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_note", false));
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(loaded.columns()[1].nullable());
+    Assertions.assertEquals("score column changed", loaded.columns()[1].comment());
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_note")));
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                TableChange.deleteColumn(new String[] {"missing_col"}, true),
+                TableChange.deleteIndex("missing_idx", true)));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.deleteIndex("missing_idx", false)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.deleteColumn(new String[] {"missing_col"}, false)));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> tableCatalog.alterTable(tableIdentifier, TableChange.setProperty("k", "v")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> tableCatalog.alterTable(tableIdentifier, TableChange.removeProperty("k")));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier, TableChange.updateColumnAutoIncrement(new String[] {"id"}, true)));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            tableCatalog.alterTable(
+                tableIdentifier,
+                TableChange.addColumn(
+                    new String[] {"parent", "nested"},
+                    Types.IntegerType.get(),
+                    "nested",
+                    TableChange.ColumnPosition.defaultPos())));
+  }
+
+  @Test
+  void testAlterIndexAndAutoIncrementBranches() {
+    String tableWithIndexes = GravitinoITUtils.genRandomName("alter_idx_branch");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableWithIndexes);
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("score", Types.IntegerType.get(), "score", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("note", Types.StringType.get(), "note")
+        };
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_MINMAX, "idx_score_minmax", new String[][] {{"score"}}),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_BLOOM_FILTER,
+              "idx_note_bloom",
+              new String[][] {{"note"}})
+        };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("id"),
+        indexes);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_MINMAX, "idx_new", new String[][] {{"score"}}));
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_new")));
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.deleteIndex("idx_score_minmax", false),
+        TableChange.deleteIndex("idx_note_bloom", false),
+        TableChange.deleteIndex("idx_new", false));
+    loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_score_minmax")));
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_note_bloom")));
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_new")));
+
+    RuntimeException autoIncrementTrueException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.updateColumnAutoIncrement(new String[] {"id"}, true)));
+    Assertions.assertTrue(
+        autoIncrementTrueException.getMessage().contains("auto increment is not supported"));
+
+    RuntimeException autoIncrementFalseException =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                tableCatalog.alterTable(
+                    tableIdentifier,
+                    TableChange.updateColumnAutoIncrement(new String[] {"id"}, false)));
+    Assertions.assertTrue(
+        autoIncrementFalseException.getMessage().contains("auto increment is not supported"));
+  }
+
+  @Test
+  void testCreateTableWithAutoIncrementUnsupported() {
+    String tableName = GravitinoITUtils.genRandomName("create_auto_inc");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, true, DEFAULT_VALUE_NOT_SET),
+          Column.of("name", Types.StringType.get(), "name", true, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    RuntimeException exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        tableIdentifier,
+                        columns,
+                        table_comment,
+                        createProperties(),
+                        Transforms.EMPTY_TRANSFORM,
+                        Distributions.NONE,
+                        getSortOrders("id")));
+    Assertions.assertTrue(exception.getMessage().contains("auto increment"));
+  }
+
+  @Test
   void testDropClickHouseDatabase() {
     String schemaName = GravitinoITUtils.genRandomName("clickhouse_schema").toLowerCase();
     String tableName = GravitinoITUtils.genRandomName("clickhouse_table").toLowerCase();
@@ -1206,7 +1481,8 @@ public class CatalogClickHouseIT extends BaseIT {
     Throwable excep =
         Assertions.assertThrows(
             RuntimeException.class, () -> catalog.asSchemas().dropSchema(schemaName, false));
-    Assertions.assertTrue(excep.getMessage().contains("the value of cascade should be true."));
+    Assertions.assertTrue(
+        excep.getMessage().contains("Database %s is not empty".formatted(schemaName)));
 
     // Check the database still exists
     catalog.asSchemas().loadSchema(schemaName);
@@ -1220,6 +1496,79 @@ public class CatalogClickHouseIT extends BaseIT {
         () -> {
           schemas.loadSchema(schemaName);
         });
+  }
+
+  @Test
+  void testCreateSameTableNameAcrossSchemas() {
+    String firstSchema = GravitinoITUtils.genRandomName("ck_db1").toLowerCase();
+    String secondSchema = GravitinoITUtils.genRandomName("ck_db2").toLowerCase();
+    String sharedTableName = GravitinoITUtils.genRandomName("ck_t").toLowerCase();
+    String firstTableComment = "first schema table";
+    String secondTableComment = "second schema table";
+
+    SupportsSchemas schemaSupport = catalog.asSchemas();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    schemaSupport.createSchema(firstSchema, null, Collections.emptyMap());
+    schemaSupport.createSchema(secondSchema, null, Collections.emptyMap());
+
+    try {
+      Column[] firstSchemaColumns =
+          new Column[] {
+            Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+            Column.of(
+                "first_value", Types.StringType.get(), "value", true, false, DEFAULT_VALUE_NOT_SET)
+          };
+      Column[] secondSchemaColumns =
+          new Column[] {
+            Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+            Column.of(
+                "second_value", Types.LongType.get(), "value", true, false, DEFAULT_VALUE_NOT_SET)
+          };
+
+      NameIdentifier firstTableIdentifier = NameIdentifier.of(firstSchema, sharedTableName);
+      NameIdentifier secondTableIdentifier = NameIdentifier.of(secondSchema, sharedTableName);
+
+      tableCatalog.createTable(
+          firstTableIdentifier,
+          firstSchemaColumns,
+          firstTableComment,
+          createProperties(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          getSortOrders("id"));
+      Table firstTable = tableCatalog.loadTable(firstTableIdentifier);
+
+      tableCatalog.createTable(
+          secondTableIdentifier,
+          secondSchemaColumns,
+          secondTableComment,
+          createProperties(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          getSortOrders("id"));
+
+      Table secondTable = tableCatalog.loadTable(secondTableIdentifier);
+      Assertions.assertEquals(sharedTableName, firstTable.name());
+      Assertions.assertEquals(sharedTableName, secondTable.name());
+      Assertions.assertEquals(firstTableComment, firstTable.comment());
+      Assertions.assertEquals(secondTableComment, secondTable.comment());
+      Assertions.assertEquals("first_value", firstTable.columns()[1].name());
+      Assertions.assertEquals("second_value", secondTable.columns()[1].name());
+
+      Set<String> firstSchemaTables =
+          Arrays.stream(tableCatalog.listTables(Namespace.of(firstSchema)))
+              .map(NameIdentifier::name)
+              .collect(Collectors.toSet());
+      Set<String> secondSchemaTables =
+          Arrays.stream(tableCatalog.listTables(Namespace.of(secondSchema)))
+              .map(NameIdentifier::name)
+              .collect(Collectors.toSet());
+      Assertions.assertEquals(Collections.singleton(sharedTableName), firstSchemaTables);
+      Assertions.assertEquals(Collections.singleton(sharedTableName), secondSchemaTables);
+    } finally {
+      schemaSupport.dropSchema(firstSchema, true);
+      schemaSupport.dropSchema(secondSchema, true);
+    }
   }
 
   @Test

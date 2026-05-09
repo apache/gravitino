@@ -183,34 +183,6 @@ public class JobMetaBaseSQLProvider {
         + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 LIMIT #{limit}";
   }
 
-  public String batchSelectJobByIdentifier(
-      @Param("metalakeName") String metalakeName,
-      @Param("jobTemplateName") String jobTemplateName,
-      @Param("jobNames") List<String> jobNames) {
-    return "<script>"
-        + "SELECT jm.job_run_id, jm.metalake_id, jm.job_template_id,"
-        + " jm.job_execution_id, jm.job_run_status, jm.job_finished_at,"
-        + " jm.audit_info, jm.current_version, jm.last_version, jm.deleted_at"
-        + " FROM "
-        + JobMetaMapper.TABLE_NAME
-        + " jm"
-        + " JOIN "
-        + JobTemplateMetaMapper.TABLE_NAME
-        + " jtm ON jm.job_template_id = jtm.job_template_id"
-        + " JOIN "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm ON jm.metalake_id = mm.metalake_id"
-        + " WHERE mm.metalake_name = #{metalakeName}"
-        + " AND jtm.job_template_name = #{jobTemplateName}"
-        + " AND jm.job_run_id IN ("
-        + "<foreach collection='jobNames' item='jobName' separator=','>"
-        + "#{jobName}"
-        + "</foreach>"
-        + " )"
-        + " AND jm.deleted_at = 0 AND jtm.deleted_at = 0 AND mm.deleted_at = 0"
-        + "</script>";
-  }
-
   public String batchSelectJobByRunIds(
       @Param("metalakeName") String metalakeName, @Param("jobRunIds") List<Long> jobRunIds) {
     return "<script>"

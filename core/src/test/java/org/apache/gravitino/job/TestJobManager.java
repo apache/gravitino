@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -898,5 +899,34 @@ public class TestJobManager {
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  @Test
+  public void testFetchFileFromUriWithMissingLocalFileShouldFail() throws IOException {
+    File stagingDir = new File(testStagingDir);
+    Assertions.assertTrue(stagingDir.mkdirs() || stagingDir.exists());
+
+    Path missingFilePath =
+        Path.of(System.getProperty("java.io.tmpdir"), "missing-job-file-" + UUID.randomUUID());
+    String uri = missingFilePath.toUri().toString();
+
+    Assertions.assertThrows(
+        RuntimeException.class, () -> JobManager.fetchFileFromUri(uri, stagingDir, 1000));
+  }
+
+  @Test
+  public void testCloseShouldShutdownExecutorsWhenJobExecutorCloseFails() throws IOException {
+    JobExecutor failingJobExecutor = Mockito.mock(JobExecutor.class);
+    doThrow(new IOException("close failed")).when(failingJobExecutor).close();
+
+    JobManager manager = new JobManager(config, entityStore, idGenerator, failingJobExecutor);
+    try {
+      Assertions.assertThrows(IOException.class, manager::close);
+      Assertions.assertTrue(manager.statusPullExecutor.isShutdown());
+      Assertions.assertTrue(manager.cleanUpExecutor.isShutdown());
+    } finally {
+      manager.statusPullExecutor.shutdownNow();
+      manager.cleanUpExecutor.shutdownNow();
+    }
   }
 }

@@ -18,7 +18,10 @@
 from httpx import AsyncClient
 
 from mcp_server.client import CatalogOperation
-from mcp_server.client.plain.utils import extract_content_from_response
+from mcp_server.client.plain.utils import (
+    encode_path_segment,
+    extract_content_from_response,
+)
 
 
 class PlainRESTClientCatalogOperation(CatalogOperation):
@@ -28,6 +31,6 @@ class PlainRESTClientCatalogOperation(CatalogOperation):
 
     async def get_list_of_catalogs(self) -> str:
         response = await self.rest_client.get(
-            f"/api/metalakes/{self.metalake_name}/catalogs?details=true"
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}/catalogs?details=true"
         )
         return extract_content_from_response(response, "catalogs", [])

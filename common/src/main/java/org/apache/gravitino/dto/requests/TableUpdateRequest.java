@@ -623,9 +623,6 @@ public interface TableUpdateRequest extends RESTRequest {
               && fieldName.length > 0
               && Arrays.stream(fieldName).allMatch(StringUtils::isNotBlank),
           "\"fieldName\" field is required and cannot be empty");
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(newComment),
-          "\"newComment\" field is required and cannot be empty");
     }
 
     /**
@@ -847,7 +844,10 @@ public interface TableUpdateRequest extends RESTRequest {
     }
   }
 
-  /** Represents a request to delete an index from a table. */
+  /**
+   * Represents a request to delete an index from a table. If `ifExists` is null, it will be treated
+   * as false, which means the request will fail if the index does not exist.
+   */
   @EqualsAndHashCode
   @ToString
   class DeleteTableIndexRequest implements TableUpdateRequest {
@@ -855,8 +855,8 @@ public interface TableUpdateRequest extends RESTRequest {
     @JsonProperty("name")
     private String name;
 
-    @JsonProperty("ifExists")
-    private Boolean ifExists;
+    @JsonProperty(value = "ifExists", defaultValue = "false")
+    private boolean ifExists;
 
     /** Default constructor for Jackson deserialization. */
     public DeleteTableIndexRequest() {}
@@ -869,7 +869,7 @@ public interface TableUpdateRequest extends RESTRequest {
      */
     public DeleteTableIndexRequest(String name, Boolean ifExists) {
       this.name = name;
-      this.ifExists = ifExists;
+      this.ifExists = ifExists != null && ifExists;
     }
 
     /**

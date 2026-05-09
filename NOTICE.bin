@@ -1,5 +1,5 @@
 Apache Gravitino
-Copyright 2024 The Apache Software Foundation
+Copyright 2026 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
@@ -240,6 +240,9 @@ Joda.org (https://www.joda.org/).
 
 Apache log4j
 Copyright 2010 The Apache Software Foundation
+
+Bouncy Castle
+Copyright (c) 2000 - 2023 The Legion of the Bouncy Castle Inc.
 
 Byte Buddy
 Copyright 2014 - Present Rafael Winterhalter

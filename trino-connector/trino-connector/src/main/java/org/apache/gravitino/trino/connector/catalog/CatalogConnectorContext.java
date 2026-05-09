@@ -25,6 +25,7 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoConnector;
 import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -47,6 +48,8 @@ public class CatalogConnectorContext {
 
   private final CatalogConnectorAdapter adapter;
 
+  private final GravitinoConfig config;
+
   /**
    * Constructs a new CatalogConnectorContext.
    *
@@ -54,16 +57,19 @@ public class CatalogConnectorContext {
    * @param metalake the Gravitino metalake
    * @param internalConnector the internal connector
    * @param adapter the catalog connector adapter
+   * @param config the Gravitino connector configuration
    */
   public CatalogConnectorContext(
       GravitinoCatalog catalog,
       GravitinoMetalake metalake,
       Connector internalConnector,
-      CatalogConnectorAdapter adapter) {
+      CatalogConnectorAdapter adapter,
+      GravitinoConfig config) {
     this.catalog = catalog;
     this.metalake = metalake;
     this.internalConnector = internalConnector;
     this.adapter = adapter;
+    this.config = config;
   }
 
   /**
@@ -138,6 +144,15 @@ public class CatalogConnectorContext {
     return adapter.getColumnProperties();
   }
 
+  /**
+   * Returns the Gravitino connector configuration.
+   *
+   * @return the Gravitino config
+   */
+  public GravitinoConfig getConfig() {
+    return config;
+  }
+
   /** Closes the internal connector associated with this context. */
   public void close() {
     this.internalConnector.shutdown();
@@ -158,6 +173,7 @@ public class CatalogConnectorContext {
     private GravitinoCatalog catalog;
     private GravitinoMetalake metalake;
     private ConnectorContext context;
+    private GravitinoConfig config;
 
     /**
      * Constructs a new Builder with the specified connector adapter.
@@ -169,24 +185,30 @@ public class CatalogConnectorContext {
     }
 
     /**
-     * Constructs a new Builder with the specified connector adapter and catalog.
+     * Constructs a new Builder with the specified connector adapter, catalog, and config. Used
+     * internally by {@link #clone(GravitinoCatalog)} to propagate all builder state.
      *
      * @param connectorAdapter the connector adapter to use
      * @param catalog the catalog to use
+     * @param config the Gravitino config to propagate
      */
-    private Builder(CatalogConnectorAdapter connectorAdapter, GravitinoCatalog catalog) {
+    private Builder(
+        CatalogConnectorAdapter connectorAdapter,
+        GravitinoCatalog catalog,
+        GravitinoConfig config) {
       this.connectorAdapter = connectorAdapter;
       this.catalog = catalog;
+      this.config = config;
     }
 
     /**
-     * Clones the builder with a new catalog.
+     * Clones the builder with a new catalog, preserving all other state including config.
      *
      * @param catalog the new catalog to use
      * @return a new builder with the specified catalog
      */
     public Builder clone(GravitinoCatalog catalog) {
-      return new Builder(connectorAdapter, catalog);
+      return new Builder(connectorAdapter, catalog, this.config);
     }
 
     /**
@@ -212,22 +234,34 @@ public class CatalogConnectorContext {
     }
 
     /**
+     * Sets the Gravitino connector configuration.
+     *
+     * @param config the Gravitino config
+     * @return the builder
+     */
+    public Builder withConfig(GravitinoConfig config) {
+      this.config = config;
+      return this;
+    }
+
+    /**
      * Builds a new CatalogConnectorContext instance.
      *
      * @return the new CatalogConnectorContext instance
      * @throws Exception if the metalake, catalog, or context is not set
      */
     public CatalogConnectorContext build() throws Exception {
-      Preconditions.checkArgument(metalake != null, "metalake is not null");
-      Preconditions.checkArgument(catalog != null, "catalog is not null");
-      Preconditions.checkArgument(context != null, "context is not null");
+      Preconditions.checkArgument(metalake != null, "metalake must not be null");
+      Preconditions.checkArgument(catalog != null, "catalog must not be null");
+      Preconditions.checkArgument(context != null, "context must not be null");
+      Preconditions.checkArgument(config != null, "config must not be null");
       Map<String, String> connectorConfig = connectorAdapter.buildInternalConnectorConfig(catalog);
       String internalConnectorName = connectorAdapter.internalConnectorName();
 
       Connector connector =
           GravitinoConnectorPluginManager.instance(context.getClass().getClassLoader())
               .createConnector(internalConnectorName, connectorConfig, context);
-      return new CatalogConnectorContext(catalog, metalake, connector, connectorAdapter);
+      return new CatalogConnectorContext(catalog, metalake, connector, connectorAdapter, config);
     }
   }
 }

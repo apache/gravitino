@@ -194,6 +194,7 @@ export default function TopicDetailsPage({ ...props }) {
           catalog={catalog}
           schema={schema}
           editTopic={topic}
+          init={true}
         />
       )}
       {openOwner && (

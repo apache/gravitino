@@ -58,7 +58,7 @@ public interface GroupMetaMapper {
   @SelectProvider(
       type = GroupMetaSQLProviderFactory.class,
       method = "listExtendedGroupPOsByMetalakeId")
-  List<ExtendedGroupPO> listExtendedGroupPOsByMetalakeId(Long metalakeId);
+  List<ExtendedGroupPO> listExtendedGroupPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   @InsertProvider(type = GroupMetaSQLProviderFactory.class, method = "insertGroupMeta")
   void insertGroupMeta(@Param("groupMeta") GroupPO groupPO);

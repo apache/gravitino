@@ -30,43 +30,48 @@ val sparkVersion = fullSparkVersion.split(".").take(2).joinToString(".")
 val hudiVersion = libs.versions.hudi.get()
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
-  }
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+
+  compileOnly(libs.lombok)
+
   implementation(project(":catalogs:catalog-common")) {
     exclude("*")
   }
   implementation(project(":catalogs:hive-metastore-common"))
-  implementation(project(":core")) {
-    exclude("*")
-  }
-  implementation(project(":common")) {
-    exclude("*")
-  }
 
   implementation(libs.commons.collections3)
-  implementation(libs.commons.lang3)
-  implementation(libs.commons.configuration1)
+  implementation(libs.commons.configuration1) {
+    exclude(group = "commons-beanutils")
+  }
   implementation(libs.commons.io)
-  implementation(libs.htrace.core4)
+  implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.hadoop2.auth) {
+  implementation(libs.hadoop3.auth) {
     exclude("*")
   }
-  implementation(libs.woodstox.core)
-  implementation(libs.hadoop2.common) {
+  implementation(libs.hadoop3.common) {
     exclude("*")
   }
+  // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
+  implementation(libs.hadoop3.shaded.guava)
+  implementation(libs.hadoop3.shaded.protobuf)
+  implementation(libs.commons.configuration2)
+  implementation(libs.re2j)
+  implementation(libs.htrace.core4)
   implementation(libs.slf4j.api)
-
-  compileOnly(libs.lombok)
+  implementation(libs.woodstox.core)
 
   annotationProcessor(libs.lombok)
 
+  testImplementation(project(":api"))
   testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
   testImplementation(project(":clients:client-java")) {
     exclude("org.apache.logging.log4j")
   }
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server")) {
     exclude("org.apache.logging.log4j")
@@ -75,55 +80,63 @@ dependencies {
     exclude("org.apache.logging.log4j")
   }
 
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$fullSparkVersion") {
+    exclude("org.apache.hadoop")
+    exclude("io.dropwizard.metrics")
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12")
+  }
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$fullSparkVersion") {
+    exclude("org.apache.hadoop")
+    exclude("io.dropwizard.metrics")
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$fullSparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$fullSparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
   testImplementation(libs.awaitility)
-  testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
+  testImplementation(libs.bundles.jetty)
   testImplementation(libs.commons.collections3)
-  testImplementation(libs.commons.configuration1)
-  testImplementation(libs.datanucleus.core)
+  testImplementation(libs.commons.configuration1) {
+    exclude(group = "commons-beanutils")
+  }
   testImplementation(libs.datanucleus.api.jdo)
-  testImplementation(libs.datanucleus.rdbms)
+  testImplementation(libs.datanucleus.core)
   testImplementation(libs.datanucleus.jdo)
+  testImplementation(libs.datanucleus.rdbms)
   testImplementation(libs.derby)
-  testImplementation(libs.hadoop2.auth) {
+  testImplementation(libs.hadoop3.auth) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.hdfs)
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
+  testImplementation(libs.hadoop3.hdfs)
+  testImplementation(libs.hadoop3.hdfs.client)
+  testImplementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
+  // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
+  testImplementation(libs.hadoop3.shaded.guava)
+  testImplementation(libs.hadoop3.shaded.protobuf)
+  testImplementation(libs.commons.configuration2)
+  testImplementation(libs.re2j)
   testImplementation(libs.htrace.core4)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.prometheus.dropwizard)
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$fullSparkVersion") {
-    exclude("org.apache.hadoop")
-    exclude("io.dropwizard.metrics")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12")
-  }
-  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$fullSparkVersion") {
-    exclude("org.apache.avro")
-    exclude("org.apache.hadoop")
-    exclude("org.apache.zookeeper")
-    exclude("io.dropwizard.metrics")
-    exclude("org.rocksdb")
-  }
   testImplementation(libs.testcontainers)
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$fullSparkVersion") {
-    exclude("org.apache.hadoop")
-    exclude("io.dropwizard.metrics")
-    exclude("com.fasterxml.jackson.core")
-    exclude("com.fasterxml.jackson.module", "jackson-module-scala_2.12")
-  }
-  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$fullSparkVersion") {
-    exclude("org.apache.avro")
-    exclude("org.apache.hadoop")
-    exclude("org.apache.zookeeper")
-    exclude("io.dropwizard.metrics")
-    exclude("org.rocksdb")
-  }
 
   testRuntimeOnly("org.apache.hudi:hudi-spark$sparkVersion-bundle_$scalaVersion:$hudiVersion")
   testRuntimeOnly(libs.junit.jupiter.engine)
@@ -141,6 +154,7 @@ tasks {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
+      exclude("error_prone_annotations-*.jar")
     }
     into("$rootDir/distribution/package/catalogs/lakehouse-hudi/libs")
   }

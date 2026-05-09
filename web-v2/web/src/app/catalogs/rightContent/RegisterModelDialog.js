@@ -136,7 +136,9 @@ export default function RegisterModelDialog({ ...props }) {
           // update model
           const reqData = { updates: genUpdates(cacheData, submitData) }
           if (reqData.updates.length) {
-            await dispatch(updateModel({ metalake, catalog, catalogType, schema, model: editModel, data: reqData }))
+            await dispatch(
+              updateModel({ init, metalake, catalog, catalogType, schema, model: editModel, data: reqData })
+            )
           }
         } else {
           await dispatch(registerModel({ data: submitData, metalake, catalog, schema, catalogType }))

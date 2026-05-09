@@ -97,6 +97,13 @@ public class TestMetadataObjectUtil {
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of(null, "metalake", MetadataObject.Type.METALAKE)));
 
+    // Verify that toEntityIdent uses the metadata object's name, not the context metalakeName
+    Assertions.assertEquals(
+        NameIdentifier.of("target_metalake"),
+        MetadataObjectUtil.toEntityIdent(
+            "request_metalake",
+            MetadataObjects.of(null, "target_metalake", MetadataObject.Type.METALAKE)));
+
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "catalog"),
         MetadataObjectUtil.toEntityIdent(

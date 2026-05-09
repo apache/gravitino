@@ -39,9 +39,9 @@ public interface Policy extends Auditable {
 
   /** The built-in policy types. Predefined policy types that are provided by the system. */
   enum BuiltInType {
-    // todo: add built-in policies, such as:
-    //    DATA_COMPACTION(BUILT_IN_TYPE_PREFIX + "data_compaction",
-    //    PolicyContent.DataCompactionContent.class)
+    /** Built-in policy type for Iceberg compaction strategy. */
+    ICEBERG_COMPACTION(
+        BUILT_IN_TYPE_PREFIX + "iceberg_compaction", IcebergDataCompactionContent.class),
 
     /**
      * Custom policy type. "custom" is a fixed string that indicates the policy is a non-built-in
@@ -61,7 +61,8 @@ public interface Policy extends Auditable {
      * Get the built-in policy type from the policy type string.
      *
      * @param policyType the policy type string
-     * @return the built-in policy type if it matches, otherwise returns CUSTOM type
+     * @return the matched built-in policy type
+     * @throws IllegalArgumentException if the policy type is unknown or blank
      */
     public static BuiltInType fromPolicyType(String policyType) {
       Preconditions.checkArgument(StringUtils.isNotBlank(policyType), "policyType cannot be blank");

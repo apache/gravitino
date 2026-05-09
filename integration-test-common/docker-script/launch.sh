@@ -74,5 +74,28 @@ while true; do
     sleep 1
 done
 
+# Wait for HDFS to be fully ready
+echo "Waiting for HDFS to be fully ready..."
+hdfs_attempts=0
+hdfs_max_attempts=60
+
+while true; do
+    # Check if HDFS DataNode is ready by testing file creation
+    docker compose exec -T hive hdfs dfs -test -d / >/dev/null 2>&1 && \
+    docker compose exec -T hive hdfs dfsadmin -report 2>/dev/null | grep -q "Live datanodes" && {
+        echo "HDFS is ready."
+        # Give HDFS a bit more time to stabilize
+        sleep 5
+        break;
+    }
+
+    if [ "$hdfs_attempts" -ge "$hdfs_max_attempts" ]; then
+        echo "WARNING: HDFS did not become fully ready within $hdfs_max_attempts seconds, but continuing..."
+        break
+    fi
+
+    ((hdfs_attempts++))
+    sleep 1
+done
 
 echo "All docker compose service is now available."

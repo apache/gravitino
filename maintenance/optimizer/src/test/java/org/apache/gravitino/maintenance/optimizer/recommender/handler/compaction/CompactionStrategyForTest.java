@@ -35,7 +35,7 @@ public class CompactionStrategyForTest implements Strategy {
 
   @Override
   public String strategyType() {
-    return "compaction";
+    return CompactionStrategyHandler.NAME;
   }
 
   @Override

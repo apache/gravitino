@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -36,6 +37,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -45,6 +47,7 @@ import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.FilesetMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -207,6 +210,14 @@ public class FilesetMetaService {
         newEntity.id(),
         oldFilesetEntity.id());
 
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String oldFullName =
+        NameIdentifierUtil.ofFileset(metalakeName, catalogName, schemaName, oldFilesetEntity.name())
+            .toString();
+    boolean isRenamed = !Objects.equals(oldFilesetEntity.name(), newEntity.name());
+
     Integer updateResult;
     try {
       boolean checkNeedUpdateVersion =
@@ -215,27 +226,71 @@ public class FilesetMetaService {
       FilesetPO newFilesetPO =
           POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, checkNeedUpdateVersion);
       if (checkNeedUpdateVersion) {
-        // These operations are guaranteed to be atomic by the transaction. If version info is
-        // inserted successfully and the uniqueness is guaranteed by `fileset_id + version +
-        // deleted_at`, it means that no other transaction has been inserted (if a uniqueness
-        // conflict occurs, the transaction will be rolled back), then we can consider that the
-        // fileset meta update is successful
+        // These operations are performed atomically within a single transaction. The version
+        // insert is protected by a unique constraint on `fileset_id + version + deleted_at`. If
+        // the meta update affects 0 rows (concurrent modification), the transaction is rolled
+        // back — including the version insert — and the update is treated as a conflict.
+        int[] metaUpdateCountRef = new int[1];
+        try {
+          SessionUtils.doMultipleWithCommit(
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FilesetVersionMapper.class,
+                      mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs())),
+              () -> {
+                metaUpdateCountRef[0] =
+                    SessionUtils.getWithoutCommit(
+                        FilesetMetaMapper.class,
+                        mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
+                if (metaUpdateCountRef[0] == 0) {
+                  throw new RuntimeException("Failed to update the entity: " + identifier);
+                }
+              },
+              () -> {
+                if (isRenamed && metaUpdateCountRef[0] > 0) {
+                  SessionUtils.doWithoutCommit(
+                      EntityChangeLogMapper.class,
+                      mapper ->
+                          mapper.insertEntityChange(
+                              metalakeName,
+                              Entity.EntityType.FILESET.name(),
+                              oldFullName,
+                              OperateType.ALTER));
+                }
+              });
+          updateResult = 1;
+        } catch (RuntimeException re) {
+          if (metaUpdateCountRef[0] == 0) {
+            // The meta update matched no rows; the transaction was rolled back,
+            // including the version insert above.
+            throw new IOException("Failed to update the entity: " + identifier);
+          } else {
+            ExceptionUtils.checkSQLException(
+                re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());
+            throw re;
+          }
+        }
+      } else {
+        int[] metaUpdateCountRef = new int[1];
         SessionUtils.doMultipleWithCommit(
             () ->
+                metaUpdateCountRef[0] =
+                    SessionUtils.getWithoutCommit(
+                        FilesetMetaMapper.class,
+                        mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO)),
+            () -> {
+              if (isRenamed && metaUpdateCountRef[0] > 0) {
                 SessionUtils.doWithoutCommit(
-                    FilesetVersionMapper.class,
-                    mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs())),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetMetaMapper.class,
-                    mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO)));
-        // we set the updateResult to 1 to indicate that the update is successful
-        updateResult = 1;
-      } else {
-        updateResult =
-            SessionUtils.doWithCommitAndFetchResult(
-                FilesetMetaMapper.class,
-                mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
+                    EntityChangeLogMapper.class,
+                    mapper ->
+                        mapper.insertEntityChange(
+                            metalakeName,
+                            Entity.EntityType.FILESET.name(),
+                            oldFullName,
+                            OperateType.ALTER));
+              }
+            });
+        updateResult = metaUpdateCountRef[0];
       }
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -257,46 +312,65 @@ public class FilesetMetaService {
     FilesetPO filesetPO = getFilesetPOByIdentifier(identifier);
     Long filesetId = filesetPO.getFilesetId();
 
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String filesetFullName =
+        NameIdentifierUtil.ofFileset(metalakeName, catalogName, schemaName, identifier.name())
+            .toString();
+
     // We should delete meta and version info
+    AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
-            SessionUtils.doWithoutCommit(
-                FilesetMetaMapper.class,
-                mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId)),
-        () ->
+            deleteResult.set(
+                SessionUtils.getWithoutCommit(
+                    FilesetMetaMapper.class,
+                    mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId))),
+        () -> {
+          if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 FilesetVersionMapper.class,
-                mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId)),
-        () ->
+                mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId));
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        filesetId, MetadataObject.Type.FILESET.name())),
-        () ->
+                        filesetId, MetadataObject.Type.FILESET.name()));
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper ->
                     mapper.softDeleteObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name())),
-        () ->
+                        filesetId, MetadataObject.Type.FILESET.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name())),
-        () ->
+                        filesetId, MetadataObject.Type.FILESET.name()));
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(filesetId)),
-        () ->
+                mapper -> mapper.softDeleteStatisticsByEntityId(filesetId));
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name())));
+                        filesetId, MetadataObject.Type.FILESET.name()));
+          }
+        },
+        () -> {
+          if (deleteResult.get() > 0) {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.FILESET.name(),
+                        filesetFullName,
+                        OperateType.DROP));
+          }
+        });
 
-    return true;
+    return deleteResult.get() > 0;
   }
 
   @Monitored(

@@ -70,6 +70,8 @@ const MetalakeList = () => {
   const [ownerRefreshKey, setOwnerRefreshKey] = useState(0)
   const auth = useAppSelector(state => state.auth)
   const { serviceAdmins, authUser, anthEnable } = auth
+  const admins = Array.isArray(serviceAdmins) ? serviceAdmins : (serviceAdmins || '').split(',')
+  const isServiceAdmin = admins.includes(authUser?.name)
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
   const [tableData, setTableData] = useState([])
@@ -273,7 +275,7 @@ const MetalakeList = () => {
           return (
             <div className='flex gap-2' key={record.name}>
               <NameContext.Provider value={record.name}>{contextHolder}</NameContext.Provider>
-              {([...(serviceAdmins || '').split(',')].includes(authUser?.name) || !authUser) && (
+              {(isServiceAdmin || !authUser) && (
                 <a data-refer={`edit-metalake-${record.name}`}>
                   <Tooltip title='Edit'>
                     <Icons.Pencil className='size-4' onClick={() => handleEditMetalake(record.name)} />
@@ -361,7 +363,7 @@ const MetalakeList = () => {
               placeholder='Search...'
               onChange={onSearchTable}
             />
-            {([...(serviceAdmins || '').split(',')].includes(authUser?.name) || !anthEnable) && (
+            {(isServiceAdmin || !anthEnable) && (
               <Button
                 data-refer='create-metalake-btn'
                 type='primary'

@@ -20,9 +20,11 @@ package org.apache.gravitino.server;
 
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.apache.commons.io.FileUtils;
@@ -115,5 +117,23 @@ public class TestGravitinoServer {
 
     // TODO: Exception due to environment variable not set. Is this the right exception?
     assertThrows(IllegalArgumentException.class, () -> config.loadFromFile("config"));
+  }
+
+  @Test
+  public void testMainShutdownHookShouldInvokeServerStop() throws IOException {
+    Path sourceFile = Path.of("src/main/java/org/apache/gravitino/server/GravitinoServer.java");
+    String source = Files.readString(sourceFile);
+
+    int hookStart = source.indexOf("addShutdownHook");
+    int joinIndex = source.indexOf("server.join();", hookStart);
+
+    assertTrue(hookStart >= 0, "Main should register a shutdown hook");
+    assertTrue(
+        joinIndex > hookStart, "Main should call server.join() after registering shutdown hook");
+
+    String hookBlock = source.substring(hookStart, joinIndex);
+    assertTrue(
+        hookBlock.contains("server.gracefulStop()"),
+        "Shutdown hook should invoke server.gracefulStop() so app-level cleanup runs on SIGTERM");
   }
 }

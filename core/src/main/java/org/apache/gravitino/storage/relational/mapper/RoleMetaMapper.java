@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -56,7 +57,7 @@ public interface RoleMetaMapper {
   List<RolePO> listRolesByUserId(@Param("userId") Long userId);
 
   @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "listRolesByGroupId")
-  List<RolePO> listRolesByGroupId(Long groupId);
+  List<RolePO> listRolesByGroupId(@Param("groupId") Long groupId);
 
   @SelectProvider(
       type = RoleMetaSQLProviderFactory.class,
@@ -81,7 +82,7 @@ public interface RoleMetaMapper {
       @Param("newRoleMeta") RolePO newRolePO, @Param("oldRoleMeta") RolePO oldRolePO);
 
   @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "softDeleteRoleMetaByRoleId")
-  void softDeleteRoleMetaByRoleId(Long roleId);
+  void softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId);
 
   @UpdateProvider(
       type = RoleMetaSQLProviderFactory.class,
@@ -93,4 +94,10 @@ public interface RoleMetaMapper {
       method = "deleteRoleMetasByLegacyTimeline")
   Integer deleteRoleMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "touchRoleUpdatedAt")
+  void touchRoleUpdatedAt(@Param("roleId") long roleId);
+
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "batchGetRoleUpdatedAt")
+  List<RoleUpdatedAt> batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds);
 }

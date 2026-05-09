@@ -71,11 +71,11 @@ public class GroupRoleRelSQLProviderFactory {
     return getProvider().softDeleteGroupRoleRelByGroupAndRoles(groupId, roleIds);
   }
 
-  public static String softDeleteGroupRoleRelByMetalakeId(Long metalakeId) {
+  public static String softDeleteGroupRoleRelByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().softDeleteGroupRoleRelByMetalakeId(metalakeId);
   }
 
-  public static String softDeleteGroupRoleRelByRoleId(Long roleId) {
+  public static String softDeleteGroupRoleRelByRoleId(@Param("roleId") Long roleId) {
     return getProvider().softDeleteGroupRoleRelByRoleId(roleId);
   }
 

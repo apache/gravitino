@@ -37,9 +37,15 @@ import org.apache.gravitino.listener.api.event.AlterCatalogPreEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogPreEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogPreEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogPreEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogPreEvent;
 import org.apache.gravitino.listener.api.event.ListCatalogEvent;
 import org.apache.gravitino.listener.api.event.ListCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.ListCatalogPreEvent;
@@ -192,13 +198,27 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   @Override
   public void enableCatalog(NameIdentifier ident)
       throws NoSuchCatalogException, CatalogNotInUseException {
-    // todo: support enable catalog event
-    dispatcher.enableCatalog(ident);
+    eventBus.dispatchEvent(new EnableCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      dispatcher.enableCatalog(ident);
+      eventBus.dispatchEvent(new EnableCatalogEvent(PrincipalUtils.getCurrentUserName(), ident));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new EnableCatalogFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 
   @Override
   public void disableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
-    // todo: support disable catalog event
-    dispatcher.disableCatalog(ident);
+    eventBus.dispatchEvent(new DisableCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      dispatcher.disableCatalog(ident);
+      eventBus.dispatchEvent(new DisableCatalogEvent(PrincipalUtils.getCurrentUserName(), ident));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new DisableCatalogFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 }

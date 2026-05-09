@@ -32,6 +32,8 @@ val icebergVersion: String = libs.versions.iceberg4connector.get()
 
 dependencies {
   implementation(project(":api"))
+  implementation(project(":maintenance:optimizer-api"))
+  implementation(project(":maintenance:updaters"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":clients:client-java"))
   implementation(project(":core")) {
@@ -41,11 +43,14 @@ dependencies {
     exclude("*")
   }
   implementation(libs.bundles.log4j)
+  implementation(libs.commons.cli.new)
   implementation(libs.commons.lang3)
   implementation(libs.jackson.databind)
   implementation(libs.jackson.annotations)
   implementation(libs.guava)
+  implementation(libs.commons.dbcp2)
   implementation(libs.ql.expression)
+  implementation(libs.h2db)
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
@@ -82,6 +87,13 @@ dependencies {
     exclude(group = "org.slf4j", module = "slf4j-log4j12")
   }
   testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.junit.jupiter)
+  testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.postgresql)
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testRuntimeOnly(libs.mysql.driver)
+  testRuntimeOnly(libs.postgresql.driver)
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
@@ -103,23 +115,8 @@ tasks {
     into("$rootDir/distribution/package/optimizer/libs")
   }
 
-  register("copyConfigs", Copy::class) {
-    from("src/main/resources")
-    into("$rootDir/distribution/package/optimizer/conf")
-
-    rename { original ->
-      if (original.endsWith(".template")) {
-        original.replace(".template", "")
-      } else {
-        original
-      }
-    }
-
-    fileMode = 0b111101101
-  }
-
   register("copyLibAndConfigs", Copy::class) {
-    dependsOn("copyLibs", "copyConfigs")
+    dependsOn("copyLibs")
   }
 }
 

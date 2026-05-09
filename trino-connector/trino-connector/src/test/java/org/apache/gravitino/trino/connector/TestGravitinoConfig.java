@@ -147,6 +147,27 @@ public class TestGravitinoConfig {
         "Config `gravitino.trino.skip-catalog-patterns` is invalid because it contains an illegal regular expression");
   }
 
+  @Test
+  public void testToCatalogConfigWithAuthProperties() {
+    String gravitinoUrl = "http://127.0.0.1:8000";
+    String metalake = "user_001";
+    ImmutableMap<String, String> configMap =
+        ImmutableMap.of(
+            "gravitino.uri",
+            gravitinoUrl,
+            "gravitino.metalake",
+            metalake,
+            "gravitino.client.authType",
+            "simple",
+            "gravitino.user",
+            "admin");
+    GravitinoConfig config = new GravitinoConfig(configMap);
+
+    String catalogConfig = config.toCatalogConfig();
+    assertTrue(catalogConfig.contains("\"gravitino.client.authType\"='simple'"));
+    assertTrue(catalogConfig.contains("\"gravitino.user\"='admin'"));
+  }
+
   private static boolean skipCatalog(String catalogName, GravitinoConfig config) {
     for (Pattern pattern : config.getSkipCatalogPatterns()) {
       if (pattern.matcher(catalogName).matches()) {

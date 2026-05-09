@@ -83,9 +83,17 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
 
           # Environment variables
-          {{- if .Values.env }}
           env:
-            {{- toYaml .Values.env | nindent 12 }}
+            - name: GRAVITINO_HOME
+              value: /opt/gravitino-iceberg-rest-server
+            - name: SKIP_CONFIG_REWRITE
+              value: "true"
+          {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- range $item := .Values.envWithTpl }}
+            - name: {{ $item.name }}
+              value: {{ tpl $item.value $ | quote }}
           {{- end }}
 
           # Environment from ConfigMaps/Secrets

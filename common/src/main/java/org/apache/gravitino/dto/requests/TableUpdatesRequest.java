@@ -57,6 +57,7 @@ public class TableUpdatesRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(updates != null, "updates must not be null");
+    Preconditions.checkArgument(!updates.isEmpty(), "updates must not be empty");
     updates.forEach(RESTRequest::validate);
   }
 }

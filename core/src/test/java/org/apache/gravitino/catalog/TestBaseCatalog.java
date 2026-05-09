@@ -20,10 +20,14 @@
 package org.apache.gravitino.catalog;
 
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.TestCatalogOperations;
+import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.credential.CatalogCredentialManager;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -48,5 +52,24 @@ public class TestBaseCatalog {
             .withCatalogEntity(entity);
     CatalogOperations dummyCatalogOperations = catalog2.ops();
     Assertions.assertTrue(dummyCatalogOperations instanceof DummyCatalogOperations);
+  }
+
+  @Test
+  void testCloseClosesAllResourcesWhenOpsCloseFails() throws IllegalAccessException, IOException {
+    TestCatalog catalog = new TestCatalog();
+    CatalogOperations ops = Mockito.mock(CatalogOperations.class);
+    AuthorizationPlugin authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
+    CatalogCredentialManager credentialManager = Mockito.mock(CatalogCredentialManager.class);
+
+    Mockito.doThrow(new IOException("close ops failed")).when(ops).close();
+
+    FieldUtils.writeField(catalog, "ops", ops, true);
+    FieldUtils.writeField(catalog, "authorizationPlugin", authorizationPlugin, true);
+    FieldUtils.writeField(catalog, "catalogCredentialManager", credentialManager, true);
+
+    Assertions.assertThrows(IOException.class, catalog::close);
+
+    Mockito.verify(authorizationPlugin).close();
+    Mockito.verify(credentialManager).close();
   }
 }

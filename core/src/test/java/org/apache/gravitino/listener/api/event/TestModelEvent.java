@@ -48,7 +48,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public class TestModelEvent {
+class TestModelEvent {
   private ModelEventDispatcher dispatcher;
   private ModelEventDispatcher failureDispatcher;
   private DummyEventListener dummyEventListener;
@@ -428,6 +428,8 @@ public class TestModelEvent {
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
 
     ListModelFailureEvent listModelFailureEvent = (ListModelFailureEvent) event;
+    Assertions.assertEquals("__list_models__", listModelFailureEvent.identifier().name());
+    Assertions.assertEquals(namespace, listModelFailureEvent.identifier().namespace());
     checkArray(namespace.levels(), listModelFailureEvent.namespace().levels());
   }
 
@@ -913,11 +915,12 @@ public class TestModelEvent {
 
     // validate pre-event
     PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(ListModelVersionPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.LIST_MODEL_VERSIONS, preEvent.operationType());
+    Assertions.assertEquals(ListModelVersionInfosPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL_VERSION_INFOS, preEvent.operationType());
     Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
 
-    ListModelVersionPreEvent listModelVersionsPreEvent = (ListModelVersionPreEvent) preEvent;
+    ListModelVersionInfosPreEvent listModelVersionsPreEvent =
+        (ListModelVersionInfosPreEvent) preEvent;
     Assertions.assertEquals(existingIdentA, listModelVersionsPreEvent.identifier());
 
     // validate post-event
@@ -930,6 +933,26 @@ public class TestModelEvent {
     Assertions.assertEquals(existingIdentA, listModelVersionInfosEvent.identifier());
     Assertions.assertEquals(1, listModelVersionInfosEvent.versions().length);
     checkModelVersionInfo(listModelVersionInfosEvent.versions()[0], firstModelVersion);
+  }
+
+  @Test
+  void testListModelVersionInfosFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.listModelVersionInfos(existingIdentA));
+
+    Event event = dummyEventListener.popPostEvent();
+
+    Assertions.assertEquals(ListModelVersionInfosFailureEvent.class, event.getClass());
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        ((ListModelVersionInfosFailureEvent) event).exception().getClass());
+    Assertions.assertEquals(OperationType.LIST_MODEL_VERSION_INFOS, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+
+    ListModelVersionInfosFailureEvent listModelVersionInfosFailureEvent =
+        (ListModelVersionInfosFailureEvent) event;
+    Assertions.assertEquals(existingIdentA, listModelVersionInfosFailureEvent.identifier());
   }
 
   @Test

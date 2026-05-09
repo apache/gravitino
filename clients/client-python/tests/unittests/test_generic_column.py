@@ -20,6 +20,7 @@ import unittest
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.types.types import Types
+from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.client.generic_column import GenericColumn
 from gravitino.utils import HTTPClient
 
@@ -112,3 +113,34 @@ class TestGenericColumn(unittest.TestCase):
         )
         self.assertEqual(TestGenericColumn._generic_column, another_generic_column)
         self.assertFalse(another_generic_column == "invalid_generic_column")
+
+    def test_extends_supports_tags_class(self) -> None:
+        another_column = Column.of(
+            name="test_column",
+            data_type=Types.StringType.get(),
+            nullable=False,
+            default_value=Literals.string_literal(value="test"),
+        )
+
+        another_generic_column = GenericColumn(
+            column=another_column,
+            rest_client=HTTPClient("http://localhost:8090"),
+            metalake="metalake_demo",
+            catalog="relational_catalog",
+            schema="test_schema",
+            table="test_table",
+        )
+        self.assertTrue(
+            issubclass(
+                GenericColumn,
+                SupportsTags,
+            )
+        )
+        expected_methods = ["list_tags", "list_tags_info", "get_tag", "associate_tags"]
+
+        self.assertTrue(
+            all(
+                callable(getattr(another_generic_column, method, None))
+                for method in expected_methods
+            )
+        )

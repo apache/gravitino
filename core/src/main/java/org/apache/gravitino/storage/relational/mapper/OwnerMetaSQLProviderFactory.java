@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.OwnerMetaBaseSQLProvider;
@@ -95,5 +96,22 @@ public class OwnerMetaSQLProviderFactory {
   public static String deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteOwnerMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  public static String batchSelectUserOwnerMetaByMetadataObjectIdAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .batchSelectUserOwnerMetaByMetadataObjectIdAndType(metadataObjectIds, metadataObjectType);
+  }
+
+  public static String selectOwnerByMetadataObjectIdAndType(
+      @Param("metadataObjectId") long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider().selectOwnerByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
+  }
+
+  public static String selectChangedOwners(@Param("updatedAtFrom") long updatedAtFrom) {
+    return getProvider().selectChangedOwners(updatedAtFrom);
   }
 }

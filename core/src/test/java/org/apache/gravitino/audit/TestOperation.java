@@ -54,6 +54,10 @@ import org.apache.gravitino.listener.api.event.CreateTableEvent;
 import org.apache.gravitino.listener.api.event.CreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogEvent;
+import org.apache.gravitino.listener.api.event.DisableCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.DisableMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogEvent;
 import org.apache.gravitino.listener.api.event.DropCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.DropFilesetEvent;
@@ -66,6 +70,10 @@ import org.apache.gravitino.listener.api.event.DropTableEvent;
 import org.apache.gravitino.listener.api.event.DropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.DropTopicEvent;
 import org.apache.gravitino.listener.api.event.DropTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogEvent;
+import org.apache.gravitino.listener.api.event.EnableCatalogFailureEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
+import org.apache.gravitino.listener.api.event.EnableMetalakeFailureEvent;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.GetFileLocationEvent;
 import org.apache.gravitino.listener.api.event.GetFileLocationFailureEvent;
@@ -481,6 +489,44 @@ public class TestOperation {
     Event loadTopicFailureEvent = new LoadTopicFailureEvent(USER, topicIdentifier, new Exception());
     Assertions.assertEquals(
         AuditLog.Operation.fromEvent(loadTopicFailureEvent), AuditLog.Operation.LOAD_TOPIC);
+  }
+
+  @Test
+  public void testEnableDisableOperation() {
+    Event enableMetalakeEvent = new EnableMetalakeEvent(USER, metalakeIdentifier);
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(enableMetalakeEvent), AuditLog.Operation.ENABLE_METALAKE);
+    Event enableMetalakeFailureEvent =
+        new EnableMetalakeFailureEvent(USER, metalakeIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(enableMetalakeFailureEvent),
+        AuditLog.Operation.ENABLE_METALAKE);
+
+    Event disableMetalakeEvent = new DisableMetalakeEvent(USER, metalakeIdentifier);
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(disableMetalakeEvent), AuditLog.Operation.DISABLE_METALAKE);
+    Event disableMetalakeFailureEvent =
+        new DisableMetalakeFailureEvent(USER, metalakeIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(disableMetalakeFailureEvent),
+        AuditLog.Operation.DISABLE_METALAKE);
+
+    Event enableCatalogEvent = new EnableCatalogEvent(USER, catalogIdentifier);
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(enableCatalogEvent), AuditLog.Operation.ENABLE_CATALOG);
+    Event enableCatalogFailureEvent =
+        new EnableCatalogFailureEvent(USER, catalogIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(enableCatalogFailureEvent), AuditLog.Operation.ENABLE_CATALOG);
+
+    Event disableCatalogEvent = new DisableCatalogEvent(USER, catalogIdentifier);
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(disableCatalogEvent), AuditLog.Operation.DISABLE_CATALOG);
+    Event disableCatalogFailureEvent =
+        new DisableCatalogFailureEvent(USER, catalogIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(disableCatalogFailureEvent),
+        AuditLog.Operation.DISABLE_CATALOG);
   }
 
   @Test

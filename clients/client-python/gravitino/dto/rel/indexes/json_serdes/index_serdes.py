@@ -26,11 +26,11 @@ from gravitino.utils.serdes import SerdesUtilsBase
 
 class IndexSerdes(SerdesUtilsBase, JsonSerializable[Index]):
     @classmethod
-    def serialize(cls, data_type: Index) -> dict[str, Any]:
-        result: dict[str, Any] = {cls.INDEX_TYPE: data_type.type().name.upper()}
-        if data_type.name() is not None:
-            result[cls.INDEX_NAME] = data_type.name()
-        result[cls.INDEX_FIELD_NAMES] = data_type.field_names()
+    def serialize(cls, value: Index) -> dict[str, Any]:
+        result: dict[str, Any] = {cls.INDEX_TYPE: value.type().name.upper()}
+        if value.name() is not None:
+            result[cls.INDEX_NAME] = value.name()
+        result[cls.INDEX_FIELD_NAMES] = value.field_names()
 
         return result
 

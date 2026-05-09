@@ -42,6 +42,67 @@ public class PolicyContents {
     return new CustomContent(rules, supportedObjectTypes, properties);
   }
 
+  /**
+   * Creates an iceberg compaction policy content with default values.
+   *
+   * @return iceberg compaction policy content with defaults
+   */
+  public static PolicyContent icebergDataCompaction() {
+    return icebergDataCompaction(
+        IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+        IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+        IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+        IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+        IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+        IcebergDataCompactionContent.DEFAULT_REWRITE_OPTIONS);
+  }
+
+  /**
+   * Creates an iceberg compaction policy content.
+   *
+   * @param minDataFileMse minimum threshold for custom-data-file-mse
+   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
+   * @param rewriteOptions rewrite options forwarded as job.options.*
+   * @return iceberg compaction policy content
+   */
+  public static PolicyContent icebergDataCompaction(
+      long minDataFileMse, long minDeleteFileNumber, Map<String, String> rewriteOptions) {
+    return icebergDataCompaction(
+        minDataFileMse,
+        minDeleteFileNumber,
+        IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+        IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+        IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+        rewriteOptions);
+  }
+
+  /**
+   * Creates an iceberg compaction policy content with configurable score weights.
+   *
+   * @param minDataFileMse minimum threshold for custom-data-file-mse
+   * @param minDeleteFileNumber minimum threshold for custom-delete-file-number
+   * @param dataFileMseWeight weight used for custom-data-file-mse score contribution
+   * @param deleteFileNumberWeight weight used for custom-delete-file-number score contribution
+   * @param maxPartitionNum maximum partition number selected for compaction
+   * @param rewriteOptions rewrite options forwarded as job.options.*
+   * @return iceberg compaction policy content
+   */
+  public static PolicyContent icebergDataCompaction(
+      long minDataFileMse,
+      long minDeleteFileNumber,
+      long dataFileMseWeight,
+      long deleteFileNumberWeight,
+      long maxPartitionNum,
+      Map<String, String> rewriteOptions) {
+    return new IcebergDataCompactionContent(
+        minDataFileMse,
+        minDeleteFileNumber,
+        dataFileMseWeight,
+        deleteFileNumberWeight,
+        maxPartitionNum,
+        rewriteOptions);
+  }
+
   private PolicyContents() {}
 
   /**

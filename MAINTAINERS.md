@@ -30,6 +30,9 @@ For larger changes, it is recommended to have more than one reviewer. In particu
 working on an area you are not familiar with, it is recommended to ask for review from that area by
 using `git log --format=full <filename>` to see who committed the most.
 
+Furthermore, we encourage involving contributors familiar with the code, including original authors where possible, 
+as they may have useful context on design and implementation
+
 ## When to commit/merge a pull request
 
 PRs shall not be merged during active, ongoing discussions, unless they address issues such as
@@ -98,7 +101,7 @@ All contributions from the people listed are licensed under the Apache License v
 | Minghuang Li  | mchades             | Datastrato       |
 | Xun Liu       | xunliu              | Datastrato       |
 | Hui Yu        | diqiu50             | Datastrato       |
-| Xiaojing Fang | FANNG1              | Datastrato       |
+| Xiaojing Fang | FANNG1              | China Mobile     |
 | Qi Yu         | yuqi1129            | Datastrato       |
 | Decheng Liu   | ch3yne              | Datastrato       |
 | Saisai Shao   | jerryshao           | Datastrato       |

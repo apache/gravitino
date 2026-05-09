@@ -1,4 +1,4 @@
-SELECT (CAST("amc" AS DECIMAL(15,4)) / CAST("pmc" + 0.001 AS DECIMAL(15,4))) "am_pm_ratio"
+SELECT CAST((CAST("amc" AS DECIMAL(15,4)) / CAST("pmc" + 0.001 AS DECIMAL(15,4))) AS DECIMAL(15,4)) "am_pm_ratio"
 FROM
   (
    SELECT "count"(*) "amc"

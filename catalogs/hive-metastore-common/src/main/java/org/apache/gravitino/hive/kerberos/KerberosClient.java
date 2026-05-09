@@ -172,10 +172,6 @@ public class KerberosClient implements java.io.Closeable {
       keytabsDir.mkdir();
     }
     File keytabFile = new File(path);
-    if (keytabFile.exists() && !keytabFile.delete()) {
-      throw new IllegalStateException(
-          String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
-    }
     int fetchKeytabFileTimeout = kerberosConfig.getFetchTimeoutSec();
     FetchFileUtils.fetchFileFromUri(keyTabUri, keytabFile, fetchKeytabFileTimeout, hadoopConf);
     return keytabFile;
@@ -193,6 +189,7 @@ public class KerberosClient implements java.io.Closeable {
       }
 
       Files.deleteIfExists(Paths.get(keytabFilePath));
+      FetchFileUtils.removeLock(new File(keytabFilePath));
     } catch (IOException e) {
       LOG.warn("Failed to delete keytab file: {}", keytabFilePath, e);
     }

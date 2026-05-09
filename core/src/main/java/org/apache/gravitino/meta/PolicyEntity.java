@@ -163,6 +163,12 @@ public class PolicyEntity implements Entity, Auditable, HasIdentifier {
             || content() instanceof PolicyContents.CustomContent,
         "Expected CustomContent for custom policy type, but got %s",
         content().getClass().getName());
+    Preconditions.checkArgument(
+        policyType == Policy.BuiltInType.CUSTOM || policyType.contentClass().isInstance(content()),
+        "Expected %s for policy type %s, but got %s",
+        policyType.contentClass().getSimpleName(),
+        policyType.name(),
+        content().getClass().getName());
     content().validate();
   }
 

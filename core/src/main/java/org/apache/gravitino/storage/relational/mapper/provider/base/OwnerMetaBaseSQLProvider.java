@@ -20,14 +20,17 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper.OWNER_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -51,6 +54,34 @@ public class OwnerMetaBaseSQLProvider {
         + " ot.metadata_object_type = #{metadataObjectType} AND"
         + " ot.owner_type = 'USER' AND"
         + " ot.deleted_at = 0 AND ut.deleted_at = 0";
+  }
+
+  public String batchSelectUserOwnerMetaByMetadataObjectIdAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "<script>"
+        + "SELECT ot.metadata_object_id as metadataObjectId,"
+        + "ut.user_id as userId, "
+        + "ut.user_name as userName, "
+        + "ut.metalake_id as metalakeId, "
+        + "ut.audit_info as auditInfo, "
+        + "ut.current_version as currentVersion, "
+        + "ut.last_version as lastVersion, "
+        + "ut.deleted_at as deletedAt "
+        + "FROM "
+        + OWNER_TABLE_NAME
+        + " ot LEFT JOIN "
+        + UserMetaMapper.USER_TABLE_NAME
+        + " ut ON ut.user_id = ot.owner_id "
+        + "WHERE "
+        + "ot.metadata_object_type = #{metadataObjectType} "
+        + "AND ot.owner_type = 'USER' "
+        + "AND ot.metadata_object_id IN "
+        + "<foreach collection='metadataObjectIds' item='itemId' open='(' separator=',' close=')'>"
+        + "#{itemId}"
+        + "</foreach> "
+        + "AND ot.deleted_at = 0 AND ut.deleted_at = 0 "
+        + "</script>";
   }
 
   public String selectGroupOwnerMetaByMetadataObjectIdAndType(
@@ -78,7 +109,7 @@ public class OwnerMetaBaseSQLProvider {
     return "INSERT INTO "
         + OWNER_TABLE_NAME
         + " (metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " audit_info, current_version, last_version, deleted_at, updated_at)"
         + " VALUES ("
         + " #{ownerRelPO.metalakeId},"
         + " #{ownerRelPO.metadataObjectId},"
@@ -88,7 +119,8 @@ public class OwnerMetaBaseSQLProvider {
         + " #{ownerRelPO.auditInfo},"
         + " #{ownerRelPO.currentVersion},"
         + " #{ownerRelPO.lastVersion},"
-        + " #{ownerRelPO.deletedAt}"
+        + " #{ownerRelPO.deletedAt},"
+        + " #{ownerRelPO.updatedAt}"
         + ")";
   }
 
@@ -154,6 +186,16 @@ public class OwnerMetaBaseSQLProvider {
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.catalog_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.catalog_id = #{catalogId} AND"
+        + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.catalog_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
+        + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 
@@ -187,6 +229,16 @@ public class OwnerMetaBaseSQLProvider {
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.schema_id = #{schemaId} AND"
         + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.schema_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.schema_id = #{schemaId} AND"
+        + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.schema_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.schema_id = #{schemaId} AND"
+        + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 
@@ -195,5 +247,26 @@ public class OwnerMetaBaseSQLProvider {
     return "DELETE FROM "
         + OWNER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String selectOwnerByMetadataObjectIdAndType(
+      @Param("metadataObjectId") long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "SELECT owner_id as ownerId, owner_type as ownerType FROM "
+        + OWNER_TABLE_NAME
+        + " WHERE metadata_object_id = #{metadataObjectId}"
+        + " AND metadata_object_type = #{metadataObjectType}"
+        + " AND deleted_at = 0"
+        + " ORDER BY updated_at DESC, id DESC LIMIT 1";
+  }
+
+  public String selectChangedOwners(@Param("updatedAtFrom") long updatedAtFrom) {
+    return "SELECT metadata_object_id as metadataObjectId,"
+        + " metadata_object_type as metadataObjectType,"
+        + " updated_at as updatedAt"
+        + " FROM "
+        + OWNER_TABLE_NAME
+        + " WHERE deleted_at = 0 AND updated_at >= #{updatedAtFrom}"
+        + " ORDER BY updated_at, id LIMIT 1000";
   }
 }

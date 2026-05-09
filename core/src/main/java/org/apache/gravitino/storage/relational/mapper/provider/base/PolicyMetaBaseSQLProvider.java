@@ -184,6 +184,23 @@ public class PolicyMetaBaseSQLProvider {
         + " AND pm.deleted_at = 0 ";
   }
 
+  public String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {
+    return "<script>"
+        + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm"
+        + " WHERE pm.deleted_at = 0"
+        + " AND pm.policy_id IN ("
+        + "<foreach collection='policyIds' item='policyId' separator=','>"
+        + "#{policyId}"
+        + "</foreach>"
+        + ")"
+        + "</script>";
+  }
+
   public String selectPolicyMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"

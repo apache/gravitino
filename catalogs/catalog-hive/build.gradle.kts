@@ -30,62 +30,86 @@ val icebergVersion: String = libs.versions.iceberg.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 
 dependencies {
-  implementation(project(":api")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:catalog-common")) {
-    exclude("*")
-  }
-  implementation(project(":common")) {
-    exclude("*")
-  }
-  implementation(project(":catalogs:hive-metastore-common"))
-  implementation(project(":core")) {
-    exclude("*")
-  }
-
-  implementation(libs.commons.collections3)
-  implementation(libs.commons.lang3)
-  implementation(libs.commons.configuration1)
-  implementation(libs.htrace.core4)
-  implementation(libs.commons.io)
-  implementation(libs.guava)
-  implementation(libs.hadoop2.auth) {
-    exclude("*")
-  }
-  implementation(libs.hadoop2.common) {
-    exclude("*")
-  }
-  implementation(libs.woodstox.core)
-  implementation(libs.slf4j.api)
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
 
   compileOnly(libs.immutables.value)
   compileOnly(libs.lombok)
 
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
+  implementation(project(":catalogs:hive-metastore-common"))
+
+  implementation(libs.commons.collections3)
+  implementation(libs.commons.configuration1) {
+    exclude(group = "commons-beanutils")
+  }
+  implementation(libs.commons.io)
+  implementation(libs.commons.lang3)
+  implementation(libs.guava)
+  implementation(libs.hadoop3.auth) {
+    exclude("*")
+  }
+  implementation(libs.hadoop3.common) {
+    exclude("*")
+  }
+  // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
+  implementation(libs.hadoop3.shaded.guava)
+  implementation(libs.hadoop3.shaded.protobuf)
+  implementation(libs.commons.configuration2)
+  implementation(libs.re2j)
+  implementation(libs.htrace.core4)
+  implementation(libs.slf4j.api)
+  implementation(libs.woodstox.core)
+
   annotationProcessor(libs.immutables.value)
   annotationProcessor(libs.lombok)
 
-  testImplementation(libs.awaitility)
-  testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
-  testImplementation(project(":common"))
-  testImplementation(project(":clients:client-java"))
-  testImplementation(project(":integration-test-common", "testArtifacts"))
-  testImplementation(project(":server"))
-  testImplementation(project(":server-common"))
+  testImplementation(project(":api"))
   testImplementation(project(":catalogs:hadoop-common")) {
     exclude("*")
   }
+  testImplementation(project(":catalogs:hive-metastore-common", "testArtifacts"))
+  testImplementation(project(":clients:client-java"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
 
-  testImplementation(libs.bundles.jetty)
+  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.hadoop")
+  }
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
+  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
+  testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jersey)
+  testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.log4j)
-  testImplementation(libs.hadoop2.common) {
+  testImplementation(libs.hadoop3.aws)
+  testImplementation(libs.hadoop3.common) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.hdfs)
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
+  testImplementation(libs.hadoop3.hdfs)
+  testImplementation(libs.hadoop3.hdfs.client)
+  testImplementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
+  // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
+  testImplementation(libs.hadoop3.shaded.guava)
+  testImplementation(libs.hadoop3.shaded.protobuf)
+  testImplementation(libs.commons.configuration2)
+  testImplementation(libs.re2j)
+  testImplementation(libs.hadoop3.abs)
+  testImplementation(libs.hadoop3.gcs)
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
@@ -94,33 +118,10 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
-
-  testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.hadoop")
-  }
-  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
-  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
-    exclude("org.apache.avro")
-    exclude("org.apache.hadoop")
-    exclude("org.apache.zookeeper")
-    exclude("io.dropwizard.metrics")
-    exclude("org.rocksdb")
-  }
   testImplementation(libs.slf4j.api)
   testImplementation(libs.testcontainers)
-  testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.localstack)
-  testImplementation(libs.hadoop2.aws)
-  testImplementation(libs.hadoop3.abs)
-  testImplementation(libs.hadoop3.gcs)
-
-  // You need this to run test CatalogHiveABSIT as it required hadoop3 environment introduced by hadoop3.abs
-  // (The protocol `abfss` was first introduced in Hadoop 3.2.0), However, as the there already exists
-  // hadoop2.common in the test classpath, If we added the following dependencies directly, it will
-  // cause the conflict between hadoop2 and hadoop3, resulting test failures, so we comment the
-  // following line temporarily, if you want to run the test, please uncomment it.
-  // In the future, we may need to refactor the test to avoid the conflict.
-  // testImplementation(libs.hadoop3.common)
+  testImplementation(libs.testcontainers.mysql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -137,6 +138,7 @@ tasks {
       exclude("guava-*.jar")
       exclude("log4j-*.jar")
       exclude("slf4j-*.jar")
+      exclude("error_prone_annotations-*.jar")
       // Exclude the following jars to avoid conflict with the jars in authorization-gcp
       exclude("protobuf-java-*.jar")
     }

@@ -58,6 +58,15 @@ public class ConfigServlet extends HttpServlet {
       configs.put(key.getKey(), serverConfig.get(key));
     }
 
+    if (serverConfig.get(Configs.ENABLE_AUTHORIZATION)) {
+      // Expose serviceAdmins when authorization is enabled so the web UI can determine whether the
+      // logged-in user has service-admin privileges (e.g. to show the "Create Metalake" button).
+      String serviceAdminsRaw = serverConfig.getRawString(Configs.SERVICE_ADMINS.getKey());
+      if (serviceAdminsRaw != null) {
+        configs.put(Configs.SERVICE_ADMINS.getKey(), serverConfig.get(Configs.SERVICE_ADMINS));
+      }
+    }
+
     if (serverConfig
         .get(Configs.AUTHENTICATORS)
         .contains(AuthenticatorType.OAUTH.name().toLowerCase())) {
@@ -83,11 +92,29 @@ public class ConfigServlet extends HttpServlet {
       res.setContentType("application/json;charset=utf-8");
       writer.write(ObjectMapperProvider.objectMapper().writeValueAsString(configs));
     } catch (IllegalStateException exception) {
-      LOG.error("Illegal state occurred when calling getWriter()");
+      LOG.error("Illegal state occurred when calling getWriter()", exception);
+      res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      sendErrorResponse(res, "Failed to get response writer");
     } catch (IOException exception) {
-      LOG.error("Failed to perform IO");
+      LOG.error("Failed to perform IO", exception);
+      res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      sendErrorResponse(res, "IO error occurred");
     } catch (Exception e) {
-      LOG.error(e.getMessage());
+      LOG.error("Unexpected error: {}", e.getMessage(), e);
+      res.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+      sendErrorResponse(res, "Internal server error");
+    }
+  }
+
+  private void sendErrorResponse(HttpServletResponse res, String message) {
+    try (PrintWriter writer = res.getWriter()) {
+      res.setContentType("application/json;charset=utf-8");
+      Map<String, String> error = Map.of("error", message);
+      writer.write(ObjectMapperProvider.objectMapper().writeValueAsString(error));
+    } catch (IOException e) {
+      LOG.error("Failed to send error response", e);
+    } catch (IllegalStateException e) {
+      LOG.error("Failed to send error response: illegal state", e);
     }
   }
 }

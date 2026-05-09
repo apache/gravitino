@@ -25,12 +25,13 @@ from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
 )
 from gravitino.dto.responses.credential_response import CredentialResponse
 from gravitino.dto.responses.file_location_response import FileLocationResponse
+from gravitino.dto.responses.function_list_response import FunctionListResponse
+from gravitino.dto.responses.function_response import FunctionResponse
 from gravitino.dto.responses.model_response import ModelResponse
 from gravitino.dto.responses.model_version_list_response import ModelVersionListResponse
 from gravitino.dto.responses.model_version_response import ModelVersionResponse
 from gravitino.dto.responses.model_version_uri_response import ModelVersionUriResponse
-from gravitino.dto.responses.function_list_response import FunctionListResponse
-from gravitino.dto.responses.function_response import FunctionResponse
+from gravitino.dto.responses.name_list_response import NameListResponse
 from gravitino.dto.responses.partition_list_response import PartitionListResponse
 from gravitino.dto.responses.partition_name_list_response import (
     PartitionNameListResponse,
@@ -579,3 +580,33 @@ class TestResponses(unittest.TestCase):
         resp.validate()
         self.assertEqual(1, len(resp.functions()))
         self.assertEqual("func1", resp.functions()[0].name())
+
+    def test_role_names_list_response(self) -> None:
+        role_response = NameListResponse(0, ["role1", "role2", "role3"])
+        role_response.validate()
+        json_str = _json.dumps(
+            {
+                "code": 0,
+                "names": ["role1", "role2", "role3"],
+            }
+        )
+
+        ser_json = _json.dumps(role_response.to_dict())
+        self.assertEqual(json_str, ser_json)
+        deser_dict = _json.loads(ser_json)
+
+        self.assertEqual(0, deser_dict.get("code"))
+        self.assertIsNotNone(deser_dict.get("names"))
+        self.assertEqual(3, len(deser_dict.get("names")))
+        self.assertEqual("role1", deser_dict["names"][0])
+        self.assertEqual("role2", deser_dict["names"][1])
+        self.assertEqual("role3", deser_dict["names"][2])
+
+    def test_role_names_list_response_validation(self) -> None:
+        with self.assertRaises(IllegalArgumentException):
+            role_response = NameListResponse(0, None)  # type: ignore
+            role_response.validate()
+
+        with self.assertRaises(IllegalArgumentException):
+            role_response = NameListResponse(0, ["role1", ""])
+            role_response.validate()

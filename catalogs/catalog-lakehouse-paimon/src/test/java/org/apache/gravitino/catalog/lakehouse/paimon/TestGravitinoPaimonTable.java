@@ -288,7 +288,10 @@ public class TestGravitinoPaimonTable {
     String[] partitionKeys = new String[] {"col_1"};
     Index[] indexes =
         Collections.singletonList(
-                primary(PAIMON_PRIMARY_KEY_INDEX_NAME, new String[][] {new String[] {"col_2"}}))
+                primary(
+                    PAIMON_PRIMARY_KEY_INDEX_NAME,
+                    new String[][] {new String[] {"col_2"}},
+                    Map.of()))
             .toArray(new Index[0]);
 
     Table table =
@@ -414,39 +417,6 @@ public class TestGravitinoPaimonTable {
             IllegalArgumentException.class, () -> GravitinoPaimonTable.getDistribution(options));
     Assertions.assertTrue(
         exception.getMessage().contains("Paimon bucket number must be a valid integer"));
-  }
-
-  @Test
-  void testCreatePaimonPrimaryKeyTableWithInvalidBucketKey() {
-    String paimonTableName = "test_paimon_primary_key_table_invalid_bucket";
-    NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);
-
-    Column[] columns =
-        new Column[] {
-          fromPaimonColumn(new DataField(0, "col_1", DataTypes.INT().notNull(), PAIMON_COMMENT)),
-          fromPaimonColumn(new DataField(1, "col_2", DataTypes.STRING().notNull(), PAIMON_COMMENT))
-        };
-
-    Index[] indexes =
-        Collections.singletonList(
-                primary(PAIMON_PRIMARY_KEY_INDEX_NAME, new String[][] {new String[] {"col_2"}}))
-            .toArray(new Index[0]);
-
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                paimonCatalogOperations.createTable(
-                    tableIdentifier,
-                    columns,
-                    PAIMON_COMMENT,
-                    Maps.newHashMap(),
-                    new Transform[0],
-                    Distributions.hash(2, NamedReference.field("col_1")),
-                    new SortOrder[0],
-                    indexes));
-    Assertions.assertTrue(
-        exception.getMessage().contains("bucket keys must be a subset of primary key columns"));
   }
 
   @Test
@@ -669,7 +639,8 @@ public class TestGravitinoPaimonTable {
         Collections.singletonList(
                 primary(
                     PAIMON_PRIMARY_KEY_INDEX_NAME,
-                    new String[][] {new String[] {columns[2].name()}}))
+                    new String[][] {new String[] {columns[2].name()}},
+                    Map.of()))
             .toArray(new Index[0]);
 
     GravitinoPaimonTable gravitinoPaimonTable =

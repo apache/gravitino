@@ -230,11 +230,14 @@ public class SchemaOperations {
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofSchema(metalake, catalog, schema);
             boolean dropped = dispatcher.dropSchema(ident, cascade);
-            if (!dropped) {
+
+            if (dropped) {
+              LOG.info("Schema dropped: {}.{}.{}", metalake, catalog, schema);
+            } else {
               LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
             }
+
             Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("Schema dropped: {}.{}.{}", metalake, catalog, schema);
             return response;
           });
     } catch (Exception e) {

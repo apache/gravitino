@@ -264,7 +264,7 @@ public class FilesetOperations {
             return response;
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleFilesetException(OperationType.LOAD, fileset, schema, e);
+      return ExceptionHandlers.handleFilesetException(OperationType.LIST, fileset, schema, e);
     }
   }
 
@@ -337,13 +337,13 @@ public class FilesetOperations {
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
             boolean dropped = dispatcher.dropFileset(ident);
-            if (!dropped) {
+            if (dropped) {
+              LOG.info("Fileset dropped: {}.{}.{}.{}", metalake, catalog, schema, fileset);
+            } else {
               LOG.warn("Cannot find to be dropped fileset {} under schema {}", fileset, schema);
             }
 
-            Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("Fileset dropped: {}.{}.{}.{}", metalake, catalog, schema, fileset);
-            return response;
+            return Utils.ok(new DropResponse(dropped));
           });
 
     } catch (Exception e) {

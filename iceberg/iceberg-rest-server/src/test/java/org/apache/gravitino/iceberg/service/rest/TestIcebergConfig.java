@@ -24,10 +24,10 @@ import java.util.Optional;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -38,10 +38,8 @@ public class TestIcebergConfig extends IcebergTestBase {
     return IcebergRestTestUtil.getIcebergResourceConfig(IcebergConfigOperations.class);
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  public void testConfig(String prefix) {
-    setUrlPathWithPrefix(prefix);
+  @Test
+  public void testConfig() {
     Response resp = getConfigClientBuilder().get();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
@@ -51,10 +49,8 @@ public class TestIcebergConfig extends IcebergTestBase {
     Assertions.assertEquals(0, response.overrides().size());
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  public void testConfigWithEmptyWarehouse(String prefix) {
-    setUrlPathWithPrefix(prefix);
+  @Test
+  public void testConfigWithEmptyWarehouse() {
     Map<String, String> queryParams = ImmutableMap.of("warehouse", "");
     Response resp =
         getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.of(queryParams)).get();
@@ -66,10 +62,8 @@ public class TestIcebergConfig extends IcebergTestBase {
     Assertions.assertEquals(0, response.overrides().size());
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  public void testConfigWithValidWarehouse(String prefix) {
-    setUrlPathWithPrefix(prefix);
+  @Test
+  public void testConfigWithValidWarehouse() {
     String warehouseName = IcebergRestTestUtil.PREFIX;
     Map<String, String> queryParams = ImmutableMap.of("warehouse", warehouseName);
     Response resp =
@@ -104,26 +98,16 @@ public class TestIcebergConfig extends IcebergTestBase {
     Assertions.assertEquals(404, resp.getStatus());
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"PREFIX", "", "\\\n\t\\\'", "\u0024", "\100", "[_~"})
-  void testIcebergRestValidPrefix(String prefix) {
-    String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, prefix);
+  @Test
+  public void testConfigRejectsPrefixInUrl() {
+    // Per the Iceberg REST spec, the config endpoint does not accept a prefix.
+    String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, IcebergRestTestUtil.PREFIX);
     Response response = getIcebergClientBuilder(path, Optional.empty()).get();
-    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(404, response.getStatus());
   }
 
-  @ParameterizedTest
-  @ValueSource(strings = {"/", "hello/"})
-  void testIcebergRestInvalidPrefix(String prefix) {
-    String path = injectPrefixToPath(IcebergRestTestUtil.CONFIG_PATH, prefix);
-    Response response = getIcebergClientBuilder(path, Optional.empty()).get();
-    Assertions.assertEquals(500, response.getStatus());
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {"", IcebergRestTestUtil.PREFIX})
-  public void testConfigEndpointsContainViewOperations(String prefix) {
-    setUrlPathWithPrefix(prefix);
+  @Test
+  public void testConfigEndpointsContainViewOperations() {
     String warehouseName = IcebergRestTestUtil.PREFIX;
     Map<String, String> queryParams = ImmutableMap.of("warehouse", warehouseName);
     Response resp =
@@ -140,5 +124,38 @@ public class TestIcebergConfig extends IcebergTestBase {
     Assertions.assertTrue(
         hasViewListEndpoint,
         "Config response should contain view list endpoint for catalog that supports views");
+  }
+
+  @Test
+  public void testConfigScanPlanEndpointPathIsNamespaceScoped() {
+    // Iceberg 1.10.1's Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN advertises the wrong path
+    // (missing namespaces/{namespace}) — fixed in apache/iceberg#14120 (targeting 1.11.x).
+    // This test guards against regressing to the broken path after an Iceberg upgrade.
+    Response resp = getConfigClientBuilder().get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    ConfigResponse response = resp.readEntity(ConfigResponse.class);
+
+    boolean hasScanPlanEndpoint =
+        response.endpoints().stream()
+            .anyMatch(
+                endpoint ->
+                    "POST".equals(endpoint.httpMethod())
+                        && endpoint.path().contains("namespaces/{namespace}/tables/{table}/plan"));
+    Assertions.assertTrue(
+        hasScanPlanEndpoint,
+        "Config response must advertise the namespace-scoped scan plan path: "
+            + "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan");
+
+    boolean hasBrokenScanPlanEndpoint =
+        response.endpoints().stream()
+            .anyMatch(
+                endpoint ->
+                    "POST".equals(endpoint.httpMethod())
+                        && endpoint.path().endsWith("/tables/{table}/plan")
+                        && !endpoint.path().contains("namespaces/{namespace}"));
+    Assertions.assertFalse(
+        hasBrokenScanPlanEndpoint,
+        "Config response must not advertise the namespace-less scan plan path from Iceberg 1.10.1");
   }
 }

@@ -515,6 +515,27 @@ public class TestResponses {
   }
 
   @Test
+  void testAuthMeResponse() throws JsonProcessingException {
+    AuthMeResponse response = new AuthMeResponse("test-user");
+    response.validate();
+    assertEquals(0, response.getCode());
+    assertEquals("test-user", response.getPrincipal());
+
+    String serJson = JsonUtils.objectMapper().writeValueAsString(response);
+    AuthMeResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, AuthMeResponse.class);
+    assertEquals(response.getCode(), deserResponse.getCode());
+    assertEquals(response.getPrincipal(), deserResponse.getPrincipal());
+  }
+
+  @Test
+  void testAuthMeResponseDefault() {
+    AuthMeResponse response = new AuthMeResponse();
+    assertDoesNotThrow(response::validate);
+    assertNull(response.getPrincipal());
+  }
+
+  @Test
   void testPartitionStatisticsListResponseNullElement() {
     AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
     StatisticDTO statistic =

@@ -280,7 +280,7 @@
    ./core/src/main/java/org/apache/gravitino/utils/Bytes.java
 
    Apache Submarine
-   ./bin/common.sh
+   ./bin/common.sh.template
 
    Confluent Kafka Streams Examples
    ./catalogs/catalog-kafka/src/test/java/org/apache/gravitino/catalog/kafka/embedded/KafkaClusterEmbedded.java
@@ -294,6 +294,10 @@
    ./integration-test-common/src/test/java/org/apache/gravitino/integration/test/util/CloseableGroup.java
    ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/catalog/hive/SortingColumn.java
    ./trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets/hive/00012_format.sql
+   ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/AbstractTypedJacksonModule.java
+   ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/BlockJsonSerde.java
+   ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/TypeDeserializer.java
+   ./trino-connector/trino-connector/src/main/java/org/apache/gravitino/trino/connector/util/json/TypeSignatureDeserializer.java
 
    Apache Arrow
    ./dev/ci/util_free_space.sh
@@ -323,6 +327,6 @@
 
     This product bundles a third-party component under the
     BSD License.
-   .dev/docker/kerberos-hive/kadm5.acl
-   .dev/docker/kerberos-hive/kdc.acl
-   .dev/docker/kerberos-hive/krb5.acl
+   ./dev/docker/kerberos-hive/kadm5.acl
+   ./dev/docker/kerberos-hive/kdc.conf
+   ./dev/docker/kerberos-hive/krb5.conf

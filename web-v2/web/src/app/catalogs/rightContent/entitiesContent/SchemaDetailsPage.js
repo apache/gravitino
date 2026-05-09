@@ -645,6 +645,7 @@ export default function SchemaDetailsPage() {
           provider={catalogData?.provider}
           locationProviders={catalogData?.properties?.['filesystem-providers']?.split(',') || []}
           editSchema={schema}
+          init={true}
         />
       )}
       {openOwner && (

@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.jdbc;
 
 import java.sql.Driver;
 import java.sql.DriverManager;
+import java.sql.SQLException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -70,13 +71,13 @@ public class MySQLProtocolCompatibleCatalogOperations extends JdbcCatalogOperati
           .getMethod("uncheckedShutdown")
           .invoke(null);
       LOG.info("AbandonedConnectionCleanupThread has been shutdown...");
-
-      // Unload the MySQL driver, only Unload the driver if it is loaded by
-      // IsolatedClassLoader.
-      Driver mysqlDriver = DriverManager.getDriver("jdbc:mysql://dumpy_address");
-      deregisterDriver(mysqlDriver);
     } catch (Exception e) {
-      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread or deregister MySQL driver", e);
+      LOG.warn("Failed to shutdown AbandonedConnectionCleanupThread", e);
     }
+  }
+
+  @Override
+  protected Driver getDriver() throws SQLException {
+    return DriverManager.getDriver("jdbc:mysql://dummy_address");
   }
 }

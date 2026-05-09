@@ -73,7 +73,9 @@ public interface MetadataObject {
     /** A job represents a data processing task in Gravitino. */
     JOB,
     /** A job template represents a reusable template for creating jobs in Gravitino. */
-    JOB_TEMPLATE;
+    JOB_TEMPLATE,
+    /** A function represents a user-defined function registered in Gravitino. */
+    FUNCTION;
   }
 
   /**

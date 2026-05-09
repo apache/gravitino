@@ -30,7 +30,7 @@ class SortOrderSerdes(SerdesUtilsBase, JsonSerializable[SortOrderDTO]):
     """Custom JSON serializer/deserializer for SortOrderDTO objects."""
 
     @classmethod
-    def serialize(cls, data_type: SortOrderDTO) -> dict[str, Any]:
+    def serialize(cls, value: SortOrderDTO) -> dict[str, Any]:
         """
         Serialize the given data into a dictionary.
 
@@ -42,9 +42,9 @@ class SortOrderSerdes(SerdesUtilsBase, JsonSerializable[SortOrderDTO]):
         """
 
         return {
-            cls.SORT_TERM: SerdesUtils.write_function_arg(data_type.sort_term()),
-            cls.DIRECTION: str(data_type.direction()),
-            cls.NULL_ORDERING: str(data_type.null_ordering()),
+            cls.SORT_TERM: SerdesUtils.write_function_arg(value.sort_term()),
+            cls.DIRECTION: str(value.direction()),
+            cls.NULL_ORDERING: str(value.null_ordering()),
         }
 
     @classmethod

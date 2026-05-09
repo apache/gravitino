@@ -19,9 +19,12 @@
 
 package org.apache.gravitino.job.local;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.util.List;
+import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -139,5 +142,64 @@ public class TestSparkProcessBuilder {
     Assertions.assertTrue(command4.contains("/path/to/spark-demo.jar"));
     Assertions.assertTrue(command4.contains("arg1"));
     Assertions.assertTrue(command4.contains("arg2"));
+  }
+
+  @Test
+  public void testSparkEnvironmentInfoOutputWithoutValue() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("template4")
+            .withExecutable("/path/to/spark-demo.jar")
+            .withArguments(Lists.newArrayList("arg1", "arg2"))
+            .withClassName("com.example.MainClass")
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.executor.memory", "2g",
+                    "spark.executor.cores", "2"))
+            .withEnvironments(ImmutableMap.of("key1", "value1", "key2", "value2"))
+            .build();
+    Map<String, String> environments = template.environments();
+    String environmentKeys = Joiner.on(", ").join(environments.keySet());
+    Assertions.assertEquals("key1, key2", environmentKeys);
+  }
+
+  @Test
+  public void testSparkEnvironmentInfoWithEmptyMap() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("template4")
+            .withExecutable("/path/to/spark-demo.jar")
+            .withArguments(Lists.newArrayList("arg1", "arg2"))
+            .withClassName("com.example.MainClass")
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.executor.memory", "2g",
+                    "spark.executor.cores", "2"))
+            .withEnvironments(ImmutableMap.of())
+            .build();
+    Map<String, String> environments = template.environments();
+    String environmentKeys = Joiner.on(", ").join(environments.keySet());
+    Assertions.assertTrue(StringUtils.isBlank(environmentKeys));
+  }
+
+  @Test
+  public void testSparkEnvironmentInfoWithNullMap() {
+    SparkJobTemplate template =
+        SparkJobTemplate.builder()
+            .withName("template4")
+            .withExecutable("/path/to/spark-demo.jar")
+            .withArguments(Lists.newArrayList("arg1", "arg2"))
+            .withClassName("com.example.MainClass")
+            .withConfigs(
+                ImmutableMap.of(
+                    "spark.executor.memory", "2g",
+                    "spark.executor.cores", "2"))
+            .withEnvironments(null)
+            .build();
+    Map<String, String> environments = template.environments();
+    Assertions.assertNotNull(environments);
+    Assertions.assertTrue(environments.isEmpty());
+    String environmentKeys = Joiner.on(", ").join(environments.keySet());
+    Assertions.assertTrue(StringUtils.isBlank(environmentKeys));
   }
 }

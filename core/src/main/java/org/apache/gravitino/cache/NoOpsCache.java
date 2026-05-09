@@ -73,6 +73,13 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public <T, E extends Exception> T withMultipleKeyCacheLock(
+      List<EntityCacheKey> keys, ThrowingSupplier<T, E> action) throws E {
+    return opLock.withMultipleKeyLockAndThrow(keys, action);
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
       NameIdentifier ident, Entity.EntityType type) {
     return Optional.empty();

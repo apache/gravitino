@@ -42,6 +42,9 @@ public class IcebergPropertiesUtils {
     map.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, IcebergConstants.GRAVITINO_JDBC_DRIVER);
     map.put(IcebergConstants.GRAVITINO_JDBC_USER, IcebergConstants.ICEBERG_JDBC_USER);
     map.put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, IcebergConstants.ICEBERG_JDBC_PASSWORD);
+    map.put(
+        IcebergConstants.GRAVITINO_JDBC_SCHEMA_VERSION,
+        IcebergConstants.ICEBERG_JDBC_SCHEMA_VERSION);
     map.put(IcebergConstants.URI, IcebergConstants.URI);
     map.put(IcebergConstants.WAREHOUSE, IcebergConstants.WAREHOUSE);
     map.put(IcebergConstants.CATALOG_BACKEND_NAME, IcebergConstants.CATALOG_BACKEND_NAME);
@@ -75,6 +78,7 @@ public class IcebergPropertiesUtils {
     map.put(
         IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES,
         IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES);
+    map.put(IcebergConstants.DATA_ACCESS, IcebergConstants.ICEBERG_ACCESS_DELEGATION);
 
     GRAVITINO_CONFIG_TO_ICEBERG = Collections.unmodifiableMap(map);
 

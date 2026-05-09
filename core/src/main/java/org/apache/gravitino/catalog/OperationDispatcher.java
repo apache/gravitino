@@ -39,6 +39,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
@@ -178,6 +179,9 @@ public abstract class OperationDispatcher {
       } else if (item instanceof TopicChange.RemoveProperty) {
         TopicChange.RemoveProperty removeProperty = (TopicChange.RemoveProperty) item;
         properties.put(removeProperty.getProperty(), removeProperty.getProperty());
+      } else if (item instanceof ViewChange.RemoveProperty) {
+        ViewChange.RemoveProperty removeProperty = (ViewChange.RemoveProperty) item;
+        properties.put(removeProperty.getProperty(), removeProperty.getProperty());
       }
     }
 
@@ -233,7 +237,11 @@ public abstract class OperationDispatcher {
     try {
       return store.get(ident, type, entityClass);
     } catch (Exception e) {
-      LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, "get", ident, e.getMessage(), e);
+      // Fix unexpected error messages like "2026-02-26T14:33:11.810125Z Gravitino-webserver-91 WARN
+      // found 2 argument placeholders, but provided 4 for pattern `Failed to {} entity for {} in
+      // Gravitino, with this situation the returned object will not contain the metadata from
+      // Gravitino.`" in ${GRAVITINO_HOME}/logs/gravitino-server.out.
+      LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, "get", ident, e);
       return null;
     }
   }
@@ -252,6 +260,9 @@ public abstract class OperationDispatcher {
         properties.put(setProperty.getProperty(), setProperty.getValue());
       } else if (item instanceof TopicChange.SetProperty) {
         TopicChange.SetProperty setProperty = (TopicChange.SetProperty) item;
+        properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof ViewChange.SetProperty) {
+        ViewChange.SetProperty setProperty = (ViewChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
       }
     }

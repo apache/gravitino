@@ -93,7 +93,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* required */,
                 false /* immutable */,
                 JdbcConfig.POOL_MIN_SIZE.getDefaultValue(),
-                true /* hidden */,
+                false /* hidden */,
                 false /* reserved */),
             integerPropertyEntry(
                 JdbcConfig.POOL_MAX_SIZE.getKey(),
@@ -101,7 +101,7 @@ public class JdbcCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                 false /* required */,
                 false /* immutable */,
                 JdbcConfig.POOL_MAX_SIZE.getDefaultValue(),
-                true /* hidden */,
+                false /* hidden */,
                 false /* reserved */),
             booleanPropertyEntry(
                 JdbcConfig.TEST_ON_BORROW.getKey(),

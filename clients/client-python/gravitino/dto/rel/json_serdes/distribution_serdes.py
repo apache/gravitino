@@ -30,12 +30,12 @@ class DistributionSerDes(SerdesUtilsBase, JsonSerializable[DistributionDTO]):
     """Custom JSON deserializer for DistributionDTO objects."""
 
     @classmethod
-    def serialize(cls, data_type: DistributionDTO) -> dict[str, Any]:
+    def serialize(cls, value: DistributionDTO) -> dict[str, Any]:
         return {
-            cls.STRATEGY: data_type.strategy().name.lower(),
-            cls.NUMBER: data_type.number(),
+            cls.STRATEGY: value.strategy().name.lower(),
+            cls.NUMBER: value.number(),
             cls.FUNCTION_ARGS: [
-                SerdesUtils.write_function_arg(arg) for arg in data_type.args()
+                SerdesUtils.write_function_arg(arg) for arg in value.args()
             ],
         }
 
