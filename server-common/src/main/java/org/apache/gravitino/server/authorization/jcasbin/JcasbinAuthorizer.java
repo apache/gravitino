@@ -459,9 +459,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /**
    * Builds the logical schema inheritance chain for a SCHEMA MetadataObject. For a schema object
-   * whose parent is {@code catalog} and whose name is {@code "A:B:C"}, this returns
-   * MetadataObjects for parent {@code catalog} with schema names {@code A:B:C}, {@code A:B}, and
-   * {@code A} in that order.
+   * whose parent is {@code catalog} and whose name is {@code "A:B:C"}, this returns MetadataObjects
+   * for parent {@code catalog} with schema names {@code A:B:C}, {@code A:B}, and {@code A} in that
+   * order.
    *
    * <p>For flat (non-HierarchicalSchema) schemas the list contains only the original object.
    */
