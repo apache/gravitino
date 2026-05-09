@@ -77,7 +77,7 @@ import org.apache.hc.core5.reactor.ssl.SSLBufferMode;
  */
 public class HTTPClient implements RESTClient {
 
-  private static final String REST_TLS_CONFIGURER = "rest.client.tls.configurer-impl";
+  static final String REST_TLS_CONFIGURER = "rest.client.tls.configurer-impl";
 
   private static final String VERSION_HEADER = "application/vnd.gravitino.v1+json";
 
@@ -124,7 +124,7 @@ public class HTTPClient implements RESTClient {
         GravitinoClientConfiguration.buildFromProperties(properties);
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
-    clientBuilder.setConnectionManager(configureConnectionManager(clientConfiguration));
+    clientBuilder.setConnectionManager(configureConnectionManager(clientConfiguration, properties));
 
     if (baseHeaders != null) {
       clientBuilder.setDefaultHeaders(
@@ -723,8 +723,8 @@ public class HTTPClient implements RESTClient {
     return new Builder(properties);
   }
 
-  private static HttpClientConnectionManager configureConnectionManager(
-      GravitinoClientConfiguration clientConfiguration) {
+  static HttpClientConnectionManager configureConnectionManager(
+      GravitinoClientConfiguration clientConfiguration, Map<String, String> properties) {
     PoolingHttpClientConnectionManagerBuilder connectionManagerBuilder =
         PoolingHttpClientConnectionManagerBuilder.create();
 
