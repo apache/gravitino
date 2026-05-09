@@ -77,7 +77,7 @@ public class IdpGroupManager {
   }
 
   public IdpGroupDTO createGroup(String groupName) {
-    ensureSimpleEnabled();
+    ensureBasicEnabled();
     ensureServiceAdmin();
     validateGroupName(groupName);
     if (groupMetaService().findGroup(groupName).isPresent()) {
@@ -114,7 +114,7 @@ public class IdpGroupManager {
   }
 
   public IdpGroupDTO getGroup(String groupName) {
-    ensureSimpleEnabled();
+    ensureBasicEnabled();
     validateGroupName(groupName);
     IdpGroupPO groupPO =
         groupMetaService()
@@ -129,7 +129,7 @@ public class IdpGroupManager {
   }
 
   public boolean deleteGroup(String groupName, boolean force) {
-    ensureSimpleEnabled();
+    ensureBasicEnabled();
     ensureServiceAdmin();
     validateGroupName(groupName);
     Optional<IdpGroupPO> group = groupMetaService().findGroup(groupName);
@@ -159,7 +159,7 @@ public class IdpGroupManager {
   }
 
   public IdpGroupDTO addUsersToGroup(String groupName, List<String> userNames) {
-    ensureSimpleEnabled();
+    ensureBasicEnabled();
     ensureServiceAdmin();
     IdpGroupPO groupPO = requireGroup(groupName);
     List<IdpUserPO> users = requireUsers(userNames);
@@ -209,7 +209,7 @@ public class IdpGroupManager {
   }
 
   public IdpGroupDTO removeUsersFromGroup(String groupName, List<String> userNames) {
-    ensureSimpleEnabled();
+    ensureBasicEnabled();
     ensureServiceAdmin();
     IdpGroupPO groupPO = requireGroup(groupName);
     List<IdpUserPO> users = requireUsers(userNames);
@@ -247,9 +247,9 @@ public class IdpGroupManager {
     return groupMetaService;
   }
 
-  private void ensureSimpleEnabled() {
+  private void ensureBasicEnabled() {
     Preconditions.checkState(
-        config.get(Configs.AUTHENTICATORS).contains("simple"),
+        config.get(Configs.AUTHENTICATORS).contains("basic"),
         "Built-in IdP authentication is disabled");
   }
 
