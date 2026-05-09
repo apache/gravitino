@@ -152,6 +152,10 @@ public class TestSchemaHookDispatcher {
 
   @Test
   public void testCreateSchemaSetsOwnerForEachMissingParentAndLeaf() throws Exception {
+    // Default catalog capability rejects ':' in schema names; hierarchical namespaces need this.
+    when(mockCatalogWrapper.capabilities())
+        .thenReturn(new AllowHierarchicalSchemaNamesCapability());
+
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     Schema mockSchema = mock(Schema.class);
     when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
@@ -174,6 +178,17 @@ public class TestSchemaHookDispatcher {
     @Override
     public CapabilityResult caseSensitiveOnName(Scope scope) {
       return CapabilityResult.unsupported("case-insensitive");
+    }
+  }
+
+  /** Accepts hierarchical schema paths (e.g. {@code A:B}) for {@link Capability.Scope#SCHEMA}. */
+  private static class AllowHierarchicalSchemaNamesCapability implements Capability {
+    @Override
+    public CapabilityResult specificationOnName(Capability.Scope scope, String name) {
+      if (scope == Capability.Scope.SCHEMA) {
+        return CapabilityResult.SUPPORTED;
+      }
+      return Capability.DEFAULT.specificationOnName(scope, name);
     }
   }
 }

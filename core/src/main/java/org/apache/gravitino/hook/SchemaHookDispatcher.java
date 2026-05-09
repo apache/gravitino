@@ -108,7 +108,7 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
     String separator = HierarchicalSchemaUtil.schemaSeparator();
     List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(ident.name(), separator);
     if (ancestorNames.isEmpty()) {
-      return Collections.emptyList();
+      return new ArrayList<>();
     }
 
     List<NameIdentifier> ancestorIdents = new ArrayList<>(ancestorNames.size());

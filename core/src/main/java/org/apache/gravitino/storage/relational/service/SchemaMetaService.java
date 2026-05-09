@@ -46,6 +46,8 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
@@ -186,7 +188,7 @@ public class SchemaMetaService {
             HierarchicalSchemaUtil.getAncestorNames(logicalLeaf, separator)) {
           SchemaEntity ancestor =
               SchemaEntity.builder()
-                  .withId(GravitinoEnv.getInstance().idGenerator().nextId())
+                  .withId(nextIdForNestedAncestor())
                   .withName(ancestorLogical)
                   .withNamespace(schemaEntity.namespace())
                   .withComment(null)
@@ -686,5 +688,14 @@ public class SchemaMetaService {
         .withProperties(entity.properties())
         .withAuditInfo(entity.auditInfo())
         .build();
+  }
+
+  /**
+   * Nested schema materialization needs extra ids for ancestor rows. Relational tests set {@link
+   * GravitinoEnv} config without a full server {@link IdGenerator}; fall back for that case.
+   */
+  private static long nextIdForNestedAncestor() {
+    IdGenerator generator = GravitinoEnv.getInstance().idGenerator();
+    return generator != null ? generator.nextId() : RandomIdGenerator.INSTANCE.nextId();
   }
 }
