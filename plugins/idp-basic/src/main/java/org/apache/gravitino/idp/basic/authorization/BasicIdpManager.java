@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.IdpGroupDTO;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -47,7 +48,7 @@ import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
  *
  * <p>This implementation manages both built-in IdP users and groups.
  */
-public class IdpManager implements org.apache.gravitino.authorization.IdpManager {
+public class BasicIdpManager implements IdpManager {
   private static final long INITIAL_VERSION = 1L;
 
   private final IdGenerator idGenerator;
@@ -55,7 +56,7 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
   private final IdpGroupMetaService groupMetaService;
   private final PasswordHasher passwordHasher;
 
-  public IdpManager() {
+  public BasicIdpManager() {
     this(
         GravitinoEnv.getInstance().idGenerator(),
         IdpUserMetaService.getInstance(),
@@ -63,7 +64,7 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
         PasswordHasherFactory.create());
   }
 
-  IdpManager(
+  BasicIdpManager(
       IdGenerator idGenerator,
       IdpUserMetaService userMetaService,
       IdpGroupMetaService groupMetaService,

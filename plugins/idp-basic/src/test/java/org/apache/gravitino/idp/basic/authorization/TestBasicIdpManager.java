@@ -44,12 +44,12 @@ import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpManager {
+public class TestBasicIdpManager {
 
   private IdpUserMetaService userMetaService;
   private IdpGroupMetaService groupMetaService;
   private PasswordHasher passwordHasher;
-  private IdpManager manager;
+  private BasicIdpManager manager;
 
   @BeforeEach
   public void setUp() {
@@ -58,7 +58,7 @@ public class TestIdpManager {
     passwordHasher = mock(PasswordHasher.class);
     IdGenerator idGenerator = mock(IdGenerator.class);
     when(idGenerator.nextId()).thenReturn(1L);
-    manager = new IdpManager(idGenerator, userMetaService, groupMetaService, passwordHasher);
+    manager = new BasicIdpManager(idGenerator, userMetaService, groupMetaService, passwordHasher);
   }
 
   @Test

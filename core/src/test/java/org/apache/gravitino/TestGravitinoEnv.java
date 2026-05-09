@@ -35,7 +35,7 @@ import org.mockito.Mockito;
 public class TestGravitinoEnv {
 
   private static final String IDP_MANAGER_IMPL =
-      "org.apache.gravitino.idp.basic.authorization.IdpManager";
+      "org.apache.gravitino.idp.basic.authorization.BasicIdpManager";
 
   private GravitinoEnv env;
   private Path tempDir;

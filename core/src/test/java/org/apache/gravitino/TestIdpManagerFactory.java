@@ -37,7 +37,8 @@ public class TestIdpManagerFactory {
   public void testCreateIdpManagerLoadsPluginImplementation() {
     IdpManager idpManager = IdpManagerFactory.createIdpManager();
     assertEquals(
-        "org.apache.gravitino.idp.basic.authorization.IdpManager", idpManager.getClass().getName());
+        "org.apache.gravitino.idp.basic.authorization.BasicIdpManager",
+        idpManager.getClass().getName());
   }
 
   @Test

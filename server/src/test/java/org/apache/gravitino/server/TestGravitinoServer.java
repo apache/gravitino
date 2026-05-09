@@ -207,10 +207,10 @@ public class TestGravitinoServer {
       assertEquals("user1", userResponse.getUser().name());
     }
 
-    try (IdpUserServerTestContext nonAdminContext =
-        newIdpUserServerTestContext(serverConfig, idpManager, "non-admin")) {
+    try (IdpUserServerTestContext selfContext =
+        newIdpUserServerTestContext(serverConfig, idpManager, "user1")) {
       Response response =
-          nonAdminContext
+          selfContext
               .jerseyTest()
               .target("/idp/users/user1")
               .request("application/vnd.gravitino.v1+json")

@@ -253,6 +253,23 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(NoSuchUserException.class.getSimpleName(), errorResponse.getType());
 
+    reset(MANAGER);
+    when(MANAGER.getUser("user1")).thenThrow(new UnsupportedOperationException("mock unsupported"));
+    Response respUnsupported =
+        target("/idp/users/user1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(
+        Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), respUnsupported.getStatus());
+
+    ErrorResponse unsupportedErrorResponse = respUnsupported.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(
+        ErrorConstants.UNSUPPORTED_OPERATION_CODE, unsupportedErrorResponse.getCode());
+    Assertions.assertEquals(
+        UnsupportedOperationException.class.getSimpleName(), unsupportedErrorResponse.getType());
+
     // Test to throw internal RuntimeException
     reset(MANAGER);
     when(MANAGER.getUser("user1")).thenThrow(new RuntimeException("mock error"));
