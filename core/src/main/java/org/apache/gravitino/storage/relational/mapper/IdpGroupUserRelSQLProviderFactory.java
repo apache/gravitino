@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.IdpGroupUserRelBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.h2.IdpGroupUserRelH2Provider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.IdpGroupUserRelPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -50,8 +51,6 @@ public class IdpGroupUserRelSQLProviderFactory {
   }
 
   static class IdpGroupUserRelMySQLProvider extends IdpGroupUserRelBaseSQLProvider {}
-
-  static class IdpGroupUserRelH2Provider extends IdpGroupUserRelBaseSQLProvider {}
 
   public static String selectGroupNamesByUserId(@Param("userId") Long userId) {
     return getProvider().selectGroupNamesByUserId(userId);
