@@ -909,6 +909,42 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             ClickHouseUtils.getSortOrders("c1"));
     Assertions.assertTrue(partitionSql.contains("PARTITION BY `c1`"));
 
+    String yearPartitionSql =
+        ops.buildCreateSql(
+            "t_year",
+            new JdbcColumn[] {col},
+            null,
+            propsWithPartition,
+            new Transform[] {Transforms.year("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+    Assertions.assertTrue(yearPartitionSql.contains("PARTITION BY toYear(`c1`)"));
+
+    String monthPartitionSql =
+        ops.buildCreateSql(
+            "t_month",
+            new JdbcColumn[] {col},
+            null,
+            propsWithPartition,
+            new Transform[] {Transforms.month("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+    Assertions.assertTrue(monthPartitionSql.contains("PARTITION BY toYYYYMM(`c1`)"));
+
+    String dayPartitionSql =
+        ops.buildCreateSql(
+            "t_day",
+            new JdbcColumn[] {col},
+            null,
+            propsWithPartition,
+            new Transform[] {Transforms.day("c1")},
+            Distributions.NONE,
+            indexes,
+            ClickHouseUtils.getSortOrders("c1"));
+    Assertions.assertTrue(dayPartitionSql.contains("PARTITION BY toDate(`c1`)"));
+
     // distribution not NONE
     Assertions.assertThrows(
         IllegalArgumentException.class,

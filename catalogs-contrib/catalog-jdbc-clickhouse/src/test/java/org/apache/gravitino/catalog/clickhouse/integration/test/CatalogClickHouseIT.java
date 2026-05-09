@@ -497,7 +497,7 @@ public class CatalogClickHouseIT extends BaseIT {
           Column.of("amount", Types.FloatType.get(), "amt")
         };
 
-    Transform[] partitioning = new Transform[] {Transforms.identity("event_time")};
+    Transform[] partitioning = new Transform[] {Transforms.month("event_time")};
     SortOrder[] sortOrders =
         new SortOrder[] {
           SortOrders.of(NamedReference.field("user_id"), SortDirection.ASCENDING),
@@ -526,6 +526,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
     Table loaded = catalog.asTableCatalog().loadTable(ident);
     Assertions.assertEquals(1, loaded.partitioning().length);
+    Assertions.assertEquals(Transforms.NAME_OF_MONTH, loaded.partitioning()[0].name());
     Assertions.assertEquals(
         "event_time", ((NamedReference) loaded.partitioning()[0].arguments()[0]).fieldName()[0]);
 
