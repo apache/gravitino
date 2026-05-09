@@ -203,8 +203,8 @@ public class TestViewOperations extends BaseOperationsTest {
     Assertions.assertNull(viewDTO.defaultCatalog());
     Assertions.assertNull(viewDTO.defaultSchema());
     Assertions.assertEquals(1, viewDTO.representations().length);
-    Assertions.assertTrue(viewDTO.representations()[0] instanceof SQLRepresentationDTO);
-    SQLRepresentationDTO sqlRep = (SQLRepresentationDTO) viewDTO.representations()[0];
+    Assertions.assertTrue(viewDTO.representations()[0] instanceof SQLRepresentation);
+    SQLRepresentation sqlRep = (SQLRepresentation) viewDTO.representations()[0];
     Assertions.assertEquals("trino", sqlRep.dialect());
     Assertions.assertEquals("SELECT 1", sqlRep.sql());
 

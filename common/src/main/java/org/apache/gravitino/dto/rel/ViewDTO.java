@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
@@ -104,7 +105,7 @@ public class ViewDTO implements View {
 
   @Override
   public Representation[] representations() {
-    return representations == null ? new RepresentationDTO[0] : representations;
+    return DTOConverters.fromDTOs(representations);
   }
 
   @Override
