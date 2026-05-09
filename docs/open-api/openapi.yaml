@@ -638,3 +638,4 @@ components:
     KerberosAuth:
       type: http
       scheme: negotiate
+
