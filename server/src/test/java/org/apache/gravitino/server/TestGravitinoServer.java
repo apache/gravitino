@@ -206,17 +206,6 @@ public class TestGravitinoServer {
       IdpUserResponse userResponse = response.readEntity(IdpUserResponse.class);
       assertEquals("user1", userResponse.getUser().name());
     }
-
-    try (IdpUserServerTestContext selfContext =
-        newIdpUserServerTestContext(serverConfig, idpManager, "user1")) {
-      Response response =
-          selfContext
-              .jerseyTest()
-              .target("/idp/users/user1")
-              .request("application/vnd.gravitino.v1+json")
-              .get();
-      assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    }
   }
 
   @Test

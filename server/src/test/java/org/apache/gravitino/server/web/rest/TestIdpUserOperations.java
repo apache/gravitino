@@ -25,13 +25,11 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.dto.requests.CreateUserRequest;
@@ -45,7 +43,6 @@ import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
@@ -200,14 +197,8 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     AuthorizationExpression getUserAuthorization =
         getUserMethod.getAnnotation(AuthorizationExpression.class);
     Assertions.assertNotNull(getUserAuthorization);
-    Assertions.assertEquals("SERVICE_ADMIN || USER::SELF", getUserAuthorization.expression());
-    Assertions.assertTrue(getUserAuthorization.errorMessage().contains("user itself"));
-
-    Parameter userParameter = getUserMethod.getParameters()[0];
-    AuthorizationMetadata authorizationMetadata =
-        userParameter.getAnnotation(AuthorizationMetadata.class);
-    Assertions.assertNotNull(authorizationMetadata);
-    Assertions.assertEquals(EntityType.USER, authorizationMetadata.type());
+    Assertions.assertEquals("SERVICE_ADMIN", getUserAuthorization.expression());
+    Assertions.assertTrue(getUserAuthorization.errorMessage().contains("service admins"));
 
     assertServiceAdminAuthorization(
         IdpUserOperations.class.getMethod("addUser", CreateUserRequest.class));

@@ -31,7 +31,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.requests.CreateUserRequest;
@@ -41,17 +40,13 @@ import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 
 @NameBindings.AccessControlInterfaces
 @Path("/idp/users")
 public class IdpUserOperations {
 
-  private static final String LOAD_IDP_USER_PRIVILEGE = "SERVICE_ADMIN || USER::SELF";
   private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";
-  private static final String VIEW_IDP_USER_ERROR =
-      "Only Gravitino service admins or the user itself can view built-in IdP identities";
   private static final String SERVICE_ADMIN_ERROR =
       "Only Gravitino service admins can manage built-in IdP identities";
   private final IdpManager idpManager;
@@ -71,9 +66,8 @@ public class IdpUserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-idp-user", absolute = true)
-  @AuthorizationExpression(expression = LOAD_IDP_USER_PRIVILEGE, errorMessage = VIEW_IDP_USER_ERROR)
-  public Response getUser(
-      @PathParam("user") @AuthorizationMetadata(type = Entity.EntityType.USER) String user) {
+  @AuthorizationExpression(expression = "SERVICE_ADMIN", errorMessage = SERVICE_ADMIN_ERROR)
+  public Response getUser(@PathParam("user") String user) {
     try {
       return Utils.doAs(httpRequest, () -> Utils.ok(new IdpUserResponse(idpManager.getUser(user))));
     } catch (Exception e) {
