@@ -26,11 +26,10 @@ import org.apache.ibatis.annotations.Param;
 public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
 
   @Override
-  public String softDeleteIdpUser(Long userId, Long deletedAt, String auditInfo) {
+  public String softDeleteIdpUser(Long userId, Long deletedAt) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
-        + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE user_id = #{userId} AND deleted_at = 0";

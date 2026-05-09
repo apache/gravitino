@@ -19,9 +19,7 @@
 
 package org.apache.gravitino.authorization;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -33,13 +31,10 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.IdpGroupDTO;
-import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
-import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.po.IdpGroupPO;
 import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
@@ -84,28 +79,11 @@ public class IdpGroupManager {
       throw new GroupAlreadyExistsException("Built-in IdP group %s already exists", groupName);
     }
 
-    String auditInfo;
-    try {
-      Instant now = Instant.now();
-      auditInfo =
-          JsonUtils.anyFieldMapper()
-              .writeValueAsString(
-                  AuditInfo.builder()
-                      .withCreator(currentUser())
-                      .withCreateTime(now)
-                      .withLastModifier(currentUser())
-                      .withLastModifiedTime(now)
-                      .build());
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Failed to serialize built-in IdP audit info", e);
-    }
-
     groupMetaService()
         .createGroup(
             IdpGroupPO.builder()
                 .withGroupId(nextId())
                 .withGroupName(groupName)
-                .withAuditInfo(auditInfo)
                 .withCurrentVersion(INITIAL_VERSION)
                 .withLastVersion(INITIAL_VERSION)
                 .withDeletedAt(0L)
@@ -138,24 +116,7 @@ public class IdpGroupManager {
     }
 
     validateGroupDeletion(groupName, force);
-    Long deletedAt = Instant.now().toEpochMilli();
-    String auditInfo;
-    try {
-      AuditInfo original =
-          JsonUtils.anyFieldMapper().readValue(group.get().getAuditInfo(), AuditInfo.class);
-      auditInfo =
-          JsonUtils.anyFieldMapper()
-              .writeValueAsString(
-                  AuditInfo.builder()
-                      .withCreator(original.creator())
-                      .withCreateTime(original.createTime())
-                      .withLastModifier(currentUser())
-                      .withLastModifiedTime(Instant.now())
-                      .build());
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Failed to deserialize built-in IdP audit info", e);
-    }
-    return groupMetaService().deleteGroup(group.get(), deletedAt, auditInfo);
+    return groupMetaService().deleteGroup(group.get(), System.currentTimeMillis());
   }
 
   public IdpGroupDTO addUsersToGroup(String groupName, List<String> userNames) {
@@ -171,21 +132,6 @@ public class IdpGroupManager {
         groupMetaService()
             .selectRelatedUserIds(groupPO.getGroupId(), new ArrayList<>(requestedUserIds));
     Set<Long> existingSet = new LinkedHashSet<>(existingUserIds);
-    String auditInfo;
-    try {
-      Instant now = Instant.now();
-      auditInfo =
-          JsonUtils.anyFieldMapper()
-              .writeValueAsString(
-                  AuditInfo.builder()
-                      .withCreator(currentUser())
-                      .withCreateTime(now)
-                      .withLastModifier(currentUser())
-                      .withLastModifiedTime(now)
-                      .build());
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Failed to serialize built-in IdP audit info", e);
-    }
     List<IdpGroupUserRelPO> relations = new ArrayList<>();
     for (IdpUserPO user : users) {
       if (existingSet.contains(user.getUserId())) {
@@ -197,7 +143,6 @@ public class IdpGroupManager {
               .withId(nextId())
               .withGroupId(groupPO.getGroupId())
               .withUserId(user.getUserId())
-              .withAuditInfo(auditInfo)
               .withCurrentVersion(INITIAL_VERSION)
               .withLastVersion(INITIAL_VERSION)
               .withDeletedAt(0L)
@@ -214,24 +159,8 @@ public class IdpGroupManager {
     IdpGroupPO groupPO = requireGroup(groupName);
     List<IdpUserPO> users = requireUsers(userNames);
     List<Long> userIds = users.stream().map(IdpUserPO::getUserId).collect(Collectors.toList());
-    String auditInfo;
-    try {
-      Instant now = Instant.now();
-      auditInfo =
-          JsonUtils.anyFieldMapper()
-              .writeValueAsString(
-                  AuditInfo.builder()
-                      .withCreator(currentUser())
-                      .withCreateTime(now)
-                      .withLastModifier(currentUser())
-                      .withLastModifiedTime(now)
-                      .build());
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Failed to serialize built-in IdP audit info", e);
-    }
     groupMetaService()
-        .removeUsersFromGroup(
-            groupPO.getGroupId(), userIds, Instant.now().toEpochMilli(), auditInfo);
+        .removeUsersFromGroup(groupPO.getGroupId(), userIds, System.currentTimeMillis());
     return getGroup(groupName);
   }
 
@@ -271,17 +200,9 @@ public class IdpGroupManager {
   }
 
   private IdpGroupDTO toGroupDTO(IdpGroupPO groupPO) {
-    AuditInfo auditInfo;
-    try {
-      auditInfo = JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class);
-    } catch (JsonProcessingException e) {
-      throw new IllegalStateException("Failed to deserialize built-in IdP audit info", e);
-    }
-
     return IdpGroupDTO.builder()
         .withName(groupPO.getGroupName())
         .withUsers(groupMetaService.listUserNames(groupPO.getGroupName()))
-        .withAudit(DTOConverters.toDTO(auditInfo))
         .build();
   }
 

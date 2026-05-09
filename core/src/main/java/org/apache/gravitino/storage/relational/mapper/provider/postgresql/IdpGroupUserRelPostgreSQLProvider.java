@@ -27,13 +27,11 @@ import org.apache.ibatis.annotations.Param;
 public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLProvider {
 
   @Override
-  public String softDeleteIdpGroupUsers(
-      Long groupId, List<Long> userIds, Long deletedAt, String auditInfo) {
+  public String softDeleteIdpGroupUsers(Long groupId, List<Long> userIds, Long deletedAt) {
     return "<script>"
         + "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
-        + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE group_id = #{groupId} "
@@ -54,22 +52,20 @@ public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLPro
   }
 
   @Override
-  public String softDeleteGroupUsersByUserId(Long userId, Long deletedAt, String auditInfo) {
+  public String softDeleteGroupUsersByUserId(Long userId, Long deletedAt) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
-        + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
   @Override
-  public String softDeleteGroupUsersByGroupId(Long groupId, Long deletedAt, String auditInfo) {
+  public String softDeleteGroupUsersByGroupId(Long groupId, Long deletedAt) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
-        + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE group_id = #{groupId} AND deleted_at = 0";

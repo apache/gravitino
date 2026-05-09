@@ -25,7 +25,6 @@ public class IdpGroupUserRelPO {
   private Long id;
   private Long groupId;
   private Long userId;
-  private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
@@ -40,10 +39,6 @@ public class IdpGroupUserRelPO {
 
   public Long getUserId() {
     return userId;
-  }
-
-  public String getAuditInfo() {
-    return auditInfo;
   }
 
   public Long getCurrentVersion() {
@@ -70,7 +65,6 @@ public class IdpGroupUserRelPO {
     return Objects.equal(getId(), idpGroupUserRelPO.getId())
         && Objects.equal(getGroupId(), idpGroupUserRelPO.getGroupId())
         && Objects.equal(getUserId(), idpGroupUserRelPO.getUserId())
-        && Objects.equal(getAuditInfo(), idpGroupUserRelPO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), idpGroupUserRelPO.getCurrentVersion())
         && Objects.equal(getLastVersion(), idpGroupUserRelPO.getLastVersion())
         && Objects.equal(getDeletedAt(), idpGroupUserRelPO.getDeletedAt());
@@ -79,13 +73,7 @@ public class IdpGroupUserRelPO {
   @Override
   public int hashCode() {
     return Objects.hashCode(
-        getId(),
-        getGroupId(),
-        getUserId(),
-        getAuditInfo(),
-        getCurrentVersion(),
-        getLastVersion(),
-        getDeletedAt());
+        getId(), getGroupId(), getUserId(), getCurrentVersion(), getLastVersion(), getDeletedAt());
   }
 
   public static class Builder {
@@ -110,11 +98,6 @@ public class IdpGroupUserRelPO {
       return this;
     }
 
-    public Builder withAuditInfo(String auditInfo) {
-      idpGroupUserRelPO.auditInfo = auditInfo;
-      return this;
-    }
-
     public Builder withCurrentVersion(Long currentVersion) {
       idpGroupUserRelPO.currentVersion = currentVersion;
       return this;
@@ -134,7 +117,6 @@ public class IdpGroupUserRelPO {
       Preconditions.checkArgument(idpGroupUserRelPO.id != null, "Relation id is required");
       Preconditions.checkArgument(idpGroupUserRelPO.groupId != null, "Group id is required");
       Preconditions.checkArgument(idpGroupUserRelPO.userId != null, "User id is required");
-      Preconditions.checkArgument(idpGroupUserRelPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(
           idpGroupUserRelPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(

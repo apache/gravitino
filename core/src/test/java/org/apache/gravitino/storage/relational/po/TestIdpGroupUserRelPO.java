@@ -30,7 +30,6 @@ public class TestIdpGroupUserRelPO {
             .withId(1L)
             .withGroupId(2L)
             .withUserId(3L)
-            .withAuditInfo("audit")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -39,7 +38,6 @@ public class TestIdpGroupUserRelPO {
     Assertions.assertEquals(1L, relPO.getId());
     Assertions.assertEquals(2L, relPO.getGroupId());
     Assertions.assertEquals(3L, relPO.getUserId());
-    Assertions.assertEquals("audit", relPO.getAuditInfo());
     Assertions.assertEquals(1L, relPO.getCurrentVersion());
     Assertions.assertEquals(1L, relPO.getLastVersion());
     Assertions.assertEquals(0L, relPO.getDeletedAt());
@@ -53,7 +51,6 @@ public class TestIdpGroupUserRelPO {
             IdpGroupUserRelPO.builder()
                 .withGroupId(2L)
                 .withUserId(3L)
-                .withAuditInfo("audit")
                 .withCurrentVersion(1L)
                 .withLastVersion(1L)
                 .withDeletedAt(0L)
@@ -67,7 +64,6 @@ public class TestIdpGroupUserRelPO {
             .withId(1L)
             .withGroupId(2L)
             .withUserId(3L)
-            .withAuditInfo("audit")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -78,7 +74,6 @@ public class TestIdpGroupUserRelPO {
             .withId(1L)
             .withGroupId(2L)
             .withUserId(3L)
-            .withAuditInfo("audit")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)

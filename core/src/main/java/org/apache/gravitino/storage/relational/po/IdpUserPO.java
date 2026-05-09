@@ -25,7 +25,6 @@ public class IdpUserPO {
   private Long userId;
   private String userName;
   private String passwordHash;
-  private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
@@ -40,10 +39,6 @@ public class IdpUserPO {
 
   public String getPasswordHash() {
     return passwordHash;
-  }
-
-  public String getAuditInfo() {
-    return auditInfo;
   }
 
   public Long getCurrentVersion() {
@@ -70,7 +65,6 @@ public class IdpUserPO {
     return Objects.equal(getUserId(), tablePO.getUserId())
         && Objects.equal(getUserName(), tablePO.getUserName())
         && Objects.equal(getPasswordHash(), tablePO.getPasswordHash())
-        && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
         && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
@@ -82,7 +76,6 @@ public class IdpUserPO {
         getUserId(),
         getUserName(),
         getPasswordHash(),
-        getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
         getDeletedAt());
@@ -110,11 +103,6 @@ public class IdpUserPO {
       return this;
     }
 
-    public Builder withAuditInfo(String auditInfo) {
-      userPO.auditInfo = auditInfo;
-      return this;
-    }
-
     public Builder withCurrentVersion(Long currentVersion) {
       userPO.currentVersion = currentVersion;
       return this;
@@ -134,7 +122,6 @@ public class IdpUserPO {
       Preconditions.checkArgument(userPO.userId != null, "User id is required");
       Preconditions.checkArgument(userPO.userName != null, "User name is required");
       Preconditions.checkArgument(userPO.passwordHash != null, "Password hash is required");
-      Preconditions.checkArgument(userPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(userPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(userPO.lastVersion != null, "Last version is required");
       Preconditions.checkArgument(userPO.deletedAt != null, "Deleted at is required");

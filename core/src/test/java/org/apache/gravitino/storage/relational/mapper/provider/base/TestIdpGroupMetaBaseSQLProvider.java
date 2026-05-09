@@ -55,20 +55,19 @@ public class TestIdpGroupMetaBaseSQLProvider {
     Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_group_meta"));
     Assertions.assertTrue(
         normalizedSql.contains(
-            "(group_id, group_name, audit_info, current_version, last_version, deleted_at)"));
+            "(group_id, group_name, current_version, last_version, deleted_at)"));
     Assertions.assertTrue(
         normalizedSql.contains(
-            "VALUES ( #{groupMeta.groupId}, #{groupMeta.groupName}, #{groupMeta.auditInfo}, #{groupMeta.currentVersion}, #{groupMeta.lastVersion}, #{groupMeta.deletedAt} )"));
+            "VALUES ( #{groupMeta.groupId}, #{groupMeta.groupName}, #{groupMeta.currentVersion}, #{groupMeta.lastVersion}, #{groupMeta.deletedAt} )"));
   }
 
   @Test
   public void testSoftDeleteIdpGroup() {
     String normalizedSql =
-        createProvider().softDeleteIdpGroup(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
+        createProvider().softDeleteIdpGroup(1L, 2L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_meta"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("audit_info = #{auditInfo}"));
     Assertions.assertTrue(normalizedSql.contains("current_version = current_version + 1"));
     Assertions.assertTrue(normalizedSql.contains("last_version = last_version + 1"));
     Assertions.assertTrue(normalizedSql.contains("WHERE group_id = #{groupId} AND deleted_at = 0"));
@@ -78,8 +77,7 @@ public class TestIdpGroupMetaBaseSQLProvider {
   public void testSoftDeleteIdpGroupDoesNotUseOptimisticLocking() {
     IdpGroupMetaBaseSQLProvider provider = createProvider();
 
-    String normalizedSql =
-        provider.softDeleteIdpGroup(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
+    String normalizedSql = provider.softDeleteIdpGroup(1L, 2L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertFalse(
         normalizedSql.contains("current_version = #{currentVersion}"),
@@ -104,7 +102,6 @@ public class TestIdpGroupMetaBaseSQLProvider {
     return IdpGroupPO.builder()
         .withGroupId(1L)
         .withGroupName("group")
-        .withAuditInfo("audit")
         .withCurrentVersion(1L)
         .withLastVersion(1L)
         .withDeletedAt(0L)

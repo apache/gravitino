@@ -26,7 +26,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.Instant;
 import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Config;
@@ -34,8 +33,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
-import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
@@ -73,7 +70,6 @@ public class TestIdpUserManager {
             new UserPrincipal("admin"), () -> manager.createUser("alice", "Passw0rd-For-Alice"));
 
     assertEquals("alice", user.name());
-    assertEquals("admin", user.auditInfo().creator());
     verify(userMetaService).createUser(any(IdpUserPO.class));
   }
 
@@ -100,21 +96,9 @@ public class TestIdpUserManager {
         .withUserId(1L)
         .withUserName(userName)
         .withPasswordHash(passwordHash)
-        .withAuditInfo(toAuditJson())
         .withCurrentVersion(1L)
         .withLastVersion(1L)
         .withDeletedAt(0L)
         .build();
-  }
-
-  private String toAuditJson() throws Exception {
-    AuditInfo auditInfo =
-        AuditInfo.builder()
-            .withCreator("admin")
-            .withCreateTime(Instant.now())
-            .withLastModifier("admin")
-            .withLastModifiedTime(Instant.now())
-            .build();
-    return JsonUtils.anyFieldMapper().writeValueAsString(auditInfo);
   }
 }

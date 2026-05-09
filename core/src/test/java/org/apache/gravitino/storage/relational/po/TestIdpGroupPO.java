@@ -29,7 +29,6 @@ public class TestIdpGroupPO {
         IdpGroupPO.builder()
             .withGroupId(1L)
             .withGroupName("engineering")
-            .withAuditInfo("audit")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -37,7 +36,6 @@ public class TestIdpGroupPO {
 
     Assertions.assertEquals(1L, groupPO.getGroupId());
     Assertions.assertEquals("engineering", groupPO.getGroupName());
-    Assertions.assertEquals("audit", groupPO.getAuditInfo());
     Assertions.assertEquals(1L, groupPO.getCurrentVersion());
     Assertions.assertEquals(1L, groupPO.getLastVersion());
     Assertions.assertEquals(0L, groupPO.getDeletedAt());
@@ -50,7 +48,6 @@ public class TestIdpGroupPO {
         () ->
             IdpGroupPO.builder()
                 .withGroupId(1L)
-                .withAuditInfo("audit")
                 .withCurrentVersion(1L)
                 .withLastVersion(1L)
                 .withDeletedAt(0L)
@@ -63,7 +60,6 @@ public class TestIdpGroupPO {
         IdpGroupPO.builder()
             .withGroupId(1L)
             .withGroupName("engineering")
-            .withAuditInfo("audit")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -73,7 +69,6 @@ public class TestIdpGroupPO {
         IdpGroupPO.builder()
             .withGroupId(1L)
             .withGroupName("engineering")
-            .withAuditInfo("audit")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)

@@ -67,8 +67,7 @@ public class IdpUserMetaService {
     SessionUtils.doWithCommit(IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO));
   }
 
-  public void updatePassword(
-      IdpUserPO userPO, String passwordHash, String auditInfo, Long nextVersion) {
+  public void updatePassword(IdpUserPO userPO, String passwordHash, Long nextVersion) {
     Integer updated =
         SessionUtils.doWithCommitAndFetchResult(
             IdpUserMetaMapper.class,
@@ -76,7 +75,6 @@ public class IdpUserMetaService {
                 mapper.updateIdpUserPassword(
                     userPO.getUserId(),
                     passwordHash,
-                    auditInfo,
                     userPO.getCurrentVersion(),
                     nextVersion,
                     nextVersion));
@@ -84,17 +82,16 @@ public class IdpUserMetaService {
         updated == 1, "Failed to update password for user %s", userPO.getUserName());
   }
 
-  public boolean deleteUser(IdpUserPO userPO, Long deletedAt, String auditInfo) {
+  public boolean deleteUser(IdpUserPO userPO, Long deletedAt) {
     SessionUtils.doMultipleWithCommit(
         () ->
             SessionUtils.doWithoutCommit(
                 IdpUserMetaMapper.class,
-                mapper -> mapper.softDeleteIdpUser(userPO.getUserId(), deletedAt, auditInfo)),
+                mapper -> mapper.softDeleteIdpUser(userPO.getUserId(), deletedAt)),
         () ->
             SessionUtils.doWithoutCommit(
                 IdpGroupUserRelMapper.class,
-                mapper ->
-                    mapper.softDeleteGroupUsersByUserId(userPO.getUserId(), deletedAt, auditInfo)));
+                mapper -> mapper.softDeleteGroupUsersByUserId(userPO.getUserId(), deletedAt)));
     return true;
   }
 

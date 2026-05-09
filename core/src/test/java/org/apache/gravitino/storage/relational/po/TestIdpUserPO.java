@@ -30,7 +30,6 @@ public class TestIdpUserPO {
             .withUserId(1L)
             .withUserName("alice")
             .withPasswordHash("hash")
-            .withAuditInfo("audit")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -39,7 +38,6 @@ public class TestIdpUserPO {
     Assertions.assertEquals(1L, userPO.getUserId());
     Assertions.assertEquals("alice", userPO.getUserName());
     Assertions.assertEquals("hash", userPO.getPasswordHash());
-    Assertions.assertEquals("audit", userPO.getAuditInfo());
     Assertions.assertEquals(1L, userPO.getCurrentVersion());
     Assertions.assertEquals(1L, userPO.getLastVersion());
     Assertions.assertEquals(0L, userPO.getDeletedAt());
@@ -53,7 +51,6 @@ public class TestIdpUserPO {
             IdpUserPO.builder()
                 .withUserId(1L)
                 .withUserName("alice")
-                .withAuditInfo("audit")
                 .withCurrentVersion(1L)
                 .withLastVersion(1L)
                 .withDeletedAt(0L)
@@ -67,7 +64,6 @@ public class TestIdpUserPO {
             .withUserId(1L)
             .withUserName("alice")
             .withPasswordHash("hash")
-            .withAuditInfo("audit")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -78,7 +74,6 @@ public class TestIdpUserPO {
             .withUserId(1L)
             .withUserName("alice")
             .withPasswordHash("hash")
-            .withAuditInfo("audit")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)

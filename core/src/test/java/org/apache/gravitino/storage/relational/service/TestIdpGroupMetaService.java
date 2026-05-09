@@ -42,8 +42,6 @@ import org.junit.jupiter.api.TestTemplate;
 
 class TestIdpGroupMetaService extends TestJDBCBackend {
 
-  private static final String AUDIT_INFO_JSON = "{\"creator\":\"creator\"}";
-
   @TestTemplate
   void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
@@ -72,7 +70,7 @@ class TestIdpGroupMetaService extends TestJDBCBackend {
     assertEquals(1, countIdpGroupUserRels());
 
     long deletedAt = Instant.now().toEpochMilli();
-    assertTrue(groupMetaService.deleteGroup(group, deletedAt, AUDIT_INFO_JSON));
+    assertTrue(groupMetaService.deleteGroup(group, deletedAt));
 
     assertFalse(groupMetaService.findGroup(group.getGroupName()).isPresent());
     assertTrue(groupMetaService.findGroup(anotherGroup.getGroupName()).isPresent());
@@ -92,7 +90,6 @@ class TestIdpGroupMetaService extends TestJDBCBackend {
         .withUserId(id)
         .withUserName(userName)
         .withPasswordHash(passwordHash)
-        .withAuditInfo(AUDIT_INFO_JSON)
         .withCurrentVersion(0L)
         .withLastVersion(0L)
         .withDeletedAt(0L)
@@ -103,7 +100,6 @@ class TestIdpGroupMetaService extends TestJDBCBackend {
     return IdpGroupPO.builder()
         .withGroupId(id)
         .withGroupName(groupName)
-        .withAuditInfo(AUDIT_INFO_JSON)
         .withCurrentVersion(0L)
         .withLastVersion(0L)
         .withDeletedAt(0L)
@@ -115,7 +111,6 @@ class TestIdpGroupMetaService extends TestJDBCBackend {
         .withId(id)
         .withGroupId(group.getGroupId())
         .withUserId(user.getUserId())
-        .withAuditInfo(AUDIT_INFO_JSON)
         .withCurrentVersion(0L)
         .withLastVersion(0L)
         .withDeletedAt(0L)

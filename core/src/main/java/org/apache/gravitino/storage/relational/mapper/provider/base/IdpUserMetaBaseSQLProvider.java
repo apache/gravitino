@@ -28,7 +28,7 @@ public class IdpUserMetaBaseSQLProvider {
 
   public String selectIdpUser(@Param("userName") String userName) {
     return "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
-        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
@@ -38,7 +38,7 @@ public class IdpUserMetaBaseSQLProvider {
   public String selectIdpUsers(@Param("userNames") List<String> userNames) {
     return "<script>"
         + "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
-        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
@@ -52,13 +52,11 @@ public class IdpUserMetaBaseSQLProvider {
   public String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
     return "INSERT INTO "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " (user_id, user_name, password_hash,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " (user_id, user_name, password_hash, current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
         + " #{userMeta.passwordHash},"
-        + " #{userMeta.auditInfo},"
         + " #{userMeta.currentVersion},"
         + " #{userMeta.lastVersion},"
         + " #{userMeta.deletedAt}"
@@ -68,14 +66,12 @@ public class IdpUserMetaBaseSQLProvider {
   public String updateIdpUserPassword(
       @Param("userId") Long userId,
       @Param("passwordHash") String passwordHash,
-      @Param("auditInfo") String auditInfo,
       @Param("currentVersion") Long currentVersion,
       @Param("newCurrentVersion") Long newCurrentVersion,
       @Param("newLastVersion") Long newLastVersion) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET password_hash = #{passwordHash},"
-        + " audit_info = #{auditInfo},"
         + " current_version = #{newCurrentVersion},"
         + " last_version = #{newLastVersion}"
         + " WHERE user_id = #{userId}"
@@ -84,13 +80,10 @@ public class IdpUserMetaBaseSQLProvider {
   }
 
   public String softDeleteIdpUser(
-      @Param("userId") Long userId,
-      @Param("deletedAt") Long deletedAt,
-      @Param("auditInfo") String auditInfo) {
+      @Param("userId") Long userId, @Param("deletedAt") Long deletedAt) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET deleted_at = #{deletedAt},"
-        + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE user_id = #{userId} AND deleted_at = 0";

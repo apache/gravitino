@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 public class IdpGroupPO {
   private Long groupId;
   private String groupName;
-  private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
@@ -35,10 +34,6 @@ public class IdpGroupPO {
 
   public String getGroupName() {
     return groupName;
-  }
-
-  public String getAuditInfo() {
-    return auditInfo;
   }
 
   public Long getCurrentVersion() {
@@ -64,7 +59,6 @@ public class IdpGroupPO {
     IdpGroupPO tablePO = (IdpGroupPO) o;
     return Objects.equal(getGroupId(), tablePO.getGroupId())
         && Objects.equal(getGroupName(), tablePO.getGroupName())
-        && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
         && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
@@ -73,12 +67,7 @@ public class IdpGroupPO {
   @Override
   public int hashCode() {
     return Objects.hashCode(
-        getGroupId(),
-        getGroupName(),
-        getAuditInfo(),
-        getCurrentVersion(),
-        getLastVersion(),
-        getDeletedAt());
+        getGroupId(), getGroupName(), getCurrentVersion(), getLastVersion(), getDeletedAt());
   }
 
   public static class Builder {
@@ -95,11 +84,6 @@ public class IdpGroupPO {
 
     public Builder withGroupName(String groupName) {
       groupPO.groupName = groupName;
-      return this;
-    }
-
-    public Builder withAuditInfo(String auditInfo) {
-      groupPO.auditInfo = auditInfo;
       return this;
     }
 
@@ -121,7 +105,6 @@ public class IdpGroupPO {
     private void validate() {
       Preconditions.checkArgument(groupPO.groupId != null, "Group id is required");
       Preconditions.checkArgument(groupPO.groupName != null, "Group name is required");
-      Preconditions.checkArgument(groupPO.auditInfo != null, "Audit info is required");
       Preconditions.checkArgument(groupPO.currentVersion != null, "Current version is required");
       Preconditions.checkArgument(groupPO.lastVersion != null, "Last version is required");
       Preconditions.checkArgument(groupPO.deletedAt != null, "Deleted at is required");

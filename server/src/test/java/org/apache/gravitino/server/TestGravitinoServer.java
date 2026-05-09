@@ -30,7 +30,6 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
 import java.util.Collections;
 import java.util.Set;
 import javax.servlet.http.HttpServletRequest;
@@ -52,7 +51,6 @@ import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
-import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.dto.responses.IdpUserResponse;
 import org.apache.gravitino.job.JobOperationDispatcher;
@@ -185,11 +183,7 @@ public class TestGravitinoServer {
     IdpUserManager userManager = Mockito.mock(IdpUserManager.class);
     Mockito.when(userManager.getUser("user1"))
         .thenReturn(
-            IdpUserDTO.builder()
-                .withName("user1")
-                .withGroups(Collections.emptyList())
-                .withAudit(buildAudit())
-                .build());
+            IdpUserDTO.builder().withName("user1").withGroups(Collections.emptyList()).build());
 
     restServer.register(newIdpUserOperations(userManager));
     restServer.register(
@@ -216,7 +210,6 @@ public class TestGravitinoServer {
 
       IdpUserResponse userResponse = response.readEntity(IdpUserResponse.class);
       assertEquals("user1", userResponse.getUser().name());
-      assertEquals("admin", userResponse.getUser().auditInfo().creator());
     } finally {
       jerseyTest.tearDown();
     }
@@ -317,15 +310,6 @@ public class TestGravitinoServer {
         IdpUserOperations.class.getDeclaredConstructor(IdpUserManager.class);
     constructor.setAccessible(true);
     return constructor.newInstance(userManager);
-  }
-
-  private AuditDTO buildAudit() {
-    return AuditDTO.builder()
-        .withCreator("admin")
-        .withCreateTime(Instant.parse("2024-01-01T00:00:00Z"))
-        .withLastModifier("admin")
-        .withLastModifiedTime(Instant.parse("2024-01-01T00:00:00Z"))
-        .build();
   }
 
   private void assertIdpInterfaceNotFound(JerseyTest jerseyTest, String path) {

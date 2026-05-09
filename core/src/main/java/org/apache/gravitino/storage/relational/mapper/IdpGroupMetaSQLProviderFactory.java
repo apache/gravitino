@@ -59,10 +59,8 @@ public class IdpGroupMetaSQLProviderFactory {
   }
 
   public static String softDeleteIdpGroup(
-      @Param("groupId") Long groupId,
-      @Param("deletedAt") Long deletedAt,
-      @Param("auditInfo") String auditInfo) {
-    return getProvider().softDeleteIdpGroup(groupId, deletedAt, auditInfo);
+      @Param("groupId") Long groupId, @Param("deletedAt") Long deletedAt) {
+    return getProvider().softDeleteIdpGroup(groupId, deletedAt);
   }
 
   public static String deleteIdpGroupMetasByLegacyTimeline(

@@ -24,7 +24,6 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Collections;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -32,7 +31,6 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.authorization.IdpGroupManager;
-import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.IdpGroupDTO;
 import org.apache.gravitino.dto.requests.CreateGroupRequest;
 import org.apache.gravitino.dto.requests.UpdateGroupUsersRequest;
@@ -133,7 +131,6 @@ public class TestIdpGroupOperations extends BaseOperationsTest {
     Assertions.assertEquals("group1", groupResponse.getGroup().name());
     Assertions.assertNotNull(groupResponse.getGroup().users());
     Assertions.assertTrue(groupResponse.getGroup().users().isEmpty());
-    Assertions.assertEquals("admin", groupResponse.getGroup().auditInfo().creator());
 
     // Test to throw GroupAlreadyExistsException
     doThrow(new GroupAlreadyExistsException("mock error")).when(MANAGER).createGroup("group1");
@@ -467,15 +464,6 @@ public class TestIdpGroupOperations extends BaseOperationsTest {
   }
 
   private IdpGroupDTO buildGroup(String group) {
-    return IdpGroupDTO.builder().withName(group).withAudit(buildAudit()).build();
-  }
-
-  private AuditDTO buildAudit() {
-    return AuditDTO.builder()
-        .withCreator("admin")
-        .withCreateTime(Instant.parse("2024-01-01T00:00:00Z"))
-        .withLastModifier("admin")
-        .withLastModifiedTime(Instant.parse("2024-01-01T00:00:00Z"))
-        .build();
+    return IdpGroupDTO.builder().withName(group).build();
   }
 }

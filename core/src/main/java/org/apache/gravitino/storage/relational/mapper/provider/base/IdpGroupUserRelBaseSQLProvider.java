@@ -79,11 +79,11 @@ public class IdpGroupUserRelBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " (id, group_id, user_id, audit_info, current_version, last_version, deleted_at)"
+        + " (id, group_id, user_id, current_version, last_version, deleted_at)"
         + " VALUES "
         + "<foreach item='item' collection='relations' separator=','>"
-        + "(#{item.id}, #{item.groupId}, #{item.userId}, #{item.auditInfo}, "
-        + "#{item.currentVersion}, #{item.lastVersion}, #{item.deletedAt})"
+        + "(#{item.id}, #{item.groupId}, #{item.userId}, #{item.currentVersion},"
+        + " #{item.lastVersion}, #{item.deletedAt})"
         + "</foreach>"
         + "</script>";
   }
@@ -91,13 +91,11 @@ public class IdpGroupUserRelBaseSQLProvider {
   public String softDeleteIdpGroupUsers(
       @Param("groupId") Long groupId,
       @Param("userIds") List<Long> userIds,
-      @Param("deletedAt") Long deletedAt,
-      @Param("auditInfo") String auditInfo) {
+      @Param("deletedAt") Long deletedAt) {
     return "<script>"
         + "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = #{deletedAt},"
-        + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE group_id = #{groupId} "
@@ -118,26 +116,20 @@ public class IdpGroupUserRelBaseSQLProvider {
   }
 
   public String softDeleteGroupUsersByUserId(
-      @Param("userId") Long userId,
-      @Param("deletedAt") Long deletedAt,
-      @Param("auditInfo") String auditInfo) {
+      @Param("userId") Long userId, @Param("deletedAt") Long deletedAt) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = #{deletedAt},"
-        + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
   public String softDeleteGroupUsersByGroupId(
-      @Param("groupId") Long groupId,
-      @Param("deletedAt") Long deletedAt,
-      @Param("auditInfo") String auditInfo) {
+      @Param("groupId") Long groupId, @Param("deletedAt") Long deletedAt) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = #{deletedAt},"
-        + " audit_info = #{auditInfo},"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE group_id = #{groupId} AND deleted_at = 0";

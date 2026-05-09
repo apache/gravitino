@@ -66,20 +66,17 @@ public class IdpUserMetaSQLProviderFactory {
   public static String updateIdpUserPassword(
       @Param("userId") Long userId,
       @Param("passwordHash") String passwordHash,
-      @Param("auditInfo") String auditInfo,
       @Param("currentVersion") Long currentVersion,
       @Param("newCurrentVersion") Long newCurrentVersion,
       @Param("newLastVersion") Long newLastVersion) {
     return getProvider()
         .updateIdpUserPassword(
-            userId, passwordHash, auditInfo, currentVersion, newCurrentVersion, newLastVersion);
+            userId, passwordHash, currentVersion, newCurrentVersion, newLastVersion);
   }
 
   public static String softDeleteIdpUser(
-      @Param("userId") Long userId,
-      @Param("deletedAt") Long deletedAt,
-      @Param("auditInfo") String auditInfo) {
-    return getProvider().softDeleteIdpUser(userId, deletedAt, auditInfo);
+      @Param("userId") Long userId, @Param("deletedAt") Long deletedAt) {
+    return getProvider().softDeleteIdpUser(userId, deletedAt);
   }
 
   public static String deleteIdpUserMetasByLegacyTimeline(

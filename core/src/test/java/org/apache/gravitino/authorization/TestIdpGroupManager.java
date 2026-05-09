@@ -22,21 +22,17 @@ package org.apache.gravitino.authorization;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.Instant;
 import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.dto.IdpGroupDTO;
-import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.po.IdpGroupPO;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
@@ -100,13 +96,9 @@ public class TestIdpGroupManager {
 
     assertEquals("engineering", group.name());
     assertEquals(Collections.emptyList(), group.users());
-    assertEquals("admin", group.auditInfo().creator());
     verify(groupMetaService)
         .removeUsersFromGroup(
-            eq(groupPO.getGroupId()),
-            eq(Collections.singletonList(userPO.getUserId())),
-            anyLong(),
-            anyString());
+            eq(groupPO.getGroupId()), eq(Collections.singletonList(userPO.getUserId())), anyLong());
   }
 
   private IdpUserPO user(String userName) throws Exception {
@@ -114,7 +106,6 @@ public class TestIdpGroupManager {
         .withUserId(1L)
         .withUserName(userName)
         .withPasswordHash("hash")
-        .withAuditInfo(toAuditJson())
         .withCurrentVersion(1L)
         .withLastVersion(1L)
         .withDeletedAt(0L)
@@ -125,21 +116,9 @@ public class TestIdpGroupManager {
     return IdpGroupPO.builder()
         .withGroupId(1L)
         .withGroupName(groupName)
-        .withAuditInfo(toAuditJson())
         .withCurrentVersion(1L)
         .withLastVersion(1L)
         .withDeletedAt(0L)
         .build();
-  }
-
-  private String toAuditJson() throws Exception {
-    AuditInfo auditInfo =
-        AuditInfo.builder()
-            .withCreator("admin")
-            .withCreateTime(Instant.now())
-            .withLastModifier("admin")
-            .withLastModifiedTime(Instant.now())
-            .build();
-    return JsonUtils.anyFieldMapper().writeValueAsString(auditInfo);
   }
 }

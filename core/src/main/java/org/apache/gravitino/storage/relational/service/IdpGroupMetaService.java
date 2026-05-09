@@ -58,18 +58,16 @@ public class IdpGroupMetaService {
     SessionUtils.doWithCommit(IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO));
   }
 
-  public boolean deleteGroup(IdpGroupPO groupPO, Long deletedAt, String auditInfo) {
+  public boolean deleteGroup(IdpGroupPO groupPO, Long deletedAt) {
     SessionUtils.doMultipleWithCommit(
         () ->
             SessionUtils.doWithoutCommit(
                 IdpGroupMetaMapper.class,
-                mapper -> mapper.softDeleteIdpGroup(groupPO.getGroupId(), deletedAt, auditInfo)),
+                mapper -> mapper.softDeleteIdpGroup(groupPO.getGroupId(), deletedAt)),
         () ->
             SessionUtils.doWithoutCommit(
                 IdpGroupUserRelMapper.class,
-                mapper ->
-                    mapper.softDeleteGroupUsersByGroupId(
-                        groupPO.getGroupId(), deletedAt, auditInfo)));
+                mapper -> mapper.softDeleteGroupUsersByGroupId(groupPO.getGroupId(), deletedAt)));
     return true;
   }
 
@@ -86,15 +84,14 @@ public class IdpGroupMetaService {
         IdpGroupUserRelMapper.class, mapper -> mapper.batchInsertIdpGroupUsers(relations));
   }
 
-  public void removeUsersFromGroup(
-      Long groupId, List<Long> userIds, Long deletedAt, String auditInfo) {
+  public void removeUsersFromGroup(Long groupId, List<Long> userIds, Long deletedAt) {
     if (userIds.isEmpty()) {
       return;
     }
 
     SessionUtils.doWithCommit(
         IdpGroupUserRelMapper.class,
-        mapper -> mapper.softDeleteIdpGroupUsers(groupId, userIds, deletedAt, auditInfo));
+        mapper -> mapper.softDeleteIdpGroupUsers(groupId, userIds, deletedAt));
   }
 
   public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {

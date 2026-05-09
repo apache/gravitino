@@ -348,8 +348,6 @@ components:
           description: The built-in IdP groups the user belongs to
           items:
             type: string
-        audit:
-          $ref: "./openapi.yaml#/components/schemas/Audit"
 
     IdpGroup:
       type: object
@@ -364,8 +362,6 @@ components:
           description: The built-in IdP users that belong to the group
           items:
             type: string
-        audit:
-          $ref: "./openapi.yaml#/components/schemas/Audit"
 
     CreateIdpUserRequest:
       type: object
@@ -460,11 +456,7 @@ components:
         "code": 0,
         "user": {
           "name": "user1",
-          "groups": [ "group1" ],
-          "audit": {
-            "creator": "admin",
-            "createTime": "2024-01-01T00:00:00Z"
-          }
+          "groups": [ "group1" ]
         }
       }
 
@@ -473,11 +465,7 @@ components:
         "code": 0,
         "group": {
           "name": "group1",
-          "users": [ "user1", "user2" ],
-          "audit": {
-            "creator": "admin",
-            "createTime": "2024-01-01T00:00:00Z"
-          }
+          "users": [ "user1", "user2" ]
         }
       }
 

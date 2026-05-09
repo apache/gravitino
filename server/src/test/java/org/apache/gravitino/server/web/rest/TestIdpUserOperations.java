@@ -24,14 +24,12 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import java.time.Instant;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.authorization.IdpUserManager;
-import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.dto.requests.CreateUserRequest;
 import org.apache.gravitino.dto.requests.ResetPasswordRequest;
@@ -131,7 +129,6 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     Assertions.assertEquals("user1", userResponse.getUser().name());
     Assertions.assertNotNull(userResponse.getUser().groups());
     Assertions.assertTrue(userResponse.getUser().groups().isEmpty());
-    Assertions.assertEquals("admin", userResponse.getUser().auditInfo().creator());
 
     // Test to throw UserAlreadyExistsException
     doThrow(new UserAlreadyExistsException("mock error"))
@@ -375,15 +372,6 @@ public class TestIdpUserOperations extends BaseOperationsTest {
   }
 
   private IdpUserDTO buildUser(String user) {
-    return IdpUserDTO.builder().withName(user).withAudit(buildAudit()).build();
-  }
-
-  private AuditDTO buildAudit() {
-    return AuditDTO.builder()
-        .withCreator("admin")
-        .withCreateTime(Instant.parse("2024-01-01T00:00:00Z"))
-        .withLastModifier("admin")
-        .withLastModifiedTime(Instant.parse("2024-01-01T00:00:00Z"))
-        .build();
+    return IdpUserDTO.builder().withName(user).build();
   }
 }

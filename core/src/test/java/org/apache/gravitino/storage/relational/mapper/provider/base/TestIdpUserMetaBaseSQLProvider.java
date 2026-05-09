@@ -75,17 +75,17 @@ public class TestIdpUserMetaBaseSQLProvider {
     Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_user_meta"));
     Assertions.assertTrue(
         normalizedSql.contains(
-            "(user_id, user_name, password_hash, audit_info, current_version, last_version, deleted_at)"));
+            "(user_id, user_name, password_hash, current_version, last_version, deleted_at)"));
     Assertions.assertTrue(
         normalizedSql.contains(
-            "VALUES ( #{userMeta.userId}, #{userMeta.userName}, #{userMeta.passwordHash}, #{userMeta.auditInfo}, #{userMeta.currentVersion}, #{userMeta.lastVersion}, #{userMeta.deletedAt} )"));
+            "VALUES ( #{userMeta.userId}, #{userMeta.userName}, #{userMeta.passwordHash}, #{userMeta.currentVersion}, #{userMeta.lastVersion}, #{userMeta.deletedAt} )"));
   }
 
   @Test
   public void testUpdateIdpUserPassword() {
     String normalizedSql =
         createProvider()
-            .updateIdpUserPassword(1L, "hash", "audit", 1L, 2L, 3L)
+            .updateIdpUserPassword(1L, "hash", 1L, 2L, 3L)
             .replaceAll("\\s+", " ")
             .trim();
 
@@ -101,11 +101,10 @@ public class TestIdpUserMetaBaseSQLProvider {
   @Test
   public void testSoftDeleteIdpUser() {
     String normalizedSql =
-        createProvider().softDeleteIdpUser(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
+        createProvider().softDeleteIdpUser(1L, 2L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_meta"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("audit_info = #{auditInfo}"));
     Assertions.assertTrue(normalizedSql.contains("current_version = current_version + 1"));
     Assertions.assertTrue(normalizedSql.contains("last_version = last_version + 1"));
     Assertions.assertTrue(normalizedSql.contains("WHERE user_id = #{userId} AND deleted_at = 0"));
@@ -115,8 +114,7 @@ public class TestIdpUserMetaBaseSQLProvider {
   public void testSoftDeleteIdpUserDoesNotUseOptimisticLocking() {
     IdpUserMetaBaseSQLProvider provider = createProvider();
 
-    String normalizedSql =
-        provider.softDeleteIdpUser(1L, 2L, "audit").replaceAll("\\s+", " ").trim();
+    String normalizedSql = provider.softDeleteIdpUser(1L, 2L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertFalse(
         normalizedSql.contains("current_version = #{currentVersion}"),
@@ -149,7 +147,6 @@ public class TestIdpUserMetaBaseSQLProvider {
         .withUserId(1L)
         .withUserName("tom")
         .withPasswordHash("hash")
-        .withAuditInfo("audit")
         .withCurrentVersion(1L)
         .withLastVersion(1L)
         .withDeletedAt(0L)

@@ -65,24 +65,19 @@ public interface IdpGroupUserRelMapper {
   void softDeleteIdpGroupUsers(
       @Param("groupId") Long groupId,
       @Param("userIds") List<Long> userIds,
-      @Param("deletedAt") Long deletedAt,
-      @Param("auditInfo") String auditInfo);
+      @Param("deletedAt") Long deletedAt);
 
   @UpdateProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
       method = "softDeleteGroupUsersByUserId")
   void softDeleteGroupUsersByUserId(
-      @Param("userId") Long userId,
-      @Param("deletedAt") Long deletedAt,
-      @Param("auditInfo") String auditInfo);
+      @Param("userId") Long userId, @Param("deletedAt") Long deletedAt);
 
   @UpdateProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
       method = "softDeleteGroupUsersByGroupId")
   void softDeleteGroupUsersByGroupId(
-      @Param("groupId") Long groupId,
-      @Param("deletedAt") Long deletedAt,
-      @Param("auditInfo") String auditInfo);
+      @Param("groupId") Long groupId, @Param("deletedAt") Long deletedAt);
 
   @DeleteProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,

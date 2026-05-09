@@ -51,16 +51,12 @@ public interface IdpUserMetaMapper {
   Integer updateIdpUserPassword(
       @Param("userId") Long userId,
       @Param("passwordHash") String passwordHash,
-      @Param("auditInfo") String auditInfo,
       @Param("currentVersion") Long currentVersion,
       @Param("newCurrentVersion") Long newCurrentVersion,
       @Param("newLastVersion") Long newLastVersion);
 
   @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "softDeleteIdpUser")
-  void softDeleteIdpUser(
-      @Param("userId") Long userId,
-      @Param("deletedAt") Long deletedAt,
-      @Param("auditInfo") String auditInfo);
+  void softDeleteIdpUser(@Param("userId") Long userId, @Param("deletedAt") Long deletedAt);
 
   @DeleteProvider(
       type = IdpUserMetaSQLProviderFactory.class,
