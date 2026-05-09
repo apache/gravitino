@@ -37,6 +37,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.IdpUserResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.rest.RESTUtils;
@@ -165,6 +166,24 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
     Assertions.assertFalse(errorResponse1.getMessage().contains("under metalake"));
     Assertions.assertTrue(errorResponse1.getMessage().contains("built-in IdP user"));
+  }
+
+  @Test
+  public void testAddUserForbidden() {
+    CreateUserRequest req = new CreateUserRequest("user1", "Passw0rd");
+    doThrow(new ForbiddenException("mock forbidden")).when(MANAGER).createUser("user1", "Passw0rd");
+
+    Response resp =
+        target("/idp/users")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test

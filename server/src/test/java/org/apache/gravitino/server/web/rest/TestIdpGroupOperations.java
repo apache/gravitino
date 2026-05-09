@@ -38,6 +38,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -168,6 +169,24 @@ public class TestIdpGroupOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAddGroupForbidden() {
+    CreateGroupRequest req = new CreateGroupRequest("group1");
+    doThrow(new ForbiddenException("mock forbidden")).when(MANAGER).createGroup("group1");
+
+    Response resp =
+        target("/idp/groups")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.FORBIDDEN.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
+    Assertions.assertEquals(ForbiddenException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
   public void testAddGroupWithNullRequest() {
     Response resp =
         target("/idp/groups")
@@ -286,6 +305,26 @@ public class TestIdpGroupOperations extends BaseOperationsTest {
     ErrorResponse errorResponse = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testRemoveGroupUnsupportedOperation() {
+    when(MANAGER.deleteGroup("group1", false))
+        .thenThrow(new UnsupportedOperationException("mock unsupported"));
+
+    Response resp =
+        target("/idp/groups/group1")
+            .queryParam("force", false)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+
+    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        UnsupportedOperationException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test
