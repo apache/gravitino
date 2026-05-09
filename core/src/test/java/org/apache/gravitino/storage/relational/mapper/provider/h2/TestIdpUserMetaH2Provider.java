@@ -17,22 +17,15 @@
  * under the License.
  */
 
-package org.apache.gravitino.auth;
+package org.apache.gravitino.storage.relational.mapper.provider.h2;
 
-/** The type of authenticator for http/https request. */
-public enum AuthenticatorType {
-  /** No authentication. */
-  NONE,
+import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.base.TestIdpUserMetaBaseSQLProvider;
 
-  /** Simple authentication. */
-  SIMPLE,
+public class TestIdpUserMetaH2Provider extends TestIdpUserMetaBaseSQLProvider {
 
-  /** Authentication that uses local basic auth. */
-  BASIC,
-
-  /** Authentication that uses OAuth. */
-  OAUTH,
-
-  /** Authentication that uses Kerberos. */
-  KERBEROS
+  @Override
+  protected IdpUserMetaBaseSQLProvider createProvider() {
+    return new IdpUserMetaH2Provider();
+  }
 }

@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 public class AuthenticatorFactory {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuthenticatorFactory.class);
-
   public static final ImmutableMap<String, String> AUTHENTICATORS =
       ImmutableMap.of(
           AuthenticatorType.SIMPLE.name().toLowerCase(),

@@ -16,23 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.storage.relational.mapper.provider;
 
-package org.apache.gravitino.auth;
+import com.google.common.collect.ImmutableList;
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
+import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
 
-/** The type of authenticator for http/https request. */
-public enum AuthenticatorType {
-  /** No authentication. */
-  NONE,
+/** The default provider that supplies the primary mapper package for built-in IdP. */
+public class IdpAuthenticationMapperPackageProvider implements MapperPackageProvider {
 
-  /** Simple authentication. */
-  SIMPLE,
-
-  /** Authentication that uses local basic auth. */
-  BASIC,
-
-  /** Authentication that uses OAuth. */
-  OAUTH,
-
-  /** Authentication that uses Kerberos. */
-  KERBEROS
+  @Override
+  public List<Class<?>> getMapperClasses() {
+    return ImmutableList.of(
+        IdpGroupMetaMapper.class, IdpGroupUserRelMapper.class, IdpUserMetaMapper.class);
+  }
 }
