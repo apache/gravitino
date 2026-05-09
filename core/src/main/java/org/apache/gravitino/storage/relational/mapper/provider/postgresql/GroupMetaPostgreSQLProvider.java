@@ -104,4 +104,12 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + GROUP_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
+
+  @Override
+  public String touchGroupUpdatedAt(@Param("groupId") long groupId) {
+    return "UPDATE "
+        + GROUP_TABLE_NAME
+        + " SET updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+  }
 }
