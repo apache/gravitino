@@ -31,6 +31,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
@@ -39,6 +40,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -194,7 +197,10 @@ public class TestGravitinoServer {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(Mockito.mock(HttpServletRequest.class)).to(HttpServletRequest.class);
+            HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
+            Mockito.when(request.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME))
+                .thenReturn(new UserPrincipal("admin"));
+            bind(request).to(HttpServletRequest.class);
           }
         });
 
@@ -280,8 +286,8 @@ public class TestGravitinoServer {
 
   private IdpUserOperations newIdpUserOperations(IdpManager idpManager) throws Exception {
     Constructor<IdpUserOperations> constructor =
-        IdpUserOperations.class.getDeclaredConstructor(IdpManager.class);
+        IdpUserOperations.class.getDeclaredConstructor(IdpManager.class, List.class);
     constructor.setAccessible(true);
-    return constructor.newInstance(idpManager);
+    return constructor.newInstance(idpManager, Collections.singletonList("admin"));
   }
 }

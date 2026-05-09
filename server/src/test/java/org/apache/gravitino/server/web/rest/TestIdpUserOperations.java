@@ -24,11 +24,14 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.Collections;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.dto.requests.CreateUserRequest;
@@ -51,10 +54,11 @@ import org.junit.jupiter.api.Test;
 public class TestIdpUserOperations extends BaseOperationsTest {
 
   private static final IdpManager MANAGER = mock(IdpManager.class);
+  private static String currentUser = "admin";
 
   public static class TestableIdpUserOperations extends IdpUserOperations {
     public TestableIdpUserOperations() {
-      super(MANAGER);
+      super(MANAGER, Collections.singletonList("admin"));
     }
   }
 
@@ -63,6 +67,8 @@ public class TestIdpUserOperations extends BaseOperationsTest {
     public HttpServletRequest get() {
       HttpServletRequest request = mock(HttpServletRequest.class);
       when(request.getRemoteUser()).thenReturn(null);
+      when(request.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME))
+          .thenReturn(new UserPrincipal(currentUser));
       return request;
     }
   }
@@ -70,6 +76,7 @@ public class TestIdpUserOperations extends BaseOperationsTest {
   @BeforeEach
   public void resetManager() {
     reset(MANAGER);
+    currentUser = "admin";
   }
 
   @Override
@@ -171,10 +178,8 @@ public class TestIdpUserOperations extends BaseOperationsTest {
 
   @Test
   public void testAddUserForbidden() {
+    currentUser = "user";
     CreateUserRequest req = new CreateUserRequest("user1", "Passw0rd-For-User");
-    doThrow(new ForbiddenException("mock forbidden"))
-        .when(MANAGER)
-        .createUser("user1", "Passw0rd-For-User");
 
     Response resp =
         target("/idp/users")
@@ -261,7 +266,7 @@ public class TestIdpUserOperations extends BaseOperationsTest {
 
   @Test
   public void testGetUserForbidden() {
-    doThrow(new ForbiddenException("mock forbidden")).when(MANAGER).getUser("user1");
+    currentUser = "user";
 
     Response resp =
         target("/idp/users/user1")

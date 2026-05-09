@@ -30,6 +30,8 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.IdpGroupDTO;
 import org.apache.gravitino.dto.requests.CreateGroupRequest;
@@ -53,10 +55,11 @@ import org.junit.jupiter.api.Test;
 public class TestIdpGroupOperations extends BaseOperationsTest {
 
   private static final IdpManager MANAGER = mock(IdpManager.class);
+  private static String currentUser = "admin";
 
   public static class TestableIdpGroupOperations extends IdpGroupOperations {
     public TestableIdpGroupOperations() {
-      super(MANAGER);
+      super(MANAGER, Collections.singletonList("admin"));
     }
   }
 
@@ -65,6 +68,8 @@ public class TestIdpGroupOperations extends BaseOperationsTest {
     public HttpServletRequest get() {
       HttpServletRequest request = mock(HttpServletRequest.class);
       when(request.getRemoteUser()).thenReturn(null);
+      when(request.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME))
+          .thenReturn(new UserPrincipal(currentUser));
       return request;
     }
   }
@@ -72,6 +77,7 @@ public class TestIdpGroupOperations extends BaseOperationsTest {
   @BeforeEach
   public void resetManager() {
     reset(MANAGER);
+    currentUser = "admin";
   }
 
   @Override
@@ -170,8 +176,8 @@ public class TestIdpGroupOperations extends BaseOperationsTest {
 
   @Test
   public void testAddGroupForbidden() {
+    currentUser = "user";
     CreateGroupRequest req = new CreateGroupRequest("group1");
-    doThrow(new ForbiddenException("mock forbidden")).when(MANAGER).createGroup("group1");
 
     Response resp =
         target("/idp/groups")
@@ -258,7 +264,7 @@ public class TestIdpGroupOperations extends BaseOperationsTest {
 
   @Test
   public void testGetGroupForbidden() {
-    doThrow(new ForbiddenException("mock forbidden")).when(MANAGER).getGroup("group1");
+    currentUser = "user";
 
     Response resp =
         target("/idp/groups/group1")

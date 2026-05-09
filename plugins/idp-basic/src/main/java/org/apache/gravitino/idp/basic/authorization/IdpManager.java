@@ -26,12 +26,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.IdpGroupDTO;
 import org.apache.gravitino.dto.IdpUserDTO;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -44,18 +41,15 @@ import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
-import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
  * Built-in IdP manager implementation loaded from the {@code idp-basic} plugin.
  *
- * <p>This implementation manages both built-in IdP users and groups and restricts mutation
- * operations to Gravitino service admins.
+ * <p>This implementation manages both built-in IdP users and groups.
  */
 public class IdpManager implements org.apache.gravitino.authorization.IdpManager {
   private static final long INITIAL_VERSION = 1L;
 
-  private final Config config;
   private final IdGenerator idGenerator;
   private final IdpUserMetaService userMetaService;
   private final IdpGroupMetaService groupMetaService;
@@ -63,7 +57,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   public IdpManager() {
     this(
-        GravitinoEnv.getInstance().config(),
         GravitinoEnv.getInstance().idGenerator(),
         IdpUserMetaService.getInstance(),
         IdpGroupMetaService.getInstance(),
@@ -71,12 +64,10 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
   }
 
   IdpManager(
-      Config config,
       IdGenerator idGenerator,
       IdpUserMetaService userMetaService,
       IdpGroupMetaService groupMetaService,
       PasswordHasher passwordHasher) {
-    this.config = config;
     this.idGenerator = idGenerator;
     this.userMetaService = userMetaService;
     this.groupMetaService = groupMetaService;
@@ -85,7 +76,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public IdpUserDTO createUser(String userName, String password) {
-    ensureServiceAdmin();
     validateUserName(userName);
     validatePassword(password);
     if (userMetaService().findUser(userName).isPresent()) {
@@ -107,7 +97,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public IdpUserDTO getUser(String userName) {
-    ensureServiceAdmin();
     validateUserName(userName);
     IdpUserPO userPO =
         userMetaService()
@@ -119,7 +108,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public boolean deleteUser(String userName) {
-    ensureServiceAdmin();
     validateUserName(userName);
     Optional<IdpUserPO> user = userMetaService().findUser(userName);
     if (!user.isPresent()) {
@@ -131,7 +119,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public IdpUserDTO resetPassword(String userName, String password) {
-    ensureServiceAdmin();
     validateUserName(userName);
     validatePassword(password);
     IdpUserPO userPO =
@@ -151,7 +138,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public IdpGroupDTO createGroup(String groupName) {
-    ensureServiceAdmin();
     validateGroupName(groupName);
     if (groupMetaService().findGroup(groupName).isPresent()) {
       throw new GroupAlreadyExistsException("Built-in IdP group %s already exists", groupName);
@@ -171,7 +157,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public IdpGroupDTO getGroup(String groupName) {
-    ensureServiceAdmin();
     validateGroupName(groupName);
     IdpGroupPO groupPO =
         groupMetaService()
@@ -183,7 +168,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public boolean deleteGroup(String groupName, boolean force) {
-    ensureServiceAdmin();
     validateGroupName(groupName);
     Optional<IdpGroupPO> group = groupMetaService().findGroup(groupName);
     if (!group.isPresent()) {
@@ -196,7 +180,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public IdpGroupDTO addUsersToGroup(String groupName, List<String> userNames) {
-    ensureServiceAdmin();
     IdpGroupPO groupPO = requireGroup(groupName);
     List<IdpUserPO> users = requireUsers(userNames);
     Set<Long> requestedUserIds =
@@ -230,7 +213,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   @Override
   public IdpGroupDTO removeUsersFromGroup(String groupName, List<String> userNames) {
-    ensureServiceAdmin();
     IdpGroupPO groupPO = requireGroup(groupName);
     List<IdpUserPO> users = requireUsers(userNames);
     List<Long> userIds = users.stream().map(IdpUserPO::getUserId).collect(Collectors.toList());
@@ -249,14 +231,6 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
 
   private IdpGroupMetaService groupMetaService() {
     return groupMetaService;
-  }
-
-  private void ensureServiceAdmin() {
-    List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
-    if (serviceAdmins == null || !serviceAdmins.contains(currentUser())) {
-      throw new ForbiddenException(
-          "Only Gravitino service admins can manage built-in IdP identities");
-    }
   }
 
   private void validateUserName(String userName) {
@@ -323,9 +297,5 @@ public class IdpManager implements org.apache.gravitino.authorization.IdpManager
                   + " force=true if this is intended",
               groupName));
     }
-  }
-
-  private String currentUser() {
-    return PrincipalUtils.getCurrentUserName();
   }
 }

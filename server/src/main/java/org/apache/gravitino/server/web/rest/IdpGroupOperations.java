@@ -21,6 +21,8 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Collections;
+import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -33,29 +35,38 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.requests.CreateGroupRequest;
 import org.apache.gravitino.dto.requests.UpdateGroupUsersRequest;
 import org.apache.gravitino.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 @Path("/idp/groups")
 public class IdpGroupOperations {
 
   private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";
+  private static final String SERVICE_ADMIN_ERROR =
+      "Only Gravitino service admins can manage built-in IdP identities";
   private final IdpManager idpManager;
+  private final List<String> serviceAdmins;
 
   @Context private HttpServletRequest httpRequest;
 
   public IdpGroupOperations() {
-    this(GravitinoEnv.getInstance().idpManager());
+    this(
+        GravitinoEnv.getInstance().idpManager(),
+        GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS));
   }
 
-  IdpGroupOperations(IdpManager idpManager) {
+  IdpGroupOperations(IdpManager idpManager, List<String> serviceAdmins) {
     this.idpManager = idpManager;
+    this.serviceAdmins = serviceAdmins != null ? serviceAdmins : Collections.emptyList();
   }
 
   @GET
@@ -66,7 +77,11 @@ public class IdpGroupOperations {
   public Response getGroup(@PathParam("group") String group) {
     try {
       return Utils.doAs(
-          httpRequest, () -> Utils.ok(new IdpGroupResponse(idpManager.getGroup(group))));
+          httpRequest,
+          () -> {
+            ensureServiceAdmin();
+            return Utils.ok(new IdpGroupResponse(idpManager.getGroup(group)));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpGroupException(OperationType.GET, group, e);
     }
@@ -87,6 +102,7 @@ public class IdpGroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            ensureServiceAdmin();
             request.validate();
             return Utils.ok(new IdpGroupResponse(idpManager.createGroup(request.getGroup())));
           });
@@ -104,7 +120,11 @@ public class IdpGroupOperations {
       @PathParam("group") String group, @DefaultValue("false") @QueryParam("force") boolean force) {
     try {
       return Utils.doAs(
-          httpRequest, () -> Utils.ok(new RemoveResponse(idpManager.deleteGroup(group, force))));
+          httpRequest,
+          () -> {
+            ensureServiceAdmin();
+            return Utils.ok(new RemoveResponse(idpManager.deleteGroup(group, force)));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpGroupException(OperationType.REMOVE, group, e);
     }
@@ -125,6 +145,7 @@ public class IdpGroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            ensureServiceAdmin();
             request.validate();
             return Utils.ok(
                 new IdpGroupResponse(idpManager.addUsersToGroup(group, request.getUsers())));
@@ -149,12 +170,19 @@ public class IdpGroupOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            ensureServiceAdmin();
             request.validate();
             return Utils.ok(
                 new IdpGroupResponse(idpManager.removeUsersFromGroup(group, request.getUsers())));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpGroupException(OperationType.REMOVE, group, e);
+    }
+  }
+
+  private void ensureServiceAdmin() {
+    if (!serviceAdmins.contains(PrincipalUtils.getCurrentUserName())) {
+      throw new ForbiddenException(SERVICE_ADMIN_ERROR);
     }
   }
 }

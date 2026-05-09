@@ -27,26 +27,20 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Optional;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
-import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.dto.IdpGroupDTO;
 import org.apache.gravitino.dto.IdpUserDTO;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.po.IdpGroupPO;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
-import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -59,15 +53,12 @@ public class TestIdpManager {
 
   @BeforeEach
   public void setUp() {
-    Config config = new Config(false) {};
-    config.set(Configs.SERVICE_ADMINS, Collections.singletonList("admin"));
     userMetaService = mock(IdpUserMetaService.class);
     groupMetaService = mock(IdpGroupMetaService.class);
     passwordHasher = mock(PasswordHasher.class);
     IdGenerator idGenerator = mock(IdGenerator.class);
     when(idGenerator.nextId()).thenReturn(1L);
-    manager =
-        new IdpManager(config, idGenerator, userMetaService, groupMetaService, passwordHasher);
+    manager = new IdpManager(idGenerator, userMetaService, groupMetaService, passwordHasher);
   }
 
   @Test
@@ -77,9 +68,7 @@ public class TestIdpManager {
     when(userMetaService.listGroupNames("alice")).thenReturn(Collections.emptyList());
     when(passwordHasher.hash("Passw0rd-For-Alice")).thenReturn("hash-1");
 
-    IdpUserDTO user =
-        PrincipalUtils.doAs(
-            new UserPrincipal("admin"), () -> manager.createUser("alice", "Passw0rd-For-Alice"));
+    IdpUserDTO user = manager.createUser("alice", "Passw0rd-For-Alice");
 
     assertEquals("alice", user.name());
     verify(userMetaService).createUser(any(IdpUserPO.class));
@@ -88,12 +77,8 @@ public class TestIdpManager {
   @Test
   public void testCreateUserRejectsInvalidUserName() throws Exception {
     IllegalArgumentException exception =
-        PrincipalUtils.doAs(
-            new UserPrincipal("admin"),
-            () ->
-                assertThrows(
-                    IllegalArgumentException.class,
-                    () -> manager.createUser("alice:1", "123456789012")));
+        assertThrows(
+            IllegalArgumentException.class, () -> manager.createUser("alice:1", "123456789012"));
 
     assertEquals("User name cannot contain ':'", exception.getMessage());
   }
@@ -101,27 +86,9 @@ public class TestIdpManager {
   @Test
   public void testCreateUserRejectsShortPassword() throws Exception {
     IllegalArgumentException exception =
-        PrincipalUtils.doAs(
-            new UserPrincipal("admin"),
-            () ->
-                assertThrows(
-                    IllegalArgumentException.class, () -> manager.createUser("alice", "short")));
+        assertThrows(IllegalArgumentException.class, () -> manager.createUser("alice", "short"));
 
     assertEquals("Password length must be at least 12 characters", exception.getMessage());
-  }
-
-  @Test
-  public void testCreateUserForbiddenForNonAdmin() throws Exception {
-    ForbiddenException exception =
-        PrincipalUtils.doAs(
-            new UserPrincipal("user"),
-            () ->
-                assertThrows(
-                    ForbiddenException.class, () -> manager.createUser("alice", "123456789012")));
-
-    assertEquals(
-        "Only Gravitino service admins can manage built-in IdP identities", exception.getMessage());
-    verify(userMetaService, never()).createUser(any(IdpUserPO.class));
   }
 
   @Test
@@ -131,12 +98,9 @@ public class TestIdpManager {
     when(passwordHasher.verify("Passw0rd-For-Alice", "hash-1")).thenReturn(true);
 
     IllegalArgumentException exception =
-        PrincipalUtils.doAs(
-            new UserPrincipal("admin"),
-            () ->
-                assertThrows(
-                    IllegalArgumentException.class,
-                    () -> manager.resetPassword("alice", "Passw0rd-For-Alice")));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> manager.resetPassword("alice", "Passw0rd-For-Alice"));
 
     assertEquals(
         "The new password must be different from the old password", exception.getMessage());
@@ -146,33 +110,19 @@ public class TestIdpManager {
   public void testDeleteUserReturnsFalseWhenUserDoesNotExist() throws Exception {
     when(userMetaService.findUser("alice")).thenReturn(Optional.empty());
 
-    boolean deleted =
-        PrincipalUtils.doAs(new UserPrincipal("admin"), () -> manager.deleteUser("alice"));
+    boolean deleted = manager.deleteUser("alice");
 
     assertFalse(deleted);
   }
 
   @Test
-  public void testGetUserRequiresServiceAdmin() throws Exception {
-    ForbiddenException exception =
-        PrincipalUtils.doAs(
-            new UserPrincipal("user"),
-            () -> assertThrows(ForbiddenException.class, () -> manager.getUser("alice")));
-
-    assertEquals(
-        "Only Gravitino service admins can manage built-in IdP identities", exception.getMessage());
-    verify(userMetaService, never()).findUser("alice");
-  }
-
-  @Test
-  public void testGetUserAsServiceAdmin() throws Exception {
+  public void testGetUser() throws Exception {
     IdpUserPO userPO = user("alice", "hash-1");
     when(userMetaService.findUser("alice")).thenReturn(Optional.of(userPO));
     when(userMetaService.listGroupNames("alice"))
         .thenReturn(Collections.singletonList("engineering"));
 
-    IdpUserDTO user =
-        PrincipalUtils.doAs(new UserPrincipal("admin"), () -> manager.getUser("alice"));
+    IdpUserDTO user = manager.getUser("alice");
 
     assertEquals("alice", user.name());
     assertEquals(Collections.singletonList("engineering"), user.groups());
@@ -185,34 +135,20 @@ public class TestIdpManager {
         .thenReturn(Optional.empty(), Optional.of(groupPO));
     when(groupMetaService.listUserNames("engineering")).thenReturn(Collections.emptyList());
 
-    IdpGroupDTO group =
-        PrincipalUtils.doAs(new UserPrincipal("admin"), () -> manager.createGroup("engineering"));
+    IdpGroupDTO group = manager.createGroup("engineering");
 
     assertEquals("engineering", group.name());
     verify(groupMetaService).createGroup(any(IdpGroupPO.class));
   }
 
   @Test
-  public void testGetGroupRequiresServiceAdmin() throws Exception {
-    ForbiddenException exception =
-        PrincipalUtils.doAs(
-            new UserPrincipal("user"),
-            () -> assertThrows(ForbiddenException.class, () -> manager.getGroup("engineering")));
-
-    assertEquals(
-        "Only Gravitino service admins can manage built-in IdP identities", exception.getMessage());
-    verify(groupMetaService, never()).findGroup("engineering");
-  }
-
-  @Test
-  public void testGetGroupAsServiceAdmin() throws Exception {
+  public void testGetGroup() throws Exception {
     IdpGroupPO groupPO = group("engineering");
     when(groupMetaService.findGroup("engineering")).thenReturn(Optional.of(groupPO));
     when(groupMetaService.listUserNames("engineering"))
         .thenReturn(Collections.singletonList("alice"));
 
-    IdpGroupDTO group =
-        PrincipalUtils.doAs(new UserPrincipal("admin"), () -> manager.getGroup("engineering"));
+    IdpGroupDTO group = manager.getGroup("engineering");
 
     assertEquals("engineering", group.name());
     assertEquals(Collections.singletonList("alice"), group.users());
@@ -226,12 +162,8 @@ public class TestIdpManager {
         .thenReturn(Collections.singletonList("alice"));
 
     UnsupportedOperationException exception =
-        PrincipalUtils.doAs(
-            new UserPrincipal("admin"),
-            () ->
-                assertThrows(
-                    UnsupportedOperationException.class,
-                    () -> manager.deleteGroup("engineering", false)));
+        assertThrows(
+            UnsupportedOperationException.class, () -> manager.deleteGroup("engineering", false));
 
     assertEquals(
         "Removing built-in IdP group engineering is dangerous while it still has users, retry with"
@@ -252,10 +184,7 @@ public class TestIdpManager {
         .thenReturn(Collections.singletonList(1L));
     when(groupMetaService.listUserNames("engineering")).thenReturn(Arrays.asList("alice", "bob"));
 
-    IdpGroupDTO group =
-        PrincipalUtils.doAs(
-            new UserPrincipal("admin"),
-            () -> manager.addUsersToGroup("engineering", Arrays.asList("alice", "bob")));
+    IdpGroupDTO group = manager.addUsersToGroup("engineering", Arrays.asList("alice", "bob"));
 
     assertEquals("engineering", group.name());
     verify(groupMetaService).addUsersToGroup(anyList());
@@ -271,9 +200,7 @@ public class TestIdpManager {
     when(groupMetaService.listUserNames("engineering")).thenReturn(Collections.emptyList());
 
     IdpGroupDTO group =
-        PrincipalUtils.doAs(
-            new UserPrincipal("admin"),
-            () -> manager.removeUsersFromGroup("engineering", Collections.singletonList("alice")));
+        manager.removeUsersFromGroup("engineering", Collections.singletonList("alice"));
 
     assertEquals("engineering", group.name());
     assertEquals(Collections.emptyList(), group.users());

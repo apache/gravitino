@@ -21,6 +21,8 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Collections;
+import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -31,29 +33,38 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.requests.CreateUserRequest;
 import org.apache.gravitino.dto.requests.ResetPasswordRequest;
 import org.apache.gravitino.dto.responses.IdpUserResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 @Path("/idp/users")
 public class IdpUserOperations {
 
   private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";
+  private static final String SERVICE_ADMIN_ERROR =
+      "Only Gravitino service admins can manage built-in IdP identities";
   private final IdpManager idpManager;
+  private final List<String> serviceAdmins;
 
   @Context private HttpServletRequest httpRequest;
 
   public IdpUserOperations() {
-    this(GravitinoEnv.getInstance().idpManager());
+    this(
+        GravitinoEnv.getInstance().idpManager(),
+        GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS));
   }
 
-  IdpUserOperations(IdpManager idpManager) {
+  IdpUserOperations(IdpManager idpManager, List<String> serviceAdmins) {
     this.idpManager = idpManager;
+    this.serviceAdmins = serviceAdmins != null ? serviceAdmins : Collections.emptyList();
   }
 
   @GET
@@ -63,7 +74,12 @@ public class IdpUserOperations {
   @ResponseMetered(name = "get-idp-user", absolute = true)
   public Response getUser(@PathParam("user") String user) {
     try {
-      return Utils.doAs(httpRequest, () -> Utils.ok(new IdpUserResponse(idpManager.getUser(user))));
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            ensureServiceAdmin();
+            return Utils.ok(new IdpUserResponse(idpManager.getUser(user)));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpUserException(OperationType.GET, user, e);
     }
@@ -84,6 +100,7 @@ public class IdpUserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            ensureServiceAdmin();
             request.validate();
             return Utils.ok(
                 new IdpUserResponse(
@@ -109,6 +126,7 @@ public class IdpUserOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            ensureServiceAdmin();
             request.validate();
             return Utils.ok(
                 new IdpUserResponse(idpManager.resetPassword(user, request.getPassword())));
@@ -126,9 +144,19 @@ public class IdpUserOperations {
   public Response removeUser(@PathParam("user") String user) {
     try {
       return Utils.doAs(
-          httpRequest, () -> Utils.ok(new RemoveResponse(idpManager.deleteUser(user))));
+          httpRequest,
+          () -> {
+            ensureServiceAdmin();
+            return Utils.ok(new RemoveResponse(idpManager.deleteUser(user)));
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleIdpUserException(OperationType.REMOVE, user, e);
+    }
+  }
+
+  private void ensureServiceAdmin() {
+    if (!serviceAdmins.contains(PrincipalUtils.getCurrentUserName())) {
+      throw new ForbiddenException(SERVICE_ADMIN_ERROR);
     }
   }
 }
