@@ -16,36 +16,56 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ServiceLoader;
+import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.dto.IdpGroupDTO;
 import org.apache.gravitino.dto.IdpUserDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/** Factory for loading built-in IdP manager implementations from the runtime classpath. */
-public final class IdpManagerFactory {
+/**
+ * This class is responsible for creating instances of IdpManager implementations. IdpManager
+ * implementations are used to manage built-in IdP users and groups within the Apache Gravitino
+ * framework.
+ */
+public class IdpManagerFactory {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IdpManagerFactory.class);
 
   private static final String IDP_MANAGER_UNAVAILABLE_MESSAGE =
       "Built-in IdP management is unavailable because no IdpManager plugin implementation was found"
           + " on the runtime classpath.";
 
+  // Private constructor to prevent instantiation of this factory class.
   private IdpManagerFactory() {}
 
-  /** Create the built-in IdP manager implementation. */
-  public static IdpManager create() {
+  /**
+   * Creates an instance of IdpManager from the runtime classpath.
+   *
+   * @return An instance of IdpManager.
+   */
+  public static IdpManager createIdpManager() {
     return loadService(IdpManager.class);
   }
 
-  /** Create the built-in IdP manager implementation or an unavailable placeholder if absent. */
-  public static IdpManager createOrDefault() {
+  /**
+   * Creates an instance of IdpManager from the runtime classpath or returns an unavailable
+   * placeholder when no implementation is present.
+   *
+   * @return An instance of IdpManager.
+   */
+  public static IdpManager createIdpManagerOrDefault() {
     try {
-      return create();
+      return createIdpManager();
     } catch (IllegalStateException e) {
       if (e.getMessage() != null
           && e.getMessage()
               .contains("No " + IdpManager.class.getSimpleName() + " implementation")) {
+        LOG.warn("No IdpManager implementation found on the runtime classpath.");
         return new UnavailableIdpManager();
       }
 

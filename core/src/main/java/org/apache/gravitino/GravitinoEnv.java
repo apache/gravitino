@@ -25,7 +25,6 @@ import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.IdpManager;
-import org.apache.gravitino.authorization.IdpManagerFactory;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
@@ -703,6 +702,6 @@ public class GravitinoEnv {
         new BuiltInJobTemplateEventListener(jobManager, entityStore, idGenerator);
     eventListenerManager.addEventListener("builtin-job-template", builtInJobTemplateListener);
 
-    this.idpManager = IdpManagerFactory.createOrDefault();
+    this.idpManager = IdpManagerFactory.createIdpManagerOrDefault();
   }
 }

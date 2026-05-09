@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import java.util.Collections;
 import java.util.List;
 import java.util.ServiceLoader;
+import org.apache.gravitino.authorization.IdpManager;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -33,20 +34,20 @@ import org.mockito.Mockito;
 public class TestIdpManagerFactory {
 
   @Test
-  public void testCreateLoadsPluginImplementation() {
-    IdpManager idpManager = IdpManagerFactory.create();
+  public void testCreateIdpManagerLoadsPluginImplementation() {
+    IdpManager idpManager = IdpManagerFactory.createIdpManager();
     assertEquals(
         "org.apache.gravitino.idp.basic.authorization.IdpManager", idpManager.getClass().getName());
   }
 
   @Test
-  public void testCreateOrDefaultReturnsUnavailableManagerWhenNoProviderFound() {
+  public void testCreateIdpManagerOrDefaultReturnsUnavailableManagerWhenNoProviderFound() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpManager> serviceLoader = mock(ServiceLoader.class);
       mockedLoader.when(() -> ServiceLoader.load(IdpManager.class)).thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(Collections.emptyIterator());
 
-      IdpManager idpManager = IdpManagerFactory.createOrDefault();
+      IdpManager idpManager = IdpManagerFactory.createIdpManagerOrDefault();
 
       UnsupportedOperationException exception =
           assertThrows(UnsupportedOperationException.class, () -> idpManager.getUser("user1"));
@@ -67,7 +68,7 @@ public class TestIdpManagerFactory {
       when(serviceLoader.iterator()).thenReturn(List.of(first, second).iterator());
 
       IllegalStateException exception =
-          assertThrows(IllegalStateException.class, IdpManagerFactory::create);
+          assertThrows(IllegalStateException.class, IdpManagerFactory::createIdpManager);
       assertEquals("Multiple IdpManager implementations found", exception.getMessage());
     }
   }
