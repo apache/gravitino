@@ -175,9 +175,9 @@ public class TestGravitinoServer {
   }
 
   @Test
-  public void testInitializeRestApiWithBasicAuthenticator() throws Exception {
+  public void testInitializeRestApiWithSimpleAuthenticator() throws Exception {
     ServerConfig serverConfig = new ServerConfig();
-    serverConfig.loadFromMap(ImmutableMap.of(Configs.AUTHENTICATORS.getKey(), "basic"), t -> true);
+    serverConfig.loadFromMap(ImmutableMap.of(Configs.AUTHENTICATORS.getKey(), "simple"), t -> true);
 
     GravitinoServer restServer = newRestApiTestServer(serverConfig, Collections.emptySet());
     invokeInitializeRestApi(restServer);
@@ -223,11 +223,11 @@ public class TestGravitinoServer {
   }
 
   @Test
-  public void testInitializeRestApiWithoutBasicAuthenticator() throws Exception {
+  public void testInitializeRestApiWithoutSimpleAuthenticator() throws Exception {
     ServerConfig serverConfig = new ServerConfig();
     serverConfig.loadFromMap(
         ImmutableMap.of(
-            Configs.AUTHENTICATORS.getKey(), "simple",
+            Configs.AUTHENTICATORS.getKey(), "oauth",
             Configs.REST_API_EXTENSION_PACKAGES.getKey(), "org.apache.gravitino.test.extension"),
         t -> true);
 

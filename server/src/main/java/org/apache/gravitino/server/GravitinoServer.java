@@ -128,10 +128,10 @@ public class GravitinoServer extends ResourceConfig {
   }
 
   private void initializeRestApi() {
-    boolean enableBasicAuthenticator =
+    boolean enableSimpleAuthenticator =
         serverConfig
             .get(Configs.AUTHENTICATORS)
-            .contains(AuthenticatorType.BASIC.name().toLowerCase());
+            .contains(AuthenticatorType.SIMPLE.name().toLowerCase());
     HashSet<String> restApiPackagesSet = new HashSet<>();
     restApiPackagesSet.add("org.apache.gravitino.server.web.rest");
     restApiPackagesSet.addAll(serverConfig.get(Configs.REST_API_EXTENSION_PACKAGES));
@@ -177,7 +177,7 @@ public class GravitinoServer extends ResourceConfig {
     if (!enableAuthorization) {
       register(AccessControlNotAllowedFilter.class);
     }
-    if (!enableBasicAuthenticator) {
+    if (!enableSimpleAuthenticator) {
       register(
           new ContainerRequestFilter() {
             @Override
