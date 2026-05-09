@@ -107,7 +107,7 @@ dependencyCheck {
   // Scan runtime dependencies only (compileClasspath may contain
   // transitive deps that get resolved to newer versions at runtime)
   scanConfigurations = listOf("runtimeClasspath")
-
+  // autoUpdate=false
   // HTML + JSON reports
   formats = listOf("HTML", "JSON")
   outputDirectory.set(layout.buildDirectory.dir("reports/dependency-check"))
