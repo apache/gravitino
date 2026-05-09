@@ -24,21 +24,48 @@ import javax.net.ssl.SSLContext;
 import org.apache.hc.client5.http.ssl.HttpsSupport;
 import org.apache.hc.core5.ssl.SSLContexts;
 
+/** Configures TLS settings for the HTTP client. */
 public interface TLSConfigurer {
+
+  /**
+   * Initializes the TLS configurer with client properties.
+   *
+   * @param properties client configuration properties
+   */
   default void initialize(Map<String, String> properties) {}
 
+  /**
+   * Returns the SSL context used for TLS connections.
+   *
+   * @return SSL context
+   */
   default SSLContext sslContext() {
     return SSLContexts.createDefault();
   }
 
+  /**
+   * Returns the hostname verifier used for TLS connections.
+   *
+   * @return hostname verifier
+   */
   default HostnameVerifier hostnameVerifier() {
     return HttpsSupport.getDefaultHostnameVerifier();
   }
 
+  /**
+   * Returns the supported TLS protocols.
+   *
+   * @return supported TLS protocols
+   */
   default String[] supportedProtocols() {
     return null;
   }
 
+  /**
+   * Returns the supported cipher suites.
+   *
+   * @return supported cipher suites
+   */
   default String[] supportedCipherSuites() {
     return null;
   }
