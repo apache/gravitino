@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.s3.credential;
 
+import org.apache.gravitino.credential.AwsIrsaCredential;
+import org.apache.gravitino.credential.AwsPodIdentityCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.junit.jupiter.api.Assertions;
@@ -35,5 +37,15 @@ public class TestCredentialProvider {
     S3SecretKeyProvider s3SecretKeyProvider = new S3SecretKeyProvider();
     Assertions.assertEquals(
         S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE, s3SecretKeyProvider.credentialType());
+
+    AwsIrsaCredentialProvider awsIrsaCredentialProvider = new AwsIrsaCredentialProvider();
+    Assertions.assertEquals(
+        AwsIrsaCredential.AWS_IRSA_CREDENTIAL_TYPE, awsIrsaCredentialProvider.credentialType());
+
+    AwsPodIdentityCredentialProvider awsPodIdentityCredentialProvider =
+        new AwsPodIdentityCredentialProvider();
+    Assertions.assertEquals(
+        AwsPodIdentityCredential.AWS_POD_IDENTITY_CREDENTIAL_TYPE,
+        awsPodIdentityCredentialProvider.credentialType());
   }
 }
