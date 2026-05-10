@@ -18,29 +18,22 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
-/** Abstract built-in IdP user metadata model shared across modules. */
-public interface IdpUserMeta {
+/** Abstract built-in IdP group metadata model used by core storage SPI. */
+public interface IdpGroupMeta {
 
   /**
-   * Returns the user id.
+   * Returns the group id.
    *
-   * @return the user id
+   * @return the group id
    */
-  Long getUserId();
+  Long getGroupId();
 
   /**
-   * Returns the user name.
+   * Returns the group name.
    *
-   * @return the user name
+   * @return the group name
    */
-  String getUserName();
-
-  /**
-   * Returns the password hash.
-   *
-   * @return the password hash
-   */
-  String getPasswordHash();
+  String getGroupName();
 
   /**
    * Returns the current version.

@@ -16,24 +16,50 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.storage.relational.po;
 
-import java.util.List;
+/** Abstract built-in IdP user metadata model used by core storage SPI. */
+public interface IdpUserMeta {
 
-/** Built-in IdP user view used by core abstractions. */
-public interface IdpUser {
+  /**
+   * Returns the user id.
+   *
+   * @return the user id
+   */
+  Long getUserId();
 
   /**
    * Returns the user name.
    *
    * @return the user name
    */
-  String name();
+  String getUserName();
 
   /**
-   * Returns the group names this user belongs to.
+   * Returns the password hash.
    *
-   * @return the group names
+   * @return the password hash
    */
-  List<String> groups();
+  String getPasswordHash();
+
+  /**
+   * Returns the current version.
+   *
+   * @return the current version
+   */
+  Long getCurrentVersion();
+
+  /**
+   * Returns the last version.
+   *
+   * @return the last version
+   */
+  Long getLastVersion();
+
+  /**
+   * Returns the deletion timestamp.
+   *
+   * @return the deletion timestamp
+   */
+  Long getDeletedAt();
 }

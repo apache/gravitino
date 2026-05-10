@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
-/** Abstract built-in IdP group-user relation metadata model shared across modules. */
+/** Abstract built-in IdP group-user relation metadata model used by core storage SPI. */
 public interface IdpGroupUserRelMeta {
 
   /**
