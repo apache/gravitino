@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-org.apache.gravitino.idp.basic.storage.provider.IdpBasicUserMetaProvider
+org.apache.gravitino.storage.provider.IdpBasicUserMetaProvider

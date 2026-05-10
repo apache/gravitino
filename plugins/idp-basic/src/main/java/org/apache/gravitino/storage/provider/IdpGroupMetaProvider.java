@@ -16,10 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.basic.storage.provider;
+package org.apache.gravitino.storage.provider;
 
-import org.apache.gravitino.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.storage.relational.po.IdpGroupPO;
+import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
 
-/** Compatibility bridge for the idp-basic user metadata provider type. */
-public interface IdpUserMetaProvider
-    extends org.apache.gravitino.storage.relational.provider.IdpUserMetaProvider<IdpUserPO> {}
+/** Compatibility bridge for the idp-basic group metadata provider type. */
+public interface IdpGroupMetaProvider
+    extends org.apache.gravitino.storage.relational.provider.IdpGroupMetaProvider<
+        IdpGroupPO, IdpGroupUserRelPO> {}

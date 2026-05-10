@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.basic.storage.provider;
+package org.apache.gravitino.storage.provider;
 
 import java.util.Collections;
 import java.util.List;
