@@ -17,10 +17,11 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.dto.requests;
+package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -29,40 +30,45 @@ import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to create a built-in IdP group. */
+/** Represents a request to update users in a built-in IdP group. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
-public class CreateGroupRequest implements RESTRequest {
+public class UpdateGroupUsersRequest implements RESTRequest {
 
-  @JsonProperty("group")
-  private final String group;
+  @JsonProperty("users")
+  private final List<String> users;
 
-  /** Default constructor for CreateGroupRequest. (Used for Jackson deserialization.) */
-  public CreateGroupRequest() {
+  /** Default constructor for UpdateGroupUsersRequest. (Used for Jackson deserialization.) */
+  public UpdateGroupUsersRequest() {
     this(null);
   }
 
   /**
-   * Creates a new CreateGroupRequest.
+   * Creates a new UpdateGroupUsersRequest.
    *
-   * @param group The group name of the built-in IdP group.
+   * @param users The user names to update in the built-in IdP group.
    */
-  public CreateGroupRequest(String group) {
+  public UpdateGroupUsersRequest(List<String> users) {
     super();
-    this.group = group;
+    this.users = users;
   }
 
   /**
-   * Validates the {@link CreateGroupRequest} request.
+   * Validates the {@link UpdateGroupUsersRequest} request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(group), "\"group\" field is required and cannot be empty");
+        users != null && !users.isEmpty(), "\"users\" field is required and cannot be empty");
+    users.forEach(
+        user ->
+            Preconditions.checkArgument(
+                StringUtils.isNotBlank(user),
+                "\"users\" field is required and cannot contain empty user names"));
   }
 }

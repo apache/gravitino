@@ -17,11 +17,10 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.dto.requests;
+package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.List;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -30,45 +29,41 @@ import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to update users in a built-in IdP group. */
+/** Represents a request to reset a built-in IdP user password. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
-public class UpdateGroupUsersRequest implements RESTRequest {
+public class ResetPasswordRequest implements RESTRequest {
 
-  @JsonProperty("users")
-  private final List<String> users;
+  @JsonProperty("password")
+  @ToString.Exclude
+  private final String password;
 
-  /** Default constructor for UpdateGroupUsersRequest. (Used for Jackson deserialization.) */
-  public UpdateGroupUsersRequest() {
+  /** Default constructor for ResetPasswordRequest. (Used for Jackson deserialization.) */
+  public ResetPasswordRequest() {
     this(null);
   }
 
   /**
-   * Creates a new UpdateGroupUsersRequest.
+   * Creates a new ResetPasswordRequest.
    *
-   * @param users The user names to update in the built-in IdP group.
+   * @param password The new password of the built-in IdP user.
    */
-  public UpdateGroupUsersRequest(List<String> users) {
+  public ResetPasswordRequest(String password) {
     super();
-    this.users = users;
+    this.password = password;
   }
 
   /**
-   * Validates the {@link UpdateGroupUsersRequest} request.
+   * Validates the {@link ResetPasswordRequest} request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        users != null && !users.isEmpty(), "\"users\" field is required and cannot be empty");
-    users.forEach(
-        user ->
-            Preconditions.checkArgument(
-                StringUtils.isNotBlank(user),
-                "\"users\" field is required and cannot contain empty user names"));
+        StringUtils.isNotBlank(password), "\"password\" field is required and cannot be empty");
   }
 }

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.dto.requests;
+package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -29,40 +29,47 @@ import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to reset a built-in IdP user password. */
+/** Represents a request to create a built-in IdP user. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
-public class ResetPasswordRequest implements RESTRequest {
+public class CreateUserRequest implements RESTRequest {
+
+  @JsonProperty("user")
+  private final String user;
 
   @JsonProperty("password")
   @ToString.Exclude
   private final String password;
 
-  /** Default constructor for ResetPasswordRequest. (Used for Jackson deserialization.) */
-  public ResetPasswordRequest() {
-    this(null);
+  /** Default constructor for CreateUserRequest. (Used for Jackson deserialization.) */
+  public CreateUserRequest() {
+    this(null, null);
   }
 
   /**
-   * Creates a new ResetPasswordRequest.
+   * Creates a new CreateUserRequest.
    *
-   * @param password The new password of the built-in IdP user.
+   * @param user The user name of the built-in IdP user.
+   * @param password The password of the built-in IdP user.
    */
-  public ResetPasswordRequest(String password) {
+  public CreateUserRequest(String user, String password) {
     super();
+    this.user = user;
     this.password = password;
   }
 
   /**
-   * Validates the {@link ResetPasswordRequest} request.
+   * Validates the {@link CreateUserRequest} request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */
   @Override
   public void validate() throws IllegalArgumentException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(user), "\"user\" field is required and cannot be empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(password), "\"password\" field is required and cannot be empty");
   }

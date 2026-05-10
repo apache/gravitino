@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.dto.responses;
+package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -25,32 +25,31 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dto.responses.BaseResponse;
-import org.apache.gravitino.idp.basic.dto.IdpUserDTO;
+import org.apache.gravitino.dto.IdpGroupDTO;
 
-/** Represents a response for a built-in IdP user. */
+/** Represents a response for a built-in IdP group. */
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class IdpUserResponse extends BaseResponse {
+public class IdpGroupResponse extends BaseResponse {
 
-  @JsonProperty("user")
-  private final IdpUserDTO user;
+  @JsonProperty("group")
+  private final IdpGroupDTO group;
 
   /**
-   * Constructor for IdpUserResponse.
+   * Constructor for IdpGroupResponse.
    *
-   * @param user The built-in IdP user data transfer object.
+   * @param group The built-in IdP group data transfer object.
    */
-  public IdpUserResponse(IdpUserDTO user) {
+  public IdpGroupResponse(IdpGroupDTO group) {
     super(0);
-    this.user = user;
+    this.group = group;
   }
 
-  /** Default constructor for IdpUserResponse. (Used for Jackson deserialization.) */
-  public IdpUserResponse() {
+  /** Default constructor for IdpGroupResponse. (Used for Jackson deserialization.) */
+  public IdpGroupResponse() {
     super();
-    this.user = null;
+    this.group = null;
   }
 
   /**
@@ -62,8 +61,8 @@ public class IdpUserResponse extends BaseResponse {
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(user != null, "user must not be null");
+    Preconditions.checkArgument(group != null, "group must not be null");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(user.name()), "user 'name' must not be null or empty");
+        StringUtils.isNotBlank(group.name()), "group 'name' must not be null or empty");
   }
 }

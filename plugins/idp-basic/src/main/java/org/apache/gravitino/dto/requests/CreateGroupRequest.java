@@ -17,53 +17,52 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.dto.responses;
+package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
+import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dto.responses.BaseResponse;
-import org.apache.gravitino.idp.basic.dto.IdpGroupDTO;
+import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a response for a built-in IdP group. */
+/** Represents a request to create a built-in IdP group. */
 @Getter
+@EqualsAndHashCode
 @ToString
-@EqualsAndHashCode(callSuper = true)
-public class IdpGroupResponse extends BaseResponse {
+@Builder
+@Jacksonized
+public class CreateGroupRequest implements RESTRequest {
 
   @JsonProperty("group")
-  private final IdpGroupDTO group;
+  private final String group;
+
+  /** Default constructor for CreateGroupRequest. (Used for Jackson deserialization.) */
+  public CreateGroupRequest() {
+    this(null);
+  }
 
   /**
-   * Constructor for IdpGroupResponse.
+   * Creates a new CreateGroupRequest.
    *
-   * @param group The built-in IdP group data transfer object.
+   * @param group The group name of the built-in IdP group.
    */
-  public IdpGroupResponse(IdpGroupDTO group) {
-    super(0);
+  public CreateGroupRequest(String group) {
+    super();
     this.group = group;
   }
 
-  /** Default constructor for IdpGroupResponse. (Used for Jackson deserialization.) */
-  public IdpGroupResponse() {
-    super();
-    this.group = null;
-  }
-
   /**
-   * Validates the response data.
+   * Validates the {@link CreateGroupRequest} request.
    *
-   * @throws IllegalArgumentException if the name is not set.
+   * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */
   @Override
   public void validate() throws IllegalArgumentException {
-    super.validate();
-
-    Preconditions.checkArgument(group != null, "group must not be null");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(group.name()), "group 'name' must not be null or empty");
+        StringUtils.isNotBlank(group), "\"group\" field is required and cannot be empty");
   }
 }

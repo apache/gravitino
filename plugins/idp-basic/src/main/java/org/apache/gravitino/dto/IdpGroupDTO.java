@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.dto;
+package org.apache.gravitino.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -26,50 +26,50 @@ import java.util.List;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.lang3.StringUtils;
 
-/** Represents a built-in IdP user Data Transfer Object (DTO). */
+/** Represents a built-in IdP group Data Transfer Object (DTO). */
 @EqualsAndHashCode
-public class IdpUserDTO {
+public class IdpGroupDTO {
 
   @JsonProperty("name")
   private String name;
 
-  @JsonProperty("groups")
-  private List<String> groups;
+  @JsonProperty("users")
+  private List<String> users;
 
   /** Default constructor for Jackson deserialization. */
-  protected IdpUserDTO() {
-    this.groups = Collections.emptyList();
+  protected IdpGroupDTO() {
+    this.users = Collections.emptyList();
   }
 
   /**
-   * Creates a new instance of IdpUserDTO.
+   * Creates a new instance of IdpGroupDTO.
    *
-   * @param name The name of the built-in IdP user DTO.
-   * @param groups The groups of the built-in IdP user DTO.
+   * @param name The name of the built-in IdP group DTO.
+   * @param users The users of the built-in IdP group DTO.
    */
-  protected IdpUserDTO(String name, List<String> groups) {
+  protected IdpGroupDTO(String name, List<String> users) {
     this.name = name;
-    this.groups = groups;
+    this.users = users;
   }
 
   /**
-   * @return The name of the built-in IdP user DTO.
+   * @return The name of the built-in IdP group DTO.
    */
   public String name() {
     return name;
   }
 
   /**
-   * The groups of the built-in IdP user. A user can belong to multiple groups.
+   * The users of the built-in IdP group. A group can contain multiple users.
    *
-   * @return The groups of the built-in IdP user.
+   * @return The users of the built-in IdP group.
    */
-  public List<String> groups() {
-    return groups;
+  public List<String> users() {
+    return users;
   }
 
   /**
-   * Creates a new Builder for constructing a built-in IdP user DTO.
+   * Creates a new Builder for constructing a built-in IdP group DTO.
    *
    * @return A new Builder instance.
    */
@@ -78,22 +78,22 @@ public class IdpUserDTO {
   }
 
   /**
-   * Builder class for constructing an IdpUserDTO instance.
+   * Builder class for constructing an IdpGroupDTO instance.
    *
    * @param <S> The type of the builder instance.
    */
   public static class Builder<S extends Builder> {
 
-    /** The name of the built-in IdP user. */
+    /** The name of the built-in IdP group. */
     protected String name;
 
-    /** The groups of the built-in IdP user. */
-    protected List<String> groups = Collections.emptyList();
+    /** The users of the built-in IdP group. */
+    protected List<String> users = Collections.emptyList();
 
     /**
-     * Sets the name of the built-in IdP user.
+     * Sets the name of the built-in IdP group.
      *
-     * @param name The name of the built-in IdP user.
+     * @param name The name of the built-in IdP group.
      * @return The builder instance.
      */
     public S withName(String name) {
@@ -102,28 +102,28 @@ public class IdpUserDTO {
     }
 
     /**
-     * Sets the groups of the built-in IdP user.
+     * Sets the users of the built-in IdP group.
      *
-     * @param groups The groups of the built-in IdP user.
+     * @param users The users of the built-in IdP group.
      * @return The builder instance.
      */
-    public S withGroups(List<String> groups) {
-      if (groups != null) {
-        this.groups = groups;
+    public S withUsers(List<String> users) {
+      if (users != null) {
+        this.users = users;
       }
 
       return (S) this;
     }
 
     /**
-     * Builds an instance of IdpUserDTO using the builder's properties.
+     * Builds an instance of IdpGroupDTO using the builder's properties.
      *
-     * @return An instance of IdpUserDTO.
+     * @return An instance of IdpGroupDTO.
      * @throws IllegalArgumentException If the name is not set.
      */
-    public IdpUserDTO build() {
+    public IdpGroupDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
-      return new IdpUserDTO(name, groups);
+      return new IdpGroupDTO(name, users);
     }
   }
 }

@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.dto.responses;
+package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Arrays;
-import org.apache.gravitino.idp.basic.dto.IdpUserDTO;
+import org.apache.gravitino.dto.IdpUserDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

@@ -17,49 +17,43 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.dto.requests;
+package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import java.util.Arrays;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestUpdateGroupUsersRequest {
+public class TestCreateGroupRequest {
 
   @Test
-  public void testUpdateGroupUsersRequestSerDe() throws JsonProcessingException {
-    UpdateGroupUsersRequest request = new UpdateGroupUsersRequest(Arrays.asList("user1", "user2"));
+  public void testCreateGroupRequestSerDe() throws JsonProcessingException {
+    CreateGroupRequest request = new CreateGroupRequest("test_group");
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
-    UpdateGroupUsersRequest deserRequest =
-        JsonUtils.objectMapper().readValue(serJson, UpdateGroupUsersRequest.class);
+    CreateGroupRequest deserRequest =
+        JsonUtils.objectMapper().readValue(serJson, CreateGroupRequest.class);
 
     Assertions.assertEquals(request, deserRequest);
-    Assertions.assertEquals(Arrays.asList("user1", "user2"), deserRequest.getUsers());
+    Assertions.assertEquals("test_group", deserRequest.getGroup());
 
-    // Test with null users
-    UpdateGroupUsersRequest request1 = new UpdateGroupUsersRequest();
+    // Test with null group
+    CreateGroupRequest request1 = new CreateGroupRequest();
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(request1);
-    UpdateGroupUsersRequest deserRequest1 =
-        JsonUtils.objectMapper().readValue(serJson1, UpdateGroupUsersRequest.class);
+    CreateGroupRequest deserRequest1 =
+        JsonUtils.objectMapper().readValue(serJson1, CreateGroupRequest.class);
 
     Assertions.assertEquals(request1, deserRequest1);
-    Assertions.assertNull(deserRequest1.getUsers());
+    Assertions.assertNull(deserRequest1.getGroup());
   }
 
   @Test
-  public void testUpdateGroupUsersRequestValidate() {
-    Assertions.assertDoesNotThrow(
-        () -> new UpdateGroupUsersRequest(Arrays.asList("user1", "user2")).validate());
+  public void testCreateGroupRequestValidate() {
+    Assertions.assertDoesNotThrow(() -> new CreateGroupRequest("test_group").validate());
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new UpdateGroupUsersRequest(null).validate());
+        IllegalArgumentException.class, () -> new CreateGroupRequest().validate());
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> new UpdateGroupUsersRequest(Arrays.asList()).validate());
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> new UpdateGroupUsersRequest(Arrays.asList("user1", " ")).validate());
+        IllegalArgumentException.class, () -> new CreateGroupRequest(" ").validate());
   }
 }

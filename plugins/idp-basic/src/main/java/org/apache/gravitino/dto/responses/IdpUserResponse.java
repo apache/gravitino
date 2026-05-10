@@ -17,60 +17,52 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.dto.requests;
+package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.dto.IdpUserDTO;
 
-/** Represents a request to create a built-in IdP user. */
+/** Represents a response for a built-in IdP user. */
 @Getter
-@EqualsAndHashCode
 @ToString
-@Builder
-@Jacksonized
-public class CreateUserRequest implements RESTRequest {
+@EqualsAndHashCode(callSuper = true)
+public class IdpUserResponse extends BaseResponse {
 
   @JsonProperty("user")
-  private final String user;
-
-  @JsonProperty("password")
-  @ToString.Exclude
-  private final String password;
-
-  /** Default constructor for CreateUserRequest. (Used for Jackson deserialization.) */
-  public CreateUserRequest() {
-    this(null, null);
-  }
+  private final IdpUserDTO user;
 
   /**
-   * Creates a new CreateUserRequest.
+   * Constructor for IdpUserResponse.
    *
-   * @param user The user name of the built-in IdP user.
-   * @param password The password of the built-in IdP user.
+   * @param user The built-in IdP user data transfer object.
    */
-  public CreateUserRequest(String user, String password) {
-    super();
+  public IdpUserResponse(IdpUserDTO user) {
+    super(0);
     this.user = user;
-    this.password = password;
+  }
+
+  /** Default constructor for IdpUserResponse. (Used for Jackson deserialization.) */
+  public IdpUserResponse() {
+    super();
+    this.user = null;
   }
 
   /**
-   * Validates the {@link CreateUserRequest} request.
+   * Validates the response data.
    *
-   * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
+   * @throws IllegalArgumentException if the name is not set.
    */
   @Override
   public void validate() throws IllegalArgumentException {
+    super.validate();
+
+    Preconditions.checkArgument(user != null, "user must not be null");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(user), "\"user\" field is required and cannot be empty");
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(password), "\"password\" field is required and cannot be empty");
+        StringUtils.isNotBlank(user.name()), "user 'name' must not be null or empty");
   }
 }

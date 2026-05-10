@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.dto;
+package org.apache.gravitino.dto;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Arrays;
