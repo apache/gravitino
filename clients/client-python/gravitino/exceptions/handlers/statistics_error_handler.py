@@ -35,7 +35,9 @@ from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 
 
 class StatisticsErrorHandler(RestErrorHandler):
-    def handle(self, error_response: ErrorResponse):
+    def handle(
+        self, error_response: ErrorResponse
+    ):  # pylint: disable=too-many-branches
         error_message = error_response.format_error_message()
         code = ErrorConstants(error_response.code())
         exception_type = error_response.type()

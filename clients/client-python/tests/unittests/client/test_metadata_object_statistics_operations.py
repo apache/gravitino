@@ -66,7 +66,7 @@ class TestMetadataObjectStatisticsOperations(unittest.TestCase):
             result = stats_op.list_statistics()
             self.assertEqual([statistic], result)
             mock_get.assert_called_once_with(
-                endpoint=stats_op._request_path,
+                endpoint=stats_op.request_path,
                 error_handler=STATISTICS_ERROR_HANDLER,
             )
 
@@ -85,7 +85,7 @@ class TestMetadataObjectStatisticsOperations(unittest.TestCase):
             stats_op.update_statistics(stats_map)
             req = StatisticsUpdateRequest(_updates=stats_map)
             mock_put.assert_called_once_with(
-                endpoint=stats_op._request_path,
+                endpoint=stats_op.request_path,
                 json=req.to_json(),
                 error_handler=STATISTICS_ERROR_HANDLER,
             )
@@ -107,7 +107,7 @@ class TestMetadataObjectStatisticsOperations(unittest.TestCase):
             self.assertTrue(result)
             req = StatisticsDropRequest(_names=names)
             mock_post.assert_called_once_with(
-                endpoint=stats_op._request_path,
+                endpoint=stats_op.request_path,
                 json=req.to_json(),
                 error_handler=STATISTICS_ERROR_HANDLER,
             )

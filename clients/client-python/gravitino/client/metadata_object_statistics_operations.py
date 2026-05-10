@@ -53,7 +53,7 @@ class MetadataObjectStatisticsOperations(SupportsStatistics):
         metadata_object_type = metadata_object.type().value
         metadata_object_fullname = metadata_object.full_name()
         self._rest_client = rest_client
-        self._request_path = (
+        self.request_path = (
             f"api/metalakes/{encode_string(metalake_name)}/"
             f"objects/{metadata_object_type}/{encode_string(metadata_object_fullname)}/"
             "statistics"
@@ -61,14 +61,14 @@ class MetadataObjectStatisticsOperations(SupportsStatistics):
 
     def list_statistics(self) -> list[Statistic]:
         resp = self._rest_client.get(
-            endpoint=self._request_path,
+            endpoint=self.request_path,
             error_handler=STATISTICS_ERROR_HANDLER,
         )
 
         statistic_resp = StatisticListResponse.from_json(resp.body, infer_missing=True)
         statistic_resp.validate()
 
-        return [statistic for statistic in statistic_resp.statistics]
+        return statistic_resp.statistics
 
     def update_statistics(self, statistics: dict[str, StatisticValue[Any]]) -> None:
         Precondition.check_argument(
@@ -78,7 +78,7 @@ class MetadataObjectStatisticsOperations(SupportsStatistics):
         req = StatisticsUpdateRequest(_updates=statistics)
         req.validate()
         resp = self._rest_client.put(
-            endpoint=self._request_path,
+            endpoint=self.request_path,
             json=req.to_json(),
             error_handler=STATISTICS_ERROR_HANDLER,
         )
@@ -92,7 +92,7 @@ class MetadataObjectStatisticsOperations(SupportsStatistics):
         req = StatisticsDropRequest(_names=statistics)
         req.validate()
         resp = self._rest_client.post(
-            endpoint=self._request_path,
+            endpoint=self.request_path,
             json=req.to_json(),
             error_handler=STATISTICS_ERROR_HANDLER,
         )
