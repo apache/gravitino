@@ -736,6 +736,7 @@ public class HTTPClient implements RESTClient {
     ConnectionConfig connectionConfig = configureConnectionConfig(clientConfiguration);
     connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
 
+    // Configure custom TLS settings, if provided
     TLSConfigurer tlsConfigurer = loadTlsConfigurer(properties);
     if (tlsConfigurer != null) {
       connectionManagerBuilder.setTlsSocketStrategy(
@@ -750,11 +751,19 @@ public class HTTPClient implements RESTClient {
     return connectionManagerBuilder.build();
   }
 
+  /**
+   * Loads a TLSConfigurer implementation from the configured class name.
+   *
+   * @param properties A map of properties (key-value pairs) used to configure the HTTP client.
+   * @return an initialized TLSConfigurer object, or null if no TLSConfigurer is configured
+   */
   private static TLSConfigurer loadTlsConfigurer(Map<String, String> properties) {
     String impl = properties.get(REST_TLS_CONFIGURER);
     if (impl == null) {
+      // No TLS configuration found
       return null;
     }
+
     DynConstructors.Ctor<TLSConfigurer> ctor;
     try {
       ctor =
@@ -779,8 +788,9 @@ public class HTTPClient implements RESTClient {
           e);
     }
 
+    // Once constructed, object will load initialization procedure (currently empty) before
+    // returning for use.
     configurer.initialize(properties);
-
     return configurer;
   }
 
