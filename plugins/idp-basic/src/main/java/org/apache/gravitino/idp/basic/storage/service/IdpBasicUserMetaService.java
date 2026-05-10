@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.service;
+package org.apache.gravitino.idp.basic.storage.service;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
@@ -28,14 +28,14 @@ import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /** The service class for user metadata. It provides the basic database operations for user. */
-public class IdpUserMetaService {
-  private static final IdpUserMetaService INSTANCE = new IdpUserMetaService();
+public class IdpBasicUserMetaService {
+  private static final IdpBasicUserMetaService INSTANCE = new IdpBasicUserMetaService();
 
-  public static IdpUserMetaService getInstance() {
+  public static IdpBasicUserMetaService getInstance() {
     return INSTANCE;
   }
 
-  private IdpUserMetaService() {}
+  private IdpBasicUserMetaService() {}
 
   public Optional<IdpUserPO> findUser(String userName) {
     return Optional.ofNullable(

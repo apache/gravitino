@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.service;
+package org.apache.gravitino.idp.basic.storage.service;
 
 import java.util.Collections;
 import java.util.List;
@@ -28,14 +28,14 @@ import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /** The service class for group metadata. It provides the basic database operations for group. */
-public class IdpGroupMetaService {
-  private static final IdpGroupMetaService INSTANCE = new IdpGroupMetaService();
+public class IdpBasicGroupMetaService {
+  private static final IdpBasicGroupMetaService INSTANCE = new IdpBasicGroupMetaService();
 
-  public static IdpGroupMetaService getInstance() {
+  public static IdpBasicGroupMetaService getInstance() {
     return INSTANCE;
   }
 
-  private IdpGroupMetaService() {}
+  private IdpBasicGroupMetaService() {}
 
   public Optional<IdpGroupPO> findGroup(String groupName) {
     return Optional.ofNullable(

@@ -16,60 +16,74 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational;
+package org.apache.gravitino.storage.relational.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.util.List;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.storage.relational.LegacyDataCleaner;
 import org.junit.jupiter.api.Test;
 
 public class TestJDBCBackendLegacyCleanup {
 
   @Test
-  public void testDeleteLegacyDataWithPluginService() throws IOException {
-    JDBCBackend backend = new JDBCBackend();
-
+  public void testDeleteLegacyDataWithPluginCleaner() throws IOException {
     assertEquals(
         3,
-        backend.deleteLegacyDataWithPluginService(
-            FakeIdpUserMetaService.class.getName(), "deleteUserMetasByLegacyTimeline", 1L));
+        IdpUserMetaService.getInstance()
+            .deleteUserMetasByLegacyTimelineWithCleaner(
+                1L, 10, List.of(new FakeCleaner(Entity.EntityType.IDP_USER, 3))));
     assertEquals(
         5,
-        backend.deleteLegacyDataWithPluginService(
-            FakeIdpGroupMetaService.class.getName(), "deleteGroupMetasByLegacyTimeline", 2L));
+        IdpGroupMetaService.getInstance()
+            .deleteGroupMetasByLegacyTimelineWithCleaner(
+                2L, 10, List.of(new FakeCleaner(Entity.EntityType.IDP_GROUP, 5))));
   }
 
   @Test
-  public void testDeleteLegacyDataWithPluginServiceFailsWhenServiceMissing() {
-    JDBCBackend backend = new JDBCBackend();
-
+  public void testDeleteLegacyDataWithPluginCleanerFailsWhenCleanerMissing() {
     assertThrows(
         IOException.class,
         () ->
-            backend.deleteLegacyDataWithPluginService(
-                "org.apache.gravitino.storage.relational.service.MissingService",
-                "deleteUserMetasByLegacyTimeline",
-                1L));
+            IdpUserMetaService.getInstance()
+                .deleteUserMetasByLegacyTimelineWithCleaner(
+                    1L, 10, List.of(new FakeCleaner(Entity.EntityType.IDP_GROUP, 5))));
   }
 
-  public static class FakeIdpUserMetaService {
-    public static FakeIdpUserMetaService getInstance() {
-      return new FakeIdpUserMetaService();
-    }
-
-    public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
-      return 3;
-    }
+  @Test
+  public void testDeleteLegacyDataWithPluginCleanerFailsWhenMultipleCleanersFound() {
+    assertThrows(
+        IOException.class,
+        () ->
+            IdpUserMetaService.getInstance()
+                .deleteUserMetasByLegacyTimelineWithCleaner(
+                    1L,
+                    10,
+                    List.of(
+                        new FakeCleaner(Entity.EntityType.IDP_USER, 3),
+                        new FakeCleaner(Entity.EntityType.IDP_USER, 4))));
   }
 
-  public static class FakeIdpGroupMetaService {
-    public static FakeIdpGroupMetaService getInstance() {
-      return new FakeIdpGroupMetaService();
+  private static class FakeCleaner implements LegacyDataCleaner {
+    private final Entity.EntityType entityType;
+    private final int deletedCount;
+
+    private FakeCleaner(Entity.EntityType entityType, int deletedCount) {
+      this.entityType = entityType;
+      this.deletedCount = deletedCount;
     }
 
-    public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {
-      return 5;
+    @Override
+    public Entity.EntityType entityType() {
+      return entityType;
+    }
+
+    @Override
+    public int hardDeleteLegacyData(long legacyTimeline, int limit) {
+      return deletedCount;
     }
   }
 }

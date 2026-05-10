@@ -26,8 +26,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -69,6 +67,8 @@ import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
+import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
+import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
@@ -101,10 +101,6 @@ public class JDBCBackend implements RelationalBackend {
 
   private static final Map<JDBCBackendType, String> EMBEDDED_JDBC_DATABASE_MAP =
       ImmutableMap.of(JDBCBackendType.H2, H2Database.class.getCanonicalName());
-  private static final String IDP_USER_META_SERVICE_CLASS =
-      "org.apache.gravitino.storage.relational.service.IdpUserMetaService";
-  private static final String IDP_GROUP_META_SERVICE_CLASS =
-      "org.apache.gravitino.storage.relational.service.IdpGroupMetaService";
 
   // Database instance of this JDBCBackend.
   private JDBCDatabase jdbcDatabase;
@@ -480,15 +476,17 @@ public class JDBCBackend implements RelationalBackend {
             .deleteUserMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case IDP_USER:
-        return deleteLegacyDataWithPluginService(
-            IDP_USER_META_SERVICE_CLASS, "deleteUserMetasByLegacyTimeline", legacyTimeline);
+        return IdpUserMetaService.getInstance()
+            .deleteUserMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case GROUP:
         return GroupMetaService.getInstance()
             .deleteGroupMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case IDP_GROUP:
-        return deleteLegacyDataWithPluginService(
-            IDP_GROUP_META_SERVICE_CLASS, "deleteGroupMetasByLegacyTimeline", legacyTimeline);
+        return IdpGroupMetaService.getInstance()
+            .deleteGroupMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case ROLE:
         return RoleMetaService.getInstance()
             .deleteRoleMetasByLegacyTimeline(
@@ -538,25 +536,6 @@ public class JDBCBackend implements RelationalBackend {
       default:
         throw new IllegalArgumentException(
             "Unsupported entity type when collectAndRemoveLegacyData: " + entityType);
-    }
-  }
-
-  int deleteLegacyDataWithPluginService(
-      String serviceClassName, String deleteMethodName, long legacyTimeline) throws IOException {
-    try {
-      Class<?> serviceClass = Class.forName(serviceClassName);
-      Object serviceInstance = serviceClass.getMethod("getInstance").invoke(null);
-      Method deleteMethod = serviceClass.getMethod(deleteMethodName, long.class, int.class);
-      return (Integer)
-          deleteMethod.invoke(
-              serviceInstance, legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-    } catch (ClassNotFoundException
-        | IllegalAccessException
-        | NoSuchMethodException
-        | InvocationTargetException e) {
-      throw new IOException(
-          String.format("Failed to delete legacy IdP metadata via service %s", serviceClassName),
-          e);
     }
   }
 
