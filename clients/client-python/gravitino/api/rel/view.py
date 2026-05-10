@@ -19,8 +19,10 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from gravitino.api.auditable import Auditable
 
-class View(ABC):
+
+class View(Auditable, ABC):
     """The `View` interface defines the metadata of a view."""
 
     @abstractmethod
@@ -38,6 +40,7 @@ class View(ABC):
         Returns:
             Optional[str]: The view comment.
         """
+        return None
 
     @abstractmethod
     def properties(self) -> dict[str, str]:
@@ -46,6 +49,7 @@ class View(ABC):
         Returns:
             dict[str, str]: The view properties.
         """
+        return {}
 
     @abstractmethod
     def view_definition(self) -> Optional[str]:

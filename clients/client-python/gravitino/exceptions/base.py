@@ -261,3 +261,4 @@ class NoSuchViewException(Exception):
 class NoSuchViewException(Exception):
     """Exception raised when a view does not exist."""
     pass
+
