@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
+import static org.apache.gravitino.Configs.DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS;
 import static org.apache.gravitino.Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
 import static org.apache.gravitino.Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
@@ -29,6 +30,7 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWO
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
+import static org.apache.gravitino.Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS;
 
 import java.io.File;
 import java.io.IOException;
@@ -174,6 +176,8 @@ public class BackendTestExtension
           .thenReturn(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS);
       Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS))
           .thenReturn(DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS);
+      Mockito.when(config.get(METRICS_TIME_SLIDING_WINDOW_SECONDS))
+          .thenReturn(DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
 
       Mockito.when(config.get(CACHE_ENABLED)).thenReturn(true);
 
