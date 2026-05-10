@@ -28,9 +28,6 @@ import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
-import org.apache.gravitino.storage.relational.mapper.IdpGroupMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
-import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
@@ -70,9 +67,6 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         FunctionVersionMetaMapper.class,
         GroupMetaMapper.class,
         GroupRoleRelMapper.class,
-        IdpGroupMetaMapper.class,
-        IdpGroupUserRelMapper.class,
-        IdpUserMetaMapper.class,
         JobMetaMapper.class,
         JobTemplateMetaMapper.class,
         MetalakeMetaMapper.class,

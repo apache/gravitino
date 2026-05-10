@@ -16,16 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.storage.relational.mapper.provider;
 
-package org.apache.gravitino.storage.relational.mapper.provider.h2;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.apache.gravitino.storage.relational.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.mapper.provider.base.TestIdpGroupMetaBaseSQLProvider;
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
+import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
+import org.junit.jupiter.api.Test;
 
-public class TestIdpGroupMetaH2Provider extends TestIdpGroupMetaBaseSQLProvider {
+public class TestIdpBasicMapperPackageProvider {
 
-  @Override
-  protected IdpGroupMetaBaseSQLProvider createProvider() {
-    return new IdpGroupMetaH2Provider();
+  @Test
+  public void testGetMapperClasses() {
+    MapperPackageProvider provider = new IdpBasicMapperPackageProvider();
+
+    assertEquals(
+        List.of(IdpGroupMetaMapper.class, IdpGroupUserRelMapper.class, IdpUserMetaMapper.class),
+        provider.getMapperClasses());
   }
 }

@@ -67,8 +67,6 @@ import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
-import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
-import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.apache.gravitino.storage.relational.service.JobMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
@@ -475,16 +473,8 @@ public class JDBCBackend implements RelationalBackend {
         return UserMetaService.getInstance()
             .deleteUserMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-      case IDP_USER:
-        return IdpUserMetaService.getInstance()
-            .deleteUserMetasByLegacyTimeline(
-                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case GROUP:
         return GroupMetaService.getInstance()
-            .deleteGroupMetasByLegacyTimeline(
-                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
-      case IDP_GROUP:
-        return IdpGroupMetaService.getInstance()
             .deleteGroupMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case ROLE:

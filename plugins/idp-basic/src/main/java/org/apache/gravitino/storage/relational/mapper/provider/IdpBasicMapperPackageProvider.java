@@ -16,16 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.storage.relational.mapper.provider;
 
-package org.apache.gravitino.storage.relational.mapper;
+import com.google.common.collect.ImmutableList;
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
+import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
 
-import org.apache.gravitino.storage.relational.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.mapper.provider.base.TestIdpGroupMetaBaseSQLProvider;
-
-public class TestIdpGroupMetaMySQLProvider extends TestIdpGroupMetaBaseSQLProvider {
+/** Supplies built-in IdP mapper classes from the idp-basic plugin. */
+public class IdpBasicMapperPackageProvider implements MapperPackageProvider {
 
   @Override
-  protected IdpGroupMetaBaseSQLProvider createProvider() {
-    return new IdpGroupMetaSQLProviderFactory.IdpGroupMetaMySQLProvider();
+  public List<Class<?>> getMapperClasses() {
+    return ImmutableList.of(
+        IdpGroupMetaMapper.class, IdpGroupUserRelMapper.class, IdpUserMetaMapper.class);
   }
 }
