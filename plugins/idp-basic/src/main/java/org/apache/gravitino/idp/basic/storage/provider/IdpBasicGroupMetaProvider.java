@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.basic.storage.service;
+package org.apache.gravitino.idp.basic.storage.provider;
 
 import java.util.Collections;
 import java.util.List;
@@ -27,22 +27,24 @@ import org.apache.gravitino.storage.relational.po.IdpGroupPO;
 import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
-/** The service class for group metadata. It provides the basic database operations for group. */
-public class IdpBasicGroupMetaService {
-  private static final IdpBasicGroupMetaService INSTANCE = new IdpBasicGroupMetaService();
+/** The provider class for group metadata. It provides the basic database operations for group. */
+public class IdpBasicGroupMetaProvider implements IdpGroupMetaProvider {
+  private static final IdpBasicGroupMetaProvider INSTANCE = new IdpBasicGroupMetaProvider();
 
-  public static IdpBasicGroupMetaService getInstance() {
+  public static IdpBasicGroupMetaProvider getInstance() {
     return INSTANCE;
   }
 
-  private IdpBasicGroupMetaService() {}
+  public IdpBasicGroupMetaProvider() {}
 
+  @Override
   public Optional<IdpGroupPO> findGroup(String groupName) {
     return Optional.ofNullable(
         SessionUtils.getWithoutCommit(
             IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName)));
   }
 
+  @Override
   public List<String> listUserNames(String groupName) {
     Optional<IdpGroupPO> group = findGroup(groupName);
     if (!group.isPresent()) {
@@ -54,10 +56,12 @@ public class IdpBasicGroupMetaService {
         mapper -> mapper.selectUserNamesByGroupId(group.get().getGroupId()));
   }
 
+  @Override
   public void createGroup(IdpGroupPO groupPO) {
     SessionUtils.doWithCommit(IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO));
   }
 
+  @Override
   public boolean deleteGroup(IdpGroupPO groupPO, Long deletedAt) {
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -71,11 +75,13 @@ public class IdpBasicGroupMetaService {
     return true;
   }
 
+  @Override
   public List<Long> selectRelatedUserIds(Long groupId, List<Long> userIds) {
     return SessionUtils.getWithoutCommit(
         IdpGroupUserRelMapper.class, mapper -> mapper.selectRelatedUserIds(groupId, userIds));
   }
 
+  @Override
   public void addUsersToGroup(List<IdpGroupUserRelPO> relations) {
     if (relations.isEmpty()) {
       return;
@@ -84,6 +90,7 @@ public class IdpBasicGroupMetaService {
         IdpGroupUserRelMapper.class, mapper -> mapper.batchInsertIdpGroupUsers(relations));
   }
 
+  @Override
   public void removeUsersFromGroup(Long groupId, List<Long> userIds, Long deletedAt) {
     if (userIds.isEmpty()) {
       return;
@@ -94,6 +101,7 @@ public class IdpBasicGroupMetaService {
         mapper -> mapper.softDeleteIdpGroupUsers(groupId, userIds, deletedAt));
   }
 
+  @Override
   public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] groupDeletedCount = new int[] {0};
     int[] groupUserRelDeletedCount = new int[] {0};

@@ -16,5 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-org.apache.gravitino.idp.basic.storage.IdpUserLegacyDataCleaner
-org.apache.gravitino.idp.basic.storage.IdpGroupLegacyDataCleaner
+org.apache.gravitino.idp.basic.storage.provider.IdpBasicUserMetaProvider

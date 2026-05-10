@@ -16,23 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.basic.storage;
+package org.apache.gravitino.idp.basic.storage.provider;
 
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.idp.basic.storage.service.IdpBasicUserMetaService;
-import org.apache.gravitino.storage.relational.LegacyDataCleaner;
+import org.apache.gravitino.storage.relational.po.IdpUserPO;
 
-/** Deletes legacy built-in IdP user metadata from the idp-basic plugin. */
-public class IdpUserLegacyDataCleaner implements LegacyDataCleaner {
-
-  @Override
-  public Entity.EntityType entityType() {
-    return Entity.EntityType.IDP_USER;
-  }
-
-  @Override
-  public int hardDeleteLegacyData(long legacyTimeline, int limit) {
-    return IdpBasicUserMetaService.getInstance()
-        .deleteUserMetasByLegacyTimeline(legacyTimeline, limit);
-  }
-}
+/** Compatibility bridge for the idp-basic user metadata provider type. */
+public interface IdpUserMetaProvider
+    extends org.apache.gravitino.storage.relational.provider.IdpUserMetaProvider<IdpUserPO> {}

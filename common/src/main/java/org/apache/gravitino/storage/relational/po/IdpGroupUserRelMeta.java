@@ -16,26 +16,50 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational;
+package org.apache.gravitino.storage.relational.po;
 
-import org.apache.gravitino.Entity;
-
-/** Extension point for hard deleting legacy relational metadata owned by plugins. */
-public interface LegacyDataCleaner {
+/** Abstract built-in IdP group-user relation metadata model shared across modules. */
+public interface IdpGroupUserRelMeta {
 
   /**
-   * Returns the entity type handled by this cleaner.
+   * Returns the relation id.
    *
-   * @return the handled entity type
+   * @return the relation id
    */
-  Entity.EntityType entityType();
+  Long getId();
 
   /**
-   * Hard deletes legacy metadata records.
+   * Returns the group id.
    *
-   * @param legacyTimeline delete records older than this timeline
-   * @param limit maximum number of records to delete per invocation
-   * @return the number of deleted records
+   * @return the group id
    */
-  int hardDeleteLegacyData(long legacyTimeline, int limit);
+  Long getGroupId();
+
+  /**
+   * Returns the user id.
+   *
+   * @return the user id
+   */
+  Long getUserId();
+
+  /**
+   * Returns the current version.
+   *
+   * @return the current version
+   */
+  Long getCurrentVersion();
+
+  /**
+   * Returns the last version.
+   *
+   * @return the last version
+   */
+  Long getLastVersion();
+
+  /**
+   * Returns the deletion timestamp.
+   *
+   * @return the deletion timestamp
+   */
+  Long getDeletedAt();
 }

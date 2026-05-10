@@ -16,23 +16,50 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.basic.storage;
+package org.apache.gravitino.storage.relational.po;
 
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.idp.basic.storage.service.IdpBasicGroupMetaService;
-import org.apache.gravitino.storage.relational.LegacyDataCleaner;
+/** Abstract built-in IdP user metadata model shared across modules. */
+public interface IdpUserMeta {
 
-/** Deletes legacy built-in IdP group metadata from the idp-basic plugin. */
-public class IdpGroupLegacyDataCleaner implements LegacyDataCleaner {
+  /**
+   * Returns the user id.
+   *
+   * @return the user id
+   */
+  Long getUserId();
 
-  @Override
-  public Entity.EntityType entityType() {
-    return Entity.EntityType.IDP_GROUP;
-  }
+  /**
+   * Returns the user name.
+   *
+   * @return the user name
+   */
+  String getUserName();
 
-  @Override
-  public int hardDeleteLegacyData(long legacyTimeline, int limit) {
-    return IdpBasicGroupMetaService.getInstance()
-        .deleteGroupMetasByLegacyTimeline(legacyTimeline, limit);
-  }
+  /**
+   * Returns the password hash.
+   *
+   * @return the password hash
+   */
+  String getPasswordHash();
+
+  /**
+   * Returns the current version.
+   *
+   * @return the current version
+   */
+  Long getCurrentVersion();
+
+  /**
+   * Returns the last version.
+   *
+   * @return the last version
+   */
+  Long getLastVersion();
+
+  /**
+   * Returns the deletion timestamp.
+   *
+   * @return the deletion timestamp
+   */
+  Long getDeletedAt();
 }

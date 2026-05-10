@@ -21,7 +21,7 @@ package org.apache.gravitino.storage.relational.po;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
-public class IdpUserPO {
+public class IdpUserPO implements IdpUserMeta {
   private Long userId;
   private String userName;
   private String passwordHash;

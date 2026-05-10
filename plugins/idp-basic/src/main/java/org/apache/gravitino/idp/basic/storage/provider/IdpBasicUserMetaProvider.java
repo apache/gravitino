@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.basic.storage.service;
+package org.apache.gravitino.idp.basic.storage.provider;
 
 import com.google.common.base.Preconditions;
 import java.util.Collections;
@@ -27,22 +27,24 @@ import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
-/** The service class for user metadata. It provides the basic database operations for user. */
-public class IdpBasicUserMetaService {
-  private static final IdpBasicUserMetaService INSTANCE = new IdpBasicUserMetaService();
+/** The provider class for user metadata. It provides the basic database operations for user. */
+public class IdpBasicUserMetaProvider implements IdpUserMetaProvider {
+  private static final IdpBasicUserMetaProvider INSTANCE = new IdpBasicUserMetaProvider();
 
-  public static IdpBasicUserMetaService getInstance() {
+  public static IdpBasicUserMetaProvider getInstance() {
     return INSTANCE;
   }
 
-  private IdpBasicUserMetaService() {}
+  public IdpBasicUserMetaProvider() {}
 
+  @Override
   public Optional<IdpUserPO> findUser(String userName) {
     return Optional.ofNullable(
         SessionUtils.getWithoutCommit(
             IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(userName)));
   }
 
+  @Override
   public List<IdpUserPO> findUsers(List<String> userNames) {
     if (userNames.isEmpty()) {
       return Collections.emptyList();
@@ -52,6 +54,7 @@ public class IdpBasicUserMetaService {
         IdpUserMetaMapper.class, mapper -> mapper.selectIdpUsers(userNames));
   }
 
+  @Override
   public List<String> listGroupNames(String userName) {
     Optional<IdpUserPO> user = findUser(userName);
     if (!user.isPresent()) {
@@ -63,10 +66,12 @@ public class IdpBasicUserMetaService {
         mapper -> mapper.selectGroupNamesByUserId(user.get().getUserId()));
   }
 
+  @Override
   public void createUser(IdpUserPO userPO) {
     SessionUtils.doWithCommit(IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO));
   }
 
+  @Override
   public void updatePassword(IdpUserPO userPO, String passwordHash, Long nextVersion) {
     Integer updated =
         SessionUtils.doWithCommitAndFetchResult(
@@ -82,6 +87,7 @@ public class IdpBasicUserMetaService {
         updated == 1, "Failed to update password for user %s", userPO.getUserName());
   }
 
+  @Override
   public boolean deleteUser(IdpUserPO userPO, Long deletedAt) {
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -95,6 +101,7 @@ public class IdpBasicUserMetaService {
     return true;
   }
 
+  @Override
   public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] userDeletedCount = new int[] {0};
     int[] userGroupRelDeletedCount = new int[] {0};
