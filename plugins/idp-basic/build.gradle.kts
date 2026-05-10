@@ -24,10 +24,17 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":common"))
   implementation(libs.bcprov.jdk18on)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+  implementation(libs.jackson.annotations)
+  implementation(libs.jackson.databind)
+  annotationProcessor(libs.lombok)
+  compileOnly(libs.lombok)
   testImplementation(libs.junit.jupiter.api)
+  testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
