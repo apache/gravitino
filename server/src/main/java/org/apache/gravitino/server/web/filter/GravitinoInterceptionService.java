@@ -82,6 +82,7 @@ import org.slf4j.LoggerFactory;
  * registered in the hk2 bean container when the gravitino server starts.
  */
 public class GravitinoInterceptionService implements InterceptionService {
+  private static final String IDP_REST_CLASS_PREFIX = "org.apache.gravitino.server.web.rest.Idp";
 
   @Override
   public Filter getDescriptorFilter() {
@@ -275,7 +276,8 @@ public class GravitinoInterceptionService implements InterceptionService {
     @Override
     public boolean matches(Descriptor descriptor) {
       String implementation = descriptor.getImplementation();
-      return targetClasses.contains(implementation);
+      return targetClasses.contains(implementation)
+          || implementation.startsWith(IDP_REST_CLASS_PREFIX);
     }
   }
 }

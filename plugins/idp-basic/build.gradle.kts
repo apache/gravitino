@@ -24,17 +24,29 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
+  implementation(project(":server"))
+  implementation(project(":server-common"))
   implementation(libs.bcprov.jdk18on)
+  implementation(libs.bundles.jersey)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.h2db)
   implementation(libs.jackson.annotations)
   implementation(libs.jackson.databind)
+  implementation(libs.metrics.jersey2)
   implementation(libs.mybatis)
+  implementation(libs.servlet)
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
+  testImplementation(libs.jersey.test.framework.core) {
+    exclude(group = "org.junit.jupiter")
+  }
+  testImplementation(libs.jersey.test.framework.provider.jetty) {
+    exclude(group = "org.junit.jupiter")
+  }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
@@ -46,6 +58,19 @@ dependencies {
 }
 
 tasks {
+  val copyIdpBasicLibs by registering(Copy::class) {
+    dependsOn(jar)
+    from("build/libs") {
+      include("*.jar")
+      exclude("error_prone_annotations-*.jar")
+    }
+    into("$rootDir/distribution/package/libs")
+  }
+
+  register("copyLibAndConfig", Copy::class) {
+    dependsOn(copyIdpBasicLibs)
+  }
+
   test {
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")

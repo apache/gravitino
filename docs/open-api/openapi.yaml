@@ -236,6 +236,24 @@ paths:
   /authn/me:
     $ref: "./authn.yaml#/paths/~1authn~1me"
 
+  /idp/users:
+    $ref: "./idp.yaml#/paths/~1idp~1users"
+
+  /idp/users/{user}:
+    $ref: "./idp.yaml#/paths/~1idp~1users~1%7Buser%7D"
+
+  /idp/groups:
+    $ref: "./idp.yaml#/paths/~1idp~1groups"
+
+  /idp/groups/{group}:
+    $ref: "./idp.yaml#/paths/~1idp~1groups~1%7Bgroup%7D"
+
+  /idp/groups/{group}/add:
+    $ref: "./idp.yaml#/paths/~1idp~1groups~1%7Bgroup%7D~1add"
+
+  /idp/groups/{group}/remove:
+    $ref: "./idp.yaml#/paths/~1idp~1groups~1%7Bgroup%7D~1remove"
+
 components:
 
   schemas:
@@ -620,4 +638,3 @@ components:
     KerberosAuth:
       type: http
       scheme: negotiate
-

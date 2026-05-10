@@ -76,7 +76,6 @@ public class GravitinoServer extends ResourceConfig {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoServer.class);
 
   private static final String API_ANY_PATH = "/api/*";
-
   public static final String CONF_FILE = "gravitino.conf";
 
   public static final String WEBSERVER_CONF_PREFIX = "gravitino.server.webserver.";

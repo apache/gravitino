@@ -63,6 +63,7 @@ dependencies {
   testImplementation(libs.mockito.inline)
   testImplementation(libs.ognl)
 
+  testRuntimeOnly(project(":plugins:idp-basic"))
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

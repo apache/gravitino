@@ -786,6 +786,7 @@ tasks {
         "copySubprojectLib",
         "copyCliLib",
         "copyJobsLib",
+        ":plugins:idp-basic:copyLibAndConfig",
         ":authorizations:copyLibAndConfig",
         ":iceberg:iceberg-rest-server:copyLibAndConfigs",
         ":lance:lance-rest-server:copyLibAndConfigs",
