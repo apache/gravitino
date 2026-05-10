@@ -255,3 +255,9 @@ class NoSuchMetadataObjectException(NotFoundException):
 
 class RoleAlreadyExistsException(AlreadyExistsException):
     """Exception thrown when a role with specified name already exists."""
+class NoSuchViewException(Exception):
+    """Exception raised when a view does not exist."""
+    pass
+class NoSuchViewException(Exception):
+    """Exception raised when a view does not exist."""
+    pass

@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+"""View catalog interface for Gravitino Python client."""
 
 from abc import ABC, abstractmethod
 from contextlib import suppress
@@ -86,8 +87,10 @@ class ViewCatalog(ABC):
         Args:
             identifier (NameIdentifier): A view identifier.
             comment (Optional[str], optional): The view comment. Defaults to None.
-            properties (Optional[dict[str, str]], optional): The view properties. Defaults to None.
-            view_definition (Optional[str], optional): The SQL definition of the view. Defaults to None.
+            properties (Optional[dict[str, str]], optional):
+                The view properties. Defaults to None.
+            view_definition (Optional[str], optional):
+                The SQL definition of the view. Defaults to None.
 
         Raises:
             NoSuchSchemaException: If the schema does not exist.
