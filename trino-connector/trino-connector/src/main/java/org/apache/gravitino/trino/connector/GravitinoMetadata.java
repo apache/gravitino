@@ -235,7 +235,8 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
 
     // CREATE OR REPLACE TABLE AS SELECT: drop the existing table first if present.
     if (replace
-        && catalogConnectorMetadata.tableExists(tableName.getSchemaName(), tableName.getTableName())) {
+        && catalogConnectorMetadata.tableExists(
+            tableName.getSchemaName(), tableName.getTableName())) {
       catalogConnectorMetadata.dropTable(tableName);
     }
 
