@@ -16,32 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.authorization;
 
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
+import java.util.List;
+import org.apache.gravitino.annotation.Evolving;
 
-dependencies {
-  implementation(project(":api"))
-  implementation(project(":common"))
-  implementation(libs.bcprov.jdk18on)
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
-  implementation(libs.jackson.annotations)
-  implementation(libs.jackson.databind)
-  annotationProcessor(libs.lombok)
-  compileOnly(libs.lombok)
-  testImplementation(libs.junit.jupiter.api)
-  testAnnotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+/** The interface of a built-in IdP group. */
+@Evolving
+public interface IdpGroup {
 
-tasks {
-  test {
-    environment("GRAVITINO_HOME", rootDir.path)
-    environment("GRAVITINO_TEST", "true")
-  }
+  /**
+   * The name of the built-in IdP group.
+   *
+   * @return The name of the built-in IdP group.
+   */
+  String name();
+
+  /**
+   * The users of the built-in IdP group.
+   *
+   * @return The users of the built-in IdP group.
+   */
+  List<String> users();
 }

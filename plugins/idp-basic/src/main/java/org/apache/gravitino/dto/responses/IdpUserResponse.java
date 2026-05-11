@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -64,5 +65,14 @@ public class IdpUserResponse extends BaseResponse {
     Preconditions.checkArgument(user != null, "user must not be null");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(user.name()), "user 'name' must not be null or empty");
+    validateNames(user.groups(), "user 'groups' must not contain null or empty group names");
+  }
+
+  private void validateNames(List<String> names, String errorMessage) {
+    if (names == null) {
+      return;
+    }
+
+    names.forEach(name -> Preconditions.checkArgument(StringUtils.isNotBlank(name), errorMessage));
   }
 }

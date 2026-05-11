@@ -20,26 +20,31 @@
 package org.apache.gravitino.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.authorization.IdpUser;
 
 /** Represents a built-in IdP user Data Transfer Object (DTO). */
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EqualsAndHashCode
-public class IdpUserDTO {
+@ToString
+public class IdpUserDTO implements IdpUser {
 
   @JsonProperty("name")
   private String name;
 
   @JsonProperty("groups")
-  private List<String> groups;
-
-  /** Default constructor for Jackson deserialization. */
-  protected IdpUserDTO() {
-    this.groups = Collections.emptyList();
-  }
+  @JsonSetter(nulls = Nulls.AS_EMPTY)
+  private List<String> groups = Collections.emptyList();
 
   /**
    * Creates a new instance of IdpUserDTO.
@@ -47,14 +52,24 @@ public class IdpUserDTO {
    * @param name The name of the built-in IdP user DTO.
    * @param groups The groups of the built-in IdP user DTO.
    */
+  @Builder(setterPrefix = "with")
   protected IdpUserDTO(String name, List<String> groups) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
+    if (groups != null) {
+      groups.forEach(
+          group ->
+              Preconditions.checkArgument(
+                  StringUtils.isNotBlank(group),
+                  "groups cannot contain null or empty group names"));
+    }
     this.name = name;
-    this.groups = groups;
+    this.groups = groups == null ? Collections.emptyList() : groups;
   }
 
   /**
    * @return The name of the built-in IdP user DTO.
    */
+  @Override
   public String name() {
     return name;
   }
@@ -64,66 +79,8 @@ public class IdpUserDTO {
    *
    * @return The groups of the built-in IdP user.
    */
+  @Override
   public List<String> groups() {
     return groups;
-  }
-
-  /**
-   * Creates a new Builder for constructing a built-in IdP user DTO.
-   *
-   * @return A new Builder instance.
-   */
-  public static Builder builder() {
-    return new Builder();
-  }
-
-  /**
-   * Builder class for constructing an IdpUserDTO instance.
-   *
-   * @param <S> The type of the builder instance.
-   */
-  public static class Builder<S extends Builder> {
-
-    /** The name of the built-in IdP user. */
-    protected String name;
-
-    /** The groups of the built-in IdP user. */
-    protected List<String> groups = Collections.emptyList();
-
-    /**
-     * Sets the name of the built-in IdP user.
-     *
-     * @param name The name of the built-in IdP user.
-     * @return The builder instance.
-     */
-    public S withName(String name) {
-      this.name = name;
-      return (S) this;
-    }
-
-    /**
-     * Sets the groups of the built-in IdP user.
-     *
-     * @param groups The groups of the built-in IdP user.
-     * @return The builder instance.
-     */
-    public S withGroups(List<String> groups) {
-      if (groups != null) {
-        this.groups = groups;
-      }
-
-      return (S) this;
-    }
-
-    /**
-     * Builds an instance of IdpUserDTO using the builder's properties.
-     *
-     * @return An instance of IdpUserDTO.
-     * @throws IllegalArgumentException If the name is not set.
-     */
-    public IdpUserDTO build() {
-      Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
-      return new IdpUserDTO(name, groups);
-    }
   }
 }

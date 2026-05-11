@@ -21,6 +21,7 @@ package org.apache.gravitino.dto;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Arrays;
+import java.util.Collections;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -51,8 +52,26 @@ public class TestIdpGroupDTO {
     Assertions.assertEquals(groupDTO1, deserialized1);
     Assertions.assertEquals("test_group", deserialized1.name());
     Assertions.assertTrue(deserialized1.users().isEmpty());
+    Assertions.assertEquals("IdpGroupDTO(name=test_group, users=[])", deserialized1.toString());
+
+    IdpGroupDTO deserializedWithNullUsers =
+        JsonUtils.objectMapper()
+            .readValue("{\"name\":\"test_group\",\"users\":null}", IdpGroupDTO.class);
+    Assertions.assertTrue(deserializedWithNullUsers.users().isEmpty());
+    Assertions.assertEquals(
+        "IdpGroupDTO(name=test_group, users=[])", deserializedWithNullUsers.toString());
 
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> IdpGroupDTO.builder().withName(" ").build());
+    IllegalArgumentException invalidUserException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                IdpGroupDTO.builder()
+                    .withName("test_group")
+                    .withUsers(Collections.singletonList(" "))
+                    .build());
+    Assertions.assertEquals(
+        "users cannot contain null or empty user names", invalidUserException.getMessage());
   }
 }
