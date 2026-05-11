@@ -1978,7 +1978,8 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   void testListViewsInNonExistentSchema() {
     ViewCatalog viewCatalog = catalog.asViewCatalog();
     Assertions.assertThrows(
-        Exception.class, () -> viewCatalog.listViews(Namespace.of("non_existent_schema_xyz")));
+        NoSuchSchemaException.class,
+        () -> viewCatalog.listViews(Namespace.of("non_existent_schema_xyz")));
   }
 
   protected static void assertionsTableInfo(

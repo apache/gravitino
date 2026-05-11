@@ -132,7 +132,7 @@ public class IcebergView implements View {
         return schema.columns().stream().map(ConvertUtil::fromNestedField).toArray(Column[]::new);
       }
     } catch (Exception e) {
-      LOG.warn("Failed to extract columns from Iceberg view metadata: {}", e.getMessage());
+      LOG.warn("Failed to extract columns from Iceberg view metadata", e);
     }
     return new Column[0];
   }
@@ -155,7 +155,7 @@ public class IcebergView implements View {
             .toArray(Representation[]::new);
       }
     } catch (Exception e) {
-      LOG.warn("Failed to extract representations from Iceberg view metadata: {}", e.getMessage());
+      LOG.warn("Failed to extract representations from Iceberg view metadata", e);
     }
     return new Representation[0];
   }

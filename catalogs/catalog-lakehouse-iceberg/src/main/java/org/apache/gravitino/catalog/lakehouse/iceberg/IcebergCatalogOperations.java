@@ -644,6 +644,17 @@ public class IcebergCatalogOperations
   }
 
   /**
+   * Checks whether a view exists in the Iceberg catalog.
+   *
+   * @param ident A view identifier.
+   * @return {@code true} if the view exists, {@code false} otherwise.
+   */
+  @Override
+  public boolean viewExists(NameIdentifier ident) {
+    return viewCatalogOperations().viewExists(ident);
+  }
+
+  /**
    * Lists all views in the given namespace from the Iceberg catalog.
    *
    * @param namespace A namespace.

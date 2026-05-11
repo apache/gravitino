@@ -85,10 +85,14 @@ class IcebergViewCatalogOperations {
           icebergCatalogWrapper.loadView(
               IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
       return IcebergView.fromLoadViewResponse(response, ident.name());
-    } catch (Exception e) {
-      throw new NoSuchViewException(
-          e, "Failed to load view %s from Iceberg catalog: %s", ident, e.getMessage());
+    } catch (org.apache.iceberg.exceptions.NoSuchViewException e) {
+      throw new NoSuchViewException(e, "Iceberg view %s does not exist", ident);
     }
+  }
+
+  public boolean viewExists(NameIdentifier ident) {
+    return icebergCatalogWrapper.viewExists(
+        IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
   }
 
   public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
