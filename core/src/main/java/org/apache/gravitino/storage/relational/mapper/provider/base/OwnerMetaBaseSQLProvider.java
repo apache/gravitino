@@ -147,7 +147,7 @@ public class OwnerMetaBaseSQLProvider {
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE deleted_at = 0 AND ("
-        + "<foreach collection='deletion' item='t' separator=' OR '>"
+        + "<foreach collection='deletions' item='t' separator=' OR '>"
         + "(metadata_object_id = #{t.metadataObjectId} AND metadata_object_type = #{t.metadataObjectType})"
         + "</foreach>"
         + ")"

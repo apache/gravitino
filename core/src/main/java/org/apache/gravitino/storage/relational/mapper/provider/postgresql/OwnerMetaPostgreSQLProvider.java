@@ -152,13 +152,13 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
 
   @Override
   public String batchSoftDeleteOwnerRelByMetadataObjects(
-      @Param("deletion") List<OwnerRelDeletion> deletion) {
+      @Param("deletions") List<OwnerRelDeletion> deletions) {
     return "<script>"
         + "UPDATE "
         + OWNER_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE deleted_at = 0 AND ("
-        + "<foreach collection='deletion' item='t' separator=' OR '>"
+        + "<foreach collection='deletions' item='t' separator=' OR '>"
         + "(metadata_object_id = #{t.metadataObjectId} AND metadata_object_type = #{t.metadataObjectType})"
         + "</foreach>"
         + ")"
