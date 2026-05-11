@@ -47,22 +47,22 @@ public class TestJdbcCatalogCredential {
 
     @Override
     protected JdbcTypeConverter createJdbcTypeConverter() {
-      return null;
+      throw new UnsupportedOperationException("Not needed for credential test");
     }
 
     @Override
     protected JdbcDatabaseOperations createJdbcDatabaseOperations() {
-      return null;
+      throw new UnsupportedOperationException("Not needed for credential test");
     }
 
     @Override
     protected JdbcTableOperations createJdbcTableOperations() {
-      return null;
+      throw new UnsupportedOperationException("Not needed for credential test");
     }
 
     @Override
     protected JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter() {
-      return null;
+      throw new UnsupportedOperationException("Not needed for credential test");
     }
   }
 
