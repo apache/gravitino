@@ -23,9 +23,11 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -166,41 +168,29 @@ public class SchemaMetaService {
   public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
-      // Convert the logical entity name to physical before building and storing the PO.
-      SchemaEntity physicalLeaf = toPhysicalEntity(schemaEntity);
-
-      String separator = HierarchicalSchemaUtil.schemaSeparator();
-      String logicalLeaf = normalizeToLogicalSchemaName(schemaEntity.name());
+      // Callers above this service (e.g. JDBCBackend + naming bridge) pass storage-form schema
+      // names: nested paths use the internal physical separator, not the external logical one.
+      String physicalSep = HierarchicalSchemaUtil.physicalSeparator();
+      String schemaName = schemaEntity.name();
       List<SchemaEntity> rowsToInsert = new ArrayList<>();
-      if (!HierarchicalSchemaUtil.isHierarchical(logicalLeaf, separator)) {
-        rowsToInsert.add(physicalLeaf);
+      if (schemaName == null || !schemaName.contains(physicalSep)) {
+        rowsToInsert.add(schemaEntity);
       } else {
-        for (String ancestorLogical :
-            HierarchicalSchemaUtil.getAncestorNames(logicalLeaf, separator)) {
+        String[] parts = schemaName.split(Pattern.quote(physicalSep), -1);
+        for (int nSeg = 1; nSeg < parts.length; nSeg++) {
+          String ancestorPhysical = String.join(physicalSep, Arrays.copyOf(parts, nSeg));
           SchemaEntity ancestor =
               SchemaEntity.builder()
                   .withId(nextIdForNestedAncestor())
-                  .withName(ancestorLogical)
+                  .withName(ancestorPhysical)
                   .withNamespace(schemaEntity.namespace())
                   .withComment(null)
                   .withProperties(Collections.emptyMap())
                   .withAuditInfo(schemaEntity.auditInfo())
                   .build();
-          rowsToInsert.add(toPhysicalEntity(ancestor));
+          rowsToInsert.add(ancestor);
         }
-        SchemaEntity leafWithLogicalName =
-            SchemaEntity.builder()
-                .withId(schemaEntity.id())
-                .withName(logicalLeaf)
-                .withNamespace(schemaEntity.namespace())
-                .withComment(schemaEntity.comment())
-                .withProperties(
-                    schemaEntity.properties() == null
-                        ? Collections.emptyMap()
-                        : schemaEntity.properties())
-                .withAuditInfo(schemaEntity.auditInfo())
-                .build();
-        rowsToInsert.add(toPhysicalEntity(leafWithLogicalName));
+        rowsToInsert.add(schemaEntity);
       }
 
       SessionUtils.doWithCommit(
@@ -240,11 +230,9 @@ public class SchemaMetaService {
       baseMetricName = "updateSchema")
   public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
-    // Identifier carries storage-form schema segment at JDBCBackend boundary; expose logical entity
-    // to updater.
     SchemaPO oldSchemaPO = getSchemaPOByIdentifier(identifier);
     SchemaEntity oldSchemaEntity =
-        toLogicalEntity(POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace()));
+        POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace());
     SchemaEntity newEntity = (SchemaEntity) updater.apply((E) oldSchemaEntity);
     Preconditions.checkArgument(
         Objects.equals(oldSchemaEntity.id(), newEntity.id()),
@@ -252,8 +240,6 @@ public class SchemaMetaService {
         newEntity.id(),
         oldSchemaEntity.id());
 
-    // Convert the updated logical entity to physical before persisting.
-    SchemaEntity physicalNewEntity = toPhysicalEntity(newEntity);
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String oldFullName =
@@ -269,8 +255,7 @@ public class SchemaMetaService {
                       SchemaMetaMapper.class,
                       mapper ->
                           mapper.updateSchemaMeta(
-                              POConverters.updateSchemaPOWithVersion(
-                                  oldSchemaPO, physicalNewEntity),
+                              POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity),
                               oldSchemaPO))),
           () -> {
             if (isRenamed && updateResult.get() > 0) {
@@ -291,7 +276,6 @@ public class SchemaMetaService {
     }
 
     if (updateResult.get() > 0) {
-      // Return the logical entity (as seen by callers above the EntityStore layer).
       return newEntity;
     } else {
       throw new IOException("Failed to update the entity: " + identifier);
@@ -309,9 +293,8 @@ public class SchemaMetaService {
     Long schemaId = schemaPO.getSchemaId();
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
-    String auditSchemaName = normalizeToLogicalSchemaName(schemaSegmentPhysical);
     String schemaFullName =
-        NameIdentifierUtil.ofSchema(metalakeName, catalogName, auditSchemaName).toString();
+        NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaSegmentPhysical).toString();
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
@@ -613,86 +596,6 @@ public class SchemaMetaService {
                   catalogIdent.namespace().level(0), catalogIdent.name(), schemaNames);
           return POConverters.fromSchemaPOs(schemaPOs, firstIdent.namespace());
         });
-  }
-
-  // ---------------------------------------------------------------------------
-  // Helpers: logical ↔ physical schema name conversion at the PO boundary
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Returns the logical schema path for hierarchy expansion. Values already using the external
-   * separator are unchanged; values stored with only the internal physical separator are converted
-   * to logical form.
-   */
-  private String normalizeToLogicalSchemaName(String schemaName) {
-    String separator = HierarchicalSchemaUtil.schemaSeparator();
-    if (HierarchicalSchemaUtil.isHierarchical(schemaName, separator)) {
-      return schemaName;
-    }
-    if (schemaName != null && schemaName.contains(HierarchicalSchemaUtil.physicalSeparator())) {
-      return toLogicalSchemaName(schemaName);
-    }
-    return schemaName;
-  }
-
-  /**
-   * Converts a logical schema name (e.g. {@code "A:B:C"}) to the physical internal form (e.g.
-   * {@code "A\u0001B\u0001C"}) used in the database. Non-HierarchicalSchema names are returned
-   * unchanged.
-   */
-  private String toPhysicalSchemaName(String logicalName) {
-    return HierarchicalSchemaUtil.logicalToPhysical(
-        logicalName, HierarchicalSchemaUtil.schemaSeparator());
-  }
-
-  /**
-   * Converts a physical schema name (e.g. {@code "A\u0001B\u0001C"}) back to the logical separator
-   * form (e.g. {@code "A:B:C"}). Non-HierarchicalSchema names are returned unchanged.
-   */
-  private String toLogicalSchemaName(String physicalName) {
-    return HierarchicalSchemaUtil.physicalToLogical(
-        physicalName, HierarchicalSchemaUtil.schemaSeparator());
-  }
-
-  /**
-   * Returns a {@link SchemaEntity} whose {@code name()} is the logical representation. If the PO
-   * stored a physical name (contains the internal physical separator), it is converted back to the
-   * logical separator form. Otherwise the original entity is returned unchanged.
-   */
-  private SchemaEntity toLogicalEntity(SchemaEntity entity) {
-    String logicalName = toLogicalSchemaName(entity.name());
-    if (logicalName.equals(entity.name())) {
-      return entity;
-    }
-    return SchemaEntity.builder()
-        .withId(entity.id())
-        .withName(logicalName)
-        .withNamespace(entity.namespace())
-        .withComment(entity.comment())
-        .withProperties(entity.properties())
-        .withAuditInfo(entity.auditInfo())
-        .build();
-  }
-
-  /**
-   * Returns a {@link SchemaEntity} whose {@code name()} is the physical representation suitable for
-   * storage. If the entity carries a logical name (contains the separator), it is converted to the
-   * physical internal form. Otherwise the original entity is returned unchanged.
-   */
-  private SchemaEntity toPhysicalEntity(SchemaEntity entity) {
-    String separator = HierarchicalSchemaUtil.schemaSeparator();
-    if (!HierarchicalSchemaUtil.isHierarchical(entity.name(), separator)) {
-      return entity;
-    }
-    String physicalName = toPhysicalSchemaName(entity.name());
-    return SchemaEntity.builder()
-        .withId(entity.id())
-        .withName(physicalName)
-        .withNamespace(entity.namespace())
-        .withComment(entity.comment())
-        .withProperties(entity.properties())
-        .withAuditInfo(entity.auditInfo())
-        .build();
   }
 
   private static long nextIdForNestedAncestor() {
