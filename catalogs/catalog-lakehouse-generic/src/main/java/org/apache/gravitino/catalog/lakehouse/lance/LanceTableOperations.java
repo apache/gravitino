@@ -394,7 +394,11 @@ public class LanceTableOperations extends ManagedTableOperations {
   Dataset openDataset(String location, Map<String, String> storageOptions) {
     if (storageOptions != null && !storageOptions.isEmpty()) {
       ReadOptions readOptions = new ReadOptions.Builder().setStorageOptions(storageOptions).build();
-      return Dataset.open().allocator(new RootAllocator()).uri(location).readOptions(readOptions).build();
+      return Dataset.open()
+          .allocator(new RootAllocator())
+          .uri(location)
+          .readOptions(readOptions)
+          .build();
     }
     return Dataset.open().allocator(new RootAllocator()).uri(location).build();
   }

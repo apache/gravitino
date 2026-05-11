@@ -410,6 +410,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
           .filter(e -> e.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
           .forEach(e -> tableProperties.putIfAbsent(e.getKey(), e.getValue()));
     }
+  }
+
   private static String normalizeCreateMode(String mode, String tableId) {
     if (mode == null) {
       return CreateMode.CREATE.name();

@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.lakehouse.lance;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
