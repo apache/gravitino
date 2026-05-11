@@ -21,16 +21,11 @@ package org.apache.gravitino.catalog.lakehouse.lance;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
-import com.lancedb.lance.Dataset;
-import com.lancedb.lance.Version;
-import com.lancedb.lance.index.IndexParams;
-import com.lancedb.lance.index.IndexType;
 import java.util.Map;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -47,6 +42,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.lance.Dataset;
+import org.lance.Version;
+import org.lance.index.IndexOptions;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
@@ -124,9 +122,7 @@ public class TestLanceTableOperations {
 
     InOrder inOrder = Mockito.inOrder(dataset);
     inOrder.verify(dataset).alterColumns(anyList());
-    inOrder
-        .verify(dataset)
-        .createIndex(anyList(), any(IndexType.class), any(), any(IndexParams.class), eq(true));
+    inOrder.verify(dataset).createIndex(any(IndexOptions.class));
     inOrder.verify(dataset).dropColumns(anyList());
     inOrder.verify(dataset).getVersion();
   }

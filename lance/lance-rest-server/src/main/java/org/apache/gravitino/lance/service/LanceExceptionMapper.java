@@ -20,14 +20,24 @@ package org.apache.gravitino.lance.service;
 
 import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
-import com.lancedb.lance.namespace.LanceNamespaceException;
-import com.lancedb.lance.namespace.model.ErrorResponse;
-import java.util.Optional;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
 import javax.ws.rs.ext.Provider;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NotFoundException;
-import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.lance.namespace.errors.ConcurrentModificationException;
+import org.lance.namespace.errors.InternalException;
+import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.errors.LanceNamespaceException;
+import org.lance.namespace.errors.NamespaceAlreadyExistsException;
+import org.lance.namespace.errors.NamespaceNotEmptyException;
+import org.lance.namespace.errors.NamespaceNotFoundException;
+import org.lance.namespace.errors.PermissionDeniedException;
+import org.lance.namespace.errors.ServiceUnavailableException;
+import org.lance.namespace.errors.TableAlreadyExistsException;
+import org.lance.namespace.errors.TableNotFoundException;
+import org.lance.namespace.errors.UnauthenticatedException;
+import org.lance.namespace.model.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,43 +66,70 @@ public class LanceExceptionMapper implements ExceptionMapper<Exception> {
   }
 
   private static LanceNamespaceException toLanceNamespaceException(String instance, Exception ex) {
-    if (ex instanceof NotFoundException) {
-      return LanceNamespaceException.notFound(
-          ex.getMessage(), ex.getClass().getSimpleName(), instance, getStackTrace(ex));
+    if (ex instanceof NoSuchTableException) {
+      return new TableNotFoundException(ex.getMessage(), getStackTrace(ex), instance);
+
+    } else if (ex instanceof NotFoundException) {
+      return new NamespaceNotFoundException(ex.getMessage(), getStackTrace(ex), instance);
 
     } else if (ex instanceof IllegalArgumentException) {
-      return LanceNamespaceException.badRequest(
-          ex.getMessage(), ex.getClass().getSimpleName(), instance, getStackTrace(ex));
+      return new InvalidInputException(ex.getMessage(), getStackTrace(ex), instance);
 
-    } else if (ex instanceof TableAlreadyExistsException) {
-      return LanceNamespaceException.conflict(
-          ex.getMessage(), ex.getClass().getSimpleName(), instance, getStackTrace(ex));
+    } else if (ex instanceof org.apache.gravitino.exceptions.TableAlreadyExistsException) {
+      return new TableAlreadyExistsException(ex.getMessage(), getStackTrace(ex), instance);
 
     } else if (ex instanceof UnsupportedOperationException) {
-      return LanceNamespaceException.unsupportedOperation(
-          ex.getMessage(), ex.getClass().getSimpleName(), instance, getStackTrace(ex));
+      return new org.lance.namespace.errors.UnsupportedOperationException(
+          ex.getMessage(), getStackTrace(ex), instance);
 
     } else {
       LOG.warn("Lance REST server unexpected exception:", ex);
-      return LanceNamespaceException.serverError(
-          ex.getMessage(), ex.getClass().getSimpleName(), instance, getStackTrace(ex));
+      return new InternalException(ex.getMessage(), getStackTrace(ex), instance);
     }
   }
 
-  // Referred from lance-namespace-adapter's LanceNamespaces exception handling
-  // com.lancedb.lance.namespace.adapter.GlobalExceptionHandler
-  private static Response handleLanceNamespaceException(LanceNamespaceException ex) {
-    ErrorResponse errResp = new ErrorResponse();
-    Optional<ErrorResponse> errorResponse = ex.getErrorResponse();
-    if (errorResponse.isPresent() && errorResponse.get().getCode() != null) {
-      errResp = errorResponse.get();
-
-    } else {
-      // Transform error info into ErrorResponse
-      errResp.setCode(ex.getCode());
-      errResp.setError(ex.getMessage());
+  private static int toHttpStatus(LanceNamespaceException exception) {
+    if (exception instanceof NamespaceNotFoundException
+        || exception instanceof TableNotFoundException) {
+      return Response.Status.NOT_FOUND.getStatusCode();
     }
 
-    return Response.status(errResp.getCode()).entity(errResp).build();
+    if (exception instanceof NamespaceAlreadyExistsException
+        || exception instanceof TableAlreadyExistsException
+        || exception instanceof ConcurrentModificationException) {
+      return Response.Status.CONFLICT.getStatusCode();
+    }
+
+    if (exception instanceof org.lance.namespace.errors.UnsupportedOperationException) {
+      return Response.Status.NOT_ACCEPTABLE.getStatusCode();
+    }
+
+    if (exception instanceof PermissionDeniedException) {
+      return Response.Status.FORBIDDEN.getStatusCode();
+    }
+
+    if (exception instanceof UnauthenticatedException) {
+      return Response.Status.UNAUTHORIZED.getStatusCode();
+    }
+
+    if (exception instanceof ServiceUnavailableException) {
+      return Response.Status.SERVICE_UNAVAILABLE.getStatusCode();
+    }
+
+    if (exception instanceof InvalidInputException
+        || exception instanceof NamespaceNotEmptyException) {
+      return Response.Status.BAD_REQUEST.getStatusCode();
+    }
+
+    return Response.Status.INTERNAL_SERVER_ERROR.getStatusCode();
+  }
+
+  private static Response handleLanceNamespaceException(LanceNamespaceException ex) {
+    ErrorResponse errResp = new ErrorResponse();
+    errResp.setCode(ex.getCode());
+    errResp.setError(ex.getMessage());
+    errResp.setDetail(ex.getDetail());
+    errResp.setInstance(ex.getInstance());
+    return Response.status(toHttpStatus(ex)).entity(errResp).build();
   }
 }

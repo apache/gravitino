@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.rel;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -30,8 +31,9 @@ public class TestRepresentationDTO {
   @Test
   public void testRepresentationDTOSerDe() throws JsonProcessingException {
     SQLRepresentationDTO sqlRepresentationDTO =
-        SQLRepresentationDTO.fromSQLRepresentation(
-            SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build());
+        (SQLRepresentationDTO)
+            RepresentationDTO.fromRepresentation(
+                SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build());
 
     String json = JsonUtils.objectMapper().writeValueAsString(sqlRepresentationDTO);
     RepresentationDTO deserialized =
@@ -39,8 +41,8 @@ public class TestRepresentationDTO {
 
     Assertions.assertInstanceOf(SQLRepresentationDTO.class, deserialized);
     Assertions.assertEquals(Representation.TYPE_SQL, deserialized.type());
-    Assertions.assertEquals("spark", ((SQLRepresentationDTO) deserialized).getDialect());
-    Assertions.assertEquals("SELECT 1", ((SQLRepresentationDTO) deserialized).getSql());
+    Assertions.assertEquals("spark", ((SQLRepresentationDTO) deserialized).dialect());
+    Assertions.assertEquals("SELECT 1", ((SQLRepresentationDTO) deserialized).sql());
   }
 
   @Test
@@ -49,8 +51,28 @@ public class TestRepresentationDTO {
         SQLRepresentation.builder().withDialect("trino").withSql("SELECT c1 FROM t").build();
 
     RepresentationDTO dto = RepresentationDTO.fromRepresentation(representation);
-    Representation converted = dto.toRepresentation();
+    Representation converted = DTOConverters.fromDTO(dto);
 
     Assertions.assertEquals(representation, converted);
+  }
+
+  @Test
+  public void testSQLRepresentationDTOBuilderRejectsMissingDialect() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SQLRepresentationDTO.builder().withSql("SELECT 1").build());
+    Assertions.assertEquals(
+        "\"dialect\" field is required and cannot be empty", exception.getMessage());
+  }
+
+  @Test
+  public void testSQLRepresentationDTOBuilderRejectsBlankSql() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> SQLRepresentationDTO.builder().withDialect("spark").withSql(" ").build());
+    Assertions.assertEquals(
+        "\"sql\" field is required and cannot be empty", exception.getMessage());
   }
 }

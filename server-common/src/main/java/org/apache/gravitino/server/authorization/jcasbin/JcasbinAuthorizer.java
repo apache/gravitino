@@ -27,9 +27,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -286,7 +288,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                     SupportsRelationOperations.Type.ROLE_USER_REL,
                     userNameIdentifier,
                     Entity.EntityType.USER);
-        return entities.stream().anyMatch(roleEntity -> Objects.equals(roleEntity.id(), roleId));
+        // Check direct user-role assignment
+        if (entities.stream().anyMatch(roleEntity -> Objects.equals(roleEntity.id(), roleId))) {
+          return true;
+        }
+        // Check group-role assignments.
+        for (GroupEntity groupEntity : resolveCurrentUserGroups(metalake, entityStore)) {
+          List<Long> groupRoleIds = groupEntity.roleIds();
+          if (groupRoleIds != null && groupRoleIds.contains(roleId)) {
+            return true;
+          }
+        }
+        return false;
 
       } catch (Exception e) {
         LOG.warn("can not get user id or role id.", e);
@@ -503,39 +516,115 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                         userNameIdentifier,
                         Entity.EntityType.USER);
             List<CompletableFuture<Void>> loadRoleFutures = new ArrayList<>();
+            Set<String> desiredRoleIds = new HashSet<>();
             for (RoleEntity role : entities) {
-              Long roleId = role.id();
-              allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-              denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
-              if (loadedRoles.getIfPresent(roleId) != null) {
+              desiredRoleIds.add(String.valueOf(role.id()));
+              addRoleForUserAndLoadPolicies(
+                  userId, metalake, role.id(), role.name(), loadRoleFutures, entityStore);
+            }
+
+            // Load roles inherited from the user's groups.
+            for (GroupEntity groupEntity : resolveCurrentUserGroups(metalake, entityStore)) {
+              List<Long> roleIds = groupEntity.roleIds();
+              List<String> roleNames = groupEntity.roleNames();
+              if (roleIds == null || roleNames == null) {
                 continue;
               }
-              CompletableFuture<Void> loadRoleFuture =
-                  CompletableFuture.supplyAsync(
-                          () -> {
-                            try {
-                              return entityStore.get(
-                                  NameIdentifierUtil.ofRole(metalake, role.name()),
-                                  Entity.EntityType.ROLE,
-                                  RoleEntity.class);
-                            } catch (Exception e) {
-                              throw new RuntimeException("Failed to load role: " + role.name(), e);
-                            }
-                          },
-                          executor)
-                      .thenAcceptAsync(
-                          roleEntity -> {
-                            loadPolicyByRoleEntity(roleEntity);
-                            loadedRoles.put(roleId, true);
-                          },
-                          executor);
-              loadRoleFutures.add(loadRoleFuture);
+              if (roleIds.size() != roleNames.size()) {
+                LOG.warn(
+                    "Group {} has mismatched roleIds ({}) and roleNames ({}) -- skipping",
+                    groupEntity.name(),
+                    roleIds.size(),
+                    roleNames.size());
+                continue;
+              }
+              for (int i = 0; i < roleIds.size(); i++) {
+                desiredRoleIds.add(String.valueOf(roleIds.get(i)));
+                addRoleForUserAndLoadPolicies(
+                    userId,
+                    metalake,
+                    roleIds.get(i),
+                    roleNames.get(i),
+                    loadRoleFutures,
+                    entityStore);
+              }
             }
+
             CompletableFuture.allOf(loadRoleFutures.toArray(new CompletableFuture[0])).join();
+
+            // Prune stale g-rows: remove role mappings that are no longer valid
+            // (e.g. user was removed from a group at the IdP level).
+            String userIdStr = String.valueOf(userId);
+            for (String currentRole : allowEnforcer.getRolesForUser(userIdStr)) {
+              if (!desiredRoleIds.contains(currentRole)) {
+                allowEnforcer.deleteRoleForUser(userIdStr, currentRole);
+                denyEnforcer.deleteRoleForUser(userIdStr, currentRole);
+              }
+            }
           } catch (IOException e) {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  /**
+   * Resolves GroupEntity objects for the current principal's groups, skipping any that are stale or
+   * not found in the store.
+   */
+  private List<GroupEntity> resolveCurrentUserGroups(String metalake, EntityStore entityStore) {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    if (!(principal instanceof UserPrincipal)) {
+      return new ArrayList<>();
+    }
+    List<UserGroup> groups = ((UserPrincipal) principal).getGroups();
+    if (groups.isEmpty()) {
+      return new ArrayList<>();
+    }
+    List<NameIdentifier> groupIdents =
+        groups.stream()
+            .map(g -> NameIdentifierUtil.ofGroup(metalake, g.getGroupname()))
+            .collect(Collectors.toList());
+    return entityStore.batchGet(groupIdents, Entity.EntityType.GROUP, GroupEntity.class);
+  }
+
+  /**
+   * Adds a role mapping for the given user in both enforcers and asynchronously loads the role's
+   * policies if they are not already cached. When a role needs loading, the resulting {@link
+   * CompletableFuture} is appended to {@code loadRoleFutures} so the caller can join all futures
+   * after processing both direct and group-inherited roles.
+   */
+  private void addRoleForUserAndLoadPolicies(
+      Long userId,
+      String metalake,
+      Long roleId,
+      String roleName,
+      List<CompletableFuture<Void>> loadRoleFutures,
+      EntityStore entityStore) {
+    allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+    denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
+    if (loadedRoles.getIfPresent(roleId) != null) {
+      return;
+    }
+    CompletableFuture<Void> loadRoleFuture =
+        CompletableFuture.supplyAsync(
+                () -> {
+                  try {
+                    return entityStore.get(
+                        NameIdentifierUtil.ofRole(metalake, roleName),
+                        Entity.EntityType.ROLE,
+                        RoleEntity.class);
+                  } catch (Exception e) {
+                    throw new RuntimeException("Failed to load role: " + roleName, e);
+                  }
+                },
+                executor)
+            .thenAcceptAsync(
+                roleEntity -> {
+                  loadPolicyByRoleEntity(roleEntity);
+                  loadedRoles.put(roleId, true);
+                },
+                executor);
+    loadRoleFutures.add(loadRoleFuture);
   }
 
   private void loadOwnerPolicy(String metalake, MetadataObject metadataObject, Long metadataId) {
