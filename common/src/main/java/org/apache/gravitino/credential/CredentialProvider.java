@@ -59,7 +59,7 @@ public interface CredentialProvider extends Closeable {
    * @return True if the provider supports the scheme.
    */
   default boolean supportsScheme(String scheme) {
-    return false;
+    return true;
   }
 
   /**
