@@ -287,13 +287,13 @@ public class SchemaMetaService {
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
     NameIdentifierUtil.checkSchema(identifier);
 
-    String schemaSegmentPhysical = identifier.name();
+    String schemaName = identifier.name();
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
     Long schemaId = schemaPO.getSchemaId();
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaFullName =
-        NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaSegmentPhysical).toString();
+        NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName).toString();
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
@@ -376,7 +376,7 @@ public class SchemaMetaService {
                   NamespaceUtil.ofTable(
                       identifier.namespace().level(0),
                       identifier.namespace().level(1),
-                      schemaSegmentPhysical));
+                      schemaName));
       if (!tableEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
@@ -387,7 +387,7 @@ public class SchemaMetaService {
                   NamespaceUtil.ofFileset(
                       identifier.namespace().level(0),
                       identifier.namespace().level(1),
-                      schemaSegmentPhysical));
+                      schemaName));
       if (!filesetEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
@@ -398,7 +398,7 @@ public class SchemaMetaService {
                   NamespaceUtil.ofModel(
                       identifier.namespace().level(0),
                       identifier.namespace().level(1),
-                      schemaSegmentPhysical));
+                      schemaName));
       if (!modelEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);
@@ -410,7 +410,7 @@ public class SchemaMetaService {
                   NamespaceUtil.ofTopic(
                       identifier.namespace().level(0),
                       identifier.namespace().level(1),
-                      schemaSegmentPhysical));
+                      schemaName));
       if (!topicEntities.isEmpty()) {
         throw new NonEmptyEntityException(
             "Entity %s has sub-entities, you should remove sub-entities first", identifier);

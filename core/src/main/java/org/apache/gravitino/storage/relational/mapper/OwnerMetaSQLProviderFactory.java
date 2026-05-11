@@ -75,8 +75,8 @@ public class OwnerMetaSQLProviderFactory {
   }
 
   public static String batchSoftDeleteOwnerRelByMetadataObjects(
-      @Param("deletion") List<OwnerRelDeletion> deletion) {
-    return getProvider().batchSoftDeleteOwnerRelByMetadataObjects(deletion);
+      @Param("deletions") List<OwnerRelDeletion> deletions) {
+    return getProvider().batchSoftDeleteOwnerRelByMetadataObjects(deletions);
   }
 
   public static String softDeleteOwnerRelByMetadataObjectIdAndType(
