@@ -33,6 +33,8 @@ import org.apache.gravitino.listener.api.event.AlterTableEvent;
 import org.apache.gravitino.listener.api.event.AlterTableFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterTopicEvent;
 import org.apache.gravitino.listener.api.event.AlterTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterViewEvent;
+import org.apache.gravitino.listener.api.event.AlterViewFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateFilesetEvent;
@@ -45,6 +47,8 @@ import org.apache.gravitino.listener.api.event.CreateTableEvent;
 import org.apache.gravitino.listener.api.event.CreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.CreateViewEvent;
+import org.apache.gravitino.listener.api.event.CreateViewFailureEvent;
 import org.apache.gravitino.listener.api.event.DisableCatalogEvent;
 import org.apache.gravitino.listener.api.event.DisableCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.DisableMetalakeEvent;
@@ -61,6 +65,8 @@ import org.apache.gravitino.listener.api.event.DropTableEvent;
 import org.apache.gravitino.listener.api.event.DropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.DropTopicEvent;
 import org.apache.gravitino.listener.api.event.DropTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.DropViewEvent;
+import org.apache.gravitino.listener.api.event.DropViewFailureEvent;
 import org.apache.gravitino.listener.api.event.EnableCatalogEvent;
 import org.apache.gravitino.listener.api.event.EnableCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
@@ -85,6 +91,8 @@ import org.apache.gravitino.listener.api.event.ListTableEvent;
 import org.apache.gravitino.listener.api.event.ListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTopicEvent;
 import org.apache.gravitino.listener.api.event.ListTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.ListViewEvent;
+import org.apache.gravitino.listener.api.event.ListViewFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadFilesetEvent;
@@ -97,6 +105,8 @@ import org.apache.gravitino.listener.api.event.LoadTableEvent;
 import org.apache.gravitino.listener.api.event.LoadTableFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadTopicEvent;
 import org.apache.gravitino.listener.api.event.LoadTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.LoadViewEvent;
+import org.apache.gravitino.listener.api.event.LoadViewFailureEvent;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.listener.api.event.PartitionExistsEvent;
@@ -551,6 +561,16 @@ public interface AuditLog {
         return LOAD_TOPIC;
       } else if (event instanceof ListTopicEvent || event instanceof ListTopicFailureEvent) {
         return LIST_TOPIC;
+      } else if (event instanceof CreateViewEvent || event instanceof CreateViewFailureEvent) {
+        return CREATE_VIEW;
+      } else if (event instanceof AlterViewEvent || event instanceof AlterViewFailureEvent) {
+        return ALTER_VIEW;
+      } else if (event instanceof DropViewEvent || event instanceof DropViewFailureEvent) {
+        return DROP_VIEW;
+      } else if (event instanceof LoadViewEvent || event instanceof LoadViewFailureEvent) {
+        return LOAD_VIEW;
+      } else if (event instanceof ListViewEvent || event instanceof ListViewFailureEvent) {
+        return LIST_VIEW;
       } else if (event instanceof CreateFilesetEvent
           || event instanceof CreateFilesetFailureEvent) {
         return CREATE_FILESET;

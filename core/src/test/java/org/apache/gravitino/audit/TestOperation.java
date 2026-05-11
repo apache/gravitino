@@ -42,6 +42,8 @@ import org.apache.gravitino.listener.api.event.AlterTableEvent;
 import org.apache.gravitino.listener.api.event.AlterTableFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterTopicEvent;
 import org.apache.gravitino.listener.api.event.AlterTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterViewEvent;
+import org.apache.gravitino.listener.api.event.AlterViewFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogEvent;
 import org.apache.gravitino.listener.api.event.CreateCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateFilesetEvent;
@@ -54,6 +56,8 @@ import org.apache.gravitino.listener.api.event.CreateTableEvent;
 import org.apache.gravitino.listener.api.event.CreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicEvent;
 import org.apache.gravitino.listener.api.event.CreateTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.CreateViewEvent;
+import org.apache.gravitino.listener.api.event.CreateViewFailureEvent;
 import org.apache.gravitino.listener.api.event.DisableCatalogEvent;
 import org.apache.gravitino.listener.api.event.DisableCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.DisableMetalakeEvent;
@@ -70,6 +74,8 @@ import org.apache.gravitino.listener.api.event.DropTableEvent;
 import org.apache.gravitino.listener.api.event.DropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.DropTopicEvent;
 import org.apache.gravitino.listener.api.event.DropTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.DropViewEvent;
+import org.apache.gravitino.listener.api.event.DropViewFailureEvent;
 import org.apache.gravitino.listener.api.event.EnableCatalogEvent;
 import org.apache.gravitino.listener.api.event.EnableCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.EnableMetalakeEvent;
@@ -91,6 +97,8 @@ import org.apache.gravitino.listener.api.event.ListTableEvent;
 import org.apache.gravitino.listener.api.event.ListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.ListTopicEvent;
 import org.apache.gravitino.listener.api.event.ListTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.ListViewEvent;
+import org.apache.gravitino.listener.api.event.ListViewFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadFilesetEvent;
@@ -103,6 +111,8 @@ import org.apache.gravitino.listener.api.event.LoadTableEvent;
 import org.apache.gravitino.listener.api.event.LoadTableFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadTopicEvent;
 import org.apache.gravitino.listener.api.event.LoadTopicFailureEvent;
+import org.apache.gravitino.listener.api.event.LoadViewEvent;
+import org.apache.gravitino.listener.api.event.LoadViewFailureEvent;
 import org.apache.gravitino.listener.api.event.PartitionExistsEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
@@ -113,11 +123,15 @@ import org.apache.gravitino.listener.api.info.MetalakeInfo;
 import org.apache.gravitino.listener.api.info.SchemaInfo;
 import org.apache.gravitino.listener.api.info.TableInfo;
 import org.apache.gravitino.listener.api.info.TopicInfo;
+import org.apache.gravitino.listener.api.info.ViewInfo;
 import org.apache.gravitino.listener.api.info.partitions.IdentityPartitionInfo;
 import org.apache.gravitino.listener.api.info.partitions.PartitionInfo;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
@@ -162,6 +176,10 @@ public class TestOperation {
 
   private TopicInfo topicInfo;
 
+  private NameIdentifier viewIdentifier;
+
+  private ViewInfo viewInfo;
+
   private NameIdentifier partitionIdentifier;
 
   private PartitionInfo partitionInfo;
@@ -186,6 +204,9 @@ public class TestOperation {
 
     this.topicIdentifier = mockTopicIdentifier();
     this.topicInfo = mockTopicInfo();
+
+    this.viewIdentifier = mockViewIdentifier();
+    this.viewInfo = mockViewInfo();
 
     this.filesetIdentifier = mockFilesetIdentifier();
     this.filesetInfo = mockFilesetInfo();
@@ -243,6 +264,14 @@ public class TestOperation {
         new CreateTopicFailureEvent(USER, topicIdentifier, new Exception(), topicInfo);
     Assertions.assertEquals(
         AuditLog.Operation.fromEvent(createTopicFailureEvent), AuditLog.Operation.CREATE_TOPIC);
+
+    Event createViewEvent = new CreateViewEvent(USER, viewIdentifier, viewInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(createViewEvent), AuditLog.Operation.CREATE_VIEW);
+    Event createViewFailureEvent =
+        new CreateViewFailureEvent(USER, viewIdentifier, new Exception(), viewInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(createViewFailureEvent), AuditLog.Operation.CREATE_VIEW);
   }
 
   @Test
@@ -303,6 +332,14 @@ public class TestOperation {
         new AlterTopicFailureEvent(USER, topicIdentifier, new Exception(), new TopicChange[] {});
     Assertions.assertEquals(
         AuditLog.Operation.fromEvent(alterTopicFailureEvent), AuditLog.Operation.ALTER_TOPIC);
+
+    Event alterViewEvent = new AlterViewEvent(USER, viewIdentifier, new ViewChange[] {}, viewInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(alterViewEvent), AuditLog.Operation.ALTER_VIEW);
+    Event alterViewFailureEvent =
+        new AlterViewFailureEvent(USER, viewIdentifier, new Exception(), new ViewChange[] {});
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(alterViewFailureEvent), AuditLog.Operation.ALTER_VIEW);
   }
 
   @Test
@@ -351,6 +388,13 @@ public class TestOperation {
     Event dropTopicFailureEvent = new DropTopicFailureEvent(USER, topicIdentifier, new Exception());
     Assertions.assertEquals(
         AuditLog.Operation.fromEvent(dropTopicFailureEvent), AuditLog.Operation.DROP_TOPIC);
+
+    Event dropViewEvent = new DropViewEvent(USER, viewIdentifier, true);
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(dropViewEvent), AuditLog.Operation.DROP_VIEW);
+    Event dropViewFailureEvent = new DropViewFailureEvent(USER, viewIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(dropViewFailureEvent), AuditLog.Operation.DROP_VIEW);
   }
 
   @Test
@@ -426,6 +470,14 @@ public class TestOperation {
     Assertions.assertEquals(
         AuditLog.Operation.fromEvent(listTopicFailureEvent), AuditLog.Operation.LIST_TOPIC);
 
+    Namespace viewNamespace = Namespace.of("metalake", "catalog", "schema");
+    Event listViewEvent = new ListViewEvent(USER, viewNamespace);
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(listViewEvent), AuditLog.Operation.LIST_VIEW);
+    Event listViewFailureEvent = new ListViewFailureEvent(USER, viewNamespace, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(listViewFailureEvent), AuditLog.Operation.LIST_VIEW);
+
     Event listFilesetEvent = new ListFilesetEvent(USER, namespace);
     Assertions.assertEquals(
         AuditLog.Operation.fromEvent(listFilesetEvent), AuditLog.Operation.LIST_FILESET);
@@ -489,6 +541,13 @@ public class TestOperation {
     Event loadTopicFailureEvent = new LoadTopicFailureEvent(USER, topicIdentifier, new Exception());
     Assertions.assertEquals(
         AuditLog.Operation.fromEvent(loadTopicFailureEvent), AuditLog.Operation.LOAD_TOPIC);
+
+    Event loadViewEvent = new LoadViewEvent(USER, viewIdentifier, viewInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(loadViewEvent), AuditLog.Operation.LOAD_VIEW);
+    Event loadViewFailureEvent = new LoadViewFailureEvent(USER, viewIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.fromEvent(loadViewFailureEvent), AuditLog.Operation.LOAD_VIEW);
   }
 
   @Test
@@ -600,6 +659,24 @@ public class TestOperation {
 
   private TopicInfo mockTopicInfo() {
     return new TopicInfo("topic", "comment", ImmutableMap.of("a", "b"), null);
+  }
+
+  private NameIdentifier mockViewIdentifier() {
+    return NameIdentifier.of("metalake", "catalog", "schema", "view");
+  }
+
+  private ViewInfo mockViewInfo() {
+    return new ViewInfo(
+        "view",
+        new Column[] {Column.of("a", Types.IntegerType.get())},
+        "comment",
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("trino").withSql("SELECT 1").build()
+        },
+        "dc",
+        "ds",
+        ImmutableMap.of("a", "b"),
+        null);
   }
 
   private NameIdentifier mockPartitionIdentifier() {
