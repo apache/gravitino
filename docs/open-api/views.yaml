@@ -525,9 +525,10 @@ components:
       value: {
         "code": 1004,
         "type": "ViewAlreadyExistsException",
-        "message": "View already exists",
+        "message": "Failed to operate view(s) [view1] operation [CREATE] under schema [test_schema], reason [ViewAlreadyExistsException]",
         "stack": [
-          "org.apache.gravitino.exceptions.ViewAlreadyExistsException: View already exists: view1"
+          "org.apache.gravitino.exceptions.ViewAlreadyExistsException: View already exists: view1",
+          "..."
         ]
       }
 
@@ -535,9 +536,9 @@ components:
       value: {
         "code": 1003,
         "type": "NoSuchViewException",
-        "message": "View does not exist",
+        "message": "Failed to operate view(s) [test_view] operation [LOAD] under schema [test_schema], reason [NoSuchViewException]",
         "stack": [
-          "org.apache.gravitino.exceptions.NoSuchViewException: View does not exist",
+          "org.apache.gravitino.exceptions.NoSuchViewException: View test_view does not exist",
           "..."
         ]
       }
