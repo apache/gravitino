@@ -18,9 +18,10 @@
  */
 package org.apache.gravitino.iceberg.common.io;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.iceberg.io.FileIO;
@@ -32,8 +33,11 @@ import org.apache.iceberg.io.OutputFile;
  */
 public class SwitchingFileIO implements FileIO {
 
-  private final Map<String, FileIO> delegateByImpl = new ConcurrentHashMap<>();
+  private final Object delegateLock = new Object();
+
+  private final Map<String, FileIO> delegateByImpl = new HashMap<>();
   private volatile Map<String, String> properties = Map.of();
+  private boolean closed;
 
   @Override
   public void initialize(Map<String, String> properties) {
@@ -67,27 +71,52 @@ public class SwitchingFileIO implements FileIO {
 
   @Override
   public void close() {
-    delegateByImpl
-        .values()
-        .forEach(
-            fileIO -> {
-              try {
-                fileIO.close();
-              } catch (Exception e) {
-                throw new RuntimeException("Failed to close delegated FileIO", e);
-              }
-            });
-    delegateByImpl.clear();
+    List<FileIO> toClose;
+    synchronized (delegateLock) {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      toClose = new ArrayList<>(delegateByImpl.values());
+      delegateByImpl.clear();
+    }
+
+    Throwable thrownOnClose = null;
+    for (FileIO fileIO : toClose) {
+      try {
+        fileIO.close();
+      } catch (Throwable t) {
+        if (thrownOnClose == null) {
+          thrownOnClose = t;
+        } else {
+          thrownOnClose.addSuppressed(t);
+        }
+      }
+    }
+    if (thrownOnClose != null) {
+      if (thrownOnClose instanceof RuntimeException) {
+        throw (RuntimeException) thrownOnClose;
+      }
+      if (thrownOnClose instanceof Error) {
+        throw (Error) thrownOnClose;
+      }
+      throw new RuntimeException("Failed to close delegated FileIO", thrownOnClose);
+    }
   }
 
   private FileIO delegate(String location) {
-    String impl =
-        IcebergCatalogUtil.resolveFileIOImplByLocation(location)
-            .orElseThrow(
-                () ->
-                    new IllegalArgumentException(
-                        "Unsupported location for SwitchingFileIO: " + location));
-    return delegateByImpl.computeIfAbsent(impl, this::newDelegate);
+    synchronized (delegateLock) {
+      if (closed) {
+        throw new IllegalStateException("SwitchingFileIO is already closed");
+      }
+      String impl =
+          IcebergCatalogUtil.resolveFileIOImplByLocation(location)
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          "Unsupported location for SwitchingFileIO: " + location));
+      return delegateByImpl.computeIfAbsent(impl, this::newDelegate);
+    }
   }
 
   private FileIO newDelegate(String implClassName) {

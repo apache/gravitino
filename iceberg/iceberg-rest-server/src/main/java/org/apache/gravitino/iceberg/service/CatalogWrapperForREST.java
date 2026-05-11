@@ -166,7 +166,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
     LoadTableResponse loadTableResponse = super.registerTable(namespace, request);
-    loadTableResponse = rewriteTableFileIOByLocation(loadTableResponse, requestCredential);
+    loadTableResponse = rewriteTableFileIOByLocation(loadTableResponse, useSwitchingFileIO);
     if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       // Vend WRITE credentials: the registering user becomes the table owner
       // (IcebergNamespaceHookDispatcher.setTableOwner runs after this call

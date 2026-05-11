@@ -105,7 +105,7 @@ public class CatalogCredentialManager implements Closeable {
     Preconditions.checkArgument(path != null, "Path should not be null");
     String scheme = URI.create(path).getScheme();
     if (scheme == null) {
-      return "file://";
+      return "file";
     }
     return scheme;
   }

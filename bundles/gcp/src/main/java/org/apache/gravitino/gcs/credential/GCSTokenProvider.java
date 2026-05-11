@@ -30,7 +30,7 @@ public class GCSTokenProvider extends CredentialProviderDelegator<GCSTokenCreden
 
   @Override
   public boolean supportsScheme(String scheme) {
-    return "gs".equalsIgnoreCase(scheme);
+    return "gs".equalsIgnoreCase(scheme) || "gcs".equalsIgnoreCase(scheme);
   }
 
   @Override
