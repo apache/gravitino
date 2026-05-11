@@ -30,34 +30,34 @@ import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to update users in a built-in IdP group. */
+/** Represents a request to remove users from a built-in IdP group. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
-public class UpdateGroupUsersRequest implements RESTRequest {
+public class GroupRemoveUsersRequest implements RESTRequest {
 
   @JsonProperty("users")
   private final List<String> users;
 
-  /** Default constructor for UpdateGroupUsersRequest. (Used for Jackson deserialization.) */
-  public UpdateGroupUsersRequest() {
+  /** Default constructor for GroupRemoveUsersRequest. (Used for Jackson deserialization.) */
+  public GroupRemoveUsersRequest() {
     this(null);
   }
 
   /**
-   * Creates a new UpdateGroupUsersRequest.
+   * Creates a new GroupRemoveUsersRequest.
    *
-   * @param users The user names to update in the built-in IdP group.
+   * @param users The user names to remove from the built-in IdP group.
    */
-  public UpdateGroupUsersRequest(List<String> users) {
+  public GroupRemoveUsersRequest(List<String> users) {
     super();
     this.users = users;
   }
 
   /**
-   * Validates the {@link UpdateGroupUsersRequest} request.
+   * Validates the {@link GroupRemoveUsersRequest} request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */
