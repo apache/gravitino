@@ -27,9 +27,9 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
@@ -231,8 +231,7 @@ public class SchemaMetaService {
   public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     SchemaPO oldSchemaPO = getSchemaPOByIdentifier(identifier);
-    SchemaEntity oldSchemaEntity =
-        POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace());
+    SchemaEntity oldSchemaEntity = POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace());
     SchemaEntity newEntity = (SchemaEntity) updater.apply((E) oldSchemaEntity);
     Preconditions.checkArgument(
         Objects.equals(oldSchemaEntity.id(), newEntity.id()),

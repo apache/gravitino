@@ -218,10 +218,12 @@ public class TestSchemaMetaService extends TestJDBCBackend {
 
     SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
     String logicalLeaf = "ns_a:ns_b:leaf";
+    String sep = HierarchicalSchemaUtil.schemaSeparator();
+    String physicalLeaf = HierarchicalSchemaUtil.logicalToPhysical(logicalLeaf, sep);
     SchemaEntity hierarchical =
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(logicalLeaf)
+            .withName(physicalLeaf)
             .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
             .withComment("nested")
             .withProperties(Collections.emptyMap())
@@ -231,7 +233,6 @@ public class TestSchemaMetaService extends TestJDBCBackend {
 
     List<SchemaEntity> schemas =
         schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName));
-    String sep = HierarchicalSchemaUtil.schemaSeparator();
     Set<String> logicalNames =
         schemas.stream()
             .map(SchemaEntity::name)
@@ -248,7 +249,6 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     Assertions.assertTrue(logicalNames.contains("ns_a:ns_b"));
     Assertions.assertTrue(logicalNames.contains(logicalLeaf));
 
-    String physicalLeaf = HierarchicalSchemaUtil.logicalToPhysical(logicalLeaf, sep);
     SchemaEntity loaded =
         schemaMetaService.getSchemaByIdentifier(
             NameIdentifier.of(metalakeName, catalogName, physicalLeaf));
