@@ -42,21 +42,8 @@ public class TestMetricsSource extends MetricsSource {
 
   private static String TEST_METRICS_SOURCE = "test";
   private static int gaugeValue = 0;
-  private static Config savedGravitinoConfig;
 
-  static {
-    try {
-      savedGravitinoConfig =
-          (Config) FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
-      Config mockConfig = mock(Config.class);
-      when(mockConfig.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS))
-          .thenReturn(Configs.DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
-    } catch (IllegalAccessException e) {
-      throw new ExceptionInInitializerError(e);
-    }
-  }
-
+  private Config savedGravitinoConfig;
   private MetricsSystem metricsSystem;
 
   public TestMetricsSource() {
@@ -64,7 +51,14 @@ public class TestMetricsSource extends MetricsSource {
   }
 
   @BeforeAll
-  void init() {
+  void setupMetricsSource() throws IllegalAccessException {
+    savedGravitinoConfig =
+        (Config) FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
+    Config mockConfig = mock(Config.class);
+    when(mockConfig.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS))
+        .thenReturn(Configs.DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
+
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(this);
   }
