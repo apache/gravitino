@@ -97,6 +97,7 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
+  private static final String FORMAT_VERSION = "format-version";
   private final CatalogCredentialManager catalogCredentialManager;
 
   private volatile Map<String, String> catalogConfigToClients;
@@ -769,7 +770,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       tableBuilder.withPartitionSpec(changedTableMeta.spec());
       tableBuilder.withSortOrder(changedTableMeta.sortOrder());
       tableBuilder.withLocation(changedTableMeta.location());
-      tableBuilder.withProperty("format-version", String.valueOf(changedTableMeta.formatVersion()));
+      tableBuilder.withProperty(FORMAT_VERSION, String.valueOf(changedTableMeta.formatVersion()));
       tableBuilder.withProperties(changedTableMeta.properties());
 
       Transaction transaction = tableBuilder.createOrReplaceTransaction();

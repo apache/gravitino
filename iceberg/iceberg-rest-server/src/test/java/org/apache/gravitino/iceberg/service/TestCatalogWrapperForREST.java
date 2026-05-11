@@ -473,8 +473,8 @@ public class TestCatalogWrapperForREST {
   }
 
   /**
-   * Same derivation as {@link CatalogWrapperForREST#tableUpdateInternal} for staged create:
-   * replay metadata updates and read {@link TableMetadata#formatVersion()}.
+   * Same derivation as {@link CatalogWrapperForREST#tableUpdateInternal} for staged create: replay
+   * metadata updates and read {@link TableMetadata#formatVersion()}.
    */
   private static String expectedFormatVersionStringAfterStagedUpdates(
       Schema schema, Optional<Integer> formatVersionForUpgrade) {
