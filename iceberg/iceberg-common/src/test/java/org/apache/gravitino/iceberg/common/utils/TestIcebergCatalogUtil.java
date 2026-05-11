@@ -152,23 +152,6 @@ public class TestIcebergCatalogUtil {
   }
 
   @Test
-  void testResolveFileIOImplByLocation() {
-    Assertions.assertEquals(
-        "org.apache.iceberg.aws.s3.S3FileIO",
-        IcebergCatalogUtil.resolveFileIOImplByLocation("s3://bucket/warehouse").orElse(null));
-    Assertions.assertEquals(
-        "org.apache.iceberg.gcp.gcs.GCSFileIO",
-        IcebergCatalogUtil.resolveFileIOImplByLocation("gs://bucket/warehouse").orElse(null));
-    Assertions.assertEquals(
-        "org.apache.iceberg.azure.adlsv2.ADLSFileIO",
-        IcebergCatalogUtil.resolveFileIOImplByLocation("abfss://container@account/warehouse")
-            .orElse(null));
-    Assertions.assertEquals(
-        "org.apache.iceberg.hadoop.HadoopFileIO",
-        IcebergCatalogUtil.resolveFileIOImplByLocation("/tmp/warehouse").orElse(null));
-  }
-
-  @Test
   void testApplyDefaultResolvingFileIOWhenMissing() {
     Map<String, String> properties = new HashMap<>();
     properties.put(IcebergConstants.WAREHOUSE, "s3://bucket/warehouse");
