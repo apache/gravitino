@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -136,5 +137,12 @@ public class TestHierarchicalSchemaUtil {
     Assertions.assertEquals("X/Y/Z", scopes.get(0));
     Assertions.assertEquals("X/Y", scopes.get(1));
     Assertions.assertEquals("X", scopes.get(2));
+  }
+
+  /** Leading separator must not yield an empty ancestor segment (invalid metadata name). */
+  @Test
+  public void testAllScopesLeadingSeparatorOmitsEmptyAncestor() {
+    List<String> scopes = HierarchicalSchemaUtil.allScopes(":A:B", ":");
+    Assertions.assertEquals(Arrays.asList(":A:B", ":A"), scopes);
   }
 }

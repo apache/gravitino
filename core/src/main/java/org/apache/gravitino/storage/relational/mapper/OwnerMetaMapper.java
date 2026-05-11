@@ -73,8 +73,7 @@ public interface OwnerMetaMapper {
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,
       method = "batchSoftDeleteOwnerRelByMetadataObjects")
-  void batchSoftDeleteOwnerRelByMetadataObjects(
-      @Param("targets") List<OwnerRelDelete> targets);
+  void batchSoftDeleteOwnerRelByMetadataObjects(@Param("targets") List<OwnerRelDelete> targets);
 
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,

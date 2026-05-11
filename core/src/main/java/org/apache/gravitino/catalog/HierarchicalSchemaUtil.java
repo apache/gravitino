@@ -156,6 +156,9 @@ public final class HierarchicalSchemaUtil {
     while (current.contains(separator)) {
       int lastIdx = current.lastIndexOf(separator);
       current = current.substring(0, lastIdx);
+      if (current.isEmpty()) {
+        break;
+      }
       result.add(current);
     }
     return result;
