@@ -18,10 +18,14 @@
  */
 package org.apache.gravitino.hook;
 
+import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -32,6 +36,7 @@ import static org.mockito.Mockito.withSettings;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -44,6 +49,7 @@ import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -63,6 +69,7 @@ public class TestSchemaHookDispatcher {
   private OwnerDispatcher savedOwnerDispatcher;
   private CatalogManager savedCatalogManager;
   private EntityStore savedEntityStore;
+  private LockManager savedLockManager;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -82,6 +89,14 @@ public class TestSchemaHookDispatcher {
         (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
     savedEntityStore =
         (EntityStore) FieldUtils.readField(GravitinoEnv.getInstance(), "entityStore", true);
+    savedLockManager =
+        (LockManager) FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
+    Config lockConfig = mock(Config.class);
+    doReturn(100000L).when(lockConfig).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    doReturn(1000L).when(lockConfig).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    doReturn(36000L).when(lockConfig).get(TREE_LOCK_CLEAN_INTERVAL);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "lockManager", new LockManager(lockConfig), true);
     EntityStore mockEntityStore = mock(EntityStore.class);
     when(mockEntityStore.batchGet(anyList(), eq(Entity.EntityType.SCHEMA), eq(SchemaEntity.class)))
         .thenReturn(Collections.emptyList());
@@ -97,6 +112,7 @@ public class TestSchemaHookDispatcher {
         GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", savedEntityStore, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", savedLockManager, true);
   }
 
   @Test

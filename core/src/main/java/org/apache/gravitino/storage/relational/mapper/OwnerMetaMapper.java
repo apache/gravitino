@@ -20,7 +20,7 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.GroupPO;
-import org.apache.gravitino.storage.relational.po.OwnerRelDeleteTarget;
+import org.apache.gravitino.storage.relational.po.OwnerRelDelete;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
@@ -74,7 +74,7 @@ public interface OwnerMetaMapper {
       type = OwnerMetaSQLProviderFactory.class,
       method = "batchSoftDeleteOwnerRelByMetadataObjects")
   void batchSoftDeleteOwnerRelByMetadataObjects(
-      @Param("targets") List<OwnerRelDeleteTarget> targets);
+      @Param("targets") List<OwnerRelDelete> targets);
 
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,

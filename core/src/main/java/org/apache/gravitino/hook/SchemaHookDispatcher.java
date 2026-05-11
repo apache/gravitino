@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.hook;
 
+import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -43,6 +45,8 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -67,32 +71,40 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    // Collect missing parent identifiers BEFORE the underlying call; the catalog itself is
-    // responsible for auto-creating them. We only need to assign ownership afterwards.
-    List<NameIdentifier> missingParents = findMissingParents(ident);
-    Schema schema = dispatcher.createSchema(ident, comment, properties);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    return TreeLockUtils.doWithTreeLock(
+        catalogIdent,
+        LockType.WRITE,
+        () -> {
+          // Collect missing parent identifiers BEFORE the underlying call; the catalog itself is
+          // responsible for auto-creating them. We only need to assign ownership afterwards.
+          List<NameIdentifier> missingParents = findMissingParents(ident);
+          Schema schema = dispatcher.createSchema(ident, comment, properties);
 
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-      String metalake = ident.namespace().level(0);
-      String user = PrincipalUtils.getCurrentUserName();
-      // Auto-created parent schemas (hierarchical namespace) and the new schema each need an
-      // owner; outer-to-inner order matches parent-before-child creation.
-      List<MetadataObject> toOwn = new ArrayList<>(missingParents.size() + 1);
-      for (NameIdentifier parentIdent : missingParents) {
-        NameIdentifier normalizedParent =
-            CapabilityHelpers.applyCapabilities(
-                parentIdent, Capability.Scope.SCHEMA, catalogManager);
-        toOwn.add(NameIdentifierUtil.toMetadataObject(normalizedParent, Entity.EntityType.SCHEMA));
-      }
-      toOwn.add(
-          NameIdentifierUtil.toMetadataObject(
-              CapabilityHelpers.applyCapabilities(ident, Capability.Scope.SCHEMA, catalogManager),
-              Entity.EntityType.SCHEMA));
-      ownerManager.setOwners(metalake, toOwn, user, Owner.Type.USER);
-    }
-    return schema;
+          OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+          if (ownerManager != null) {
+            CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+            String metalake = ident.namespace().level(0);
+            String user = PrincipalUtils.getCurrentUserName();
+            // Auto-created parent schemas (hierarchical namespace) and the new schema each need an
+            // owner; outer-to-inner order matches parent-before-child creation.
+            List<MetadataObject> toOwn = new ArrayList<>(missingParents.size() + 1);
+            for (NameIdentifier parentIdent : missingParents) {
+              NameIdentifier normalizedParent =
+                  CapabilityHelpers.applyCapabilities(
+                      parentIdent, Capability.Scope.SCHEMA, catalogManager);
+              toOwn.add(
+                  NameIdentifierUtil.toMetadataObject(normalizedParent, Entity.EntityType.SCHEMA));
+            }
+            toOwn.add(
+                NameIdentifierUtil.toMetadataObject(
+                    CapabilityHelpers.applyCapabilities(
+                        ident, Capability.Scope.SCHEMA, catalogManager),
+                    Entity.EntityType.SCHEMA));
+            ownerManager.setOwners(metalake, toOwn, user, Owner.Type.USER);
+          }
+          return schema;
+        });
   }
 
   /**

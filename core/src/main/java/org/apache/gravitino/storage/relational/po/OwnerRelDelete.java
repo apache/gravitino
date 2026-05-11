@@ -24,7 +24,7 @@ import lombok.Getter;
 /** Key for batch soft-deleting owner rows by metadata object. */
 @Getter
 @AllArgsConstructor
-public class OwnerRelDeleteTarget {
+public class OwnerRelDelete {
   private final Long metadataObjectId;
   private final String metadataObjectType;
 }

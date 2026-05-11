@@ -39,7 +39,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
-import org.apache.gravitino.storage.relational.po.OwnerRelDeleteTarget;
+import org.apache.gravitino.storage.relational.po.OwnerRelDelete;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
@@ -196,12 +196,12 @@ public class OwnerMetaService {
     long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
     Long ownerId = EntityIdService.getEntityId(ownerIdent, ownerType);
 
-    List<OwnerRelDeleteTarget> targets = new ArrayList<>(ownedObjects.size());
+    List<OwnerRelDelete> targets = new ArrayList<>(ownedObjects.size());
     List<OwnerRelPO> ownerRelPOs = new ArrayList<>(ownedObjects.size());
     for (NameIdentifier entity : ownedObjects) {
       Long entityId = EntityIdService.getEntityId(entity, ownedObjectType);
       targets.add(
-          new OwnerRelDeleteTarget(
+          new OwnerRelDelete(
               entityId,
               NameIdentifierUtil.toMetadataObject(entity, ownedObjectType).type().name()));
       ownerRelPOs.add(
