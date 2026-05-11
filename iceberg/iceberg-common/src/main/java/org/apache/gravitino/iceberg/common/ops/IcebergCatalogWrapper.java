@@ -37,6 +37,7 @@ import org.apache.gravitino.utils.ClassUtils;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.iceberg.CatalogUtil;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.Transaction;
 import org.apache.iceberg.catalog.Catalog;
@@ -44,6 +45,8 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
+import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.RESTCatalog;
@@ -71,6 +74,7 @@ import org.slf4j.LoggerFactory;
 public class IcebergCatalogWrapper implements AutoCloseable {
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapper.class);
+  private static final String OSS_LOCATION_PREFIX = "oss://";
 
   private final Object initializationLock = new Object();
   private volatile Catalog catalog;
@@ -79,6 +83,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private final IcebergConfig icebergConfig;
   private String catalogUri = null;
   private volatile TableMetadataCache metadataCache;
+  private volatile FileIO metadataFileIO;
   private final Configuration configuration;
 
   public IcebergCatalogWrapper(IcebergConfig icebergConfig) {
@@ -246,6 +251,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       return LoadTableResponse.builder().withTableMetadata(tableMetadataOptional.get()).build();
     }
 
+    checkMetadataFileBeforeLoad(tableIdentifier);
     LoadTableResponse loadTableResponse = CatalogHandlers.loadTable(getCatalog(), tableIdentifier);
     if (loadTableResponse != null) {
       getMetadataCache().updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
@@ -272,6 +278,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public boolean tableExists(TableIdentifier tableIdentifier) {
+    Optional<String> metadataLocation = getTableMetadataLocation(tableIdentifier);
+    if (metadataLocation.isPresent() && shouldCheckMetadataFileExists(metadataLocation.get())) {
+      return metadataFileExists(metadataLocation.get());
+    }
+
     return getCatalog().tableExists(tableIdentifier);
   }
 
@@ -365,6 +376,10 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     if (cache != null) {
       cache.close();
     }
+    FileIO loadedMetadataFileIO = metadataFileIO;
+    if (loadedMetadataFileIO != null) {
+      loadedMetadataFileIO.close();
+    }
 
     // For Iceberg REST server which use the same classloader when recreating catalog wrapper, the
     // Driver couldn't be reloaded after deregister()
@@ -387,6 +402,47 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    */
   protected boolean useDifferentClassLoader() {
     return true;
+  }
+
+  private void checkMetadataFileBeforeLoad(TableIdentifier tableIdentifier) {
+    Optional<String> metadataLocation = getTableMetadataLocation(tableIdentifier);
+    if (metadataLocation.isEmpty() || !shouldCheckMetadataFileExists(metadataLocation.get())) {
+      return;
+    }
+
+    // Aliyun OSS exists() converts missing keys to false before Iceberg's metadata read retry loop.
+    if (!metadataFileExists(metadataLocation.get())) {
+      throw new NoSuchTableException(
+          "Iceberg table metadata file does not exist for table %s: %s",
+          tableIdentifier, metadataLocation.get());
+    }
+  }
+
+  private boolean shouldCheckMetadataFileExists(String metadataLocation) {
+    return StringUtils.startsWithIgnoreCase(metadataLocation, OSS_LOCATION_PREFIX)
+        && StringUtils.isNotBlank(icebergConfig.get(IcebergConfig.IO_IMPL));
+  }
+
+  private boolean metadataFileExists(String metadataLocation) {
+    return getMetadataFileIO().newInputFile(metadataLocation).exists();
+  }
+
+  private FileIO getMetadataFileIO() {
+    FileIO loadedMetadataFileIO = metadataFileIO;
+    if (loadedMetadataFileIO != null) {
+      return loadedMetadataFileIO;
+    }
+
+    synchronized (initializationLock) {
+      if (metadataFileIO == null) {
+        metadataFileIO =
+            CatalogUtil.loadFileIO(
+                icebergConfig.get(IcebergConfig.IO_IMPL),
+                icebergConfig.getIcebergCatalogProperties(),
+                configuration);
+      }
+      return metadataFileIO;
+    }
   }
 
   private void closeJdbcDriverResources() {
