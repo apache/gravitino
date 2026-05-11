@@ -53,8 +53,6 @@ import java.util.function.UnaryOperator;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.document.Document;
 import software.amazon.awssdk.services.glue.model.Column;
 import software.amazon.awssdk.services.glue.model.IcebergSchema;
@@ -69,8 +67,6 @@ import software.amazon.awssdk.services.glue.model.Table;
  * modifying Iceberg-format tables via the AWS Glue Data Catalog.
  */
 final class GlueIcebergHelper {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GlueIcebergHelper.class);
 
   private GlueIcebergHelper() {}
 
@@ -273,12 +269,12 @@ final class GlueIcebergHelper {
         try {
           return Integer.parseInt(raw);
         } catch (NumberFormatException e) {
-          LOG.warn(
-              "Column '{}' has non-numeric iceberg.field.id '{}'; falling back to sequence ID {}",
-              col.name(),
-              raw,
-              fallbackId);
-          return fallbackId;
+          throw new IllegalStateException(
+              String.format(
+                  "Column '%s' has non-numeric iceberg.field.id '%s'."
+                      + " The Iceberg metadata may be corrupt. Aborting schema update.",
+                  col.name(), raw),
+              e);
         }
       }
     }
@@ -321,7 +317,8 @@ final class GlueIcebergHelper {
   }
 
   /**
-   * Converts a Glue/Hive column type string to an Iceberg type {@link Document}.
+   * Converts a Glue/Hive column type string to an Iceberg type {@link
+   * software.amazon.awssdk.core.document.Document}.
    *
    * <p>Iceberg REST spec type names are used for primitives (e.g. {@code "long"} for Hive {@code
    * bigint}). Complex types (array, map, struct) are not supported and will throw {@link
@@ -392,7 +389,9 @@ final class GlueIcebergHelper {
   }
 
   /**
-   * Converts a Gravitino {@link Type} to an Iceberg type {@link Document}.
+   * Converts a Gravitino {@link Type} to an Iceberg type {@link
+   * software.amazon.awssdk.core.document.Document} ({@code "Doc"} in the method name refers to the
+   * AWS SDK {@code Document} type used to represent Iceberg type descriptors in Glue API payloads).
    *
    * <p>Supports primitive types. Complex types (list, map, struct) are not supported and will throw
    * {@link UnsupportedOperationException}.

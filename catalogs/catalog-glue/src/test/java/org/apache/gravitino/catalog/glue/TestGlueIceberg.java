@@ -542,6 +542,22 @@ class TestGlueIceberg {
                 raw, TableChange.renameColumn(new String[] {"nested", "field"}, "new_name")));
   }
 
+  @Test
+  void testCurrentFields_malformedFieldIdThrows() {
+    Column col =
+        Column.builder()
+            .name("id")
+            .type("long")
+            .parameters(Map.of(GlueConstants.ICEBERG_FIELD_ID, "not-a-number"))
+            .build();
+    Table raw = icebergTable(col);
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            GlueIcebergHelper.buildSchemaUpdate(
+                raw, TableChange.deleteColumn(new String[] {"id"}, false)));
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------

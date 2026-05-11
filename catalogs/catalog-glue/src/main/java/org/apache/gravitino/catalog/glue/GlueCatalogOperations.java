@@ -560,20 +560,17 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
 
     if (schemaUpdate.isPresent()) {
+      UpdateIcebergTableInput icebergTableInput =
+          UpdateIcebergTableInput.builder().updates(schemaUpdate.get()).build();
+      UpdateIcebergInput icebergInput =
+          UpdateIcebergInput.builder().updateIcebergTableInput(icebergTableInput).build();
+      UpdateOpenTableFormatInput openFormatInput =
+          UpdateOpenTableFormatInput.builder().updateIcebergInput(icebergInput).build();
       executeUpdateTable(
           ident,
           UpdateTableRequest.builder()
               .databaseName(dbName)
-              .updateOpenTableFormatInput(
-                  UpdateOpenTableFormatInput.builder()
-                      .updateIcebergInput(
-                          UpdateIcebergInput.builder()
-                              .updateIcebergTableInput(
-                                  UpdateIcebergTableInput.builder()
-                                      .updates(schemaUpdate.get())
-                                      .build())
-                              .build())
-                      .build()));
+              .updateOpenTableFormatInput(openFormatInput));
       LOG.info("Altered Iceberg table {}.{} schema via Glue native API", dbName, ident.name());
       // Re-fetch to pick up server-side parameter changes (e.g., current-schema-id update)
       // before using rawGlueTable.parameters() for the property update below.
@@ -664,6 +661,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         TableInput.builder()
             .name(rawGlueTable.name())
             .description(rawGlueTable.description())
+            .tableType(rawGlueTable.tableType())
             .parameters(newParams);
     if (rawGlueTable.storageDescriptor() != null) {
       b.storageDescriptor(rawGlueTable.storageDescriptor())
