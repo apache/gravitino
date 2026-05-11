@@ -30,7 +30,10 @@ import org.apache.flink.table.types.logical.CharType;
 import org.apache.flink.table.types.logical.DecimalType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.MapType;
+import org.apache.flink.table.types.logical.MultisetType;
 import org.apache.flink.table.types.logical.RowType;
+import org.apache.flink.table.types.logical.utils.LogicalTypeParser;
+import org.apache.flink.table.types.utils.TypeConversions;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 
@@ -130,6 +133,10 @@ public class TypeUtils {
       case NULL:
         return Types.NullType.get();
       case MULTISET:
+        MultisetType multisetType = (MultisetType) logicalType;
+        // Gravitino's type system does not have a native MULTISET type. We use ExternalType to
+        // preserve the original type information so it can be correctly restored.
+        return Types.ExternalType.of(multisetType.asSerializableString());
       case STRUCTURED_TYPE:
       case UNRESOLVED:
       case DISTINCT_TYPE:
@@ -236,6 +243,14 @@ public class TypeUtils {
         return DataTypes.INTERVAL(DataTypes.YEAR());
       case INTERVAL_DAY:
         return DataTypes.INTERVAL(DataTypes.DAY());
+      case EXTERNAL:
+        Types.ExternalType externalType = (Types.ExternalType) gravitinoType;
+        String catalogString = externalType.catalogString();
+        // Parse the external catalog type string back to Flink LogicalType.
+        // This is used to restore types like MULTISET that Gravitino doesn't natively support.
+        LogicalType parsedType =
+            LogicalTypeParser.parse(catalogString, TypeUtils.class.getClassLoader());
+        return TypeConversions.fromLogicalToDataType(parsedType);
       default:
         throw new UnsupportedOperationException("Not support " + gravitinoType.toString());
     }

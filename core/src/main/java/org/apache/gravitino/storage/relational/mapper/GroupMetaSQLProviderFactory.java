@@ -95,4 +95,13 @@ public class GroupMetaSQLProviderFactory {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteGroupMetasByLegacyTimeline(legacyTimeline, limit);
   }
+
+  public static String touchGroupUpdatedAt(@Param("groupId") long groupId) {
+    return getProvider().touchGroupUpdatedAt(groupId);
+  }
+
+  public static String getGroupUpdatedAt(
+      @Param("metalakeName") String metalakeName, @Param("groupName") String groupName) {
+    return getProvider().getGroupUpdatedAt(metalakeName, groupName);
+  }
 }

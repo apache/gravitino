@@ -182,4 +182,25 @@ public class GroupMetaBaseSQLProvider {
         + GROUP_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  public String touchGroupUpdatedAt(@Param("groupId") long groupId) {
+    return "UPDATE "
+        + GROUP_TABLE_NAME
+        + " SET updated_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+  }
+
+  public String getGroupUpdatedAt(
+      @Param("metalakeName") String metalakeName, @Param("groupName") String groupName) {
+    return "SELECT gm.group_id as groupId, gm.updated_at as updatedAt"
+        + " FROM "
+        + GROUP_TABLE_NAME
+        + " gm"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON gm.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
+        + " WHERE mm.metalake_name = #{metalakeName} AND gm.group_name = #{groupName}"
+        + " AND gm.deleted_at = 0";
+  }
 }

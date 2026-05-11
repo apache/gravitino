@@ -28,15 +28,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.lancedb.lance.Dataset;
-import com.lancedb.lance.Fragment;
-import com.lancedb.lance.FragmentMetadata;
-import com.lancedb.lance.ReadOptions;
-import com.lancedb.lance.Transaction;
-import com.lancedb.lance.WriteParams;
-import com.lancedb.lance.ipc.LanceScanner;
-import com.lancedb.lance.ipc.ScanOptions;
-import com.lancedb.lance.operation.Append;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -76,6 +67,15 @@ import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.lance.Dataset;
+import org.lance.Fragment;
+import org.lance.FragmentMetadata;
+import org.lance.ReadOptions;
+import org.lance.Transaction;
+import org.lance.WriteParams;
+import org.lance.ipc.LanceScanner;
+import org.lance.ipc.ScanOptions;
+import org.lance.operation.Append;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -438,16 +438,18 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
       root.setRowCount(index);
 
       fragmentMetas =
-          Fragment.create(
-              getFilePath(tableId),
-              allocator,
-              root,
-              new WriteParams.Builder()
-                  .withMaxRowsPerFile(maxRowsPerFile)
-                  .withMaxBytesPerFile(maxBytesPerFile)
-                  .withMaxRowsPerGroup(maxRowsPerGroup)
-                  .withStorageOptions(properties)
-                  .build());
+          Fragment.write()
+              .datasetUri(getFilePath(tableId))
+              .allocator(allocator)
+              .data(root)
+              .writeParams(
+                  new WriteParams.Builder()
+                      .withMaxRowsPerFile(maxRowsPerFile)
+                      .withMaxBytesPerFile(maxBytesPerFile)
+                      .withMaxRowsPerGroup(maxRowsPerGroup)
+                      .withStorageOptions(properties)
+                      .build())
+              .execute();
       return fragmentMetas;
     }
   }
@@ -581,16 +583,23 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
   private Dataset open(String fileName) {
     try {
-      return Dataset.open(
-          allocator,
-          fileName,
-          new ReadOptions.Builder()
-              .setMetadataCacheSizeBytes(metadataFileCacheSize)
-              .setIndexCacheSizeBytes(indexCacheSize)
-              .build());
+      return Dataset.open()
+          .allocator(allocator)
+          .uri(fileName)
+          .readOptions(
+              new ReadOptions.Builder()
+                  .setMetadataCacheSizeBytes(metadataFileCacheSize)
+                  .setIndexCacheSizeBytes(indexCacheSize)
+                  .build())
+          .build();
     } catch (IllegalArgumentException illegalArgumentException) {
       if (illegalArgumentException.getMessage().contains("was not found")) {
-        return Dataset.create(allocator, fileName, SCHEMA, new WriteParams.Builder().build());
+        return Dataset.write()
+            .allocator(allocator)
+            .schema(SCHEMA)
+            .uri(fileName)
+            .mode(WriteParams.WriteMode.CREATE)
+            .execute();
       } else {
         throw illegalArgumentException;
       }
