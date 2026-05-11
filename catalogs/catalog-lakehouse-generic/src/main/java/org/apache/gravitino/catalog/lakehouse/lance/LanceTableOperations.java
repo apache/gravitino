@@ -23,14 +23,6 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.lancedb.lance.Dataset;
-import com.lancedb.lance.ReadOptions;
-import com.lancedb.lance.WriteParams;
-import com.lancedb.lance.index.DistanceType;
-import com.lancedb.lance.index.IndexParams;
-import com.lancedb.lance.index.IndexType;
-import com.lancedb.lance.index.vector.VectorIndexParams;
-import com.lancedb.lance.schema.ColumnAlteration;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -61,6 +53,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
 import org.lance.Dataset;
+import org.lance.ReadOptions;
 import org.lance.WriteParams;
 import org.lance.index.DistanceType;
 import org.lance.index.IndexOptions;
