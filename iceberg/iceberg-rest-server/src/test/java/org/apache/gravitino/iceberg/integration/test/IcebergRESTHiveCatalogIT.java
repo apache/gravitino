@@ -35,7 +35,7 @@ public class IcebergRESTHiveCatalogIT extends IcebergRESTServiceIT {
   protected static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
   @Override
-  protected boolean supportsNestedNamespaces() {
+  protected boolean supportsHierarchicalSchema() {
     return false;
   }
 

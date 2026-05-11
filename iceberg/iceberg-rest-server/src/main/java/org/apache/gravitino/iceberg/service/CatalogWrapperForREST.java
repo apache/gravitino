@@ -775,7 +775,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       tableBuilder.withPartitionSpec(changedTableMeta.spec());
       tableBuilder.withSortOrder(changedTableMeta.sortOrder());
       tableBuilder.withLocation(changedTableMeta.location());
+<<<<<<< HEAD
       tableBuilder.withProperty(FORMAT_VERSION, String.valueOf(changedTableMeta.formatVersion()));
+=======
+>>>>>>> e64b4332a (feat(iceberg-rest): nested namespace support via hooks and REST catalog wrapper)
       tableBuilder.withProperties(changedTableMeta.properties());
 
       Transaction transaction = tableBuilder.createOrReplaceTransaction();

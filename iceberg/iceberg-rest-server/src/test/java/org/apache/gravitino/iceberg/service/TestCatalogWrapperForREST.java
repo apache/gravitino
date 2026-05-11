@@ -53,7 +53,10 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.io.FileIO;
+<<<<<<< HEAD
 import org.apache.iceberg.io.ResolvingFileIO;
+=======
+>>>>>>> e64b4332a (feat(iceberg-rest): nested namespace support via hooks and REST catalog wrapper)
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
@@ -152,6 +155,7 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
+<<<<<<< HEAD
   void testCatalogConfigToClientsIncludesResolvingFileIO() {
     IcebergConfig config =
         new IcebergConfig(
@@ -172,6 +176,8 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
+=======
+>>>>>>> e64b4332a (feat(iceberg-rest): nested namespace support via hooks and REST catalog wrapper)
   void testNonRestCatalogClientConfig() {
     Catalog catalog = mock(Catalog.class);
     IcebergConfig config =
@@ -397,7 +403,10 @@ public class TestCatalogWrapperForREST {
     when(tableBuilder.withPartitionSpec(any())).thenReturn(tableBuilder);
     when(tableBuilder.withSortOrder(any())).thenReturn(tableBuilder);
     when(tableBuilder.withLocation(any())).thenReturn(tableBuilder);
+<<<<<<< HEAD
     when(tableBuilder.withProperty(anyString(), anyString())).thenReturn(tableBuilder);
+=======
+>>>>>>> e64b4332a (feat(iceberg-rest): nested namespace support via hooks and REST catalog wrapper)
     when(tableBuilder.withProperties(any())).thenReturn(tableBuilder);
     when(tableBuilder.createOrReplaceTransaction()).thenReturn(baseTransaction);
     when(baseTransaction.underlyingOps()).thenReturn(ops);
@@ -423,26 +432,42 @@ public class TestCatalogWrapperForREST {
     CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
 
     Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+<<<<<<< HEAD
     Optional<Integer> upgradeFormat = Optional.of(3);
     UpdateTableRequest request =
         new UpdateTableRequest(
             List.of(new UpdateRequirement.AssertTableDoesNotExist()),
             stagedCreateMetadataUpdates(schema, upgradeFormat));
+=======
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()),
+            stagedCreateMetadataUpdates(schema, Optional.of(3)));
+>>>>>>> e64b4332a (feat(iceberg-rest): nested namespace support via hooks and REST catalog wrapper)
 
     Assertions.assertDoesNotThrow(
         () -> wrapper.updateTable(TableIdentifier.of("db", "tbl"), request));
 
     verify(tableBuilder).withPartitionSpec(any());
     verify(tableBuilder).withSortOrder(any());
+<<<<<<< HEAD
     verify(tableBuilder)
         .withProperty(
             "format-version", expectedFormatVersionStringAfterStagedUpdates(schema, upgradeFormat));
     verify(tableBuilder).withProperties(any());
+=======
+    verify(tableBuilder).withProperties(any());
+    verify(tableBuilder, never()).withProperty(anyString(), anyString());
+>>>>>>> e64b4332a (feat(iceberg-rest): nested namespace support via hooks and REST catalog wrapper)
     verify(tableBuilder).createOrReplaceTransaction();
   }
 
   @Test
+<<<<<<< HEAD
   void testStagedCreateSetsFormatVersionWhenNoUpgradeFormatUpdate() {
+=======
+  void testStagedCreateOmitsFormatWithProperty() {
+>>>>>>> e64b4332a (feat(iceberg-rest): nested namespace support via hooks and REST catalog wrapper)
     RESTCatalog catalog = mock(RESTCatalog.class);
     Catalog.TableBuilder tableBuilder = mock(Catalog.TableBuilder.class);
     BaseTransaction baseTransaction = mock(BaseTransaction.class);
@@ -452,7 +477,10 @@ public class TestCatalogWrapperForREST {
     when(tableBuilder.withPartitionSpec(any())).thenReturn(tableBuilder);
     when(tableBuilder.withSortOrder(any())).thenReturn(tableBuilder);
     when(tableBuilder.withLocation(any())).thenReturn(tableBuilder);
+<<<<<<< HEAD
     when(tableBuilder.withProperty(anyString(), anyString())).thenReturn(tableBuilder);
+=======
+>>>>>>> e64b4332a (feat(iceberg-rest): nested namespace support via hooks and REST catalog wrapper)
     when(tableBuilder.withProperties(any())).thenReturn(tableBuilder);
     when(tableBuilder.createOrReplaceTransaction()).thenReturn(baseTransaction);
     when(baseTransaction.underlyingOps()).thenReturn(ops);
@@ -478,15 +506,23 @@ public class TestCatalogWrapperForREST {
     CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
 
     Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+<<<<<<< HEAD
     Optional<Integer> noExplicitUpgrade = Optional.empty();
     UpdateTableRequest request =
         new UpdateTableRequest(
             List.of(new UpdateRequirement.AssertTableDoesNotExist()),
             stagedCreateMetadataUpdates(schema, noExplicitUpgrade));
+=======
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            List.of(new UpdateRequirement.AssertTableDoesNotExist()),
+            stagedCreateMetadataUpdates(schema, Optional.empty()));
+>>>>>>> e64b4332a (feat(iceberg-rest): nested namespace support via hooks and REST catalog wrapper)
 
     Assertions.assertDoesNotThrow(
         () -> wrapper.updateTable(TableIdentifier.of("db", "tbl"), request));
 
+<<<<<<< HEAD
     verify(tableBuilder)
         .withProperty(
             "format-version",
@@ -509,6 +545,9 @@ public class TestCatalogWrapperForREST {
         formatVersion.map(TableMetadata::buildFromEmpty).orElse(TableMetadata.buildFromEmpty());
     updates.forEach(update -> update.applyTo(changedMetadata));
     return String.valueOf(changedMetadata.build().formatVersion());
+=======
+    verify(tableBuilder, never()).withProperty(anyString(), anyString());
+>>>>>>> e64b4332a (feat(iceberg-rest): nested namespace support via hooks and REST catalog wrapper)
   }
 
   /**
