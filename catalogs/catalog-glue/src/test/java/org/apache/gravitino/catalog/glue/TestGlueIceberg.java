@@ -104,26 +104,26 @@ class TestGlueIceberg {
   }
 
   // ---------------------------------------------------------------------------
-  // hiveTypeToDoc
+  // hiveTypeToIcebergType
   // ---------------------------------------------------------------------------
 
   @Test
   void testHiveTypeToDoc_primitives() {
-    assertEquals("long", GlueIcebergHelper.hiveTypeToDoc("bigint").asString());
-    assertEquals("int", GlueIcebergHelper.hiveTypeToDoc("int").asString());
-    assertEquals("int", GlueIcebergHelper.hiveTypeToDoc("smallint").asString());
-    assertEquals("float", GlueIcebergHelper.hiveTypeToDoc("float").asString());
-    assertEquals("double", GlueIcebergHelper.hiveTypeToDoc("double").asString());
-    assertEquals("boolean", GlueIcebergHelper.hiveTypeToDoc("boolean").asString());
-    assertEquals("binary", GlueIcebergHelper.hiveTypeToDoc("binary").asString());
-    assertEquals("date", GlueIcebergHelper.hiveTypeToDoc("date").asString());
-    assertEquals("timestamp", GlueIcebergHelper.hiveTypeToDoc("timestamp").asString());
-    assertEquals("string", GlueIcebergHelper.hiveTypeToDoc("string").asString());
+    assertEquals("long", GlueIcebergHelper.hiveTypeToIcebergType("bigint").asString());
+    assertEquals("int", GlueIcebergHelper.hiveTypeToIcebergType("int").asString());
+    assertEquals("int", GlueIcebergHelper.hiveTypeToIcebergType("smallint").asString());
+    assertEquals("float", GlueIcebergHelper.hiveTypeToIcebergType("float").asString());
+    assertEquals("double", GlueIcebergHelper.hiveTypeToIcebergType("double").asString());
+    assertEquals("boolean", GlueIcebergHelper.hiveTypeToIcebergType("boolean").asString());
+    assertEquals("binary", GlueIcebergHelper.hiveTypeToIcebergType("binary").asString());
+    assertEquals("date", GlueIcebergHelper.hiveTypeToIcebergType("date").asString());
+    assertEquals("timestamp", GlueIcebergHelper.hiveTypeToIcebergType("timestamp").asString());
+    assertEquals("string", GlueIcebergHelper.hiveTypeToIcebergType("string").asString());
   }
 
   @Test
   void testHiveTypeToDoc_decimal() {
-    var doc = GlueIcebergHelper.hiveTypeToDoc("decimal(18,2)");
+    var doc = GlueIcebergHelper.hiveTypeToIcebergType("decimal(18,2)");
     var m = doc.asMap();
     assertEquals("decimal", m.get("type").asString());
     assertEquals(18, m.get("precision").asNumber().intValue());
@@ -132,35 +132,45 @@ class TestGlueIceberg {
 
   @Test
   void testHiveTypeToDoc_varchar() {
-    assertEquals("string", GlueIcebergHelper.hiveTypeToDoc("varchar(255)").asString());
+    assertEquals("string", GlueIcebergHelper.hiveTypeToIcebergType("varchar(255)").asString());
   }
 
   // ---------------------------------------------------------------------------
-  // gravitinoTypeToDoc
+  // gravitinoTypeToIcebergType
   // ---------------------------------------------------------------------------
 
   @Test
   void testGravitinoTypeToDoc_primitives() {
-    assertEquals("long", GlueIcebergHelper.gravitinoTypeToDoc(Types.LongType.get()).asString());
-    assertEquals("int", GlueIcebergHelper.gravitinoTypeToDoc(Types.IntegerType.get()).asString());
-    assertEquals("float", GlueIcebergHelper.gravitinoTypeToDoc(Types.FloatType.get()).asString());
-    assertEquals("double", GlueIcebergHelper.gravitinoTypeToDoc(Types.DoubleType.get()).asString());
     assertEquals(
-        "boolean", GlueIcebergHelper.gravitinoTypeToDoc(Types.BooleanType.get()).asString());
-    assertEquals("string", GlueIcebergHelper.gravitinoTypeToDoc(Types.StringType.get()).asString());
-    assertEquals("date", GlueIcebergHelper.gravitinoTypeToDoc(Types.DateType.get()).asString());
+        "long", GlueIcebergHelper.gravitinoTypeToIcebergType(Types.LongType.get()).asString());
+    assertEquals(
+        "int", GlueIcebergHelper.gravitinoTypeToIcebergType(Types.IntegerType.get()).asString());
+    assertEquals(
+        "float", GlueIcebergHelper.gravitinoTypeToIcebergType(Types.FloatType.get()).asString());
+    assertEquals(
+        "double", GlueIcebergHelper.gravitinoTypeToIcebergType(Types.DoubleType.get()).asString());
+    assertEquals(
+        "boolean",
+        GlueIcebergHelper.gravitinoTypeToIcebergType(Types.BooleanType.get()).asString());
+    assertEquals(
+        "string", GlueIcebergHelper.gravitinoTypeToIcebergType(Types.StringType.get()).asString());
+    assertEquals(
+        "date", GlueIcebergHelper.gravitinoTypeToIcebergType(Types.DateType.get()).asString());
     assertEquals(
         "timestamp",
-        GlueIcebergHelper.gravitinoTypeToDoc(Types.TimestampType.withoutTimeZone()).asString());
+        GlueIcebergHelper.gravitinoTypeToIcebergType(Types.TimestampType.withoutTimeZone())
+            .asString());
     assertEquals(
         "timestamptz",
-        GlueIcebergHelper.gravitinoTypeToDoc(Types.TimestampType.withTimeZone()).asString());
-    assertEquals("uuid", GlueIcebergHelper.gravitinoTypeToDoc(Types.UUIDType.get()).asString());
+        GlueIcebergHelper.gravitinoTypeToIcebergType(Types.TimestampType.withTimeZone())
+            .asString());
+    assertEquals(
+        "uuid", GlueIcebergHelper.gravitinoTypeToIcebergType(Types.UUIDType.get()).asString());
   }
 
   @Test
   void testGravitinoTypeToDoc_decimal() {
-    var doc = GlueIcebergHelper.gravitinoTypeToDoc(Types.DecimalType.of(10, 3));
+    var doc = GlueIcebergHelper.gravitinoTypeToIcebergType(Types.DecimalType.of(10, 3));
     var m = doc.asMap();
     assertEquals("decimal", m.get("type").asString());
     assertEquals(10, m.get("precision").asNumber().intValue());
@@ -171,7 +181,7 @@ class TestGlueIceberg {
   void testGravitinoTypeToDoc_unsupported() {
     assertThrows(
         UnsupportedOperationException.class,
-        () -> GlueIcebergHelper.gravitinoTypeToDoc(Types.NullType.get()));
+        () -> GlueIcebergHelper.gravitinoTypeToIcebergType(Types.NullType.get()));
   }
 
   // ---------------------------------------------------------------------------
@@ -321,13 +331,15 @@ class TestGlueIceberg {
   void testHiveTypeToDoc_unknownTypeThrows() {
     // Complex types (array, map, struct) in existing Iceberg schema must abort, not silently retype
     assertThrows(
-        IllegalStateException.class, () -> GlueIcebergHelper.hiveTypeToDoc("array<string>"));
+        IllegalStateException.class,
+        () -> GlueIcebergHelper.hiveTypeToIcebergType("array<string>"));
   }
 
   @Test
   void testHiveTypeToDoc_malformedDecimalThrows() {
     assertThrows(
-        IllegalStateException.class, () -> GlueIcebergHelper.hiveTypeToDoc("decimal(abc,2)"));
+        IllegalStateException.class,
+        () -> GlueIcebergHelper.hiveTypeToIcebergType("decimal(abc,2)"));
   }
 
   // ---------------------------------------------------------------------------
@@ -439,7 +451,7 @@ class TestGlueIceberg {
 
   @Test
   void testHiveTypeToDoc_nullFallsBackToString() {
-    assertEquals("string", GlueIcebergHelper.hiveTypeToDoc(null).asString());
+    assertEquals("string", GlueIcebergHelper.hiveTypeToIcebergType(null).asString());
   }
 
   @Test

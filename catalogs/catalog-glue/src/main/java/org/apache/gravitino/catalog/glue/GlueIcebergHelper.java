@@ -152,7 +152,7 @@ final class GlueIcebergHelper {
             IcebergStructField.builder()
                 .id(++maxId)
                 .name(add.fieldName()[0])
-                .type(gravitinoTypeToDoc(add.getDataType()))
+                .type(gravitinoTypeToIcebergType(add.getDataType()))
                 .required(!add.isNullable())
                 .doc(add.getComment())
                 .build());
@@ -178,7 +178,7 @@ final class GlueIcebergHelper {
         TableChange.UpdateColumnType upd = (TableChange.UpdateColumnType) change;
         Preconditions.checkArgument(
             upd.fieldName().length == 1, "Nested column type updates are not supported");
-        Document newTypeDoc = gravitinoTypeToDoc(upd.getNewDataType());
+        Document newTypeDoc = gravitinoTypeToIcebergType(upd.getNewDataType());
         updateField(fields, upd.fieldName()[0], b -> b.type(newTypeDoc));
 
       } else if (change instanceof TableChange.UpdateColumnComment) {
@@ -242,7 +242,7 @@ final class GlueIcebergHelper {
           IcebergStructField.builder()
               .id(fieldId)
               .name(col.name())
-              .type(hiveTypeToDoc(col.type()))
+              .type(hiveTypeToIcebergType(col.type()))
               .required(required)
               .doc(col.comment())
               .build());
@@ -324,7 +324,7 @@ final class GlueIcebergHelper {
    * bigint}). Complex types (array, map, struct) are not supported and will throw {@link
    * IllegalStateException}.
    */
-  static Document hiveTypeToDoc(String hiveType) {
+  static Document hiveTypeToIcebergType(String hiveType) {
     if (hiveType == null) return Document.fromString(STRING);
     String t = hiveType.toLowerCase(Locale.ROOT).trim();
 
@@ -396,7 +396,7 @@ final class GlueIcebergHelper {
    * <p>Supports primitive types. Complex types (list, map, struct) are not supported and will throw
    * {@link UnsupportedOperationException}.
    */
-  static Document gravitinoTypeToDoc(Type type) {
+  static Document gravitinoTypeToIcebergType(Type type) {
     if (type instanceof Types.StringType
         || type instanceof Types.VarCharType
         || type instanceof Types.FixedCharType) {
