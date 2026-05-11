@@ -29,13 +29,13 @@ import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to create a built-in IdP user. */
+/** Represents a request to add a built-in IdP user. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
-public class CreateUserRequest implements RESTRequest {
+public class AddUserRequest implements RESTRequest {
 
   @JsonProperty("user")
   private final String user;
@@ -44,25 +44,25 @@ public class CreateUserRequest implements RESTRequest {
   @ToString.Exclude
   private final String password;
 
-  /** Default constructor for CreateUserRequest. (Used for Jackson deserialization.) */
-  public CreateUserRequest() {
+  /** Default constructor for AddUserRequest. (Used for Jackson deserialization.) */
+  public AddUserRequest() {
     this(null, null);
   }
 
   /**
-   * Creates a new CreateUserRequest.
+   * Creates a new AddUserRequest.
    *
    * @param user The user name of the built-in IdP user.
    * @param password The password of the built-in IdP user.
    */
-  public CreateUserRequest(String user, String password) {
+  public AddUserRequest(String user, String password) {
     super();
     this.user = user;
     this.password = password;
   }
 
   /**
-   * Validates the {@link CreateUserRequest} request.
+   * Validates the {@link AddUserRequest} request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */

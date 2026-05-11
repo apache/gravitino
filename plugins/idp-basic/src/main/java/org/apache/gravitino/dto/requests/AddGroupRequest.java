@@ -29,34 +29,34 @@ import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to create a built-in IdP group. */
+/** Represents a request to add a built-in IdP group. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
-public class CreateGroupRequest implements RESTRequest {
+public class AddGroupRequest implements RESTRequest {
 
   @JsonProperty("group")
   private final String group;
 
-  /** Default constructor for CreateGroupRequest. (Used for Jackson deserialization.) */
-  public CreateGroupRequest() {
+  /** Default constructor for AddGroupRequest. (Used for Jackson deserialization.) */
+  public AddGroupRequest() {
     this(null);
   }
 
   /**
-   * Creates a new CreateGroupRequest.
+   * Creates a new AddGroupRequest.
    *
    * @param group The group name of the built-in IdP group.
    */
-  public CreateGroupRequest(String group) {
+  public AddGroupRequest(String group) {
     super();
     this.group = group;
   }
 
   /**
-   * Validates the {@link CreateGroupRequest} request.
+   * Validates the {@link AddGroupRequest} request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */

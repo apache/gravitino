@@ -24,26 +24,25 @@ import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestCreateUserRequest {
+public class TestAddUserRequest {
 
   @Test
-  public void testCreateUserRequestSerDe() throws JsonProcessingException {
-    CreateUserRequest request = new CreateUserRequest("test_user", "password");
+  public void testAddUserRequestSerDe() throws JsonProcessingException {
+    AddUserRequest request = new AddUserRequest("test_user", "password");
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
-    CreateUserRequest deserRequest =
-        JsonUtils.objectMapper().readValue(serJson, CreateUserRequest.class);
+    AddUserRequest deserRequest = JsonUtils.objectMapper().readValue(serJson, AddUserRequest.class);
 
     Assertions.assertEquals(request, deserRequest);
     Assertions.assertEquals("test_user", deserRequest.getUser());
     Assertions.assertEquals("password", deserRequest.getPassword());
 
     // Test with null user and password
-    CreateUserRequest request1 = new CreateUserRequest();
+    AddUserRequest request1 = new AddUserRequest();
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(request1);
-    CreateUserRequest deserRequest1 =
-        JsonUtils.objectMapper().readValue(serJson1, CreateUserRequest.class);
+    AddUserRequest deserRequest1 =
+        JsonUtils.objectMapper().readValue(serJson1, AddUserRequest.class);
 
     Assertions.assertEquals(request1, deserRequest1);
     Assertions.assertNull(deserRequest1.getUser());
@@ -51,19 +50,18 @@ public class TestCreateUserRequest {
   }
 
   @Test
-  public void testCreateUserRequestValidate() {
-    Assertions.assertDoesNotThrow(() -> new CreateUserRequest("test_user", "password").validate());
+  public void testAddUserRequestValidate() {
+    Assertions.assertDoesNotThrow(() -> new AddUserRequest("test_user", "password").validate());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new AddUserRequest().validate());
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new CreateUserRequest().validate());
+        IllegalArgumentException.class, () -> new AddUserRequest(" ", "password").validate());
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new CreateUserRequest(" ", "password").validate());
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new CreateUserRequest("test_user", " ").validate());
+        IllegalArgumentException.class, () -> new AddUserRequest("test_user", " ").validate());
   }
 
   @Test
-  public void testCreateUserRequestToStringDoesNotExposePassword() {
-    String requestString = new CreateUserRequest("test_user", "password").toString();
+  public void testAddUserRequestToStringDoesNotExposePassword() {
+    String requestString = new AddUserRequest("test_user", "password").toString();
 
     Assertions.assertTrue(requestString.contains("test_user"));
     Assertions.assertFalse(requestString.contains("password="));

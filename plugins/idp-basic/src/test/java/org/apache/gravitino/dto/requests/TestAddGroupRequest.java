@@ -24,36 +24,35 @@ import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestCreateGroupRequest {
+public class TestAddGroupRequest {
 
   @Test
-  public void testCreateGroupRequestSerDe() throws JsonProcessingException {
-    CreateGroupRequest request = new CreateGroupRequest("test_group");
+  public void testAddGroupRequestSerDe() throws JsonProcessingException {
+    AddGroupRequest request = new AddGroupRequest("test_group");
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
-    CreateGroupRequest deserRequest =
-        JsonUtils.objectMapper().readValue(serJson, CreateGroupRequest.class);
+    AddGroupRequest deserRequest =
+        JsonUtils.objectMapper().readValue(serJson, AddGroupRequest.class);
 
     Assertions.assertEquals(request, deserRequest);
     Assertions.assertEquals("test_group", deserRequest.getGroup());
 
     // Test with null group
-    CreateGroupRequest request1 = new CreateGroupRequest();
+    AddGroupRequest request1 = new AddGroupRequest();
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(request1);
-    CreateGroupRequest deserRequest1 =
-        JsonUtils.objectMapper().readValue(serJson1, CreateGroupRequest.class);
+    AddGroupRequest deserRequest1 =
+        JsonUtils.objectMapper().readValue(serJson1, AddGroupRequest.class);
 
     Assertions.assertEquals(request1, deserRequest1);
     Assertions.assertNull(deserRequest1.getGroup());
   }
 
   @Test
-  public void testCreateGroupRequestValidate() {
-    Assertions.assertDoesNotThrow(() -> new CreateGroupRequest("test_group").validate());
+  public void testAddGroupRequestValidate() {
+    Assertions.assertDoesNotThrow(() -> new AddGroupRequest("test_group").validate());
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new AddGroupRequest().validate());
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new CreateGroupRequest().validate());
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new CreateGroupRequest(" ").validate());
+        IllegalArgumentException.class, () -> new AddGroupRequest(" ").validate());
   }
 }
