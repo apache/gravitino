@@ -68,6 +68,9 @@ final class ClickHouseTableSqlUtils {
 
   static String toPartitionExpression(Transform transform) {
     Preconditions.checkArgument(transform != null, "Partition transform cannot be null");
+    Preconditions.checkArgument(
+        isSupportedPartitionTransform(transform),
+        "Unsupported partition transform: " + transform.name());
     String fieldName = partitionFieldName(transform);
 
     if (StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_IDENTITY)) {
@@ -79,7 +82,7 @@ final class ClickHouseTableSqlUtils {
     } else if (StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_DAY)) {
       return "toDate(%s)".formatted(quoteIdentifier(fieldName));
     }
-    throw new IllegalArgumentException("Unsupported partition transform: " + transform.name());
+    throw new IllegalStateException("Unexpected partition transform: " + transform.name());
   }
 
   static List<String> extractShardingKeyColumns(String shardingKey) {
@@ -246,5 +249,12 @@ final class ClickHouseTableSqlUtils {
         "ClickHouse only supports single column partitioning");
 
     return ((NamedReference) transform.arguments()[0]).fieldName()[0];
+  }
+
+  private static boolean isSupportedPartitionTransform(Transform transform) {
+    return StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_IDENTITY)
+        || StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_YEAR)
+        || StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_MONTH)
+        || StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_DAY);
   }
 }

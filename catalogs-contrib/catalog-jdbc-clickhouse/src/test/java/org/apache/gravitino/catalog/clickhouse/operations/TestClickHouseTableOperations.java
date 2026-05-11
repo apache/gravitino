@@ -945,6 +945,21 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             ClickHouseUtils.getSortOrders("c1"));
     Assertions.assertTrue(dayPartitionSql.contains("PARTITION BY toDate(`c1`)"));
 
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.buildCreateSql(
+                    "t_bucket",
+                    new JdbcColumn[] {col},
+                    null,
+                    propsWithPartition,
+                    new Transform[] {Transforms.bucket(8, new String[] {"c1"})},
+                    Distributions.NONE,
+                    indexes,
+                    ClickHouseUtils.getSortOrders("c1")));
+    Assertions.assertEquals("Unsupported partition transform: bucket", exception.getMessage());
+
     // distribution not NONE
     Assertions.assertThrows(
         IllegalArgumentException.class,
