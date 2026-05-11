@@ -53,6 +53,12 @@ public interface GroupMetaMapper {
   GroupPO selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
 
+  @SelectProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "batchSelectGroupMetaByMetalakeIdAndNames")
+  List<GroupPO> batchSelectGroupMetaByMetalakeIdAndNames(
+      @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames);
+
   @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "listGroupPOsByMetalake")
   List<GroupPO> listGroupPOsByMetalake(@Param("metalakeName") String metalakeName);
 
