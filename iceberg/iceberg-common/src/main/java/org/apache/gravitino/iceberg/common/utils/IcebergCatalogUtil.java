@@ -35,7 +35,6 @@ import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.ClosableHiveCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
-import org.apache.gravitino.iceberg.common.io.SwitchingFileIO;
 import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
 import org.apache.hadoop.hdfs.HdfsConfiguration;
 import org.apache.iceberg.CatalogProperties;
@@ -44,6 +43,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.hive.HiveCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
+import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
@@ -70,7 +70,7 @@ public class IcebergCatalogUtil {
     if (!resultProperties.containsKey(IcebergConstants.WAREHOUSE)) {
       resultProperties.put(IcebergConstants.WAREHOUSE, "/tmp");
     }
-    applyDefaultSwitchingFileIO(resultProperties);
+    applyDefaultResolvingFileIO(resultProperties);
     memoryCatalog.initialize(icebergCatalogName, resultProperties);
     return memoryCatalog;
   }
@@ -81,7 +81,7 @@ public class IcebergCatalogUtil {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
 
     Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
-    applyDefaultSwitchingFileIO(properties);
+    applyDefaultResolvingFileIO(properties);
     properties.forEach(hdfsConfiguration::set);
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(properties);
     if (authenticationConfig.isSimpleAuth()) {
@@ -108,7 +108,7 @@ public class IcebergCatalogUtil {
     String icebergCatalogName = icebergConfig.getCatalogBackendName();
 
     Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
-    applyDefaultSwitchingFileIO(properties);
+    applyDefaultResolvingFileIO(properties);
     try {
       // Load the jdbc driver
       Class.forName(driverClassName);
@@ -142,7 +142,7 @@ public class IcebergCatalogUtil {
     RESTCatalog restCatalog = new RESTCatalog();
     HdfsConfiguration hdfsConfiguration = new HdfsConfiguration();
     Map<String, String> properties = Maps.newHashMap(icebergConfig.getIcebergCatalogProperties());
-    applyDefaultSwitchingFileIO(properties);
+    applyDefaultResolvingFileIO(properties);
 
     // REST catalog must use forward access token from the user request
     properties.put(AuthProperties.AUTH_TYPE, UserPrincipalForwardingAuthManager.class.getName());
@@ -157,14 +157,14 @@ public class IcebergCatalogUtil {
     String customCatalogName = icebergConfig.getCatalogBackendName();
     String className = icebergConfig.get(IcebergConfig.CATALOG_BACKEND_IMPL);
     Map<String, String> properties = icebergConfig.getIcebergCatalogProperties();
-    applyDefaultSwitchingFileIO(properties);
+    applyDefaultResolvingFileIO(properties);
     return CatalogUtil.loadCatalog(
         className, customCatalogName, properties, new HdfsConfiguration());
   }
 
   @VisibleForTesting
-  public static void applyDefaultSwitchingFileIO(Map<String, String> properties) {
-    properties.putIfAbsent(IcebergConstants.IO_IMPL, SwitchingFileIO.class.getName());
+  public static void applyDefaultResolvingFileIO(Map<String, String> properties) {
+    properties.putIfAbsent(IcebergConstants.IO_IMPL, ResolvingFileIO.class.getName());
   }
 
   @VisibleForTesting

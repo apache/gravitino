@@ -169,24 +169,24 @@ public class TestIcebergCatalogUtil {
   }
 
   @Test
-  void testApplyDefaultSwitchingFileIOWhenMissing() {
+  void testApplyDefaultResolvingFileIOWhenMissing() {
     Map<String, String> properties = new HashMap<>();
     properties.put(IcebergConstants.WAREHOUSE, "s3://bucket/warehouse");
 
-    IcebergCatalogUtil.applyDefaultSwitchingFileIO(properties);
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
 
     Assertions.assertEquals(
-        "org.apache.gravitino.iceberg.common.io.SwitchingFileIO",
+        org.apache.iceberg.io.ResolvingFileIO.class.getName(),
         properties.get(IcebergConstants.IO_IMPL));
   }
 
   @Test
-  void testApplyDefaultSwitchingFileIODoesNotOverrideExplicitIOImpl() {
+  void testApplyDefaultResolvingFileIODoesNotOverrideExplicitIOImpl() {
     Map<String, String> properties = new HashMap<>();
     properties.put(IcebergConstants.WAREHOUSE, "s3://bucket/warehouse");
     properties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO");
 
-    IcebergCatalogUtil.applyDefaultSwitchingFileIO(properties);
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
 
     Assertions.assertEquals(
         "org.apache.iceberg.aws.s3.S3FileIO", properties.get(IcebergConstants.IO_IMPL));

@@ -48,7 +48,6 @@ import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
 import org.apache.gravitino.storage.GCSProperties;
@@ -99,7 +98,6 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private final CatalogCredentialManager catalogCredentialManager;
-  private final boolean useSwitchingFileIO;
 
   private volatile Map<String, String> catalogConfigToClients;
   private final Object catalogConfigToClientsLock = new Object();
@@ -133,8 +131,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     Map<String, String> catalogProperties =
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
-    this.useSwitchingFileIO =
-        !config.getIcebergCatalogProperties().containsKey(IcebergConstants.IO_IMPL);
     this.scanPlanCache = loadScanPlanCache(config);
   }
 
@@ -146,7 +142,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     } else {
       loadTableResponse = super.createTable(namespace, request);
     }
-    loadTableResponse = rewriteTableFileIOByLocation(loadTableResponse, useSwitchingFileIO);
     if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(
           TableIdentifier.of(namespace, request.name()),
@@ -164,7 +159,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     } else {
       loadTableResponse = super.loadTable(identifier);
     }
-    loadTableResponse = rewriteTableFileIOByLocation(loadTableResponse, useSwitchingFileIO);
     if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       return injectCredentialConfig(identifier, loadTableResponse, privilege);
     }
@@ -174,7 +168,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
     LoadTableResponse loadTableResponse = super.registerTable(namespace, request);
-    loadTableResponse = rewriteTableFileIOByLocation(loadTableResponse, useSwitchingFileIO);
     if (shouldGenerateCredential(loadTableResponse, requestCredential)) {
       // Vend WRITE credentials: the registering user becomes the table owner
       // (IcebergNamespaceHookDispatcher.setTableOwner runs after this call
@@ -193,8 +186,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     if (isRESTCatalog()) {
       return tableUpdateInternal(tableIdentifier, updateTableRequest);
     } else {
-      return rewriteTableFileIOByLocation(
-          super.updateTable(tableIdentifier, updateTableRequest), useSwitchingFileIO);
+      return super.updateTable(tableIdentifier, updateTableRequest);
     }
   }
 
@@ -259,8 +251,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     synchronized (catalogConfigToClientsLock) {
       if (catalogConfigToClients == null) {
-        catalogConfigToClients =
-            buildCatalogConfigToClients(getIcebergConfig(), getCatalog(), useSwitchingFileIO);
+        catalogConfigToClients = buildCatalogConfigToClients(getIcebergConfig(), getCatalog());
       }
       return catalogConfigToClients;
     }
@@ -272,14 +263,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * <p>For {@link RESTCatalog}, uses {@link RESTCatalog#properties()} so defaults reflect the
    * remote catalog's config response merged with client properties (after REST handshake), not only
    * static Gravitino catalog configuration.
+   *
+   * <p>{@link IcebergConstants#IO_IMPL} is passed through when present (e.g. Iceberg {@link
+   * org.apache.iceberg.io.ResolvingFileIO}), so clients multiplex by URI scheme without server-side
+   * rewriting per table.
    */
   @VisibleForTesting
   static Map<String, String> buildCatalogConfigToClients(IcebergConfig config, Catalog catalog) {
-    return buildCatalogConfigToClients(config, catalog, false);
-  }
-
-  static Map<String, String> buildCatalogConfigToClients(
-      IcebergConfig config, Catalog catalog, boolean useSwitchingFileIOForClients) {
     Map<String, String> sourceProps;
     if (catalog instanceof RESTCatalog) {
       Map<String, String> merged = ((RESTCatalog) catalog).properties();
@@ -291,9 +281,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     Map<String, String> filtered =
         MapUtils.getFilteredMap(sourceProps, key -> catalogPropertiesToClientKeys.contains(key));
     filtered = new HashMap<>(filtered);
-    if (useSwitchingFileIOForClients) {
-      filtered.remove(IcebergConstants.IO_IMPL);
-    }
     validateAndNormalizeDataAccessProperty(filtered);
 
     return Collections.unmodifiableMap(filtered);
@@ -320,28 +307,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
               + DATA_ACCESS_REMOTE_SIGNING
               + "]");
     }
-  }
-
-  @VisibleForTesting
-  static void setFileIOByLocation(
-      Map<String, String> properties, String location, boolean useSwitchingFileIO) {
-    if (!useSwitchingFileIO) {
-      return;
-    }
-
-    IcebergCatalogUtil.resolveFileIOImplByLocation(location)
-        .ifPresent(resolvedImpl -> properties.put(IcebergConstants.IO_IMPL, resolvedImpl));
-  }
-
-  @VisibleForTesting
-  static LoadTableResponse rewriteTableFileIOByLocation(
-      LoadTableResponse response, boolean useSwitchingFileIO) {
-    Map<String, String> config = new HashMap<>(response.config());
-    setFileIOByLocation(config, response.tableMetadata().location(), useSwitchingFileIO);
-    return LoadTableResponse.builder()
-        .withTableMetadata(response.tableMetadata())
-        .addAllConfig(config)
-        .build();
   }
 
   @Override

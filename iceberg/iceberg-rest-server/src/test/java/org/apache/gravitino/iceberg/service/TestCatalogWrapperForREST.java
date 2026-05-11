@@ -31,7 +31,6 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,6 +53,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
@@ -152,99 +152,23 @@ public class TestCatalogWrapperForREST {
   }
 
   @Test
-  void testCatalogConfigToClientsResolvesSwitchingFileIOForClients() {
+  void testCatalogConfigToClientsIncludesResolvingFileIO() {
     IcebergConfig config =
         new IcebergConfig(
             ImmutableMap.of(
                 IcebergConstants.CATALOG_BACKEND,
                 "hive",
                 IcebergConstants.IO_IMPL,
-                "org.apache.gravitino.iceberg.common.io.SwitchingFileIO",
+                ResolvingFileIO.class.getName(),
                 IcebergConstants.WAREHOUSE,
                 "s3://bucket/warehouse"));
     Catalog catalog = mock(Catalog.class);
 
     Map<String, String> configToClients =
-        CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog, true);
-
-    Assertions.assertFalse(configToClients.containsKey(IcebergConstants.IO_IMPL));
-  }
-
-  @Test
-  void testCatalogConfigToClientsResolvesSwitchingFileIOForNonRestByWarehouse() {
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "hive",
-                IcebergConstants.IO_IMPL,
-                "org.apache.gravitino.iceberg.common.io.SwitchingFileIO",
-                IcebergConstants.WAREHOUSE,
-                "s3://bucket/warehouse"));
-    Catalog catalog = mock(Catalog.class);
-
-    Map<String, String> configToClients =
-        CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog, true);
-
-    Assertions.assertFalse(configToClients.containsKey(IcebergConstants.IO_IMPL));
-  }
-
-  @Test
-  void testSetFileIOByLocation() {
-    Map<String, String> properties =
-        new HashMap<>(
-            ImmutableMap.of(
-                IcebergConstants.IO_IMPL,
-                "org.apache.gravitino.iceberg.common.io.SwitchingFileIO"));
-
-    CatalogWrapperForREST.setFileIOByLocation(properties, "gs://bucket/warehouse", true);
+        CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog);
 
     Assertions.assertEquals(
-        "org.apache.iceberg.gcp.gcs.GCSFileIO", properties.get(IcebergConstants.IO_IMPL));
-  }
-
-  @Test
-  void testCatalogConfigToClientsKeepsExplicitSwitchingFileIO() {
-    IcebergConfig config =
-        new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "hive",
-                IcebergConstants.IO_IMPL,
-                "org.apache.gravitino.iceberg.common.io.SwitchingFileIO",
-                IcebergConstants.WAREHOUSE,
-                "s3://bucket/warehouse"));
-    Catalog catalog = mock(Catalog.class);
-
-    Map<String, String> configToClients =
-        CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog, false);
-
-    Assertions.assertEquals(
-        "org.apache.gravitino.iceberg.common.io.SwitchingFileIO",
-        configToClients.get(IcebergConstants.IO_IMPL));
-  }
-
-  @Test
-  void testRewriteTableFileIOByLocationForNonRest() {
-    TableMetadata metadata =
-        TableMetadata.newTableMetadata(
-            new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get())),
-            PartitionSpec.unpartitioned(),
-            SortOrder.unsorted(),
-            "gs://bucket/table",
-            ImmutableMap.of());
-    Map<String, String> config =
-        new HashMap<>(
-            ImmutableMap.of(
-                IcebergConstants.IO_IMPL,
-                "org.apache.gravitino.iceberg.common.io.SwitchingFileIO"));
-    LoadTableResponse response =
-        LoadTableResponse.builder().withTableMetadata(metadata).addAllConfig(config).build();
-
-    LoadTableResponse rewritten =
-        CatalogWrapperForREST.rewriteTableFileIOByLocation(response, true);
-    Assertions.assertEquals(
-        "org.apache.iceberg.gcp.gcs.GCSFileIO", rewritten.config().get(IcebergConstants.IO_IMPL));
+        ResolvingFileIO.class.getName(), configToClients.get(IcebergConstants.IO_IMPL));
   }
 
   @Test
