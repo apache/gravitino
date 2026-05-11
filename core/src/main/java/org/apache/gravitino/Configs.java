@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.audit.FileAuditWriter;
 import org.apache.gravitino.audit.v2.SimpleFormatterV2;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -499,6 +500,26 @@ public class Configs {
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(5 * 60 * 1000L); // Default is 5 minutes
+
+  public static final ConfigEntry<String> SCHEMA_SEPARATOR =
+      new ConfigBuilder("gravitino.schema.separator")
+          .doc(
+              "The separator used to represent HierarchicalSchema hierarchy in schema names at the "
+                  + "API boundary (e.g. ':' for 'A:B:C'). Schema names are stored internally in "
+                  + "EntityStore using ASCII-1 (\\u0001) as the physical separator. The "
+                  + "configured separator is only used at external API and catalog capability "
+                  + "validation layer. The internal physical separator and '.' must not be used "
+                  + "as the external separator.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  StringUtils.isNotBlank(value)
+                      && !value.contains(".")
+                      && !value.contains(HierarchicalSchemaUtil.physicalSeparator()),
+              ConfigConstants.NOT_BLANK_ERROR_MSG
+                  + " and must not contain '.' or the internal physical separator (\\u0001)")
+          .createWithDefault(":");
 
   public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS =
       new ConfigBuilder("gravitino.stats.partition.storageFactoryClass")

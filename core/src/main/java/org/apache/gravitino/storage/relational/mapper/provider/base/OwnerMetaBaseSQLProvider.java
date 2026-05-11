@@ -31,6 +31,7 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.po.OwnerRelDelete;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -122,6 +123,35 @@ public class OwnerMetaBaseSQLProvider {
         + " #{ownerRelPO.deletedAt},"
         + " #{ownerRelPO.updatedAt}"
         + ")";
+  }
+
+  public String batchInsertOwnerRels(@Param("ownerRelPOs") List<OwnerRelPO> ownerRelPOs) {
+    return "<script>"
+        + "INSERT INTO "
+        + OWNER_TABLE_NAME
+        + " (metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
+        + " audit_info, current_version, last_version, deleted_at, updated_at) VALUES "
+        + "<foreach collection='ownerRelPOs' item='po' separator=','>"
+        + "(#{po.metalakeId}, #{po.metadataObjectId}, #{po.metadataObjectType},"
+        + " #{po.ownerId}, #{po.ownerType}, #{po.auditInfo},"
+        + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt}, #{po.updatedAt})"
+        + "</foreach>"
+        + "</script>";
+  }
+
+  public String batchSoftDeleteOwnerRelByMetadataObjects(
+      @Param("targets") List<OwnerRelDelete> targets) {
+    return "<script>"
+        + "UPDATE "
+        + OWNER_TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE deleted_at = 0 AND ("
+        + "<foreach collection='targets' item='t' separator=' OR '>"
+        + "(metadata_object_id = #{t.metadataObjectId} AND metadata_object_type = #{t.metadataObjectType})"
+        + "</foreach>"
+        + ")"
+        + "</script>";
   }
 
   public String softDeleteOwnerRelByMetadataObjectIdAndType(

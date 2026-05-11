@@ -21,10 +21,12 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -298,6 +300,64 @@ public class PolicyMetaService {
                       .build())
           .collect(Collectors.toList());
 
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.POLICY, policyIdent.toString());
+      throw e;
+    }
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listAssociatedMetadataObjectsForPolicy")
+  public List<GenericEntity> listAssociatedMetadataObjectsForPolicy(NameIdentifier policyIdent)
+      throws IOException {
+    String metalakeName = policyIdent.namespace().level(0);
+    String policyName = policyIdent.name();
+
+    try {
+      List<PolicyMetadataObjectRelPO> policyMetadataObjectRelPOs =
+          SessionUtils.doWithCommitAndFetchResult(
+              PolicyMetadataObjectRelMapper.class,
+              mapper ->
+                  mapper.listPolicyMetadataObjectRelsByMetalakeAndPolicyName(
+                      metalakeName, policyName));
+
+      List<GenericEntity> metadataObjects = Lists.newArrayList();
+      Map<String, List<PolicyMetadataObjectRelPO>> policyMetadataObjectRelPOsByType =
+          policyMetadataObjectRelPOs.stream()
+              .collect(Collectors.groupingBy(PolicyMetadataObjectRelPO::getMetadataObjectType));
+
+      for (Map.Entry<String, List<PolicyMetadataObjectRelPO>> entry :
+          policyMetadataObjectRelPOsByType.entrySet()) {
+        String metadataObjectType = entry.getKey();
+        List<PolicyMetadataObjectRelPO> rels = entry.getValue();
+
+        List<Long> metadataObjectIds =
+            rels.stream()
+                .map(PolicyMetadataObjectRelPO::getMetadataObjectId)
+                .collect(Collectors.toList());
+        Map<Long, String> metadataObjectNames =
+            MetadataObjectService.TYPE_TO_FULLNAME_FUNCTION_MAP
+                .get(MetadataObject.Type.valueOf(metadataObjectType))
+                .apply(metadataObjectIds);
+
+        for (Map.Entry<Long, String> metadataObjectName : metadataObjectNames.entrySet()) {
+          String fullName = metadataObjectName.getValue();
+
+          // Metadata object may be deleted asynchronously when we query the name, so it will
+          // return null, we should skip this metadata object.
+          if (fullName != null) {
+            metadataObjects.add(
+                GenericEntity.builder()
+                    .withName(fullName)
+                    .withEntityType(Entity.EntityType.valueOf(metadataObjectType))
+                    .withId(metadataObjectName.getKey())
+                    .build());
+          }
+        }
+      }
+
+      return metadataObjects;
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.POLICY, policyIdent.toString());
       throw e;

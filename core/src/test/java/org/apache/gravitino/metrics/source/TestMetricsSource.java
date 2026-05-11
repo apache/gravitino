@@ -19,10 +19,18 @@
 
 package org.apache.gravitino.metrics.source;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Snapshot;
 import com.codahale.metrics.Timer;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.metrics.MetricsSystem;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -34,6 +42,8 @@ public class TestMetricsSource extends MetricsSource {
 
   private static String TEST_METRICS_SOURCE = "test";
   private static int gaugeValue = 0;
+
+  private Config savedGravitinoConfig;
   private MetricsSystem metricsSystem;
 
   public TestMetricsSource() {
@@ -41,9 +51,21 @@ public class TestMetricsSource extends MetricsSource {
   }
 
   @BeforeAll
-  void init() {
+  void setupMetricsSource() throws IllegalAccessException {
+    savedGravitinoConfig =
+        (Config) FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
+    Config mockConfig = mock(Config.class);
+    when(mockConfig.get(Configs.METRICS_TIME_SLIDING_WINDOW_SECONDS))
+        .thenReturn(Configs.DEFAULT_METRICS_TIME_SLIDING_WINDOW_SECONDS);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
+
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(this);
+  }
+
+  @AfterAll
+  void restoreGravitinoConfig() throws IllegalAccessException {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", savedGravitinoConfig, true);
   }
 
   public void incCounter(String name) {

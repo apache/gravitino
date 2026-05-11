@@ -18,10 +18,17 @@
  */
 package org.apache.gravitino.hook;
 
+import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -30,12 +37,17 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CapabilityHelpers;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.HierarchicalSchemaUtil;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -59,24 +71,90 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    Schema schema = dispatcher.createSchema(ident, comment, properties);
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    return TreeLockUtils.doWithTreeLock(
+        catalogIdent,
+        LockType.WRITE,
+        () -> {
+          // Collect missing parent identifiers BEFORE the underlying call; the catalog itself is
+          // responsible for auto-creating them. We only need to assign ownership afterwards.
+          List<NameIdentifier> missingParents = findMissingParents(ident);
+          Schema schema = dispatcher.createSchema(ident, comment, properties);
 
-    // Set the creator as the owner of the schema.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      // The inner NormalizeDispatcher case-folds the schema name based on catalog capabilities,
-      // so the entity is stored under the normalized identifier. Apply the same normalization
-      // here so the owner is attached to the same identifier the manager sees.
-      NameIdentifier normalizedIdent =
-          CapabilityHelpers.applyCapabilities(
-              ident, Capability.Scope.SCHEMA, GravitinoEnv.getInstance().catalogManager());
-      ownerManager.setOwner(
-          normalizedIdent.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+          OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+          if (ownerManager != null) {
+            CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+            String metalake = ident.namespace().level(0);
+            String user = PrincipalUtils.getCurrentUserName();
+            // Auto-created parent schemas (hierarchical namespace) and the new schema each need an
+            // owner; outer-to-inner order matches parent-before-child creation.
+            List<MetadataObject> toOwn = new ArrayList<>(missingParents.size() + 1);
+            for (NameIdentifier parentIdent : missingParents) {
+              NameIdentifier normalizedParent =
+                  CapabilityHelpers.applyCapabilities(
+                      parentIdent, Capability.Scope.SCHEMA, catalogManager);
+              toOwn.add(
+                  NameIdentifierUtil.toMetadataObject(normalizedParent, Entity.EntityType.SCHEMA));
+            }
+            toOwn.add(
+                NameIdentifierUtil.toMetadataObject(
+                    CapabilityHelpers.applyCapabilities(
+                        ident, Capability.Scope.SCHEMA, catalogManager),
+                    Entity.EntityType.SCHEMA));
+            ownerManager.setOwners(metalake, toOwn, user, Owner.Type.USER);
+          }
+          return schema;
+        });
+  }
+
+  /**
+   * Returns ancestor schema identifiers for {@code ident} that do not currently exist. The catalog
+   * will auto-create them during {@link #createSchema}; we collect them here only so we can assign
+   * ownership after the fact.
+   *
+   * <p>Walks from the nearest parent outward. If a parent exists, more distant ancestors must exist
+   * too, so lookup stops. Uses {@link org.apache.gravitino.EntityStore#batchGet} once for store
+   * state; any ancestor not in that result is checked with {@link #schemaExists(NameIdentifier)}.
+   */
+  private List<NameIdentifier> findMissingParents(NameIdentifier ident) {
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(ident.name(), separator);
+    if (ancestorNames.isEmpty()) {
+      return new ArrayList<>();
     }
-    return schema;
+
+    List<NameIdentifier> ancestorIdents = new ArrayList<>(ancestorNames.size());
+    for (String ancestorName : ancestorNames) {
+      ancestorIdents.add(NameIdentifier.of(ident.namespace(), ancestorName));
+    }
+
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    Set<String> foundNormalizedNames = new HashSet<>();
+    for (SchemaEntity schemaEntity :
+        GravitinoEnv.getInstance()
+            .entityStore()
+            .batchGet(ancestorIdents, Entity.EntityType.SCHEMA, SchemaEntity.class)) {
+      NameIdentifier storeIdent = NameIdentifier.of(ident.namespace(), schemaEntity.name());
+      Capability cap = CapabilityHelpers.getCapability(storeIdent, catalogManager);
+      foundNormalizedNames.add(
+          CapabilityHelpers.applyCaseSensitive(storeIdent, Capability.Scope.SCHEMA, cap).name());
+    }
+
+    List<NameIdentifier> missing = new ArrayList<>();
+    for (int i = ancestorIdents.size() - 1; i >= 0; i--) {
+      NameIdentifier ancestorIdent = ancestorIdents.get(i);
+      Capability cap = CapabilityHelpers.getCapability(ancestorIdent, catalogManager);
+      String normalizedName =
+          CapabilityHelpers.applyCaseSensitive(ancestorIdent, Capability.Scope.SCHEMA, cap).name();
+      boolean exists =
+          foundNormalizedNames.contains(normalizedName) || dispatcher.schemaExists(ancestorIdent);
+      if (exists) {
+        break;
+      }
+      missing.add(ancestorIdent);
+    }
+    Collections.reverse(missing);
+    return missing;
   }
 
   @Override
