@@ -230,12 +230,18 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       ConnectorTableMetadata tableMetadata,
       Optional<ConnectorTableLayout> layout,
       RetryMode retryMode,
-      boolean noExistingData) {
-    // First, create the table in the Gravitino catalog
+      boolean replace) {
+    SchemaTableName tableName = tableMetadata.getTable();
+
+    // CREATE OR REPLACE TABLE AS SELECT: drop the existing table first if present.
+    if (replace
+        && catalogConnectorMetadata.tableExists(tableName.getSchemaName(), tableName.getTableName())) {
+      catalogConnectorMetadata.dropTable(tableName);
+    }
+
+    // Create the table in the Gravitino catalog
     GravitinoTable table = metadataAdapter.createTable(tableMetadata);
     catalogConnectorMetadata.createTable(table, false);
-
-    SchemaTableName tableName = tableMetadata.getTable();
     try {
       // Get the table handle from the internal connector for the newly created table
       ConnectorTableHandle internalTableHandle =
