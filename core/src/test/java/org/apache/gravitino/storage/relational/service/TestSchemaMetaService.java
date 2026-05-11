@@ -29,8 +29,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -230,8 +230,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     schemaMetaService.insertSchema(hierarchical, false);
 
     List<SchemaEntity> schemas =
-        schemaMetaService.listSchemasByNamespace(
-            NamespaceUtil.ofSchema(metalakeName, catalogName));
+        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName));
     String sep = HierarchicalSchemaUtil.schemaSeparator();
     Set<String> logicalNames =
         schemas.stream()
@@ -249,8 +248,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     Assertions.assertTrue(logicalNames.contains("ns_a:ns_b"));
     Assertions.assertTrue(logicalNames.contains(logicalLeaf));
 
-    String physicalLeaf =
-        HierarchicalSchemaUtil.logicalToPhysical(logicalLeaf, sep);
+    String physicalLeaf = HierarchicalSchemaUtil.logicalToPhysical(logicalLeaf, sep);
     SchemaEntity loaded =
         schemaMetaService.getSchemaByIdentifier(
             NameIdentifier.of(metalakeName, catalogName, physicalLeaf));

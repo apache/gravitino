@@ -140,7 +140,7 @@ public class OwnerMetaBaseSQLProvider {
   }
 
   public String batchSoftDeleteOwnerRelByMetadataObjects(
-      @Param("deletion") List<OwnerRelDeletion> deletion) {
+      @Param("deletions") List<OwnerRelDeletion> deletions) {
     return "<script>"
         + "UPDATE "
         + OWNER_TABLE_NAME

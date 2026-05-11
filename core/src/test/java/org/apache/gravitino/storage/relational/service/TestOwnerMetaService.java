@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
@@ -782,15 +783,17 @@ class TestOwnerMetaService extends TestJDBCBackend {
 
     Assertions.assertEquals(
         user.nameIdentifier(),
-        OwnerMetaService.getInstance()
-            .getOwner(table1.nameIdentifier(), table1.type())
-            .get()
+        ((HasIdentifier)
+                OwnerMetaService.getInstance()
+                    .getOwner(table1.nameIdentifier(), table1.type())
+                    .get())
             .nameIdentifier());
     Assertions.assertEquals(
         user.nameIdentifier(),
-        OwnerMetaService.getInstance()
-            .getOwner(table2.nameIdentifier(), table2.type())
-            .get()
+        ((HasIdentifier)
+                OwnerMetaService.getInstance()
+                    .getOwner(table2.nameIdentifier(), table2.type())
+                    .get())
             .nameIdentifier());
   }
 
@@ -833,9 +836,8 @@ class TestOwnerMetaService extends TestJDBCBackend {
 
     Assertions.assertEquals(
         user2.nameIdentifier(),
-        OwnerMetaService.getInstance()
-            .getOwner(table.nameIdentifier(), table.type())
-            .get()
+        ((HasIdentifier)
+                OwnerMetaService.getInstance().getOwner(table.nameIdentifier(), table.type()).get())
             .nameIdentifier());
   }
 

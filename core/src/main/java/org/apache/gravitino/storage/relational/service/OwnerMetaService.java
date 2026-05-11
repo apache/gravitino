@@ -196,11 +196,11 @@ public class OwnerMetaService {
     long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
     Long ownerId = EntityIdService.getEntityId(ownerIdent, ownerType);
 
-    List<OwnerRelDeletion> deletion = new ArrayList<>(ownedObjects.size());
+    List<OwnerRelDeletion> deletions = new ArrayList<>(ownedObjects.size());
     List<OwnerRelPO> ownerRelPOs = new ArrayList<>(ownedObjects.size());
     for (NameIdentifier entity : ownedObjects) {
       Long entityId = EntityIdService.getEntityId(entity, ownedObjectType);
-      deletion.add(
+      deletions.add(
           new OwnerRelDeletion(
               entityId,
               NameIdentifierUtil.toMetadataObject(entity, ownedObjectType).type().name()));
@@ -213,7 +213,7 @@ public class OwnerMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
-                mapper -> mapper.batchSoftDeleteOwnerRelByMetadataObjects(deletion)),
+                mapper -> mapper.batchSoftDeleteOwnerRelByMetadataObjects(deletions)),
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.batchInsertOwnerRels(ownerRelPOs)));
