@@ -19,14 +19,22 @@
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.rel.ViewChange;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceFailureException;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -67,5 +75,77 @@ public class TestIcebergViewCatalogOperations {
 
     Assertions.assertTrue(operations.viewExists(ident));
     verify(wrapper).viewExists(any(TableIdentifier.class));
+  }
+
+  @Test
+  public void testAlterViewSetAfterRemoveKeepsProperty() throws Exception {
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+    when(wrapper.loadView(any(TableIdentifier.class))).thenReturn(mockLoadViewResponse());
+
+    doAnswer(
+            invocation -> {
+              UpdateTableRequest request = invocation.getArgument(1);
+              Map<String, String> setProps = extractSetProperties(request.updates());
+              Set<String> removedProps = extractRemovedProperties(request.updates());
+              Assertions.assertEquals("v1", setProps.get("k1"));
+              Assertions.assertFalse(removedProps.contains("k1"));
+              return mockLoadViewResponse();
+            })
+        .when(wrapper)
+        .updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+
+    operations.alterView(
+        ident, ViewChange.removeProperty("k1"), ViewChange.setProperty("k1", "v1"));
+
+    verify(wrapper).updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+  }
+
+  @Test
+  public void testAlterViewRemoveAfterSetRemovesProperty() throws Exception {
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+    when(wrapper.loadView(any(TableIdentifier.class))).thenReturn(mockLoadViewResponse());
+
+    doAnswer(
+            invocation -> {
+              UpdateTableRequest request = invocation.getArgument(1);
+              Map<String, String> setProps = extractSetProperties(request.updates());
+              Set<String> removedProps = extractRemovedProperties(request.updates());
+              Assertions.assertFalse(setProps.containsKey("k1"));
+              Assertions.assertTrue(removedProps.contains("k1"));
+              return mockLoadViewResponse();
+            })
+        .when(wrapper)
+        .updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+
+    operations.alterView(
+        ident, ViewChange.setProperty("k1", "v1"), ViewChange.removeProperty("k1"));
+
+    verify(wrapper).updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+  }
+
+  private static LoadViewResponse mockLoadViewResponse() {
+    return Mockito.mock(LoadViewResponse.class);
+  }
+
+  private static Map<String, String> extractSetProperties(List<MetadataUpdate> updates) {
+    return updates.stream()
+        .filter(update -> update instanceof MetadataUpdate.SetProperties)
+        .map(update -> ((MetadataUpdate.SetProperties) update).updated())
+        .findFirst()
+        .orElse(java.util.Collections.emptyMap());
+  }
+
+  private static Set<String> extractRemovedProperties(List<MetadataUpdate> updates) {
+    return updates.stream()
+        .filter(update -> update instanceof MetadataUpdate.RemoveProperties)
+        .map(update -> ((MetadataUpdate.RemoveProperties) update).removed())
+        .findFirst()
+        .orElse(java.util.Collections.emptySet());
   }
 }

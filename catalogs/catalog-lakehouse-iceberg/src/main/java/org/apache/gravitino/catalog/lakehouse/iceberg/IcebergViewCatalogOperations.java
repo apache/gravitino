@@ -249,9 +249,13 @@ class IcebergViewCatalogOperations {
       for (ViewChange change : changes) {
         if (change instanceof ViewChange.SetProperty) {
           ViewChange.SetProperty setProperty = (ViewChange.SetProperty) change;
-          setProps.put(setProperty.getProperty(), setProperty.getValue());
+          String property = setProperty.getProperty();
+          setProps.put(property, setProperty.getValue());
+          removeProps.remove(property);
         } else if (change instanceof ViewChange.RemoveProperty) {
-          removeProps.add(((ViewChange.RemoveProperty) change).getProperty());
+          String property = ((ViewChange.RemoveProperty) change).getProperty();
+          removeProps.add(property);
+          setProps.remove(property);
         } else if (change instanceof ViewChange.ReplaceView) {
           replace = (ViewChange.ReplaceView) change;
         } else {
@@ -264,13 +268,17 @@ class IcebergViewCatalogOperations {
         setProps.put("replace.drop-dialect.allowed", "true");
         if (replace.getComment() == null) {
           removeProps.add("comment");
+          setProps.remove("comment");
         } else {
           setProps.put("comment", replace.getComment());
+          removeProps.remove("comment");
         }
         if (replace.getDefaultCatalog() == null) {
           removeProps.add("default-catalog");
+          setProps.remove("default-catalog");
         } else {
           setProps.put("default-catalog", replace.getDefaultCatalog());
+          removeProps.remove("default-catalog");
         }
       }
 
