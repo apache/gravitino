@@ -324,7 +324,8 @@ final class GlueIcebergHelper {
    * Converts a Glue/Hive column type string to an Iceberg type {@link Document}.
    *
    * <p>Iceberg REST spec type names are used for primitives (e.g. {@code "long"} for Hive {@code
-   * bigint}). Complex types (array, map, struct) are represented as JSON maps.
+   * bigint}). Complex types (array, map, struct) are not supported and will throw {@link
+   * IllegalStateException}.
    */
   static Document hiveTypeToDoc(String hiveType) {
     if (hiveType == null) return Document.fromString(STRING);
