@@ -24,6 +24,19 @@ plugins {
   id("idea")
 }
 
+val scalaVersion: String =
+  project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
+val sparkVersion: String = libs.versions.spark35.get()
+val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
+val lanceSparkBundleVersion = "0.2.0"
+val lanceSparkBundleJarPathProperty = "gravitino.lance.spark.bundle.jar"
+val lanceSparkBundleDir = layout.buildDirectory.dir("lance-spark-bundle")
+val lanceSparkBundle by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+  isTransitive = false
+}
+
 dependencies {
   implementation(project(":api"))
   implementation(project(":common")) {
@@ -45,7 +58,7 @@ dependencies {
   implementation(libs.bundles.prometheus)
   implementation(libs.commons.lang3)
   implementation(libs.lance.namespace.core) {
-    exclude(group = "com.lancedb", module = "lance-core")
+    exclude(group = "org.lance", module = "lance-core")
     exclude(group = "com.google.guava", module = "guava") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
@@ -65,9 +78,26 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(libs.lance)
+
+  add(
+    lanceSparkBundle.name,
+    "org.lance:lance-spark-bundle-3.5_2.12:$lanceSparkBundleVersion"
+  )
+
+  testImplementation("org.scala-lang.modules:scala-collection-compat_$scalaVersion:$scalaCollectionCompatVersion")
+  testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
+    exclude("org.apache.avro")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.zookeeper")
+    exclude("io.dropwizard.metrics")
+    exclude("org.rocksdb")
+  }
 
   testImplementation(libs.awaitility)
   testImplementation(libs.commons.io)
+  testImplementation(libs.hadoop3.client.api)
+  testImplementation(libs.hadoop3.client.runtime)
   testImplementation(libs.jersey.test.framework.core) {
     exclude(group = "org.junit.jupiter")
   }
@@ -88,6 +118,10 @@ tasks {
   val copyDepends by registering(Copy::class) {
     from(configurations.runtimeClasspath)
     into("build/libs")
+  }
+  val prepareLanceSparkBundle by registering(Sync::class) {
+    from(lanceSparkBundle)
+    into(lanceSparkBundleDir)
   }
 
   jar {
@@ -119,9 +153,20 @@ tasks {
   }
 
   test {
+    dependsOn(prepareLanceSparkBundle)
+
+    doFirst {
+      val bundleJar =
+        lanceSparkBundleDir.get().asFile.listFiles()?.singleOrNull { it.extension == "jar" }
+          ?: throw GradleException(
+            "Expected exactly one Lance Spark bundle jar in ${lanceSparkBundleDir.get().asFile}"
+          )
+      systemProperty(lanceSparkBundleJarPathProperty, bundleJar.absolutePath)
+    }
+
     val testMode = project.properties["testMode"] as? String ?: "embedded"
     if (testMode == "embedded") {
-      dependsOn(":catalogs:catalog-lakehouse-generic:build")
+      dependsOn(":catalogs:catalog-lakehouse-generic:jar")
     }
   }
 }

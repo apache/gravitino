@@ -110,6 +110,7 @@ include(":bundles:azure", ":bundles:azure-bundle", ":bundles:iceberg-azure-bundl
 include(":catalogs:hadoop-common")
 include(":lineage")
 include(":mcp-server")
+include(":plugins:idp-basic")
 include(
   ":maintenance:optimizer-api",
   ":maintenance:updaters",
