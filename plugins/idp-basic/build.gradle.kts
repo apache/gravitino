@@ -24,7 +24,6 @@ plugins {
 }
 
 dependencies {
-  implementation(project(":api"))
   implementation(project(":common"))
   implementation(libs.bcprov.jdk18on)
   implementation(libs.commons.lang3)

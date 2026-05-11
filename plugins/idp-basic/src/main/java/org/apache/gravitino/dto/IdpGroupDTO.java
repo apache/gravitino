@@ -31,13 +31,12 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.authorization.IdpGroup;
 
 /** Represents a built-in IdP group Data Transfer Object (DTO). */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EqualsAndHashCode
 @ToString
-public class IdpGroupDTO implements IdpGroup {
+public class IdpGroupDTO {
 
   @JsonProperty("name")
   private String name;
@@ -68,7 +67,6 @@ public class IdpGroupDTO implements IdpGroup {
   /**
    * @return The name of the built-in IdP group DTO.
    */
-  @Override
   public String name() {
     return name;
   }
@@ -78,7 +76,6 @@ public class IdpGroupDTO implements IdpGroup {
    *
    * @return The users of the built-in IdP group.
    */
-  @Override
   public List<String> users() {
     return users;
   }

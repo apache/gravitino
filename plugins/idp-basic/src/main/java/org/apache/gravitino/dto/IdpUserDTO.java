@@ -31,13 +31,12 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.authorization.IdpUser;
 
 /** Represents a built-in IdP user Data Transfer Object (DTO). */
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @EqualsAndHashCode
 @ToString
-public class IdpUserDTO implements IdpUser {
+public class IdpUserDTO {
 
   @JsonProperty("name")
   private String name;
@@ -69,7 +68,6 @@ public class IdpUserDTO implements IdpUser {
   /**
    * @return The name of the built-in IdP user DTO.
    */
-  @Override
   public String name() {
     return name;
   }
@@ -79,7 +77,6 @@ public class IdpUserDTO implements IdpUser {
    *
    * @return The groups of the built-in IdP user.
    */
-  @Override
   public List<String> groups() {
     return groups;
   }
