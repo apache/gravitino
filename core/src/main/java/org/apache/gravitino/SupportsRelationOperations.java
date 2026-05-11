@@ -20,6 +20,7 @@ package org.apache.gravitino;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 
 /**
@@ -164,6 +165,39 @@ public interface SupportsRelationOperations {
       Entity.EntityType dstType,
       boolean override)
       throws IOException;
+
+  /**
+   * Batch inserts the same relation from many source entities to one destination. Parameter order
+   * matches {@link #insertRelation}. All sources share one {@code srcType}. Semantics match
+   * repeated {@link #insertRelation} with the same {@code relType}; a relational backend may use
+   * fewer round-trips for some relation types (e.g. {@link Type#OWNER_REL}).
+   *
+   * @param relType the relation type (e.g. {@link Type#OWNER_REL})
+   * @param srcIdentifiers identifiers of the source side for each relation row
+   * @param srcType entity type shared by every identifier in {@code srcIdentifiers}
+   * @param dstIdentifier destination entity identifier (shared by all rows)
+   * @param dstType destination entity type
+   * @param override if true, replace existing relations of each source entity first, per {@link
+   *     #insertRelation}
+   * @throws IOException if the storage operation fails
+   */
+  default void batchInsertRelations(
+      Type relType,
+      List<NameIdentifier> srcIdentifiers,
+      Entity.EntityType srcType,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType,
+      boolean override)
+      throws IOException {
+    Objects.requireNonNull(relType, "relType must not be null");
+    Objects.requireNonNull(srcIdentifiers, "srcIdentifiers must not be null");
+    Objects.requireNonNull(srcType, "srcType must not be null");
+    Objects.requireNonNull(dstIdentifier, "dstIdentifier must not be null");
+    Objects.requireNonNull(dstType, "dstType must not be null");
+    for (NameIdentifier srcIdent : srcIdentifiers) {
+      insertRelation(relType, srcIdent, srcType, dstIdentifier, dstType, override);
+    }
+  }
 
   /**
    * Updates the relations for a given entity by adding a set of new relations and removing another

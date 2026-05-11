@@ -328,6 +328,26 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   }
 
   @Override
+  public void batchInsertRelations(
+      Type relType,
+      List<NameIdentifier> srcIdentifiers,
+      Entity.EntityType srcType,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType,
+      boolean override)
+      throws IOException {
+    if (srcIdentifiers == null || srcIdentifiers.isEmpty()) {
+      return;
+    }
+    backend.batchInsertRelations(
+        relType, srcIdentifiers, srcType, dstIdentifier, dstType, override);
+    for (NameIdentifier ident : srcIdentifiers) {
+      cache.invalidate(ident, srcType, relType);
+    }
+    cache.invalidate(dstIdentifier, dstType, relType);
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
       Type relType,
       NameIdentifier srcEntityIdent,
