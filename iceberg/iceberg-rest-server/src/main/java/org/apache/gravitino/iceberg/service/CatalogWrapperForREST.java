@@ -769,6 +769,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       tableBuilder.withPartitionSpec(changedTableMeta.spec());
       tableBuilder.withSortOrder(changedTableMeta.sortOrder());
       tableBuilder.withLocation(changedTableMeta.location());
+      tableBuilder.withProperty("format-version", String.valueOf(changedTableMeta.formatVersion()));
       tableBuilder.withProperties(changedTableMeta.properties());
 
       Transaction transaction = tableBuilder.createOrReplaceTransaction();
