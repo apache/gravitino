@@ -18,12 +18,16 @@
 package org.apache.gravitino.authorization;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
+import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthorizationRequestContext {
@@ -100,5 +104,154 @@ public class TestAuthorizationRequestContext {
     assertEquals(2, counter.get(), "Flag should remain false after failure so next call runs.");
     context.loadRole(counter::incrementAndGet);
     assertEquals(2, counter.get(), "After a successful loadRole, further calls must be ignored.");
+  }
+
+  @Test
+  public void testComputeUserInfoIfAbsentDedupesLoaderInvocation() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger loaderCalls = new AtomicInteger();
+    UserUpdatedAt expected = new UserUpdatedAt(42L, 1234L);
+
+    Optional<UserUpdatedAt> first =
+        context.computeUserInfoIfAbsent(
+            "ml::alice",
+            k -> {
+              loaderCalls.incrementAndGet();
+              return Optional.of(expected);
+            });
+    Optional<UserUpdatedAt> second =
+        context.computeUserInfoIfAbsent(
+            "ml::alice",
+            k -> {
+              loaderCalls.incrementAndGet();
+              return Optional.empty();
+            });
+
+    assertTrue(first.isPresent());
+    assertEquals(expected, first.get());
+    assertTrue(second.isPresent());
+    assertEquals(expected, second.get());
+    assertEquals(1, loaderCalls.get(), "Loader must run only once for the same key");
+  }
+
+  @Test
+  public void testComputeUserInfoIfAbsentCachesEmptyResult() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger loaderCalls = new AtomicInteger();
+
+    Optional<UserUpdatedAt> first =
+        context.computeUserInfoIfAbsent(
+            "ml::ghost",
+            k -> {
+              loaderCalls.incrementAndGet();
+              return Optional.empty();
+            });
+    Optional<UserUpdatedAt> second =
+        context.computeUserInfoIfAbsent(
+            "ml::ghost",
+            k -> {
+              loaderCalls.incrementAndGet();
+              return Optional.of(new UserUpdatedAt(1L, 1L));
+            });
+
+    assertFalse(first.isPresent());
+    assertFalse(second.isPresent(), "Empty optional should be cached and reused");
+    assertEquals(1, loaderCalls.get());
+  }
+
+  @Test
+  public void testComputeUserInfoIfAbsentDifferentKeysRunLoaderEachTime() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger loaderCalls = new AtomicInteger();
+
+    context.computeUserInfoIfAbsent(
+        "ml::alice",
+        k -> {
+          loaderCalls.incrementAndGet();
+          return Optional.of(new UserUpdatedAt(1L, 1L));
+        });
+    context.computeUserInfoIfAbsent(
+        "ml::bob",
+        k -> {
+          loaderCalls.incrementAndGet();
+          return Optional.of(new UserUpdatedAt(2L, 2L));
+        });
+
+    assertEquals(2, loaderCalls.get());
+  }
+
+  @Test
+  public void testComputeMetadataIdIfAbsentDedupesLoaderInvocation() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger loaderCalls = new AtomicInteger();
+
+    Long first =
+        context.computeMetadataIdIfAbsent(
+            "ml::cat::TABLE",
+            k -> {
+              loaderCalls.incrementAndGet();
+              return 1001L;
+            });
+    Long second =
+        context.computeMetadataIdIfAbsent(
+            "ml::cat::TABLE",
+            k -> {
+              loaderCalls.incrementAndGet();
+              return 9999L;
+            });
+
+    assertEquals(1001L, first);
+    assertEquals(1001L, second);
+    assertEquals(1, loaderCalls.get());
+  }
+
+  @Test
+  public void testComputeOwnerIfAbsentCachesPresentAndAbsentResults() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger loaderCalls = new AtomicInteger();
+
+    OwnerInfo ownerInfo = new OwnerInfo(99L, "USER");
+    Optional<OwnerInfo> presentFirst =
+        context.computeOwnerIfAbsent(
+            10L,
+            id -> {
+              loaderCalls.incrementAndGet();
+              return Optional.of(ownerInfo);
+            });
+    Optional<OwnerInfo> presentSecond =
+        context.computeOwnerIfAbsent(
+            10L,
+            id -> {
+              loaderCalls.incrementAndGet();
+              return Optional.empty();
+            });
+
+    Optional<OwnerInfo> absentFirst =
+        context.computeOwnerIfAbsent(
+            20L,
+            id -> {
+              loaderCalls.incrementAndGet();
+              return Optional.empty();
+            });
+    Optional<OwnerInfo> absentSecond =
+        context.computeOwnerIfAbsent(
+            20L,
+            id -> {
+              loaderCalls.incrementAndGet();
+              return Optional.of(new OwnerInfo(123L, "USER"));
+            });
+
+    assertEquals(Optional.of(ownerInfo), presentFirst);
+    assertEquals(Optional.of(ownerInfo), presentSecond);
+    assertFalse(absentFirst.isPresent());
+    assertFalse(absentSecond.isPresent(), "Absent owner result must also be cached");
+    assertEquals(2, loaderCalls.get(), "Loader must fire once per distinct metadataId");
+  }
+
+  @Test
+  public void testOriginalAuthorizationExpressionRoundTrip() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    context.setOriginalAuthorizationExpression("OWNER && HAS_PRIVILEGE");
+    assertEquals("OWNER && HAS_PRIVILEGE", context.getOriginalAuthorizationExpression());
   }
 }

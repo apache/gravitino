@@ -69,9 +69,14 @@ public class TestTableMetaService extends TestJDBCBackend {
   private final String catalogName = "catalog_for_table_test";
   private final String schemaName = "schema_for_table_test";
 
-  private List<EntityChangeRecord> listEntityChanges(long createdAtFrom) {
+  private long latestEntityChangeId() {
     return SessionUtils.doWithCommitAndFetchResult(
-        EntityChangeLogMapper.class, mapper -> mapper.selectEntityChanges(createdAtFrom, 100));
+        EntityChangeLogMapper.class, EntityChangeLogMapper::selectLatestChangeId);
+  }
+
+  private List<EntityChangeRecord> listEntityChanges(long lastId) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        EntityChangeLogMapper.class, mapper -> mapper.selectEntityChanges(lastId, 100));
   }
 
   @TestTemplate
@@ -201,7 +206,7 @@ public class TestTableMetaService extends TestJDBCBackend {
     TableMetaService.getInstance().insertTable(createdTable, false);
 
     // test update table without changing schema name
-    long beforeRename = System.currentTimeMillis() - 1;
+    long beforeRename = latestEntityChangeId();
     TableEntity updatedTable =
         TableEntity.builder()
             .withId(createdTable.id())
@@ -263,7 +268,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     backend.insert(newSchema, false);
 
-    long beforeSchemaMove = System.currentTimeMillis() - 1;
+    long beforeSchemaMove = latestEntityChangeId();
     TableEntity movedTable =
         TableEntity.builder()
             .withId(updatedTable.id())
@@ -298,7 +303,7 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertEquals(updatedTable2.auditInfo(), retrievedTable2.auditInfo());
     compareTwoColumns(updatedTable2.columns(), retrievedTable2.columns());
 
-    long beforeDelete = System.currentTimeMillis() - 1;
+    long beforeDelete = latestEntityChangeId();
     Assertions.assertTrue(
         TableMetaService.getInstance().deleteTable(updatedTable2.nameIdentifier()));
     Assertions.assertTrue(

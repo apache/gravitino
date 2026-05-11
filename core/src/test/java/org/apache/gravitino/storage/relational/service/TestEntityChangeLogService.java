@@ -47,19 +47,24 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
   private static final String CATALOG_NAME = "catalog_for_entity_change_log_test";
   private static final String SCHEMA_NAME = "schema_for_entity_change_log_test";
 
-  private List<EntityChangeRecord> listEntityChanges(long createdAtFrom) {
+  private long latestEntityChangeId() {
     return SessionUtils.doWithCommitAndFetchResult(
-        EntityChangeLogMapper.class, mapper -> mapper.selectEntityChanges(createdAtFrom, 100));
+        EntityChangeLogMapper.class, EntityChangeLogMapper::selectLatestChangeId);
+  }
+
+  private List<EntityChangeRecord> listEntityChanges(long lastId) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        EntityChangeLogMapper.class, mapper -> mapper.selectEntityChanges(lastId, 100));
   }
 
   private void assertEntityChange(
-      long createdAtFrom,
+      long lastId,
       String metalakeName,
       Entity.EntityType entityType,
       String fullName,
       OperateType operateType) {
     Assertions.assertTrue(
-        listEntityChanges(createdAtFrom).stream()
+        listEntityChanges(lastId).stream()
             .anyMatch(
                 record ->
                     record.getMetalakeName().equals(metalakeName)
@@ -73,7 +78,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
   void testMetalakeChangeLogOnRenameAndDrop() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
 
-    long beforeRename = System.currentTimeMillis() - 1;
+    long beforeRename = latestEntityChangeId();
     BaseMetalake renamedMetalake =
         backend.update(
             metalake.nameIdentifier(),
@@ -84,7 +89,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
     assertEntityChange(
         beforeRename, METALAKE_NAME, Entity.EntityType.METALAKE, METALAKE_NAME, OperateType.ALTER);
 
-    long beforeDrop = System.currentTimeMillis() - 1;
+    long beforeDrop = latestEntityChangeId();
     Assertions.assertTrue(
         MetalakeMetaService.getInstance().deleteMetalake(renamedMetalake.nameIdentifier(), false));
     assertEntityChange(
@@ -100,7 +105,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
     createAndInsertMakeLake(METALAKE_NAME);
 
     CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
-    long beforeCatalogRename = System.currentTimeMillis() - 1;
+    long beforeCatalogRename = latestEntityChangeId();
     CatalogEntity renamedCatalog =
         backend.update(
             catalog.nameIdentifier(),
@@ -115,7 +120,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         NameIdentifierUtil.ofCatalog(METALAKE_NAME, CATALOG_NAME).toString(),
         OperateType.ALTER);
 
-    long beforeCatalogDrop = System.currentTimeMillis() - 1;
+    long beforeCatalogDrop = latestEntityChangeId();
     Assertions.assertTrue(
         CatalogMetaService.getInstance().deleteCatalog(renamedCatalog.nameIdentifier(), false));
     assertEntityChange(
@@ -127,7 +132,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
 
     CatalogEntity schemaCatalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME + "_schema");
     SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, schemaCatalog.name(), SCHEMA_NAME);
-    long beforeSchemaRename = System.currentTimeMillis() - 1;
+    long beforeSchemaRename = latestEntityChangeId();
     SchemaEntity renamedSchema =
         backend.update(
             schema.nameIdentifier(),
@@ -142,7 +147,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         NameIdentifierUtil.ofSchema(METALAKE_NAME, schemaCatalog.name(), SCHEMA_NAME).toString(),
         OperateType.ALTER);
 
-    long beforeSchemaDrop = System.currentTimeMillis() - 1;
+    long beforeSchemaDrop = latestEntityChangeId();
     Assertions.assertTrue(
         SchemaMetaService.getInstance().deleteSchema(renamedSchema.nameIdentifier(), false));
     assertEntityChange(
@@ -162,7 +167,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
     TableEntity table =
         createTableEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, "table1", AUDIT_INFO);
     backend.insert(table, false);
-    long beforeTableRename = System.currentTimeMillis() - 1;
+    long beforeTableRename = latestEntityChangeId();
     TableEntity renamedTable =
         TableMetaService.getInstance()
             .updateTable(
@@ -176,7 +181,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         NameIdentifierUtil.ofTable(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "table1").toString(),
         OperateType.ALTER);
 
-    long beforeTableDrop = System.currentTimeMillis() - 1;
+    long beforeTableDrop = latestEntityChangeId();
     Assertions.assertTrue(
         TableMetaService.getInstance().deleteTable(renamedTable.nameIdentifier()));
     assertEntityChange(
@@ -193,7 +198,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
             "topic1",
             AUDIT_INFO);
     backend.insert(topic, false);
-    long beforeTopicRename = System.currentTimeMillis() - 1;
+    long beforeTopicRename = latestEntityChangeId();
     TopicEntity renamedTopic =
         backend.update(
             topic.nameIdentifier(),
@@ -206,7 +211,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         NameIdentifierUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "topic1").toString(),
         OperateType.ALTER);
 
-    long beforeTopicDrop = System.currentTimeMillis() - 1;
+    long beforeTopicDrop = latestEntityChangeId();
     Assertions.assertTrue(
         TopicMetaService.getInstance().deleteTopic(renamedTopic.nameIdentifier()));
     assertEntityChange(
@@ -222,7 +227,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
             NamespaceUtil.ofView(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "view1");
     ViewMetaService.getInstance().insertView(view, false);
-    long beforeViewRename = System.currentTimeMillis() - 1;
+    long beforeViewRename = latestEntityChangeId();
     ViewEntity renamedView =
         ViewMetaService.getInstance()
             .updateView(
@@ -243,7 +248,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         NameIdentifierUtil.ofView(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "view1").toString(),
         OperateType.ALTER);
 
-    long beforeViewDrop = System.currentTimeMillis() - 1;
+    long beforeViewDrop = latestEntityChangeId();
     Assertions.assertTrue(ViewMetaService.getInstance().deleteView(renamedView.nameIdentifier()));
     assertEntityChange(
         beforeViewDrop,
@@ -259,7 +264,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
             "fileset1",
             AUDIT_INFO);
     FilesetMetaService.getInstance().insertFileset(fileset, false);
-    long beforeFilesetRename = System.currentTimeMillis() - 1;
+    long beforeFilesetRename = latestEntityChangeId();
     FilesetEntity renamedFileset =
         FilesetMetaService.getInstance()
             .updateFileset(
@@ -274,7 +279,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
             .toString(),
         OperateType.ALTER);
 
-    long beforeFilesetDrop = System.currentTimeMillis() - 1;
+    long beforeFilesetDrop = latestEntityChangeId();
     Assertions.assertTrue(
         FilesetMetaService.getInstance().deleteFileset(renamedFileset.nameIdentifier()));
     assertEntityChange(
@@ -295,7 +300,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
             Map.of("k1", "v1"),
             AUDIT_INFO);
     ModelMetaService.getInstance().insertModel(model, false);
-    long beforeModelRename = System.currentTimeMillis() - 1;
+    long beforeModelRename = latestEntityChangeId();
     ModelEntity renamedModel =
         ModelMetaService.getInstance()
             .updateModel(
@@ -316,7 +321,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "model1").toString(),
         OperateType.ALTER);
 
-    long beforeModelDrop = System.currentTimeMillis() - 1;
+    long beforeModelDrop = latestEntityChangeId();
     Assertions.assertTrue(
         ModelMetaService.getInstance().deleteModel(renamedModel.nameIdentifier()));
     assertEntityChange(

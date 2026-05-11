@@ -106,5 +106,8 @@ public interface OwnerMetaMapper {
       @Param("metadataObjectType") String metadataObjectType);
 
   @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectChangedOwners")
-  List<ChangedOwnerInfo> selectChangedOwners(@Param("updatedAtFrom") long updatedAtFrom);
+  List<ChangedOwnerInfo> selectChangedOwners(@Param("lastId") long lastId);
+
+  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectLatestChangeId")
+  Long selectLatestChangeId();
 }

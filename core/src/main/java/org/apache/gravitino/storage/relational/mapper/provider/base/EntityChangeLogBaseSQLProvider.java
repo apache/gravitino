@@ -26,23 +26,19 @@ import org.apache.ibatis.annotations.Param;
 public class EntityChangeLogBaseSQLProvider {
 
   /**
-   * Cursor-advance contract for the entity change poller:
-   *
-   * <p>The {@code created_at >= #{createdAtFrom}} predicate is <b>inclusive</b>. Combined with
-   * {@code ORDER BY created_at, id}, callers must remember the {@code (lastCreatedAt, lastId)} of
-   * the last consumed row and on the next poll: pass {@code createdAtFrom = lastCreatedAt} and
-   * client-side skip rows whose {@code id <= lastId} until they encounter a row with {@code
-   * created_at > lastCreatedAt}. Naively advancing by {@code lastCreatedAt + 1} would miss rows
-   * sharing the same millisecond boundary; advancing by {@code lastCreatedAt} re-reads the boundary
-   * row and relies on the client-side id filter.
+   * Cursor-advance contract for the entity change poller: {@code id} is monotonic and unique, so
+   * callers only need to remember the last consumed id.
    */
-  public String selectEntityChanges(
-      @Param("createdAtFrom") long createdAtFrom, @Param("maxRows") int maxRows) {
+  public String selectEntityChanges(@Param("lastId") long lastId, @Param("maxRows") int maxRows) {
     return "SELECT id, metalake_name as metalakeName, entity_type as entityType,"
         + " entity_full_name as fullName, operate_type as operateType, created_at as createdAt"
         + " FROM "
         + ENTITY_CHANGE_LOG_TABLE_NAME
-        + " WHERE created_at >= #{createdAtFrom} ORDER BY created_at, id LIMIT #{maxRows}";
+        + " WHERE id > #{lastId} ORDER BY id LIMIT #{maxRows}";
+  }
+
+  public String selectLatestChangeId() {
+    return "SELECT COALESCE(MAX(id), 0) FROM " + ENTITY_CHANGE_LOG_TABLE_NAME;
   }
 
   /**
