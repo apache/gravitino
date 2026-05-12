@@ -257,14 +257,13 @@ public class TopicOperations {
             LOG.info("Dropping topic under schema: {}.{}.{}", metalake, catalog, schema);
             NameIdentifier ident = NameIdentifierUtil.ofTopic(metalake, catalog, schema, topic);
             boolean dropped = dispatcher.dropTopic(ident);
-
-            if (!dropped) {
+            if (dropped) {
+              LOG.info("Topic dropped: {}.{}.{}.{}", metalake, catalog, schema, topic);
+            } else {
               LOG.warn("Cannot find to be dropped topic {} under schema {}", topic, schema);
             }
 
-            Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("Topic dropped: {}.{}.{}.{}", metalake, catalog, schema, topic);
-            return response;
+            return Utils.ok(new DropResponse(dropped));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTopicException(OperationType.DROP, topic, schema, e);

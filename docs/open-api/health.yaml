@@ -29,6 +29,8 @@ paths:
         Returns aggregate health status combining liveness and readiness checks.
         Returns 200 when all checks pass; 503 when any check fails.
         This endpoint is exempt from authentication so probes can reach it without credentials.
+        Root-level aliases at /health and /health.html (outside the /api base path) are also
+        available for GTMs that require probes at well-known root paths.
       security: []
       responses:
         "200":
@@ -50,6 +52,8 @@ paths:
         Returns 200 as long as the HTTP server thread can respond.
         Use this for Kubernetes liveness probes to determine whether to restart a pod.
         This endpoint is exempt from authentication so probes can reach it without credentials.
+        A root-level alias at /health/live (outside the /api base path) is also available
+        for GTMs that require probes at well-known root paths.
       security: []
       responses:
         "200":
@@ -70,6 +74,8 @@ paths:
         Returns 503 when the entity store is unavailable or slow.
         Use this for Kubernetes readiness probes to control traffic routing.
         This endpoint is exempt from authentication so probes can reach it without credentials.
+        A root-level alias at /health/ready (outside the /api base path) is also available
+        for GTMs that require probes at well-known root paths.
       security: []
       responses:
         "200":

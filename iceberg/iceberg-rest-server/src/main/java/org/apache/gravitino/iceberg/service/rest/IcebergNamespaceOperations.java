@@ -33,6 +33,7 @@ import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
+import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -300,20 +301,25 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      RegisterTableRequest registerTableRequest) {
+      RegisterTableRequest registerTableRequest,
+      @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
     LOG.info(
-        "Register Iceberg table, catalog: {}, namespace: {}, registerTableRequest: {}",
+        "Register Iceberg table, catalog: {}, namespace: {}, registerTableRequest: {}, "
+            + "accessDelegation: {}, isCredentialVending: {}",
         catalogName,
         icebergNS,
-        registerTableRequest);
+        registerTableRequest,
+        accessDelegation,
+        isCredentialVending);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
             LoadTableResponse loadTableResponse =
                 namespaceOperationDispatcher.registerTable(
                     context, icebergNS, registerTableRequest);

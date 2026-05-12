@@ -27,14 +27,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.lancedb.lance.Dataset;
-import com.lancedb.lance.Fragment;
-import com.lancedb.lance.FragmentMetadata;
-import com.lancedb.lance.Transaction;
-import com.lancedb.lance.WriteParams;
-import com.lancedb.lance.ipc.LanceScanner;
-import com.lancedb.lance.ipc.ScanOptions;
-import com.lancedb.lance.operation.Append;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -87,6 +79,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.lance.Dataset;
+import org.lance.Fragment;
+import org.lance.FragmentMetadata;
+import org.lance.Transaction;
+import org.lance.WriteParams;
+import org.lance.ipc.LanceScanner;
+import org.lance.ipc.ScanOptions;
+import org.lance.operation.Append;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -358,7 +358,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
             null);
 
     // Now try to read the lance directory and check it.
-    try (Dataset dataset = Dataset.open(tableLocation)) {
+    try (Dataset dataset = Dataset.open().uri(tableLocation).build()) {
       org.apache.arrow.vector.types.pojo.Schema lanceSchema = dataset.getSchema();
       List<Field> fields = lanceSchema.getFields();
       for (Field field : fields) {
@@ -470,7 +470,12 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
       root.setRowCount(index);
 
       fragmentMetas =
-          Fragment.create(tableLocation, rootAllocator, root, new WriteParams.Builder().build());
+          Fragment.write()
+              .datasetUri(tableLocation)
+              .allocator(rootAllocator)
+              .data(root)
+              .writeParams(new WriteParams.Builder().build())
+              .execute();
       return fragmentMetas;
     }
   }
@@ -739,7 +744,12 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
     try (RootAllocator allocator = new RootAllocator();
         Dataset dataset =
-            Dataset.create(allocator, location, arrowSchema, new WriteParams.Builder().build())) {
+            Dataset.write()
+                .allocator(allocator)
+                .schema(arrowSchema)
+                .uri(location)
+                .mode(WriteParams.WriteMode.CREATE)
+                .execute()) {
       // Dataset created successfully
     }
 
@@ -811,7 +821,12 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
     try (RootAllocator allocator = new RootAllocator();
         Dataset dataset =
-            Dataset.create(allocator, location, arrowSchema, new WriteParams.Builder().build())) {
+            Dataset.write()
+                .allocator(allocator)
+                .schema(arrowSchema)
+                .uri(location)
+                .mode(WriteParams.WriteMode.CREATE)
+                .execute()) {
       // Dataset created
     }
 
@@ -894,7 +909,12 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
     try (RootAllocator allocator = new RootAllocator();
         Dataset dataset =
-            Dataset.create(allocator, location, arrowSchema, new WriteParams.Builder().build())) {
+            Dataset.write()
+                .allocator(allocator)
+                .schema(arrowSchema)
+                .uri(location)
+                .mode(WriteParams.WriteMode.CREATE)
+                .execute()) {
       // Dataset created
     }
 

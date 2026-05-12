@@ -140,10 +140,11 @@ public class AuthenticationFilter implements Filter {
     if (path == null) {
       return false;
     }
-    // Also match /health and /health/* — the root-level aliases that forward to /api/health/*.
-    // During a forward, getRequestURI() returns the original URI, not the forwarded target.
+    // Also match /health, /health/*, and /health.html — root-level aliases that forward to
+    // /api/health/*. During a forward, getRequestURI() returns the original URI, not the target.
     return path.equals("/health")
         || path.startsWith("/health/")
+        || path.equals("/health.html")
         || path.equals("/api/health")
         || path.startsWith("/api/health/");
   }

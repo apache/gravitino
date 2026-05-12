@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -36,6 +37,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -43,6 +45,7 @@ import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -110,21 +113,44 @@ public class TopicMetaService {
         newEntity.id(),
         oldTopicEntity.id());
 
-    Integer updateResult;
+    String metalakeName = ident.namespace().level(0);
+    String catalogName = ident.namespace().level(1);
+    String schemaName = ident.namespace().level(2);
+    String oldFullName =
+        NameIdentifierUtil.ofTopic(metalakeName, catalogName, schemaName, oldTopicEntity.name())
+            .toString();
+    boolean isRenamed = !Objects.equals(oldTopicEntity.name(), newEntity.name());
+
+    AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              TopicMetaMapper.class,
-              mapper ->
-                  mapper.updateTopicMeta(
-                      POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity), oldTopicPO));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              updateResult.set(
+                  SessionUtils.getWithoutCommit(
+                      TopicMetaMapper.class,
+                      mapper ->
+                          mapper.updateTopicMeta(
+                              POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity),
+                              oldTopicPO))),
+          () -> {
+            if (isRenamed && updateResult.get() > 0) {
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertEntityChange(
+                          metalakeName,
+                          Entity.EntityType.TOPIC.name(),
+                          oldFullName,
+                          OperateType.ALTER));
+            }
+          });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TOPIC, newEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult > 0) {
+    if (updateResult.get() > 0) {
       return newEntity;
     } else {
       throw new IOException("Failed to update the entity: " + ident);
@@ -267,40 +293,61 @@ public class TopicMetaService {
     TopicPO topicPO = getTopicPOByIdentifier(identifier);
     Long topicId = topicPO.getTopicId();
 
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaName = identifier.namespace().level(2);
+    String topicFullName =
+        NameIdentifierUtil.ofTopic(metalakeName, catalogName, schemaName, identifier.name())
+            .toString();
+
+    AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
-            SessionUtils.doWithoutCommit(
-                TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasByTopicId(topicId)),
-        () ->
+            deleteResult.set(
+                SessionUtils.getWithoutCommit(
+                    TopicMetaMapper.class,
+                    mapper -> mapper.softDeleteTopicMetasByTopicId(topicId))),
+        () -> {
+          if (deleteResult.get() > 0) {
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        topicId, MetadataObject.Type.TOPIC.name())),
-        () ->
+                        topicId, MetadataObject.Type.TOPIC.name()));
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper ->
                     mapper.softDeleteObjectRelsByMetadataObject(
-                        topicId, MetadataObject.Type.TOPIC.name())),
-        () ->
+                        topicId, MetadataObject.Type.TOPIC.name()));
             SessionUtils.doWithoutCommit(
                 TagMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        topicId, MetadataObject.Type.TOPIC.name())),
-        () ->
+                        topicId, MetadataObject.Type.TOPIC.name()));
             SessionUtils.doWithoutCommit(
                 StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(topicId)),
-        () ->
+                mapper -> mapper.softDeleteStatisticsByEntityId(topicId));
             SessionUtils.doWithoutCommit(
                 PolicyMetadataObjectRelMapper.class,
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        topicId, MetadataObject.Type.TOPIC.name())));
+                        topicId, MetadataObject.Type.TOPIC.name()));
+          }
+        },
+        () -> {
+          if (deleteResult.get() > 0) {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.TOPIC.name(),
+                        topicFullName,
+                        OperateType.DROP));
+          }
+        });
 
-    return true;
+    return deleteResult.get() > 0;
   }
 
   @Monitored(

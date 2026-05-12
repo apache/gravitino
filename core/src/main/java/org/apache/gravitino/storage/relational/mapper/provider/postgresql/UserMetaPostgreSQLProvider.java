@@ -104,4 +104,12 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + USER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
+
+  @Override
+  public String touchUserUpdatedAt(@Param("userId") long userId) {
+    return "UPDATE "
+        + USER_TABLE_NAME
+        + " SET updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE user_id = #{userId} AND deleted_at = 0";
+  }
 }

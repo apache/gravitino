@@ -132,6 +132,7 @@ public class TestAuthenticationFilter {
       "/health",
       "/health/live",
       "/health/ready",
+      "/health.html",
       "/api/health",
       "/api/health/",
       "/api/health/live",

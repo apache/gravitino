@@ -65,6 +65,12 @@ license: "This software is licensed under the Apache License version 2."
    ./gradlew build -PpythonVersion=3.12
    ```
 
+  If you don't need to build the Trino connector (for example, when building on a machine without JDK 24), you can skip it with:
+
+   ```shell
+   ./gradlew build -PskipTrinoConnector=true
+   ```
+
   If you want to build a module on its own, like the Spark connector, you can use Gradle to build a module with a specific name, like so:
 
    ```shell

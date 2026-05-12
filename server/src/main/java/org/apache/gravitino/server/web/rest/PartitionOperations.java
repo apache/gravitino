@@ -245,23 +245,24 @@ public class PartitionOperations {
                 purge
                     ? dispatcher.purgePartition(tableIdent, partition)
                     : dispatcher.dropPartition(tableIdent, partition);
-            if (!dropped) {
+            if (dropped) {
+              LOG.info(
+                  "Partition {} {} in table {}.{}.{}.{}",
+                  partition,
+                  purge ? "purged" : "dropped",
+                  metalake,
+                  catalog,
+                  schema,
+                  table);
+            } else {
               LOG.warn(
                   "Failed to drop partition {} under table {} under schema {}",
                   partition,
                   table,
                   schema);
             }
-            Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info(
-                "Partition {} {} in table {}.{}.{}.{}",
-                partition,
-                purge ? "purged" : "dropped",
-                metalake,
-                catalog,
-                schema,
-                table);
-            return response;
+
+            return Utils.ok(new DropResponse(dropped));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePartitionException(OperationType.DROP, "", table, e);

@@ -34,6 +34,7 @@ public class TestHealthAliasServlet {
   @ParameterizedTest
   @CsvSource({
     "/health,        /api/health",
+    "/health.html,   /api/health",
     "/health/live,   /api/health/live",
     "/health/ready,  /api/health/ready"
   })

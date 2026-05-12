@@ -26,8 +26,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 /**
- * Serves root-level health paths ({@code /health}, {@code /health/live}, {@code /health/ready}) by
- * forwarding to the canonical {@code /api/health/*} endpoints.
+ * Serves root-level health paths ({@code /health}, {@code /health/live}, {@code /health/ready},
+ * {@code /health.html}) by forwarding to the canonical {@code /api/health/*} endpoints.
  *
  * <p>This alias exists for compatibility with enterprise global traffic managers that require
  * probes at well-known root paths. The canonical implementation remains at {@code /api/health}.
@@ -37,8 +37,11 @@ public class HealthAliasServlet extends HttpServlet {
   @Override
   protected void doGet(HttpServletRequest req, HttpServletResponse resp)
       throws ServletException, IOException {
-    // Prepend /api to the incoming path: /health → /api/health, /health/live → /api/health/live
-    String targetPath = "/api" + req.getRequestURI();
+    // Map root-level health paths to their canonical /api/health counterparts.
+    // /health and /health.html both target the aggregate /api/health; legacy GTM
+    // standards sometimes hardcode the .html extension.
+    String uri = req.getRequestURI();
+    String targetPath = "/health.html".equals(uri) ? "/api/health" : "/api" + uri;
     RequestDispatcher dispatcher = req.getRequestDispatcher(targetPath);
     if (dispatcher == null) {
       resp.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, "health dispatcher unavailable");
