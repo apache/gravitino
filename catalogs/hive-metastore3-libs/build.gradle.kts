@@ -62,6 +62,7 @@ dependencies {
     exclude(group = "junit")
     exclude(group = "org.apache.ant")
     exclude(group = "org.apache.avro")
+    exclude(group = "org.apache.derby")
     exclude(group = "org.apache.hadoop", module = "hadoop-yarn-server-resourcemanager")
     exclude(group = "org.apache.hbase")
     exclude(group = "org.apache.logging.log4j")
