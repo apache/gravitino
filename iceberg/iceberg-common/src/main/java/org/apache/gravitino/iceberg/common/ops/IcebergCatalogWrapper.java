@@ -46,6 +46,7 @@ import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.exceptions.NoSuchTableException;
+import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
@@ -74,7 +75,6 @@ import org.slf4j.LoggerFactory;
 public class IcebergCatalogWrapper implements AutoCloseable {
 
   public static final Logger LOG = LoggerFactory.getLogger(IcebergCatalogWrapper.class);
-  private static final String OSS_LOCATION_PREFIX = "oss://";
 
   private final Object initializationLock = new Object();
   private volatile Catalog catalog;
@@ -279,8 +279,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public boolean tableExists(TableIdentifier tableIdentifier) {
     Optional<String> metadataLocation = getTableMetadataLocation(tableIdentifier);
-    if (metadataLocation.isPresent() && shouldCheckMetadataFileExists(metadataLocation.get())) {
-      return metadataFileExists(metadataLocation.get());
+    if (metadataLocation.isPresent() && shouldCheckMetadataFileExists()) {
+      Optional<Boolean> metadataFileExists = tryMetadataFileExists(metadataLocation.get());
+      if (metadataFileExists.isPresent()) {
+        return metadataFileExists.get();
+      }
     }
 
     return getCatalog().tableExists(tableIdentifier);
@@ -406,25 +409,35 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   private void checkMetadataFileBeforeLoad(TableIdentifier tableIdentifier) {
     Optional<String> metadataLocation = getTableMetadataLocation(tableIdentifier);
-    if (metadataLocation.isEmpty() || !shouldCheckMetadataFileExists(metadataLocation.get())) {
+    if (metadataLocation.isEmpty() || !shouldCheckMetadataFileExists()) {
       return;
     }
 
-    // Aliyun OSS exists() converts missing keys to false before Iceberg's metadata read retry loop.
-    if (!metadataFileExists(metadataLocation.get())) {
+    // exists() converts missing metadata files to false before Iceberg's metadata read retry loop.
+    Optional<Boolean> metadataFileExists = tryMetadataFileExists(metadataLocation.get());
+    if (metadataFileExists.isPresent() && !metadataFileExists.get()) {
       throw new NoSuchTableException(
           "Iceberg table metadata file does not exist for table %s: %s",
           tableIdentifier, metadataLocation.get());
     }
   }
 
-  private boolean shouldCheckMetadataFileExists(String metadataLocation) {
-    return StringUtils.startsWithIgnoreCase(metadataLocation, OSS_LOCATION_PREFIX)
-        && StringUtils.isNotBlank(icebergConfig.get(IcebergConfig.IO_IMPL));
+  private boolean shouldCheckMetadataFileExists() {
+    return StringUtils.isNotBlank(icebergConfig.get(IcebergConfig.IO_IMPL));
   }
 
-  private boolean metadataFileExists(String metadataLocation) {
-    return getMetadataFileIO().newInputFile(metadataLocation).exists();
+  private Optional<Boolean> tryMetadataFileExists(String metadataLocation) {
+    FileIO fileIO = getMetadataFileIO();
+    try {
+      return Optional.of(fileIO.newInputFile(metadataLocation).exists());
+    } catch (IllegalArgumentException | ValidationException e) {
+      LOG.debug(
+          "Skip metadata file existence check because FileIO {} cannot handle metadata location {}",
+          icebergConfig.get(IcebergConfig.IO_IMPL),
+          metadataLocation,
+          e);
+      return Optional.empty();
+    }
   }
 
   private FileIO getMetadataFileIO() {
