@@ -64,8 +64,6 @@ import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsResponse;
-import org.lance.namespace.model.CreateEmptyTableRequest;
-import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.CreateNamespaceResponse;
 import org.lance.namespace.model.CreateTableResponse;
@@ -433,12 +431,12 @@ public class LanceRESTServiceIT extends BaseIT {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
 
-    CreateEmptyTableRequest request = new CreateEmptyTableRequest();
+    DeclareTableRequest request = new DeclareTableRequest();
     String location = tempDir + "/" + "empty_table/";
     request.setLocation(location);
     request.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
 
-    CreateEmptyTableResponse response = ns.createEmptyTable(request);
+    DeclareTableResponse response = ns.declareTable(request);
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
@@ -457,18 +455,18 @@ public class LanceRESTServiceIT extends BaseIT {
         Assertions.assertThrows(
             RuntimeException.class,
             () -> {
-              ns.createEmptyTable(request);
+              ns.declareTable(request);
             });
     Assertions.assertTrue(exception.getMessage().contains("\"code\":5"));
 
     // Create an empty table with non-existent location should succeed
     // since storage is not touched
-    CreateEmptyTableRequest wrongLocationRequest = new CreateEmptyTableRequest();
+    DeclareTableRequest wrongLocationRequest = new DeclareTableRequest();
     wrongLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "another_table"));
     String another_location = tempDir + "/" + "another_location/";
     Assertions.assertFalse(new File(another_location).exists());
     wrongLocationRequest.setLocation(another_location);
-    response = ns.createEmptyTable(wrongLocationRequest);
+    response = ns.declareTable(wrongLocationRequest);
     Assertions.assertNotNull(response);
     Assertions.assertEquals(another_location, response.getLocation());
     // Will not touch storage, so the path should not be created.
@@ -478,8 +476,8 @@ public class LanceRESTServiceIT extends BaseIT {
     String correctedLocation = tempDir + "/" + "wrong_location_table/";
     wrongLocationRequest.setLocation(correctedLocation);
     wrongLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "wrong_location_table"));
-    CreateEmptyTableResponse wrongLocationResponse =
-        Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(wrongLocationRequest));
+    DeclareTableResponse wrongLocationResponse =
+        Assertions.assertDoesNotThrow(() -> ns.declareTable(wrongLocationRequest));
     Assertions.assertNotNull(wrongLocationResponse);
     Assertions.assertEquals(correctedLocation, wrongLocationResponse.getLocation());
   }
@@ -855,13 +853,13 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
     Assertions.assertTrue(exception.getMessage().contains("Table not found"));
     // Try to create a table and then deregister table
-    CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
+    DeclareTableRequest createEmptyTableRequest = new DeclareTableRequest();
     String location = tempDir + "/" + "to_be_deregistered_table/";
     ids = List.of(CATALOG_NAME, SCHEMA_NAME, "to_be_deregistered_table");
     createEmptyTableRequest.setLocation(location);
     createEmptyTableRequest.setId(ids);
-    CreateEmptyTableResponse response =
-        Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
+    DeclareTableResponse response =
+        Assertions.assertDoesNotThrow(() -> ns.declareTable(createEmptyTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
@@ -899,12 +897,12 @@ public class LanceRESTServiceIT extends BaseIT {
     createSchema();
 
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_exists");
-    CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
+    DeclareTableRequest createEmptyTableRequest = new DeclareTableRequest();
     String location = tempDir + "/" + "table_exists/";
     createEmptyTableRequest.setLocation(location);
     createEmptyTableRequest.setId(ids);
-    CreateEmptyTableResponse response =
-        Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
+    DeclareTableResponse response =
+        Assertions.assertDoesNotThrow(() -> ns.declareTable(createEmptyTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
@@ -928,12 +926,12 @@ public class LanceRESTServiceIT extends BaseIT {
     createSchema();
 
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_to_drop");
-    CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
+    DeclareTableRequest createEmptyTableRequest = new DeclareTableRequest();
     String location = tempDir + "/" + "table_to_drop/";
     createEmptyTableRequest.setLocation(location);
     createEmptyTableRequest.setId(ids);
-    CreateEmptyTableResponse response =
-        Assertions.assertDoesNotThrow(() -> ns.createEmptyTable(createEmptyTableRequest));
+    DeclareTableResponse response =
+        Assertions.assertDoesNotThrow(() -> ns.declareTable(createEmptyTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
@@ -1022,7 +1020,8 @@ public class LanceRESTServiceIT extends BaseIT {
 
     try {
       return createTableApi()
-          .createTable(String.join(DELIMITER, ids), body, DELIMITER, mode, additionalHeaders);
+          .createTable(
+              String.join(DELIMITER, ids), body, DELIMITER, mode, null, null, additionalHeaders);
     } catch (ApiException e) {
       throw toLanceNamespaceException(e);
     }

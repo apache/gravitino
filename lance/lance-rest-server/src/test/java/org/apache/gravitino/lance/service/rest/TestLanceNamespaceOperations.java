@@ -60,8 +60,6 @@ import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsResponse;
-import org.lance.namespace.model.CreateEmptyTableRequest;
-import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.CreateNamespaceResponse;
 import org.lance.namespace.model.CreateTableResponse;
@@ -115,6 +113,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     resourceConfig.property(CommonProperties.FEATURE_AUTO_DISCOVERY_DISABLE, true);
     resourceConfig.property(CommonProperties.MOXY_JSON_FEATURE_DISABLE, true);
     ObjectMapper mapper = new ObjectMapper();
+    mapper.registerModule(new org.openapitools.jackson.nullable.JsonNullableModule());
     JacksonJaxbJsonProvider provider = new JacksonJaxbJsonProvider();
     provider.setMapper(mapper);
     resourceConfig.register(provider);
@@ -449,12 +448,12 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     String delimiter = ".";
 
     // Test normal
-    CreateEmptyTableResponse createTableResponse = new CreateEmptyTableResponse();
+    DeclareTableResponse createTableResponse = new DeclareTableResponse();
     createTableResponse.setLocation("/path/to/table");
     createTableResponse.setStorageOptions(ImmutableMap.of("key", "value"));
     when(tableOps.createEmptyTable(any(), any(), any(), any())).thenReturn(createTableResponse);
 
-    CreateEmptyTableRequest tableRequest = new CreateEmptyTableRequest();
+    DeclareTableRequest tableRequest = new DeclareTableRequest();
     tableRequest.setLocation("/path/to/table");
 
     Response resp =
@@ -465,7 +464,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
-    CreateEmptyTableResponse response = resp.readEntity(CreateEmptyTableResponse.class);
+    DeclareTableResponse response = resp.readEntity(DeclareTableResponse.class);
     Assertions.assertEquals(createTableResponse.getLocation(), response.getLocation());
     Assertions.assertEquals(createTableResponse.getStorageOptions(), response.getStorageOptions());
 

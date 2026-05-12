@@ -47,9 +47,9 @@ import org.apache.gravitino.stats.PartitionStatisticsModification;
 import org.apache.gravitino.stats.PartitionStatisticsUpdate;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
+import org.apache.gravitino.stats.storage.LancePartitionStatisticStorage.DatasetHolder;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.lance.Dataset;
 import org.mockito.InOrder;
 
 public class TestLancePartitionStatisticStorage {
@@ -623,10 +623,10 @@ public class TestLancePartitionStatisticStorage {
       BufferAllocator allocator = spy(new RootAllocator(Long.MAX_VALUE));
       FieldUtils.writeField(storage, "allocator", allocator, true);
 
-      Cache<Long, Dataset> datasetCache = storage.getDatasetCache();
+      Cache<Long, DatasetHolder> datasetCache = storage.getDatasetCache();
       Assertions.assertNotNull(datasetCache);
 
-      Dataset dataset = mock(Dataset.class);
+      DatasetHolder holder = mock(DatasetHolder.class);
       VarCharVector buffer = new VarCharVector("test", allocator);
       buffer.allocateNew(1024);
 
@@ -635,17 +635,17 @@ public class TestLancePartitionStatisticStorage {
                 buffer.close();
                 return null;
               })
-          .when(dataset)
+          .when(holder)
           .close();
 
-      datasetCache.put(1L, dataset);
+      datasetCache.put(1L, holder);
 
       storage.close();
 
       Assertions.assertEquals(0, allocator.getAllocatedMemory());
 
-      InOrder inOrder = inOrder(dataset, allocator);
-      inOrder.verify(dataset).close();
+      InOrder inOrder = inOrder(holder, allocator);
+      inOrder.verify(holder).close();
       inOrder.verify(allocator).close();
 
     } finally {

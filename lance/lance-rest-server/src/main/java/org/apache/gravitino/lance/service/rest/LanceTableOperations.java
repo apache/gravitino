@@ -54,7 +54,6 @@ import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsResponse;
-import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateTableResponse;
 import org.lance.namespace.model.DeclareTableRequest;
 import org.lance.namespace.model.DeclareTableResponse;
@@ -164,7 +163,7 @@ public class LanceTableOperations {
       // conflict.
       props.putAll(headerProps);
 
-      CreateEmptyTableResponse response =
+      DeclareTableResponse response =
           lanceNamespace.asTableOps().createEmptyTable(tableId, delimiter, tableLocation, props);
       return Response.ok(response).build();
     } catch (Exception e) {
