@@ -22,7 +22,8 @@ The following table outlines the tested compatibility between Gravitino versions
 
 | Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions |
 |--------------------------------|--------------------------------|------------------------------|
-| 1.1.1                          | 0.0.10 – 0.0.15                | 0.0.6 – 0.0.8                |
+| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15               | 0.0.6 - 0.0.8                |
+| 1.3.0                          | 0.1.0 - 0.2.0                 | 0.0.6 - 0.2.0                |
 
 :::note
 - These version ranges show which versions are expected to work together.
@@ -157,7 +158,7 @@ pip install lance-ray
 
 :::info
 - Ray will be automatically installed if not already present
-- lance-ray is currently tested with Ray versions 2.41.0 to 2.50.0
+- The lance-namespace version must be less than or equal to 0.4.5.
 - Ensure Ray version compatibility in your environment before deployment
 :::
 
