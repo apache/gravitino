@@ -62,8 +62,8 @@ CREATE TABLE: 1 row
 
 CREATE TABLE: 2 rows
 
-"2","bob","20.75"
-"3","charlie","30.00"
+"2","bob"
+"3","charlie"
 
 DROP TABLE
 
