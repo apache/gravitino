@@ -30,7 +30,7 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.OwnerMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.OwnerRelDeletion;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.ibatis.annotations.Param;
 
 public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
@@ -152,7 +152,7 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
 
   @Override
   public String batchSoftDeleteOwnerRelByMetadataObjects(
-      @Param("deletions") List<OwnerRelDeletion> deletions) {
+      @Param("deletions") List<OwnerRelForDeletion> deletions) {
     return "<script>"
         + "UPDATE "
         + OWNER_TABLE_NAME

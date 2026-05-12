@@ -24,7 +24,7 @@ import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.OwnerMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.OwnerMetaPostgreSQLProvider;
-import org.apache.gravitino.storage.relational.po.OwnerRelDeletion;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -75,7 +75,7 @@ public class OwnerMetaSQLProviderFactory {
   }
 
   public static String batchSoftDeleteOwnerRelByMetadataObjects(
-      @Param("deletions") List<OwnerRelDeletion> deletions) {
+      @Param("deletions") List<OwnerRelForDeletion> deletions) {
     return getProvider().batchSoftDeleteOwnerRelByMetadataObjects(deletions);
   }
 
