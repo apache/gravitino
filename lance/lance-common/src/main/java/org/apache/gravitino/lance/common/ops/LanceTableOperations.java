@@ -20,7 +20,6 @@ package org.apache.gravitino.lance.common.ops;
 
 import java.util.Map;
 import java.util.Optional;
-import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateTableResponse;
 import org.lance.namespace.model.DeclareTableResponse;
 import org.lance.namespace.model.DeregisterTableResponse;
@@ -83,8 +82,7 @@ public interface LanceTableOperations {
    * @deprecated Use {@link #declareTable} instead.
    */
   @Deprecated
-  @SuppressWarnings("deprecation")
-  CreateEmptyTableResponse createEmptyTable(
+  DeclareTableResponse createEmptyTable(
       String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties);
 
   /**

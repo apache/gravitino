@@ -53,7 +53,6 @@ import org.apache.gravitino.rel.TableChange;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
-import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateTableResponse;
 import org.lance.namespace.model.DeclareTableResponse;
 import org.lance.namespace.model.DeregisterTableResponse;
@@ -210,7 +209,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
   @Override
   @SuppressWarnings("deprecation")
-  public CreateEmptyTableResponse createEmptyTable(
+  public DeclareTableResponse createEmptyTable(
       String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties) {
     // Empty table creation only supports CREATE mode (not EXIST_OK or OVERWRITE).
     ImmutableMap<String, String> props =
@@ -222,7 +221,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     CreateTableResponse response =
         createTable(tableId, "create", delimiter, tableLocation, props, null);
-    CreateEmptyTableResponse emptyTableResponse = new CreateEmptyTableResponse();
+    DeclareTableResponse emptyTableResponse = new DeclareTableResponse();
     emptyTableResponse.setLocation(response.getLocation());
     emptyTableResponse.setStorageOptions(response.getStorageOptions());
     return emptyTableResponse;
