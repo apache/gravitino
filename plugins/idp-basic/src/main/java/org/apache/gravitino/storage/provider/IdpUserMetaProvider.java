@@ -16,32 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.storage.provider;
 
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
+import org.apache.gravitino.storage.relational.po.IdpUserPO;
 
-dependencies {
-  implementation(project(":core"))
-  implementation(libs.bcprov.jdk18on)
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
-  implementation(libs.mybatis)
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.mockito.core)
-  testImplementation(libs.mockito.inline)
-  testImplementation(libs.postgresql.driver)
-  testAnnotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
-
-tasks {
-  test {
-    environment("GRAVITINO_HOME", rootDir.path)
-    environment("GRAVITINO_TEST", "true")
-  }
-}
+/** Compatibility bridge for the idp-basic user metadata provider type. */
+public interface IdpUserMetaProvider
+    extends org.apache.gravitino.storage.relational.provider.IdpUserMetaProvider<IdpUserPO> {}

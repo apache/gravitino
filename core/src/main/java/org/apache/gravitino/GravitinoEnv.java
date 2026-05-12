@@ -24,6 +24,7 @@ import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.IdpManager;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
@@ -169,6 +170,7 @@ public class GravitinoEnv {
   private FutureGrantManager futureGrantManager;
   private GravitinoAuthorizer gravitinoAuthorizer;
   private StatisticDispatcher statisticDispatcher;
+  private IdpManager idpManager;
 
   protected GravitinoEnv() {}
 
@@ -458,6 +460,12 @@ public class GravitinoEnv {
     return statisticDispatcher;
   }
 
+  /** Get the built-in IdP manager implementation. */
+  public IdpManager idpManager() {
+    Preconditions.checkArgument(idpManager != null, "GravitinoEnv is not initialized.");
+    return idpManager;
+  }
+
   public boolean cacheEnabled() {
     return config == null || config.get(Configs.CACHE_ENABLED);
   }
@@ -520,6 +528,14 @@ public class GravitinoEnv {
         statisticDispatcher.close();
       } catch (Exception e) {
         LOG.warn("Failed to close StatisticDispatcher", e);
+      }
+    }
+
+    if (idpManager != null) {
+      try {
+        idpManager.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close IdpManager", e);
       }
     }
 
@@ -685,5 +701,7 @@ public class GravitinoEnv {
     BuiltInJobTemplateEventListener builtInJobTemplateListener =
         new BuiltInJobTemplateEventListener(jobManager, entityStore, idGenerator);
     eventListenerManager.addEventListener("builtin-job-template", builtInJobTemplateListener);
+
+    this.idpManager = IdpManagerFactory.createIdpManager();
   }
 }
