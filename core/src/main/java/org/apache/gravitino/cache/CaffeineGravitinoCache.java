@@ -20,6 +20,7 @@ package org.apache.gravitino.cache;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Ticker;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -41,10 +42,15 @@ public class CaffeineGravitinoCache<K, V> implements GravitinoCache<K, V> {
    * @param maxSize the maximum number of entries in the cache
    */
   public CaffeineGravitinoCache(long ttlMs, long maxSize) {
+    this(ttlMs, maxSize, Ticker.systemTicker());
+  }
+
+  CaffeineGravitinoCache(long ttlMs, long maxSize, Ticker ticker) {
     this.cache =
         Caffeine.newBuilder()
             .expireAfterWrite(ttlMs, TimeUnit.MILLISECONDS)
             .maximumSize(maxSize)
+            .ticker(ticker)
             .build();
   }
 
@@ -71,7 +77,7 @@ public class CaffeineGravitinoCache<K, V> implements GravitinoCache<K, V> {
 
   @Override
   public void invalidateByPrefix(String prefix) {
-    cache.asMap().keySet().removeIf(k -> k.toString().startsWith(prefix));
+    cache.asMap().keySet().removeIf(k -> k instanceof String && ((String) k).startsWith(prefix));
   }
 
   @Override

@@ -18,7 +18,10 @@
  */
 package org.apache.gravitino.cache;
 
+import com.github.benmanes.caffeine.cache.Ticker;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -188,17 +191,33 @@ public class TestGravitinoCache {
   }
 
   @Test
-  void testCaffeineExpiresAfterAccessTtl() throws InterruptedException {
-    CaffeineGravitinoCache<String, Long> cache = new CaffeineGravitinoCache<>(50L, 1000L);
+  void testCaffeineInvalidateByPrefixIgnoresNonStringKeys() {
+    CaffeineGravitinoCache<Long, String> cache = new CaffeineGravitinoCache<>(60_000L, 1000L);
+    try {
+      cache.put(10L, "role10");
+      cache.put(11L, "role11");
+
+      cache.invalidateByPrefix("1");
+
+      Assertions.assertEquals(2, cache.size());
+      Assertions.assertEquals("role10", cache.getIfPresent(10L).get());
+      Assertions.assertEquals("role11", cache.getIfPresent(11L).get());
+    } finally {
+      cache.close();
+    }
+  }
+
+  @Test
+  void testCaffeineExpiresAfterWriteTtl() {
+    ManualTicker ticker = new ManualTicker();
+    CaffeineGravitinoCache<String, Long> cache = new CaffeineGravitinoCache<>(50L, 1000L, ticker);
     try {
       cache.put("k", 1L);
       Assertions.assertTrue(cache.getIfPresent("k").isPresent());
 
-      Thread.sleep(120L);
-      // Caffeine cleanup is lazy; force it by accessing again then waiting briefly
+      ticker.advance(51L, TimeUnit.MILLISECONDS);
       Optional<Long> afterTtl = cache.getIfPresent("k");
-      Assertions.assertFalse(
-          afterTtl.isPresent(), "Entry should have expired after TTL elapsed beyond grace");
+      Assertions.assertFalse(afterTtl.isPresent(), "Entry should have expired after write TTL");
     } finally {
       cache.close();
     }
@@ -278,6 +297,19 @@ public class TestGravitinoCache {
       Assertions.assertEquals(0, cache.size());
     } finally {
       cache.close();
+    }
+  }
+
+  private static class ManualTicker implements Ticker {
+    private final AtomicLong nanos = new AtomicLong();
+
+    @Override
+    public long read() {
+      return nanos.get();
+    }
+
+    private void advance(long time, TimeUnit unit) {
+      nanos.addAndGet(unit.toNanos(time));
     }
   }
 }
