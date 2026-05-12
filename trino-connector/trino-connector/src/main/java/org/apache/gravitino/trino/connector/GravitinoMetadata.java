@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_COLUMN_NOT_EXISTS;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_TABLE_NOT_EXISTS;
 
@@ -231,14 +232,12 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       Optional<ConnectorTableLayout> layout,
       RetryMode retryMode,
       boolean replace) {
-    SchemaTableName tableName = tableMetadata.getTable();
-
-    // CREATE OR REPLACE TABLE AS SELECT: drop the existing table first if present.
-    if (replace
-        && catalogConnectorMetadata.tableExists(
-            tableName.getSchemaName(), tableName.getTableName())) {
-      catalogConnectorMetadata.dropTable(tableName);
+    if (replace) {
+      throw new TrinoException(
+          NOT_SUPPORTED, "This connector does not support replacing a table");
     }
+
+    SchemaTableName tableName = tableMetadata.getTable();
 
     // Create the table in the Gravitino catalog
     GravitinoTable table = metadataAdapter.createTable(tableMetadata);

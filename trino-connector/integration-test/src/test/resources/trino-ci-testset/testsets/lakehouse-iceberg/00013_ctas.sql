@@ -41,18 +41,7 @@ SELECT * FROM gt_ctas_db.ctas_partitioned ORDER BY id;
 
 show create table gt_ctas_db.ctas_partitioned;
 
--- Test 6: CREATE OR REPLACE TABLE AS SELECT (replace existing table)
-CREATE TABLE gt_ctas_db.ctas_replace AS SELECT id, name FROM gt_ctas_db.src_table WHERE id = 1;
-
-SELECT * FROM gt_ctas_db.ctas_replace ORDER BY id;
-
-CREATE OR REPLACE TABLE gt_ctas_db.ctas_replace AS SELECT id, name FROM gt_ctas_db.src_table WHERE id > 1;
-
-SELECT * FROM gt_ctas_db.ctas_replace ORDER BY id;
-
 -- Cleanup
-DROP TABLE gt_ctas_db.ctas_replace;
-
 DROP TABLE gt_ctas_db.ctas_partitioned;
 
 DROP TABLE gt_ctas_db.ctas_empty;
