@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -79,12 +80,19 @@ import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTablesRequest;
 import software.amazon.awssdk.services.glue.model.GetTablesResponse;
 import software.amazon.awssdk.services.glue.model.GlueException;
+import software.amazon.awssdk.services.glue.model.IcebergInput;
+import software.amazon.awssdk.services.glue.model.IcebergTableUpdate;
+import software.amazon.awssdk.services.glue.model.MetadataOperation;
+import software.amazon.awssdk.services.glue.model.OpenTableFormatInput;
 import software.amazon.awssdk.services.glue.model.Order;
 import software.amazon.awssdk.services.glue.model.SerDeInfo;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 import software.amazon.awssdk.services.glue.model.UpdateDatabaseRequest;
+import software.amazon.awssdk.services.glue.model.UpdateIcebergInput;
+import software.amazon.awssdk.services.glue.model.UpdateIcebergTableInput;
+import software.amazon.awssdk.services.glue.model.UpdateOpenTableFormatInput;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 
 /**
@@ -117,6 +125,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   /** Nullable — when null all table formats are exposed. */
   @VisibleForTesting Set<String> tableFormatFilter;
 
+  @VisibleForTesting String defaultTableFormat;
+
   private final GlueTypeConverter typeConverter = new GlueTypeConverter();
 
   @Override
@@ -125,6 +135,9 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       throws RuntimeException {
     this.glueClient = GlueClientProvider.buildClient(config);
     this.catalogId = config.get(GlueConstants.AWS_GLUE_CATALOG_ID);
+    this.defaultTableFormat =
+        config.getOrDefault(
+            GlueConstants.DEFAULT_TABLE_FORMAT, GlueConstants.DEFAULT_TABLE_FORMAT_VALUE);
     String filterProp =
         config.getOrDefault(
             GlueConstants.TABLE_FORMAT_FILTER, GlueConstants.DEFAULT_TABLE_FORMAT_FILTER);
@@ -375,24 +388,52 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     String dbName = schemaName(ident.namespace());
     Map<String, String> props = properties != null ? properties : Collections.emptyMap();
 
+    String tableFormat = props.getOrDefault(GlueConstants.TABLE_FORMAT, defaultTableFormat);
+    boolean isIceberg = GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(tableFormat);
+
+    // For Iceberg tables, stamp table_type=ICEBERG into the Glue parameters so that
+    // isIcebergTable() detection works consistently for future alterTable/listTable calls.
+    Map<String, String> finalProps = props;
+    if (isIceberg) {
+      finalProps = new HashMap<>(props);
+      finalProps.put(GlueConstants.TABLE_TYPE_PARAM, GlueConstants.ICEBERG_TABLE_TYPE_VALUE);
+    }
+
     TableInput input =
         buildTableInput(
-            ident.name(), comment, columns, props, partitions, distribution, sortOrders);
+            ident.name(), comment, columns, finalProps, partitions, distribution, sortOrders);
 
     CreateTableRequest.Builder req =
         CreateTableRequest.builder().databaseName(dbName).tableInput(input);
-    applyCatalogId(catalogId, req::catalogId);
 
-    try {
-      glueClient.createTable(req.build());
-    } catch (EntityNotFoundException e) {
-      throw new NoSuchSchemaException(e, "Schema %s does not exist", dbName);
-    } catch (GlueException e) {
-      throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
+    if (isIceberg) {
+      // Register mode: metadata_location points to existing Iceberg metadata.
+      // Create mode: new table; Glue writes metadata.json at the given location.
+      boolean registerMode = props.containsKey(GlueConstants.METADATA_LOCATION);
+      if (!registerMode) {
+        Preconditions.checkArgument(
+            props.containsKey(GlueConstants.LOCATION),
+            "Either '%s' (register existing table) or '%s' (create new table) is required",
+            GlueConstants.METADATA_LOCATION,
+            GlueConstants.LOCATION);
+        req.openTableFormatInput(
+            OpenTableFormatInput.builder()
+                .icebergInput(
+                    IcebergInput.builder()
+                        .metadataOperation(MetadataOperation.CREATE)
+                        .version(GlueConstants.ICEBERG_FORMAT_VERSION)
+                        .build())
+                .build());
+      }
     }
 
-    LOG.info("Created Glue table {}.{}", dbName, ident.name());
+    executeCreateTable(dbName, ident, req);
+    LOG.info("Created {} table {}.{}", isIceberg ? "Iceberg" : "Glue", dbName, ident.name());
 
+    if (isIceberg) {
+      // Load from Glue to pick up any server-set parameters (e.g. current-schema-id).
+      return loadTable(ident);
+    }
     GlueTable created =
         GlueTable.builder()
             .withName(ident.name())
@@ -416,8 +457,24 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   public GlueTable alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
 
-    GlueTable current = loadTable(ident);
     String dbName = schemaName(ident.namespace());
+
+    GetTableRequest.Builder rawReq =
+        GetTableRequest.builder().databaseName(dbName).name(ident.name());
+    applyCatalogId(catalogId, rawReq::catalogId);
+    Table rawGlueTable;
+    try {
+      rawGlueTable = glueClient.getTable(rawReq.build()).table();
+    } catch (GlueException e) {
+      throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
+    }
+
+    if (GlueIcebergHelper.isIcebergTable(rawGlueTable)) {
+      return alterIcebergTable(ident, dbName, rawGlueTable, changes);
+    }
+
+    GlueTable current = GlueTable.fromGlueTable(rawGlueTable, typeConverter);
+    current.initOpsContext(glueClient, catalogId, dbName);
 
     String newName = current.name();
     String newComment = current.comment();
@@ -470,16 +527,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             current.distribution(),
             current.sortOrder());
 
-    UpdateTableRequest.Builder req =
-        UpdateTableRequest.builder().databaseName(dbName).tableInput(input);
-    applyCatalogId(catalogId, req::catalogId);
-
-    try {
-      glueClient.updateTable(req.build());
-    } catch (GlueException e) {
-      throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
-    }
-
+    executeUpdateTable(ident, UpdateTableRequest.builder().databaseName(dbName).tableInput(input));
     LOG.info("Altered Glue table {}.{}", dbName, ident.name());
 
     GlueTable altered =
@@ -495,6 +543,55 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             .build();
     altered.initOpsContext(glueClient, catalogId, dbName);
     return altered;
+  }
+
+  private GlueTable alterIcebergTable(
+      NameIdentifier ident, String dbName, Table rawGlueTable, TableChange... changes) {
+
+    GlueIcebergHelper.validateChanges(changes);
+
+    Optional<IcebergTableUpdate> schemaUpdate =
+        GlueIcebergHelper.buildSchemaUpdate(rawGlueTable, changes);
+    Map<String, String> propUpdates = GlueIcebergHelper.extractSetProperties(changes);
+
+    if (schemaUpdate.isEmpty() && propUpdates.isEmpty()) {
+      LOG.debug("No-op alterIcebergTable for {}.{}", dbName, ident.name());
+      return loadTable(ident);
+    }
+
+    if (schemaUpdate.isPresent()) {
+      UpdateIcebergTableInput icebergTableInput =
+          UpdateIcebergTableInput.builder().updates(schemaUpdate.get()).build();
+      UpdateIcebergInput icebergInput =
+          UpdateIcebergInput.builder().updateIcebergTableInput(icebergTableInput).build();
+      UpdateOpenTableFormatInput openFormatInput =
+          UpdateOpenTableFormatInput.builder().updateIcebergInput(icebergInput).build();
+      executeUpdateTable(
+          ident,
+          UpdateTableRequest.builder()
+              .databaseName(dbName)
+              .updateOpenTableFormatInput(openFormatInput));
+      LOG.info("Altered Iceberg table {}.{} schema via Glue native API", dbName, ident.name());
+      // Re-fetch to pick up server-side parameter changes (e.g., current-schema-id update)
+      // before using rawGlueTable.parameters() for the property update below.
+      GetTableRequest.Builder rawReq =
+          GetTableRequest.builder().databaseName(dbName).name(ident.name());
+      applyCatalogId(catalogId, rawReq::catalogId);
+      rawGlueTable = glueClient.getTable(rawReq.build()).table();
+    }
+
+    if (!propUpdates.isEmpty()) {
+      Map<String, String> newParams = new HashMap<>(rawGlueTable.parameters());
+      newParams.putAll(propUpdates);
+      executeUpdateTable(
+          ident,
+          UpdateTableRequest.builder()
+              .databaseName(dbName)
+              .tableInput(tableInputFromRaw(rawGlueTable, newParams)));
+      LOG.info("Altered Iceberg table {}.{} properties directly", dbName, ident.name());
+    }
+
+    return loadTable(ident);
   }
 
   @Override
@@ -527,9 +624,50 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   private boolean matchesFormatFilter(Table table) {
     if (tableFormatFilter == null) return true;
     String fmt = table.hasParameters() ? table.parameters().get(GlueConstants.TABLE_FORMAT) : null;
+    // Fall back to checking native Glue table_type for tables created without the Gravitino
+    // table-format property (e.g. created via default-table-format config or external tooling).
+    if (fmt == null && GlueIcebergHelper.isIcebergTable(table)) {
+      fmt = GlueConstants.ICEBERG_TABLE_TYPE_VALUE;
+    }
     String normalized =
         fmt != null ? fmt.toLowerCase(Locale.ROOT) : GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
     return tableFormatFilter.contains(normalized);
+  }
+
+  private void executeCreateTable(
+      String dbName, NameIdentifier ident, CreateTableRequest.Builder req) {
+    applyCatalogId(catalogId, req::catalogId);
+    try {
+      glueClient.createTable(req.build());
+    } catch (EntityNotFoundException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", dbName);
+    } catch (GlueException e) {
+      throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
+    }
+  }
+
+  private void executeUpdateTable(NameIdentifier ident, UpdateTableRequest.Builder req) {
+    applyCatalogId(catalogId, req::catalogId);
+    try {
+      glueClient.updateTable(req.build());
+    } catch (GlueException e) {
+      throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
+    }
+  }
+
+  /** Copies fields from {@code rawGlueTable} into a {@link TableInput} with updated parameters. */
+  private static TableInput tableInputFromRaw(Table rawGlueTable, Map<String, String> newParams) {
+    TableInput.Builder b =
+        TableInput.builder()
+            .name(rawGlueTable.name())
+            .description(rawGlueTable.description())
+            .tableType(rawGlueTable.tableType())
+            .parameters(newParams);
+    if (rawGlueTable.storageDescriptor() != null) {
+      b.storageDescriptor(rawGlueTable.storageDescriptor())
+          .partitionKeys(rawGlueTable.partitionKeys());
+    }
+    return b.build();
   }
 
   private TableInput buildTableInput(
