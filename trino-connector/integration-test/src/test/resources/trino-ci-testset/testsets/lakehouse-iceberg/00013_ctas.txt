@@ -56,6 +56,17 @@ WITH (
    partitioning = ARRAY['name']
 )"
 
+CREATE TABLE: 1 rows
+
+"1","alice"
+
+CREATE TABLE: 2 rows
+
+"2","bob","20.75"
+"3","charlie","30.00"
+
+DROP TABLE
+
 DROP TABLE
 
 DROP TABLE
