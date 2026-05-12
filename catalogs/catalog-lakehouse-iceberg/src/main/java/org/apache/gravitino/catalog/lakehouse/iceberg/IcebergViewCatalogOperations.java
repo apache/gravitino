@@ -255,7 +255,8 @@ class IcebergViewCatalogOperations {
 
       List<MetadataUpdate> updates =
           new ArrayList<>(buildPropertyMetadataUpdates(setProps, removeProps));
-      replaceOpt.ifPresent(replaceView -> updates.addAll(buildNewViewVersionUpdates(ident, replaceView, metadata)));
+      replaceOpt.ifPresent(
+          replaceView -> updates.addAll(buildNewViewVersionUpdates(ident, replaceView, metadata)));
 
       if (updates.isEmpty()) {
         return loadView(ident);
