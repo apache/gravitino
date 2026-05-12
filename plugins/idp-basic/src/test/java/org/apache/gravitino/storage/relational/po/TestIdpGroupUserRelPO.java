@@ -44,6 +44,23 @@ public class TestIdpGroupUserRelPO {
   }
 
   @Test
+  public void testIdpGroupUserRelPOImplementsMeta() {
+    IdpGroupUserRelMeta relMeta =
+        IdpGroupUserRelPO.builder()
+            .withId(1L)
+            .withGroupId(2L)
+            .withUserId(3L)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
+            .withDeletedAt(0L)
+            .build();
+
+    Assertions.assertEquals(1L, relMeta.getId());
+    Assertions.assertEquals(2L, relMeta.getGroupId());
+    Assertions.assertEquals(3L, relMeta.getUserId());
+  }
+
+  @Test
   public void testIdpGroupUserRelPOBuilderValidation() {
     Assertions.assertThrows(
         IllegalArgumentException.class,

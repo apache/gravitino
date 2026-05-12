@@ -42,6 +42,21 @@ public class TestIdpGroupPO {
   }
 
   @Test
+  public void testIdpGroupPOImplementsMeta() {
+    IdpGroupMeta groupMeta =
+        IdpGroupPO.builder()
+            .withGroupId(1L)
+            .withGroupName("engineering")
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
+            .withDeletedAt(0L)
+            .build();
+
+    Assertions.assertEquals(1L, groupMeta.getGroupId());
+    Assertions.assertEquals("engineering", groupMeta.getGroupName());
+  }
+
+  @Test
   public void testIdpGroupPOBuilderValidation() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
