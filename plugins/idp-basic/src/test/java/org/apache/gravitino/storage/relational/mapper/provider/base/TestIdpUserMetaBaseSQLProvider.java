@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
@@ -65,6 +66,39 @@ public class TestIdpUserMetaBaseSQLProvider {
     Assertions.assertTrue(normalizedSql.contains("SELECT user_id as userId"));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta"));
     Assertions.assertTrue(normalizedSql.matches(".*user_name IN \\( \\? , \\? \\).*"));
+    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
+  }
+
+  @Test
+  public void testSelectIdpUsersWithEmptyUserNames() {
+    String script = createProvider().selectIdpUsers(Collections.emptyList());
+    Map<String, Object> params = new HashMap<>();
+    params.put("userNames", Collections.emptyList());
+
+    String normalizedSql = renderScript(script, params);
+
+    Assertions.assertFalse(
+        normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
+        "Empty userNames should not generate invalid SQL IN (...) with no values");
+    Assertions.assertTrue(
+        normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"),
+        "Empty userNames should result in an unsatisfiable WHERE clause (e.g., AND 1 = 0)");
+  }
+
+  @Test
+  public void testSelectIdpUsersWithNullUserNames() {
+    String script = createProvider().selectIdpUsers(null);
+    Map<String, Object> params = new HashMap<>();
+    params.put("userNames", null);
+
+    String normalizedSql = renderScript(script, params);
+
+    Assertions.assertFalse(
+        normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
+        "Null userNames should not generate invalid SQL IN (...) with no values");
+    Assertions.assertTrue(
+        normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"),
+        "Null userNames should result in an unsatisfiable WHERE clause (e.g., AND 1 = 0)");
   }
 
   @Test

@@ -42,10 +42,19 @@ public class IdpUserMetaBaseSQLProvider {
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " WHERE deleted_at = 0 AND user_name IN "
-        + "<foreach item='item' collection='userNames' open='(' separator=',' close=')'>"
+        + " WHERE deleted_at = 0 "
+        + "<choose>"
+        + "<when test='userNames != null and userNames.size() > 0'>"
+        + "AND user_name IN ("
+        + "<foreach item='item' collection='userNames' separator=','>"
         + "#{item}"
         + "</foreach>"
+        + ") "
+        + "</when>"
+        + "<otherwise>"
+        + "AND 1 = 0 "
+        + "</otherwise>"
+        + "</choose>"
         + "</script>";
   }
 
