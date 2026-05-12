@@ -44,23 +44,6 @@ public class TestIdpUserPO {
   }
 
   @Test
-  public void testIdpUserPOImplementsMeta() {
-    IdpUserMeta userMeta =
-        IdpUserPO.builder()
-            .withUserId(1L)
-            .withUserName("alice")
-            .withPasswordHash("hash")
-            .withCurrentVersion(1L)
-            .withLastVersion(1L)
-            .withDeletedAt(0L)
-            .build();
-
-    Assertions.assertEquals(1L, userMeta.getUserId());
-    Assertions.assertEquals("alice", userMeta.getUserName());
-    Assertions.assertEquals("hash", userMeta.getPasswordHash());
-  }
-
-  @Test
   public void testIdpUserPOBuilderValidation() {
     Assertions.assertThrows(
         IllegalArgumentException.class,

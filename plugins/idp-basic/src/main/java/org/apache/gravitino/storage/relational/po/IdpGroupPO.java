@@ -21,7 +21,7 @@ package org.apache.gravitino.storage.relational.po;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
-public class IdpGroupPO implements IdpGroupMeta {
+public class IdpGroupPO {
   private Long groupId;
   private String groupName;
   private Long currentVersion;
