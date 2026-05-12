@@ -28,8 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.ServiceLoader;
-import org.apache.gravitino.storage.relational.po.IdpGroupMeta;
-import org.apache.gravitino.storage.relational.po.IdpGroupUserRelMeta;
 import org.apache.gravitino.storage.relational.provider.IdpGroupMetaProvider;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -41,7 +39,7 @@ public class TestIdpGroupMetaService {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpGroupMetaProvider> serviceLoader = mock(ServiceLoader.class);
       IdpGroupMetaProvider provider = mock(IdpGroupMetaProvider.class);
-      IdpGroupMeta groupMeta = mock(IdpGroupMeta.class);
+      Object groupMeta = new Object();
       mockedLoader
           .when(() -> ServiceLoader.load(IdpGroupMetaProvider.class))
           .thenReturn(serviceLoader);
@@ -73,7 +71,7 @@ public class TestIdpGroupMetaService {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpGroupMetaProvider> serviceLoader = mock(ServiceLoader.class);
       IdpGroupMetaProvider provider = mock(IdpGroupMetaProvider.class);
-      IdpGroupMeta groupMeta = mock(IdpGroupMeta.class);
+      Object groupMeta = new Object();
       mockedLoader
           .when(() -> ServiceLoader.load(IdpGroupMetaProvider.class))
           .thenReturn(serviceLoader);
@@ -90,7 +88,7 @@ public class TestIdpGroupMetaService {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpGroupMetaProvider> serviceLoader = mock(ServiceLoader.class);
       IdpGroupMetaProvider provider = mock(IdpGroupMetaProvider.class);
-      IdpGroupMeta groupMeta = mock(IdpGroupMeta.class);
+      Object groupMeta = new Object();
       mockedLoader
           .when(() -> ServiceLoader.load(IdpGroupMetaProvider.class))
           .thenReturn(serviceLoader);
@@ -124,8 +122,8 @@ public class TestIdpGroupMetaService {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpGroupMetaProvider> serviceLoader = mock(ServiceLoader.class);
       IdpGroupMetaProvider provider = mock(IdpGroupMetaProvider.class);
-      IdpGroupUserRelMeta relation = mock(IdpGroupUserRelMeta.class);
-      List<IdpGroupUserRelMeta> relations = List.of(relation);
+      Object relation = new Object();
+      List<Object> relations = List.of(relation);
       mockedLoader
           .when(() -> ServiceLoader.load(IdpGroupMetaProvider.class))
           .thenReturn(serviceLoader);

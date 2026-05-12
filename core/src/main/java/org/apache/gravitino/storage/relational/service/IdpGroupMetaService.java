@@ -20,14 +20,11 @@ package org.apache.gravitino.storage.relational.service;
 
 import java.util.List;
 import java.util.Optional;
-import org.apache.gravitino.storage.relational.po.IdpGroupMeta;
-import org.apache.gravitino.storage.relational.po.IdpGroupUserRelMeta;
 import org.apache.gravitino.storage.relational.provider.IdpGroupMetaProvider;
 import org.apache.gravitino.storage.relational.provider.IdpMetaProviderLoader;
 
 /** Core facade for built-in IdP group metadata operations via plugin implementation. */
-public class IdpGroupMetaService<G extends IdpGroupMeta, R extends IdpGroupUserRelMeta>
-    implements IdpGroupMetaProvider<G, R> {
+public class IdpGroupMetaService<G, R> implements IdpGroupMetaProvider<G, R> {
   private static final IdpGroupMetaService<?, ?> INSTANCE = new IdpGroupMetaService<>();
 
   /**
@@ -38,8 +35,7 @@ public class IdpGroupMetaService<G extends IdpGroupMeta, R extends IdpGroupUserR
    * @return the singleton service
    */
   @SuppressWarnings("unchecked")
-  public static <G extends IdpGroupMeta, R extends IdpGroupUserRelMeta>
-      IdpGroupMetaService<G, R> getInstance() {
+  public static <G, R> IdpGroupMetaService<G, R> getInstance() {
     return (IdpGroupMetaService<G, R>) INSTANCE;
   }
 

@@ -20,10 +20,9 @@ package org.apache.gravitino.storage.relational.provider;
 
 import java.util.List;
 import java.util.Optional;
-import org.apache.gravitino.storage.relational.po.IdpUserMeta;
 
 /** SPI for built-in IdP user metadata operations. */
-public interface IdpUserMetaProvider<U extends IdpUserMeta> {
+public interface IdpUserMetaProvider<U> {
 
   /**
    * Find a built-in IdP user by name.

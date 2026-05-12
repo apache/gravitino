@@ -20,12 +20,11 @@ package org.apache.gravitino.storage.relational.service;
 
 import java.util.List;
 import java.util.Optional;
-import org.apache.gravitino.storage.relational.po.IdpUserMeta;
 import org.apache.gravitino.storage.relational.provider.IdpMetaProviderLoader;
 import org.apache.gravitino.storage.relational.provider.IdpUserMetaProvider;
 
 /** Core facade for built-in IdP user metadata operations via plugin implementation. */
-public class IdpUserMetaService<U extends IdpUserMeta> implements IdpUserMetaProvider<U> {
+public class IdpUserMetaService<U> implements IdpUserMetaProvider<U> {
   private static final IdpUserMetaService<?> INSTANCE = new IdpUserMetaService<>();
 
   /**
@@ -35,7 +34,7 @@ public class IdpUserMetaService<U extends IdpUserMeta> implements IdpUserMetaPro
    * @return the singleton service
    */
   @SuppressWarnings("unchecked")
-  public static <U extends IdpUserMeta> IdpUserMetaService<U> getInstance() {
+  public static <U> IdpUserMetaService<U> getInstance() {
     return (IdpUserMetaService<U>) INSTANCE;
   }
 

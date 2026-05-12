@@ -20,11 +20,9 @@ package org.apache.gravitino.storage.relational.provider;
 
 import java.util.List;
 import java.util.Optional;
-import org.apache.gravitino.storage.relational.po.IdpGroupMeta;
-import org.apache.gravitino.storage.relational.po.IdpGroupUserRelMeta;
 
 /** SPI for built-in IdP group metadata operations. */
-public interface IdpGroupMetaProvider<G extends IdpGroupMeta, R extends IdpGroupUserRelMeta> {
+public interface IdpGroupMetaProvider<G, R> {
 
   /**
    * Find a built-in IdP group by name.

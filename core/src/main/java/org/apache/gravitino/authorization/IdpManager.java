@@ -20,11 +20,9 @@ package org.apache.gravitino.authorization;
 
 import java.io.Closeable;
 import java.util.List;
-import org.apache.gravitino.storage.relational.po.IdpGroupMeta;
-import org.apache.gravitino.storage.relational.po.IdpUserMeta;
 
 /** Manager for built-in IdP user and group management APIs. */
-public interface IdpManager extends Closeable {
+public interface IdpManager<U, G> extends Closeable {
 
   /**
    * Create a built-in IdP user.
@@ -33,7 +31,7 @@ public interface IdpManager extends Closeable {
    * @param password the initial password for the user
    * @return the created user
    */
-  IdpUserMeta createUser(String userName, String password);
+  U createUser(String userName, String password);
 
   /**
    * Get a built-in IdP user.
@@ -41,7 +39,7 @@ public interface IdpManager extends Closeable {
    * @param userName the user name
    * @return the requested user
    */
-  IdpUserMeta getUser(String userName);
+  U getUser(String userName);
 
   /**
    * Delete a built-in IdP user.
@@ -58,7 +56,7 @@ public interface IdpManager extends Closeable {
    * @param password the new password
    * @return the updated user
    */
-  IdpUserMeta resetPassword(String userName, String password);
+  U resetPassword(String userName, String password);
 
   /**
    * Create a built-in IdP group.
@@ -66,7 +64,7 @@ public interface IdpManager extends Closeable {
    * @param groupName the group name to create
    * @return the created group
    */
-  IdpGroupMeta createGroup(String groupName);
+  G createGroup(String groupName);
 
   /**
    * Get a built-in IdP group.
@@ -74,7 +72,7 @@ public interface IdpManager extends Closeable {
    * @param groupName the group name
    * @return the requested group
    */
-  IdpGroupMeta getGroup(String groupName);
+  G getGroup(String groupName);
 
   /**
    * Delete a built-in IdP group without forcing removal of groups that still contain users.
@@ -102,7 +100,7 @@ public interface IdpManager extends Closeable {
    * @param userNames the users to add
    * @return the updated group
    */
-  IdpGroupMeta addUsersToGroup(String groupName, List<String> userNames);
+  G addUsersToGroup(String groupName, List<String> userNames);
 
   /**
    * Remove users from a built-in IdP group.
@@ -111,7 +109,7 @@ public interface IdpManager extends Closeable {
    * @param userNames the users to remove
    * @return the updated group
    */
-  IdpGroupMeta removeUsersFromGroup(String groupName, List<String> userNames);
+  G removeUsersFromGroup(String groupName, List<String> userNames);
 
   /** Release any resources held by this manager. */
   @Override

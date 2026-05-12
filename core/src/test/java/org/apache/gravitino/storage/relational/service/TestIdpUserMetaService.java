@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.ServiceLoader;
-import org.apache.gravitino.storage.relational.po.IdpUserMeta;
 import org.apache.gravitino.storage.relational.provider.IdpUserMetaProvider;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -40,7 +39,7 @@ public class TestIdpUserMetaService {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
       IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
-      IdpUserMeta userMeta = mock(IdpUserMeta.class);
+      Object userMeta = new Object();
       mockedLoader
           .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
           .thenReturn(serviceLoader);
@@ -56,10 +55,10 @@ public class TestIdpUserMetaService {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
       IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
-      IdpUserMeta firstUser = mock(IdpUserMeta.class);
-      IdpUserMeta secondUser = mock(IdpUserMeta.class);
+      Object firstUser = new Object();
+      Object secondUser = new Object();
       List<String> userNames = List.of("user1", "user2");
-      List<IdpUserMeta> users = List.of(firstUser, secondUser);
+      List<Object> users = List.of(firstUser, secondUser);
       mockedLoader
           .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
           .thenReturn(serviceLoader);
@@ -91,7 +90,7 @@ public class TestIdpUserMetaService {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
       IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
-      IdpUserMeta userMeta = mock(IdpUserMeta.class);
+      Object userMeta = new Object();
       mockedLoader
           .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
           .thenReturn(serviceLoader);
@@ -108,7 +107,7 @@ public class TestIdpUserMetaService {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
       IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
-      IdpUserMeta userMeta = mock(IdpUserMeta.class);
+      Object userMeta = new Object();
       mockedLoader
           .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
           .thenReturn(serviceLoader);
@@ -125,7 +124,7 @@ public class TestIdpUserMetaService {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
       ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
       IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
-      IdpUserMeta userMeta = mock(IdpUserMeta.class);
+      Object userMeta = new Object();
       mockedLoader
           .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
           .thenReturn(serviceLoader);
