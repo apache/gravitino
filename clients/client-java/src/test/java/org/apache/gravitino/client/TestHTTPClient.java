@@ -369,6 +369,7 @@ public class TestHTTPClient {
 
   @Test
   public void testLoadTLSConfigurer() {
+    DefaultTLSConfigurer.count = 0;
     Map<String, String> properties =
         ImmutableMap.of(HTTPClient.REST_TLS_CONFIGURER, DefaultTLSConfigurer.class.getName());
 
@@ -438,6 +439,19 @@ public class TestHTTPClient {
       Assertions.assertTrue(e.getMessage().startsWith("Cannot initialize TLSConfigurer"));
       Assertions.assertTrue(e.getMessage().contains("does not implement TLSConfigurer"));
     }
+  }
+
+  @Test
+  public void testNoTLSConfigurerProperty() {
+    Map<String, String> properties = ImmutableMap.of();
+
+    GravitinoClientConfiguration clientConfiguration =
+        GravitinoClientConfiguration.buildFromProperties(ImmutableMap.of());
+
+    HttpClientConnectionManager connectionManager =
+        HTTPClient.configureConnectionManager(clientConfiguration, properties);
+
+    Assertions.assertTrue(connectionManager instanceof PoolingHttpClientConnectionManager);
   }
 
   public static void testHttpMethodOnSuccess(
