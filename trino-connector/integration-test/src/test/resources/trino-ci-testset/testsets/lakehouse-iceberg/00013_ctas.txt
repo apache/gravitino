@@ -56,7 +56,7 @@ WITH (
    partitioning = ARRAY['name']
 )"
 
-CREATE TABLE: 1 rows
+CREATE TABLE: 1 row
 
 "1","alice"
 
