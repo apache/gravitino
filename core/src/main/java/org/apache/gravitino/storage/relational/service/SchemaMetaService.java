@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -197,25 +198,40 @@ public class SchemaMetaService {
           SchemaMetaMapper.class,
           mapper -> {
             int n = rowsToInsert.size();
-            // Upsert ancestor rows unconditionally so concurrent inserts of sibling
-            // nested schemas never collide on the shared ancestor rows.
+            List<SchemaPO> missingAncestorPOs = new ArrayList<>();
             if (n > 1) {
-              List<SchemaPO> ancestorPOs = new ArrayList<>();
+              SchemaEntity firstAncestor = rowsToInsert.get(0);
+              Namespace ancestorNs = firstAncestor.namespace();
+              List<String> ancestorPhysicalNames =
+                  rowsToInsert.subList(0, n - 1).stream()
+                      .map(SchemaEntity::name)
+                      .collect(Collectors.toList());
+              Set<String> existingAncestorNames =
+                  mapper
+                      .batchSelectSchemaByIdentifier(
+                          ancestorNs.level(0), ancestorNs.level(1), ancestorPhysicalNames)
+                      .stream()
+                      .map(SchemaPO::getSchemaName)
+                      .collect(Collectors.toSet());
               for (SchemaEntity row : rowsToInsert.subList(0, n - 1)) {
+                if (existingAncestorNames.contains(row.name())) {
+                  continue;
+                }
                 SchemaPO.Builder builder = SchemaPO.builder();
                 fillSchemaPOBuilderParentEntityId(builder, row.namespace());
-                ancestorPOs.add(POConverters.initializeSchemaPOWithVersion(row, builder));
+                missingAncestorPOs.add(POConverters.initializeSchemaPOWithVersion(row, builder));
               }
-              mapper.batchInsertSchemaMetaOnDuplicateKeyUpdate(ancestorPOs);
             }
             SchemaEntity leafRow = rowsToInsert.get(n - 1);
             SchemaPO.Builder leafBuilder = SchemaPO.builder();
             fillSchemaPOBuilderParentEntityId(leafBuilder, leafRow.namespace());
             SchemaPO leafPO = POConverters.initializeSchemaPOWithVersion(leafRow, leafBuilder);
+            List<SchemaPO> schemaPosToInsert = new ArrayList<>(missingAncestorPOs);
+            schemaPosToInsert.add(leafPO);
             if (overwrite) {
-              mapper.batchInsertSchemaMetaOnDuplicateKeyUpdate(Collections.singletonList(leafPO));
+              mapper.batchInsertSchemaMetaOnDuplicateKeyUpdate(schemaPosToInsert);
             } else {
-              mapper.batchInsertSchemaMeta(Collections.singletonList(leafPO));
+              mapper.batchInsertSchemaMeta(schemaPosToInsert);
             }
           });
     } catch (RuntimeException re) {
