@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -874,6 +875,38 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
           Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
         });
+  }
+
+  @Test
+  public void testLoadTableConcurrentImport() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_concurrent");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(tableNs.levels()), "comment", props);
+
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_concurrent");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    reset(entityStore);
+    doThrow(new NoSuchEntityException(""))
+        .doThrow(new NoSuchEntityException(""))
+        .doCallRealMethod()
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.TABLE), any());
+    doThrow(new EntityAlreadyExistsException("concurrent import"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    Table loadedTable = tableOperationDispatcher.loadTable(tableIdent);
+    Assertions.assertNotNull(loadedTable);
+    Assertions.assertEquals("table_concurrent", loadedTable.name());
   }
 
   public static TableOperationDispatcher getTableOperationDispatcher() {

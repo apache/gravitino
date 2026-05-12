@@ -509,10 +509,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     try {
       store.put(viewEntity, true /* overwrite */);
     } catch (EntityAlreadyExistsException e) {
-      LOG.error("Failed to import view {} with id {} to the store.", ident, uid, e);
-      throw new UnsupportedOperationException(
-          "View managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-              + "To resolve: Remove all catalogs managing this view, then recreate one catalog to ensure single-catalog management.");
+      LOG.warn(
+          "View {} was concurrently imported by another node, reusing existing entity.", ident);
+      return internalLoadView(ident);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       throw new RuntimeException("Fail to import the view entity to the store.", e);

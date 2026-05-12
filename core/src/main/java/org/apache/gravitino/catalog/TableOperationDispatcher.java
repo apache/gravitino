@@ -477,10 +477,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     try {
       store.put(tableEntity, true);
     } catch (EntityAlreadyExistsException e) {
-      LOG.error("Failed to import table {} with id {} to the store.", identifier, uid, e);
-      throw new UnsupportedOperationException(
-          "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-              + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
+      LOG.warn(
+          "Table {} was concurrently imported by another node, reusing existing entity.",
+          identifier);
+      return internalLoadTable(identifier);
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Fail to import the table entity to the store.", e);

@@ -24,8 +24,13 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Entity.EntityType.VIEW;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -43,6 +48,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -570,5 +576,39 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
                 .findFirst()
                 .orElseThrow(AssertionError::new);
     Assertions.assertEquals("SELECT 2", trino.sql());
+  }
+
+  @Test
+  public void testLoadViewConcurrentImport() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_concurrent_view");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(viewNs.levels()), "comment", props);
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_concurrent");
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    View mockView = createMockView("view_concurrent", props, auditInfo);
+
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    testCatalogOperations.views.put(viewIdent, mockView);
+
+    viewOperationDispatcher.loadView(viewIdent);
+
+    reset(entityStore);
+    doThrow(new NoSuchEntityException(""))
+        .doThrow(new NoSuchEntityException(""))
+        .doCallRealMethod()
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.VIEW), any());
+    doThrow(new EntityAlreadyExistsException("concurrent import"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    View loadedView = viewOperationDispatcher.loadView(viewIdent);
+    Assertions.assertNotNull(loadedView);
+    Assertions.assertEquals("view_concurrent", loadedView.name());
   }
 }

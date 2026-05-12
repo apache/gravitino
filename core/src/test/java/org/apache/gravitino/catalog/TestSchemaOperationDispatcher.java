@@ -40,6 +40,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -294,5 +295,25 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> dispatcher.dropSchema(schemaIdent, false));
+  }
+
+  @Test
+  public void testLoadSchemaConcurrentImport() throws IOException {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_concurrent");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.createSchema(schemaIdent, "comment", props);
+
+    reset(entityStore);
+    entityStore.delete(schemaIdent, SCHEMA);
+    doThrow(new NoSuchEntityException(""))
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.SCHEMA), any());
+    doThrow(new EntityAlreadyExistsException("concurrent import"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    Schema loadedSchema = dispatcher.loadSchema(schemaIdent);
+    Assertions.assertNotNull(loadedSchema);
+    Assertions.assertEquals("schema_concurrent", loadedSchema.name());
   }
 }
