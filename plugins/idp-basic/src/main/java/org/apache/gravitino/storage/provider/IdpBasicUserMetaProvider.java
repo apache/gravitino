@@ -25,10 +25,11 @@ import java.util.Optional;
 import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
 import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /** The provider class for user metadata. It provides the basic database operations for user. */
-public class IdpBasicUserMetaProvider implements IdpUserMetaProvider {
+public class IdpBasicUserMetaProvider implements IdpUserMetaService<IdpUserPO> {
   private static final IdpBasicUserMetaProvider INSTANCE = new IdpBasicUserMetaProvider();
 
   public static IdpBasicUserMetaProvider getInstance() {

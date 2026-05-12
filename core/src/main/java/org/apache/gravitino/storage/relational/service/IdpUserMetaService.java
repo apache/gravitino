@@ -18,27 +18,23 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import org.apache.gravitino.storage.relational.provider.IdpMetaProviderLoader;
-import org.apache.gravitino.storage.relational.provider.IdpUserMetaProvider;
+import java.util.ServiceLoader;
 
-/** Core facade for built-in IdP user metadata operations via plugin implementation. */
-public class IdpUserMetaService<U> implements IdpUserMetaProvider<U> {
-  private static final IdpUserMetaService<?> INSTANCE = new IdpUserMetaService<>();
-
+/** Core service contract for built-in IdP user metadata operations. */
+public interface IdpUserMetaService<U> {
   /**
-   * Returns the singleton IdP user metadata service.
+   * Returns the IdP user metadata service implementation from the runtime classpath.
    *
    * @param <U> the user metadata type
-   * @return the singleton service
+   * @return the service implementation
    */
   @SuppressWarnings("unchecked")
-  public static <U> IdpUserMetaService<U> getInstance() {
-    return (IdpUserMetaService<U>) INSTANCE;
+  static <U> IdpUserMetaService<U> getInstance() {
+    return (IdpUserMetaService<U>) loadService();
   }
-
-  private IdpUserMetaService() {}
 
   /**
    * Find a built-in IdP user by name.
@@ -46,10 +42,7 @@ public class IdpUserMetaService<U> implements IdpUserMetaProvider<U> {
    * @param userName the user name
    * @return the matched user if present
    */
-  @Override
-  public Optional<U> findUser(String userName) {
-    return provider().findUser(userName);
-  }
+  Optional<U> findUser(String userName);
 
   /**
    * Find built-in IdP users by names.
@@ -57,10 +50,7 @@ public class IdpUserMetaService<U> implements IdpUserMetaProvider<U> {
    * @param userNames the user names
    * @return the matched users
    */
-  @Override
-  public List<U> findUsers(List<String> userNames) {
-    return provider().findUsers(userNames);
-  }
+  List<U> findUsers(List<String> userNames);
 
   /**
    * List the groups of a built-in IdP user.
@@ -68,20 +58,14 @@ public class IdpUserMetaService<U> implements IdpUserMetaProvider<U> {
    * @param userName the user name
    * @return the group names
    */
-  @Override
-  public List<String> listGroupNames(String userName) {
-    return provider().listGroupNames(userName);
-  }
+  List<String> listGroupNames(String userName);
 
   /**
    * Create a built-in IdP user.
    *
    * @param userMeta the user metadata
    */
-  @Override
-  public void createUser(U userMeta) {
-    provider().createUser(userMeta);
-  }
+  void createUser(U userMeta);
 
   /**
    * Update the password of a built-in IdP user.
@@ -90,10 +74,7 @@ public class IdpUserMetaService<U> implements IdpUserMetaProvider<U> {
    * @param passwordHash the new password hash
    * @param nextVersion the next version
    */
-  @Override
-  public void updatePassword(U userMeta, String passwordHash, Long nextVersion) {
-    provider().updatePassword(userMeta, passwordHash, nextVersion);
-  }
+  void updatePassword(U userMeta, String passwordHash, Long nextVersion);
 
   /**
    * Soft delete a built-in IdP user.
@@ -102,10 +83,7 @@ public class IdpUserMetaService<U> implements IdpUserMetaProvider<U> {
    * @param deletedAt the deletion timestamp
    * @return true if the delete succeeded
    */
-  @Override
-  public boolean deleteUser(U userMeta, Long deletedAt) {
-    return provider().deleteUser(userMeta, deletedAt);
-  }
+  boolean deleteUser(U userMeta, Long deletedAt);
 
   /**
    * Hard deletes legacy built-in IdP user metadata records.
@@ -114,13 +92,22 @@ public class IdpUserMetaService<U> implements IdpUserMetaProvider<U> {
    * @param limit maximum number of records to delete per invocation
    * @return the number of deleted records
    */
-  @Override
-  public int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit) {
-    return provider().deleteUserMetasByLegacyTimeline(legacyTimeline, limit);
-  }
+  int deleteUserMetasByLegacyTimeline(long legacyTimeline, int limit);
 
-  @SuppressWarnings("unchecked")
-  private IdpUserMetaProvider<U> provider() {
-    return (IdpUserMetaProvider<U>) IdpMetaProviderLoader.loadService(IdpUserMetaProvider.class);
+  private static IdpUserMetaService<?> loadService() {
+    List<IdpUserMetaService<?>> services = new ArrayList<>();
+    for (IdpUserMetaService<?> service : ServiceLoader.load(IdpUserMetaService.class)) {
+      services.add(service);
+    }
+
+    if (services.isEmpty()) {
+      throw new IllegalStateException("No IdpUserMetaService implementation found");
+    }
+
+    if (services.size() > 1) {
+      throw new IllegalStateException("Multiple IdpUserMetaService implementations found");
+    }
+
+    return services.get(0);
   }
 }

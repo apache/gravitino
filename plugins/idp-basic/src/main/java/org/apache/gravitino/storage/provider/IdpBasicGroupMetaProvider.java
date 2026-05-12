@@ -25,10 +25,12 @@ import org.apache.gravitino.storage.relational.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
 import org.apache.gravitino.storage.relational.po.IdpGroupPO;
 import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
+import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /** The provider class for group metadata. It provides the basic database operations for group. */
-public class IdpBasicGroupMetaProvider implements IdpGroupMetaProvider {
+public class IdpBasicGroupMetaProvider
+    implements IdpGroupMetaService<IdpGroupPO, IdpGroupUserRelPO> {
   private static final IdpBasicGroupMetaProvider INSTANCE = new IdpBasicGroupMetaProvider();
 
   public static IdpBasicGroupMetaProvider getInstance() {

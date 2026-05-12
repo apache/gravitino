@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.provider;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.stream.Collectors;
+import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -31,17 +32,13 @@ public class TestIdpBasicGroupMetaProvider {
     IdpBasicGroupMetaProvider provider = IdpBasicGroupMetaProvider.getInstance();
 
     Assertions.assertSame(provider, IdpBasicGroupMetaProvider.getInstance());
-    Assertions.assertInstanceOf(IdpGroupMetaProvider.class, provider);
-    Assertions.assertInstanceOf(
-        org.apache.gravitino.storage.relational.provider.IdpGroupMetaProvider.class, provider);
+    Assertions.assertInstanceOf(IdpGroupMetaService.class, provider);
   }
 
   @Test
   public void testServiceLoaderRegistration() {
     List<Class<?>> providerClasses =
-        ServiceLoader.load(
-                org.apache.gravitino.storage.relational.provider.IdpGroupMetaProvider.class)
-            .stream()
+        ServiceLoader.load(IdpGroupMetaService.class).stream()
             .map(ServiceLoader.Provider::type)
             .collect(Collectors.toList());
 

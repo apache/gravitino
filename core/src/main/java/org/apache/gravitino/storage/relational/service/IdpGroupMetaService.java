@@ -18,28 +18,25 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import org.apache.gravitino.storage.relational.provider.IdpGroupMetaProvider;
-import org.apache.gravitino.storage.relational.provider.IdpMetaProviderLoader;
+import java.util.ServiceLoader;
 
-/** Core facade for built-in IdP group metadata operations via plugin implementation. */
-public class IdpGroupMetaService<G, R> implements IdpGroupMetaProvider<G, R> {
-  private static final IdpGroupMetaService<?, ?> INSTANCE = new IdpGroupMetaService<>();
+/** Core service contract for built-in IdP group metadata operations. */
+public interface IdpGroupMetaService<G, R> {
 
   /**
-   * Returns the singleton IdP group metadata service.
+   * Returns the IdP group metadata service implementation from the runtime classpath.
    *
    * @param <G> the group metadata type
    * @param <R> the group-user relation metadata type
-   * @return the singleton service
+   * @return the service implementation
    */
   @SuppressWarnings("unchecked")
-  public static <G, R> IdpGroupMetaService<G, R> getInstance() {
-    return (IdpGroupMetaService<G, R>) INSTANCE;
+  static <G, R> IdpGroupMetaService<G, R> getInstance() {
+    return (IdpGroupMetaService<G, R>) loadService();
   }
-
-  private IdpGroupMetaService() {}
 
   /**
    * Find a built-in IdP group by name.
@@ -47,10 +44,7 @@ public class IdpGroupMetaService<G, R> implements IdpGroupMetaProvider<G, R> {
    * @param groupName the group name
    * @return the matched group if present
    */
-  @Override
-  public Optional<G> findGroup(String groupName) {
-    return provider().findGroup(groupName);
-  }
+  Optional<G> findGroup(String groupName);
 
   /**
    * List the users of a built-in IdP group.
@@ -58,20 +52,14 @@ public class IdpGroupMetaService<G, R> implements IdpGroupMetaProvider<G, R> {
    * @param groupName the group name
    * @return the user names
    */
-  @Override
-  public List<String> listUserNames(String groupName) {
-    return provider().listUserNames(groupName);
-  }
+  List<String> listUserNames(String groupName);
 
   /**
    * Create a built-in IdP group.
    *
    * @param groupMeta the group metadata
    */
-  @Override
-  public void createGroup(G groupMeta) {
-    provider().createGroup(groupMeta);
-  }
+  void createGroup(G groupMeta);
 
   /**
    * Soft delete a built-in IdP group.
@@ -80,10 +68,7 @@ public class IdpGroupMetaService<G, R> implements IdpGroupMetaProvider<G, R> {
    * @param deletedAt the deletion timestamp
    * @return true if the delete succeeded
    */
-  @Override
-  public boolean deleteGroup(G groupMeta, Long deletedAt) {
-    return provider().deleteGroup(groupMeta, deletedAt);
-  }
+  boolean deleteGroup(G groupMeta, Long deletedAt);
 
   /**
    * Select user ids already related to the group.
@@ -92,20 +77,14 @@ public class IdpGroupMetaService<G, R> implements IdpGroupMetaProvider<G, R> {
    * @param userIds the candidate user ids
    * @return the related user ids
    */
-  @Override
-  public List<Long> selectRelatedUserIds(Long groupId, List<Long> userIds) {
-    return provider().selectRelatedUserIds(groupId, userIds);
-  }
+  List<Long> selectRelatedUserIds(Long groupId, List<Long> userIds);
 
   /**
    * Add users to a built-in IdP group.
    *
    * @param relations the group-user relations
    */
-  @Override
-  public void addUsersToGroup(List<R> relations) {
-    provider().addUsersToGroup(relations);
-  }
+  void addUsersToGroup(List<R> relations);
 
   /**
    * Remove users from a built-in IdP group.
@@ -114,10 +93,7 @@ public class IdpGroupMetaService<G, R> implements IdpGroupMetaProvider<G, R> {
    * @param userIds the user ids to remove
    * @param deletedAt the deletion timestamp
    */
-  @Override
-  public void removeUsersFromGroup(Long groupId, List<Long> userIds, Long deletedAt) {
-    provider().removeUsersFromGroup(groupId, userIds, deletedAt);
-  }
+  void removeUsersFromGroup(Long groupId, List<Long> userIds, Long deletedAt);
 
   /**
    * Hard deletes legacy built-in IdP group metadata records.
@@ -126,14 +102,22 @@ public class IdpGroupMetaService<G, R> implements IdpGroupMetaProvider<G, R> {
    * @param limit maximum number of records to delete per invocation
    * @return the number of deleted records
    */
-  @Override
-  public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {
-    return provider().deleteGroupMetasByLegacyTimeline(legacyTimeline, limit);
-  }
+  int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit);
 
-  @SuppressWarnings("unchecked")
-  private IdpGroupMetaProvider<G, R> provider() {
-    return (IdpGroupMetaProvider<G, R>)
-        IdpMetaProviderLoader.loadService(IdpGroupMetaProvider.class);
+  private static IdpGroupMetaService<?, ?> loadService() {
+    List<IdpGroupMetaService<?, ?>> services = new ArrayList<>();
+    for (IdpGroupMetaService<?, ?> service : ServiceLoader.load(IdpGroupMetaService.class)) {
+      services.add(service);
+    }
+
+    if (services.isEmpty()) {
+      throw new IllegalStateException("No IdpGroupMetaService implementation found");
+    }
+
+    if (services.size() > 1) {
+      throw new IllegalStateException("Multiple IdpGroupMetaService implementations found");
+    }
+
+    return services.get(0);
   }
 }

@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.ServiceLoader;
-import org.apache.gravitino.storage.relational.provider.IdpUserMetaProvider;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -37,11 +36,11 @@ public class TestIdpUserMetaService {
   @Test
   public void testFindUserDelegatesToPluginService() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
-      ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
-      IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
+      ServiceLoader<IdpUserMetaService> serviceLoader = mock(ServiceLoader.class);
+      IdpUserMetaService provider = mock(IdpUserMetaService.class);
       Object userMeta = new Object();
       mockedLoader
-          .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
+          .when(() -> ServiceLoader.load(IdpUserMetaService.class))
           .thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(List.of(provider).iterator());
       when(provider.findUser("user")).thenReturn(Optional.of(userMeta));
@@ -53,14 +52,14 @@ public class TestIdpUserMetaService {
   @Test
   public void testFindUsersDelegatesToPluginService() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
-      ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
-      IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
+      ServiceLoader<IdpUserMetaService> serviceLoader = mock(ServiceLoader.class);
+      IdpUserMetaService provider = mock(IdpUserMetaService.class);
       Object firstUser = new Object();
       Object secondUser = new Object();
       List<String> userNames = List.of("user1", "user2");
       List<Object> users = List.of(firstUser, secondUser);
       mockedLoader
-          .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
+          .when(() -> ServiceLoader.load(IdpUserMetaService.class))
           .thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(List.of(provider).iterator());
       when(provider.findUsers(userNames)).thenReturn(users);
@@ -72,11 +71,11 @@ public class TestIdpUserMetaService {
   @Test
   public void testListGroupNamesDelegatesToPluginService() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
-      ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
-      IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
+      ServiceLoader<IdpUserMetaService> serviceLoader = mock(ServiceLoader.class);
+      IdpUserMetaService provider = mock(IdpUserMetaService.class);
       List<String> groupNames = List.of("group1", "group2");
       mockedLoader
-          .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
+          .when(() -> ServiceLoader.load(IdpUserMetaService.class))
           .thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(List.of(provider).iterator());
       when(provider.listGroupNames("user")).thenReturn(groupNames);
@@ -88,11 +87,11 @@ public class TestIdpUserMetaService {
   @Test
   public void testCreateUserDelegatesToPluginService() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
-      ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
-      IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
+      ServiceLoader<IdpUserMetaService> serviceLoader = mock(ServiceLoader.class);
+      IdpUserMetaService provider = mock(IdpUserMetaService.class);
       Object userMeta = new Object();
       mockedLoader
-          .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
+          .when(() -> ServiceLoader.load(IdpUserMetaService.class))
           .thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(List.of(provider).iterator());
 
@@ -105,11 +104,11 @@ public class TestIdpUserMetaService {
   @Test
   public void testUpdatePasswordDelegatesToPluginService() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
-      ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
-      IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
+      ServiceLoader<IdpUserMetaService> serviceLoader = mock(ServiceLoader.class);
+      IdpUserMetaService provider = mock(IdpUserMetaService.class);
       Object userMeta = new Object();
       mockedLoader
-          .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
+          .when(() -> ServiceLoader.load(IdpUserMetaService.class))
           .thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(List.of(provider).iterator());
 
@@ -122,11 +121,11 @@ public class TestIdpUserMetaService {
   @Test
   public void testDeleteUserDelegatesToPluginService() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
-      ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
-      IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
+      ServiceLoader<IdpUserMetaService> serviceLoader = mock(ServiceLoader.class);
+      IdpUserMetaService provider = mock(IdpUserMetaService.class);
       Object userMeta = new Object();
       mockedLoader
-          .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
+          .when(() -> ServiceLoader.load(IdpUserMetaService.class))
           .thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(List.of(provider).iterator());
       when(provider.deleteUser(userMeta, 3L)).thenReturn(true);
@@ -138,10 +137,10 @@ public class TestIdpUserMetaService {
   @Test
   public void testDeleteUserMetasByLegacyTimelineDelegatesToPluginService() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
-      ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
-      IdpUserMetaProvider provider = mock(IdpUserMetaProvider.class);
+      ServiceLoader<IdpUserMetaService> serviceLoader = mock(ServiceLoader.class);
+      IdpUserMetaService provider = mock(IdpUserMetaService.class);
       mockedLoader
-          .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
+          .when(() -> ServiceLoader.load(IdpUserMetaService.class))
           .thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(List.of(provider).iterator());
       when(provider.deleteUserMetasByLegacyTimeline(1L, 10)).thenReturn(3);
@@ -153,9 +152,9 @@ public class TestIdpUserMetaService {
   @Test
   public void testDeleteUserMetasByLegacyTimelineFailsWhenNoProviderFound() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
-      ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
+      ServiceLoader<IdpUserMetaService> serviceLoader = mock(ServiceLoader.class);
       mockedLoader
-          .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
+          .when(() -> ServiceLoader.load(IdpUserMetaService.class))
           .thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(Collections.emptyIterator());
 
@@ -163,18 +162,18 @@ public class TestIdpUserMetaService {
           assertThrows(
               IllegalStateException.class,
               () -> IdpUserMetaService.getInstance().deleteUserMetasByLegacyTimeline(1L, 10));
-      assertEquals("No IdpUserMetaProvider implementation found", exception.getMessage());
+      assertEquals("No IdpUserMetaService implementation found", exception.getMessage());
     }
   }
 
   @Test
   public void testDeleteUserMetasByLegacyTimelineFailsWhenMultipleProvidersFound() {
     try (MockedStatic<ServiceLoader> mockedLoader = Mockito.mockStatic(ServiceLoader.class)) {
-      ServiceLoader<IdpUserMetaProvider> serviceLoader = mock(ServiceLoader.class);
-      IdpUserMetaProvider first = mock(IdpUserMetaProvider.class);
-      IdpUserMetaProvider second = mock(IdpUserMetaProvider.class);
+      ServiceLoader<IdpUserMetaService> serviceLoader = mock(ServiceLoader.class);
+      IdpUserMetaService first = mock(IdpUserMetaService.class);
+      IdpUserMetaService second = mock(IdpUserMetaService.class);
       mockedLoader
-          .when(() -> ServiceLoader.load(IdpUserMetaProvider.class))
+          .when(() -> ServiceLoader.load(IdpUserMetaService.class))
           .thenReturn(serviceLoader);
       when(serviceLoader.iterator()).thenReturn(List.of(first, second).iterator());
 
@@ -182,7 +181,7 @@ public class TestIdpUserMetaService {
           assertThrows(
               IllegalStateException.class,
               () -> IdpUserMetaService.getInstance().deleteUserMetasByLegacyTimeline(1L, 10));
-      assertEquals("Multiple IdpUserMetaProvider implementations found", exception.getMessage());
+      assertEquals("Multiple IdpUserMetaService implementations found", exception.getMessage());
     }
   }
 }
