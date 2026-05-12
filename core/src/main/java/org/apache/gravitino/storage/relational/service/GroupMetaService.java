@@ -138,15 +138,10 @@ public class GroupMetaService {
     return SessionUtils.doWithCommitAndFetchResult(
         GroupMetaMapper.class,
         mapper -> {
-          List<GroupPO> groupPOs =
-              mapper.batchSelectGroupMetaByMetalakeIdAndNames(metalakeId, groupNames);
-          return groupPOs.stream()
-              .map(
-                  groupPO -> {
-                    List<RolePO> rolePOs =
-                        RoleMetaService.getInstance().listRolesByGroupId(groupPO.getGroupId());
-                    return POConverters.fromGroupPO(groupPO, rolePOs, namespace);
-                  })
+          List<ExtendedGroupPO> extendedPOs =
+              mapper.listExtendedGroupPOsByMetalakeIdAndNames(metalakeId, groupNames);
+          return extendedPOs.stream()
+              .map(po -> POConverters.fromExtendedGroupPO(po, namespace))
               .collect(Collectors.toList());
         });
   }

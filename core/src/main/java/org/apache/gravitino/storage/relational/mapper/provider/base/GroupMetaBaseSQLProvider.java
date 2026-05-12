@@ -87,22 +87,38 @@ public class GroupMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String batchSelectGroupMetaByMetalakeIdAndNames(
+  public String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return "<script>"
-        + "SELECT group_id as groupId, group_name as groupName,"
-        + " metalake_id as metalakeId,"
-        + " audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
+        + "SELECT gt.group_id as groupId, gt.group_name as groupName,"
+        + " gt.metalake_id as metalakeId,"
+        + " gt.audit_info as auditInfo,"
+        + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
+        + " gt.deleted_at as deletedAt,"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM "
         + GROUP_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND group_name IN ("
+        + " gt LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + GROUP_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.group_id = gt.group_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
+        + " WHERE"
+        + " gt.deleted_at = 0 AND"
+        + " gt.metalake_id = #{metalakeId}"
+        + " AND gt.group_name IN ("
         + "<foreach collection='groupNames' item='groupName' separator=','>"
         + "#{groupName}"
         + "</foreach>"
         + " )"
-        + " AND deleted_at = 0"
+        + " GROUP BY gt.group_id, gt.group_name, gt.metalake_id, gt.audit_info,"
+        + " gt.current_version, gt.last_version, gt.deleted_at"
         + "</script>";
   }
 

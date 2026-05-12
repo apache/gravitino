@@ -55,8 +55,8 @@ public interface GroupMetaMapper {
 
   @SelectProvider(
       type = GroupMetaSQLProviderFactory.class,
-      method = "batchSelectGroupMetaByMetalakeIdAndNames")
-  List<GroupPO> batchSelectGroupMetaByMetalakeIdAndNames(
+      method = "listExtendedGroupPOsByMetalakeIdAndNames")
+  List<ExtendedGroupPO> listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames);
 
   @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "listGroupPOsByMetalake")
