@@ -19,8 +19,10 @@
 package org.apache.gravitino.storage.relational.mapper.provider;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.ServiceLoader;
 import org.apache.gravitino.storage.relational.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
 import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
@@ -35,5 +37,17 @@ public class TestIdpBasicMapperPackageProvider {
     assertEquals(
         List.of(IdpGroupMetaMapper.class, IdpGroupUserRelMapper.class, IdpUserMetaMapper.class),
         provider.getMapperClasses());
+  }
+
+  @Test
+  public void testServiceLoaderDiscoversProvider() {
+    List<MapperPackageProvider> providers =
+        ServiceLoader.load(MapperPackageProvider.class).stream()
+            .map(ServiceLoader.Provider::get)
+            .filter(provider -> provider instanceof IdpBasicMapperPackageProvider)
+            .toList();
+
+    assertEquals(1, providers.size());
+    assertTrue(providers.get(0) instanceof IdpBasicMapperPackageProvider);
   }
 }

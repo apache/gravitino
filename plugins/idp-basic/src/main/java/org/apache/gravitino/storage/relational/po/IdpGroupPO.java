@@ -56,12 +56,12 @@ public class IdpGroupPO {
     if (!(o instanceof IdpGroupPO)) {
       return false;
     }
-    IdpGroupPO tablePO = (IdpGroupPO) o;
-    return Objects.equal(getGroupId(), tablePO.getGroupId())
-        && Objects.equal(getGroupName(), tablePO.getGroupName())
-        && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
-        && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
+    IdpGroupPO groupPO = (IdpGroupPO) o;
+    return Objects.equal(getGroupId(), groupPO.getGroupId())
+        && Objects.equal(getGroupName(), groupPO.getGroupName())
+        && Objects.equal(getCurrentVersion(), groupPO.getCurrentVersion())
+        && Objects.equal(getLastVersion(), groupPO.getLastVersion())
+        && Objects.equal(getDeletedAt(), groupPO.getDeletedAt());
   }
 
   @Override

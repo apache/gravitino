@@ -61,13 +61,13 @@ public class IdpUserPO {
     if (!(o instanceof IdpUserPO)) {
       return false;
     }
-    IdpUserPO tablePO = (IdpUserPO) o;
-    return Objects.equal(getUserId(), tablePO.getUserId())
-        && Objects.equal(getUserName(), tablePO.getUserName())
-        && Objects.equal(getPasswordHash(), tablePO.getPasswordHash())
-        && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
-        && Objects.equal(getLastVersion(), tablePO.getLastVersion())
-        && Objects.equal(getDeletedAt(), tablePO.getDeletedAt());
+    IdpUserPO userPO = (IdpUserPO) o;
+    return Objects.equal(getUserId(), userPO.getUserId())
+        && Objects.equal(getUserName(), userPO.getUserName())
+        && Objects.equal(getPasswordHash(), userPO.getPasswordHash())
+        && Objects.equal(getCurrentVersion(), userPO.getCurrentVersion())
+        && Objects.equal(getLastVersion(), userPO.getLastVersion())
+        && Objects.equal(getDeletedAt(), userPO.getDeletedAt());
   }
 
   @Override
