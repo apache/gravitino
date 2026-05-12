@@ -736,14 +736,11 @@ public class IcebergCatalogOperations
     return Distributions.NONE;
   }
 
-  private IcebergViewCatalogOperations viewCatalogOperations() {
-    if (icebergViewCatalogOperations == null) {
-      icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
-    }
-    return icebergViewCatalogOperations;
-  }
-
   private static String currentUser() {
     return PrincipalUtils.getCurrentUserName();
+  }
+
+  private IcebergViewCatalogOperations viewCatalogOperations() {
+    return icebergViewCatalogOperations;
   }
 }

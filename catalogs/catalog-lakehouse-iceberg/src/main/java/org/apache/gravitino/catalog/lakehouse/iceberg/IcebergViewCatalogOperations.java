@@ -72,11 +72,17 @@ class IcebergViewCatalogOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergViewCatalogOperations.class);
 
+  private static final int INITIAL_VIEW_VERSION_ID = 1;
+
+  /** Iceberg sentinel value for {@code SetCurrentViewVersion}: "use the last added version". */
+  private static final int ICEBERG_LAST_ADDED_VIEW_VERSION = -1;
+
   private final IcebergCatalogWrapper icebergCatalogWrapper;
 
   IcebergViewCatalogOperations(IcebergCatalogWrapper icebergCatalogWrapper) {
-    this.icebergCatalogWrapper =
-        Preconditions.checkNotNull(icebergCatalogWrapper, "icebergCatalogWrapper must not be null");
+    Preconditions.checkArgument(
+        icebergCatalogWrapper != null, "icebergCatalogWrapper must not be null");
+    this.icebergCatalogWrapper = icebergCatalogWrapper;
   }
 
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
@@ -121,8 +127,7 @@ class IcebergViewCatalogOperations {
       Map<String, String> properties)
       throws NoSuchSchemaException, ViewAlreadyExistsException {
     org.apache.iceberg.catalog.Namespace icebergNamespace =
-        IcebergCatalogWrapperHelper.getIcebergNamespace(
-            ident.namespace().level(ident.namespace().length() - 1));
+        IcebergCatalogWrapperHelper.getIcebergNamespace(ident.namespace());
 
     Schema schema = ConvertUtil.toIcebergSchema(columns);
     List<ViewRepresentation> viewRepresentations = new ArrayList<>();
@@ -141,9 +146,9 @@ class IcebergViewCatalogOperations {
 
     ViewVersion viewVersion =
         ImmutableViewVersion.builder()
-            .versionId(1)
+            .versionId(INITIAL_VIEW_VERSION_ID)
             .timestampMillis(System.currentTimeMillis())
-            .schemaId(0)
+            .schemaId(schema.schemaId())
             .defaultNamespace(defaultNamespace)
             .representations(viewRepresentations)
             .putSummary("operation", "create")
@@ -241,101 +246,16 @@ class IcebergViewCatalogOperations {
       LoadViewResponse current = icebergCatalogWrapper.loadView(viewId);
       ViewMetadata metadata = current.metadata();
 
-      List<MetadataUpdate> updates = new ArrayList<>();
       Map<String, String> setProps = new HashMap<>();
       Set<String> removeProps = new HashSet<>();
-      ViewChange.ReplaceView replace = null;
+      Optional<ViewChange.ReplaceView> replaceOpt =
+          collectPropertyChanges(changes, setProps, removeProps);
 
-      for (ViewChange change : changes) {
-        if (change instanceof ViewChange.SetProperty) {
-          ViewChange.SetProperty setProperty = (ViewChange.SetProperty) change;
-          String property = setProperty.getProperty();
-          setProps.put(property, setProperty.getValue());
-          removeProps.remove(property);
-        } else if (change instanceof ViewChange.RemoveProperty) {
-          String property = ((ViewChange.RemoveProperty) change).getProperty();
-          removeProps.add(property);
-          setProps.remove(property);
-        } else if (change instanceof ViewChange.ReplaceView) {
-          replace = (ViewChange.ReplaceView) change;
-        } else {
-          throw new IllegalArgumentException(
-              "Unsupported view change type: " + change.getClass().getSimpleName());
-        }
-      }
+      replaceOpt.ifPresent(replace -> applyReplaceViewProperties(replace, setProps, removeProps));
 
-      if (replace != null) {
-        setProps.put("replace.drop-dialect.allowed", "true");
-        if (replace.getComment() == null) {
-          removeProps.add("comment");
-          setProps.remove("comment");
-        } else {
-          setProps.put("comment", replace.getComment());
-          removeProps.remove("comment");
-        }
-        if (replace.getDefaultCatalog() == null) {
-          removeProps.add("default-catalog");
-          setProps.remove("default-catalog");
-        } else {
-          setProps.put("default-catalog", replace.getDefaultCatalog());
-          removeProps.remove("default-catalog");
-        }
-      }
-
-      if (!setProps.isEmpty()) {
-        updates.add(new MetadataUpdate.SetProperties(setProps));
-      }
-      if (!removeProps.isEmpty()) {
-        updates.add(new MetadataUpdate.RemoveProperties(removeProps));
-      }
-
-      if (replace != null) {
-        ViewVersion currentVersion = metadata.currentVersion();
-        List<ViewRepresentation> newRepresentations = new ArrayList<>();
-        for (Representation representation : replace.getRepresentations()) {
-          newRepresentations.add(toSqlViewRepresentation(representation));
-        }
-
-        int newVersionId = currentVersion != null ? currentVersion.versionId() + 1 : 1;
-        int schemaId = currentVersion != null ? currentVersion.schemaId() : 0;
-        Schema replacementSchema = ConvertUtil.toIcebergSchema(replace.getColumns());
-        Optional<Schema> existingSchema =
-            metadata.schemas().stream()
-                .filter(schema -> schema.sameSchema(replacementSchema))
-                .findFirst();
-        if (existingSchema.isPresent()) {
-          schemaId = existingSchema.get().schemaId();
-        } else {
-          int newSchemaId =
-              metadata.schemas().stream().mapToInt(Schema::schemaId).max().orElse(-1) + 1;
-          Schema newSchema =
-              new Schema(
-                  newSchemaId, replacementSchema.columns(), replacementSchema.identifierFieldIds());
-          updates.add(new MetadataUpdate.AddSchema(newSchema));
-          schemaId = newSchemaId;
-        }
-
-        org.apache.iceberg.catalog.Namespace defaultNamespace =
-            replace.getDefaultSchema() != null
-                ? IcebergCatalogWrapperHelper.getIcebergNamespace(replace.getDefaultSchema())
-                : (currentVersion != null
-                    ? currentVersion.defaultNamespace()
-                    : IcebergCatalogWrapperHelper.getIcebergNamespace(
-                        ident.namespace().level(ident.namespace().length() - 1)));
-
-        ViewVersion newVersion =
-            ImmutableViewVersion.builder()
-                .versionId(newVersionId)
-                .timestampMillis(System.currentTimeMillis())
-                .schemaId(schemaId)
-                .defaultNamespace(defaultNamespace)
-                .representations(newRepresentations)
-                .putSummary("operation", "alter")
-                .build();
-
-        updates.add(new MetadataUpdate.AddViewVersion(newVersion));
-        updates.add(new MetadataUpdate.SetCurrentViewVersion(-1));
-      }
+      List<MetadataUpdate> updates =
+          new ArrayList<>(buildPropertyMetadataUpdates(setProps, removeProps));
+      replaceOpt.ifPresent(replaceView -> updates.addAll(buildNewViewVersionUpdates(ident, replaceView, metadata)));
 
       if (updates.isEmpty()) {
         return loadView(ident);
@@ -349,6 +269,127 @@ class IcebergViewCatalogOperations {
     } catch (org.apache.iceberg.exceptions.NoSuchViewException e) {
       throw new NoSuchViewException(e, "Iceberg view %s does not exist", ident);
     }
+  }
+
+  /**
+   * Iterates {@code changes} collecting SetProperty/RemoveProperty entries into {@code setProps}
+   * and {@code removeProps}, resolving conflicts so the last change for a key wins. Returns the
+   * last {@link ViewChange.ReplaceView} change found, or empty if none.
+   */
+  private static Optional<ViewChange.ReplaceView> collectPropertyChanges(
+      ViewChange[] changes, Map<String, String> setProps, Set<String> removeProps) {
+    ViewChange.ReplaceView replace = null;
+    for (ViewChange change : changes) {
+      if (change instanceof ViewChange.SetProperty) {
+        ViewChange.SetProperty setProperty = (ViewChange.SetProperty) change;
+        String property = setProperty.getProperty();
+        setProps.put(property, setProperty.getValue());
+        removeProps.remove(property);
+      } else if (change instanceof ViewChange.RemoveProperty) {
+        String property = ((ViewChange.RemoveProperty) change).getProperty();
+        removeProps.add(property);
+        setProps.remove(property);
+      } else if (change instanceof ViewChange.ReplaceView) {
+        replace = (ViewChange.ReplaceView) change;
+      } else {
+        throw new IllegalArgumentException(
+            "Unsupported view change type: " + change.getClass().getSimpleName());
+      }
+    }
+    return Optional.ofNullable(replace);
+  }
+
+  /**
+   * Applies the implicit property side-effects of a {@link ViewChange.ReplaceView}: sets or removes
+   * {@code comment} and {@code default-catalog}, and always sets the {@code
+   * replace.drop-dialect.allowed} flag.
+   */
+  private static void applyReplaceViewProperties(
+      ViewChange.ReplaceView replace, Map<String, String> setProps, Set<String> removeProps) {
+    setProps.put("replace.drop-dialect.allowed", "true");
+    if (replace.getComment() == null) {
+      removeProps.add("comment");
+      setProps.remove("comment");
+    } else {
+      setProps.put("comment", replace.getComment());
+      removeProps.remove("comment");
+    }
+    if (replace.getDefaultCatalog() == null) {
+      removeProps.add("default-catalog");
+      setProps.remove("default-catalog");
+    } else {
+      setProps.put("default-catalog", replace.getDefaultCatalog());
+      removeProps.remove("default-catalog");
+    }
+  }
+
+  /** Converts {@code setProps} and {@code removeProps} into the corresponding MetadataUpdates. */
+  private static List<MetadataUpdate> buildPropertyMetadataUpdates(
+      Map<String, String> setProps, Set<String> removeProps) {
+    List<MetadataUpdate> updates = new ArrayList<>();
+    if (!setProps.isEmpty()) {
+      updates.add(new MetadataUpdate.SetProperties(setProps));
+    }
+    if (!removeProps.isEmpty()) {
+      updates.add(new MetadataUpdate.RemoveProperties(removeProps));
+    }
+    return updates;
+  }
+
+  /**
+   * Builds the schema-and-version MetadataUpdates required to replace a view's SQL definition.
+   * Reuses an existing schema when the column layout matches; otherwise adds a new one.
+   */
+  private static List<MetadataUpdate> buildNewViewVersionUpdates(
+      NameIdentifier ident, ViewChange.ReplaceView replace, ViewMetadata metadata) {
+    List<MetadataUpdate> updates = new ArrayList<>();
+    ViewVersion currentVersion = metadata.currentVersion();
+
+    int newVersionId =
+        currentVersion != null ? currentVersion.versionId() + 1 : INITIAL_VIEW_VERSION_ID;
+
+    Schema replacementSchema = ConvertUtil.toIcebergSchema(replace.getColumns());
+    Optional<Schema> existingSchema =
+        metadata.schemas().stream()
+            .filter(schema -> schema.sameSchema(replacementSchema))
+            .findFirst();
+    int schemaId;
+    if (existingSchema.isPresent()) {
+      schemaId = existingSchema.get().schemaId();
+    } else {
+      int newSchemaId = metadata.schemas().stream().mapToInt(Schema::schemaId).max().orElse(-1) + 1;
+      Schema newSchema =
+          new Schema(
+              newSchemaId, replacementSchema.columns(), replacementSchema.identifierFieldIds());
+      updates.add(new MetadataUpdate.AddSchema(newSchema));
+      schemaId = newSchemaId;
+    }
+
+    org.apache.iceberg.catalog.Namespace defaultNamespace =
+        replace.getDefaultSchema() != null
+            ? IcebergCatalogWrapperHelper.getIcebergNamespace(replace.getDefaultSchema())
+            : (currentVersion != null
+                ? currentVersion.defaultNamespace()
+                : IcebergCatalogWrapperHelper.getIcebergNamespace(ident.namespace()));
+
+    List<ViewRepresentation> newRepresentations = new ArrayList<>();
+    for (Representation representation : replace.getRepresentations()) {
+      newRepresentations.add(toSqlViewRepresentation(representation));
+    }
+
+    ViewVersion newVersion =
+        ImmutableViewVersion.builder()
+            .versionId(newVersionId)
+            .timestampMillis(System.currentTimeMillis())
+            .schemaId(schemaId)
+            .defaultNamespace(defaultNamespace)
+            .representations(newRepresentations)
+            .putSummary("operation", "alter")
+            .build();
+
+    updates.add(new MetadataUpdate.AddViewVersion(newVersion));
+    updates.add(new MetadataUpdate.SetCurrentViewVersion(ICEBERG_LAST_ADDED_VIEW_VERSION));
+    return updates;
   }
 
   private static ViewRepresentation toSqlViewRepresentation(Representation representation) {
