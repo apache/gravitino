@@ -144,8 +144,14 @@ class Privilege(ABC):
         REGISTER_MODEL = (0, 1 << 18)
         """The privilege to create a model."""
 
+        CREATE_MODEL = REGISTER_MODEL
+        """Deprecated. Please use REGISTER_MODEL."""
+
         LINK_MODEL_VERSION = (0, 1 << 19)
         """The privilege to create a model version."""
+
+        CREATE_MODEL_VERSION = LINK_MODEL_VERSION
+        """Deprecated. Please use LINK_MODEL_VERSION."""
 
         USE_MODEL = (0, 1 << 20)
         """The privilege to view model metadata and download all model versions."""
@@ -924,9 +930,9 @@ class CreateRole(GenericPrivilege):
 class ManageGrants(GenericPrivilege):
     """
     The privilege to grant or revoke privileges on securable objects. If bound on the metalake,
-    we can grant or revoke the role for users or groups.Unlike most privileges,
+    we can grant or revoke the role for users or groups. Unlike most privileges,
     this can be bound at any level of the object hierarchy — METALAKE,
-    CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, or MODEL.
+    CATALOG, SCHEMA, TABLE, VIEW, TOPIC, FILESET, FUNCTION, or MODEL.
     A grant at a parent level implicitly covers all descendants within it.
     """
 

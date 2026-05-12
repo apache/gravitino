@@ -84,6 +84,33 @@ class TestPrivileges(unittest.TestCase):
         with self.assertRaises(IllegalArgumentException):
             Privileges.deny("NO_SUCH_PRIVILEGE")
 
+    def test_deprecated_model_privilege_names_are_supported(self) -> None:
+        self.assertEqual(
+            Privilege.Name.REGISTER_MODEL.low_bits,
+            Privilege.Name.CREATE_MODEL.low_bits,
+        )
+        self.assertEqual(
+            Privilege.Name.LINK_MODEL_VERSION.low_bits,
+            Privilege.Name.CREATE_MODEL_VERSION.low_bits,
+        )
+
+        self.assertEqual(
+            Privilege.Name.REGISTER_MODEL,
+            Privileges.allow("CREATE_MODEL").name(),
+        )
+        self.assertEqual(
+            Privilege.Name.REGISTER_MODEL,
+            Privileges.deny("CREATE_MODEL").name(),
+        )
+        self.assertEqual(
+            Privilege.Name.LINK_MODEL_VERSION,
+            Privileges.allow("CREATE_MODEL_VERSION").name(),
+        )
+        self.assertEqual(
+            Privilege.Name.LINK_MODEL_VERSION,
+            Privileges.deny("CREATE_MODEL_VERSION").name(),
+        )
+
     def test_create_catalog_binding(self) -> None:
         allow_privilege = CreateCatalog.allow()
         for obj_type in MetadataObject.Type:
