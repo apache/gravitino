@@ -233,8 +233,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       RetryMode retryMode,
       boolean replace) {
     if (replace) {
-      throw new TrinoException(
-          NOT_SUPPORTED, "This connector does not support replacing a table");
+      throw new TrinoException(NOT_SUPPORTED, "This connector does not support replacing a table");
     }
 
     SchemaTableName tableName = tableMetadata.getTable();
