@@ -50,6 +50,19 @@ public interface CredentialProvider extends Closeable {
   String credentialType();
 
   /**
+   * Checks whether this provider supports generating credentials for the given URI scheme.
+   *
+   * <p>By default, it returns {@code true}. Path-based credential flows should only use providers
+   * that explicitly declare supported schemes.
+   *
+   * @param scheme The URI scheme (e.g. {@code s3}, {@code s3a}, {@code gs}, {@code abfs}).
+   * @return True if the provider supports the scheme.
+   */
+  default boolean supportsScheme(String scheme) {
+    return true;
+  }
+
+  /**
    * Gets a credential based on the provided context information.
    *
    * @param context A context object providing necessary information for retrieving credentials.

@@ -44,6 +44,11 @@ public class DummyCredentialProvider implements CredentialProvider {
   }
 
   @Override
+  public boolean supportsScheme(String scheme) {
+    return true;
+  }
+
+  @Override
   public Credential getCredential(CredentialContext context) {
     Preconditions.checkArgument(
         context instanceof PathBasedCredentialContext

@@ -61,6 +61,11 @@ public class DummyCredentialProvider implements CredentialProvider {
     return DUMMY_CREDENTIAL_TYPE;
   }
 
+  @Override
+  public boolean supportsScheme(String scheme) {
+    return true;
+  }
+
   @Nullable
   @Override
   public Credential getCredential(CredentialContext context) {
