@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
@@ -48,6 +49,7 @@ import org.apache.gravitino.messaging.TopicChange;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.ConfigEntry;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -63,6 +65,7 @@ import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -363,18 +366,22 @@ public class CatalogKafkaIT extends BaseIT {
                 TopicChange.updateComment("new comment"),
                 TopicChange.setProperty(PARTITION_COUNT, "3"),
                 TopicChange.removeProperty(TopicConfig.RETENTION_MS_CONFIG));
-    Topic loadedTopic =
-        catalog.asTopicCatalog().loadTopic(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName));
 
     Assertions.assertEquals("new comment", alteredTopic.comment());
     Assertions.assertEquals("3", alteredTopic.properties().get(PARTITION_COUNT));
     Assertions.assertNull(alteredTopic.properties().get(TopicConfig.RETENTION_MS_CONFIG));
 
+    ConfigEntry retentionConfigEntry =
+        waitUntilTopicConfigRevertedToDefault(topicName, TopicConfig.RETENTION_MS_CONFIG);
+    Topic loadedTopic =
+        catalog.asTopicCatalog().loadTopic(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName));
+
     Assertions.assertEquals("new comment", loadedTopic.comment());
     Assertions.assertEquals("3", loadedTopic.properties().get(PARTITION_COUNT));
-    // retention.ms overridden was removed, so it should be the default value
+    // retention.ms override is removed, so loaded topic should reflect Kafka's effective default.
     Assertions.assertEquals(
-        "604800000", loadedTopic.properties().get(TopicConfig.RETENTION_MS_CONFIG));
+        retentionConfigEntry.value(),
+        loadedTopic.properties().get(TopicConfig.RETENTION_MS_CONFIG));
     checkTopicReadWrite(topicName);
   }
 
@@ -395,10 +402,8 @@ public class CatalogKafkaIT extends BaseIT {
     Assertions.assertTrue(dropped);
 
     // verify topic not exist in Kafka
-    Exception ex =
-        Assertions.assertThrows(ExecutionException.class, () -> getTopicDesc(createdTopic.name()));
-    Assertions.assertTrue(
-        ex.getMessage().contains("This server does not host this topic-partition"));
+    awaitTopicDeletedInKafka(createdTopic.name());
+    Assertions.assertFalse(topicExistsInKafka(createdTopic.name()));
 
     // verify dropping non-exist topic
     String topicName1 = GravitinoITUtils.genRandomName("test-topic");
@@ -411,6 +416,7 @@ public class CatalogKafkaIT extends BaseIT {
             Collections.emptyMap());
 
     adminClient.deleteTopics(Collections.singleton(topicName1)).all().get();
+    awaitTopicDeletedInKafka(topicName1);
     boolean dropped1 =
         catalog.asTopicCatalog().dropTopic(NameIdentifier.of(DEFAULT_SCHEMA_NAME, topicName1));
     Assertions.assertFalse(dropped1, "Should return false when dropping non-exist topic");
@@ -558,6 +564,58 @@ public class CatalogKafkaIT extends BaseIT {
         .topicNameValues()
         .get(topicName)
         .get();
+  }
+
+  private void awaitTopicDeletedInKafka(String topicName) {
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(200, TimeUnit.MILLISECONDS)
+        .until(() -> !topicExistsInKafka(topicName));
+  }
+
+  private boolean topicExistsInKafka(String topicName) {
+    try {
+      return adminClient.listTopics().names().get().contains(topicName);
+    } catch (ExecutionException e) {
+      throw new RuntimeException("Failed to check topic existence for topic " + topicName, e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(
+          "Interrupted while checking topic existence for topic " + topicName, e);
+    }
+  }
+
+  private ConfigEntry waitUntilTopicConfigRevertedToDefault(String topicName, String configName) {
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .pollInterval(200, TimeUnit.MILLISECONDS)
+        .until(
+            () -> {
+              ConfigEntry configEntry = getTopicConfigEntry(topicName, configName);
+              return configEntry != null && configEntry.isDefault();
+            });
+    return getTopicConfigEntry(topicName, configName);
+  }
+
+  private ConfigEntry getTopicConfigEntry(String topicName, String configName) {
+    ConfigResource configResource = new ConfigResource(ConfigResource.Type.TOPIC, topicName);
+    try {
+      Config topicConfigs =
+          adminClient
+              .describeConfigs(Collections.singleton(configResource))
+              .all()
+              .get()
+              .get(configResource);
+      return topicConfigs.get(configName);
+    } catch (ExecutionException e) {
+      throw new RuntimeException(
+          String.format("Failed to get config %s for topic %s", configName, topicName), e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(
+          String.format("Interrupted while getting config %s for topic %s", configName, topicName),
+          e);
+    }
   }
 
   private void createMetalake() {

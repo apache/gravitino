@@ -469,6 +469,10 @@ public class HudiCatalogHMSIT extends BaseIT {
                 "org.apache.spark.sql.hudi.catalog.HoodieCatalog")
             .config("spark.kryo.registrator", "org.apache.spark.HoodieSparkKryoRegistrar")
             .config("dfs.replication", "1")
+            // Disable Hudi metadata table to avoid NoSuchMethodError caused by Hudi 0.15.0's
+            // shaded HBase code (HoodieHFileReader) being incompatible with hadoop-hdfs-client
+            // 3.3.6. See: https://github.com/apache/hudi/issues/5765
+            .config("hoodie.metadata.enable", "false")
             .enableHiveSupport()
             .getOrCreate();
 

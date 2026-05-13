@@ -23,16 +23,19 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.connector.AggregationApplicationResult;
 import io.trino.spi.connector.Assignment;
+import io.trino.spi.connector.BeginTableExecuteResult;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorPartitioningHandle;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorTableExecuteHandle;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableLayout;
 import io.trino.spi.connector.ConnectorTableMetadata;
@@ -673,6 +676,49 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
                         result.getPartitionColumns(),
                         result.supportsMultipleWritersPerPartition())
                     : new ConnectorTableLayout(result.getPartitionColumns()));
+  }
+
+  @Override
+  public Optional<ConnectorTableLayout> getLayoutForTableExecute(
+      ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
+    return internalMetadata
+        .getLayoutForTableExecute(session, GravitinoHandle.unWrap(tableExecuteHandle))
+        .map(
+            result ->
+                result.getPartitioning().isPresent()
+                    ? new ConnectorTableLayout(
+                        new GravitinoPartitioningHandle(result.getPartitioning().get()),
+                        result.getPartitionColumns(),
+                        result.supportsMultipleWritersPerPartition())
+                    : new ConnectorTableLayout(result.getPartitionColumns()));
+  }
+
+  @Override
+  public BeginTableExecuteResult<ConnectorTableExecuteHandle, ConnectorTableHandle>
+      beginTableExecute(
+          ConnectorSession session,
+          ConnectorTableExecuteHandle tableExecuteHandle,
+          ConnectorTableHandle updatedSourceTableHandle) {
+    BeginTableExecuteResult<ConnectorTableExecuteHandle, ConnectorTableHandle> result =
+        internalMetadata.beginTableExecute(
+            session,
+            GravitinoHandle.unWrap(tableExecuteHandle),
+            GravitinoHandle.unWrap(updatedSourceTableHandle));
+    SchemaTableName tableName = getTableName(updatedSourceTableHandle);
+    return new BeginTableExecuteResult<>(
+        new GravitinoTableExecuteHandle(result.getTableExecuteHandle()),
+        new GravitinoTableHandle(
+            tableName.getSchemaName(), tableName.getTableName(), result.getSourceHandle()));
+  }
+
+  @Override
+  public void finishTableExecute(
+      ConnectorSession session,
+      ConnectorTableExecuteHandle tableExecuteHandle,
+      Collection<Slice> fragments,
+      List<Object> tableExecuteState) {
+    internalMetadata.finishTableExecute(
+        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
   }
 
   protected SchemaTableName getTableName(ConnectorTableHandle tableHandle) {

@@ -22,19 +22,37 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.CURRENT_SCHEMA_ID_
 import static org.apache.gravitino.catalog.glue.GlueConstants.ICEBERG_FIELD_ID;
 import static org.apache.gravitino.catalog.glue.GlueConstants.ICEBERG_FIELD_OPTIONAL;
 import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE_PARAM;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.BIGINT;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.BINARY;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.BOOLEAN;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.CHAR;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.DATE;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.DECIMAL;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.DOUBLE;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.DOUBLE_PRECISION;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.FLOAT;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.INT;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.INTEGER;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.LONG;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.SMALLINT;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.STRING;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.TIMESTAMP;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.TINYINT;
+import static org.apache.gravitino.catalog.glue.GlueTypeConverter.VARCHAR;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.core.document.Document;
 import software.amazon.awssdk.services.glue.model.Column;
 import software.amazon.awssdk.services.glue.model.IcebergSchema;
@@ -50,8 +68,6 @@ import software.amazon.awssdk.services.glue.model.Table;
  */
 final class GlueIcebergHelper {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GlueIcebergHelper.class);
-
   private GlueIcebergHelper() {}
 
   /**
@@ -66,51 +82,56 @@ final class GlueIcebergHelper {
   }
 
   /**
-   * Builds a list of {@link IcebergTableUpdate} objects from Gravitino {@link TableChange} entries.
-   *
-   * <p>Schema changes (add/rename/delete/update column) are consolidated into a single {@code
-   * add-schema} update carrying the complete new schema. Property changes are emitted as a separate
-   * {@code set-properties} update.
-   *
-   * @param rawGlueTable the current Glue table (used to read existing column field IDs)
-   * @param changes the changes to apply
-   * @return list of {@link IcebergTableUpdate} to apply; empty if {@code changes} contains no
-   *     applicable entries, otherwise one entry for schema changes and/or one for property changes
+   * Validates that all {@code changes} are supported for Iceberg tables. Throws {@link
+   * IllegalArgumentException} for unsupported change types, including {@link
+   * TableChange.RemoveProperty} (not supported via the Glue SDK) and non-column/non-property
+   * changes (e.g., {@code RenameTable}, {@code UpdateComment}).
    */
-  static List<IcebergTableUpdate> buildIcebergTableUpdates(
-      Table rawGlueTable, TableChange... changes) {
-
-    List<TableChange> schemaChanges = new ArrayList<>();
-    Map<String, String> setProperties = new HashMap<>();
-
+  static void validateChanges(TableChange... changes) {
     for (TableChange change : changes) {
-      if (change instanceof TableChange.ColumnChange) {
-        schemaChanges.add(change);
-      } else if (change instanceof TableChange.SetProperty) {
-        TableChange.SetProperty sp = (TableChange.SetProperty) change;
-        setProperties.put(sp.getProperty(), sp.getValue());
-      } else if (change instanceof TableChange.RemoveProperty) {
-        throw new UnsupportedOperationException(
-            "Removing properties from Iceberg tables is not supported via the Glue SDK. "
-                + "Use an Iceberg-native client (Spark/Athena) to modify table properties.");
-      } else {
+      if (change instanceof TableChange.ColumnChange || change instanceof TableChange.SetProperty) {
+        continue;
+      }
+      if (change instanceof TableChange.RemoveProperty) {
         throw new IllegalArgumentException(
-            "Unsupported table change for Iceberg table: " + change.getClass().getSimpleName());
+            "Removing properties from Iceberg tables is not supported via the Glue SDK."
+                + " Use SetProperty to override values instead.");
+      }
+      throw new IllegalArgumentException(
+          "Unsupported table change for Iceberg table: " + change.getClass().getSimpleName());
+    }
+  }
+
+  /**
+   * Filters {@code changes} to column-schema changes and builds a single {@link IcebergTableUpdate}
+   * carrying the updated schema. Returns empty if there are no column changes.
+   */
+  static Optional<IcebergTableUpdate> buildSchemaUpdate(
+      Table rawGlueTable, TableChange... changes) {
+    List<TableChange> schemaChanges = new ArrayList<>();
+    for (TableChange c : changes) {
+      if (c instanceof TableChange.ColumnChange) schemaChanges.add(c);
+    }
+    if (schemaChanges.isEmpty()) return Optional.empty();
+    return Optional.of(
+        IcebergTableUpdate.builder()
+            .schema(buildUpdatedSchema(rawGlueTable, schemaChanges))
+            .build());
+  }
+
+  /**
+   * Extracts {@link TableChange.SetProperty} entries from {@code changes} into a key-value map.
+   * Returns an empty map if there are no property-set changes.
+   */
+  static Map<String, String> extractSetProperties(TableChange... changes) {
+    Map<String, String> props = new HashMap<>();
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.SetProperty) {
+        TableChange.SetProperty sp = (TableChange.SetProperty) change;
+        props.put(sp.getProperty(), sp.getValue());
       }
     }
-
-    List<IcebergTableUpdate> updates = new ArrayList<>();
-
-    if (!schemaChanges.isEmpty()) {
-      IcebergSchema newSchema = buildUpdatedSchema(rawGlueTable, schemaChanges);
-      updates.add(IcebergTableUpdate.builder().schema(newSchema).build());
-    }
-
-    if (!setProperties.isEmpty()) {
-      updates.add(IcebergTableUpdate.builder().properties(setProperties).build());
-    }
-
-    return updates;
+    return props;
   }
 
   /**
@@ -131,30 +152,45 @@ final class GlueIcebergHelper {
             IcebergStructField.builder()
                 .id(++maxId)
                 .name(add.fieldName()[0])
-                .type(gravitinoTypeToDoc(add.getDataType()))
+                .type(gravitinoTypeToIcebergType(add.getDataType()))
                 .required(!add.isNullable())
                 .doc(add.getComment())
                 .build());
 
       } else if (change instanceof TableChange.DeleteColumn) {
-        String name = ((TableChange.DeleteColumn) change).fieldName()[0];
-        fields.removeIf(f -> f.name().equals(name));
+        TableChange.DeleteColumn del = (TableChange.DeleteColumn) change;
+        Preconditions.checkArgument(
+            del.fieldName().length == 1, "Nested column deletions are not supported");
+        String name = del.fieldName()[0];
+        boolean removed = fields.removeIf(f -> f.name().equals(name));
+        if (!removed && !del.getIfExists()) {
+          throw new IllegalArgumentException(
+              "Column '" + name + "' not found in Iceberg table schema");
+        }
 
       } else if (change instanceof TableChange.RenameColumn) {
         TableChange.RenameColumn rename = (TableChange.RenameColumn) change;
+        Preconditions.checkArgument(
+            rename.fieldName().length == 1, "Nested column renames are not supported");
         updateField(fields, rename.fieldName()[0], b -> b.name(rename.getNewName()));
 
       } else if (change instanceof TableChange.UpdateColumnType) {
         TableChange.UpdateColumnType upd = (TableChange.UpdateColumnType) change;
-        Document newTypeDoc = gravitinoTypeToDoc(upd.getNewDataType());
+        Preconditions.checkArgument(
+            upd.fieldName().length == 1, "Nested column type updates are not supported");
+        Document newTypeDoc = gravitinoTypeToIcebergType(upd.getNewDataType());
         updateField(fields, upd.fieldName()[0], b -> b.type(newTypeDoc));
 
       } else if (change instanceof TableChange.UpdateColumnComment) {
         TableChange.UpdateColumnComment upd = (TableChange.UpdateColumnComment) change;
+        Preconditions.checkArgument(
+            upd.fieldName().length == 1, "Nested column comment updates are not supported");
         updateField(fields, upd.fieldName()[0], b -> b.doc(upd.getNewComment()));
 
       } else if (change instanceof TableChange.UpdateColumnNullability) {
         TableChange.UpdateColumnNullability upd = (TableChange.UpdateColumnNullability) change;
+        Preconditions.checkArgument(
+            upd.fieldName().length == 1, "Nested column nullability updates are not supported");
         updateField(fields, upd.fieldName()[0], b -> b.required(!upd.nullable()));
 
       } else {
@@ -206,10 +242,21 @@ final class GlueIcebergHelper {
           IcebergStructField.builder()
               .id(fieldId)
               .name(col.name())
-              .type(hiveTypeToDoc(col.type()))
+              .type(hiveTypeToIcebergType(col.type()))
               .required(required)
               .doc(col.comment())
               .build());
+    }
+
+    Set<Integer> seen = new HashSet<>();
+    for (IcebergStructField f : fields) {
+      if (!seen.add(f.id())) {
+        throw new IllegalStateException(
+            String.format(
+                "Iceberg table '%s' has duplicate field ID %d in column metadata."
+                    + " The Glue metadata may be corrupt. Aborting schema update.",
+                rawGlueTable.name(), f.id()));
+      }
     }
     return fields;
   }
@@ -222,19 +269,22 @@ final class GlueIcebergHelper {
         try {
           return Integer.parseInt(raw);
         } catch (NumberFormatException e) {
-          LOG.warn(
-              "Column '{}' has non-numeric iceberg.field.id '{}'; falling back to sequence ID {}",
-              col.name(),
-              raw,
-              fallbackId);
-          return fallbackId;
+          throw new IllegalStateException(
+              String.format(
+                  "Column '%s' has non-numeric iceberg.field.id '%s'."
+                      + " The Iceberg metadata may be corrupt. Aborting schema update.",
+                  col.name(), raw),
+              e);
         }
       }
     }
     return fallbackId;
   }
 
-  /** Parses {@code iceberg.field.optional}; defaults to {@code false} (i.e., nullable). */
+  /**
+   * Parses {@code iceberg.field.optional}; defaults to {@code false} (i.e., not required /
+   * optional).
+   */
   private static boolean parseRequired(Column col) {
     if (col.hasParameters()) {
       String optional = col.parameters().get(ICEBERG_FIELD_OPTIONAL);
@@ -247,7 +297,8 @@ final class GlueIcebergHelper {
 
   /**
    * Reads the current schema ID from {@code Table.parameters()["current-schema-id"]}; returns 0 if
-   * absent.
+   * absent. Throws {@link IllegalStateException} if the value is present but non-numeric, since
+   * proceeding with a fabricated schema ID risks corrupting the Iceberg schema version chain.
    */
   private static int parseSchemaId(Table rawGlueTable) {
     if (!rawGlueTable.hasParameters()) return 0;
@@ -256,79 +307,96 @@ final class GlueIcebergHelper {
     try {
       return Integer.parseInt(raw);
     } catch (NumberFormatException e) {
-      LOG.warn("Table has non-numeric current-schema-id '{}'; treating as 0", raw);
-      return 0;
+      throw new IllegalStateException(
+          String.format(
+              "Iceberg table '%s' has non-numeric current-schema-id '%s'."
+                  + " The Iceberg metadata may be corrupt. Aborting schema update.",
+              rawGlueTable.name(), raw),
+          e);
     }
   }
 
   /**
-   * Converts a Glue/Hive column type string to an Iceberg type {@link Document}.
+   * Converts a Glue/Hive column type string to an Iceberg type {@link
+   * software.amazon.awssdk.core.document.Document}.
    *
    * <p>Iceberg REST spec type names are used for primitives (e.g. {@code "long"} for Hive {@code
-   * bigint}). Complex types (array, map, struct) are represented as JSON maps.
+   * bigint}). Complex types (array, map, struct) are not supported and will throw {@link
+   * IllegalStateException}.
    */
-  static Document hiveTypeToDoc(String hiveType) {
-    if (hiveType == null) return Document.fromString("string");
+  static Document hiveTypeToIcebergType(String hiveType) {
+    if (hiveType == null) return Document.fromString(STRING);
     String t = hiveType.toLowerCase(Locale.ROOT).trim();
 
     switch (t) {
-      case "string":
-        return Document.fromString("string");
-      case "bigint":
-        return Document.fromString("long");
-      case "int":
-      case "integer":
-      case "smallint":
-      case "tinyint":
-        return Document.fromString("int");
-      case "float":
-        return Document.fromString("float");
-      case "double":
-      case "double precision":
-        return Document.fromString("double");
-      case "boolean":
-        return Document.fromString("boolean");
-      case "binary":
-        return Document.fromString("binary");
-      case "date":
-        return Document.fromString("date");
-      case "timestamp":
-        return Document.fromString("timestamp");
+      case STRING:
+        return Document.fromString(STRING);
+      case BIGINT:
+      case LONG: // Iceberg type name stored by Glue native Iceberg API
+        return Document.fromString(LONG);
+      case INT:
+      case INTEGER:
+      case SMALLINT:
+      case TINYINT:
+        return Document.fromString(INT);
+      case FLOAT:
+        return Document.fromString(FLOAT);
+      case DOUBLE:
+      case DOUBLE_PRECISION:
+        return Document.fromString(DOUBLE);
+      case BOOLEAN:
+        return Document.fromString(BOOLEAN);
+      case BINARY:
+        return Document.fromString(BINARY);
+      case DATE:
+        return Document.fromString(DATE);
+      case TIMESTAMP:
+        return Document.fromString(TIMESTAMP);
       default:
         break;
     }
 
-    if (t.startsWith("decimal(")) {
+    if (t.startsWith(DECIMAL + "(")) {
       try {
         String inner =
-            t.substring("decimal(".length(), t.endsWith(")") ? t.length() - 1 : t.length());
+            t.substring((DECIMAL + "(").length(), t.endsWith(")") ? t.length() - 1 : t.length());
         String[] parts = inner.split(",");
         int precision = Integer.parseInt(parts[0].trim());
         int scale = parts.length > 1 ? Integer.parseInt(parts[1].trim()) : 0;
         return Document.fromMap(
             Map.of(
-                "type", Document.fromString("decimal"),
+                "type", Document.fromString(DECIMAL),
                 "precision", Document.fromNumber(precision),
                 "scale", Document.fromNumber(scale)));
       } catch (NumberFormatException e) {
-        LOG.warn("Malformed Hive decimal type '{}', falling back to Iceberg 'string'", hiveType);
-        return Document.fromString("string");
+        throw new IllegalStateException(
+            "Malformed Hive decimal type '"
+                + hiveType
+                + "' in existing Iceberg table schema."
+                + " Cannot safely build schema update.",
+            e);
       }
     }
-    if (t.startsWith("varchar(") || t.startsWith("char(")) {
-      return Document.fromString("string");
+    if (t.startsWith(VARCHAR + "(") || t.startsWith(CHAR + "(")) {
+      return Document.fromString(STRING);
     }
-    LOG.warn("Unknown Hive type '{}', falling back to Iceberg 'string'", hiveType);
-    return Document.fromString("string");
+    throw new IllegalStateException(
+        "Unsupported Hive column type '"
+            + hiveType
+            + "' in existing Iceberg table schema."
+            + " Cannot safely build schema update."
+            + " Complex types (array, map, struct) are not supported by the Glue Iceberg schema update API.");
   }
 
   /**
-   * Converts a Gravitino {@link Type} to an Iceberg type {@link Document}.
+   * Converts a Gravitino {@link Type} to an Iceberg type {@link
+   * software.amazon.awssdk.core.document.Document} ({@code "Doc"} in the method name refers to the
+   * AWS SDK {@code Document} type used to represent Iceberg type descriptors in Glue API payloads).
    *
-   * <p>Supports primitive types. Complex types (list, map, struct) require element/key/value field
-   * IDs that can only be assigned at schema-build time; pass-through as nested Document maps.
+   * <p>Supports primitive types. Complex types (list, map, struct) are not supported and will throw
+   * {@link UnsupportedOperationException}.
    */
-  static Document gravitinoTypeToDoc(Type type) {
+  static Document gravitinoTypeToIcebergType(Type type) {
     if (type instanceof Types.StringType
         || type instanceof Types.VarCharType
         || type instanceof Types.FixedCharType) {

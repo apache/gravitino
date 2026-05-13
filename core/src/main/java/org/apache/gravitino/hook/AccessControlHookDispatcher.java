@@ -21,7 +21,6 @@ package org.apache.gravitino.hook;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -47,14 +46,17 @@ import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code AccessControlHookDispatcher} is a decorator for {@link AccessControlDispatcher} that not
  * only delegates access control operations to the underlying access control dispatcher but also
  * executes some hook operations before or after the underlying operations.
  */
-@Slf4j
 public class AccessControlHookDispatcher implements AccessControlDispatcher {
+
+  private static final Logger LOG = LoggerFactory.getLogger(AccessControlHookDispatcher.class);
   private final AccessControlDispatcher dispatcher;
 
   public AccessControlHookDispatcher(AccessControlDispatcher dispatcher) {
@@ -127,7 +129,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     Group grantedGroup = dispatcher.grantRolesToGroup(metalake, roles, group);
-    notifyRoleUserRelChange(metalake, roles);
+    notifyRoleGroupRelChange(metalake, roles);
     return grantedGroup;
   }
 
@@ -135,7 +137,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     Group revokedGroup = dispatcher.revokeRolesFromGroup(metalake, roles, group);
-    notifyRoleUserRelChange(metalake, roles);
+    notifyRoleGroupRelChange(metalake, roles);
     return revokedGroup;
   }
 
@@ -186,7 +188,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     try {
       oldRole = getRole(metalake, role);
     } catch (NoSuchRoleException e) {
-      log.debug(e.getMessage());
+      LOG.debug(e.getMessage());
     }
     boolean resultOfDeleteRole = dispatcher.deleteRole(metalake, role);
     if (resultOfDeleteRole && oldRole != null) {
@@ -254,6 +256,15 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer != null) {
       gravitinoAuthorizer.handleRolePrivilegeChange(role);
+    }
+  }
+
+  private static void notifyRoleGroupRelChange(String metalake, List<String> roles) {
+    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (gravitinoAuthorizer != null) {
+      for (String role : roles) {
+        gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
+      }
     }
   }
 }
