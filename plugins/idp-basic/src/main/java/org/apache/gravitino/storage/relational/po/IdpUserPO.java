@@ -129,6 +129,13 @@ public class IdpUserPO {
 
     public IdpUserPO build() {
       validate();
+      IdpUserPO userPO = new IdpUserPO();
+      userPO.userId = this.userPO.userId;
+      userPO.userName = this.userPO.userName;
+      userPO.passwordHash = this.userPO.passwordHash;
+      userPO.currentVersion = this.userPO.currentVersion;
+      userPO.lastVersion = this.userPO.lastVersion;
+      userPO.deletedAt = this.userPO.deletedAt;
       return userPO;
     }
   }
