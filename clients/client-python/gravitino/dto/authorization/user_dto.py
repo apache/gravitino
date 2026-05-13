@@ -32,7 +32,9 @@ class UserDTO(User):
     """Represents a User Data Transfer Object (DTO)."""
 
     _name: str = field(metadata=config(field_name="name"))
-    _roles: list[str] = field(default_factory=list, metadata=config(field_name="roles"))
+    _roles: tuple[str, ...] = field(
+        default_factory=tuple, metadata=config(field_name="roles")
+    )
     _audit: Optional[AuditDTO] = field(
         default=None, metadata=config(field_name="audit")
     )
@@ -57,7 +59,7 @@ class UserDTO(User):
         return self._name
 
     def roles(self) -> list[str]:
-        return self._roles if self._roles else []
+        return list(self._roles) if self._roles else []
 
     def audit_info(self) -> Optional[AuditDTO]:
         return self._audit
@@ -67,7 +69,7 @@ class UserDTO(User):
 
         def __init__(self) -> None:
             self._name: str = ""
-            self._roles: list[str] = []
+            self._roles: tuple[str, ...] = ()
             self._audit: Optional[AuditDTO] = None
 
         def with_name(self, name: str) -> UserDTO.Builder:
@@ -76,7 +78,7 @@ class UserDTO(User):
 
         def with_roles(self, roles: list[str]) -> UserDTO.Builder:
             if roles is not None:
-                self._roles = roles
+                self._roles = tuple(roles)
             return self
 
         def with_audit(self, audit: AuditDTO) -> UserDTO.Builder:

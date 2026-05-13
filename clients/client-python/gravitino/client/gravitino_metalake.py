@@ -786,7 +786,18 @@ class GravitinoMetalake(
     ####################
 
     def add_user(self, user: str) -> User:
-        """Add a user to this metalake."""
+        """Add a user to this metalake.
+
+        Args:
+            user: The name of the user.
+
+        Returns:
+            The added User object.
+
+        Raises:
+            UserAlreadyExistsException: If a user with the same name already exists.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
         Precondition.check_string_not_empty(user, "user name must not be null or empty")
         req = UserAddRequest(user)
         req.validate()
@@ -799,7 +810,17 @@ class GravitinoMetalake(
         return resp.user()
 
     def remove_user(self, user: str) -> bool:
-        """Remove a user from this metalake."""
+        """Remove a user from this metalake.
+
+        Args:
+            user: The name of the user.
+
+        Returns:
+            True if the user was removed, False if the user did not exist.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
         Precondition.check_string_not_empty(user, "user name must not be null or empty")
         url = self.API_METALAKES_USER_PATH.format(
             encode_string(self.name()), encode_string(user)
@@ -810,7 +831,18 @@ class GravitinoMetalake(
         return remove_response.removed()
 
     def get_user(self, user: str) -> User:
-        """Get a user by name from this metalake."""
+        """Get a user by name from this metalake.
+
+        Args:
+            user: The name of the user.
+
+        Returns:
+            The User object.
+
+        Raises:
+            NoSuchUserException: If the user does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
         Precondition.check_string_not_empty(user, "user name must not be null or empty")
         url = self.API_METALAKES_USER_PATH.format(
             encode_string(self.name()), encode_string(user)
@@ -821,7 +853,14 @@ class GravitinoMetalake(
         return resp.user()
 
     def list_users(self) -> list[User]:
-        """List all users with details under this metalake."""
+        """List all users with details under this metalake.
+
+        Returns:
+            A list of User objects.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
         url = self.API_METALAKES_USERS_PATH.format(encode_string(self.name()))
         response = self.rest_client.get(
             url, params={"details": "true"}, error_handler=USER_ERROR_HANDLER
@@ -831,7 +870,14 @@ class GravitinoMetalake(
         return resp.users()
 
     def list_user_names(self) -> list[str]:
-        """List all user names under this metalake."""
+        """List all user names under this metalake.
+
+        Returns:
+            A list of user name strings.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
         url = self.API_METALAKES_USERS_PATH.format(encode_string(self.name()))
         response = self.rest_client.get(url, error_handler=USER_ERROR_HANDLER)
         resp = UserNamesListResponse.from_json(response.body, infer_missing=True)

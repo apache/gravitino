@@ -94,3 +94,13 @@ class TestUserDTO(unittest.TestCase):
         self.assertEqual(user1, user2)
         self.assertEqual(hash(user1), hash(user2))
         self.assertNotEqual(user1, user3)
+
+    def test_roles_returns_list_type(self):
+        user_dto = UserDTO.builder().with_name("test").with_roles(["r1"]).build()
+        self.assertIsInstance(user_dto.roles(), list)
+
+    def test_roles_immutability(self):
+        user_dto = UserDTO.builder().with_name("test").with_roles(["r1", "r2"]).build()
+        roles = user_dto.roles()
+        roles.append("r3")
+        self.assertEqual(["r1", "r2"], user_dto.roles())

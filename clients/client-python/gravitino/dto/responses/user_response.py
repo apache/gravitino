@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional
 
 from dataclasses_json import config, dataclass_json
 
@@ -31,9 +32,9 @@ from gravitino.utils.precondition import Precondition
 class UserResponse(BaseResponse):
     """Represents a response for a user."""
 
-    _user: UserDTO = field(default=None, metadata=config(field_name="user"))
+    _user: Optional[UserDTO] = field(default=None, metadata=config(field_name="user"))
 
-    def user(self) -> UserDTO:
+    def user(self) -> Optional[UserDTO]:
         return self._user
 
     def validate(self) -> None:
