@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
@@ -733,6 +734,154 @@ class TestOwnerMetaService extends TestJDBCBackend {
             .batchGetOwner(Collections.emptyList(), Entity.EntityType.TABLE);
     Assertions.assertNotNull(relations);
     Assertions.assertTrue(relations.isEmpty());
+  }
+
+  @TestTemplate
+  void testBatchSetOwnersWithEmptyInput() {
+    OwnerMetaService.getInstance()
+        .batchSetOwners(
+            Collections.emptyList(),
+            Entity.EntityType.TABLE,
+            NameIdentifier.of(METALAKE_NAME, "u"),
+            Entity.EntityType.USER);
+  }
+
+  @TestTemplate
+  void testBatchSetOwnersAssignsSameUserToMultipleTables() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    TableEntity table1 =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME,
+            AUDIT_INFO);
+    TableEntity table2 =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME + "_2",
+            AUDIT_INFO);
+    backend.insert(table1, false);
+    backend.insert(table2, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "batch_owner",
+            AUDIT_INFO);
+    backend.insert(user, false);
+
+    OwnerMetaService.getInstance()
+        .batchSetOwners(
+            List.of(table1.nameIdentifier(), table2.nameIdentifier()),
+            Entity.EntityType.TABLE,
+            user.nameIdentifier(),
+            user.type());
+
+    Assertions.assertEquals(
+        user.nameIdentifier(),
+        ((HasIdentifier)
+                OwnerMetaService.getInstance()
+                    .getOwner(table1.nameIdentifier(), table1.type())
+                    .get())
+            .nameIdentifier());
+    Assertions.assertEquals(
+        user.nameIdentifier(),
+        ((HasIdentifier)
+                OwnerMetaService.getInstance()
+                    .getOwner(table2.nameIdentifier(), table2.type())
+                    .get())
+            .nameIdentifier());
+  }
+
+  @TestTemplate
+  void testBatchSetOwnersReplacesPriorOwner() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME,
+            AUDIT_INFO);
+    backend.insert(table, false);
+
+    UserEntity user1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "u1",
+            AUDIT_INFO);
+    UserEntity user2 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "u2",
+            AUDIT_INFO);
+    backend.insert(user1, false);
+    backend.insert(user2, false);
+
+    OwnerMetaService.getInstance()
+        .setOwner(table.nameIdentifier(), table.type(), user1.nameIdentifier(), user1.type());
+    OwnerMetaService.getInstance()
+        .batchSetOwners(
+            List.of(table.nameIdentifier()),
+            Entity.EntityType.TABLE,
+            user2.nameIdentifier(),
+            user2.type());
+
+    Assertions.assertEquals(
+        user2.nameIdentifier(),
+        ((HasIdentifier)
+                OwnerMetaService.getInstance().getOwner(table.nameIdentifier(), table.type()).get())
+            .nameIdentifier());
+  }
+
+  @TestTemplate
+  void testBatchSetOwnersRequiresSingleMetalake() throws IOException {
+    String ml2 = METALAKE_NAME + "_other";
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertMakeLake(ml2);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertCatalog(ml2, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    createAndInsertSchema(ml2, CATALOG_NAME, SCHEMA_NAME);
+    TableEntity table1 =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME,
+            AUDIT_INFO);
+    TableEntity table2 =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(ml2, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME,
+            AUDIT_INFO);
+    backend.insert(table1, false);
+    backend.insert(table2, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "u",
+            AUDIT_INFO);
+    backend.insert(user, false);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            OwnerMetaService.getInstance()
+                .batchSetOwners(
+                    List.of(table1.nameIdentifier(), table2.nameIdentifier()),
+                    Entity.EntityType.TABLE,
+                    user.nameIdentifier(),
+                    user.type()));
   }
 
   @TestTemplate
