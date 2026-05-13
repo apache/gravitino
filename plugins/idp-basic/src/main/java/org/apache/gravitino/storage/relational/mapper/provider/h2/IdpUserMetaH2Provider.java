@@ -17,26 +17,8 @@
  * under the License.
  */
 
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
+package org.apache.gravitino.storage.relational.mapper.provider.h2;
 
-dependencies {
-  implementation(project(":core"))
-  implementation(libs.bcprov.jdk18on)
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
-  implementation(libs.mybatis)
-  testImplementation(project(":common"))
-  testImplementation(libs.junit.jupiter.api)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
 
-tasks {
-  test {
-    environment("GRAVITINO_HOME", rootDir.path)
-    environment("GRAVITINO_TEST", "true")
-  }
-}
+public class IdpUserMetaH2Provider extends IdpUserMetaBaseSQLProvider {}

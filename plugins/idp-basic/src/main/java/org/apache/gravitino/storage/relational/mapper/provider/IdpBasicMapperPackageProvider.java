@@ -16,27 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.storage.relational.mapper.provider;
 
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
+import com.google.common.collect.ImmutableList;
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
 
-dependencies {
-  implementation(project(":core"))
-  implementation(libs.bcprov.jdk18on)
-  implementation(libs.commons.lang3)
-  implementation(libs.guava)
-  implementation(libs.mybatis)
-  testImplementation(project(":common"))
-  testImplementation(libs.junit.jupiter.api)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+/** Supplies built-in IdP mapper classes from the idp-basic plugin. */
+public class IdpBasicMapperPackageProvider implements MapperPackageProvider {
 
-tasks {
-  test {
-    environment("GRAVITINO_HOME", rootDir.path)
-    environment("GRAVITINO_TEST", "true")
+  @Override
+  public List<Class<?>> getMapperClasses() {
+    return ImmutableList.of(IdpUserMetaMapper.class);
   }
 }
