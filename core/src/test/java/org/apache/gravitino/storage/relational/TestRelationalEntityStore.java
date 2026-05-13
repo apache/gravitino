@@ -26,13 +26,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -285,44 +283,5 @@ public class TestRelationalEntityStore {
             destToRemove,
             Entity.EntityType.TABLE,
             SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
-  }
-
-  @Test
-  void testBatchDeleteInvalidatesCacheForEachEntity()
-      throws IOException, IllegalAccessException {
-    NameIdentifier ident1 = NameIdentifier.of("metalake", "catalog1");
-    NameIdentifier ident2 = NameIdentifier.of("metalake", "catalog2");
-    List<Pair<NameIdentifier, Entity.EntityType>> toDelete =
-        Arrays.asList(
-            Pair.of(ident1, Entity.EntityType.CATALOG),
-            Pair.of(ident2, Entity.EntityType.CATALOG));
-    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-
-    Mockito.when(backend.batchDelete(toDelete, false)).thenReturn(2);
-
-    int result = store.batchDelete(toDelete, false);
-
-    Assertions.assertEquals(2, result);
-    InOrder inOrder = Mockito.inOrder(backend, cache);
-    inOrder.verify(backend).batchDelete(toDelete, false);
-    inOrder.verify(cache).invalidate(ident1, Entity.EntityType.CATALOG);
-    inOrder.verify(cache).invalidate(ident2, Entity.EntityType.CATALOG);
-  }
-
-  @Test
-  void testBatchPutPopulatesCacheForEachEntity()
-      throws IOException, EntityAlreadyExistsException, IllegalAccessException {
-    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
-
-    BaseMetalake e1 = Mockito.mock(BaseMetalake.class);
-    BaseMetalake e2 = Mockito.mock(BaseMetalake.class);
-    List<BaseMetalake> entities = Arrays.asList(e1, e2);
-
-    store.batchPut(entities, false);
-
-    InOrder inOrder = Mockito.inOrder(backend, cache);
-    inOrder.verify(backend).batchPut(entities, false);
-    inOrder.verify(cache).put(e1);
-    inOrder.verify(cache).put(e2);
   }
 }

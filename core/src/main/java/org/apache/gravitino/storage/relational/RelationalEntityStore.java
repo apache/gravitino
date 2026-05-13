@@ -378,20 +378,13 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   public int batchDelete(
       List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
       throws IOException {
-    int deleted = backend.batchDelete(entitiesToDelete, cascade);
-    for (Pair<NameIdentifier, Entity.EntityType> entry : entitiesToDelete) {
-      cache.invalidate(entry.getLeft(), entry.getRight());
-    }
-    return deleted;
+    return backend.batchDelete(entitiesToDelete, cascade);
   }
 
   @Override
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
-    for (E entity : entities) {
-      cache.put(entity);
-    }
   }
 
   private <E extends Entity & HasIdentifier> Optional<List<RelationalEntity<?>>> getCachedRelations(
