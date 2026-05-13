@@ -67,158 +67,65 @@ public class TestRelationalSchemaNamingBridge {
   }
 
   // -------------------------------------------------------------------------
-  // convertMetadataObjectDottedFullName – each MetadataObject.Type
+  // securableObjectForStorage / securableObjectForApi
   // -------------------------------------------------------------------------
 
   @Test
-  public void schemaToStorage() {
-    String logical = "catalog.a:b:c";
-    String physical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            logical, MetadataObject.Type.SCHEMA, true);
-    assertEquals("catalog.a" + P + "b" + P + "c", physical);
+  public void securableObjectSchemaToStorage() {
+    SecurableObject obj = SecurableObjects.ofSchema(CATALOG_OBJ, "a:b:c", USE_SCHEMA_PRIVS);
+    SecurableObject result = RelationalSchemaNamingBridge.securableObjectForStorage(obj);
+    assertEquals("catalog.a" + P + "b" + P + "c", result.fullName());
   }
 
   @Test
-  public void schemaToApi() {
-    String physical = "catalog.a" + P + "b" + P + "c";
-    String logical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            physical, MetadataObject.Type.SCHEMA, false);
-    assertEquals("catalog.a:b:c", logical);
+  public void securableObjectSchemaToApi() {
+    SecurableObject obj =
+        SecurableObjects.parse("catalog.a" + P + "b" + P + "c", MetadataObject.Type.SCHEMA, USE_SCHEMA_PRIVS);
+    SecurableObject result = RelationalSchemaNamingBridge.securableObjectForApi(obj);
+    assertEquals("catalog.a:b:c", result.fullName());
   }
 
   @Test
-  public void tableToStorage() {
-    String logical = "catalog.a:b.mytable";
-    String physical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            logical, MetadataObject.Type.TABLE, true);
-    assertEquals("catalog.a" + P + "b.mytable", physical);
+  public void securableObjectTableToStorage() {
+    SecurableObject obj =
+        SecurableObjects.parse("catalog.a:b.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
+    SecurableObject result = RelationalSchemaNamingBridge.securableObjectForStorage(obj);
+    assertEquals("catalog.a" + P + "b.mytable", result.fullName());
   }
 
   @Test
-  public void tableToApi() {
-    String physical = "catalog.a" + P + "b.mytable";
-    String logical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            physical, MetadataObject.Type.TABLE, false);
-    assertEquals("catalog.a:b.mytable", logical);
+  public void securableObjectTableToApi() {
+    SecurableObject obj =
+        SecurableObjects.parse("catalog.a" + P + "b.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
+    SecurableObject result = RelationalSchemaNamingBridge.securableObjectForApi(obj);
+    assertEquals("catalog.a:b.mytable", result.fullName());
   }
 
   @Test
-  public void viewToStorage() {
-    String logical = "catalog.a:b.myview";
-    String physical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            logical, MetadataObject.Type.VIEW, true);
-    assertEquals("catalog.a" + P + "b.myview", physical);
+  public void securableObjectCatalogPassthrough() {
+    SecurableObject catalog = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+    assertSame(catalog, RelationalSchemaNamingBridge.securableObjectForStorage(catalog));
+    assertSame(catalog, RelationalSchemaNamingBridge.securableObjectForApi(catalog));
   }
 
   @Test
-  public void functionToStorage() {
-    String logical = "catalog.a:b.myfunc";
-    String physical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            logical, MetadataObject.Type.FUNCTION, true);
-    assertEquals("catalog.a" + P + "b.myfunc", physical);
+  public void securableObjectTableRoundTrip() {
+    SecurableObject obj =
+        SecurableObjects.parse("catalog.a:b:c.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
+    SecurableObject stored = RelationalSchemaNamingBridge.securableObjectForStorage(obj);
+    SecurableObject backToApi = RelationalSchemaNamingBridge.securableObjectForApi(stored);
+    assertEquals(obj.fullName(), backToApi.fullName());
   }
 
   @Test
-  public void columnToStorage() {
-    String logical = "catalog.a:b.mytable.mycol";
-    String physical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            logical, MetadataObject.Type.COLUMN, true);
-    assertEquals("catalog.a" + P + "b.mytable.mycol", physical);
-  }
-
-  @Test
-  public void metalakePassthrough() {
-    String name = "mymetal";
-    String result =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            name, MetadataObject.Type.METALAKE, true);
-    assertEquals(name, result);
-  }
-
-  @Test
-  public void catalogPassthrough() {
-    String name = "catalog";
-    String result =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            name, MetadataObject.Type.CATALOG, true);
-    assertEquals(name, result);
-  }
-
-  // -------------------------------------------------------------------------
-  // Part-count mismatch → input returned unchanged
-  // -------------------------------------------------------------------------
-
-  @Test
-  public void schemaPartCountMismatch() {
-    String name = "catalog.schema.extra";
-    String result =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            name, MetadataObject.Type.SCHEMA, true);
-    assertEquals(name, result);
-  }
-
-  @Test
-  public void tablePartCountMismatch() {
-    // TABLE expects 3 parts; 2 parts → no conversion
-    String name = "catalog.schema";
-    String result =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            name, MetadataObject.Type.TABLE, true);
-    assertEquals(name, result);
-  }
-
-  // -------------------------------------------------------------------------
-  // Round-trip: logical → physical → logical
-  // -------------------------------------------------------------------------
-
-  @Test
-  public void schemaRoundTrip() {
-    String logical = "catalog.a:b:c";
-    String physical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            logical, MetadataObject.Type.SCHEMA, true);
-    String backToLogical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            physical, MetadataObject.Type.SCHEMA, false);
-    assertEquals(logical, backToLogical);
-  }
-
-  @Test
-  public void tableRoundTrip() {
-    String logical = "catalog.a:b.mytable";
-    String physical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            logical, MetadataObject.Type.TABLE, true);
-    String backToLogical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            physical, MetadataObject.Type.TABLE, false);
-    assertEquals(logical, backToLogical);
-  }
-
-  // -------------------------------------------------------------------------
-  // Non-default separator
-  // -------------------------------------------------------------------------
-
-  @Test
-  public void customSeparatorSchema() throws Exception {
+  public void customSeparatorSecurableObject() throws Exception {
     mockSeparator("/");
-    String logical = "catalog.a/b/c";
-    String physical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            logical, MetadataObject.Type.SCHEMA, true);
-    assertEquals("catalog.a" + P + "b" + P + "c", physical);
-
-    String backToLogical =
-        RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
-            physical, MetadataObject.Type.SCHEMA, false);
-    assertEquals(logical, backToLogical);
+    SecurableObject obj =
+        SecurableObjects.parse("catalog.a/b.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
+    SecurableObject stored = RelationalSchemaNamingBridge.securableObjectForStorage(obj);
+    assertEquals("catalog.a" + P + "b.mytable", stored.fullName());
+    SecurableObject backToApi = RelationalSchemaNamingBridge.securableObjectForApi(stored);
+    assertEquals("catalog.a/b.mytable", backToApi.fullName());
   }
 
   // -------------------------------------------------------------------------

@@ -26,7 +26,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -41,6 +40,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TableStatisticEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /**
  * Translates hierarchical schema naming between the logical representation used above {@link
@@ -54,8 +54,24 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 public final class RelationalSchemaNamingBridge {
 
   private static final Joiner DOT_JOINER = Joiner.on('.');
+  private static final String SENTINEL_METALAKE = "_";
 
   private RelationalSchemaNamingBridge() {}
+
+  /**
+   * Reconstructs a dotted metadata-object full name from a {@link NameIdentifier} that was created
+   * by prepending {@link #SENTINEL_METALAKE} to the original full name. Skips the sentinel at
+   * {@code namespace.levels()[0]} and joins the remaining levels with the identifier's name.
+   */
+  private static String identToMetadataObjectFullName(NameIdentifier ident) {
+    String[] levels = ident.namespace().levels();
+    List<String> parts = new ArrayList<>(levels.length);
+    for (int i = 1; i < levels.length; i++) {
+      parts.add(levels[i]);
+    }
+    parts.add(ident.name());
+    return DOT_JOINER.join(parts);
+  }
 
   private static String separator() {
     return HierarchicalSchemaUtil.schemaSeparator();
@@ -68,12 +84,14 @@ public final class RelationalSchemaNamingBridge {
    * Entity.EntityType#MODEL}, {@link Entity.EntityType#MODEL_VERSION}) are unchanged.
    */
   public static SecurableObject securableObjectForStorage(SecurableObject object) {
-    String converted =
-        convertMetadataObjectDottedFullName(object.fullName(), object.type(), /* toStorage */ true);
-    if (converted.equals(object.fullName())) {
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
+    NameIdentifier ident = NameIdentifier.parse(SENTINEL_METALAKE + "." + object.fullName());
+    NameIdentifier converted = nameIdentifierForStorage(ident, entityType);
+    if (converted.equals(ident)) {
       return object;
     }
-    return SecurableObjects.parse(converted, object.type(), object.privileges());
+    return SecurableObjects.parse(
+        identToMetadataObjectFullName(converted), object.type(), object.privileges());
   }
 
   /**
@@ -82,13 +100,14 @@ public final class RelationalSchemaNamingBridge {
    * #securableObjectForStorage(SecurableObject)}.
    */
   public static SecurableObject securableObjectForApi(SecurableObject object) {
-    String converted =
-        convertMetadataObjectDottedFullName(
-            object.fullName(), object.type(), /* toStorage */ false);
-    if (converted.equals(object.fullName())) {
+    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object.type());
+    NameIdentifier ident = NameIdentifier.parse(SENTINEL_METALAKE + "." + object.fullName());
+    NameIdentifier converted = nameIdentifierForApi(ident, entityType);
+    if (converted.equals(ident)) {
       return object;
     }
-    return SecurableObjects.parse(converted, object.type(), object.privileges());
+    return SecurableObjects.parse(
+        identToMetadataObjectFullName(converted), object.type(), object.privileges());
   }
 
   public static RoleEntity roleEntityForStorage(RoleEntity entity) {
@@ -123,78 +142,23 @@ public final class RelationalSchemaNamingBridge {
   /**
    * Normalizes {@link GenericEntity#name()} when it holds a dotted metadata-object path whose
    * schema segment uses physical hierarchical encoding, for API callers above {@link JDBCBackend}.
-   *
-   * <p>Uses {@link MetadataObject.Type} derived from {@link Entity.EntityType} (same as relational
-   * policy/tag stubs that only set dotted {@link GenericEntity#name()}, not a full table/view
-   * namespace).
    */
   public static GenericEntity genericEntityMetadataFullNameForApi(GenericEntity entity) {
     String name = entity.name();
     if (name == null || name.isEmpty()) {
       return entity;
     }
-    final MetadataObject.Type moType;
-    try {
-      moType = MetadataObject.Type.valueOf(entity.type().name());
-    } catch (IllegalArgumentException e) {
-      return entity;
-    }
-    String convertedName = convertMetadataObjectDottedFullName(name, moType, false);
-
-    if (convertedName.equals(name)) {
+    NameIdentifier ident = NameIdentifier.parse(SENTINEL_METALAKE + "." + name);
+    NameIdentifier converted = nameIdentifierForApi(ident, entity.type());
+    if (converted.equals(ident)) {
       return entity;
     }
     return GenericEntity.builder()
         .withId(entity.id())
         .withEntityType(entity.type())
-        .withName(convertedName)
+        .withName(identToMetadataObjectFullName(converted))
         .withNamespace(entity.namespace())
         .build();
-  }
-
-  /**
-   * Rewrites the schema segment inside a dotted metadata full name (catalog.schema[.rest]) between
-   * logical and physical hierarchical forms. Non-matching part counts are returned unchanged.
-   */
-  static String convertMetadataObjectDottedFullName(
-      String fullName, MetadataObject.Type type, boolean toStorage) {
-    if (fullName == null || fullName.isEmpty()) {
-      return fullName;
-    }
-    switch (type) {
-      case SCHEMA:
-        return convertSchemaSegmentAt(fullName, /* expectedParts */ 2, toStorage);
-      case TABLE:
-      case VIEW:
-      case FUNCTION:
-        return convertSchemaSegmentAt(fullName, /* expectedParts */ 3, toStorage);
-      case COLUMN:
-        return convertSchemaSegmentAt(fullName, /* expectedParts */ 4, toStorage);
-      default:
-        return fullName;
-    }
-  }
-
-  private static String convertSchemaSegmentAt(
-      String fullName, int expectedParts, boolean toStorage) {
-    List<String> parts = SecurableObjects.DOT_SPLITTER.splitToList(fullName);
-    if (parts.size() != expectedParts) {
-      return fullName;
-    }
-    String schemaSegment = parts.get(1);
-    if (schemaSegment == null || schemaSegment.isEmpty()) {
-      return fullName;
-    }
-    String mapped =
-        toStorage
-            ? HierarchicalSchemaUtil.logicalToPhysical(schemaSegment, separator())
-            : HierarchicalSchemaUtil.physicalToLogical(schemaSegment, separator());
-    if (mapped.equals(schemaSegment)) {
-      return fullName;
-    }
-    List<String> copy = new ArrayList<>(parts);
-    copy.set(1, mapped);
-    return DOT_JOINER.join(copy);
   }
 
   /**
