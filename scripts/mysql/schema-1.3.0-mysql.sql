@@ -140,6 +140,30 @@ CREATE TABLE IF NOT EXISTS `fileset_version_info` (
     KEY `idx_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'fileset version info';
 
+CREATE TABLE IF NOT EXISTS `lance_table_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
+    `version` BIGINT(20) UNSIGNED NOT NULL COMMENT 'lance table version',
+    `manifest_path` MEDIUMTEXT NOT NULL COMMENT 'manifest path',
+    `manifest_size` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'manifest size',
+    `e_tag` VARCHAR(256) DEFAULT NULL COMMENT 'object store etag',
+    `naming_scheme` VARCHAR(64) DEFAULT NULL COMMENT 'manifest naming scheme',
+    `metadata_json` MEDIUMTEXT DEFAULT NULL COMMENT 'version metadata',
+    `context_json` MEDIUMTEXT DEFAULT NULL COMMENT 'request context',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'created at',
+    `created_by` VARCHAR(256) DEFAULT NULL COMMENT 'created by',
+    `request_id` VARCHAR(256) DEFAULT NULL COMMENT 'request id',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_ltv_tid_ver_del` (`table_id`, `version`, `deleted_at`),
+    KEY `idx_ltv_mid` (`metalake_id`),
+    KEY `idx_ltv_cid` (`catalog_id`),
+    KEY `idx_ltv_sid` (`schema_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'lance table version info';
+
 CREATE TABLE IF NOT EXISTS `topic_meta` (
     `topic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'topic id',
     `topic_name` VARCHAR(128) NOT NULL COMMENT 'topic name',

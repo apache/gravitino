@@ -19,6 +19,7 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -42,6 +43,15 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.lance.common.model.BatchCreateTableVersionsRequest;
+import org.apache.gravitino.lance.common.model.BatchCreateTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.BatchDeleteTableVersionsRequest;
+import org.apache.gravitino.lance.common.model.BatchDeleteTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.CreateTableVersionEntry;
+import org.apache.gravitino.lance.common.model.CreateTableVersionRequest;
+import org.apache.gravitino.lance.common.model.DescribeTableVersionRequest;
+import org.apache.gravitino.lance.common.model.ListTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.TableVersionInfo;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
@@ -120,6 +130,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     resourceConfig.register(provider);
     resourceConfig.register(LanceNamespaceOperations.class);
     resourceConfig.register(org.apache.gravitino.lance.service.rest.LanceTableOperations.class);
+    resourceConfig.register(org.apache.gravitino.lance.service.rest.LanceTableVersionOperations.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -1087,5 +1098,167 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
     ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals("Runtime exception", errorResp.getError());
+  }
+
+  @Test
+  void testCreateTableVersion() {
+    String tableIds = "catalog.schema.versioned_table";
+    String delimiter = ".";
+
+    TableVersionInfo tableVersionInfo = new TableVersionInfo();
+    tableVersionInfo.setVersion(11L);
+    tableVersionInfo.setManifestPath("s3://bucket/table/_versions/11.manifest");
+    tableVersionInfo.setManifestSize(4096L);
+    tableVersionInfo.setMetadata(Map.of("operation", "append"));
+    when(tableOps.createTableVersion(any(), any(), any())).thenReturn(tableVersionInfo);
+
+    CreateTableVersionRequest request = new CreateTableVersionRequest();
+    request.setVersion(11L);
+    request.setManifestPath("s3://bucket/table/_versions/11.manifest");
+    request.setManifestSize(4096L);
+
+    Response resp =
+        target(String.format("/v1/table/%s/version/create", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    TableVersionInfo response = resp.readEntity(TableVersionInfo.class);
+    Assertions.assertEquals(11L, response.getVersion());
+    Assertions.assertEquals(request.getManifestPath(), response.getManifestPath());
+
+    Mockito.verify(tableOps).createTableVersion(eq(tableIds), eq(delimiter), any());
+
+    CreateTableVersionRequest invalidRequest = new CreateTableVersionRequest();
+    invalidRequest.setVersion(1L);
+    resp =
+        target(String.format("/v1/table/%s/version/create", tableIds))
+            .queryParam("delimiter", delimiter)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(invalidRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("manifest_path is required.", errorResp.getError());
+  }
+
+  @Test
+  void testListTableVersions() {
+    String tableIds = "catalog.schema.versioned_table";
+
+    TableVersionInfo version1 = new TableVersionInfo();
+    version1.setVersion(3L);
+    version1.setManifestPath("s3://bucket/table/_versions/3.manifest");
+    TableVersionInfo version2 = new TableVersionInfo();
+    version2.setVersion(2L);
+    version2.setManifestPath("s3://bucket/table/_versions/2.manifest");
+
+    ListTableVersionsResponse expected = new ListTableVersionsResponse();
+    expected.setVersions(List.of(version1, version2));
+    expected.setPageToken("2");
+    when(tableOps.listTableVersions(any(), any(), any(), anyBoolean(), any()))
+        .thenReturn(expected);
+
+    Response resp =
+        target(String.format("/v1/table/%s/version/list", tableIds))
+            .queryParam("delimiter", ".")
+            .queryParam("limit", 2)
+            .queryParam("descending", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    ListTableVersionsResponse response = resp.readEntity(ListTableVersionsResponse.class);
+    Assertions.assertEquals(2, response.getVersions().size());
+    Assertions.assertEquals("2", response.getPageToken());
+  }
+
+  @Test
+  void testDescribeTableVersion() {
+    String tableIds = "catalog.schema.versioned_table";
+
+    TableVersionInfo tableVersionInfo = new TableVersionInfo();
+    tableVersionInfo.setVersion(8L);
+    tableVersionInfo.setManifestPath("s3://bucket/table/_versions/8.manifest");
+    when(tableOps.describeTableVersion(any(), any(), any())).thenReturn(tableVersionInfo);
+
+    DescribeTableVersionRequest request = new DescribeTableVersionRequest();
+    request.setVersion(8L);
+    Response resp =
+        target(String.format("/v1/table/%s/version/describe", tableIds))
+            .queryParam("delimiter", ".")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    TableVersionInfo response = resp.readEntity(TableVersionInfo.class);
+    Assertions.assertEquals(8L, response.getVersion());
+
+    Mockito.reset(tableOps);
+    when(tableOps.describeTableVersion(any(), any(), any()))
+        .thenThrow(new org.lance.namespace.errors.TableVersionNotFoundException("Missing version"));
+    resp =
+        target(String.format("/v1/table/%s/version/describe", tableIds))
+            .queryParam("delimiter", ".")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
+  void testBatchCreateTableVersions() {
+    TableVersionInfo versionInfo = new TableVersionInfo();
+    versionInfo.setVersion(5L);
+    versionInfo.setManifestPath("s3://bucket/table/_versions/5.manifest");
+    BatchCreateTableVersionsResponse expected = new BatchCreateTableVersionsResponse();
+    expected.setVersions(List.of(versionInfo));
+    when(tableOps.batchCreateTableVersions(any())).thenReturn(expected);
+
+    CreateTableVersionEntry entry = new CreateTableVersionEntry();
+    entry.setId(List.of("catalog", "schema", "table_a"));
+    entry.setVersion(5L);
+    entry.setManifestPath("s3://bucket/table/_versions/5.manifest");
+    BatchCreateTableVersionsRequest request = new BatchCreateTableVersionsRequest();
+    request.setEntries(List.of(entry));
+
+    Response resp =
+        target("/v1/table/version/batch-create")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    BatchCreateTableVersionsResponse response =
+        resp.readEntity(BatchCreateTableVersionsResponse.class);
+    Assertions.assertEquals(1, response.getVersions().size());
+
+    entry.setManifestPath(" ");
+    resp =
+        target("/v1/table/version/batch-create")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+  }
+
+  @Test
+  void testBatchDeleteTableVersions() {
+    String tableIds = "catalog.schema.versioned_table";
+
+    BatchDeleteTableVersionsResponse expected = new BatchDeleteTableVersionsResponse();
+    expected.setDeletedCount(2);
+    expected.setVersions(List.of(2L, 3L));
+    when(tableOps.batchDeleteTableVersions(any(), any(), any())).thenReturn(expected);
+
+    BatchDeleteTableVersionsRequest request = new BatchDeleteTableVersionsRequest();
+    request.setVersions(List.of(2L, 3L));
+    Response resp =
+        target(String.format("/v1/table/%s/version/batch-delete", tableIds))
+            .queryParam("delimiter", ".")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    BatchDeleteTableVersionsResponse response =
+        resp.readEntity(BatchDeleteTableVersionsResponse.class);
+    Assertions.assertEquals(2, response.getDeletedCount());
   }
 }

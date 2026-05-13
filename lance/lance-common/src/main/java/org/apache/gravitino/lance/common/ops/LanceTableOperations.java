@@ -20,6 +20,14 @@ package org.apache.gravitino.lance.common.ops;
 
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.lance.common.model.BatchCreateTableVersionsRequest;
+import org.apache.gravitino.lance.common.model.BatchCreateTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.BatchDeleteTableVersionsRequest;
+import org.apache.gravitino.lance.common.model.BatchDeleteTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.CreateTableVersionRequest;
+import org.apache.gravitino.lance.common.model.DescribeTableVersionRequest;
+import org.apache.gravitino.lance.common.model.ListTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.TableVersionInfo;
 import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateTableResponse;
 import org.lance.namespace.model.DeclareTableResponse;
@@ -125,6 +133,61 @@ public interface LanceTableOperations {
    * @return the response of the drop table operation
    */
   DropTableResponse dropTable(String tableId, String delimiter);
+
+  /**
+   * Register a new table version in the catalog-managed version registry.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param request the version registration payload
+   * @return the created table version metadata
+   */
+  TableVersionInfo createTableVersion(
+      String tableId, String delimiter, CreateTableVersionRequest request);
+
+  /**
+   * List registered table versions for a table.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param limit max results to return
+   * @param descending whether results should be returned in descending version order
+   * @param pageToken optional version cursor
+   * @return the registered table versions
+   */
+  ListTableVersionsResponse listTableVersions(
+      String tableId, String delimiter, Integer limit, boolean descending, String pageToken);
+
+  /**
+   * Describe a single registered table version.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param request the describe request payload
+   * @return the registered table version metadata
+   */
+  TableVersionInfo describeTableVersion(
+      String tableId, String delimiter, DescribeTableVersionRequest request);
+
+  /**
+   * Atomically register multiple table versions.
+   *
+   * @param request the batch create request payload
+   * @return the created table version metadata entries
+   */
+  BatchCreateTableVersionsResponse batchCreateTableVersions(
+      BatchCreateTableVersionsRequest request);
+
+  /**
+   * Soft delete table version registrations for a single table.
+   *
+   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
+   * @param delimiter the delimiter used in the namespace
+   * @param request the delete request payload
+   * @return deleted version summary
+   */
+  BatchDeleteTableVersionsResponse batchDeleteTableVersions(
+      String tableId, String delimiter, BatchDeleteTableVersionsRequest request);
 
   /**
    * Alter a table.

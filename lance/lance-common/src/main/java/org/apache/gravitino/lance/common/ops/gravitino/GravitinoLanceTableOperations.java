@@ -42,6 +42,14 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.lance.common.model.BatchCreateTableVersionsRequest;
+import org.apache.gravitino.lance.common.model.BatchCreateTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.BatchDeleteTableVersionsRequest;
+import org.apache.gravitino.lance.common.model.BatchDeleteTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.CreateTableVersionRequest;
+import org.apache.gravitino.lance.common.model.DescribeTableVersionRequest;
+import org.apache.gravitino.lance.common.model.ListTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.TableVersionInfo;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
@@ -74,6 +82,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
           AlterTableAlterColumnsRequest.class, new AlterColumnsGravitinoLance());
 
   private final GravitinoLanceNamespaceWrapper namespaceWrapper;
+  private final GravitinoLanceTableVersionRegistry tableVersionRegistry;
 
   private enum CreateMode {
     CREATE,
@@ -96,6 +105,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
   public GravitinoLanceTableOperations(GravitinoLanceNamespaceWrapper namespaceWrapper) {
     this.namespaceWrapper = namespaceWrapper;
+    this.tableVersionRegistry = new GravitinoLanceTableVersionRegistry(namespaceWrapper);
   }
 
   @Override
@@ -339,6 +349,37 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     response.setProperties(table.properties());
 
     return response;
+  }
+
+  @Override
+  public TableVersionInfo createTableVersion(
+      String tableId, String delimiter, CreateTableVersionRequest request) {
+    return tableVersionRegistry.createTableVersion(tableId, delimiter, request);
+  }
+
+  @Override
+  public ListTableVersionsResponse listTableVersions(
+      String tableId, String delimiter, Integer limit, boolean descending, String pageToken) {
+    return tableVersionRegistry.listTableVersions(
+        tableId, delimiter, limit, descending, pageToken);
+  }
+
+  @Override
+  public TableVersionInfo describeTableVersion(
+      String tableId, String delimiter, DescribeTableVersionRequest request) {
+    return tableVersionRegistry.describeTableVersion(tableId, delimiter, request);
+  }
+
+  @Override
+  public BatchCreateTableVersionsResponse batchCreateTableVersions(
+      BatchCreateTableVersionsRequest request) {
+    return tableVersionRegistry.batchCreateTableVersions(request);
+  }
+
+  @Override
+  public BatchDeleteTableVersionsResponse batchDeleteTableVersions(
+      String tableId, String delimiter, BatchDeleteTableVersionsRequest request) {
+    return tableVersionRegistry.batchDeleteTableVersions(tableId, delimiter, request);
   }
 
   @Override

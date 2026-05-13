@@ -36,6 +36,7 @@ import org.lance.namespace.errors.PermissionDeniedException;
 import org.lance.namespace.errors.ServiceUnavailableException;
 import org.lance.namespace.errors.TableAlreadyExistsException;
 import org.lance.namespace.errors.TableNotFoundException;
+import org.lance.namespace.errors.TableVersionNotFoundException;
 import org.lance.namespace.errors.UnauthenticatedException;
 import org.lance.namespace.model.ErrorResponse;
 import org.slf4j.Logger;
@@ -90,7 +91,8 @@ public class LanceExceptionMapper implements ExceptionMapper<Exception> {
 
   private static int toHttpStatus(LanceNamespaceException exception) {
     if (exception instanceof NamespaceNotFoundException
-        || exception instanceof TableNotFoundException) {
+        || exception instanceof TableNotFoundException
+        || exception instanceof TableVersionNotFoundException) {
       return Response.Status.NOT_FOUND.getStatusCode();
     }
 

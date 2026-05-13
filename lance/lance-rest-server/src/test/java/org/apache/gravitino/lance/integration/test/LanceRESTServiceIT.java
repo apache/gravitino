@@ -45,6 +45,13 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.lance.common.model.BatchCreateTableVersionsRequest;
+import org.apache.gravitino.lance.common.model.BatchCreateTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.CreateTableVersionEntry;
+import org.apache.gravitino.lance.common.model.CreateTableVersionRequest;
+import org.apache.gravitino.lance.common.model.DescribeTableVersionRequest;
+import org.apache.gravitino.lance.common.model.ListTableVersionsResponse;
+import org.apache.gravitino.lance.common.model.TableVersionInfo;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rel.Table;
@@ -89,6 +96,11 @@ import org.lance.namespace.model.NamespaceExistsRequest;
 import org.lance.namespace.model.RegisterTableRequest;
 import org.lance.namespace.model.RegisterTableResponse;
 import org.lance.namespace.model.TableExistsRequest;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
 @SuppressWarnings("deprecation")
 public class LanceRESTServiceIT extends BaseIT {
@@ -960,6 +972,103 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertFalse(new File(anotherLocation).exists());
   }
 
+  @Test
+  void testManagedTableVersionRegistration() throws Exception {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    String tableName = "versioned_table";
+    String location = tempDir + "/" + tableName + "/";
+    DeclareTableRequest declareRequest = new DeclareTableRequest();
+    declareRequest.setLocation(location);
+    declareRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, tableName));
+    ns.declareTable(declareRequest);
+
+    CreateTableVersionRequest createRequest = new CreateTableVersionRequest();
+    createRequest.setVersion(1L);
+    createRequest.setManifestPath(location + "_versions/1.manifest-staging");
+    createRequest.setManifestSize(4096L);
+    createRequest.setMetadata(Map.of("operation", "append", "job_id", "job-1"));
+    createRequest.setContext(Map.of("request_id", "req-1", "actor", "it"));
+
+    TableVersionInfo created =
+        postJson(
+            String.format("/v1/table/%s.%s.%s/version/create", CATALOG_NAME, SCHEMA_NAME, tableName),
+            createRequest,
+            TableVersionInfo.class);
+    Assertions.assertEquals(1L, created.getVersion());
+    Assertions.assertEquals(createRequest.getManifestPath(), created.getManifestPath());
+
+    ListTableVersionsResponse listed =
+        getJson(
+            String.format("/v1/table/%s.%s.%s/version/list?delimiter=.&limit=10&descending=true", CATALOG_NAME, SCHEMA_NAME, tableName),
+            ListTableVersionsResponse.class);
+    Assertions.assertEquals(1, listed.getVersions().size());
+    Assertions.assertEquals(1L, listed.getVersions().get(0).getVersion());
+
+    DescribeTableVersionRequest describeRequest = new DescribeTableVersionRequest();
+    describeRequest.setVersion(1L);
+    TableVersionInfo described =
+        postJson(
+            String.format("/v1/table/%s.%s.%s/version/describe", CATALOG_NAME, SCHEMA_NAME, tableName),
+            describeRequest,
+            TableVersionInfo.class);
+    Assertions.assertEquals(createRequest.getManifestPath(), described.getManifestPath());
+    Assertions.assertEquals("append", described.getMetadata().get("operation"));
+
+    int duplicateStatus =
+        postStatus(
+            String.format("/v1/table/%s.%s.%s/version/create", CATALOG_NAME, SCHEMA_NAME, tableName),
+            createRequest);
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), duplicateStatus);
+  }
+
+  @Test
+  void testBatchCreateTableVersionsRollbackOnConflict() throws Exception {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+
+    declareTableForVersioning("table_a");
+    declareTableForVersioning("table_b");
+
+    CreateTableVersionRequest initial = new CreateTableVersionRequest();
+    initial.setVersion(1L);
+    initial.setManifestPath(tempDir + "/table_a/_versions/1.manifest-staging");
+    postJson(
+        String.format("/v1/table/%s.%s.%s/version/create", CATALOG_NAME, SCHEMA_NAME, "table_a"),
+        initial,
+        TableVersionInfo.class);
+
+    CreateTableVersionEntry duplicateEntry = new CreateTableVersionEntry();
+    duplicateEntry.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "table_a"));
+    duplicateEntry.setVersion(1L);
+    duplicateEntry.setManifestPath(tempDir + "/table_a/_versions/1.manifest-staging");
+
+    CreateTableVersionEntry freshEntry = new CreateTableVersionEntry();
+    freshEntry.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "table_b"));
+    freshEntry.setVersion(1L);
+    freshEntry.setManifestPath(tempDir + "/table_b/_versions/1.manifest-staging");
+
+    BatchCreateTableVersionsRequest failingBatch = new BatchCreateTableVersionsRequest();
+    failingBatch.setEntries(List.of(duplicateEntry, freshEntry));
+    int failingStatus = postStatus("/v1/table/version/batch-create", failingBatch);
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), failingStatus);
+
+    ListTableVersionsResponse tableBVersions =
+        getJson(
+            String.format("/v1/table/%s.%s.%s/version/list?delimiter=.&limit=10&descending=true", CATALOG_NAME, SCHEMA_NAME, "table_b"),
+            ListTableVersionsResponse.class);
+    Assertions.assertTrue(tableBVersions.getVersions().isEmpty());
+
+    duplicateEntry.setVersion(2L);
+    duplicateEntry.setManifestPath(tempDir + "/table_a/_versions/2.manifest-staging");
+    BatchCreateTableVersionsRequest successBatch = new BatchCreateTableVersionsRequest();
+    successBatch.setEntries(List.of(duplicateEntry, freshEntry));
+    BatchCreateTableVersionsResponse success =
+        postJson("/v1/table/version/batch-create", successBatch, BatchCreateTableVersionsResponse.class);
+    Assertions.assertEquals(2, success.getVersions().size());
+  }
+
   private CreateTableResponse createTable(
       List<String> ids,
       String location,
@@ -1042,6 +1151,59 @@ public class LanceRESTServiceIT extends BaseIT {
 
   private String getLanceRestServiceUrl() {
     return String.format("http://%s:%d/lance", "localhost", getLanceRESTServerPort());
+  }
+
+  private void declareTableForVersioning(String tableName) {
+    DeclareTableRequest declareRequest = new DeclareTableRequest();
+    declareRequest.setLocation(tempDir + "/" + tableName + "/");
+    declareRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, tableName));
+    ns.declareTable(declareRequest);
+  }
+
+  private <T> T postJson(String path, Object requestBody, Class<T> responseClass) throws IOException {
+    Client client = ClientBuilder.newClient();
+    try {
+      Response response =
+          client
+              .target(getLanceRestServiceUrl() + path)
+              .queryParam("delimiter", ".")
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .post(Entity.entity(requestBody, MediaType.APPLICATION_JSON_TYPE));
+      if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
+        throw new IOException("Request failed with status " + response.getStatus());
+      }
+      return response.readEntity(responseClass);
+    } finally {
+      client.close();
+    }
+  }
+
+  private <T> T getJson(String path, Class<T> responseClass) throws IOException {
+    Client client = ClientBuilder.newClient();
+    try {
+      Response response = client.target(getLanceRestServiceUrl() + path).request(MediaType.APPLICATION_JSON_TYPE).get();
+      if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
+        throw new IOException("Request failed with status " + response.getStatus());
+      }
+      return response.readEntity(responseClass);
+    } finally {
+      client.close();
+    }
+  }
+
+  private int postStatus(String path, Object requestBody) {
+    Client client = ClientBuilder.newClient();
+    try {
+      Response response =
+          client
+              .target(getLanceRestServiceUrl() + path)
+              .queryParam("delimiter", ".")
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .post(Entity.entity(requestBody, MediaType.APPLICATION_JSON_TYPE));
+      return response.getStatus();
+    } finally {
+      client.close();
+    }
   }
 
   private Exception appendFailure(Exception failure, Exception candidate) {
