@@ -64,27 +64,27 @@ interface IdpUserMetaMapperTest {
     IdpMapperTestBase testBase = testBase();
     testBase.insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
 
-    assertEquals(1, testBase.idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2", 2L));
+    assertEquals(1, testBase.idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
     assertEquals("hash-a-2", testBase.idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
-    assertEquals(2L, testBase.idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
-    assertEquals(2L, testBase.idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
+    assertEquals(1L, testBase.idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
+    assertEquals(0L, testBase.idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
   }
 
   default void testUpdateIdpUserPasswordReturnsZeroForVersionMismatch() {
     IdpMapperTestBase testBase = testBase();
     testBase.insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
 
-    assertEquals(1, testBase.idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2", 3L));
+    assertEquals(1, testBase.idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
     assertEquals("hash-a-2", testBase.idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
-    assertEquals(3L, testBase.idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
-    assertEquals(3L, testBase.idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
+    assertEquals(1L, testBase.idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
+    assertEquals(0L, testBase.idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
   }
 
   default void testUpdateIdpUserPasswordReturnsZeroForDeletedUser() {
     IdpMapperTestBase testBase = testBase();
     testBase.insertUser(1L, "alice", "hash-a", 1L, 0L, 10L);
 
-    assertEquals(0, testBase.idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2", 2L));
+    assertEquals(0, testBase.idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
     assertEquals(
         1L, testBase.queryLongValueInMapperTest("idp_user_meta", "current_version", "user_id", 1L));
     assertEquals(

@@ -122,12 +122,10 @@ public class TestIdpUserMetaBaseSQLProvider {
   @Test
   public void testUpdateIdpUserPassword() {
     String normalizedSql =
-        createProvider().updateIdpUserPassword(1L, "hash", 3L).replaceAll("\\s+", " ").trim();
+        createProvider().updateIdpUserPassword(1L, "hash").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_meta"));
     Assertions.assertTrue(normalizedSql.contains("SET password_hash = #{passwordHash}"));
-    Assertions.assertTrue(normalizedSql.contains("current_version = #{newLastVersion}"));
-    Assertions.assertTrue(normalizedSql.contains("last_version = #{newLastVersion}"));
     Assertions.assertTrue(normalizedSql.contains("WHERE user_id = #{userId}"));
     Assertions.assertTrue(normalizedSql.contains("AND deleted_at = 0"));
   }

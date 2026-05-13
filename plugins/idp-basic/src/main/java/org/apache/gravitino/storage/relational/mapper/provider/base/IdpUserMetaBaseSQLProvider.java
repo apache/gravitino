@@ -73,14 +73,10 @@ public class IdpUserMetaBaseSQLProvider {
   }
 
   public String updateIdpUserPassword(
-      @Param("userId") Long userId,
-      @Param("passwordHash") String passwordHash,
-      @Param("newLastVersion") Long newLastVersion) {
+      @Param("userId") Long userId, @Param("passwordHash") String passwordHash) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " SET password_hash = #{passwordHash},"
-        + " current_version = #{newLastVersion},"
-        + " last_version = #{newLastVersion}"
+        + " SET password_hash = #{passwordHash}"
         + " WHERE user_id = #{userId}"
         + " AND deleted_at = 0";
   }

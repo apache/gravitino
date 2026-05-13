@@ -63,10 +63,8 @@ public class IdpUserMetaSQLProviderFactory {
   }
 
   public static String updateIdpUserPassword(
-      @Param("userId") Long userId,
-      @Param("passwordHash") String passwordHash,
-      @Param("newLastVersion") Long newLastVersion) {
-    return getProvider().updateIdpUserPassword(userId, passwordHash, newLastVersion);
+      @Param("userId") Long userId, @Param("passwordHash") String passwordHash) {
+    return getProvider().updateIdpUserPassword(userId, passwordHash);
   }
 
   public static String softDeleteIdpUser(@Param("userId") Long userId) {
