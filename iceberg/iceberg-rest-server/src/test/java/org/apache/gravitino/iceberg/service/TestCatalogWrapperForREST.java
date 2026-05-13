@@ -53,6 +53,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
@@ -137,7 +138,7 @@ public class TestCatalogWrapperForREST {
                 IcebergConstants.ICEBERG_ACCESS_DELEGATION,
                 "vended-credentials",
                 IcebergConstants.WAREHOUSE,
-                "/remote/warehouse"));
+                "s3://remote/warehouse"));
 
     Map<String, String> configToClients =
         CatalogWrapperForREST.buildCatalogConfigToClients(config, restCatalog);
@@ -148,6 +149,26 @@ public class TestCatalogWrapperForREST {
         "http://localhost:9000", configToClients.get(IcebergConstants.ICEBERG_S3_ENDPOINT));
     Assertions.assertEquals(
         "vended-credentials", configToClients.get(IcebergConstants.ICEBERG_ACCESS_DELEGATION));
+  }
+
+  @Test
+  void testCatalogConfigToClientsIncludesResolvingFileIO() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "hive",
+                IcebergConstants.IO_IMPL,
+                ResolvingFileIO.class.getName(),
+                IcebergConstants.WAREHOUSE,
+                "s3://bucket/warehouse"));
+    Catalog catalog = mock(Catalog.class);
+
+    Map<String, String> configToClients =
+        CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog);
+
+    Assertions.assertEquals(
+        ResolvingFileIO.class.getName(), configToClients.get(IcebergConstants.IO_IMPL));
   }
 
   @Test
@@ -376,6 +397,7 @@ public class TestCatalogWrapperForREST {
     when(tableBuilder.withPartitionSpec(any())).thenReturn(tableBuilder);
     when(tableBuilder.withSortOrder(any())).thenReturn(tableBuilder);
     when(tableBuilder.withLocation(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withProperty(anyString(), anyString())).thenReturn(tableBuilder);
     when(tableBuilder.withProperties(any())).thenReturn(tableBuilder);
     when(tableBuilder.createOrReplaceTransaction()).thenReturn(baseTransaction);
     when(baseTransaction.underlyingOps()).thenReturn(ops);
@@ -401,23 +423,26 @@ public class TestCatalogWrapperForREST {
     CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
 
     Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    Optional<Integer> upgradeFormat = Optional.of(3);
     UpdateTableRequest request =
         new UpdateTableRequest(
             List.of(new UpdateRequirement.AssertTableDoesNotExist()),
-            stagedCreateMetadataUpdates(schema, Optional.of(3)));
+            stagedCreateMetadataUpdates(schema, upgradeFormat));
 
     Assertions.assertDoesNotThrow(
         () -> wrapper.updateTable(TableIdentifier.of("db", "tbl"), request));
 
     verify(tableBuilder).withPartitionSpec(any());
     verify(tableBuilder).withSortOrder(any());
+    verify(tableBuilder)
+        .withProperty(
+            "format-version", expectedFormatVersionStringAfterStagedUpdates(schema, upgradeFormat));
     verify(tableBuilder).withProperties(any());
-    verify(tableBuilder, never()).withProperty(anyString(), anyString());
     verify(tableBuilder).createOrReplaceTransaction();
   }
 
   @Test
-  void testStagedCreateOmitsFormatWithProperty() {
+  void testStagedCreateSetsFormatVersionWhenNoUpgradeFormatUpdate() {
     RESTCatalog catalog = mock(RESTCatalog.class);
     Catalog.TableBuilder tableBuilder = mock(Catalog.TableBuilder.class);
     BaseTransaction baseTransaction = mock(BaseTransaction.class);
@@ -427,6 +452,7 @@ public class TestCatalogWrapperForREST {
     when(tableBuilder.withPartitionSpec(any())).thenReturn(tableBuilder);
     when(tableBuilder.withSortOrder(any())).thenReturn(tableBuilder);
     when(tableBuilder.withLocation(any())).thenReturn(tableBuilder);
+    when(tableBuilder.withProperty(anyString(), anyString())).thenReturn(tableBuilder);
     when(tableBuilder.withProperties(any())).thenReturn(tableBuilder);
     when(tableBuilder.createOrReplaceTransaction()).thenReturn(baseTransaction);
     when(baseTransaction.underlyingOps()).thenReturn(ops);
@@ -452,15 +478,37 @@ public class TestCatalogWrapperForREST {
     CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("test", config, catalog);
 
     Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    Optional<Integer> noExplicitUpgrade = Optional.empty();
     UpdateTableRequest request =
         new UpdateTableRequest(
             List.of(new UpdateRequirement.AssertTableDoesNotExist()),
-            stagedCreateMetadataUpdates(schema, Optional.empty()));
+            stagedCreateMetadataUpdates(schema, noExplicitUpgrade));
 
     Assertions.assertDoesNotThrow(
         () -> wrapper.updateTable(TableIdentifier.of("db", "tbl"), request));
 
-    verify(tableBuilder, never()).withProperty(anyString(), anyString());
+    verify(tableBuilder)
+        .withProperty(
+            "format-version",
+            expectedFormatVersionStringAfterStagedUpdates(schema, noExplicitUpgrade));
+  }
+
+  /**
+   * Same derivation as {@link CatalogWrapperForREST#tableUpdateInternal} for staged create: replay
+   * metadata updates and read {@link TableMetadata#formatVersion()}.
+   */
+  private static String expectedFormatVersionStringAfterStagedUpdates(
+      Schema schema, Optional<Integer> formatVersionForUpgrade) {
+    List<MetadataUpdate> updates = stagedCreateMetadataUpdates(schema, formatVersionForUpgrade);
+    Optional<Integer> formatVersion =
+        updates.stream()
+            .filter(update -> update instanceof MetadataUpdate.UpgradeFormatVersion)
+            .map(update -> ((MetadataUpdate.UpgradeFormatVersion) update).formatVersion())
+            .findFirst();
+    TableMetadata.Builder changedMetadata =
+        formatVersion.map(TableMetadata::buildFromEmpty).orElse(TableMetadata.buildFromEmpty());
+    updates.forEach(update -> update.applyTo(changedMetadata));
+    return String.valueOf(changedMetadata.build().formatVersion());
   }
 
   /**
