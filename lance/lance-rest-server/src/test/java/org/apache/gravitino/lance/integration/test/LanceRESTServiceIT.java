@@ -574,16 +574,20 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertTrue(exception.getMessage().contains("already exists"));
     Assertions.assertEquals(5, exception.getCode());
 
-    // Create a table without location should fail
-    Assertions.assertThrows(
-        LanceNamespaceException.class,
-        () ->
-            createTable(
-                List.of(CATALOG_NAME, SCHEMA_NAME, "no_location_table"),
-                /* location= */ null,
-                ImmutableMap.of(),
-                body,
-                /* mode= */ null));
+    // Create a table without explicit location should use the catalog default location.
+    CreateTableResponse noLocationResponse =
+        Assertions.assertDoesNotThrow(
+            () ->
+                createTable(
+                    List.of(CATALOG_NAME, SCHEMA_NAME, "no_location_table"),
+                    /* location= */ null,
+                    ImmutableMap.of(),
+                    body,
+                    /* mode= */ null));
+    Assertions.assertNotNull(noLocationResponse);
+    Assertions.assertTrue(
+        noLocationResponse.getLocation().startsWith(tempDir.toString()),
+        "Expected the catalog default location to be used");
 
     // Create table with invalid schema should fail
     byte[] invalidBody = "".getBytes(Charset.defaultCharset());
@@ -670,7 +674,7 @@ public class LanceRESTServiceIT extends BaseIT {
     catalog = createCatalog(GravitinoITUtils.genRandomName("lance_rest_catalog"));
     createSchema();
 
-    String location = tempDir + "/" + "catalog_storage_table/";
+    String location = tempDir.resolve("catalog_storage_table").toString();
     List<String> ids = List.of(catalog.name(), SCHEMA_NAME, "catalog_storage_table");
     org.apache.arrow.vector.types.pojo.Schema schema =
         new org.apache.arrow.vector.types.pojo.Schema(
@@ -700,6 +704,9 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(
         MINIO_SECRET_KEY, loadTable.getStorageOptions().get("secret_access_key"));
     Assertions.assertEquals(MINIO_REGION, loadTable.getStorageOptions().get("region"));
+    Assertions.assertFalse(loadTable.getMetadata().containsKey("lance.storage.endpoint"));
+    Assertions.assertFalse(loadTable.getMetadata().containsKey("lance.storage.access_key_id"));
+    Assertions.assertFalse(loadTable.getMetadata().containsKey("lance.storage.secret_access_key"));
   }
 
   @Test

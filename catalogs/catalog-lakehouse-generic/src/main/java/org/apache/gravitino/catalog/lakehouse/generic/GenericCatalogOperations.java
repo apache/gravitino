@@ -44,6 +44,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
+import org.apache.gravitino.catalog.lakehouse.lance.LanceTableOperations;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -55,8 +56,6 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
-import org.apache.gravitino.lance.common.utils.LanceConstants;
-import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -247,18 +246,11 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     Map<String, String> newProperties = Maps.newHashMap(properties);
     newProperties.put(Table.PROPERTY_LOCATION, tableLocation);
     newProperties.put(Table.PROPERTY_TABLE_FORMAT, format);
-    if ("lance".equals(format)) {
-      LancePropertiesUtils.getLanceStorageOptions(catalogProperties)
-          .forEach(
-              (key, value) ->
-                  newProperties.putIfAbsent(
-                      LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX + key, value));
-    }
 
     // Get the table operations for the specified table format.
     Supplier<ManagedTableOperations> tableOpsSupplier = tableOpsCache.get(format);
     Preconditions.checkArgument(tableOpsSupplier != null, "Unsupported table format: %s", format);
-    ManagedTableOperations tableOps = tableOpsSupplier.get();
+    ManagedTableOperations tableOps = configureTableOps(tableOpsSupplier.get());
 
     Table createdTable =
         tableOps.createTable(
@@ -351,7 +343,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
                 return format.toLowerCase(Locale.ROOT);
               });
 
-      ManagedTableOperations ops = tableOpsCache.get(tableFormat).get();
+      ManagedTableOperations ops = configureTableOps(tableOpsCache.get(tableFormat).get());
       Preconditions.checkArgument(
           ops != null, "No table operations found for table format %s", tableFormat);
       return ops;
@@ -371,5 +363,13 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
             String.format("Unexpected exception when loading table %s", tableIdent), t);
       }
     }
+  }
+
+  private ManagedTableOperations configureTableOps(ManagedTableOperations ops) {
+    if (ops instanceof LanceTableOperations) {
+      ((LanceTableOperations) ops).setCatalogProperties(catalogProperties);
+    }
+
+    return ops;
   }
 }

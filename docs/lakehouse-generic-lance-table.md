@@ -307,6 +307,23 @@ To use Lance tables stored in MinIO with Gravitino, configure the MinIO storage 
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "lance_catalog",
+  "type": "RELATIONAL",
+  "provider": "lakehouse-generic",
+  "comment": "catalog for Lance tables on MinIO",
+  "properties": {
+    "location": "s3://bucket1/lance",
+    "lance.storage.endpoint": "http://minio:9000",
+    "lance.storage.access_key_id": "ak",
+    "lance.storage.secret_access_key": "sk",
+    "lance.storage.allow_http": "true",
+    "lance.storage.region": "us-east-1"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
   "name": "lance_orders",
   "comment": "Order table stored in MinIO",
@@ -318,10 +335,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
       "nullable": false
     }
   ],
-    "properties": {
+  "properties": {
     "format": "lance",
     "location": "s3://bucket1/lance_orders"
-    }
+  }
 }' http://localhost:8090/api/metalakes/test/catalogs/lance_catalog/schemas/sales/tables
 
 ```

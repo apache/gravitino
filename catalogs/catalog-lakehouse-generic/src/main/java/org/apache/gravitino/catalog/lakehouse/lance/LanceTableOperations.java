@@ -78,6 +78,8 @@ public class LanceTableOperations extends ManagedTableOperations {
 
   private final IdGenerator idGenerator;
 
+  private volatile Map<String, String> catalogProperties = Map.of();
+
   public LanceTableOperations(
       EntityStore store, ManagedSchemaOperations schemaOps, IdGenerator idGenerator) {
     this.store = store;
@@ -98,6 +100,16 @@ public class LanceTableOperations extends ManagedTableOperations {
   @Override
   protected IdGenerator idGenerator() {
     return idGenerator;
+  }
+
+  /**
+   * Sets the catalog properties used to resolve Lance storage defaults at runtime.
+   *
+   * @param catalogProperties the catalog properties
+   */
+  public void setCatalogProperties(Map<String, String> catalogProperties) {
+    this.catalogProperties =
+        catalogProperties == null ? Map.of() : ImmutableMap.copyOf(catalogProperties);
   }
 
   @Override
@@ -197,7 +209,9 @@ public class LanceTableOperations extends ManagedTableOperations {
       // Otherwise, we should not delete the dataset.
       if (purged) {
         // Delete the Lance dataset at the location
-        Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+        Dataset.drop(
+            location,
+            LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties()));
         LOG.info("Deleted Lance dataset at location {}", location);
       }
 
@@ -231,7 +245,9 @@ public class LanceTableOperations extends ManagedTableOperations {
         String location = table.properties().get(Table.PROPERTY_LOCATION);
 
         // Delete the Lance dataset at the location
-        Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+        Dataset.drop(
+            location,
+            LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties()));
         LOG.info("Deleted Lance dataset at location {}", location);
       }
 
@@ -277,7 +293,8 @@ public class LanceTableOperations extends ManagedTableOperations {
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     }
 
-    Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
+    Map<String, String> storageProps =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
     try (Dataset ignored =
         Dataset.write()
             .allocator(new RootAllocator())
@@ -308,7 +325,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (TableAlreadyExistsException e) {
       // If the table metadata already exists, but the underlying lance table was just created
       // successfully, we need to clean up the created lance table to avoid orphaned datasets.
-      Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(properties));
+      Dataset.drop(location, storageProps);
       throw e;
     } catch (IllegalArgumentException e) {
       if (e.getMessage().contains("Dataset already exists")) {

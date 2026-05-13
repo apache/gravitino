@@ -128,6 +128,27 @@ For detailed information on location resolution logic, refer to the [Lakehouse G
 
 For Gravitino-managed Lance catalogs, put the storage configuration in the Gravitino catalog properties so Spark does not need to repeat it.
 
+For example, create the Gravitino catalog with catalog-level Lance storage properties:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "lance_catalog",
+  "type": "RELATIONAL",
+  "provider": "lakehouse-generic",
+  "comment": "catalog for Lance tables on MinIO",
+  "properties": {
+    "location": "s3://bucket/tmp",
+    "lance.storage.endpoint": "http://minio:9000",
+    "lance.storage.access_key_id": "ak",
+    "lance.storage.secret_access_key": "sk",
+    "lance.storage.allow_http": "true",
+    "lance.storage.region": "us-east-1"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs
+```
+
 ```python
 spark.sql("""
     CREATE TABLE sales.orders (
