@@ -670,7 +670,7 @@ public class LanceRESTServiceIT extends BaseIT {
     catalog = createCatalog(GravitinoITUtils.genRandomName("lance_rest_catalog"));
     createSchema();
 
-    String location = tempDir.resolve("catalog_storage_table").toString();
+    String location = tempDir.resolve("catalog_storage_table").toString() + "/";
     List<String> ids = List.of(catalog.name(), SCHEMA_NAME, "catalog_storage_table");
     org.apache.arrow.vector.types.pojo.Schema schema =
         new org.apache.arrow.vector.types.pojo.Schema(
