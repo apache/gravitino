@@ -55,6 +55,8 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
+import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -76,6 +78,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   private final Map<String, Supplier<ManagedTableOperations>> tableOpsCache;
 
   private Optional<String> catalogLocation;
+
+  private Map<String, String> catalogProperties = Map.of();
 
   private HasPropertyMetadata propertiesMetadata;
 
@@ -125,6 +129,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   public void initialize(
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
+    this.catalogProperties = conf == null ? Map.of() : Maps.newHashMap(conf);
     String location =
         (String)
             propertiesMetadata
@@ -242,6 +247,13 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     Map<String, String> newProperties = Maps.newHashMap(properties);
     newProperties.put(Table.PROPERTY_LOCATION, tableLocation);
     newProperties.put(Table.PROPERTY_TABLE_FORMAT, format);
+    if ("lance".equals(format)) {
+      LancePropertiesUtils.getLanceStorageOptions(catalogProperties)
+          .forEach(
+              (key, value) ->
+                  newProperties.putIfAbsent(
+                      LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX + key, value));
+    }
 
     // Get the table operations for the specified table format.
     Supplier<ManagedTableOperations> tableOpsSupplier = tableOpsCache.get(format);
