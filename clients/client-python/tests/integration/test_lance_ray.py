@@ -67,7 +67,12 @@ class TestLanceRayIntegration(IntegrationTestEnv):
     ``read_lance`` flow from the upstream lance-ray docs.
     """
 
-    METALAKE_NAME: str = "lance_ray_metalake_" + str(randint(1, 100000))
+    # Metalake name is fixed (not randomized) so back-to-back runs in the
+    # same Gravitino process can detect that the lance-rest aux service is
+    # already bound and skip the costly server restart. The per-test table
+    # name still gets a random suffix to keep individual test methods
+    # isolated.
+    METALAKE_NAME: str = "lance_ray_test_metalake"
     CATALOG_NAME: str = "lance_catalog"
     SCHEMA_NAME: str = "schema"
     TABLE_NAME: str = "lance_ray_tbl_" + str(randint(1, 100000))
@@ -88,13 +93,16 @@ class TestLanceRayIntegration(IntegrationTestEnv):
             )
         cls.main_conf_path = os.path.join(gravitino_home, MAIN_CONF_FILE)
 
-        # Bind the lance-rest aux service to our test metalake and restart
-        # so the change takes effect. ``IntegrationTestEnv.restart_server``
-        # works whether ``START_EXTERNAL_GRAVITINO`` was used or not.
-        cls._append_conf(
-            {LANCE_REST_METALAKE_KEY: cls.METALAKE_NAME}, cls.main_conf_path
-        )
-        cls.restart_server()
+        # Bind the lance-rest aux service to our test metalake. If the same
+        # binding is already present (e.g. an earlier run in the same Gradle
+        # session left it there), skip the conf write and the restart. This
+        # avoids restarting Gravitino in the middle of the IT suite when the
+        # test class is replayed, which would briefly disrupt other ITs.
+        if not cls._lance_metalake_already_bound():
+            cls._append_conf(
+                {LANCE_REST_METALAKE_KEY: cls.METALAKE_NAME}, cls.main_conf_path
+            )
+            cls.restart_server()
         if not cls._wait_for_lance_rest_ready():
             raise RuntimeError(
                 "Lance REST aux service did not become ready in time at "
@@ -102,28 +110,43 @@ class TestLanceRayIntegration(IntegrationTestEnv):
             )
 
         cls.gravitino_admin_client = GravitinoAdminClient("http://localhost:8090")
-        cls.gravitino_admin_client.create_metalake(
-            cls.METALAKE_NAME,
-            comment="lance-ray IT metalake",
-            properties={},
-        )
+        # Idempotent: tolerate a metalake left over from a prior failed run.
+        try:
+            cls.gravitino_admin_client.create_metalake(
+                cls.METALAKE_NAME,
+                comment="lance-ray IT metalake",
+                properties={},
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            if "already exists" not in str(e).lower():
+                raise
+            logger.info("Metalake %s already exists, reusing", cls.METALAKE_NAME)
         cls.gravitino_client = GravitinoClient(
             uri="http://localhost:8090", metalake_name=cls.METALAKE_NAME
         )
         cls.temp_dir = tempfile.mkdtemp(prefix="lance_ray_it_")
-        cls.gravitino_client.create_catalog(
-            name=cls.CATALOG_NAME,
-            catalog_type=Catalog.Type.RELATIONAL,
-            provider="lakehouse-generic",
-            comment="lance-ray IT catalog",
-            properties={"location": cls.temp_dir},
-        )
+        # Idempotent catalog + schema creation too.
+        try:
+            cls.gravitino_client.create_catalog(
+                name=cls.CATALOG_NAME,
+                catalog_type=Catalog.Type.RELATIONAL,
+                provider="lakehouse-generic",
+                comment="lance-ray IT catalog",
+                properties={"location": cls.temp_dir},
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            if "already exists" not in str(e).lower():
+                raise
         catalog = cls.gravitino_client.load_catalog(cls.CATALOG_NAME)
-        catalog.as_schemas().create_schema(
-            schema_name=cls.SCHEMA_NAME,
-            comment="lance-ray IT schema",
-            properties={},
-        )
+        try:
+            catalog.as_schemas().create_schema(
+                schema_name=cls.SCHEMA_NAME,
+                comment="lance-ray IT schema",
+                properties={},
+            )
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            if "already exists" not in str(e).lower():
+                raise
 
     @classmethod
     def tearDownClass(cls):
@@ -143,14 +166,12 @@ class TestLanceRayIntegration(IntegrationTestEnv):
         except Exception as e:  # pylint: disable=broad-exception-caught
             failures.append(("drop metalake", e))
 
-        try:
-            if cls.main_conf_path is not None:
-                cls._reset_conf(
-                    {LANCE_REST_METALAKE_KEY: cls.METALAKE_NAME},
-                    cls.main_conf_path,
-                )
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            failures.append(("reset lance-rest aux conf", e))
+        # Intentionally do NOT reset the lance-rest metalake binding in
+        # gravitino.conf. Removing it would force the next setUpClass to
+        # restart the server, which is disruptive when this IT is replayed
+        # back-to-back or alongside other ITs in the same Gradle invocation.
+        # The conf line is regenerated by `compileDistribution`, so it does
+        # not survive a fresh distribution build.
 
         try:
             if cls.temp_dir and os.path.exists(cls.temp_dir):
@@ -162,6 +183,17 @@ class TestLanceRayIntegration(IntegrationTestEnv):
             logger.warning("Cleanup step %s failed: %s", step, err)
 
         super().tearDownClass()
+
+    @classmethod
+    def _lance_metalake_already_bound(cls) -> bool:
+        if cls.main_conf_path is None or not os.path.exists(cls.main_conf_path):
+            return False
+        needle = f"{LANCE_REST_METALAKE_KEY} = {cls.METALAKE_NAME}"
+        with open(cls.main_conf_path, encoding="utf-8") as f:
+            for line in f:
+                if line.strip() == needle:
+                    return True
+        return False
 
     @staticmethod
     def _wait_for_lance_rest_ready(timeout_s: float = 60.0) -> bool:
