@@ -95,6 +95,10 @@ public class LanceRESTServiceIT extends BaseIT {
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_rest_catalog");
   private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("lance_rest_schema");
   private static final String DELIMITER = ".";
+  private static final String MINIO_ENDPOINT = "http://127.0.0.1:9000";
+  private static final String MINIO_REGION = "us-east-1";
+  private static final String MINIO_ACCESS_KEY = "minioadmin";
+  private static final String MINIO_SECRET_KEY = "minioadmin";
 
   private GravitinoMetalake metalake;
   private Catalog catalog;
@@ -662,6 +666,43 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
+  void testCreateTableUsesCatalogStorageOptions() throws IOException {
+    catalog = createCatalog(GravitinoITUtils.genRandomName("lance_rest_catalog"));
+    createSchema();
+
+    String location = tempDir + "/" + "catalog_storage_table/";
+    List<String> ids = List.of(catalog.name(), SCHEMA_NAME, "catalog_storage_table");
+    org.apache.arrow.vector.types.pojo.Schema schema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("value", new ArrowType.Utf8())));
+    byte[] body = ArrowUtils.generateIpcStream(schema);
+
+    CreateTableResponse response =
+        createTable(ids, location, ImmutableMap.of("key1", "v1"), body, /* mode= */ null);
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(location, response.getLocation());
+    Assertions.assertEquals(MINIO_ENDPOINT, response.getStorageOptions().get("endpoint"));
+    Assertions.assertEquals("true", response.getStorageOptions().get("allow_http"));
+    Assertions.assertEquals(MINIO_ACCESS_KEY, response.getStorageOptions().get("access_key_id"));
+    Assertions.assertEquals(
+        MINIO_SECRET_KEY, response.getStorageOptions().get("secret_access_key"));
+    Assertions.assertEquals(MINIO_REGION, response.getStorageOptions().get("region"));
+
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(ids);
+    DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(loadTable);
+    Assertions.assertEquals(MINIO_ENDPOINT, loadTable.getStorageOptions().get("endpoint"));
+    Assertions.assertEquals("true", loadTable.getStorageOptions().get("allow_http"));
+    Assertions.assertEquals(MINIO_ACCESS_KEY, loadTable.getStorageOptions().get("access_key_id"));
+    Assertions.assertEquals(
+        MINIO_SECRET_KEY, loadTable.getStorageOptions().get("secret_access_key"));
+    Assertions.assertEquals(MINIO_REGION, loadTable.getStorageOptions().get("region"));
+  }
+
+  @Test
   void testAlterColumns() throws Exception {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
@@ -1025,12 +1066,23 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) {
+    Map<String, String> catalogProperties =
+        ImmutableMap.<String, String>builder()
+            .putAll(properties)
+            .put(Catalog.PROPERTY_LOCATION, tempDir.toString())
+            .put("lance.storage.endpoint", MINIO_ENDPOINT)
+            .put("lance.storage.allow_http", "true")
+            .put("lance.storage.access_key_id", MINIO_ACCESS_KEY)
+            .put("lance.storage.secret_access_key", MINIO_SECRET_KEY)
+            .put("lance.storage.region", MINIO_REGION)
+            .build();
+
     return metalake.createCatalog(
         catalogName,
         Catalog.Type.RELATIONAL,
         "lakehouse-generic",
         "catalog for lance rest service tests",
-        properties);
+        catalogProperties);
   }
 
   private void createSchema() {
