@@ -19,17 +19,8 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
-import org.apache.gravitino.integration.test.util.CloseContainerExtension;
-import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
-import org.apache.gravitino.storage.relational.JDBCBackend;
+import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.po.IdpGroupPO;
 import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
@@ -37,18 +28,8 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.extension.ExtendWith;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@ExtendWith({
-  IdpMapperBackendTestExtension.class,
-  PrintFuncNameExtension.class,
-  CloseContainerExtension.class
-})
-abstract class IdpMapperTestBase {
-  protected String backendType;
-  protected JDBCBackend backend;
+abstract class IdpMapperTestBase extends TestJDBCBackend {
   protected SqlSession sharedSession;
   protected IdpUserMetaMapper idpUserMetaMapper;
   protected IdpGroupMetaMapper idpGroupMetaMapper;
@@ -60,7 +41,6 @@ abstract class IdpMapperTestBase {
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
     idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
     idpGroupUserRelMapper = sharedSession.getMapper(IdpGroupUserRelMapper.class);
-    truncateTables();
   }
 
   @AfterEach
@@ -68,26 +48,6 @@ abstract class IdpMapperTestBase {
     if (sharedSession != null) {
       sharedSession.close();
       sharedSession = null;
-    }
-  }
-
-  void truncateTables() {
-    try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection();
-          Statement statement = connection.createStatement()) {
-        if ("postgresql".equalsIgnoreCase(backendType)) {
-          statement.execute("TRUNCATE TABLE idp_group_user_rel RESTART IDENTITY CASCADE");
-          statement.execute("TRUNCATE TABLE idp_group_meta RESTART IDENTITY CASCADE");
-          statement.execute("TRUNCATE TABLE idp_user_meta RESTART IDENTITY CASCADE");
-        } else {
-          statement.execute("TRUNCATE TABLE idp_group_user_rel");
-          statement.execute("TRUNCATE TABLE idp_group_meta");
-          statement.execute("TRUNCATE TABLE idp_user_meta");
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Truncate table failed", e);
     }
   }
 
@@ -138,49 +98,5 @@ abstract class IdpMapperTestBase {
             .build();
     idpGroupUserRelMapper.batchInsertIdpGroupUsers(List.of(relationPO));
     return relationPO;
-  }
-
-  protected long queryLongValue(String table, String column, String idColumn, long idValue) {
-    try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection()) {
-        String query = "SELECT " + column + " FROM " + table + " WHERE " + idColumn + " = ?";
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
-          statement.setLong(1, idValue);
-          try (ResultSet resultSet = statement.executeQuery()) {
-            assertTrue(resultSet.next());
-            return resultSet.getLong(1);
-          }
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Query " + column + " from " + table + " failed", e);
-    }
-  }
-
-  protected int countRows(String table, String idColumn, long idValue) {
-    try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection()) {
-        String query = "SELECT COUNT(1) FROM " + table + " WHERE " + idColumn + " = ?";
-        try (PreparedStatement statement = connection.prepareStatement(query)) {
-          statement.setLong(1, idValue);
-          try (ResultSet resultSet = statement.executeQuery()) {
-            assertTrue(resultSet.next());
-            return resultSet.getInt(1);
-          }
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Count rows from " + table + " failed", e);
-    }
-  }
-
-  void setBackendType(String backendType) {
-    this.backendType = backendType;
-  }
-
-  void setBackend(JDBCBackend backend) {
-    this.backend = backend;
   }
 }
