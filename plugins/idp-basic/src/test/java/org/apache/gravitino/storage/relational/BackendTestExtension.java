@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.storage.relational.mapper;
+package org.apache.gravitino.storage.relational;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -30,7 +30,6 @@ import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
@@ -39,7 +38,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
 
-class IdpMapperBackendTestExtension implements TestTemplateInvocationContextProvider {
+class BackendTestExtension implements TestTemplateInvocationContextProvider {
   private static final String DOCKER_TEST_FLAG = "dockerTest";
 
   @Override
@@ -52,7 +51,7 @@ class IdpMapperBackendTestExtension implements TestTemplateInvocationContextProv
       ExtensionContext context) {
     List<String> backends =
         "true".equalsIgnoreCase(System.getenv(DOCKER_TEST_FLAG))
-            ? List.of("h2", "postgresql", "mysql")
+            ? List.of("h2", "mysql", "postgresql")
             : List.of("h2");
     return backends.stream().map(BackendInvocationContext::new);
   }
@@ -90,10 +89,9 @@ class IdpMapperBackendTestExtension implements TestTemplateInvocationContextProv
     public void beforeEach(ExtensionContext context) throws Exception {
       backend = startBackend();
       Object testInstance = context.getRequiredTestInstance();
-      if (testInstance instanceof IdpMapperTestBase) {
-        IdpMapperTestBase idpMapperTestBase = (IdpMapperTestBase) testInstance;
-        idpMapperTestBase.setBackendType(backendType);
-        idpMapperTestBase.setBackend(backend);
+      if (testInstance instanceof TestJDBCBackend) {
+        ((TestJDBCBackend) testInstance).setBackendType(backendType);
+        ((TestJDBCBackend) testInstance).setBackend(backend);
       }
     }
 
