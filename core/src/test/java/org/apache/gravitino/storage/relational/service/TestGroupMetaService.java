@@ -50,6 +50,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -552,6 +553,7 @@ class TestGroupMetaService extends TestJDBCBackend {
             Lists.newArrayList(role1.name(), role2.name()),
             Lists.newArrayList(role1.id(), role2.id()));
     groupMetaService.insertGroup(group1, false);
+    Assertions.assertEquals(0L, getGroupUpdatedAt(group1.name()).getUpdatedAt());
     GroupEntity actualGroup = groupMetaService.getGroupByIdentifier(group1.nameIdentifier());
     Assertions.assertEquals(group1.name(), actualGroup.name());
     Assertions.assertEquals(
@@ -592,7 +594,13 @@ class TestGroupMetaService extends TestJDBCBackend {
               .build();
         };
 
+    long beforeGrant = System.currentTimeMillis();
     Assertions.assertNotNull(groupMetaService.updateGroup(group1.nameIdentifier(), grantUpdater));
+    long afterGrant = System.currentTimeMillis();
+    long grantUpdatedAt = getGroupUpdatedAt(group1.name()).getUpdatedAt();
+    Assertions.assertTrue(
+        grantUpdatedAt >= beforeGrant - 1000L && grantUpdatedAt <= afterGrant + 1000L,
+        "expected DB-time group updated_at within 1s of JVM clock, got " + grantUpdatedAt);
     GroupEntity grantGroup =
         GroupMetaService.getInstance().getGroupByIdentifier(group1.nameIdentifier());
     Assertions.assertEquals(group1.id(), grantGroup.id());
@@ -630,7 +638,13 @@ class TestGroupMetaService extends TestJDBCBackend {
               .build();
         };
 
+    long beforeRevoke = System.currentTimeMillis();
     Assertions.assertNotNull(groupMetaService.updateGroup(group1.nameIdentifier(), revokeUpdater));
+    long afterRevoke = System.currentTimeMillis();
+    long revokeUpdatedAt = getGroupUpdatedAt(group1.name()).getUpdatedAt();
+    Assertions.assertTrue(
+        revokeUpdatedAt >= beforeRevoke - 1000L && revokeUpdatedAt <= afterRevoke + 1000L,
+        "expected DB-time group updated_at within 1s of JVM clock, got " + revokeUpdatedAt);
     GroupEntity revokeGroup =
         GroupMetaService.getInstance().getGroupByIdentifier(group1.nameIdentifier());
     Assertions.assertEquals(group1.id(), revokeGroup.id());
@@ -714,7 +728,9 @@ class TestGroupMetaService extends TestJDBCBackend {
               .withAuditInfo(updateAuditInfo)
               .build();
         };
+    long beforeNoUpdate = getGroupUpdatedAt(group1.name()).getUpdatedAt();
     Assertions.assertNotNull(groupMetaService.updateGroup(group1.nameIdentifier(), noUpdater));
+    Assertions.assertEquals(beforeNoUpdate, getGroupUpdatedAt(group1.name()).getUpdatedAt());
     GroupEntity noUpdaterGroup =
         GroupMetaService.getInstance().getGroupByIdentifier(group1.nameIdentifier());
     Assertions.assertEquals(group1.id(), noUpdaterGroup.id());
@@ -1040,6 +1056,11 @@ class TestGroupMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return count;
+  }
+
+  private GroupUpdatedAt getGroupUpdatedAt(String groupName) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        GroupMetaMapper.class, mapper -> mapper.getGroupUpdatedAt(metalakeName, groupName));
   }
 
   private GroupEntity createGroupEntity(

@@ -33,6 +33,7 @@ import java.util.Properties;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
 
 /** Gravitino config. */
 public class GravitinoConfig {
@@ -149,6 +150,20 @@ public class GravitinoConfig {
           "gravitino.trino.skip-catalog-patterns",
           "The property to specify a comma-separated list of catalog name regex patterns that should be excluded from loading.",
           "",
+          false);
+
+  private static final ConfigEntry GRAVITINO_SESSION_CACHE_MAX_SIZE =
+      new ConfigEntry(
+          GravitinoAuthProvider.SESSION_CACHE_MAX_SIZE_KEY,
+          "Maximum number of per-user sessions to keep in the cache when session.forwardUser=true",
+          "500",
+          false);
+
+  private static final ConfigEntry GRAVITINO_SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS =
+      new ConfigEntry(
+          GravitinoAuthProvider.SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY,
+          "Seconds before an idle per-user session is evicted from the cache when session.forwardUser=true",
+          "3600",
           false);
 
   /**
@@ -387,6 +402,46 @@ public class GravitinoConfig {
         .splitToStream(skipCatalogConfig)
         .map(Pattern::compile)
         .collect(Collectors.toList());
+  }
+
+  /**
+   * Returns whether Trino session user forwarding is enabled.
+   *
+   * @return true if forwardUser is set to true
+   */
+  public boolean isForwardUser() {
+    return Boolean.parseBoolean(
+        config.getOrDefault(GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "false"));
+  }
+
+  /**
+   * Retrieves the maximum number of per-user sessions to keep in the cache.
+   *
+   * @return the session cache maximum size
+   */
+  public long getSessionCacheMaxSize() {
+    return parseLongConfigEntry(GRAVITINO_SESSION_CACHE_MAX_SIZE);
+  }
+
+  /**
+   * Retrieves the expiry (in seconds) for idle per-user sessions in the cache.
+   *
+   * @return the session cache expiry in seconds
+   */
+  public long getSessionCacheExpireAfterAccessSeconds() {
+    return parseLongConfigEntry(GRAVITINO_SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS);
+  }
+
+  private long parseLongConfigEntry(ConfigEntry entry) {
+    String value = config.getOrDefault(entry.key, entry.defaultValue);
+    try {
+      return Long.parseLong(value);
+    } catch (NumberFormatException e) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "Invalid value for config '" + entry.key + "': expected a number, got: " + value,
+          e);
+    }
   }
 
   /**

@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector.integration.test;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -101,6 +102,11 @@ public class TrinoQueryTestTool {
           "Specify the Gravitino connector JAR path. "
               + "The JAR file under ${trino_connector_dir} will be copied into the test image, "
               + "the default value is ${project_root}/trino-connector/trino-connector/build/libs.");
+
+      options.addOption(
+          "env_only",
+          false,
+          "Start the environment (Gravitino + Trino) and keep it running for manual testing. Press Ctrl+C to shutdown.");
 
       options.addOption("help", false, "Print this help message");
 
@@ -251,6 +257,26 @@ public class TrinoQueryTestTool {
         String catalogFileName = "catalog_" + catalog + "_prepare.sql";
         testerRunner.runOneTestSetAndGenOutput(testSetDir, catalogFileName, testerId);
         System.out.println("The output file is generated successfully in the path " + testSetDir);
+        return;
+      }
+
+      if (commandLine.hasOption("env_only")) {
+        CountDownLatch shutdownLatch = new CountDownLatch(1);
+        Runtime.getRuntime().addShutdownHook(new Thread(shutdownLatch::countDown));
+
+        System.out.println("=======================================================");
+        System.out.println("Environment is ready for manual testing.");
+        System.out.println("  Gravitino URI : " + TrinoQueryITBase.gravitinoUri);
+        System.out.println("  Trino URI     : " + TrinoQueryITBase.trinoUri);
+        System.out.println("Connect to Trino CLI:");
+        System.out.println("  docker exec -it trino-ci-trino trino");
+        System.out.println("Press Ctrl+C to shutdown the environment.");
+        System.out.println("=======================================================");
+        try {
+          shutdownLatch.await();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
         return;
       }
 

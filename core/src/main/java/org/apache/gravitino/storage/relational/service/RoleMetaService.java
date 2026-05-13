@@ -259,7 +259,10 @@ public class RoleMetaService {
             SessionUtils.doWithoutCommit(
                 SecurableObjectMapper.class,
                 mapper -> mapper.batchInsertSecurableObjects(insertSecurableObjectPOs));
-          });
+          },
+          () ->
+              SessionUtils.doWithoutCommit(
+                  RoleMetaMapper.class, mapper -> mapper.touchRoleUpdatedAt(rolePO.getRoleId())));
 
       return newRoleEntity;
     } catch (RuntimeException re) {

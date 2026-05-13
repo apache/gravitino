@@ -27,7 +27,8 @@ WORKDIR /opt/gravitino
 COPY packages/gravitino /opt/gravitino
 
 RUN chmod -R g+rwX /opt/gravitino \
-    && chmod +x /opt/gravitino/bin/start-gravitino.sh
+    && chmod +x /opt/gravitino/bin/start-gravitino.sh \
+    && useradd -u 1000 -g 0 -M -s /sbin/nologin gravitino
 
 EXPOSE 8090
 EXPOSE 9001

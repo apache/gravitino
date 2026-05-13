@@ -29,11 +29,77 @@ from gravitino.client.generic_model_catalog import GenericModelCatalog
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.dto.metalake_dto import MetalakeDTO
+from gravitino.dto.model_dto import ModelDTO
 from gravitino.dto.schema_dto import SchemaDTO
 from gravitino.dto.tag_dto import TagDTO
 from gravitino.namespace import Namespace
 from gravitino.utils import Response
 from gravitino.utils.http_client import HTTPClient
+
+
+def build_schema_dto(
+    name: str = "demo_schema",
+    comment: str = "This is a demo schema.",
+    properties: tp.Optional[dict[str, str]] = None,
+) -> SchemaDTO:
+    """
+    Build a schema DTO for testing.
+
+    Args:
+        name (str, optional): The name of the schema. Defaults to "demo_schema".
+        comment (str, optional): The comment for the schema. Defaults to "This is a demo model.".
+        properties (tp.Optional[dict[str, str]], optional): The properties for the schema.
+
+    Returns:
+        SchemaDTO: The built schema DTO.
+    """
+    if properties is None:
+        properties = {
+            "key1": "value1",
+            "key2": "value2",
+        }
+    return SchemaDTO.from_dict(
+        {
+            "name": name,
+            "comment": comment,
+            "properties": properties,
+            "audit": build_audit_info().to_dict(),
+        }
+    )
+
+
+def build_model_dto(
+    name: str = "demo_model",
+    comment: str = "This is a demo model.",
+    properties: tp.Optional[dict[str, str]] = None,
+    latest_version: int = 1,
+) -> ModelDTO:
+    """
+    Build a model DTO for testing.
+
+    Args:
+        name (str, optional): The name of the model. Defaults to "demo_model".
+        comment (str, optional): The comment for the model. Defaults to "This is a demo model.".
+        properties (tp.Optional[dict[str, str]], optional): The properties for the model.
+        latest_version (int, optional): The latest version of the model. Defaults to 1.
+
+    Returns:
+        ModelDTO: The built model DTO.
+    """
+    if properties is None:
+        properties = {
+            "key1": "value1",
+            "key2": "value2",
+        }
+    return ModelDTO.from_dict(
+        {
+            "name": name,
+            "comment": comment,
+            "properties": properties,
+            "latestVersion": latest_version,
+            "audit": build_audit_info().to_dict(),
+        }
+    )
 
 
 def build_tag_dto(

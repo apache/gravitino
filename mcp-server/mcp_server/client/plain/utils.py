@@ -17,8 +17,14 @@
 
 import json
 import logging
+from urllib.parse import quote
 
 from mcp_server.client.plain.exception import GravitinoException
+
+
+def encode_path_segment(segment: str) -> str:
+    """URL-encode a single path segment, encoding all reserved characters."""
+    return quote(str(segment), safe="")
 
 
 def extract_content_from_response(response, field: str, default="") -> str:

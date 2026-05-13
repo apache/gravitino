@@ -75,6 +75,21 @@ public class AuthorizationExpressionConstants {
   public static final String FILTER_MODEL_AUTHORIZATION_EXPRESSION =
       "ANY(OWNER, METALAKE, CATALOG, SCHEMA, MODEL) || ANY_USE_MODEL";
 
+  public static final String LOAD_FUNCTION_AUTHORIZATION_EXPRESSION =
+      """
+            ANY(OWNER, METALAKE, CATALOG) ||
+             SCHEMA_OWNER_WITH_USE_CATALOG ||
+              ANY_USE_CATALOG && ANY_USE_SCHEMA
+              && (FUNCTION::OWNER || ANY_EXECUTE_FUNCTION || ANY_MODIFY_FUNCTION)
+                  """;
+
+  public static final String FILTER_FUNCTION_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, FUNCTION) ||
+                  ANY_EXECUTE_FUNCTION ||
+                  ANY_MODIFY_FUNCTION
+                  """;
+
   public static final String LOAD_VIEW_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||

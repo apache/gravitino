@@ -220,6 +220,15 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault(IcebergConstants.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME);
 
+  public static final ConfigEntry<Boolean> ICEBERG_REST_DISABLE_REST_AUTHZ =
+      new ConfigBuilder(IcebergConstants.ICEBERG_REST_DISABLE_REST_AUTHZ)
+          .doc(
+              "Whether to disable authorization in IRC1 when backend catalog is a REST catalog. "
+                  + "Set to false to enforce authorization in IRC1 before proxying to IRC2.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .booleanConf()
+          .createWithDefault(true);
+
   public static final ConfigEntry<String> GRAVITINO_URI =
       new ConfigBuilder(IcebergConstants.GRAVITINO_URI)
           .doc(

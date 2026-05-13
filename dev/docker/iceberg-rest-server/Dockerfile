@@ -28,7 +28,8 @@ WORKDIR /opt/gravitino-iceberg-rest-server
 COPY packages/gravitino-iceberg-rest-server /opt/gravitino-iceberg-rest-server
 
 RUN chmod -R g+rwX /opt/gravitino-iceberg-rest-server \
-    && chmod +x /opt/gravitino-iceberg-rest-server/bin/start-iceberg-rest-server.sh
+    && chmod +x /opt/gravitino-iceberg-rest-server/bin/start-iceberg-rest-server.sh \
+    && useradd -u 1000 -g 0 -M -s /sbin/nologin gravitino
 
 EXPOSE 9001
 

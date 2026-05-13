@@ -78,9 +78,38 @@ public final class GlueConstants {
   /** Table-format value indicating an Iceberg table stored in Glue {@code Table.parameters()}. */
   public static final String TABLE_FORMAT_ICEBERG = "ICEBERG";
 
+  /**
+   * Table file format (lowercase, e.g. "parquet", "orc", "textfile") used when creating Hive-format
+   * tables via Trino. Maps to input-format/output-format/serde-lib.
+   */
+  public static final String FORMAT = "format";
+
   /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
   public static final String METADATA_LOCATION = "metadata_location";
 
+  /**
+   * Key of the {@code table_type} entry in {@code Table.parameters()} that identifies the table
+   * format (e.g., {@code "ICEBERG"}).
+   */
+  public static final String TABLE_TYPE_PARAM = "table_type";
+
+  /** Value of {@link #TABLE_TYPE_PARAM} that identifies an Iceberg table. */
+  public static final String ICEBERG_TABLE_TYPE_VALUE = "ICEBERG";
+
+  /** Default Iceberg spec version used when creating Iceberg tables via Glue. */
+  public static final String ICEBERG_FORMAT_VERSION = "2";
+
+  /**
+   * Key of the {@code current-schema-id} entry in {@code Table.parameters()} that holds the active
+   * Iceberg schema ID.
+   */
+  public static final String CURRENT_SCHEMA_ID_PARAM = "current-schema-id";
+
+  /** Glue column parameter key for the Iceberg field ID (assigned at table creation). */
+  public static final String ICEBERG_FIELD_ID = "iceberg.field.id";
+
+  /** Glue column parameter key indicating whether the Iceberg field is optional (nullable). */
+  public static final String ICEBERG_FIELD_OPTIONAL = "iceberg.field.optional";
   // -------------------------------------------------------------------------
   // StorageDescriptor-derived table properties (stored in Gravitino properties map)
   // -------------------------------------------------------------------------

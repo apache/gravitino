@@ -63,8 +63,8 @@ import org.junit.jupiter.api.TestInstance;
 /**
  * Abstract base class for Glue catalog integration tests.
  *
- * <p>Subclasses provide backend-specific configuration (LocalStack or real AWS) via {@link
- * #catalogConfig()}. All test scenarios are defined here and shared between backends.
+ * <p>Subclasses provide backend-specific configuration via {@link #catalogConfig()}. All test
+ * scenarios are defined here and shared between backend implementations.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 abstract class AbstractGlueCatalogIT {
@@ -250,10 +250,25 @@ abstract class AbstractGlueCatalogIT {
     ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
     createHiveTable(schema, "tbl");
 
-    assertThrows(NonEmptySchemaException.class, () -> ops.dropSchema(schemaIdent(schema), false));
+    try {
+      assertThrows(NonEmptySchemaException.class, () -> ops.dropSchema(schemaIdent(schema), false));
 
-    assertTrue(ops.dropSchema(schemaIdent(schema), true));
-    currentSchema = null;
+      assertTrue(ops.dropTable(tableIdent(schema, "tbl")));
+      assertTrue(ops.dropSchema(schemaIdent(schema), false));
+      currentSchema = null;
+    } finally {
+      if (currentSchema != null) {
+        try {
+          ops.dropTable(tableIdent(schema, "tbl"));
+        } catch (Exception ignored) {
+        }
+        try {
+          ops.dropSchema(schemaIdent(schema), false);
+        } catch (Exception ignored) {
+        }
+        currentSchema = null;
+      }
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -535,11 +550,9 @@ abstract class AbstractGlueCatalogIT {
         new Index[0]);
 
     Table loaded = ops.loadTable(tableIdent(schema, "complex"));
-    assertEquals(
-        "array<string>", ((Types.ExternalType) loaded.columns()[0].dataType()).catalogString());
-    assertEquals(
-        "struct<name:string,age:int>",
-        ((Types.ExternalType) loaded.columns()[1].dataType()).catalogString());
+    // GlueTypeConverter.toGravitino converts known complex types to native types.
+    assertEquals(Types.ListType.class, loaded.columns()[0].dataType().getClass());
+    assertEquals(Types.StructType.class, loaded.columns()[1].dataType().getClass());
   }
 
   @Test

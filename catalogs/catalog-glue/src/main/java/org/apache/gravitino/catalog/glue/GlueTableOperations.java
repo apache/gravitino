@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
@@ -51,8 +52,9 @@ import software.amazon.awssdk.services.glue.model.StorageDescriptor;
  * <p>Implements {@link SupportsPartitions} for Hive-format identity-partitioned tables. Partition
  * names follow the Hive convention: {@code col=val/col2=val2}.
  *
- * <p>Only {@link IdentityPartition} is supported; other partition types throw {@link
- * IllegalArgumentException}.
+ * <p>Only {@link IdentityPartition} is supported because the Glue partition model is Hive-style
+ * key=value, which maps directly to identity partitions. Other partition types (bucket, truncate,
+ * etc.) have no equivalent representation in the Glue partition API.
  */
 class GlueTableOperations implements TableOperations, SupportsPartitions {
 
@@ -88,7 +90,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
       do {
         GetPartitionsRequest.Builder req =
             GetPartitionsRequest.builder().databaseName(dbName).tableName(tableName);
-        if (catalogId != null) req.catalogId(catalogId);
+        GlueCatalogOperations.applyCatalogId(catalogId, req::catalogId);
         if (nextToken != null) req.nextToken(nextToken);
         GetPartitionsResponse resp = glueClient.getPartitions(req.build());
         for (software.amazon.awssdk.services.glue.model.Partition p : resp.partitions()) {
@@ -110,7 +112,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
       do {
         GetPartitionsRequest.Builder req =
             GetPartitionsRequest.builder().databaseName(dbName).tableName(tableName);
-        if (catalogId != null) req.catalogId(catalogId);
+        GlueCatalogOperations.applyCatalogId(catalogId, req::catalogId);
         if (nextToken != null) req.nextToken(nextToken);
         GetPartitionsResponse resp = glueClient.getPartitions(req.build());
         for (software.amazon.awssdk.services.glue.model.Partition p : resp.partitions()) {
@@ -132,7 +134,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
             .databaseName(dbName)
             .tableName(tableName)
             .partitionValues(values);
-    if (catalogId != null) req.catalogId(catalogId);
+    GlueCatalogOperations.applyCatalogId(catalogId, req::catalogId);
     try {
       return toGravitinoPartition(glueClient.getPartition(req.build()).partition());
     } catch (EntityNotFoundException e) {
@@ -148,6 +150,11 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     Preconditions.checkArgument(
         partition instanceof IdentityPartition, "Glue only supports identity partitions");
     IdentityPartition ip = (IdentityPartition) partition;
+    Preconditions.checkArgument(
+        ip.values().length == partitionColNames.length,
+        "Partition values count (%s) must match partition columns count (%s)",
+        ip.values().length,
+        partitionColNames.length);
 
     List<String> values = new ArrayList<>(ip.values().length);
     for (Literal<?> v : ip.values()) {
@@ -157,6 +164,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
     PartitionInput input =
         PartitionInput.builder()
             .values(values)
+            .parameters(partition.properties())
             .storageDescriptor(StorageDescriptor.builder().build())
             .build();
 
@@ -165,7 +173,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
             .databaseName(dbName)
             .tableName(tableName)
             .partitionInput(input);
-    if (catalogId != null) req.catalogId(catalogId);
+    GlueCatalogOperations.applyCatalogId(catalogId, req::catalogId);
 
     try {
       glueClient.createPartition(req.build());
@@ -194,7 +202,7 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
             .databaseName(dbName)
             .tableName(tableName)
             .partitionValues(values);
-    if (catalogId != null) req.catalogId(catalogId);
+    GlueCatalogOperations.applyCatalogId(catalogId, req::catalogId);
     try {
       glueClient.deletePartition(req.build());
       LOG.info("Dropped partition {} from {}.{}", partitionName, dbName, tableName);
@@ -221,14 +229,25 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
 
   /**
    * Parses a Hive-style partition name (e.g. {@code dt=2024-01-01/country=us}) into an ordered list
-   * of values.
+   * of values, validating that the keys match the table's partition columns in order.
    */
-  private static List<String> parsePartitionName(String partitionName) {
+  private List<String> parsePartitionName(String partitionName) {
     String[] parts = partitionName.split("/");
+    Preconditions.checkArgument(
+        parts.length == partitionColNames.length,
+        "Partition name '%s' has %s segment(s) but table has %s partition column(s)",
+        partitionName,
+        parts.length,
+        partitionColNames.length);
     List<String> values = new ArrayList<>(parts.length);
-    for (String part : parts) {
-      int eq = part.indexOf('=');
-      values.add(eq >= 0 ? part.substring(eq + 1) : part);
+    for (int i = 0; i < parts.length; i++) {
+      int eq = parts[i].indexOf('=');
+      Preconditions.checkArgument(
+          eq >= 0 && parts[i].substring(0, eq).equals(partitionColNames[i]),
+          "Partition segment '%s' does not match expected column '%s'",
+          parts[i],
+          partitionColNames[i]);
+      values.add(parts[i].substring(eq + 1));
     }
     return values;
   }
@@ -244,6 +263,8 @@ class GlueTableOperations implements TableOperations, SupportsPartitions {
       fieldNames[i] = new String[] {partitionColNames[i]};
       literals[i] = Literals.stringLiteral(i < values.size() ? values.get(i) : null);
     }
-    return Partitions.identity(name, fieldNames, literals, Collections.emptyMap());
+    Map<String, String> props =
+        gluePartition.hasParameters() ? gluePartition.parameters() : Collections.emptyMap();
+    return Partitions.identity(name, fieldNames, literals, props);
   }
 }

@@ -1,0 +1,88 @@
+name: Publish Helm Charts
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Chart version to publish (e.g., 1.3.0)'
+        required: true
+        type: string
+      username:
+        description: 'Docker Hub username'
+        required: true
+        type: string
+      token:
+        description: 'Publish Docker token'
+        required: true
+        type: string
+      docker_repo_name:
+        description: 'Docker repository name (default is apache)'
+        required: false
+        default: 'apache'
+        type: string
+      charts:
+        description: 'Charts to publish (comma-separated: gravitino,iceberg,lance or "all")'
+        required: false
+        default: 'all'
+        type: string
+
+jobs:
+  publish-helm-charts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      input_token: ${{ github.event.inputs.token }}
+      secrets_token: ${{ secrets.PUBLISH_DOCKER_TOKEN }}
+      DOCKER_REPO: registry-1.docker.io/${{ github.event.inputs.docker_repo_name }}
+    steps:
+      - name: Check publish Docker token
+        run: |
+          if [[ "${secrets_token}" != "${input_token}" ]]; then
+            echo "You have entered an incorrect token. Please re-enter it."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4.3.0
+
+      - name: Login to Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_REPOSITORY_PASSWORD }}" | helm registry login registry-1.docker.io -u ${{ github.event.inputs.username }} --password-stdin
+
+      - name: Determine charts to publish
+        id: charts
+        run: |
+          INPUT_CHARTS="${{ github.event.inputs.charts }}"
+          if [[ "${INPUT_CHARTS}" == "all" ]]; then
+            echo "charts=gravitino,iceberg,lance" >> $GITHUB_OUTPUT
+          else
+            echo "charts=${INPUT_CHARTS}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Package and publish Gravitino chart
+        if: contains(steps.charts.outputs.charts, 'gravitino')
+        run: |
+          cd dev/charts/gravitino
+          helm dependency update
+          helm package . --version ${{ github.event.inputs.version }}
+          helm push gravitino-helm-${{ github.event.inputs.version }}.tgz oci://${DOCKER_REPO}
+
+      - name: Package and publish Gravitino Iceberg REST Server chart
+        if: contains(steps.charts.outputs.charts, 'iceberg')
+        run: |
+          cd dev/charts/gravitino-iceberg-rest-server
+          helm package . --version ${{ github.event.inputs.version }}
+          helm push gravitino-iceberg-rest-server-helm-${{ github.event.inputs.version }}.tgz oci://${DOCKER_REPO}
+
+      - name: Package and publish Gravitino Lance REST Server chart
+        if: contains(steps.charts.outputs.charts, 'lance')
+        run: |
+          cd dev/charts/gravitino-lance-rest-server
+          helm package . --version ${{ github.event.inputs.version }}
+          helm push gravitino-lance-rest-server-helm-${{ github.event.inputs.version }}.tgz oci://${DOCKER_REPO}
+
+      - name: Logout from Docker Hub
+        if: always()
+        run: helm registry logout registry-1.docker.io

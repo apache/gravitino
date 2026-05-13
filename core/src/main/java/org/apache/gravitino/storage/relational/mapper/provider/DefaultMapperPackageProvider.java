@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider;
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -50,6 +51,7 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 
 /** The default provider that supplies the primary mapper package for Gravitino. */
 public class DefaultMapperPackageProvider implements MapperPackageProvider {
@@ -58,6 +60,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
   public List<Class<?>> getMapperClasses() {
     return ImmutableList.of(
         CatalogMetaMapper.class,
+        EntityChangeLogMapper.class,
         FilesetMetaMapper.class,
         FilesetVersionMapper.class,
         FunctionMetaMapper.class,
@@ -86,6 +89,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         UserMetaMapper.class,
         UserRoleRelMapper.class,
         TableVersionMapper.class,
-        ViewMetaMapper.class);
+        ViewMetaMapper.class,
+        ViewVersionInfoMapper.class);
   }
 }

@@ -22,6 +22,8 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Entity.EntityType.VIEW;
+import static org.apache.gravitino.StringIdentifier.ID_KEY;
+import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
@@ -29,6 +31,8 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -48,8 +52,12 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -98,6 +106,18 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
       @Override
       public String name() {
         return name;
+      }
+
+      @Override
+      public Column[] columns() {
+        return new Column[0];
+      }
+
+      @Override
+      public Representation[] representations() {
+        return new Representation[] {
+          SQLRepresentation.builder().withDialect("unknown").withSql("SELECT 1").build()
+        };
       }
 
       @Override
@@ -198,14 +218,14 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
 
     // Verify view is not in entity store initially
     Assertions.assertThrows(
-        NoSuchEntityException.class, () -> entityStore.get(viewIdent, VIEW, GenericEntity.class));
+        NoSuchEntityException.class, () -> entityStore.get(viewIdent, VIEW, ViewEntity.class));
 
     // Load view - should auto-import
     View loadedView = viewOperationDispatcher.loadView(viewIdent);
     Assertions.assertEquals("auto_import_view", loadedView.name());
 
     // Verify view was auto-imported into entity store
-    GenericEntity viewEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
+    ViewEntity viewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
     Assertions.assertNotNull(viewEntity);
     Assertions.assertEquals(viewIdent.name(), viewEntity.name());
     Assertions.assertEquals(viewIdent.namespace(), viewEntity.namespace());
@@ -221,12 +241,17 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier viewIdent = NameIdentifier.of(viewNs, "already_imported_view");
 
     // Pre-populate entity store with view entity
-    GenericEntity viewEntity =
-        GenericEntity.builder()
+    ViewEntity viewEntity =
+        ViewEntity.builder()
             .withId(1L)
             .withName(viewIdent.name())
             .withNamespace(viewIdent.namespace())
-            .withEntityType(Entity.EntityType.VIEW)
+            .withColumns(new Column[0])
+            .withRepresentations(
+                new Representation[] {
+                  SQLRepresentation.builder().withDialect("unknown").withSql("SELECT 1").build()
+                })
+            .withAuditInfo(AuditInfo.EMPTY)
             .build();
     entityStore.put(viewEntity, false);
 
@@ -241,7 +266,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     testCatalogOperations.views.put(viewIdent, mockView);
 
     // Record the initial entity state
-    GenericEntity initialEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
+    ViewEntity initialEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
     long initialId = initialEntity.id();
 
     // Load view - should load from catalog but skip import since already in entity store
@@ -250,7 +275,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
 
     // Verify entity is still in store with same ID (no duplicate import)
     // If import was called, a new entity would be created with a different ID
-    GenericEntity retrievedEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
+    ViewEntity retrievedEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
     Assertions.assertNotNull(retrievedEntity);
     Assertions.assertEquals(initialId, retrievedEntity.id(), "Entity ID should not change");
     Assertions.assertEquals(1L, retrievedEntity.id(), "Entity ID should remain 1L (no new import)");
@@ -301,7 +326,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertEquals("concurrent_view", loadedView.name());
 
         EntityCombinedView combinedView = (EntityCombinedView) loadedView;
-        long currentEntityId = combinedView.viewFromGravitino().id();
+        long currentEntityId = combinedView.viewEntity().id();
 
         if (entityId == null) {
           entityId = currentEntityId;
@@ -349,7 +374,201 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("deleted_view", loadedView2.name());
 
     // Verify view was re-imported
-    GenericEntity viewEntity = entityStore.get(viewIdent, VIEW, GenericEntity.class);
+    ViewEntity viewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
     Assertions.assertNotNull(viewEntity);
+  }
+
+  @Test
+  public void testCreateView() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_create_view");
+    Map<String, String> schemaProps = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", schemaProps);
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "created_view");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    Map<String, String> viewProps = ImmutableMap.of("k1", "v1", "p1", "pv1");
+
+    View created =
+        viewOperationDispatcher.createView(
+            viewIdent, "view comment", new Column[0], representations, null, null, viewProps);
+
+    Assertions.assertEquals("created_view", created.name());
+    Assertions.assertEquals("view comment", created.comment());
+    Assertions.assertTrue(created instanceof EntityCombinedView);
+
+    // Entity stored as ViewEntity in entity store.
+    ViewEntity stored = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+    Assertions.assertNotNull(stored);
+    Assertions.assertEquals("view comment", stored.comment());
+    Assertions.assertEquals("pv1", stored.properties().get("p1"));
+
+    // Test required view properties exception
+    Map<String, String> missingRequired = new HashMap<>();
+    missingRequired.put("p1", "pv1");
+    testPropertyException(
+        () ->
+            viewOperationDispatcher.createView(
+                NameIdentifier.of(viewNs, "missing_required"),
+                "c",
+                new Column[0],
+                representations,
+                null,
+                null,
+                missingRequired),
+        "Properties or property prefixes are required and must be set");
+
+    // Test reserved view properties exception
+    Map<String, String> reservedProps = new HashMap<>();
+    reservedProps.put("k1", "v1");
+    reservedProps.put(COMMENT_KEY, "view comment");
+    reservedProps.put(ID_KEY, "gravitino.v1.uidfdsafdsa");
+    testPropertyException(
+        () ->
+            viewOperationDispatcher.createView(
+                NameIdentifier.of(viewNs, "reserved_props"),
+                "c",
+                new Column[0],
+                representations,
+                null,
+                null,
+                reservedProps),
+        "Properties or property prefixes are reserved and cannot be set",
+        "comment",
+        "gravitino.identifier");
+
+    Assertions.assertFalse(created.properties().containsKey(ID_KEY));
+  }
+
+  @Test
+  public void testDropView() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_drop_view");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "to_drop");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, null, new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    Assertions.assertTrue(viewOperationDispatcher.dropView(viewIdent));
+    // Entity removed.
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> entityStore.get(viewIdent, VIEW, ViewEntity.class));
+    // Dropping again returns false (underlying catalog reports missing).
+    Assertions.assertFalse(viewOperationDispatcher.dropView(viewIdent));
+  }
+
+  @Test
+  public void testListViews() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_list_view");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    for (int i = 0; i < 3; i++) {
+      viewOperationDispatcher.createView(
+          NameIdentifier.of(viewNs, "lv" + i),
+          null,
+          new Column[0],
+          representations,
+          null,
+          null,
+          ImmutableMap.of("k1", "v1"));
+    }
+
+    NameIdentifier[] listed = viewOperationDispatcher.listViews(viewNs);
+    Assertions.assertEquals(3, listed.length);
+  }
+
+  @Test
+  public void testAlterViewProperties() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_alter_props");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "c", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "alter_props");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, "c", new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    View altered =
+        viewOperationDispatcher.alterView(
+            viewIdent, ViewChange.setProperty("k2", "v2"), ViewChange.removeProperty("k1"));
+    Assertions.assertEquals("v2", altered.properties().get("k2"));
+    Assertions.assertFalse(altered.properties().containsKey("k1"));
+
+    ViewEntity stored = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+    Assertions.assertEquals("v2", stored.properties().get("k2"));
+    Assertions.assertFalse(stored.properties().containsKey("k1"));
+
+    // Test immutable view properties
+    ViewChange[] illegalChange =
+        new ViewChange[] {ViewChange.setProperty(COMMENT_KEY, "new comment")};
+    testPropertyException(
+        () -> viewOperationDispatcher.alterView(viewIdent, illegalChange),
+        "Property comment is immutable or reserved, cannot be set");
+  }
+
+  @Test
+  public void testAlterViewRename() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_alter_rename");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "c", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier oldIdent = NameIdentifier.of(viewNs, "old_view");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        oldIdent, "c", new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    View altered = viewOperationDispatcher.alterView(oldIdent, ViewChange.rename("new_view"));
+    Assertions.assertEquals("new_view", altered.name());
+  }
+
+  @Test
+  public void testAlterViewReplace() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_alter_replace");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "c", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "replace");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        viewIdent, "c", new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    Representation[] newRepresentations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build(),
+      SQLRepresentation.builder().withDialect("trino").withSql("SELECT 2").build()
+    };
+    View altered =
+        viewOperationDispatcher.alterView(
+            viewIdent,
+            ViewChange.replaceView(
+                new Column[0], newRepresentations, "cat1", "sch1", "new comment"));
+    Assertions.assertEquals(2, altered.representations().length);
+    Assertions.assertEquals("new comment", altered.comment());
+    Assertions.assertEquals("cat1", altered.defaultCatalog());
+    Assertions.assertEquals("sch1", altered.defaultSchema());
+
+    SQLRepresentation trino =
+        (SQLRepresentation)
+            Arrays.stream(altered.representations())
+                .filter(r -> r instanceof SQLRepresentation)
+                .filter(r -> "trino".equals(((SQLRepresentation) r).dialect()))
+                .findFirst()
+                .orElseThrow(AssertionError::new);
+    Assertions.assertEquals("SELECT 2", trino.sql());
   }
 }

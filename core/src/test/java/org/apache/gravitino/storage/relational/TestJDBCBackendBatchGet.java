@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -33,14 +34,18 @@ import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -846,5 +851,215 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
 
     Assertions.assertEquals(1, result.size());
     Assertions.assertEquals("catalog_single", result.get(0).name());
+  }
+
+  @TestTemplate
+  public void testBatchGetGroups() throws IOException {
+    String metalakeName = "metalake_for_group_batch";
+    createAndInsertMakeLake(metalakeName);
+
+    // Create a catalog and two roles so we can attach roles to one of the groups
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_for_group_batch",
+            AUDIT_INFO);
+    backend.insert(catalog, false);
+
+    RoleEntity roleA =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofRole(metalakeName),
+            "role_a",
+            AUDIT_INFO,
+            "catalog_for_group_batch");
+    RoleEntity roleB =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofRole(metalakeName),
+            "role_b",
+            AUDIT_INFO,
+            "catalog_for_group_batch");
+    backend.insert(roleA, false);
+    backend.insert(roleB, false);
+
+    // group1: no roles. group2: two roles. group3: no roles.
+    GroupEntity group1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofGroup(metalakeName),
+            "group1",
+            AUDIT_INFO,
+            Lists.newArrayList(),
+            Lists.newArrayList());
+    GroupEntity group2 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofGroup(metalakeName),
+            "group2",
+            AUDIT_INFO,
+            Lists.newArrayList(roleA.name(), roleB.name()),
+            Lists.newArrayList(roleA.id(), roleB.id()));
+    GroupEntity group3 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofGroup(metalakeName),
+            "group3",
+            AUDIT_INFO,
+            Lists.newArrayList(),
+            Lists.newArrayList());
+    backend.insert(group1, false);
+    backend.insert(group2, false);
+    backend.insert(group3, false);
+
+    List<NameIdentifier> identifiers =
+        Lists.newArrayList(
+            group1.nameIdentifier(), group2.nameIdentifier(), group3.nameIdentifier());
+
+    List<GroupEntity> result = backend.batchGet(identifiers, Entity.EntityType.GROUP);
+
+    Assertions.assertEquals(3, result.size());
+    Map<String, GroupEntity> resultMap =
+        result.stream().collect(Collectors.toMap(GroupEntity::name, g -> g));
+
+    GroupEntity retrieved1 = resultMap.get("group1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(group1.id(), retrieved1.id());
+    Assertions.assertEquals(group1.namespace(), retrieved1.namespace());
+    Assertions.assertTrue(
+        retrieved1.roleIds() == null || retrieved1.roleIds().isEmpty(),
+        "group1 should have no roles");
+
+    GroupEntity retrieved2 = resultMap.get("group2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(group2.id(), retrieved2.id());
+    Assertions.assertEquals(group2.namespace(), retrieved2.namespace());
+    Assertions.assertNotNull(retrieved2.roleIds());
+    Assertions.assertEquals(2, retrieved2.roleIds().size());
+    Assertions.assertEquals(
+        Sets.newHashSet(roleA.id(), roleB.id()), Sets.newHashSet(retrieved2.roleIds()));
+    Assertions.assertEquals(
+        Sets.newHashSet(roleA.name(), roleB.name()), Sets.newHashSet(retrieved2.roleNames()));
+
+    GroupEntity retrieved3 = resultMap.get("group3");
+    Assertions.assertNotNull(retrieved3);
+    Assertions.assertEquals(group3.id(), retrieved3.id());
+    Assertions.assertTrue(
+        retrieved3.roleIds() == null || retrieved3.roleIds().isEmpty(),
+        "group3 should have no roles");
+  }
+
+  @TestTemplate
+  public void testBatchGetGroupsPartialResults() throws IOException {
+    String metalakeName = "metalake_for_group_partial";
+    createAndInsertMakeLake(metalakeName);
+
+    GroupEntity group1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofGroup(metalakeName),
+            "group1",
+            AUDIT_INFO,
+            Lists.newArrayList(),
+            Lists.newArrayList());
+    backend.insert(group1, false);
+
+    // Non-existing first to verify the loop continues past the failure
+    List<NameIdentifier> identifiers =
+        Lists.newArrayList(
+            NameIdentifier.of(NamespaceUtil.ofGroup(metalakeName), "nonexistent_group"),
+            group1.nameIdentifier());
+
+    List<GroupEntity> result = backend.batchGet(identifiers, Entity.EntityType.GROUP);
+
+    Assertions.assertEquals(1, result.size());
+    Assertions.assertEquals("group1", result.get(0).name());
+  }
+
+  @TestTemplate
+  public void testBatchGetUsersPartialResults() throws IOException {
+    String metalakeName = "metalake_for_user_partial";
+    createAndInsertMakeLake(metalakeName);
+
+    UserEntity user1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofUser(metalakeName),
+            "user1",
+            AUDIT_INFO);
+    backend.insert(user1, false);
+
+    // Non-existing first to verify the loop continues past the failure
+    List<NameIdentifier> identifiers =
+        Lists.newArrayList(
+            NameIdentifier.of(NamespaceUtil.ofUser(metalakeName), "nonexistent_user"),
+            user1.nameIdentifier());
+
+    List<UserEntity> result = backend.batchGet(identifiers, Entity.EntityType.USER);
+
+    Assertions.assertEquals(1, result.size());
+    Assertions.assertEquals("user1", result.get(0).name());
+  }
+
+  @TestTemplate
+  public void testBatchGetRolesPartialResults() throws IOException {
+    String metalakeName = "metalake_for_role_partial";
+    createAndInsertMakeLake(metalakeName);
+
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_for_roles",
+            AUDIT_INFO);
+    backend.insert(catalog, false);
+
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofRole(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            "catalog_for_roles");
+    backend.insert(role1, false);
+
+    // Non-existing first to verify the loop continues past the failure
+    List<NameIdentifier> identifiers =
+        Lists.newArrayList(
+            NameIdentifier.of(NamespaceUtil.ofRole(metalakeName), "nonexistent_role"),
+            role1.nameIdentifier());
+
+    List<RoleEntity> result = backend.batchGet(identifiers, Entity.EntityType.ROLE);
+
+    Assertions.assertEquals(1, result.size());
+    Assertions.assertEquals("role1", result.get(0).name());
+  }
+
+  @TestTemplate
+  public void testBatchGetViewsPartialResults() throws IOException {
+    String metalakeName = "metalake_for_view_partial";
+    String catalogName = "catalog_for_view_partial";
+    String schemaName = "schema_for_view_partial";
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+
+    ViewEntity view1 =
+        createViewEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofView(metalakeName, catalogName, schemaName),
+            "view1");
+    backend.insert(view1, false);
+
+    // Non-existing first to verify the loop continues past the failure
+    List<NameIdentifier> identifiers =
+        Lists.newArrayList(
+            NameIdentifier.of(
+                NamespaceUtil.ofView(metalakeName, catalogName, schemaName), "nonexistent_view"),
+            view1.nameIdentifier());
+
+    List<ViewEntity> result = backend.batchGet(identifiers, Entity.EntityType.VIEW);
+
+    Assertions.assertEquals(1, result.size());
+    Assertions.assertEquals("view1", result.get(0).name());
   }
 }

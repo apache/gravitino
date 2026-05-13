@@ -18,7 +18,7 @@
 #
 
 apiVersion: v2
-name: gravitino-iceberg-rest-server
+name: gravitino-iceberg-rest-server-helm
 description: Apache Gravitino's REST catalog server delivers unified metadata management via RESTful APIs, supporting HDFS/S3/OSS storage backends, Spark/Flink/Trino engines, federated metadata, access control, and Iceberg REST spec compatibility.
 
 home: https://gravitino.apache.org
@@ -31,6 +31,7 @@ keywords:
 
 annotations:
   licenses: Apache-2.0
+  artifacthub.io/prerelease: "false"
 kubeVersion: '>=1.29.0-0'
 maintainers:
   - name: Gravitino

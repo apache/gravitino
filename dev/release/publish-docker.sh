@@ -54,6 +54,8 @@
 
 set -e
 
+SELF=$(cd "$(dirname "$0")" && pwd)
+
 # Check required commands
 for cmd in git gh; do
   if ! command -v "$cmd" > /dev/null 2>&1; then
@@ -67,12 +69,21 @@ DRY_RUN=false
 INPUT_TAG=""
 DOCKER_VERSION=""
 TRINO_VER="478"
+STATE_KEY="docker"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run)
       DRY_RUN=true
       shift
+      ;;
+    --state-key)
+      if [[ -z "${2:-}" || "$2" == -* ]]; then
+        echo "ERROR: --state-key requires a non-empty value." >&2
+        exit 1
+      fi
+      STATE_KEY="$2"
+      shift 2
       ;;
     --docker-version)
       if [[ -z "${2:-}" || "$2" == -* ]]; then
@@ -152,6 +163,22 @@ if ! git ls-remote --exit-code https://github.com/apache/gravitino.git "$INPUT_T
 fi
 
 echo "Verified: $INPUT_TAG exists"
+
+# ---------------------------------------------------------------------------
+# Stage state tracking: reuse the same .release-state/{TAG}/ convention as
+# do-release.sh so all stage markers live together.
+# ---------------------------------------------------------------------------
+DOCKER_STATE_DIR="${RELEASE_STATE_DIR:-$SELF/.release-state}/${INPUT_TAG}"
+DOCKER_STATE_FILE="${DOCKER_STATE_DIR}/${STATE_KEY}.done"
+
+if [[ "$DRY_RUN" == "false" ]] && [[ -f "$DOCKER_STATE_FILE" ]]; then
+  echo ""
+  echo "=== Stage '${STATE_KEY}' is already complete ==="
+  cat "$DOCKER_STATE_FILE"
+  echo "To re-run, delete: $DOCKER_STATE_FILE"
+  echo ""
+  exit 0
+fi
 
 # Trino special version
 TRINO_VERSION="${TRINO_VER}-gravitino-${DOCKER_VERSION}"
@@ -233,3 +260,15 @@ else
   echo "=== All workflows triggered ==="
   echo "View progress: https://github.com/apache/gravitino/actions/workflows/docker-image.yml"
 fi
+
+# Mark stage as done regardless of dry-run so the skill can track completion.
+mkdir -p "$DOCKER_STATE_DIR"
+{
+  echo "completed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  echo "release=$INPUT_TAG"
+  echo "docker_version=$DOCKER_VERSION"
+  echo "trino_version=$TRINO_VERSION"
+  [[ "$DRY_RUN" == "true" ]] && echo "dry_run=true"
+  echo "info=All Docker image workflows dispatched to apache/gravitino"
+} > "$DOCKER_STATE_FILE"
+echo "Stage '${STATE_KEY}' marked as done. State file: $DOCKER_STATE_FILE"

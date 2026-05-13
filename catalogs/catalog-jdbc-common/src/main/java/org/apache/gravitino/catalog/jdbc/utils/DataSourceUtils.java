@@ -45,6 +45,17 @@ public class DataSourceUtils {
 
   public static DataSource createDataSource(JdbcConfig jdbcConfig)
       throws GravitinoRuntimeException {
+    // H2 is bundled as an embedded backend and must not be used through user-facing catalog
+    // configuration. Its INIT parameter allows arbitrary SQL (and Java code via CREATE ALIAS)
+    // to execute at connection time, and the H2 driver class must also be blocked to prevent
+    // bypassing this check via a mismatched driver and URL combination.
+    String decodedUrl = recursiveDecode(jdbcConfig.getJdbcUrl().toLowerCase());
+    if (decodedUrl.startsWith("jdbc:h2")) {
+      throw new GravitinoRuntimeException("H2 JDBC URL is not allowed in catalog configuration");
+    }
+    if (jdbcConfig.getJdbcDriver().toLowerCase().startsWith("org.h2.")) {
+      throw new GravitinoRuntimeException("H2 JDBC driver is not allowed in catalog configuration");
+    }
     try {
       return createDBCPDataSource(jdbcConfig);
     } catch (Exception exception) {

@@ -125,6 +125,12 @@ Build a distribution:
 ./gradlew compileDistribution -x test
 ```
 
+Skip building and packaging both Web UIs:
+
+```bash
+./gradlew compileDistribution -PskipWebBuild=true -x test
+```
+
 Or compressed package:
 
 ```bash

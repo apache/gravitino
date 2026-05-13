@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.hive;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Properties;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hive.client.HiveClient;
@@ -67,6 +68,24 @@ public class HiveClientPool extends ClientPoolImpl<HiveClient, GravitinoRuntimeE
   protected boolean isConnectionException(Exception e) {
     // Pool-level reconnection is not required by design.
     return false;
+  }
+
+  @Override
+  public void close() {
+    if (isClosed()) {
+      return;
+    }
+
+    try {
+      super.close();
+    } finally {
+      closeClientFactory();
+    }
+  }
+
+  @VisibleForTesting
+  void closeClientFactory() {
+    clientFactory.close();
   }
 
   @Override

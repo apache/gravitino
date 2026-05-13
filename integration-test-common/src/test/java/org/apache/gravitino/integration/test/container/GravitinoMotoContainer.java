@@ -62,6 +62,11 @@ public class GravitinoMotoContainer extends BaseContainer {
 
     @Override
     public GravitinoMotoContainer build() {
+      if (image == null || image.isBlank()) {
+        throw new IllegalStateException(
+            "GravitinoMotoContainer image must be set. "
+                + "Provide a non-blank image via withImage() or set the GRAVITINO_CI_MOTO_DOCKER_IMAGE environment variable.");
+      }
       return new GravitinoMotoContainer(
           image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }

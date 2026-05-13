@@ -494,7 +494,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   }
 
   private Response doPlanTableScan(Namespace ns, String tableName, PlanTableScanRequest request) {
-    Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/scan"));
+    Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/plan"));
     return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
@@ -661,7 +661,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     verifyCreateNamespaceSucc(ns);
 
     // Then create a table
-    verifyCreateTableSucc(ns, tableName);
+    doCreateTableWithCredentialVending(ns, tableName, "s3://abc");
 
     // Then test getting credentials
     Response response = doGetTableCredentials(ns, tableName);

@@ -18,7 +18,7 @@
 #
 
 apiVersion: v2
-name: gravitino-lance-rest-server
+name: gravitino-lance-rest-server-helm
 description: Apache Gravitino's Lance REST server provides high-performance columnar data management via RESTful APIs, supporting HDFS/S3/OSS/Azure/GCS storage backends, and Lance format compatibility for analytical workloads.
 
 home: https://gravitino.apache.org
@@ -33,6 +33,7 @@ keywords:
 
 annotations:
   licenses: Apache-2.0
+  artifacthub.io/prerelease: "false"
 kubeVersion: '>=1.29.0-0'
 maintainers:
   - name: Gravitino
