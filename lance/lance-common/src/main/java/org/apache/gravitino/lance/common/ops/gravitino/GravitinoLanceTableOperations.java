@@ -172,9 +172,6 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     // Pass creation mode as property to delegate handling to LanceTableOperations
     createTableProperties.put(LANCE_CREATION_MODE, normalizeCreateMode(mode, tableId));
-    Map<String, String> effectiveStorageOptions =
-        LancePropertiesUtils.resolveLanceStorageOptions(
-            catalog.properties(), createTableProperties);
 
     // Single call - mode is handled server-side
     Table t =
@@ -183,6 +180,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
             .createTable(
                 tableIdentifier, columns.toArray(new Column[0]), null, createTableProperties);
     Map<String, String> properties = t.properties();
+    Map<String, String> effectiveStorageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), properties);
 
     CreateTableResponse response = new CreateTableResponse();
     response.setStorageOptions(effectiveStorageOptions);
