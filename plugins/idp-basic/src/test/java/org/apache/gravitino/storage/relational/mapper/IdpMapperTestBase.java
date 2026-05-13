@@ -21,84 +21,59 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Comparator;
-import java.util.UUID;
-import java.util.stream.Stream;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
+import org.apache.gravitino.integration.test.util.CloseContainerExtension;
+import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.extension.ExtendWith;
 
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@ExtendWith({
+  IdpMapperBackendTestExtension.class,
+  PrintFuncNameExtension.class,
+  CloseContainerExtension.class
+})
 abstract class IdpMapperTestBase {
-  private static final String JDBC_STORE_PATH =
-      "/tmp/gravitino_jdbc_idpMappers_" + UUID.randomUUID().toString().replace("-", "");
-  private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
-
-  protected static JDBCBackend backend;
-  protected static SqlSession sharedSession;
-  protected static IdpUserMetaMapper idpUserMetaMapper;
-
-  @BeforeAll
-  static void setup() throws Exception {
-    Path dbDir = Path.of(DB_DIR);
-    if (Files.exists(dbDir)) {
-      deleteDirectory(dbDir);
-    }
-    Files.createDirectories(dbDir);
-
-    Config config = new Config(false) {};
-    config.set(Configs.ENTITY_STORE, "relational");
-    config.set(Configs.ENTITY_RELATIONAL_STORE, "h2");
-    config.set(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL,
-        String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", DB_DIR));
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "gravitino");
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "gravitino");
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS, 20);
-    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS, 1000L);
-
-    backend = new JDBCBackend();
-    backend.initialize(config);
-
-    sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-    idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
-  }
-
-  @AfterAll
-  static void tearDown() throws IOException {
-    if (sharedSession != null) {
-      sharedSession.close();
-    }
-    if (backend != null) {
-      backend.close();
-    }
-    Path jdbcStoreDir = Path.of(JDBC_STORE_PATH);
-    if (Files.exists(jdbcStoreDir)) {
-      deleteDirectory(jdbcStoreDir);
-    }
-  }
+  protected String backendType;
+  protected JDBCBackend backend;
+  protected SqlSession sharedSession;
+  protected IdpUserMetaMapper idpUserMetaMapper;
 
   @BeforeEach
+  void openSession() {
+    sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+    idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
+    truncateTables();
+  }
+
+  @AfterEach
+  void closeSession() {
+    if (sharedSession != null) {
+      sharedSession.close();
+      sharedSession = null;
+    }
+  }
+
   void truncateTables() {
     try (SqlSession sqlSession =
         SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
       try (Connection connection = sqlSession.getConnection();
           Statement statement = connection.createStatement()) {
-        statement.execute("TRUNCATE TABLE idp_user_meta");
+        if ("postgresql".equalsIgnoreCase(backendType)) {
+          statement.execute("TRUNCATE TABLE idp_user_meta RESTART IDENTITY CASCADE");
+        } else {
+          statement.execute("TRUNCATE TABLE idp_user_meta");
+        }
       }
     } catch (SQLException e) {
       throw new RuntimeException("Truncate table failed", e);
@@ -161,18 +136,11 @@ abstract class IdpMapperTestBase {
     }
   }
 
-  private static void deleteDirectory(Path dir) throws IOException {
-    try (Stream<Path> paths = Files.walk(dir)) {
-      paths
-          .sorted(Comparator.reverseOrder())
-          .forEach(
-              path -> {
-                try {
-                  Files.deleteIfExists(path);
-                } catch (IOException e) {
-                  throw new RuntimeException("Delete path failed: " + path, e);
-                }
-              });
-    }
+  void setBackendType(String backendType) {
+    this.backendType = backendType;
+  }
+
+  void setBackend(JDBCBackend backend) {
+    this.backend = backend;
   }
 }

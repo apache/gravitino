@@ -27,11 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
 public class TestIdpUserMetaMapper extends IdpMapperTestBase {
 
-  @Test
+  @TestTemplate
   void testInsertIdpUserAndSelectIdpUser() {
     IdpUserPO firstUser = insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
 
@@ -39,7 +39,7 @@ public class TestIdpUserMetaMapper extends IdpMapperTestBase {
     assertNull(idpUserMetaMapper.selectIdpUser("unknown"));
   }
 
-  @Test
+  @TestTemplate
   void testSelectIdpUsers() {
     IdpUserPO firstUser = insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
     IdpUserPO secondUser = insertUser(2L, "bob", "hash-b", 1L, 0L, 0L);
@@ -51,7 +51,7 @@ public class TestIdpUserMetaMapper extends IdpMapperTestBase {
     assertTrue(idpUserMetaMapper.selectIdpUsers(null).isEmpty());
   }
 
-  @Test
+  @TestTemplate
   void testUpdateIdpUserPassword() {
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
 
@@ -61,7 +61,7 @@ public class TestIdpUserMetaMapper extends IdpMapperTestBase {
     assertEquals(2L, idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
   }
 
-  @Test
+  @TestTemplate
   void testUpdateIdpUserPasswordReturnsZeroForVersionMismatch() {
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
 
@@ -71,7 +71,7 @@ public class TestIdpUserMetaMapper extends IdpMapperTestBase {
     assertEquals(0L, idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
   }
 
-  @Test
+  @TestTemplate
   void testSoftDeleteIdpUser() {
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
 
@@ -82,7 +82,7 @@ public class TestIdpUserMetaMapper extends IdpMapperTestBase {
     assertEquals(1L, queryLongValue("idp_user_meta", "last_version", "user_id", 1L));
   }
 
-  @Test
+  @TestTemplate
   void testDeleteIdpUserMetasByLegacyTimeline() {
     insertUser(1L, "legacy-user", "hash", 1L, 0L, 10L);
     insertUser(2L, "new-user", "hash", 1L, 0L, 30L);

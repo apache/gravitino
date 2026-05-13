@@ -29,8 +29,24 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.mybatis)
+  testImplementation(project(":api"))
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
+  testImplementation(project(":lance:lance-common")) {
+    exclude("*")
+  }
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
+  testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(libs.commons.io)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.postgresql)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
