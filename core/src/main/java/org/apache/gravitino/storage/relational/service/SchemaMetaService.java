@@ -177,6 +177,8 @@ public class SchemaMetaService {
       if (schemaName == null || !schemaName.contains(physicalSep)) {
         rowsToInsert.add(schemaEntity);
       } else {
+        // Segments of the storage-form name; e.g. [A, B, C] -> ancestor rows "A", "A"+sep+"B", then
+        // leaf.
         String[] parts = schemaName.split(Pattern.quote(physicalSep), -1);
         for (int nSeg = 1; nSeg < parts.length; nSeg++) {
           String ancestorPhysical = String.join(physicalSep, Arrays.copyOf(parts, nSeg));
