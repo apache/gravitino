@@ -93,14 +93,6 @@ import org.slf4j.LoggerFactory;
  * a database that supports the JDBC protocol as storage. If the specified database has special SQL
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
- *
- * <p>This class is storage-oriented: {@link NameIdentifier}s, {@link Namespace}s, and entity
- * payloads passed into meta services must already use the physical hierarchical encoding expected
- * by the relational layer (ASCII-1 schema segments where nested schemas are stored). API-level
- * logical naming is translated at the {@link RelationalEntityStore} boundary by {@link
- * HierarchicalSchemaRelationalBackend} (see {@link RelationalSchemaNamingBridge}). Types such as
- * Fileset, Topic, Model, and Model version are not subject to embedded-schema identifier
- * conversion.
  */
 public class JDBCBackend implements RelationalBackend {
 
@@ -161,11 +153,10 @@ public class JDBCBackend implements RelationalBackend {
       case JOB:
         return (List<E>) JobMetaService.getInstance().listJobsByNamespace(namespace);
       case TABLE_STATISTIC:
-        Namespace statisticNs = namespace;
         return (List<E>)
             StatisticMetaService.getInstance()
                 .listStatisticsByEntity(
-                    NameIdentifier.parse(statisticNs.toString()), Entity.EntityType.TABLE);
+                    NameIdentifier.parse(namespace.toString()), Entity.EntityType.TABLE);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -344,12 +335,7 @@ public class JDBCBackend implements RelationalBackend {
       case SCHEMA:
         return (List<E>) SchemaMetaService.getInstance().batchGetSchemaByIdentifier(identifiers);
       case TABLE:
-        List<NameIdentifier> tableStorageIdents =
-            identifiers.stream()
-                .map(id -> NameIdentifier.of(firstNamespace, id.name()))
-                .collect(Collectors.toList());
-        return (List<E>)
-            TableMetaService.getInstance().batchGetTableByIdentifier(tableStorageIdents);
+        return (List<E>) TableMetaService.getInstance().batchGetTableByIdentifier(identifiers);
       case FILESET:
         return (List<E>) FilesetMetaService.getInstance().batchGetFilesetByIdentifier(identifiers);
       case TOPIC:
@@ -366,8 +352,7 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>)
             JobTemplateMetaService.getInstance().batchGetJobTemplateByIdentifier(identifiers);
       case USER:
-        // No batch SQL yet; missing entities are silently omitted per batchGet contract.
-        // TODO: replace loops with true batch SQL operations for USER/GROUP/ROLE/VIEW.
+        // TODO: Add true batch SQL operations for users, roles, and views
         List<E> users = Lists.newArrayList();
         for (NameIdentifier identifier : identifiers) {
           try {
@@ -650,12 +635,10 @@ public class JDBCBackend implements RelationalBackend {
             1 == entities.stream().collect(Collectors.groupingBy(HasIdentifier::namespace)).size(),
             "All entities must be in the same namespace for batchPut operation.");
 
-        List<StatisticEntity> storageStatisticEntities = statisticEntities;
-        Namespace statisticNamespace = statisticEntities.get(0).namespace();
         StatisticMetaService.getInstance()
             .batchInsertStatisticPOsOnDuplicateKeyUpdate(
-                storageStatisticEntities,
-                NameIdentifier.parse(statisticNamespace.toString()),
+                statisticEntities,
+                NameIdentifier.parse(statisticEntities.get(0).namespace().toString()),
                 Entity.EntityType.TABLE);
         break;
       default:

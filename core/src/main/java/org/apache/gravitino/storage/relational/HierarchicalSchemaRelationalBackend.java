@@ -175,8 +175,7 @@ public class HierarchicalSchemaRelationalBackend extends JDBCBackend {
         re.type(),
         storageToLogical.get(re.source()),
         re.sourceType(),
-            RelationalSchemaNamingBridge.entityForApi(
-                (Entity & HasIdentifier) tgt, tgt.type()));
+        RelationalSchemaNamingBridge.entityForApi((Entity & HasIdentifier) tgt, tgt.type()));
   }
 
   @Override
