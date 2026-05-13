@@ -49,7 +49,6 @@ abstract class IdpMapperTestBase {
   protected JDBCBackend backend;
   protected SqlSession sharedSession;
   protected IdpUserMetaMapper idpUserMetaMapper;
-  protected static IdpGroupMetaMapper idpGroupMetaMapper;
   protected IdpGroupMetaMapper idpGroupMetaMapper;
 
   @BeforeEach
