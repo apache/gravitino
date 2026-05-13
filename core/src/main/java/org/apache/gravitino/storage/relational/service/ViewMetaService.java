@@ -54,7 +54,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
 /** The service class for view metadata. It provides the basic database operations for view. */
-public class ViewMetaService {
+public class ViewMetaService extends RequireSchemaConventionService<ViewPO> {
 
   private static final ViewMetaService INSTANCE = new ViewMetaService();
 
@@ -87,7 +87,7 @@ public class ViewMetaService {
       baseMetricName = "listViewsByNamespace")
   public List<ViewEntity> listViewsByNamespace(Namespace namespace) {
     NamespaceUtil.checkView(namespace);
-    List<ViewPO> viewPOs = listViewPOsByNamespace(namespace);
+    List<ViewPO> viewPOs = listViewPOs(namespace);
     return viewPOs.stream().map(po -> fromViewPO(po, namespace)).collect(Collectors.toList());
   }
 
@@ -95,8 +95,7 @@ public class ViewMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getViewByIdentifier")
   public ViewEntity getViewByIdentifier(NameIdentifier identifier) {
-    NameIdentifierUtil.checkView(identifier);
-    ViewPO viewPO = viewPOFetcher().apply(identifier);
+    ViewPO viewPO = getViewPOByIdentifier(identifier);
     return fromViewPO(viewPO, identifier.namespace());
   }
 
@@ -141,9 +140,7 @@ public class ViewMetaService {
       baseMetricName = "updateViewByIdentifier")
   public <E extends Entity & HasIdentifier> ViewEntity updateView(
       NameIdentifier ident, Function<E, E> updater) throws IOException {
-    NameIdentifierUtil.checkView(ident);
-
-    ViewPO oldViewPO = viewPOFetcher().apply(ident);
+    ViewPO oldViewPO = getViewPOByIdentifier(ident);
     ViewEntity oldViewEntity = fromViewPO(oldViewPO, ident.namespace());
     ViewEntity newEntity = (ViewEntity) updater.apply((E) oldViewEntity);
     Preconditions.checkArgument(
@@ -203,8 +200,7 @@ public class ViewMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteViewByIdentifier")
   public boolean deleteView(NameIdentifier ident) {
-    NameIdentifierUtil.checkView(ident);
-    ViewPO viewPO = viewPOFetcher().apply(ident);
+    ViewPO viewPO = getViewPOByIdentifier(ident);
     String metalakeName = ident.namespace().level(0);
     String catalogName = ident.namespace().level(1);
     String schemaName = ident.namespace().level(2);
@@ -287,20 +283,25 @@ public class ViewMetaService {
     return buildViewPO(newEntity, builder, newVersion.intValue());
   }
 
-  private List<ViewPO> listViewPOsByNamespace(Namespace namespace) {
+  private ViewPO getViewPOByIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkView(identifier);
+    return viewPOFetcher().apply(identifier);
+  }
+
+  private List<ViewPO> listViewPOs(Namespace namespace) {
     return viewListFetcher().apply(namespace);
   }
 
   private Function<Namespace, List<ViewPO>> viewListFetcher() {
     return GravitinoEnv.getInstance().cacheEnabled()
         ? this::listViewPOsBySchemaId
-        : this::listViewPOsByFullQualifiedName;
+        : this::listPOsForApiNamespace;
   }
 
   private Function<NameIdentifier, ViewPO> viewPOFetcher() {
     return GravitinoEnv.getInstance().cacheEnabled()
         ? this::getViewPOBySchemaId
-        : this::getViewPOByFullQualifiedName;
+        : this::getPOForApiIdentifier;
   }
 
   private List<ViewPO> listViewPOsBySchemaId(Namespace namespace) {
@@ -370,5 +371,15 @@ public class ViewMetaService {
     }
 
     return viewPO;
+  }
+
+  @Override
+  protected ViewPO fetchPOByStorageIdentifier(NameIdentifier storageIdentifier) {
+    return getViewPOByFullQualifiedName(storageIdentifier);
+  }
+
+  @Override
+  protected List<ViewPO> fetchPOsByStorageNamespace(Namespace storageNamespace) {
+    return listViewPOsByFullQualifiedName(storageNamespace);
   }
 }

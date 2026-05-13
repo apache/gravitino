@@ -55,7 +55,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FunctionMetaService {
+public class FunctionMetaService extends RequireSchemaConventionService<FunctionPO> {
   public static FunctionMetaService getInstance() {
     return INSTANCE;
   }
@@ -270,12 +270,6 @@ public class FunctionMetaService {
     }
   }
 
-  private Function<NameIdentifier, FunctionPO> functionPOFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::getFunctionPOBySchemaId
-        : this::getFunctionPOByFullQualifiedName;
-  }
-
   private FunctionPO getFunctionPOBySchemaId(NameIdentifier ident) {
     Long schemaId =
         EntityIdService.getEntityId(
@@ -332,12 +326,6 @@ public class FunctionMetaService {
         FunctionMetaMapper.class, mapper -> mapper.listFunctionPOsBySchemaId(schemaId));
   }
 
-  private Function<Namespace, List<FunctionPO>> functionListFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::listFunctionPOsBySchemaId
-        : this::listFunctionPOsByFullQualifiedName;
-  }
-
   private List<FunctionPO> listFunctionPOsByFullQualifiedName(Namespace namespace) {
     String[] namespaceLevels = namespace.levels();
     List<FunctionPO> functionPOs =
@@ -353,6 +341,28 @@ public class FunctionMetaService {
           namespaceLevels[2]);
     }
     return functionPOs.stream().filter(po -> po.functionId() != null).collect(Collectors.toList());
+  }
+
+  private Function<Namespace, List<FunctionPO>> functionListFetcher() {
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::listFunctionPOsBySchemaId
+        : this::listPOsForApiNamespace;
+  }
+
+  private Function<NameIdentifier, FunctionPO> functionPOFetcher() {
+    return GravitinoEnv.getInstance().cacheEnabled()
+        ? this::getFunctionPOBySchemaId
+        : this::getPOForApiIdentifier;
+  }
+
+  @Override
+  protected FunctionPO fetchPOByStorageIdentifier(NameIdentifier storageIdentifier) {
+    return getFunctionPOByFullQualifiedName(storageIdentifier);
+  }
+
+  @Override
+  protected List<FunctionPO> fetchPOsByStorageNamespace(Namespace storageNamespace) {
+    return listFunctionPOsByFullQualifiedName(storageNamespace);
   }
 
   private void fillFunctionPOBuilderParentEntityId(
