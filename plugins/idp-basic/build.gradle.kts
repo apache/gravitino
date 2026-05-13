@@ -32,6 +32,7 @@ dependencies {
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
+  testImplementation(project(":core"))
   testImplementation(project(":lance:lance-common")) {
     exclude("*")
   }
