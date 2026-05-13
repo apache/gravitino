@@ -183,7 +183,7 @@ public class BackendTestExtension
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "idGenerator", RandomIdGenerator.INSTANCE, true);
 
-      RelationalBackend backend = new JDBCBackend();
+      RelationalBackend backend = new HierarchicalSchemaRelationalBackend();
       if ("mysql".equals(type)) {
         String url = baseIT.startAndInitMySQLBackend();
         Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL)).thenReturn(url);
@@ -225,7 +225,7 @@ public class BackendTestExtension
   }
 
   // A simple Wrapper solves the H2 file cleanup issue.
-  public static class H2BackendWrapper extends JDBCBackend {
+  public static class H2BackendWrapper extends HierarchicalSchemaRelationalBackend {
     private final String path;
 
     public H2BackendWrapper(Config config, String path) {

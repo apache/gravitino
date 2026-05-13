@@ -169,12 +169,15 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
 
   private NamespacedEntityId getEntityIdsRequiringSchemaIds(
       NameIdentifier nameIdentifier, Entity.EntityType type) {
+    NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(nameIdentifier);
+    String storageSchemaName =
+        RelationalSchemaNamingBridge.schemaIdentifierForStorage(schemaIdent).name();
     SchemaIds schemaIds =
         SchemaMetaService.getInstance()
             .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
                 NameIdentifierUtil.getMetalake(nameIdentifier),
                 NameIdentifierUtil.getCatalogIdentifier(nameIdentifier).name(),
-                NameIdentifierUtil.getSchemaIdentifier(nameIdentifier).name());
+                storageSchemaName);
 
     switch (type) {
       case SCHEMA:

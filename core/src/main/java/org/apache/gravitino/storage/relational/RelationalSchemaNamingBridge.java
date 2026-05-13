@@ -29,6 +29,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations.Type;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.meta.AuditInfo;
@@ -125,8 +126,7 @@ public final class RelationalSchemaNamingBridge {
     if (objects == null || objects.isEmpty()) {
       return entity;
     }
-    List<SecurableObject> mapped =
-        objects.stream().map(mapper).collect(Collectors.toList());
+    List<SecurableObject> mapped = objects.stream().map(mapper).collect(Collectors.toList());
     if (mapped.equals(objects)) {
       return entity;
     }
@@ -149,34 +149,20 @@ public final class RelationalSchemaNamingBridge {
    * MODEL_VERSION) are returned unchanged.
    */
   public static GenericEntity genericEntityMetadataFullNameForApi(GenericEntity entity) {
-    String name = entity.name();
-    if (name == null || name.isEmpty()) {
-      return entity;
-    }
-    final MetadataObject.Type moType;
-    try {
-      moType = MetadataObject.Type.valueOf(entity.type().name());
-    } catch (IllegalArgumentException e) {
-      return entity;
-    }
-    NameIdentifier ident = NameIdentifier.parse(SENTINEL_METALAKE + "." + name);
-    NameIdentifier converted = nameIdentifierForApi(ident, MetadataObjectUtil.toEntityType(moType));
-    if (converted.equals(ident)) {
-      return entity;
-    }
+    NameIdentifier converted = nameIdentifierForStorage(entity.nameIdentifier(), entity.type());
     return GenericEntity.builder()
         .withId(entity.id())
         .withEntityType(entity.type())
-        .withName(identToMetadataObjectFullName(converted))
-        .withNamespace(entity.namespace())
+        .withName(converted.name())
+        .withNamespace(converted.namespace())
         .build();
   }
 
   /**
    * Converts the schema segment at namespace index 2 (the slot occupied by the schema name in the
-   * standard {@code [metalake, catalog, schema, ...]} layout) from logical to physical form. Callers
-   * must only pass namespaces that follow this layout; if the schema sits at a different index the
-   * conversion will silently apply to the wrong segment.
+   * standard {@code [metalake, catalog, schema, ...]} layout) from logical to physical form.
+   * Callers must only pass namespaces that follow this layout; if the schema sits at a different
+   * index the conversion will silently apply to the wrong segment.
    */
   public static Namespace embeddedNamespaceForStorage(Namespace ns) {
     if (ns.length() < 3) {
@@ -263,6 +249,25 @@ public final class RelationalSchemaNamingBridge {
     return SchemaEntity.builder()
         .withId(entity.id())
         .withName(logicalName)
+        .withNamespace(entity.namespace())
+        .withComment(entity.comment())
+        .withProperties(entity.properties())
+        .withAuditInfo(entity.auditInfo())
+        .build();
+  }
+
+  /**
+   * Converts a {@link SchemaEntity}'s {@link SchemaEntity#name()} from logical (API) form to the
+   * physical encoding used by relational meta services. Inverse of {@link #schemaEntityForApi}.
+   */
+  public static SchemaEntity schemaEntityForStorage(SchemaEntity entity) {
+    String physicalName = HierarchicalSchemaUtil.logicalToPhysical(entity.name(), separator());
+    if (physicalName.equals(entity.name())) {
+      return entity;
+    }
+    return SchemaEntity.builder()
+        .withId(entity.id())
+        .withName(physicalName)
         .withNamespace(entity.namespace())
         .withComment(entity.comment())
         .withProperties(entity.properties())
@@ -427,9 +432,6 @@ public final class RelationalSchemaNamingBridge {
   @SuppressWarnings("unchecked") // entityForApi/entityForStorage dispatch on known concrete types
   public static <E extends Entity & HasIdentifier> Function<E, E> wrapperUpdater(
       Entity.EntityType entityType, Function<E, E> updater) {
-    Preconditions.checkArgument(
-        entityType != Entity.EntityType.SCHEMA,
-        "Schema entity updates must go through SchemaMetaService directly, not wrapperUpdater");
     return e -> {
       E logicalOld = entityForApi(e, entityType);
       E logicalNew = updater.apply(logicalOld);
@@ -437,9 +439,23 @@ public final class RelationalSchemaNamingBridge {
     };
   }
 
-  @SuppressWarnings("unchecked") // each case casts to the statically known subtype for that EntityType
+  /**
+   * Converts storage-shaped entities to API naming. {@link RoleEntity} and {@link GenericEntity}
+   * (policy/tag relation list payloads) are normalized by concrete type before the {@code
+   * type}-based branch so callers may pass each element's {@link Entity.EntityType} (e.g. roles
+   * listed for a {@link Entity.EntityType#TABLE} metadata object still use {@code TABLE} while
+   * elements are roles).
+   */
+  @SuppressWarnings(
+      "unchecked") // each case casts to the statically known subtype for that EntityType
   public static <E extends Entity & HasIdentifier> E entityForApi(
       E entity, Entity.EntityType type) {
+    if (entity instanceof RoleEntity) {
+      return (E) roleEntityForApi((RoleEntity) entity);
+    }
+    if (entity instanceof GenericEntity) {
+      return (E) genericEntityMetadataFullNameForApi((GenericEntity) entity);
+    }
     switch (type) {
       case SCHEMA:
         return (E) schemaEntityForApi((SchemaEntity) entity);
@@ -459,7 +475,7 @@ public final class RelationalSchemaNamingBridge {
   @SuppressWarnings("unchecked") // instanceof guards ensure each cast is safe
   public static <E extends Entity & HasIdentifier> E entityForStorage(E entity) {
     if (entity instanceof SchemaEntity) {
-      return entity;
+      return (E) schemaEntityForStorage((SchemaEntity) entity);
     }
     if (entity instanceof TableEntity) {
       return (E) tableEntityForStorage((TableEntity) entity);
@@ -473,6 +489,27 @@ public final class RelationalSchemaNamingBridge {
     if (entity instanceof StatisticEntity) {
       return (E) statisticEntityForStorage((StatisticEntity) entity);
     }
+    if (entity instanceof RoleEntity) {
+      return (E) roleEntityForStorage((RoleEntity) entity);
+    }
     return entity;
+  }
+
+  /**
+   * JDBC policy/tag relation APIs: a destination {@link NameIdentifier} is normalized using the
+   * element type implied by {@code relType} when applicable (e.g. policy or tag name for
+   * association rows).
+   */
+  public static NameIdentifier relationDestIdentifiersForStorage(
+      Type relType, NameIdentifier ident) {
+    Entity.EntityType elementType;
+    if (relType == Type.POLICY_METADATA_OBJECT_REL) {
+      elementType = Entity.EntityType.POLICY;
+    } else if (relType == Type.TAG_METADATA_OBJECT_REL) {
+      elementType = Entity.EntityType.TAG;
+    } else {
+      return ident;
+    }
+    return nameIdentifierForStorage(ident, elementType);
   }
 }

@@ -20,7 +20,6 @@ package org.apache.gravitino.storage.relational;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.Lists;
 import java.time.Instant;
@@ -40,6 +39,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.RoleEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,7 +80,8 @@ public class TestRelationalSchemaNamingBridge {
   @Test
   public void securableObjectSchemaToApi() {
     SecurableObject obj =
-        SecurableObjects.parse("catalog.a" + P + "b" + P + "c", MetadataObject.Type.SCHEMA, USE_SCHEMA_PRIVS);
+        SecurableObjects.parse(
+            "catalog.a" + P + "b" + P + "c", MetadataObject.Type.SCHEMA, USE_SCHEMA_PRIVS);
     SecurableObject result = RelationalSchemaNamingBridge.securableObjectForApi(obj);
     assertEquals("catalog.a:b:c", result.fullName());
   }
@@ -88,7 +89,8 @@ public class TestRelationalSchemaNamingBridge {
   @Test
   public void securableObjectTableToStorage() {
     SecurableObject obj =
-        SecurableObjects.parse("catalog.a:b.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
+        SecurableObjects.parse(
+            "catalog.a:b.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
     SecurableObject result = RelationalSchemaNamingBridge.securableObjectForStorage(obj);
     assertEquals("catalog.a" + P + "b.mytable", result.fullName());
   }
@@ -96,7 +98,8 @@ public class TestRelationalSchemaNamingBridge {
   @Test
   public void securableObjectTableToApi() {
     SecurableObject obj =
-        SecurableObjects.parse("catalog.a" + P + "b.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
+        SecurableObjects.parse(
+            "catalog.a" + P + "b.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
     SecurableObject result = RelationalSchemaNamingBridge.securableObjectForApi(obj);
     assertEquals("catalog.a:b.mytable", result.fullName());
   }
@@ -111,7 +114,8 @@ public class TestRelationalSchemaNamingBridge {
   @Test
   public void securableObjectTableRoundTrip() {
     SecurableObject obj =
-        SecurableObjects.parse("catalog.a:b:c.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
+        SecurableObjects.parse(
+            "catalog.a:b:c.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
     SecurableObject stored = RelationalSchemaNamingBridge.securableObjectForStorage(obj);
     SecurableObject backToApi = RelationalSchemaNamingBridge.securableObjectForApi(stored);
     assertEquals(obj.fullName(), backToApi.fullName());
@@ -121,7 +125,8 @@ public class TestRelationalSchemaNamingBridge {
   public void customSeparatorSecurableObject() throws Exception {
     mockSeparator("/");
     SecurableObject obj =
-        SecurableObjects.parse("catalog.a/b.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
+        SecurableObjects.parse(
+            "catalog.a/b.mytable", MetadataObject.Type.TABLE, Lists.newArrayList());
     SecurableObject stored = RelationalSchemaNamingBridge.securableObjectForStorage(obj);
     assertEquals("catalog.a" + P + "b.mytable", stored.fullName());
     SecurableObject backToApi = RelationalSchemaNamingBridge.securableObjectForApi(stored);
@@ -187,14 +192,50 @@ public class TestRelationalSchemaNamingBridge {
   }
 
   // -------------------------------------------------------------------------
-  // wrapperUpdater – SCHEMA guard
+  // wrapperUpdater – SCHEMA
   // -------------------------------------------------------------------------
 
   @Test
-  public void wrapperUpdaterRejectsSchema() {
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> RelationalSchemaNamingBridge.wrapperUpdater(Entity.EntityType.SCHEMA, e -> e));
+  public void wrapperUpdaterSchemaRoundTrip() throws Exception {
+    mockSeparator(":");
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    SchemaEntity storageEntity =
+        SchemaEntity.builder()
+            .withId(1L)
+            .withName("a" + P + "b")
+            .withNamespace(Namespace.of("ml", "cat"))
+            .withComment("c0")
+            .withProperties(null)
+            .withAuditInfo(audit)
+            .build();
+
+    var wrapped =
+        RelationalSchemaNamingBridge.<SchemaEntity>wrapperUpdater(
+            Entity.EntityType.SCHEMA,
+            e ->
+                SchemaEntity.builder()
+                    .withId(e.id())
+                    .withName(e.name())
+                    .withNamespace(e.namespace())
+                    .withComment("c1")
+                    .withProperties(e.properties())
+                    .withAuditInfo(e.auditInfo())
+                    .build());
+
+    SchemaEntity out = wrapped.apply(storageEntity);
+    assertEquals("a" + P + "b", out.name());
+    assertEquals("c1", out.comment());
+
+    final String[] seenLogicalName = new String[1];
+    var wrappedPassThrough =
+        RelationalSchemaNamingBridge.<SchemaEntity>wrapperUpdater(
+            Entity.EntityType.SCHEMA,
+            e -> {
+              seenLogicalName[0] = e.name();
+              return e;
+            });
+    wrappedPassThrough.apply(storageEntity);
+    assertEquals("a:b", seenLogicalName[0]);
   }
 
   // -------------------------------------------------------------------------
@@ -324,8 +365,7 @@ public class TestRelationalSchemaNamingBridge {
   // -------------------------------------------------------------------------
 
   private static RoleEntity buildRole(List<SecurableObject> securableObjects) {
-    AuditInfo audit =
-        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
     return RoleEntity.builder()
         .withId(1L)
         .withName("role1")

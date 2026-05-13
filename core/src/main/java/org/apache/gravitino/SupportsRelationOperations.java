@@ -20,7 +20,6 @@ package org.apache.gravitino;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Objects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 
 /**
@@ -189,11 +188,6 @@ public interface SupportsRelationOperations {
       Entity.EntityType dstType,
       boolean override)
       throws IOException {
-    Objects.requireNonNull(relType, "relType must not be null");
-    Objects.requireNonNull(srcIdentifiers, "srcIdentifiers must not be null");
-    Objects.requireNonNull(srcType, "srcType must not be null");
-    Objects.requireNonNull(dstIdentifier, "dstIdentifier must not be null");
-    Objects.requireNonNull(dstType, "dstType must not be null");
     for (NameIdentifier srcIdent : srcIdentifiers) {
       insertRelation(relType, srcIdent, srcType, dstIdentifier, dstType, override);
     }

@@ -26,7 +26,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -95,13 +94,13 @@ import org.slf4j.LoggerFactory;
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  *
- * <p>Hierarchical schema names use the configured logical separator in {@link NameIdentifier}s and
- * {@link Namespace}s seen by callers; this layer translates schema segments to the internal
- * physical form ({@link org.apache.gravitino.catalog.HierarchicalSchemaUtil#physicalSeparator()})
- * before delegating to meta services for applicable entity types, and translates back on results
- * (except {@code insertSchema}, which still accepts logical {@link SchemaEntity} names for
- * nested-schema materialization). Fileset, Topic, Model, and Model version entities are not
- * transformed here.
+ * <p>This class is storage-oriented: {@link NameIdentifier}s, {@link Namespace}s, and entity
+ * payloads passed into meta services must already use the physical hierarchical encoding expected
+ * by the relational layer (ASCII-1 schema segments where nested schemas are stored). API-level
+ * logical naming is translated at the {@link RelationalEntityStore} boundary by {@link
+ * HierarchicalSchemaRelationalBackend} (see {@link RelationalSchemaNamingBridge}). Types such as
+ * Fileset, Topic, Model, and Model version are not subject to embedded-schema identifier
+ * conversion.
  */
 public class JDBCBackend implements RelationalBackend {
 
@@ -130,26 +129,11 @@ public class JDBCBackend implements RelationalBackend {
       case CATALOG:
         return (List<E>) CatalogMetaService.getInstance().listCatalogsByNamespace(namespace);
       case SCHEMA:
-        return (List<E>)
-            SchemaMetaService.getInstance().listSchemasByNamespace(namespace).stream()
-                .map(RelationalSchemaNamingBridge::schemaEntityForApi)
-                .collect(Collectors.toList());
+        return (List<E>) SchemaMetaService.getInstance().listSchemasByNamespace(namespace);
       case TABLE:
-        return (List<E>)
-            TableMetaService.getInstance()
-                .listTablesByNamespace(
-                    RelationalSchemaNamingBridge.embeddedNamespaceForStorage(namespace))
-                .stream()
-                .map(RelationalSchemaNamingBridge::tableEntityForApi)
-                .collect(Collectors.toList());
+        return (List<E>) TableMetaService.getInstance().listTablesByNamespace(namespace);
       case VIEW:
-        return (List<E>)
-            ViewMetaService.getInstance()
-                .listViewsByNamespace(
-                    RelationalSchemaNamingBridge.embeddedNamespaceForStorage(namespace))
-                .stream()
-                .map(RelationalSchemaNamingBridge::viewEntityForApi)
-                .collect(Collectors.toList());
+        return (List<E>) ViewMetaService.getInstance().listViewsByNamespace(namespace);
       case FILESET:
         return (List<E>) FilesetMetaService.getInstance().listFilesetsByNamespace(namespace);
       case TOPIC:
@@ -159,10 +143,7 @@ public class JDBCBackend implements RelationalBackend {
       case USER:
         return (List<E>) UserMetaService.getInstance().listUsersByNamespace(namespace, allFields);
       case ROLE:
-        return (List<E>)
-            RoleMetaService.getInstance().listRolesByNamespace(namespace).stream()
-                .map(RelationalSchemaNamingBridge::roleEntityForApi)
-                .collect(Collectors.toList());
+        return (List<E>) RoleMetaService.getInstance().listRolesByNamespace(namespace);
       case GROUP:
         return (List<E>) GroupMetaService.getInstance().listGroupsByNamespace(namespace, allFields);
       case MODEL:
@@ -171,13 +152,7 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>)
             ModelVersionMetaService.getInstance().listModelVersionsByNamespace(namespace);
       case FUNCTION:
-        return (List<E>)
-            FunctionMetaService.getInstance()
-                .listFunctionsByNamespace(
-                    RelationalSchemaNamingBridge.embeddedNamespaceForStorage(namespace))
-                .stream()
-                .map(RelationalSchemaNamingBridge::functionEntityForApi)
-                .collect(Collectors.toList());
+        return (List<E>) FunctionMetaService.getInstance().listFunctionsByNamespace(namespace);
       case POLICY:
         return (List<E>) PolicyMetaService.getInstance().listPoliciesByNamespace(namespace);
       case JOB_TEMPLATE:
@@ -186,14 +161,11 @@ public class JDBCBackend implements RelationalBackend {
       case JOB:
         return (List<E>) JobMetaService.getInstance().listJobsByNamespace(namespace);
       case TABLE_STATISTIC:
-        Namespace statisticNs = RelationalSchemaNamingBridge.embeddedNamespaceForStorage(namespace);
+        Namespace statisticNs = namespace;
         return (List<E>)
             StatisticMetaService.getInstance()
                 .listStatisticsByEntity(
-                    NameIdentifier.parse(statisticNs.toString()), Entity.EntityType.TABLE)
-                .stream()
-                .map(RelationalSchemaNamingBridge::statisticEntityForApi)
-                .collect(Collectors.toList());
+                    NameIdentifier.parse(statisticNs.toString()), Entity.EntityType.TABLE);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for list operation", entityType);
@@ -220,9 +192,7 @@ public class JDBCBackend implements RelationalBackend {
     } else if (e instanceof SchemaEntity) {
       SchemaMetaService.getInstance().insertSchema((SchemaEntity) e, overwritten);
     } else if (e instanceof TableEntity) {
-      TableMetaService.getInstance()
-          .insertTable(
-              RelationalSchemaNamingBridge.tableEntityForStorage((TableEntity) e), overwritten);
+      TableMetaService.getInstance().insertTable((TableEntity) e, overwritten);
     } else if (e instanceof FilesetEntity) {
       FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
     } else if (e instanceof TopicEntity) {
@@ -230,9 +200,7 @@ public class JDBCBackend implements RelationalBackend {
     } else if (e instanceof UserEntity) {
       UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
     } else if (e instanceof RoleEntity) {
-      RoleMetaService.getInstance()
-          .insertRole(
-              RelationalSchemaNamingBridge.roleEntityForStorage((RoleEntity) e), overwritten);
+      RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
     } else if (e instanceof GroupEntity) {
       GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
     } else if (e instanceof TagEntity) {
@@ -247,10 +215,7 @@ public class JDBCBackend implements RelationalBackend {
       }
       ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e);
     } else if (e instanceof FunctionEntity) {
-      FunctionMetaService.getInstance()
-          .insertFunction(
-              RelationalSchemaNamingBridge.functionEntityForStorage((FunctionEntity) e),
-              overwritten);
+      FunctionMetaService.getInstance().insertFunction((FunctionEntity) e, overwritten);
     } else if (e instanceof PolicyEntity) {
       PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
     } else if (e instanceof JobTemplateEntity) {
@@ -258,9 +223,7 @@ public class JDBCBackend implements RelationalBackend {
     } else if (e instanceof JobEntity) {
       JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
     } else if (e instanceof ViewEntity) {
-      ViewMetaService.getInstance()
-          .insertView(
-              RelationalSchemaNamingBridge.viewEntityForStorage((ViewEntity) e), overwritten);
+      ViewMetaService.getInstance().insertView((ViewEntity) e, overwritten);
     } else if (e instanceof GenericEntity) {
       GenericEntity genericEntity = (GenericEntity) e;
       throw new UnsupportedEntityTypeException(
@@ -281,19 +244,9 @@ public class JDBCBackend implements RelationalBackend {
       case CATALOG:
         return (E) CatalogMetaService.getInstance().updateCatalog(ident, updater);
       case SCHEMA:
-        return (E)
-            SchemaMetaService.getInstance()
-                .updateSchema(
-                    RelationalSchemaNamingBridge.schemaIdentifierForStorage(ident), updater);
+        return (E) SchemaMetaService.getInstance().updateSchema(ident, updater);
       case TABLE:
-        return (E)
-            RelationalSchemaNamingBridge.tableEntityForApi(
-                TableMetaService.getInstance()
-                    .updateTable(
-                        RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                            ident, Entity.EntityType.TABLE),
-                        RelationalSchemaNamingBridge.wrapperUpdater(
-                            Entity.EntityType.TABLE, updater)));
+        return (E) TableMetaService.getInstance().updateTable(ident, updater);
       case FILESET:
         return (E) FilesetMetaService.getInstance().updateFileset(ident, updater);
       case TOPIC:
@@ -311,27 +264,13 @@ public class JDBCBackend implements RelationalBackend {
       case MODEL_VERSION:
         return (E) ModelVersionMetaService.getInstance().updateModelVersion(ident, updater);
       case FUNCTION:
-        return (E)
-            RelationalSchemaNamingBridge.functionEntityForApi(
-                FunctionMetaService.getInstance()
-                    .updateFunction(
-                        RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                            ident, Entity.EntityType.FUNCTION),
-                        RelationalSchemaNamingBridge.wrapperUpdater(
-                            Entity.EntityType.FUNCTION, updater)));
+        return (E) FunctionMetaService.getInstance().updateFunction(ident, updater);
       case POLICY:
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       case JOB_TEMPLATE:
         return (E) JobTemplateMetaService.getInstance().updateJobTemplate(ident, updater);
       case VIEW:
-        return (E)
-            RelationalSchemaNamingBridge.viewEntityForApi(
-                ViewMetaService.getInstance()
-                    .updateView(
-                        RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                            ident, Entity.EntityType.VIEW),
-                        RelationalSchemaNamingBridge.wrapperUpdater(
-                            Entity.EntityType.VIEW, updater)));
+        return (E) ViewMetaService.getInstance().updateView(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
@@ -348,18 +287,9 @@ public class JDBCBackend implements RelationalBackend {
       case CATALOG:
         return (E) CatalogMetaService.getInstance().getCatalogByIdentifier(ident);
       case SCHEMA:
-        return (E)
-            RelationalSchemaNamingBridge.schemaEntityForApi(
-                SchemaMetaService.getInstance()
-                    .getSchemaByIdentifier(
-                        RelationalSchemaNamingBridge.schemaIdentifierForStorage(ident)));
+        return (E) SchemaMetaService.getInstance().getSchemaByIdentifier(ident);
       case TABLE:
-        return (E)
-            RelationalSchemaNamingBridge.tableEntityForApi(
-                TableMetaService.getInstance()
-                    .getTableByIdentifier(
-                        RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                            ident, Entity.EntityType.TABLE)));
+        return (E) TableMetaService.getInstance().getTableByIdentifier(ident);
       case FILESET:
         return (E) FilesetMetaService.getInstance().getFilesetByIdentifier(ident);
       case TOPIC:
@@ -369,9 +299,7 @@ public class JDBCBackend implements RelationalBackend {
       case GROUP:
         return (E) GroupMetaService.getInstance().getGroupByIdentifier(ident);
       case ROLE:
-        return (E)
-            RelationalSchemaNamingBridge.roleEntityForApi(
-                RoleMetaService.getInstance().getRoleByIdentifier(ident));
+        return (E) RoleMetaService.getInstance().getRoleByIdentifier(ident);
       case TAG:
         return (E) TagMetaService.getInstance().getTagByIdentifier(ident);
       case MODEL:
@@ -379,12 +307,7 @@ public class JDBCBackend implements RelationalBackend {
       case MODEL_VERSION:
         return (E) ModelVersionMetaService.getInstance().getModelVersionByIdentifier(ident);
       case FUNCTION:
-        return (E)
-            RelationalSchemaNamingBridge.functionEntityForApi(
-                FunctionMetaService.getInstance()
-                    .getFunctionByIdentifier(
-                        RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                            ident, Entity.EntityType.FUNCTION)));
+        return (E) FunctionMetaService.getInstance().getFunctionByIdentifier(ident);
       case POLICY:
         return (E) PolicyMetaService.getInstance().getPolicyByIdentifier(ident);
       case JOB_TEMPLATE:
@@ -392,12 +315,7 @@ public class JDBCBackend implements RelationalBackend {
       case JOB:
         return (E) JobMetaService.getInstance().getJobByIdentifier(ident);
       case VIEW:
-        return (E)
-            RelationalSchemaNamingBridge.viewEntityForApi(
-                ViewMetaService.getInstance()
-                    .getViewByIdentifier(
-                        RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                            ident, Entity.EntityType.VIEW)));
+        return (E) ViewMetaService.getInstance().getViewByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -424,25 +342,14 @@ public class JDBCBackend implements RelationalBackend {
       case CATALOG:
         return (List<E>) CatalogMetaService.getInstance().batchGetCatalogByIdentifier(identifiers);
       case SCHEMA:
-        List<NameIdentifier> schemaStorageIdents =
-            identifiers.stream()
-                .map(RelationalSchemaNamingBridge::schemaIdentifierForStorage)
-                .collect(Collectors.toList());
-        return (List<E>)
-            SchemaMetaService.getInstance().batchGetSchemaByIdentifier(schemaStorageIdents).stream()
-                .map(RelationalSchemaNamingBridge::schemaEntityForApi)
-                .collect(Collectors.toList());
+        return (List<E>) SchemaMetaService.getInstance().batchGetSchemaByIdentifier(identifiers);
       case TABLE:
-        Namespace tableStorageNs =
-            RelationalSchemaNamingBridge.embeddedNamespaceForStorage(firstNamespace);
         List<NameIdentifier> tableStorageIdents =
             identifiers.stream()
-                .map(id -> NameIdentifier.of(tableStorageNs, id.name()))
+                .map(id -> NameIdentifier.of(firstNamespace, id.name()))
                 .collect(Collectors.toList());
         return (List<E>)
-            TableMetaService.getInstance().batchGetTableByIdentifier(tableStorageIdents).stream()
-                .map(RelationalSchemaNamingBridge::tableEntityForApi)
-                .collect(Collectors.toList());
+            TableMetaService.getInstance().batchGetTableByIdentifier(tableStorageIdents);
       case FILESET:
         return (List<E>) FilesetMetaService.getInstance().batchGetFilesetByIdentifier(identifiers);
       case TOPIC:
@@ -476,10 +383,7 @@ public class JDBCBackend implements RelationalBackend {
         List<E> roles = Lists.newArrayList();
         for (NameIdentifier identifier : identifiers) {
           try {
-            roles.add(
-                (E)
-                    RelationalSchemaNamingBridge.roleEntityForApi(
-                        RoleMetaService.getInstance().getRoleByIdentifier(identifier)));
+            roles.add((E) RoleMetaService.getInstance().getRoleByIdentifier(identifier));
           } catch (NoSuchEntityException e) {
             LOG.debug("Skipping missing role during batch get: {}", identifier.name());
           }
@@ -489,13 +393,7 @@ public class JDBCBackend implements RelationalBackend {
         List<E> views = Lists.newArrayList();
         for (NameIdentifier identifier : identifiers) {
           try {
-            views.add(
-                (E)
-                    RelationalSchemaNamingBridge.viewEntityForApi(
-                        ViewMetaService.getInstance()
-                            .getViewByIdentifier(
-                                RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                                    identifier, Entity.EntityType.VIEW))));
+            views.add((E) ViewMetaService.getInstance().getViewByIdentifier(identifier));
           } catch (NoSuchEntityException e) {
             LOG.debug("Skipping missing view during batch get: {}", identifier.name());
           }
@@ -516,13 +414,9 @@ public class JDBCBackend implements RelationalBackend {
       case CATALOG:
         return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
       case SCHEMA:
-        return SchemaMetaService.getInstance()
-            .deleteSchema(RelationalSchemaNamingBridge.schemaIdentifierForStorage(ident), cascade);
+        return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
       case TABLE:
-        return TableMetaService.getInstance()
-            .deleteTable(
-                RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                    ident, Entity.EntityType.TABLE));
+        return TableMetaService.getInstance().deleteTable(ident);
       case FILESET:
         return FilesetMetaService.getInstance().deleteFileset(ident);
       case TOPIC:
@@ -540,10 +434,7 @@ public class JDBCBackend implements RelationalBackend {
       case MODEL_VERSION:
         return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
       case FUNCTION:
-        return FunctionMetaService.getInstance()
-            .deleteFunction(
-                RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                    ident, Entity.EntityType.FUNCTION));
+        return FunctionMetaService.getInstance().deleteFunction(ident);
       case POLICY:
         return PolicyMetaService.getInstance().deletePolicy(ident);
       case JOB_TEMPLATE:
@@ -551,10 +442,7 @@ public class JDBCBackend implements RelationalBackend {
       case JOB:
         return JobMetaService.getInstance().deleteJob(ident);
       case VIEW:
-        return ViewMetaService.getInstance()
-            .deleteView(
-                RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                    ident, Entity.EntityType.VIEW));
+        return ViewMetaService.getInstance().deleteView(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
@@ -729,9 +617,7 @@ public class JDBCBackend implements RelationalBackend {
             1 == namespaceSize,
             "All entities must be in the same namespace for batch delete operation.");
 
-        Namespace namespace =
-            RelationalSchemaNamingBridge.embeddedNamespaceForStorage(
-                deleteIdents.get(0).namespace());
+        Namespace namespace = deleteIdents.get(0).namespace();
         return StatisticMetaService.getInstance()
             .batchDeleteStatisticPOs(
                 NameIdentifier.parse(namespace.toString()),
@@ -764,13 +650,8 @@ public class JDBCBackend implements RelationalBackend {
             1 == entities.stream().collect(Collectors.groupingBy(HasIdentifier::namespace)).size(),
             "All entities must be in the same namespace for batchPut operation.");
 
-        List<StatisticEntity> storageStatisticEntities =
-            statisticEntities.stream()
-                .map(RelationalSchemaNamingBridge::statisticEntityForStorage)
-                .collect(Collectors.toList());
-        Namespace statisticNamespace =
-            RelationalSchemaNamingBridge.embeddedNamespaceForStorage(
-                statisticEntities.get(0).namespace());
+        List<StatisticEntity> storageStatisticEntities = statisticEntities;
+        Namespace statisticNamespace = statisticEntities.get(0).namespace();
         StatisticMetaService.getInstance()
             .batchInsertStatisticPOsOnDuplicateKeyUpdate(
                 storageStatisticEntities,
@@ -791,22 +672,13 @@ public class JDBCBackend implements RelationalBackend {
       case OWNER_REL:
         List<E> list = Lists.newArrayList();
         OwnerMetaService.getInstance()
-            .getOwner(
-                RelationalSchemaNamingBridge.nameIdentifierForStorage(nameIdentifier, identType),
-                identType)
+            .getOwner(nameIdentifier, identType)
             .ifPresent(e -> list.add((E) e));
         return list;
       case METADATA_OBJECT_ROLE_REL:
         return (List<E>)
             RoleMetaService.getInstance()
-                .listRolesByMetadataObject(
-                    RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                        nameIdentifier, identType),
-                    identType,
-                    allFields)
-                .stream()
-                .map(RelationalSchemaNamingBridge::roleEntityForApi)
-                .collect(Collectors.toList());
+                .listRolesByMetadataObject(nameIdentifier, identType, allFields);
       case ROLE_GROUP_REL:
         if (identType == Entity.EntityType.ROLE) {
           return (List<E>) GroupMetaService.getInstance().listGroupsByRoleIdent(nameIdentifier);
@@ -818,10 +690,7 @@ public class JDBCBackend implements RelationalBackend {
         if (identType == Entity.EntityType.ROLE) {
           return (List<E>) UserMetaService.getInstance().listUsersByRoleIdent(nameIdentifier);
         } else if (identType == Entity.EntityType.USER) {
-          return (List<E>)
-              RoleMetaService.getInstance().listRolesByUserIdent(nameIdentifier).stream()
-                  .map(RelationalSchemaNamingBridge::roleEntityForApi)
-                  .collect(Collectors.toList());
+          return (List<E>) RoleMetaService.getInstance().listRolesByUserIdent(nameIdentifier);
         } else {
           throw new IllegalArgumentException(
               String.format("ROLE_USER_REL doesn't support type %s", identType.name()));
@@ -830,35 +699,20 @@ public class JDBCBackend implements RelationalBackend {
       case POLICY_METADATA_OBJECT_REL:
         if (identType == Entity.EntityType.POLICY) {
           return (List<E>)
-              PolicyMetaService.getInstance()
-                  .listAssociatedEntitiesForPolicy(nameIdentifier)
-                  .stream()
-                  .map(RelationalSchemaNamingBridge::genericEntityMetadataFullNameForApi)
-                  .collect(Collectors.toList());
+              PolicyMetaService.getInstance().listAssociatedEntitiesForPolicy(nameIdentifier);
         } else {
           return (List<E>)
               PolicyMetaService.getInstance()
-                  .listPoliciesForMetadataObject(
-                      RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                          nameIdentifier, identType),
-                      identType);
+                  .listPoliciesForMetadataObject(nameIdentifier, identType);
         }
 
       case TAG_METADATA_OBJECT_REL:
         if (identType == Entity.EntityType.TAG) {
           return (List<E>)
-              TagMetaService.getInstance()
-                  .listAssociatedMetadataObjectsForTag(nameIdentifier)
-                  .stream()
-                  .map(RelationalSchemaNamingBridge::genericEntityMetadataFullNameForApi)
-                  .collect(Collectors.toList());
+              TagMetaService.getInstance().listAssociatedMetadataObjectsForTag(nameIdentifier);
         } else {
           return (List<E>)
-              TagMetaService.getInstance()
-                  .listTagsForMetadataObject(
-                      RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                          nameIdentifier, identType),
-                      identType);
+              TagMetaService.getInstance().listTagsForMetadataObject(nameIdentifier, identType);
         }
       default:
         throw new IllegalArgumentException(
@@ -872,11 +726,7 @@ public class JDBCBackend implements RelationalBackend {
       throws IOException {
     switch (relType) {
       case OWNER_REL:
-        List<NameIdentifier> ownerRelStorageIdents =
-            nameIdentifiers.stream()
-                .map(id -> RelationalSchemaNamingBridge.nameIdentifierForStorage(id, identType))
-                .collect(Collectors.toList());
-        return OwnerMetaService.getInstance().batchGetOwner(ownerRelStorageIdents, identType);
+        return OwnerMetaService.getInstance().batchGetOwner(nameIdentifiers, identType);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -893,12 +743,7 @@ public class JDBCBackend implements RelationalBackend {
       boolean override) {
     switch (relType) {
       case OWNER_REL:
-        OwnerMetaService.getInstance()
-            .setOwner(
-                RelationalSchemaNamingBridge.nameIdentifierForStorage(srcIdentifier, srcType),
-                srcType,
-                RelationalSchemaNamingBridge.nameIdentifierForStorage(dstIdentifier, dstType),
-                dstType);
+        OwnerMetaService.getInstance().setOwner(srcIdentifier, srcType, dstIdentifier, dstType);
         break;
       default:
         throw new IllegalArgumentException(
@@ -924,16 +769,8 @@ public class JDBCBackend implements RelationalBackend {
     Objects.requireNonNull(dstType, "dstType must not be null");
     switch (relType) {
       case OWNER_REL:
-        List<NameIdentifier> srcStorage =
-            srcIdentifiers.stream()
-                .map(id -> RelationalSchemaNamingBridge.nameIdentifierForStorage(id, srcType))
-                .collect(Collectors.toList());
         OwnerMetaService.getInstance()
-            .batchSetOwners(
-                srcStorage,
-                srcType,
-                RelationalSchemaNamingBridge.nameIdentifierForStorage(dstIdentifier, dstType),
-                dstType);
+            .batchSetOwners(srcIdentifiers, srcType, dstIdentifier, dstType);
         break;
       default:
         throw new IllegalArgumentException(
@@ -954,20 +791,12 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>)
             PolicyMetaService.getInstance()
                 .associatePoliciesWithMetadataObject(
-                    RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                        srcEntityIdent, srcEntityType),
-                    srcEntityType,
-                    storageIdents(destEntitiesToAdd, Entity.EntityType.POLICY),
-                    storageIdents(destEntitiesToRemove, Entity.EntityType.POLICY));
+                    srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
       case TAG_METADATA_OBJECT_REL:
         return (List<E>)
             TagMetaService.getInstance()
                 .associateTagsWithMetadataObject(
-                    RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                        srcEntityIdent, srcEntityType),
-                    srcEntityType,
-                    storageIdents(destEntitiesToAdd, Entity.EntityType.TAG),
-                    storageIdents(destEntitiesToRemove, Entity.EntityType.TAG));
+                    srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -985,33 +814,15 @@ public class JDBCBackend implements RelationalBackend {
       case POLICY_METADATA_OBJECT_REL:
         return (E)
             PolicyMetaService.getInstance()
-                .getPolicyForMetadataObject(
-                    RelationalSchemaNamingBridge.nameIdentifierForStorage(srcIdentifier, srcType),
-                    srcType,
-                    RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                        destEntityIdent, Entity.EntityType.POLICY));
+                .getPolicyForMetadataObject(srcIdentifier, srcType, destEntityIdent);
       case TAG_METADATA_OBJECT_REL:
         return (E)
             TagMetaService.getInstance()
-                .getTagForMetadataObject(
-                    RelationalSchemaNamingBridge.nameIdentifierForStorage(srcIdentifier, srcType),
-                    srcType,
-                    RelationalSchemaNamingBridge.nameIdentifierForStorage(
-                        destEntityIdent, Entity.EntityType.TAG));
+                .getTagForMetadataObject(srcIdentifier, srcType, destEntityIdent);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
     }
-  }
-
-  private static NameIdentifier[] storageIdents(
-      NameIdentifier[] idents, Entity.EntityType entityType) {
-    if (idents == null) {
-      return null;
-    }
-    return Arrays.stream(idents)
-        .map(id -> RelationalSchemaNamingBridge.nameIdentifierForStorage(id, entityType))
-        .toArray(NameIdentifier[]::new);
   }
 
   public enum JDBCBackendType {
