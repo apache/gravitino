@@ -33,9 +33,6 @@ dependencies {
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
-  testImplementation(project(":lance:lance-common")) {
-    exclude("*")
-  }
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(libs.awaitility)
