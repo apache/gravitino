@@ -27,15 +27,6 @@ cp "$trino_conf_dir/config/log4j2.properties" /etc/trino/log4j2.properties
 cp "$trino_conf_dir/config/node.properties" /etc/trino/node.properties
 cp "$trino_conf_dir/config/catalog/gravitino.properties" /etc/trino/catalog/gravitino.properties
 
-# Configure the native Lakehouse connector for AWS Glue (if credentials are available)
-if [[ -n "${AWS_ACCESS_KEY_ID}" && -n "${AWS_SECRET_ACCESS_KEY}" ]]; then
-  cp "$trino_conf_dir/config/catalog/lakehouse-glue.properties" /etc/trino/catalog/lakehouse-glue.properties
-  sed -i "s|AWS_DEFAULT_REGION|${AWS_DEFAULT_REGION:-ap-northeast-1}|g" /etc/trino/catalog/lakehouse-glue.properties
-  sed -i "s|AWS_GLUE_CATALOG_ID|${AWS_GLUE_CATALOG_ID:-}|g" /etc/trino/catalog/lakehouse-glue.properties
-  sed -i "s|AWS_ACCESS_KEY_ID|${AWS_ACCESS_KEY_ID}|g" /etc/trino/catalog/lakehouse-glue.properties
-  sed -i "s|AWS_SECRET_ACCESS_KEY|${AWS_SECRET_ACCESS_KEY}|g" /etc/trino/catalog/lakehouse-glue.properties
-fi
-
 # Copy the MYSQL driver to iceberg connector
 cp /usr/lib/trino/plugin/mysql/*mysql-connector-j-*.jar /usr/lib/trino/plugin/iceberg/
 
