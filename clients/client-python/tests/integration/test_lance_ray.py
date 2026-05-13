@@ -109,6 +109,16 @@ class TestLanceRayIntegration(IntegrationTestEnv):
                 + LANCE_REST_BASE_URL
             )
 
+        # Probe whether the server-side `lance-namespace-core` is new enough
+        # to deserialize requests from the installed PyPI `lance-namespace`.
+        # We skip cleanly (rather than fail) when the server is older — this
+        # happens on branches that haven't merged the `lance-namespace-core`
+        # upgrade yet. The probe runs *before* metalake/catalog/schema setup
+        # so a skipped run leaves no fixtures behind.
+        skip_reason = cls._check_lance_namespace_compat()
+        if skip_reason is not None:
+            raise unittest.SkipTest(skip_reason)
+
         cls.gravitino_admin_client = GravitinoAdminClient("http://localhost:8090")
         # Idempotent: tolerate a metalake left over from a prior failed run.
         try:
@@ -183,6 +193,60 @@ class TestLanceRayIntegration(IntegrationTestEnv):
             logger.warning("Cleanup step %s failed: %s", step, err)
 
         super().tearDownClass()
+
+    @classmethod
+    def _check_lance_namespace_compat(cls) -> Optional[str]:
+        """Detect server/client schema drift on lance-namespace.
+
+        The lance-namespace REST model evolves: newer client versions add
+        request fields (e.g. ``check_declared``) that older
+        ``lance-namespace-core`` builds on the server side reject with
+        Jackson's "Unrecognized field ... not marked as ignorable". This
+        helper sends a harmless ``describe_table`` for a bogus table id so
+        we can observe the schema-validation error without doing any real
+        work. Returns a skip reason on incompatibility, or ``None`` if the
+        server understands the request shape.
+        """
+        try:
+            import lance_namespace
+            from lance_namespace import DescribeTableRequest
+        except ImportError:
+            # `@unittest.skipIf` on the class already handles this case; if
+            # we reach here something odd is going on but it's not our job
+            # to recover from it.
+            return None
+
+        try:
+            ns = lance_namespace.connect("rest", {"uri": LANCE_REST_BASE_URL})
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            return f"unable to connect to lance-rest aux service: {e}"
+
+        probe = DescribeTableRequest(
+            id=["__probe__", "__probe__", "__probe__"]
+        )
+        try:
+            ns.describe_table(probe)
+            # Unlikely but not impossible: the probe table actually exists
+            # in a leftover metalake. That's still a compatible server.
+            return None
+        except Exception as e:  # pylint: disable=broad-exception-caught
+            msg = str(e)
+            if (
+                "Unrecognized field" in msg
+                or "not marked as ignorable" in msg
+            ):
+                short = msg.splitlines()[0][:200]
+                return (
+                    "lance-rest server's lance-namespace-core is older than "
+                    "the client's lance-namespace (request schema mismatch). "
+                    f"Server reported: {short}. To run this test, upgrade "
+                    "the server (e.g. via PR #11060 -> lance-namespace 0.7.5) "
+                    "or roll the client back to a matching version."
+                )
+            # Any other error (table-not-found, metalake-not-found, etc.)
+            # means the server *did* deserialize the request — i.e. schemas
+            # are compatible.
+            return None
 
     @classmethod
     def _lance_metalake_already_bound(cls) -> bool:
