@@ -208,8 +208,11 @@ class TestLanceRayIntegration(IntegrationTestEnv):
         server understands the request shape.
         """
         try:
+            # pylint: disable=import-outside-toplevel
             import lance_namespace
             from lance_namespace import DescribeTableRequest
+
+            # pylint: enable=import-outside-toplevel
         except ImportError:
             # `@unittest.skipIf` on the class already handles this case; if
             # we reach here something odd is going on but it's not our job
@@ -221,9 +224,7 @@ class TestLanceRayIntegration(IntegrationTestEnv):
         except Exception as e:  # pylint: disable=broad-exception-caught
             return f"unable to connect to lance-rest aux service: {e}"
 
-        probe = DescribeTableRequest(
-            id=["__probe__", "__probe__", "__probe__"]
-        )
+        probe = DescribeTableRequest(id=["__probe__", "__probe__", "__probe__"])
         try:
             ns.describe_table(probe)
             # Unlikely but not impossible: the probe table actually exists
@@ -231,10 +232,7 @@ class TestLanceRayIntegration(IntegrationTestEnv):
             return None
         except Exception as e:  # pylint: disable=broad-exception-caught
             msg = str(e)
-            if (
-                "Unrecognized field" in msg
-                or "not marked as ignorable" in msg
-            ):
+            if "Unrecognized field" in msg or "not marked as ignorable" in msg:
                 short = msg.splitlines()[0][:200]
                 return (
                     "lance-rest server's lance-namespace-core is older than "
