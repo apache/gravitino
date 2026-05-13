@@ -52,6 +52,16 @@ public class TestIdpUserMetaMapper extends IdpMapperTestBase {
   }
 
   @TestTemplate
+  void testSelectIdpUsersIgnoresDeletedUsers() {
+    IdpUserPO activeUser = insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
+    insertUser(2L, "bob", "hash-b", 1L, 0L, 10L);
+
+    assertIterableEquals(
+        List.of(activeUser), idpUserMetaMapper.selectIdpUsers(List.of("alice", "bob")));
+    assertNull(idpUserMetaMapper.selectIdpUser("bob"));
+  }
+
+  @TestTemplate
   void testUpdateIdpUserPassword() {
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
 
@@ -69,6 +79,16 @@ public class TestIdpUserMetaMapper extends IdpMapperTestBase {
     assertEquals("hash-a", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
     assertEquals(1L, idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
     assertEquals(0L, idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
+  }
+
+  @TestTemplate
+  void testUpdateIdpUserPasswordReturnsZeroForDeletedUser() {
+    insertUser(1L, "alice", "hash-a", 1L, 0L, 10L);
+
+    assertEquals(0, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2", 1L, 2L, 2L));
+    assertEquals(1L, queryLongValue("idp_user_meta", "current_version", "user_id", 1L));
+    assertEquals(0L, queryLongValue("idp_user_meta", "last_version", "user_id", 1L));
+    assertEquals(10L, queryLongValue("idp_user_meta", "deleted_at", "user_id", 1L));
   }
 
   @TestTemplate
