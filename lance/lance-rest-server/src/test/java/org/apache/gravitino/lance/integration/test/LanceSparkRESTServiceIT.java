@@ -65,10 +65,6 @@ public class LanceSparkRESTServiceIT extends BaseIT {
       "gravitino.lance.spark.bundle.jar";
   private static final String JAVA_MODULE_OPEN_OPTIONS =
       "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED";
-  private static final String MINIO_ENDPOINT = "http://127.0.0.1:9000";
-  private static final String MINIO_REGION = "us-east-1";
-  private static final String MINIO_ACCESS_KEY = "minioadmin";
-  private static final String MINIO_SECRET_KEY = "minioadmin";
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_spark_catalog");
   private static final String TABLE_COLUMNS = "(id INT, score FLOAT)";
   private static final String LANCE_CLASS_PREFIX = "org.lance.";
@@ -360,22 +356,12 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) {
-    Map<String, String> catalogProperties =
-        ImmutableMap.<String, String>builder()
-            .put(Catalog.PROPERTY_LOCATION, tempDir.toString())
-            .put("lance.storage.endpoint", MINIO_ENDPOINT)
-            .put("lance.storage.allow_http", "true")
-            .put("lance.storage.access_key_id", MINIO_ACCESS_KEY)
-            .put("lance.storage.secret_access_key", MINIO_SECRET_KEY)
-            .put("lance.storage.region", MINIO_REGION)
-            .build();
-
     return metalake.createCatalog(
         catalogName,
         Catalog.Type.RELATIONAL,
         "lakehouse-generic",
         "catalog for lance spark rest service tests",
-        catalogProperties);
+        ImmutableMap.of(Catalog.PROPERTY_LOCATION, tempDir.toString()));
   }
 
   private SparkSession createSparkSession() {

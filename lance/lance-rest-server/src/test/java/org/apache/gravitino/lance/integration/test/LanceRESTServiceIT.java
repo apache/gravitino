@@ -430,7 +430,7 @@ public class LanceRESTServiceIT extends BaseIT {
 
   @Test
   void testCreateEmptyTable() throws ApiException {
-    catalog = createCatalog(CATALOG_NAME);
+    catalog = createCatalogWithLocation(CATALOG_NAME, tempDir.toString());
     createSchema();
 
     CreateEmptyTableRequest request = new CreateEmptyTableRequest();
@@ -1073,16 +1073,23 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) {
-    Map<String, String> catalogProperties =
+    return createCatalogWithLocation(catalogName, null);
+  }
+
+  private Catalog createCatalogWithLocation(String catalogName, String location) {
+    ImmutableMap.Builder<String, String> catalogPropertiesBuilder =
         ImmutableMap.<String, String>builder()
             .putAll(properties)
-            .put(Catalog.PROPERTY_LOCATION, tempDir.toString())
             .put("lance.storage.endpoint", MINIO_ENDPOINT)
             .put("lance.storage.allow_http", "true")
             .put("lance.storage.access_key_id", MINIO_ACCESS_KEY)
             .put("lance.storage.secret_access_key", MINIO_SECRET_KEY)
-            .put("lance.storage.region", MINIO_REGION)
-            .build();
+            .put("lance.storage.region", MINIO_REGION);
+    if (location != null) {
+      catalogPropertiesBuilder.put(Catalog.PROPERTY_LOCATION, location);
+    }
+
+    Map<String, String> catalogProperties = catalogPropertiesBuilder.build();
 
     return metalake.createCatalog(
         catalogName,
