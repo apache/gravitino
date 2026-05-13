@@ -131,6 +131,36 @@ public class TestJdbcCatalogCredential {
   }
 
   @Test
+  void testJdbcCatalogNoCredentialProvidersWithNeitherUserNorPassword() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test JDBC catalog with neither user nor password
+    Map<String, String> jdbcProps = Maps.newHashMap();
+    jdbcProps.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    jdbcProps.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+
+    CatalogEntity jdbcEntity =
+        CatalogEntity.builder()
+            .withId(4L)
+            .withName("jdbc-catalog-no-creds")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(TestableJdbcCatalog.Type.RELATIONAL)
+            .withProvider("jdbc-mysql")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcProps)
+            .build();
+
+    TestableJdbcCatalog jdbcCatalog = new TestableJdbcCatalog();
+    jdbcCatalog.withCatalogConf(jdbcProps).withCatalogEntity(jdbcEntity);
+    Map<String, String> properties = jdbcCatalog.propertiesWithCredentialProviders();
+
+    // Should not have credential providers
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNull(credentialProviders);
+  }
+
+  @Test
   void testJdbcCatalogExplicitCredentialProvidersNotOverridden() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
