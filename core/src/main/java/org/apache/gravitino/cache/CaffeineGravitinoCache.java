@@ -77,6 +77,8 @@ public class CaffeineGravitinoCache<K, V> implements GravitinoCache<K, V> {
 
   @Override
   public void invalidateByPrefix(String prefix) {
+    // Prefix invalidation scans all keys. It is intended for infrequent structural invalidations
+    // such as dropping or renaming an entity hierarchy, not for per-request hot paths.
     cache.asMap().keySet().removeIf(k -> k instanceof String && ((String) k).startsWith(prefix));
   }
 

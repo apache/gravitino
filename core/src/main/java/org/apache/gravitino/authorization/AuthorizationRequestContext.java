@@ -21,7 +21,6 @@ package org.apache.gravitino.authorization;
 
 import java.security.Principal;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -180,8 +179,8 @@ public class AuthorizationRequestContext {
 
   /**
    * Composite key for {@link #allowAuthorizerCache} / {@link #denyAuthorizerCache}. Immutable —
-   * mutating any field after construction would silently corrupt the {@link Objects#hashCode} used
-   * by the backing {@link ConcurrentHashMap}.
+   * mutating any field after construction would silently corrupt the {@link
+   * java.util.Objects#hashCode} used by the backing {@link ConcurrentHashMap}.
    */
   @Getter
   @AllArgsConstructor
