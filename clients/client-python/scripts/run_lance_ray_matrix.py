@@ -212,7 +212,9 @@ def run_unittest(venv_python: Path, gravitino_home: Path) -> int:
         "tests.integration.test_lance_ray",
     ]
     print(f"[matrix] $ PYTHONPATH=... GRAVITINO_HOME=... {' '.join(cmd)}")
-    return subprocess.run(cmd, cwd=str(PYTHON_CLIENT_DIR), env=env).returncode
+    return subprocess.run(
+        cmd, cwd=str(PYTHON_CLIENT_DIR), env=env, check=False
+    ).returncode
 
 
 def main() -> int:
@@ -259,9 +261,7 @@ def main() -> int:
             results.append(VersionResult(version, "ok", "tests passed"))
         else:
             print(f"[matrix] {version}: FAIL (exit={rc})")
-            results.append(
-                VersionResult(version, "fail", f"unittest exit {rc}")
-            )
+            results.append(VersionResult(version, "fail", f"unittest exit {rc}"))
             if not args.keep_going:
                 break
 

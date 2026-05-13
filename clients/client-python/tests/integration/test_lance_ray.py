@@ -215,8 +215,11 @@ class TestLanceRayIntegration(IntegrationTestEnv):
     def test_write_read_filter_via_lance_ray(self):
         # Imports are deferred so the skipIf decorator handles missing deps
         # cleanly without import errors at module load time.
+        # pylint: disable=import-outside-toplevel
         import ray
         from lance_ray import read_lance, write_lance
+
+        # pylint: enable=import-outside-toplevel
 
         ns_properties = {"uri": LANCE_REST_BASE_URL}
         table_id = [self.CATALOG_NAME, self.SCHEMA_NAME, self.TABLE_NAME]
@@ -245,9 +248,7 @@ class TestLanceRayIntegration(IntegrationTestEnv):
                 table_id=table_id,
             )
             # value = id * 2, value < 100  =>  id in [0, 49]  =>  50 rows
-            filtered_count = ray_dataset.filter(
-                lambda row: row["value"] < 100
-            ).count()
+            filtered_count = ray_dataset.filter(lambda row: row["value"] < 100).count()
             self.assertEqual(50, filtered_count)
         finally:
             ray.shutdown()
