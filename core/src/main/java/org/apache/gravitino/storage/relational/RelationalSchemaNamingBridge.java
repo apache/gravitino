@@ -212,7 +212,12 @@ public final class RelationalSchemaNamingBridge {
     return DOT_JOINER.join(copy);
   }
 
-  /** Converts the schema segment embedded at namespace index 2 when length ≥ 3. */
+  /**
+   * Converts the schema segment at namespace index 2 (the slot occupied by the schema name in the
+   * standard {@code [metalake, catalog, schema, ...]} layout) from logical to physical form. Callers
+   * must only pass namespaces that follow this layout; if the schema sits at a different index the
+   * conversion will silently apply to the wrong segment.
+   */
   public static Namespace embeddedNamespaceForStorage(Namespace ns) {
     if (ns.length() < 3) {
       return ns;
@@ -223,6 +228,10 @@ public final class RelationalSchemaNamingBridge {
     return Namespace.of(copy);
   }
 
+  /**
+   * Converts the schema segment at namespace index 2 from physical to logical form. See {@link
+   * #embeddedNamespaceForStorage(Namespace)} for the layout constraint.
+   */
   public static Namespace embeddedNamespaceForApi(Namespace ns) {
     if (ns.length() < 3) {
       return ns;
@@ -259,10 +268,16 @@ public final class RelationalSchemaNamingBridge {
       case TABLE_STATISTIC:
         return NameIdentifier.of(embeddedNamespaceForStorage(ident.namespace()), ident.name());
       default:
+        // FILESET, TOPIC, MODEL, MODEL_VERSION and other types do not embed the schema
+        // in their identifier path and are forwarded as-is to the meta services.
         return ident;
     }
   }
 
+  /**
+   * Converts identifiers from physical storage naming back to the logical form used by API callers.
+   * Passthrough rules match {@link #nameIdentifierForStorage(NameIdentifier, Entity.EntityType)}.
+   */
   public static NameIdentifier nameIdentifierForApi(
       NameIdentifier ident, Entity.EntityType entityType) {
     switch (entityType) {
@@ -275,6 +290,7 @@ public final class RelationalSchemaNamingBridge {
       case TABLE_STATISTIC:
         return NameIdentifier.of(embeddedNamespaceForApi(ident.namespace()), ident.name());
       default:
+        // FILESET, TOPIC, MODEL, MODEL_VERSION and other types are returned unchanged.
         return ident;
     }
   }
@@ -406,7 +422,16 @@ public final class RelationalSchemaNamingBridge {
         .build();
   }
 
+  /**
+   * Converts a {@link StatisticEntity}'s namespace from physical storage form to logical API form.
+   * Only {@link TableStatisticEntity} is currently stored with an embedded schema namespace; other
+   * concrete subtypes are not expected and will cause an {@link IllegalArgumentException}.
+   */
   public static StatisticEntity statisticEntityForApi(StatisticEntity e) {
+    Preconditions.checkArgument(
+        e instanceof TableStatisticEntity,
+        "Only TableStatisticEntity is supported by statisticEntityForApi, got: %s",
+        e.getClass().getSimpleName());
     Namespace apiNs = embeddedNamespaceForApi(e.namespace());
     if (apiNs.equals(e.namespace())) {
       return e;
@@ -420,7 +445,15 @@ public final class RelationalSchemaNamingBridge {
         .build();
   }
 
+  /**
+   * Converts a {@link StatisticEntity}'s namespace to the physical storage form. See {@link
+   * #statisticEntityForApi(StatisticEntity)} for subtype restrictions.
+   */
   public static StatisticEntity statisticEntityForStorage(StatisticEntity e) {
+    Preconditions.checkArgument(
+        e instanceof TableStatisticEntity,
+        "Only TableStatisticEntity is supported by statisticEntityForStorage, got: %s",
+        e.getClass().getSimpleName());
     Namespace storageNs = embeddedNamespaceForStorage(e.namespace());
     if (storageNs.equals(e.namespace())) {
       return e;
@@ -442,7 +475,7 @@ public final class RelationalSchemaNamingBridge {
    * @param entityType bridged entity kind (e.g. {@link Entity.EntityType#TABLE}); passed to {@link
    *     #entityForApi(Entity, Entity.EntityType)}
    */
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings("unchecked") // entityForApi/entityForStorage dispatch on known concrete types
   public static <E extends Entity & HasIdentifier> Function<E, E> wrapperUpdater(
       Entity.EntityType entityType, Function<E, E> updater) {
     Preconditions.checkArgument(
@@ -455,7 +488,7 @@ public final class RelationalSchemaNamingBridge {
     };
   }
 
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings("unchecked") // each case casts to the statically known subtype for that EntityType
   public static <E extends Entity & HasIdentifier> E entityForApi(
       E entity, Entity.EntityType type) {
     switch (type) {
@@ -474,7 +507,7 @@ public final class RelationalSchemaNamingBridge {
     }
   }
 
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings("unchecked") // instanceof guards ensure each cast is safe
   public static <E extends Entity & HasIdentifier> E entityForStorage(E entity) {
     if (entity instanceof SchemaEntity) {
       return entity;

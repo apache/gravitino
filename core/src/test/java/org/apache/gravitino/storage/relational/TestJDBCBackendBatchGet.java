@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -1061,5 +1062,22 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
 
     Assertions.assertEquals(1, result.size());
     Assertions.assertEquals("view1", result.get(0).name());
+  }
+
+  @TestTemplate
+  public void testBatchInsertRelationsRejectsUnsupportedRelationType() {
+    NameIdentifier src = NameIdentifier.of("metalake", "schema1");
+    NameIdentifier dst = NameIdentifier.of("metalake", "role1");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            backend.batchInsertRelations(
+                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                Lists.newArrayList(src),
+                Entity.EntityType.SCHEMA,
+                dst,
+                Entity.EntityType.ROLE,
+                false));
   }
 }

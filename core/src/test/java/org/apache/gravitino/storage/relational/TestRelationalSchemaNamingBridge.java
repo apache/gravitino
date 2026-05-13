@@ -22,6 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.google.common.collect.Lists;
+import java.time.Instant;
+import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -30,7 +33,13 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -357,8 +366,88 @@ public class TestRelationalSchemaNamingBridge {
   }
 
   // -------------------------------------------------------------------------
+  // roleEntityForStorage / roleEntityForApi
+  // -------------------------------------------------------------------------
+
+  @Test
+  public void roleWithNestedSchemaSecurableObjectToStorage() {
+    // SecurableObject of type SCHEMA with logical name "catalog.a:b"
+    List<Privilege> privs = Lists.newArrayList(Privileges.UseSchema.allow());
+    SecurableObject catalogObj = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+    SecurableObject schemaObj = SecurableObjects.ofSchema(catalogObj, "a:b", privs);
+
+    RoleEntity role = buildRole(Lists.newArrayList(schemaObj));
+
+    RoleEntity stored = RelationalSchemaNamingBridge.roleEntityForStorage(role);
+    SecurableObject storedSchema = stored.securableObjects().get(0);
+    // schema segment "a:b" → "ab"
+    assertEquals("catalog.a" + P + "b", storedSchema.fullName());
+  }
+
+  @Test
+  public void roleWithNestedSchemaSecurableObjectToApi() {
+    // SecurableObject of type SCHEMA with physical name "catalog.ab"
+    List<Privilege> privs = Lists.newArrayList(Privileges.UseSchema.allow());
+    SecurableObject schemaObj =
+        SecurableObjects.parse("catalog.a" + P + "b", MetadataObject.Type.SCHEMA, privs);
+
+    RoleEntity role = buildRole(Lists.newArrayList(schemaObj));
+
+    RoleEntity api = RelationalSchemaNamingBridge.roleEntityForApi(role);
+    SecurableObject apiSchema = api.securableObjects().get(0);
+    assertEquals("catalog.a:b", apiSchema.fullName());
+  }
+
+  @Test
+  public void roleWithFlatSchemaIsUnchanged() {
+    // A schema without the separator → same instance returned
+    List<Privilege> privs = Lists.newArrayList(Privileges.UseSchema.allow());
+    SecurableObject catalogObj = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+    SecurableObject schemaObj = SecurableObjects.ofSchema(catalogObj, "flat", privs);
+
+    RoleEntity role = buildRole(Lists.newArrayList(schemaObj));
+    assertSame(role, RelationalSchemaNamingBridge.roleEntityForStorage(role));
+    assertSame(role, RelationalSchemaNamingBridge.roleEntityForApi(role));
+  }
+
+  @Test
+  public void roleWithNoSecurableObjectsIsUnchanged() {
+    RoleEntity role = buildRole(null);
+    assertSame(role, RelationalSchemaNamingBridge.roleEntityForStorage(role));
+    assertSame(role, RelationalSchemaNamingBridge.roleEntityForApi(role));
+  }
+
+  @Test
+  public void roleRoundTrip() {
+    List<Privilege> privs = Lists.newArrayList(Privileges.UseSchema.allow());
+    SecurableObject catalogObj = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+    SecurableObject schemaObj = SecurableObjects.ofSchema(catalogObj, "a:b:c", privs);
+
+    RoleEntity original = buildRole(Lists.newArrayList(schemaObj));
+    RoleEntity stored = RelationalSchemaNamingBridge.roleEntityForStorage(original);
+    RoleEntity backToApi = RelationalSchemaNamingBridge.roleEntityForApi(stored);
+
+    assertEquals(
+        original.securableObjects().get(0).fullName(),
+        backToApi.securableObjects().get(0).fullName());
+  }
+
+  // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
+
+  private static RoleEntity buildRole(List<SecurableObject> securableObjects) {
+    AuditInfo audit =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    return RoleEntity.builder()
+        .withId(1L)
+        .withName("role1")
+        .withNamespace(Namespace.of("ml"))
+        .withProperties(null)
+        .withAuditInfo(audit)
+        .withSecurableObjects(securableObjects)
+        .build();
+  }
 
   private static void mockSeparator(String sep) throws Exception {
     Config config = Mockito.mock(Config.class);

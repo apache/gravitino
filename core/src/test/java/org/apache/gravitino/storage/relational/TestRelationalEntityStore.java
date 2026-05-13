@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -155,6 +156,61 @@ public class TestRelationalEntityStore {
         .verify(cache)
         .invalidate(
             dst, Entity.EntityType.TAG, SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+  }
+
+  @Test
+  void testBatchInsertRelationsInvalidatesCacheForAllSrcsAndDst()
+      throws IOException, IllegalAccessException {
+    NameIdentifier src1 = NameIdentifier.of("metalake", "schema1");
+    NameIdentifier src2 = NameIdentifier.of("metalake", "schema2");
+    NameIdentifier dst = NameIdentifier.of("metalake", "role1");
+    List<NameIdentifier> srcs = Arrays.asList(src1, src2);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    store.batchInsertRelations(
+        SupportsRelationOperations.Type.OWNER_REL,
+        srcs,
+        Entity.EntityType.SCHEMA,
+        dst,
+        Entity.EntityType.ROLE,
+        false);
+
+    InOrder inOrder = Mockito.inOrder(backend, cache);
+    inOrder
+        .verify(backend)
+        .batchInsertRelations(
+            SupportsRelationOperations.Type.OWNER_REL,
+            srcs,
+            Entity.EntityType.SCHEMA,
+            dst,
+            Entity.EntityType.ROLE,
+            false);
+    inOrder
+        .verify(cache)
+        .invalidate(src1, Entity.EntityType.SCHEMA, SupportsRelationOperations.Type.OWNER_REL);
+    inOrder
+        .verify(cache)
+        .invalidate(src2, Entity.EntityType.SCHEMA, SupportsRelationOperations.Type.OWNER_REL);
+    inOrder
+        .verify(cache)
+        .invalidate(dst, Entity.EntityType.ROLE, SupportsRelationOperations.Type.OWNER_REL);
+  }
+
+  @Test
+  void testBatchInsertRelationsWithEmptyListIsNoOp() throws IOException, IllegalAccessException {
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    store.batchInsertRelations(
+        SupportsRelationOperations.Type.OWNER_REL,
+        List.of(),
+        Entity.EntityType.SCHEMA,
+        NameIdentifier.of("metalake", "role1"),
+        Entity.EntityType.ROLE,
+        false);
+
+    Mockito.verify(backend, Mockito.never())
+        .batchInsertRelations(any(), any(), any(), any(), any(), any(Boolean.class));
+    Mockito.verify(cache, Mockito.never()).invalidate(any(), any(), any());
   }
 
   @Test

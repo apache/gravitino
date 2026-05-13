@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -917,10 +918,10 @@ public class JDBCBackend implements RelationalBackend {
     if (srcIdentifiers == null || srcIdentifiers.isEmpty()) {
       return;
     }
-    Preconditions.checkNotNull(relType, "relType must not be null");
-    Preconditions.checkNotNull(srcType, "srcType must not be null");
-    Preconditions.checkNotNull(dstIdentifier, "dstIdentifier must not be null");
-    Preconditions.checkNotNull(dstType, "dstType must not be null");
+    Objects.requireNonNull(relType, "relType must not be null");
+    Objects.requireNonNull(srcType, "srcType must not be null");
+    Objects.requireNonNull(dstIdentifier, "dstIdentifier must not be null");
+    Objects.requireNonNull(dstType, "dstType must not be null");
     switch (relType) {
       case OWNER_REL:
         List<NameIdentifier> srcStorage =
