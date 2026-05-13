@@ -24,11 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.gravitino.storage.relational.po.IdpGroupPO;
-import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.Test;
 
-public class TestIdpGroupMetaMapper extends IdpMapperTestBase {
+abstract class IdpGroupMetaMapperTestBase extends IdpMapperTestBase {
 
-  @TestTemplate
+  @Test
   void testInsertIdpGroupAndSelectIdpGroup() {
     IdpGroupPO group = insertGroup(10L, "dev", 1L, 0L, 0L);
 
@@ -36,7 +36,7 @@ public class TestIdpGroupMetaMapper extends IdpMapperTestBase {
     assertNull(idpGroupMetaMapper.selectIdpGroup("unknown"));
   }
 
-  @TestTemplate
+  @Test
   void testSoftDeleteIdpGroup() {
     insertGroup(10L, "dev", 1L, 0L, 0L);
 
@@ -47,7 +47,7 @@ public class TestIdpGroupMetaMapper extends IdpMapperTestBase {
     assertEquals(1L, queryLongValue("idp_group_meta", "last_version", "group_id", 10L));
   }
 
-  @TestTemplate
+  @Test
   void testDeleteIdpGroupMetasByLegacyTimeline() {
     insertGroup(10L, "legacy-group", 1L, 0L, 10L);
     insertGroup(20L, "new-group", 1L, 0L, 30L);
