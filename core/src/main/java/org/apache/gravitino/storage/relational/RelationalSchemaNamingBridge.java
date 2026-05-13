@@ -450,12 +450,10 @@ public final class RelationalSchemaNamingBridge {
       "unchecked") // each case casts to the statically known subtype for that EntityType
   public static <E extends Entity & HasIdentifier> E entityForApi(
       E entity, Entity.EntityType type) {
-    if (entity instanceof RoleEntity) {
-      return (E) roleEntityForApi((RoleEntity) entity);
-    }
     if (entity instanceof GenericEntity) {
       return (E) genericEntityMetadataFullNameForApi((GenericEntity) entity);
     }
+
     switch (type) {
       case SCHEMA:
         return (E) schemaEntityForApi((SchemaEntity) entity);
@@ -467,6 +465,8 @@ public final class RelationalSchemaNamingBridge {
         return (E) functionEntityForApi((FunctionEntity) entity);
       case TABLE_STATISTIC:
         return (E) statisticEntityForApi((StatisticEntity) entity);
+      case ROLE:
+        return (E) roleEntityForApi((RoleEntity) entity);
       default:
         return entity;
     }
