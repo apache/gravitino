@@ -244,6 +244,9 @@ public class OwnerMetaBaseSQLProvider {
 
   public String deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    // Keep this cutoff comfortably behind the present time. These deleted owner rows are also used
+    // as short-lived cache-invalidation signals; a running server that is delayed by long GC,
+    // network isolation, scheduler stalls, or clock skew must still have time to consume them.
     return "DELETE FROM "
         + OWNER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
@@ -261,6 +264,9 @@ public class OwnerMetaBaseSQLProvider {
   }
 
   public String selectChangedOwners(@Param("lastId") long lastId) {
+    // Owner changes are broadcast to every server instance because owner caches are local. Each
+    // instance tracks its own last consumed id; re-reading a row is harmless because cache
+    // invalidation is idempotent.
     return "SELECT id,"
         + " metadata_object_id as metadataObjectId,"
         + " metadata_object_type as metadataObjectType,"
@@ -272,6 +278,8 @@ public class OwnerMetaBaseSQLProvider {
   }
 
   public String selectLatestChangeId() {
+    // A newly started server has an empty local owner cache. It can start from the current max id
+    // and consume only owner changes that happen after startup.
     return "SELECT COALESCE(MAX(id), 0) FROM " + OWNER_TABLE_NAME + " WHERE deleted_at = 0";
   }
 }

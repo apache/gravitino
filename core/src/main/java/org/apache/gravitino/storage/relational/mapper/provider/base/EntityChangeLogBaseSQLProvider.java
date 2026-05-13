@@ -28,6 +28,13 @@ public class EntityChangeLogBaseSQLProvider {
   /**
    * Cursor-advance contract for the entity change poller: {@code id} is monotonic and unique, so
    * callers only need to remember the last consumed id.
+   *
+   * <p>This table is a short-lived broadcast log for local cache invalidation, not a queue. In a
+   * multi-node deployment every server instance has its own local cache and should independently
+   * consume the same change rows. A new instance may initialize its cursor from {@link
+   * #selectLatestChangeId()} because its cache starts empty and it does not need historical
+   * invalidations. Re-consuming a row on an existing instance is acceptable: entity DROP/ALTER
+   * handling only invalidates cache keys, and invalidation is idempotent.
    */
   public String selectEntityChanges(@Param("lastId") long lastId, @Param("maxRows") int maxRows) {
     return "SELECT id, metalake_name as metalakeName, entity_type as entityType,"
@@ -64,6 +71,9 @@ public class EntityChangeLogBaseSQLProvider {
   }
 
   public String pruneOldEntityChanges(@Param("before") long before) {
+    // Keep the retention window conservative. A running server can be delayed by long GC pauses,
+    // network isolation, scheduler stalls, or clock skew between nodes; pruning too aggressively
+    // can let that server miss an invalidation while its local cache is still warm.
     return "DELETE FROM "
         + ENTITY_CHANGE_LOG_TABLE_NAME
         + " WHERE created_at < #{before} LIMIT 1000";
