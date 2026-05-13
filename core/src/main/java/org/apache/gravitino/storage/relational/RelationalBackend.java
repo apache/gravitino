@@ -119,7 +119,8 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    * @param <E> The type of the entity returned.
    * @param identifiers The identifiers of the entities.
    * @param entityType The type of the entity.
-   * @return The entities found; may be smaller than {@code identifiers} if some are missing.
+   * @return The entities associated with the identifiers and the entity type, or null if the key
+   *     does not exist.
    */
   <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> identifiers, Entity.EntityType entityType);
