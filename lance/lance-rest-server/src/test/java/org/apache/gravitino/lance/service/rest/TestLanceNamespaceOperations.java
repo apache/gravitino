@@ -78,6 +78,7 @@ import org.lance.namespace.model.ListNamespacesResponse;
 import org.lance.namespace.model.RegisterTableRequest;
 import org.lance.namespace.model.RegisterTableResponse;
 import org.mockito.Mockito;
+import org.openapitools.jackson.nullable.JsonNullableModule;
 
 @SuppressWarnings("deprecation")
 public class TestLanceNamespaceOperations extends JerseyTest {
@@ -113,7 +114,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     resourceConfig.property(CommonProperties.FEATURE_AUTO_DISCOVERY_DISABLE, true);
     resourceConfig.property(CommonProperties.MOXY_JSON_FEATURE_DISABLE, true);
     ObjectMapper mapper = new ObjectMapper();
-    mapper.registerModule(new org.openapitools.jackson.nullable.JsonNullableModule());
+    mapper.registerModule(new JsonNullableModule());
     JacksonJaxbJsonProvider provider = new JacksonJaxbJsonProvider();
     provider.setMapper(mapper);
     resourceConfig.register(provider);
