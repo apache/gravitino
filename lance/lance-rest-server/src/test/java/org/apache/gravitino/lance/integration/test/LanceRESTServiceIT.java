@@ -430,7 +430,7 @@ public class LanceRESTServiceIT extends BaseIT {
 
   @Test
   void testCreateEmptyTable() throws ApiException {
-    catalog = createCatalogWithLocation(CATALOG_NAME, tempDir.toString());
+    catalog = createCatalog(CATALOG_NAME);
     createSchema();
 
     CreateEmptyTableRequest request = new CreateEmptyTableRequest();
@@ -574,20 +574,16 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertTrue(exception.getMessage().contains("already exists"));
     Assertions.assertEquals(5, exception.getCode());
 
-    // Create a table without explicit location should use the catalog default location.
-    CreateTableResponse noLocationResponse =
-        Assertions.assertDoesNotThrow(
-            () ->
-                createTable(
-                    List.of(CATALOG_NAME, SCHEMA_NAME, "no_location_table"),
-                    /* location= */ null,
-                    ImmutableMap.of(),
-                    body,
-                    /* mode= */ null));
-    Assertions.assertNotNull(noLocationResponse);
-    Assertions.assertTrue(
-        noLocationResponse.getLocation().startsWith(tempDir.toString()),
-        "Expected the catalog default location to be used");
+    // Create a table without location should fail
+    Assertions.assertThrows(
+        LanceNamespaceException.class,
+        () ->
+            createTable(
+                List.of(CATALOG_NAME, SCHEMA_NAME, "no_location_table"),
+                /* location= */ null,
+                ImmutableMap.of(),
+                body,
+                /* mode= */ null));
 
     // Create table with invalid schema should fail
     byte[] invalidBody = "".getBytes(Charset.defaultCharset());
@@ -1073,23 +1069,15 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) {
-    return createCatalogWithLocation(catalogName, null);
-  }
-
-  private Catalog createCatalogWithLocation(String catalogName, String location) {
-    ImmutableMap.Builder<String, String> catalogPropertiesBuilder =
+    Map<String, String> catalogProperties =
         ImmutableMap.<String, String>builder()
             .putAll(properties)
             .put("lance.storage.endpoint", MINIO_ENDPOINT)
             .put("lance.storage.allow_http", "true")
             .put("lance.storage.access_key_id", MINIO_ACCESS_KEY)
             .put("lance.storage.secret_access_key", MINIO_SECRET_KEY)
-            .put("lance.storage.region", MINIO_REGION);
-    if (location != null) {
-      catalogPropertiesBuilder.put(Catalog.PROPERTY_LOCATION, location);
-    }
-
-    Map<String, String> catalogProperties = catalogPropertiesBuilder.build();
+            .put("lance.storage.region", MINIO_REGION)
+            .build();
 
     return metalake.createCatalog(
         catalogName,
