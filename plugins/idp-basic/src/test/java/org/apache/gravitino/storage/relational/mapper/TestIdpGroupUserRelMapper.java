@@ -25,11 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestTemplate;
 
-abstract class IdpGroupUserRelMapperTestBase extends IdpMapperTestBase {
+public class TestIdpGroupUserRelMapper extends IdpMapperTestBase {
 
-  @Test
+  @TestTemplate
   void testBatchInsertIdpGroupUsersAndSelectGroupNamesByUserId() {
     insertGroup(10L, "dev", 1L, 0L, 0L);
     insertGroup(20L, "ops", 1L, 0L, 0L);
@@ -41,7 +41,7 @@ abstract class IdpGroupUserRelMapperTestBase extends IdpMapperTestBase {
     assertTrue(idpGroupUserRelMapper.selectGroupNamesByUserId(999L).isEmpty());
   }
 
-  @Test
+  @TestTemplate
   void testSelectUserNamesByGroupId() {
     insertGroup(10L, "dev", 1L, 0L, 0L);
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
@@ -54,7 +54,7 @@ abstract class IdpGroupUserRelMapperTestBase extends IdpMapperTestBase {
     assertTrue(idpGroupUserRelMapper.selectUserNamesByGroupId(999L).isEmpty());
   }
 
-  @Test
+  @TestTemplate
   void testSelectRelatedUserIds() {
     insertGroup(10L, "dev", 1L, 0L, 0L);
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
@@ -71,7 +71,7 @@ abstract class IdpGroupUserRelMapperTestBase extends IdpMapperTestBase {
     assertTrue(idpGroupUserRelMapper.selectRelatedUserIds(10L, null).isEmpty());
   }
 
-  @Test
+  @TestTemplate
   void testSoftDeleteIdpGroupUsers() {
     insertGroup(10L, "dev", 1L, 0L, 0L);
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
@@ -89,7 +89,7 @@ abstract class IdpGroupUserRelMapperTestBase extends IdpMapperTestBase {
         1L, queryLongValue("idp_group_user_rel", "last_version", "id", firstRelation.getId()));
   }
 
-  @Test
+  @TestTemplate
   void testSoftDeleteGroupUsersByUserId() {
     insertGroup(10L, "dev", 1L, 0L, 0L);
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
@@ -103,7 +103,7 @@ abstract class IdpGroupUserRelMapperTestBase extends IdpMapperTestBase {
         queryLongValue("idp_group_user_rel", "deleted_at", "id", secondRelation.getId()) > 0L);
   }
 
-  @Test
+  @TestTemplate
   void testSoftDeleteGroupUsersByGroupId() {
     insertGroup(20L, "ops", 1L, 0L, 0L);
     insertUser(3L, "carol", "hash-c", 1L, 0L, 0L);
@@ -115,7 +115,7 @@ abstract class IdpGroupUserRelMapperTestBase extends IdpMapperTestBase {
         queryLongValue("idp_group_user_rel", "deleted_at", "id", thirdRelation.getId()) > 0L);
   }
 
-  @Test
+  @TestTemplate
   void testDeleteIdpGroupUserRelMetasByLegacyTimeline() {
     insertRelation(100L, 10L, 1L, 1L, 0L, 10L);
     insertRelation(101L, 20L, 2L, 1L, 0L, 30L);
