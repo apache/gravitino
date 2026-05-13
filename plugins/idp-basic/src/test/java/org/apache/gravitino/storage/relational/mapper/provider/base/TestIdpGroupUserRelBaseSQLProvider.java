@@ -38,7 +38,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   protected String expectedDeleteAtClause() {
-    return "deleted_at = #{deletedAt}";
+    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
   }
 
   protected String expectedDeleteIdpGroupUserRelMetasByLegacyTimelineSql() {
@@ -141,17 +141,15 @@ public class TestIdpGroupUserRelBaseSQLProvider {
 
   @Test
   public void testSoftDeleteIdpGroupUsers() {
-    String script = createProvider().softDeleteIdpGroupUsers(10L, Arrays.asList(20L, 21L), 2L);
+    String script = createProvider().softDeleteIdpGroupUsers(10L, Arrays.asList(20L, 21L));
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
     params.put("userIds", Arrays.asList(20L, 21L));
-    params.put("deletedAt", 2L);
 
     String normalizedSql = renderScript(script, params);
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
-    Assertions.assertTrue(
-        normalizedSql.contains(expectedDeleteAtClause().replace("#{deletedAt}", "?")));
+    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
     Assertions.assertTrue(normalizedSql.contains("current_version = current_version + 1"));
     Assertions.assertTrue(normalizedSql.contains("last_version = last_version + 1"));
     Assertions.assertTrue(normalizedSql.matches(".*user_id IN \\( \\? , \\? \\).*"));
@@ -159,11 +157,10 @@ public class TestIdpGroupUserRelBaseSQLProvider {
 
   @Test
   public void testSoftDeleteIdpGroupUsersWithEmptyUserIds() {
-    String script = createProvider().softDeleteIdpGroupUsers(10L, Collections.emptyList(), 2L);
+    String script = createProvider().softDeleteIdpGroupUsers(10L, Collections.emptyList());
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
     params.put("userIds", Collections.emptyList());
-    params.put("deletedAt", 2L);
 
     String normalizedSql = renderScript(script, params);
 
@@ -177,10 +174,9 @@ public class TestIdpGroupUserRelBaseSQLProvider {
 
   @Test
   public void testSoftDeleteIdpGroupUsersWithNullUserIds() {
-    String script = createProvider().softDeleteIdpGroupUsers(10L, null, 2L);
+    String script = createProvider().softDeleteIdpGroupUsers(10L, null);
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
-    params.put("deletedAt", 2L);
 
     String normalizedSql = renderScript(script, params);
 
@@ -195,7 +191,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   @Test
   public void testSoftDeleteGroupUsersByUserId() {
     String normalizedSql =
-        createProvider().softDeleteGroupUsersByUserId(1L, 2L).replaceAll("\\s+", " ").trim();
+        createProvider().softDeleteGroupUsersByUserId(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
@@ -205,7 +201,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   @Test
   public void testSoftDeleteGroupUsersByGroupId() {
     String normalizedSql =
-        createProvider().softDeleteGroupUsersByGroupId(1L, 2L).replaceAll("\\s+", " ").trim();
+        createProvider().softDeleteGroupUsersByGroupId(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));

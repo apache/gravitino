@@ -71,20 +71,16 @@ public class IdpGroupUserRelSQLProviderFactory {
   }
 
   public static String softDeleteIdpGroupUsers(
-      @Param("groupId") Long groupId,
-      @Param("userIds") List<Long> userIds,
-      @Param("deletedAt") Long deletedAt) {
-    return getProvider().softDeleteIdpGroupUsers(groupId, userIds, deletedAt);
+      @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
+    return getProvider().softDeleteIdpGroupUsers(groupId, userIds);
   }
 
-  public static String softDeleteGroupUsersByUserId(
-      @Param("userId") Long userId, @Param("deletedAt") Long deletedAt) {
-    return getProvider().softDeleteGroupUsersByUserId(userId, deletedAt);
+  public static String softDeleteGroupUsersByUserId(@Param("userId") Long userId) {
+    return getProvider().softDeleteGroupUsersByUserId(userId);
   }
 
-  public static String softDeleteGroupUsersByGroupId(
-      @Param("groupId") Long groupId, @Param("deletedAt") Long deletedAt) {
-    return getProvider().softDeleteGroupUsersByGroupId(groupId, deletedAt);
+  public static String softDeleteGroupUsersByGroupId(@Param("groupId") Long groupId) {
+    return getProvider().softDeleteGroupUsersByGroupId(groupId);
   }
 
   public static String deleteIdpGroupUserRelMetasByLegacyTimeline(

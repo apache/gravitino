@@ -89,13 +89,12 @@ public class IdpGroupUserRelBaseSQLProvider {
   }
 
   public String softDeleteIdpGroupUsers(
-      @Param("groupId") Long groupId,
-      @Param("userIds") List<Long> userIds,
-      @Param("deletedAt") Long deletedAt) {
+      @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
     return "<script>"
         + "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " SET deleted_at = #{deletedAt},"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000,"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE group_id = #{groupId} "
@@ -115,21 +114,21 @@ public class IdpGroupUserRelBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteGroupUsersByUserId(
-      @Param("userId") Long userId, @Param("deletedAt") Long deletedAt) {
+  public String softDeleteGroupUsersByUserId(@Param("userId") Long userId) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " SET deleted_at = #{deletedAt},"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000,"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
-  public String softDeleteGroupUsersByGroupId(
-      @Param("groupId") Long groupId, @Param("deletedAt") Long deletedAt) {
+  public String softDeleteGroupUsersByGroupId(@Param("groupId") Long groupId) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " SET deleted_at = #{deletedAt},"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000,"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE group_id = #{groupId} AND deleted_at = 0";

@@ -27,7 +27,7 @@ import org.apache.ibatis.annotations.Param;
 public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLProvider {
 
   @Override
-  public String softDeleteIdpGroupUsers(Long groupId, List<Long> userIds, Long deletedAt) {
+  public String softDeleteIdpGroupUsers(Long groupId, List<Long> userIds) {
     return "<script>"
         + "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
@@ -52,7 +52,7 @@ public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLPro
   }
 
   @Override
-  public String softDeleteGroupUsersByUserId(Long userId, Long deletedAt) {
+  public String softDeleteGroupUsersByUserId(Long userId) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
@@ -62,7 +62,7 @@ public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLPro
   }
 
   @Override
-  public String softDeleteGroupUsersByGroupId(Long groupId, Long deletedAt) {
+  public String softDeleteGroupUsersByGroupId(Long groupId) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
