@@ -38,10 +38,10 @@ public interface EntityChangeLogMapper {
 
   @SelectProvider(type = EntityChangeLogSQLProviderFactory.class, method = "selectEntityChanges")
   List<EntityChangeRecord> selectEntityChanges(
-      @Param("lastId") long lastId, @Param("maxRows") int maxRows);
+      @Param("lastConsumedId") long lastConsumedId, @Param("maxRows") int maxRows);
 
-  @SelectProvider(type = EntityChangeLogSQLProviderFactory.class, method = "selectLatestChangeId")
-  Long selectLatestChangeId();
+  @SelectProvider(type = EntityChangeLogSQLProviderFactory.class, method = "selectMaxChangeId")
+  Long selectMaxChangeId();
 
   @InsertProvider(type = EntityChangeLogSQLProviderFactory.class, method = "insertEntityChange")
   void insertEntityChange(

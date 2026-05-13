@@ -263,7 +263,7 @@ public class OwnerMetaBaseSQLProvider {
         + " ORDER BY updated_at DESC, id DESC LIMIT 1";
   }
 
-  public String selectChangedOwners(@Param("lastId") long lastId) {
+  public String selectChangedOwners(@Param("lastConsumedId") long lastConsumedId) {
     // Owner changes are broadcast to every server instance because owner caches are local. Each
     // instance tracks its own last consumed id; re-reading a row is harmless because cache
     // invalidation is idempotent.
@@ -273,11 +273,11 @@ public class OwnerMetaBaseSQLProvider {
         + " updated_at as updatedAt"
         + " FROM "
         + OWNER_TABLE_NAME
-        + " WHERE deleted_at = 0 AND id > #{lastId}"
+        + " WHERE deleted_at = 0 AND id > #{lastConsumedId}"
         + " ORDER BY id LIMIT 1000";
   }
 
-  public String selectLatestChangeId() {
+  public String selectMaxChangeId() {
     // A newly started server has an empty local owner cache. It can start from the current max id
     // and consume only owner changes that happen after startup.
     return "SELECT COALESCE(MAX(id), 0) FROM " + OWNER_TABLE_NAME + " WHERE deleted_at = 0";

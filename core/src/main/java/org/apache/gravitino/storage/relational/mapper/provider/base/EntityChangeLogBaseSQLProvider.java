@@ -32,19 +32,20 @@ public class EntityChangeLogBaseSQLProvider {
    * <p>This table is a short-lived broadcast log for local cache invalidation, not a queue. In a
    * multi-node deployment every server instance has its own local cache and should independently
    * consume the same change rows. A new instance may initialize its cursor from {@link
-   * #selectLatestChangeId()} because its cache starts empty and it does not need historical
+   * #selectMaxChangeId()} because its cache starts empty and it does not need historical
    * invalidations. Re-consuming a row on an existing instance is acceptable: entity DROP/ALTER
    * handling only invalidates cache keys, and invalidation is idempotent.
    */
-  public String selectEntityChanges(@Param("lastId") long lastId, @Param("maxRows") int maxRows) {
+  public String selectEntityChanges(
+      @Param("lastConsumedId") long lastConsumedId, @Param("maxRows") int maxRows) {
     return "SELECT id, metalake_name as metalakeName, entity_type as entityType,"
         + " entity_full_name as fullName, operate_type as operateType, created_at as createdAt"
         + " FROM "
         + ENTITY_CHANGE_LOG_TABLE_NAME
-        + " WHERE id > #{lastId} ORDER BY id LIMIT #{maxRows}";
+        + " WHERE id > #{lastConsumedId} ORDER BY id LIMIT #{maxRows}";
   }
 
-  public String selectLatestChangeId() {
+  public String selectMaxChangeId() {
     return "SELECT COALESCE(MAX(id), 0) FROM " + ENTITY_CHANGE_LOG_TABLE_NAME;
   }
 
