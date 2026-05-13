@@ -28,7 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 public class JdbcCredential implements Credential {
 
   /** JDBC credential type. */
-  public static final String JDBC_CREDENTIAL_TYPE = "jdbc";
+  public static final String JDBC_CREDENTIAL_TYPE = "jdbc-user-password";
   /** The JDBC user name. */
   public static final String GRAVITINO_JDBC_USER = "jdbc-user";
   /** The JDBC password. */

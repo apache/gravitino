@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -89,12 +90,13 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   }
 
   @Override
+  @Evolving
   public Map<String, String> propertiesWithCredentialProviders() {
     Map<String, String> properties = Maps.newHashMap(super.propertiesWithCredentialProviders());
-    return buildCredentialProvidersIfNecessary(properties);
+    return applyDefaultCredentialProviders(properties);
   }
 
-  private Map<String, String> buildCredentialProvidersIfNecessary(Map<String, String> properties) {
+  private Map<String, String> applyDefaultCredentialProviders(Map<String, String> properties) {
     // If credential providers already set, return as is
     if (StringUtils.isNotBlank(properties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
       return properties;
@@ -104,7 +106,8 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
 
     // Add JDBC credential provider if backend is JDBC and jdbc-user/jdbc-password are set
     String catalogBackend = properties.get(IcebergConstants.CATALOG_BACKEND);
-    if (IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
+    if (catalogBackend != null
+        && IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
       String jdbcUser = properties.get(IcebergConstants.GRAVITINO_JDBC_USER);
       String jdbcPassword = properties.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD);
       if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {

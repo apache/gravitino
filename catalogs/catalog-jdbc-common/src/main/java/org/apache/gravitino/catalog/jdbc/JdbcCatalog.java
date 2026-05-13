@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -120,18 +121,17 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   }
 
   @Override
+  @Evolving
   public Map<String, String> propertiesWithCredentialProviders() {
     Map<String, String> properties = Maps.newHashMap(super.propertiesWithCredentialProviders());
-    return buildCredentialProvidersIfNecessary(properties);
+    return applyDefaultCredentialProviders(properties);
   }
 
-  private Map<String, String> buildCredentialProvidersIfNecessary(Map<String, String> properties) {
-    // If credential providers already set, return as is
+  private Map<String, String> applyDefaultCredentialProviders(Map<String, String> properties) {
     if (StringUtils.isNotBlank(properties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
       return properties;
     }
 
-    // Add JDBC credential provider if jdbc-user and jdbc-password are set
     String jdbcUser = properties.get(JdbcConfig.USERNAME.getKey());
     String jdbcPassword = properties.get(JdbcConfig.PASSWORD.getKey());
     if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {
