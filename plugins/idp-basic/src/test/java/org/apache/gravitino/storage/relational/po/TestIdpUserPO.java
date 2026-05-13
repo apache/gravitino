@@ -82,4 +82,22 @@ public class TestIdpUserPO {
     Assertions.assertEquals(userPO1, userPO2);
     Assertions.assertEquals(userPO1.hashCode(), userPO2.hashCode());
   }
+
+  @Test
+  public void testBuilderReuseDoesNotMutateBuiltObject() {
+    IdpUserPO.Builder builder =
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUserName("alice")
+            .withPasswordHash("hash")
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
+            .withDeletedAt(0L);
+
+    IdpUserPO firstUser = builder.build();
+    IdpUserPO secondUser = builder.withUserName("bob").build();
+
+    Assertions.assertEquals("alice", firstUser.getUserName());
+    Assertions.assertEquals("bob", secondUser.getUserName());
+  }
 }
