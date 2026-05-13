@@ -204,15 +204,12 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
               Caffeine.newBuilder()
                   .maximumSize(datasetCacheSize)
                   .scheduler(Scheduler.forScheduledExecutorService(this.scheduler))
-                  .evictionListener(
+                  .executor(Runnable::run)
+                  .removalListener(
                       (RemovalListener<Long, DatasetHolder>)
                           (key, value, cause) -> {
                             if (value != null) {
-                              try {
-                                value.close();
-                              } catch (IOException e) {
-                                LOG.warn("Failed to close evicted Lance dataset", e);
-                              }
+                              closeDatasetHolder(value);
                             }
                           })
                   .build());
@@ -361,14 +358,8 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   public void close() throws IOException {
     if (datasetCache.isPresent()) {
       Cache<Long, DatasetHolder> cache = datasetCache.get();
-      for (DatasetHolder holder : cache.asMap().values()) {
-        try {
-          holder.close();
-        } catch (Exception e) {
-          LOG.warn("Failed to close cached Lance dataset", e);
-        }
-      }
       cache.invalidateAll();
+      cache.cleanUp();
     }
 
     if (allocator != null) {
@@ -613,6 +604,14 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
   private ThreadFactory newDaemonThreadFactory(String name) {
     return new ThreadFactoryBuilder().setDaemon(true).setNameFormat(name + "-%d").build();
+  }
+
+  private static void closeDatasetHolder(DatasetHolder holder) {
+    try {
+      holder.close();
+    } catch (IOException | RuntimeException e) {
+      LOG.warn("Failed to close cached Lance dataset", e);
+    }
   }
 
   /**
