@@ -116,11 +116,6 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
   /**
    * Batch retrieves the entities associated with the identifiers and the entity type.
    *
-   * <p><b>Partial-result contract:</b> for entity types that do not have a native batch-SQL
-   * implementation (currently {@code USER}, {@code GROUP}, {@code ROLE}, {@code VIEW}), missing
-   * entities are silently omitted from the result rather than causing an exception. Callers must
-   * therefore not assume that the returned list has the same size as {@code identifiers}.
-   *
    * @param <E> The type of the entity returned.
    * @param identifiers The identifiers of the entities.
    * @param entityType The type of the entity.

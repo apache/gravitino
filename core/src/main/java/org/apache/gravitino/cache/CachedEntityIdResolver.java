@@ -23,6 +23,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.EntityIdResolver;
 import org.apache.gravitino.meta.NamespacedEntityId;
+import org.apache.gravitino.storage.relational.RelationalSchemaNamingBridge;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public class CachedEntityIdResolver implements EntityIdResolver {
@@ -37,14 +38,16 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   @Override
   public NamespacedEntityId getEntityIds(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    NameIdentifier cacheKey =
+        RelationalSchemaNamingBridge.nameIdentifierForApi(nameIdentifier, type);
     return entityCache
-        .getIfPresent(nameIdentifier, type)
+        .getIfPresent(cacheKey, type)
         .map(
             entity -> {
-              if (nameIdentifier.hasNamespace()) {
+              if (cacheKey.hasNamespace()) {
                 NamespacedEntityId namespaceIds =
                     getEntityIds(
-                        NameIdentifierUtil.parentNameIdentifier(nameIdentifier, type),
+                        NameIdentifierUtil.parentNameIdentifier(cacheKey, type),
                         NameIdentifierUtil.parentEntityType(type));
                 return new NamespacedEntityId(entity.id(), namespaceIds.fullIds());
               } else {
@@ -56,8 +59,10 @@ public class CachedEntityIdResolver implements EntityIdResolver {
 
   @Override
   public Long getEntityId(NameIdentifier nameIdentifier, Entity.EntityType type) {
+    NameIdentifier cacheKey =
+        RelationalSchemaNamingBridge.nameIdentifierForApi(nameIdentifier, type);
     return entityCache
-        .getIfPresent(nameIdentifier, type)
+        .getIfPresent(cacheKey, type)
         .map(HasIdentifier::id)
         .orElseGet(() -> underlyingResolver.getEntityId(nameIdentifier, type));
   }
