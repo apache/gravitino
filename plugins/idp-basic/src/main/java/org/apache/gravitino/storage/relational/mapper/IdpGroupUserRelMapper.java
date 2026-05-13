@@ -28,12 +28,12 @@ import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
- * A MyBatis Mapper for table meta operation SQLs.
+ * A MyBatis mapper for built-in IdP group-user relation operations.
  *
- * <p>This interface class is a specification defined by MyBatis. It requires this interface class
- * to identify the corresponding SQLs for execution. We can write SQLs in an additional XML file, or
- * write SQLs with annotations in this interface Mapper. See: <a
- * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
+ * <p>This interface defines the SQL statements MyBatis executes for the built-in IdP group-user
+ * relation store. The SQLs can be provided by XML files or annotations on this mapper interface.
+ * See the <a href="https://mybatis.org/mybatis-3/getting-started.html">MyBatis getting started
+ * guide</a>.
  */
 public interface IdpGroupUserRelMapper {
   String IDP_USER_TABLE_NAME = "idp_user_meta";
