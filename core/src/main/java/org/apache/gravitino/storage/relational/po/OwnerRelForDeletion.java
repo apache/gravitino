@@ -16,30 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.storage.relational.po;
 
-package org.apache.gravitino.oss.credential;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-import org.apache.gravitino.credential.CredentialProviderDelegator;
-import org.apache.gravitino.credential.OSSTokenCredential;
-
-/**
- * A lightweight credential provider for OSS. It delegates the actual credential generation to
- * {@link OSSTokenGenerator} which is loaded via reflection to avoid classpath issues.
- */
-public class OSSTokenProvider extends CredentialProviderDelegator<OSSTokenCredential> {
-
-  @Override
-  public boolean supportsScheme(String scheme) {
-    return "oss".equalsIgnoreCase(scheme);
-  }
-
-  @Override
-  public String credentialType() {
-    return OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE;
-  }
-
-  @Override
-  public String getGeneratorClassName() {
-    return "org.apache.gravitino.oss.credential.OSSTokenGenerator";
-  }
+/** Key for batch soft-deleting owner rows by metadata object. */
+@Getter
+@AllArgsConstructor
+public class OwnerRelForDeletion {
+  private final Long metadataObjectId;
+  private final String metadataObjectType;
 }

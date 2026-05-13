@@ -264,6 +264,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * <p>For {@link RESTCatalog}, uses {@link RESTCatalog#properties()} so defaults reflect the
    * remote catalog's config response merged with client properties (after REST handshake), not only
    * static Gravitino catalog configuration.
+   *
+   * <p>{@link IcebergConstants#IO_IMPL} is passed through when present (e.g. Iceberg {@link
+   * org.apache.iceberg.io.ResolvingFileIO}), so clients multiplex by URI scheme without server-side
+   * rewriting per table.
    */
   @VisibleForTesting
   static Map<String, String> buildCatalogConfigToClients(IcebergConfig config, Catalog catalog) {
@@ -355,7 +359,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
                 PrincipalUtils.getCurrentUserName(),
                 Collections.emptySet(),
                 ImmutableSet.copyOf(path));
-    Credential credential = catalogCredentialManager.getCredential(context);
+    Credential credential =
+        catalogCredentialManager.getCredentialByPath(tableMetadata.location(), context);
     if (credential == null) {
       throw new ServiceUnavailableException("Couldn't generate credential, %s", context);
     }
@@ -907,6 +912,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   private static Map<String, String> retrieveFileIOProperties(FileIO fileIO) {
-    return fileIO instanceof InMemoryFileIO ? Maps.newHashMap() : fileIO.properties();
+    return fileIO instanceof InMemoryFileIO
+        ? Maps.newHashMap()
+        : new HashMap<>(fileIO.properties());
   }
 }

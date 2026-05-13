@@ -53,6 +53,7 @@ import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
@@ -137,7 +138,7 @@ public class TestCatalogWrapperForREST {
                 IcebergConstants.ICEBERG_ACCESS_DELEGATION,
                 "vended-credentials",
                 IcebergConstants.WAREHOUSE,
-                "/remote/warehouse"));
+                "s3://remote/warehouse"));
 
     Map<String, String> configToClients =
         CatalogWrapperForREST.buildCatalogConfigToClients(config, restCatalog);
@@ -148,6 +149,26 @@ public class TestCatalogWrapperForREST {
         "http://localhost:9000", configToClients.get(IcebergConstants.ICEBERG_S3_ENDPOINT));
     Assertions.assertEquals(
         "vended-credentials", configToClients.get(IcebergConstants.ICEBERG_ACCESS_DELEGATION));
+  }
+
+  @Test
+  void testCatalogConfigToClientsIncludesResolvingFileIO() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "hive",
+                IcebergConstants.IO_IMPL,
+                ResolvingFileIO.class.getName(),
+                IcebergConstants.WAREHOUSE,
+                "s3://bucket/warehouse"));
+    Catalog catalog = mock(Catalog.class);
+
+    Map<String, String> configToClients =
+        CatalogWrapperForREST.buildCatalogConfigToClients(config, catalog);
+
+    Assertions.assertEquals(
+        ResolvingFileIO.class.getName(), configToClients.get(IcebergConstants.IO_IMPL));
   }
 
   @Test

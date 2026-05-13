@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupMetaBaseSQLProvider;
@@ -56,6 +57,11 @@ public class GroupMetaSQLProviderFactory {
   public static String selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name) {
     return getProvider().selectGroupMetaByMetalakeIdAndName(metalakeId, name);
+  }
+
+  public static String listExtendedGroupPOsByMetalakeIdAndNames(
+      @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
+    return getProvider().listExtendedGroupPOsByMetalakeIdAndNames(metalakeId, groupNames);
   }
 
   public static String insertGroupMeta(@Param("groupMeta") GroupPO groupPO) {

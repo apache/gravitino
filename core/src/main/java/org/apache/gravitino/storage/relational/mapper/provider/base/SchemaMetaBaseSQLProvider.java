@@ -200,6 +200,45 @@ public class SchemaMetaBaseSQLProvider {
         + " deleted_at = #{schemaMeta.deletedAt}";
   }
 
+  public String batchInsertSchemaMeta(@Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return "<script>"
+        + "INSERT INTO "
+        + TABLE_NAME
+        + " (schema_id, schema_name, metalake_id, catalog_id, schema_comment,"
+        + " properties, audit_info, current_version, last_version, deleted_at) VALUES "
+        + "<foreach collection='schemaMetas' item='po' separator=','>"
+        + "(#{po.schemaId}, #{po.schemaName}, #{po.metalakeId}, #{po.catalogId},"
+        + " #{po.schemaComment}, #{po.properties}, #{po.auditInfo},"
+        + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt})"
+        + "</foreach>"
+        + "</script>";
+  }
+
+  public String batchInsertSchemaMetaOnDuplicateKeyUpdate(
+      @Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return "<script>"
+        + "INSERT INTO "
+        + TABLE_NAME
+        + " (schema_id, schema_name, metalake_id, catalog_id, schema_comment,"
+        + " properties, audit_info, current_version, last_version, deleted_at) VALUES "
+        + "<foreach collection='schemaMetas' item='po' separator=','>"
+        + "(#{po.schemaId}, #{po.schemaName}, #{po.metalakeId}, #{po.catalogId},"
+        + " #{po.schemaComment}, #{po.properties}, #{po.auditInfo},"
+        + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt})"
+        + "</foreach>"
+        + " ON DUPLICATE KEY UPDATE"
+        + " schema_name = VALUES(schema_name),"
+        + " metalake_id = VALUES(metalake_id),"
+        + " catalog_id = VALUES(catalog_id),"
+        + " schema_comment = VALUES(schema_comment),"
+        + " properties = VALUES(properties),"
+        + " audit_info = VALUES(audit_info),"
+        + " current_version = VALUES(current_version),"
+        + " last_version = VALUES(last_version),"
+        + " deleted_at = VALUES(deleted_at)"
+        + "</script>";
+  }
+
   public String updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO) {
     return "UPDATE "
