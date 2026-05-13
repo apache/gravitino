@@ -23,6 +23,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -648,6 +649,35 @@ public class TestLancePartitionStatisticStorage {
       inOrder.verify(holder).close();
       inOrder.verify(allocator).close();
 
+    } finally {
+      FileUtils.deleteDirectory(new File(location));
+    }
+  }
+
+  @Test
+  public void testDatasetCacheClosesPreviousHolderOnReplacement() throws Exception {
+    String location = Files.createTempDirectory("lance_stats_replace_cache").toString();
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put("location", location);
+    properties.put("datasetCacheSize", "10");
+
+    LancePartitionStatisticStorage storage = new LancePartitionStatisticStorage(properties);
+
+    try {
+      Cache<Long, DatasetHolder> datasetCache = storage.getDatasetCache();
+      Assertions.assertNotNull(datasetCache);
+
+      DatasetHolder previousHolder = mock(DatasetHolder.class);
+      DatasetHolder newHolder = mock(DatasetHolder.class);
+
+      datasetCache.put(1L, previousHolder);
+      datasetCache.put(1L, newHolder);
+
+      verify(previousHolder).close();
+
+      storage.close();
+
+      verify(newHolder).close();
     } finally {
       FileUtils.deleteDirectory(new File(location));
     }
