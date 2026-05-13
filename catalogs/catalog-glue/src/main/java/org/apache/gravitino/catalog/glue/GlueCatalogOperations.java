@@ -506,8 +506,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
-        // Already handled above; this branch is never reached.
-        throw new UnsupportedOperationException("Glue does not support table rename");
+        newName = ((TableChange.RenameTable) change).getNewName();
       } else if (change instanceof TableChange.UpdateComment) {
         newComment = ((TableChange.UpdateComment) change).getNewComment();
       } else if (change instanceof TableChange.SetProperty) {
@@ -537,7 +536,24 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             current.distribution(),
             current.sortOrder());
 
-    executeUpdateTable(ident, UpdateTableRequest.builder().databaseName(dbName).tableInput(input));
+    boolean isRename = !newName.equals(current.name());
+    if (isRename) {
+      executeCreateTable(
+          dbName,
+          NameIdentifier.of(ident.namespace(), newName),
+          CreateTableRequest.builder().databaseName(dbName).tableInput(input));
+      DeleteTableRequest.Builder delReq =
+          DeleteTableRequest.builder().databaseName(dbName).name(ident.name());
+      applyCatalogId(catalogId, delReq::catalogId);
+      try {
+        glueClient.deleteTable(delReq.build());
+      } catch (GlueException e) {
+        LOG.warn("Failed to delete old Glue table {}.{} after rename: {}", dbName, ident.name(), e);
+      }
+    } else {
+      executeUpdateTable(
+          ident, UpdateTableRequest.builder().databaseName(dbName).tableInput(input));
+    }
     LOG.info("Altered Glue table {}.{}", dbName, ident.name());
 
     GlueTable altered =

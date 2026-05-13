@@ -45,8 +45,6 @@ public class SparkAwsGlueCatalogIT34 extends SparkGlueCatalogIT {
     String accessKeyId = System.getenv("AWS_ACCESS_KEY_ID");
     String secretAccessKey = System.getenv("AWS_SECRET_ACCESS_KEY");
     String bucketName = System.getenv("S3_BUCKET_NAME");
-    System.out.println(
-        "[DEBUG] S3_BUCKET_NAME env = " + bucketName + ", default = " + S3_BUCKET_NAME);
     if (bucketName == null) {
       bucketName = S3_BUCKET_NAME;
     }
