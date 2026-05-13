@@ -22,15 +22,41 @@ The following table outlines the tested compatibility between Gravitino versions
 
 | Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions |
 |--------------------------------|--------------------------------|------------------------------|
-| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15               | 0.0.6 - 0.0.8                |
-| 1.3.0                          | 0.1.0 - 0.2.0                 | 0.0.6 - 0.2.0                |
+| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                |
+| 1.3.0                          | 0.1.0 - 0.4.0                  | 0.3.0 - 0.4.2                |
 
 :::note
 - These version ranges show which versions are expected to work together.
-- Not all versions in these ranges have been tested. Only some versions were tested.
+- For Gravitino 1.3.0, the explicitly verified release versions are
+  `lance-spark` {0.1.0, 0.1.1, 0.2.0, 0.4.0} and `lance-ray`
+  {0.3.0, 0.4.2}. lance-ray 0.2.0 and earlier are *not* supported on 1.3.0
+  because pip resolves them with an older `lance-namespace` whose request
+  schema is incompatible with the upgraded server-side `lance-namespace-core`
+  (0.7.5+).
 - Before using in production, please test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
+
+#### Reproducing the matrix locally
+
+Both connectors ship with a multi-version integration test driver so the
+matrix can be re-verified (and extended) without ad-hoc scripting:
+
+```bash
+# lance-spark — runs LanceSparkRESTServiceIT once per bundle version
+./gradlew :lance:lance-rest-server:lanceSparkMatrixTest \
+    -PlanceSparkBundleVersions=0.1.0,0.1.1,0.2.0,0.4.0 \
+    -PskipDockerTests=true
+# Per-version JUnit reports land under
+# lance/lance-rest-server/build/reports/lance-spark-matrix/<version>/.
+
+# lance-ray — provisions a venv per version under
+# clients/client-python/build/lance-ray-matrix/.venv-<version>/ and runs
+# tests/integration/test_lance_ray.py against each. The Gradle wrapper
+# below starts / stops Gravitino automatically.
+./gradlew :clients:client-python:lanceRayMatrixTest \
+    -PlanceRayVersions=0.4.2,0.3.0
+```
 
 ### Why Maintain a Compatibility Matrix?
 
@@ -79,7 +105,7 @@ logging.basicConfig(level=logging.INFO)
 # Replace /path/to/lance-spark-bundle-3.5_2.12-X.X.XX.jar with your actual JAR path and version;
 # refer to the compatibility matrix for supported lance-spark versions.
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    "--jars /path/to/lance-spark-bundle-3.5_2.12-0.0.15.jar "
+    "--jars /path/to/lance-spark-bundle-3.5_2.12-0.4.0.jar "
     "--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--master local[1] pyspark-shell"

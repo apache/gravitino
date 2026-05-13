@@ -239,6 +239,52 @@ tasks {
     finalizedBy(unitCoverageReport)
   }
 
+  // Run tests/integration/test_lance_ray.py against multiple lance-ray
+  // versions. Each version is exercised inside its own venv under
+  // build/lance-ray-matrix/.venv-<version>/ (cached across runs).
+  // Override the matrix with `-PlanceRayVersions=0.4.2,0.4.1,0.4.0`.
+  register("lanceRayMatrixTest") {
+    group = "verification"
+    description =
+      "Run tests/integration/test_lance_ray.py against multiple lance-ray " +
+        "versions. Override with -PlanceRayVersions=<csv> (default: " +
+        "tracks docs/lance-rest-integration.md Compatibility Matrix)."
+
+    val versions = project.findProperty("lanceRayVersions") as? String
+    val keepGoing = project.hasProperty("lanceRayKeepGoing")
+    val script = projectDir.resolve("scripts/run_lance_ray_matrix.py")
+    val gravitinoHome = file("${project.rootDir}/distribution/package")
+
+    doFirst {
+      gravitinoServer("start")
+    }
+    doLast {
+      try {
+        val args = mutableListOf(
+          "python3",
+          script.absolutePath,
+          "--gravitino-home",
+          gravitinoHome.absolutePath,
+        )
+        if (!versions.isNullOrBlank()) {
+          args += listOf("--versions", versions)
+        }
+        if (keepGoing) {
+          args += "--keep-going"
+        }
+        val proc = ProcessBuilder(args)
+          .inheritIO()
+          .start()
+        val exit = proc.waitFor()
+        if (exit != 0) {
+          throw GradleException("lance-ray matrix failed with exit code $exit")
+        }
+      } finally {
+        gravitinoServer("stop")
+      }
+    }
+  }
+
   register("test", VenvTask::class) {
     val skipUTs = project.hasProperty("skipTests")
     val skipITs = project.hasProperty("skipITs")
