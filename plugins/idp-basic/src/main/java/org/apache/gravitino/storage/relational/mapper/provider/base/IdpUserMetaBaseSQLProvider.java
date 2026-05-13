@@ -88,11 +88,11 @@ public class IdpUserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteIdpUser(
-      @Param("userId") Long userId, @Param("deletedAt") Long deletedAt) {
+  public String softDeleteIdpUser(@Param("userId") Long userId) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " SET deleted_at = #{deletedAt},"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000,"
         + " current_version = current_version + 1,"
         + " last_version = last_version + 1"
         + " WHERE user_id = #{userId} AND deleted_at = 0";

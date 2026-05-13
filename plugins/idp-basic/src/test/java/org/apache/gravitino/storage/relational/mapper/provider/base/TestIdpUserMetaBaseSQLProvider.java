@@ -38,7 +38,7 @@ public class TestIdpUserMetaBaseSQLProvider {
   }
 
   protected String expectedDeleteAtClause() {
-    return "deleted_at = #{deletedAt}";
+    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
   }
 
   protected String expectedDeleteIdpUserMetasByLegacyTimelineSql() {
@@ -134,8 +134,7 @@ public class TestIdpUserMetaBaseSQLProvider {
 
   @Test
   public void testSoftDeleteIdpUser() {
-    String normalizedSql =
-        createProvider().softDeleteIdpUser(1L, 2L).replaceAll("\\s+", " ").trim();
+    String normalizedSql = createProvider().softDeleteIdpUser(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_meta"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
@@ -148,7 +147,7 @@ public class TestIdpUserMetaBaseSQLProvider {
   public void testSoftDeleteIdpUserDoesNotUseOptimisticLocking() {
     IdpUserMetaBaseSQLProvider provider = createProvider();
 
-    String normalizedSql = provider.softDeleteIdpUser(1L, 2L).replaceAll("\\s+", " ").trim();
+    String normalizedSql = provider.softDeleteIdpUser(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertFalse(
         normalizedSql.contains("current_version = #{currentVersion}"),

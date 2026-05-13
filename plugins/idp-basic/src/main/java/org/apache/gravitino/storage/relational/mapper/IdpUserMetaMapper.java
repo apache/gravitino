@@ -56,7 +56,7 @@ public interface IdpUserMetaMapper {
       @Param("newLastVersion") Long newLastVersion);
 
   @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "softDeleteIdpUser")
-  void softDeleteIdpUser(@Param("userId") Long userId, @Param("deletedAt") Long deletedAt);
+  void softDeleteIdpUser(@Param("userId") Long userId);
 
   @DeleteProvider(
       type = IdpUserMetaSQLProviderFactory.class,

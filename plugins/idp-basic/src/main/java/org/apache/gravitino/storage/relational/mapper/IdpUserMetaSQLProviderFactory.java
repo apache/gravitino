@@ -74,9 +74,8 @@ public class IdpUserMetaSQLProviderFactory {
             userId, passwordHash, currentVersion, newCurrentVersion, newLastVersion);
   }
 
-  public static String softDeleteIdpUser(
-      @Param("userId") Long userId, @Param("deletedAt") Long deletedAt) {
-    return getProvider().softDeleteIdpUser(userId, deletedAt);
+  public static String softDeleteIdpUser(@Param("userId") Long userId) {
+    return getProvider().softDeleteIdpUser(userId);
   }
 
   public static String deleteIdpUserMetasByLegacyTimeline(

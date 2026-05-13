@@ -75,9 +75,9 @@ public class TestIdpUserMetaMapper extends IdpMapperTestBase {
   void testSoftDeleteIdpUser() {
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
 
-    idpUserMetaMapper.softDeleteIdpUser(1L, 100L);
+    idpUserMetaMapper.softDeleteIdpUser(1L);
     assertNull(idpUserMetaMapper.selectIdpUser("alice"));
-    assertEquals(100L, queryLongValue("idp_user_meta", "deleted_at", "user_id", 1L));
+    assertTrue(queryLongValue("idp_user_meta", "deleted_at", "user_id", 1L) > 0L);
     assertEquals(2L, queryLongValue("idp_user_meta", "current_version", "user_id", 1L));
     assertEquals(1L, queryLongValue("idp_user_meta", "last_version", "user_id", 1L));
   }
