@@ -92,36 +92,21 @@ public final class RelationalSchemaNamingBridge {
   }
 
   public static RoleEntity roleEntityForStorage(RoleEntity entity) {
-    List<SecurableObject> objects = entity.securableObjects();
-    if (objects == null || objects.isEmpty()) {
-      return entity;
-    }
-    List<SecurableObject> mapped =
-        objects.stream()
-            .map(RelationalSchemaNamingBridge::securableObjectForStorage)
-            .collect(Collectors.toList());
-    if (mapped.equals(objects)) {
-      return entity;
-    }
-    return RoleEntity.builder()
-        .withId(entity.id())
-        .withName(entity.name())
-        .withNamespace(entity.namespace())
-        .withProperties(entity.properties())
-        .withAuditInfo(entity.auditInfo())
-        .withSecurableObjects(mapped)
-        .build();
+    return mapRoleSecurableObjects(entity, RelationalSchemaNamingBridge::securableObjectForStorage);
   }
 
   public static RoleEntity roleEntityForApi(RoleEntity entity) {
+    return mapRoleSecurableObjects(entity, RelationalSchemaNamingBridge::securableObjectForApi);
+  }
+
+  private static RoleEntity mapRoleSecurableObjects(
+      RoleEntity entity, Function<SecurableObject, SecurableObject> mapper) {
     List<SecurableObject> objects = entity.securableObjects();
     if (objects == null || objects.isEmpty()) {
       return entity;
     }
     List<SecurableObject> mapped =
-        objects.stream()
-            .map(RelationalSchemaNamingBridge::securableObjectForApi)
-            .collect(Collectors.toList());
+        objects.stream().map(mapper).collect(Collectors.toList());
     if (mapped.equals(objects)) {
       return entity;
     }
@@ -428,21 +413,7 @@ public final class RelationalSchemaNamingBridge {
    * concrete subtypes are not expected and will cause an {@link IllegalArgumentException}.
    */
   public static StatisticEntity statisticEntityForApi(StatisticEntity e) {
-    Preconditions.checkArgument(
-        e instanceof TableStatisticEntity,
-        "Only TableStatisticEntity is supported by statisticEntityForApi, got: %s",
-        e.getClass().getSimpleName());
-    Namespace apiNs = embeddedNamespaceForApi(e.namespace());
-    if (apiNs.equals(e.namespace())) {
-      return e;
-    }
-    return TableStatisticEntity.builder()
-        .withId(e.id())
-        .withName(e.name())
-        .withValue(e.value())
-        .withAuditInfo((AuditInfo) e.auditInfo())
-        .withNamespace(apiNs)
-        .build();
+    return statisticEntityWithNamespace(e, embeddedNamespaceForApi(e.namespace()));
   }
 
   /**
@@ -450,12 +421,15 @@ public final class RelationalSchemaNamingBridge {
    * #statisticEntityForApi(StatisticEntity)} for subtype restrictions.
    */
   public static StatisticEntity statisticEntityForStorage(StatisticEntity e) {
+    return statisticEntityWithNamespace(e, embeddedNamespaceForStorage(e.namespace()));
+  }
+
+  private static StatisticEntity statisticEntityWithNamespace(StatisticEntity e, Namespace ns) {
     Preconditions.checkArgument(
         e instanceof TableStatisticEntity,
-        "Only TableStatisticEntity is supported by statisticEntityForStorage, got: %s",
+        "Only TableStatisticEntity is supported, got: %s",
         e.getClass().getSimpleName());
-    Namespace storageNs = embeddedNamespaceForStorage(e.namespace());
-    if (storageNs.equals(e.namespace())) {
+    if (ns.equals(e.namespace())) {
       return e;
     }
     return TableStatisticEntity.builder()
@@ -463,7 +437,7 @@ public final class RelationalSchemaNamingBridge {
         .withName(e.name())
         .withValue(e.value())
         .withAuditInfo((AuditInfo) e.auditInfo())
-        .withNamespace(storageNs)
+        .withNamespace(ns)
         .build();
   }
 

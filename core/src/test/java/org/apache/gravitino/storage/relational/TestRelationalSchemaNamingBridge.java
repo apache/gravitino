@@ -51,6 +51,11 @@ public class TestRelationalSchemaNamingBridge {
   /** ASCII-1 internal separator used in physical storage. */
   private static final String P = "";
 
+  private static final List<Privilege> USE_SCHEMA_PRIVS =
+      Lists.newArrayList(Privileges.UseSchema.allow());
+  private static final SecurableObject CATALOG_OBJ =
+      SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
+
   @BeforeEach
   public void setUp() throws Exception {
     mockSeparator(":");
@@ -67,7 +72,6 @@ public class TestRelationalSchemaNamingBridge {
 
   @Test
   public void schemaToStorage() {
-    // SCHEMA expects 2 dot-parts; schema segment "a:b:c" → "abc"
     String logical = "catalog.a:b:c";
     String physical =
         RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
@@ -86,7 +90,6 @@ public class TestRelationalSchemaNamingBridge {
 
   @Test
   public void tableToStorage() {
-    // TABLE expects 3 dot-parts; schema segment at index 1
     String logical = "catalog.a:b.mytable";
     String physical =
         RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
@@ -123,7 +126,6 @@ public class TestRelationalSchemaNamingBridge {
 
   @Test
   public void columnToStorage() {
-    // COLUMN expects 4 dot-parts
     String logical = "catalog.a:b.mytable.mycol";
     String physical =
         RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
@@ -155,7 +157,6 @@ public class TestRelationalSchemaNamingBridge {
 
   @Test
   public void schemaPartCountMismatch() {
-    // SCHEMA expects 2 parts; 3 parts → no conversion
     String name = "catalog.schema.extra";
     String result =
         RelationalSchemaNamingBridge.convertMetadataObjectDottedFullName(
@@ -295,7 +296,6 @@ public class TestRelationalSchemaNamingBridge {
 
   @Test
   public void genericEntityApiTable() {
-    // TABLE has 3 dot-parts; schema segment at index 1 gets physical→logical conversion
     String physicalName = "catalog.a" + P + "b.mytable";
     GenericEntity entity =
         GenericEntity.builder()
@@ -310,7 +310,6 @@ public class TestRelationalSchemaNamingBridge {
 
   @Test
   public void genericEntityApiSchema() {
-    // SCHEMA has 2 dot-parts
     String physicalName = "catalog.a" + P + "b" + P + "c";
     GenericEntity entity =
         GenericEntity.builder()
@@ -371,40 +370,24 @@ public class TestRelationalSchemaNamingBridge {
 
   @Test
   public void roleWithNestedSchemaSecurableObjectToStorage() {
-    // SecurableObject of type SCHEMA with logical name "catalog.a:b"
-    List<Privilege> privs = Lists.newArrayList(Privileges.UseSchema.allow());
-    SecurableObject catalogObj = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
-    SecurableObject schemaObj = SecurableObjects.ofSchema(catalogObj, "a:b", privs);
-
-    RoleEntity role = buildRole(Lists.newArrayList(schemaObj));
-
-    RoleEntity stored = RelationalSchemaNamingBridge.roleEntityForStorage(role);
-    SecurableObject storedSchema = stored.securableObjects().get(0);
-    // schema segment "a:b" → "ab"
-    assertEquals("catalog.a" + P + "b", storedSchema.fullName());
+    SecurableObject schemaObj = SecurableObjects.ofSchema(CATALOG_OBJ, "a:b", USE_SCHEMA_PRIVS);
+    RoleEntity stored =
+        RelationalSchemaNamingBridge.roleEntityForStorage(buildRole(Lists.newArrayList(schemaObj)));
+    assertEquals("catalog.a" + P + "b", stored.securableObjects().get(0).fullName());
   }
 
   @Test
   public void roleWithNestedSchemaSecurableObjectToApi() {
-    // SecurableObject of type SCHEMA with physical name "catalog.ab"
-    List<Privilege> privs = Lists.newArrayList(Privileges.UseSchema.allow());
     SecurableObject schemaObj =
-        SecurableObjects.parse("catalog.a" + P + "b", MetadataObject.Type.SCHEMA, privs);
-
-    RoleEntity role = buildRole(Lists.newArrayList(schemaObj));
-
-    RoleEntity api = RelationalSchemaNamingBridge.roleEntityForApi(role);
-    SecurableObject apiSchema = api.securableObjects().get(0);
-    assertEquals("catalog.a:b", apiSchema.fullName());
+        SecurableObjects.parse("catalog.a" + P + "b", MetadataObject.Type.SCHEMA, USE_SCHEMA_PRIVS);
+    RoleEntity api =
+        RelationalSchemaNamingBridge.roleEntityForApi(buildRole(Lists.newArrayList(schemaObj)));
+    assertEquals("catalog.a:b", api.securableObjects().get(0).fullName());
   }
 
   @Test
   public void roleWithFlatSchemaIsUnchanged() {
-    // A schema without the separator → same instance returned
-    List<Privilege> privs = Lists.newArrayList(Privileges.UseSchema.allow());
-    SecurableObject catalogObj = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
-    SecurableObject schemaObj = SecurableObjects.ofSchema(catalogObj, "flat", privs);
-
+    SecurableObject schemaObj = SecurableObjects.ofSchema(CATALOG_OBJ, "flat", USE_SCHEMA_PRIVS);
     RoleEntity role = buildRole(Lists.newArrayList(schemaObj));
     assertSame(role, RelationalSchemaNamingBridge.roleEntityForStorage(role));
     assertSame(role, RelationalSchemaNamingBridge.roleEntityForApi(role));
@@ -419,14 +402,11 @@ public class TestRelationalSchemaNamingBridge {
 
   @Test
   public void roleRoundTrip() {
-    List<Privilege> privs = Lists.newArrayList(Privileges.UseSchema.allow());
-    SecurableObject catalogObj = SecurableObjects.ofCatalog("catalog", Lists.newArrayList());
-    SecurableObject schemaObj = SecurableObjects.ofSchema(catalogObj, "a:b:c", privs);
-
+    SecurableObject schemaObj = SecurableObjects.ofSchema(CATALOG_OBJ, "a:b:c", USE_SCHEMA_PRIVS);
     RoleEntity original = buildRole(Lists.newArrayList(schemaObj));
-    RoleEntity stored = RelationalSchemaNamingBridge.roleEntityForStorage(original);
-    RoleEntity backToApi = RelationalSchemaNamingBridge.roleEntityForApi(stored);
-
+    RoleEntity backToApi =
+        RelationalSchemaNamingBridge.roleEntityForApi(
+            RelationalSchemaNamingBridge.roleEntityForStorage(original));
     assertEquals(
         original.securableObjects().get(0).fullName(),
         backToApi.securableObjects().get(0).fullName());
