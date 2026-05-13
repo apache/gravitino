@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper.TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.Param;
@@ -54,6 +55,32 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " current_version = #{schemaMeta.currentVersion},"
         + " last_version = #{schemaMeta.lastVersion},"
         + " deleted_at = #{schemaMeta.deletedAt}";
+  }
+
+  @Override
+  public String batchInsertSchemaMetaOnDuplicateKeyUpdate(
+      @Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return "<script>"
+        + "INSERT INTO "
+        + TABLE_NAME
+        + " (schema_id, schema_name, metalake_id, catalog_id, schema_comment,"
+        + " properties, audit_info, current_version, last_version, deleted_at) VALUES "
+        + "<foreach collection='schemaMetas' item='po' separator=','>"
+        + "(#{po.schemaId}, #{po.schemaName}, #{po.metalakeId}, #{po.catalogId},"
+        + " #{po.schemaComment}, #{po.properties}, #{po.auditInfo},"
+        + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt})"
+        + "</foreach>"
+        + " ON CONFLICT(schema_id) DO UPDATE SET"
+        + " schema_name = EXCLUDED.schema_name,"
+        + " metalake_id = EXCLUDED.metalake_id,"
+        + " catalog_id = EXCLUDED.catalog_id,"
+        + " schema_comment = EXCLUDED.schema_comment,"
+        + " properties = EXCLUDED.properties,"
+        + " audit_info = EXCLUDED.audit_info,"
+        + " current_version = EXCLUDED.current_version,"
+        + " last_version = EXCLUDED.last_version,"
+        + " deleted_at = EXCLUDED.deleted_at"
+        + "</script>";
   }
 
   @Override
