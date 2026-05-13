@@ -21,7 +21,6 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -54,11 +53,11 @@ abstract class IdpMapperTestBase {
 
   @BeforeAll
   static void setup() throws Exception {
-    File dir = new File(DB_DIR);
-    if (dir.exists()) {
-      deleteDirectory(dir.toPath());
+    Path dbDir = Path.of(DB_DIR);
+    if (Files.exists(dbDir)) {
+      deleteDirectory(dbDir);
     }
-    dir.mkdirs();
+    Files.createDirectories(dbDir);
 
     Config config = new Config(false) {};
     config.set(Configs.ENTITY_STORE, "relational");
@@ -87,9 +86,9 @@ abstract class IdpMapperTestBase {
     if (backend != null) {
       backend.close();
     }
-    File dir = new File(JDBC_STORE_PATH);
-    if (dir.exists()) {
-      deleteDirectory(dir.toPath());
+    Path jdbcStoreDir = Path.of(JDBC_STORE_PATH);
+    if (Files.exists(jdbcStoreDir)) {
+      deleteDirectory(jdbcStoreDir);
     }
   }
 
