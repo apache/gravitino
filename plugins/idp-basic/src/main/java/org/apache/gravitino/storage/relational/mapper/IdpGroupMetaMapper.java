@@ -44,7 +44,7 @@ public interface IdpGroupMetaMapper {
   void insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO);
 
   @UpdateProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "softDeleteIdpGroup")
-  void softDeleteIdpGroup(@Param("groupId") Long groupId, @Param("deletedAt") Long deletedAt);
+  void softDeleteIdpGroup(@Param("groupId") Long groupId);
 
   @DeleteProvider(
       type = IdpGroupMetaSQLProviderFactory.class,

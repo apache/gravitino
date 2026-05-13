@@ -26,7 +26,7 @@ import org.apache.ibatis.annotations.Param;
 public class IdpGroupMetaPostgreSQLProvider extends IdpGroupMetaBaseSQLProvider {
 
   @Override
-  public String softDeleteIdpGroup(Long groupId, Long deletedAt) {
+  public String softDeleteIdpGroup(Long groupId) {
     return "UPDATE "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
