@@ -58,7 +58,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
 /** The service class for table metadata. It provides the basic database operations for table. */
-public class TableMetaService {
+public class TableMetaService extends RequireSchemaConventionService<TablePO> {
   private static final TableMetaService INSTANCE = new TableMetaService();
 
   public static TableMetaService getInstance() {
@@ -466,12 +466,22 @@ public class TableMetaService {
   private Function<Namespace, List<TablePO>> tableListFetcher() {
     return GravitinoEnv.getInstance().cacheEnabled()
         ? this::listTablePOsBySchemaId
-        : this::listTablePOsByFullQualifiedName;
+        : this::listPOsForApiNamespace;
   }
 
   private Function<NameIdentifier, TablePO> tablePOFetcher() {
     return GravitinoEnv.getInstance().cacheEnabled()
         ? this::getTablePOBySchemaId
-        : this::getTablePOByFullQualifiedName;
+        : this::getPOForApiIdentifier;
   }
+
+    @Override
+    protected TablePO fetchPOByStorageIdentifier(NameIdentifier storageIdentifier) {
+        return getTablePOByFullQualifiedName(storageIdentifier);
+    }
+
+    @Override
+    protected List<TablePO> fetchPOsByStorageNamespace(Namespace storageNamespace) {
+        return listTablePOsByFullQualifiedName(storageNamespace);
+    }
 }
