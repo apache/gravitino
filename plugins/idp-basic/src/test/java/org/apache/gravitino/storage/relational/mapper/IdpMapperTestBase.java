@@ -21,33 +21,49 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Comparator;
+import java.util.UUID;
+import java.util.stream.Stream;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@ExtendWith({
-  IdpMapperBackendTestExtension.class,
-  PrintFuncNameExtension.class,
-  CloseContainerExtension.class
-})
+@ExtendWith({PrintFuncNameExtension.class, CloseContainerExtension.class})
 abstract class IdpMapperTestBase {
+  private final BaseIT baseIT = new BaseIT();
+  private Path h2Path;
+
   protected String backendType;
   protected JDBCBackend backend;
   protected SqlSession sharedSession;
   protected IdpUserMetaMapper idpUserMetaMapper;
+
+  @BeforeAll
+  void startBackend() throws SQLException {
+    backendType = backendType();
+    backend = createBackend(backendType);
+  }
 
   @BeforeEach
   void openSession() {
@@ -61,6 +77,20 @@ abstract class IdpMapperTestBase {
     if (sharedSession != null) {
       sharedSession.close();
       sharedSession = null;
+    }
+  }
+
+  @AfterAll
+  void stopBackend() throws IOException {
+    SqlSessionFactoryHelper.getInstance().close();
+    if (backend != null) {
+      backend.close();
+      backend = null;
+    }
+
+    if (h2Path != null && Files.exists(h2Path)) {
+      deleteDirectory(h2Path);
+      h2Path = null;
     }
   }
 
@@ -136,11 +166,60 @@ abstract class IdpMapperTestBase {
     }
   }
 
-  void setBackendType(String backendType) {
-    this.backendType = backendType;
+  protected abstract String backendType();
+
+  private JDBCBackend createBackend(String backendType) throws SQLException {
+    Config config = new Config(false) {};
+    config.set(Configs.ENTITY_STORE, Configs.RELATIONAL_ENTITY_STORE);
+    config.set(Configs.ENTITY_RELATIONAL_STORE, backendType);
+    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS, 20);
+    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS, 1000L);
+
+    if ("mysql".equals(backendType)) {
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, baseIT.startAndInitMySQLBackend());
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "root");
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "root");
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "com.mysql.cj.jdbc.Driver");
+    } else if ("postgresql".equals(backendType)) {
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, baseIT.startAndInitPGBackend());
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "root");
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "root");
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.postgresql.Driver");
+    } else {
+      String jdbcStorePath =
+          "/tmp/gravitino_jdbc_idpMappers_" + UUID.randomUUID().toString().replace("-", "");
+      h2Path = Path.of(jdbcStorePath);
+      try {
+        Files.createDirectories(h2Path);
+      } catch (IOException e) {
+        throw new RuntimeException("Create H2 test directory failed: " + h2Path, e);
+      }
+
+      config.set(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL,
+          String.format("jdbc:h2:file:%s/testdb;DB_CLOSE_DELAY=-1;MODE=MYSQL", jdbcStorePath));
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "root");
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "123456");
+      config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
+    }
+
+    JDBCBackend jdbcBackend = new JDBCBackend();
+    jdbcBackend.initialize(config);
+    return jdbcBackend;
   }
 
-  void setBackend(JDBCBackend backend) {
-    this.backend = backend;
+  private void deleteDirectory(Path dir) throws IOException {
+    try (Stream<Path> paths = Files.walk(dir)) {
+      paths
+          .sorted(Comparator.reverseOrder())
+          .forEach(
+              path -> {
+                try {
+                  Files.deleteIfExists(path);
+                } catch (IOException e) {
+                  throw new RuntimeException("Delete path failed: " + path, e);
+                }
+              });
+    }
   }
 }
