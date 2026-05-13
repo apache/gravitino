@@ -29,9 +29,7 @@ public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
   public String softDeleteIdpUser(Long userId) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),"
-        + " current_version = current_version + 1,"
-        + " last_version = last_version + 1"
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 

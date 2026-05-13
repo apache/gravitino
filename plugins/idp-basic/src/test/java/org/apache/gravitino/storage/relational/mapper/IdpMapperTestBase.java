@@ -63,4 +63,12 @@ abstract class IdpMapperTestBase extends TestJDBCBackend {
     idpUserMetaMapper.insertIdpUser(userPO);
     return userPO;
   }
+
+  long queryLongValueInMapperTest(String table, String column, String idColumn, long idValue) {
+    return queryLongValue(table, column, idColumn, idValue);
+  }
+
+  int countRowsInMapperTest(String table, String idColumn, long idValue) {
+    return countRows(table, idColumn, idValue);
+  }
 }

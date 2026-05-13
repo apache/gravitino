@@ -24,12 +24,13 @@ plugins {
 }
 
 dependencies {
+  annotationProcessor(libs.lombok)
   implementation(project(":core"))
   implementation(libs.bcprov.jdk18on)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.mybatis)
-  testImplementation(project(":api"))
+  compileOnly(libs.lombok)
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.mapper.provider.h2.IdpUserMetaH2Provider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.IdpUserMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -35,7 +34,7 @@ public class IdpUserMetaSQLProviderFactory {
       IDP_USER_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new IdpUserMetaMySQLProvider(),
-              JDBCBackendType.H2, new IdpUserMetaH2Provider(),
+              JDBCBackendType.H2, new IdpUserMetaBaseSQLProvider(),
               JDBCBackendType.POSTGRESQL, new IdpUserMetaPostgreSQLProvider());
 
   public static IdpUserMetaBaseSQLProvider getProvider() {
@@ -51,12 +50,12 @@ public class IdpUserMetaSQLProviderFactory {
 
   static class IdpUserMetaMySQLProvider extends IdpUserMetaBaseSQLProvider {}
 
-  public static String selectIdpUser(@Param("userName") String userName) {
-    return getProvider().selectIdpUser(userName);
+  public static String selectIdpUser(@Param("username") String username) {
+    return getProvider().selectIdpUser(username);
   }
 
-  public static String selectIdpUsers(@Param("userNames") List<String> userNames) {
-    return getProvider().selectIdpUsers(userNames);
+  public static String selectIdpUsers(@Param("usernames") List<String> usernames) {
+    return getProvider().selectIdpUsers(usernames);
   }
 
   public static String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
@@ -66,12 +65,8 @@ public class IdpUserMetaSQLProviderFactory {
   public static String updateIdpUserPassword(
       @Param("userId") Long userId,
       @Param("passwordHash") String passwordHash,
-      @Param("currentVersion") Long currentVersion,
-      @Param("newCurrentVersion") Long newCurrentVersion,
       @Param("newLastVersion") Long newLastVersion) {
-    return getProvider()
-        .updateIdpUserPassword(
-            userId, passwordHash, currentVersion, newCurrentVersion, newLastVersion);
+    return getProvider().updateIdpUserPassword(userId, passwordHash, newLastVersion);
   }
 
   public static String softDeleteIdpUser(@Param("userId") Long userId) {

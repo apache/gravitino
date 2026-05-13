@@ -17,8 +17,15 @@
  * under the License.
  */
 
-package org.apache.gravitino.storage.relational.mapper.provider.h2;
+package org.apache.gravitino.storage.relational;
 
-import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
-public class IdpUserMetaH2Provider extends IdpUserMetaBaseSQLProvider {}
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+public @interface BackendTypes {
+  String[] value();
+}

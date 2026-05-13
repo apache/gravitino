@@ -38,11 +38,13 @@ public class TestIdpUserMetaBaseSQLProvider {
   }
 
   protected String expectedDeleteAtClause() {
-    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
   }
 
   protected String expectedDeleteIdpUserMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_user_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+    return "DELETE FROM idp_user_meta"
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 
   @Test
@@ -52,14 +54,14 @@ public class TestIdpUserMetaBaseSQLProvider {
     Assertions.assertTrue(normalizedSql.contains("SELECT user_id as userId"));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta"));
     Assertions.assertTrue(
-        normalizedSql.contains("WHERE user_name = #{userName} AND deleted_at = 0"));
+        normalizedSql.contains("WHERE user_name = #{username} AND deleted_at = 0"));
   }
 
   @Test
   public void testSelectIdpUsers() {
     String script = createProvider().selectIdpUsers(Arrays.asList("tom", "jerry"));
     Map<String, Object> params = new HashMap<>();
-    params.put("userNames", Arrays.asList("tom", "jerry"));
+    params.put("usernames", Arrays.asList("tom", "jerry"));
 
     String normalizedSql = renderScript(script, params);
 
@@ -73,7 +75,7 @@ public class TestIdpUserMetaBaseSQLProvider {
   public void testSelectIdpUsersWithEmptyUserNames() {
     String script = createProvider().selectIdpUsers(Collections.emptyList());
     Map<String, Object> params = new HashMap<>();
-    params.put("userNames", Collections.emptyList());
+    params.put("usernames", Collections.emptyList());
 
     String normalizedSql = renderScript(script, params);
 
@@ -89,7 +91,7 @@ public class TestIdpUserMetaBaseSQLProvider {
   public void testSelectIdpUsersWithNullUserNames() {
     String script = createProvider().selectIdpUsers(null);
     Map<String, Object> params = new HashMap<>();
-    params.put("userNames", null);
+    params.put("usernames", null);
 
     String normalizedSql = renderScript(script, params);
 
@@ -112,23 +114,21 @@ public class TestIdpUserMetaBaseSQLProvider {
             "(user_id, user_name, password_hash, current_version, last_version, deleted_at)"));
     Assertions.assertTrue(
         normalizedSql.contains(
-            "VALUES ( #{userMeta.userId}, #{userMeta.userName}, #{userMeta.passwordHash}, #{userMeta.currentVersion}, #{userMeta.lastVersion}, #{userMeta.deletedAt} )"));
+            "VALUES ( #{userMeta.userId}, #{userMeta.userName}, #{userMeta.passwordHash},"
+                + " #{userMeta.currentVersion}, #{userMeta.lastVersion},"
+                + " #{userMeta.deletedAt} )"));
   }
 
   @Test
   public void testUpdateIdpUserPassword() {
     String normalizedSql =
-        createProvider()
-            .updateIdpUserPassword(1L, "hash", 1L, 2L, 3L)
-            .replaceAll("\\s+", " ")
-            .trim();
+        createProvider().updateIdpUserPassword(1L, "hash", 3L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_meta"));
     Assertions.assertTrue(normalizedSql.contains("SET password_hash = #{passwordHash}"));
-    Assertions.assertTrue(normalizedSql.contains("current_version = #{newCurrentVersion}"));
+    Assertions.assertTrue(normalizedSql.contains("current_version = #{newLastVersion}"));
     Assertions.assertTrue(normalizedSql.contains("last_version = #{newLastVersion}"));
     Assertions.assertTrue(normalizedSql.contains("WHERE user_id = #{userId}"));
-    Assertions.assertTrue(normalizedSql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(normalizedSql.contains("AND deleted_at = 0"));
   }
 
@@ -138,8 +138,6 @@ public class TestIdpUserMetaBaseSQLProvider {
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_meta"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("current_version = current_version + 1"));
-    Assertions.assertTrue(normalizedSql.contains("last_version = last_version + 1"));
     Assertions.assertTrue(normalizedSql.contains("WHERE user_id = #{userId} AND deleted_at = 0"));
   }
 
@@ -152,12 +150,12 @@ public class TestIdpUserMetaBaseSQLProvider {
     Assertions.assertFalse(
         normalizedSql.contains("current_version = #{currentVersion}"),
         "Built-in IdP user delete should not use optimistic locking");
-    Assertions.assertTrue(
+    Assertions.assertFalse(
         normalizedSql.contains("current_version = current_version + 1"),
-        "Built-in IdP user delete should increment current_version in place");
-    Assertions.assertTrue(
+        "Built-in IdP user delete should not increment current_version");
+    Assertions.assertFalse(
         normalizedSql.contains("last_version = last_version + 1"),
-        "Built-in IdP user delete should increment last_version in place");
+        "Built-in IdP user delete should not increment last_version");
   }
 
   @Test

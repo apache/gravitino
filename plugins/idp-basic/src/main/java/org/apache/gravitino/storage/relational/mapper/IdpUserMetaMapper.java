@@ -38,10 +38,10 @@ public interface IdpUserMetaMapper {
   String IDP_USER_TABLE_NAME = "idp_user_meta";
 
   @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUser")
-  IdpUserPO selectIdpUser(@Param("userName") String userName);
+  IdpUserPO selectIdpUser(@Param("username") String username);
 
   @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUsers")
-  List<IdpUserPO> selectIdpUsers(@Param("userNames") List<String> userNames);
+  List<IdpUserPO> selectIdpUsers(@Param("usernames") List<String> usernames);
 
   @InsertProvider(type = IdpUserMetaSQLProviderFactory.class, method = "insertIdpUser")
   void insertIdpUser(@Param("userMeta") IdpUserPO userPO);
@@ -50,8 +50,6 @@ public interface IdpUserMetaMapper {
   Integer updateIdpUserPassword(
       @Param("userId") Long userId,
       @Param("passwordHash") String passwordHash,
-      @Param("currentVersion") Long currentVersion,
-      @Param("newCurrentVersion") Long newCurrentVersion,
       @Param("newLastVersion") Long newLastVersion);
 
   @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "softDeleteIdpUser")

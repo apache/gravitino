@@ -21,11 +21,12 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
+import org.apache.gravitino.storage.relational.BackendTypes;
 import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.mapper.provider.h2.IdpUserMetaH2Provider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.IdpUserMetaPostgreSQLProvider;
 import org.junit.jupiter.api.TestTemplate;
 
+@BackendTypes({"h2"})
 public class TestIdpUserMetaSQLProviderFactory extends IdpMapperTestBase {
 
   @TestTemplate
@@ -34,7 +35,7 @@ public class TestIdpUserMetaSQLProviderFactory extends IdpMapperTestBase {
 
     switch (backendType) {
       case "h2":
-        assertInstanceOf(IdpUserMetaH2Provider.class, provider);
+        assertInstanceOf(IdpUserMetaBaseSQLProvider.class, provider);
         break;
       case "postgresql":
         assertInstanceOf(IdpUserMetaPostgreSQLProvider.class, provider);

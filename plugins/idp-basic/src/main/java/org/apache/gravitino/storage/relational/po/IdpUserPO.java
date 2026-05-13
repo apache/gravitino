@@ -18,9 +18,21 @@
  */
 package org.apache.gravitino.storage.relational.po;
 
-import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 
+@Getter
+@EqualsAndHashCode
+@ToString
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder(builderClassName = "Builder", setterPrefix = "with")
 public class IdpUserPO {
   private Long userId;
   private String userName;
@@ -29,123 +41,19 @@ public class IdpUserPO {
   private Long lastVersion;
   private Long deletedAt;
 
-  public Long getUserId() {
-    return userId;
-  }
-
-  public String getUserName() {
-    return userName;
-  }
-
-  public String getPasswordHash() {
-    return passwordHash;
-  }
-
-  public Long getCurrentVersion() {
-    return currentVersion;
-  }
-
-  public Long getLastVersion() {
-    return lastVersion;
-  }
-
-  public Long getDeletedAt() {
-    return deletedAt;
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof IdpUserPO)) {
-      return false;
-    }
-    IdpUserPO userPO = (IdpUserPO) o;
-    return Objects.equal(getUserId(), userPO.getUserId())
-        && Objects.equal(getUserName(), userPO.getUserName())
-        && Objects.equal(getPasswordHash(), userPO.getPasswordHash())
-        && Objects.equal(getCurrentVersion(), userPO.getCurrentVersion())
-        && Objects.equal(getLastVersion(), userPO.getLastVersion())
-        && Objects.equal(getDeletedAt(), userPO.getDeletedAt());
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hashCode(
-        getUserId(),
-        getUserName(),
-        getPasswordHash(),
-        getCurrentVersion(),
-        getLastVersion(),
-        getDeletedAt());
-  }
-
   public static class Builder {
-    private final IdpUserPO userPO;
-
-    private Builder() {
-      userPO = new IdpUserPO();
-    }
-
-    public Builder withUserId(Long userId) {
-      userPO.userId = userId;
-      return this;
-    }
-
-    public Builder withUserName(String userName) {
-      userPO.userName = userName;
-      return this;
-    }
-
-    public Builder withPasswordHash(String passwordHash) {
-      userPO.passwordHash = passwordHash;
-      return this;
-    }
-
-    public Builder withCurrentVersion(Long currentVersion) {
-      userPO.currentVersion = currentVersion;
-      return this;
-    }
-
-    public Builder withLastVersion(Long lastVersion) {
-      userPO.lastVersion = lastVersion;
-      return this;
-    }
-
-    public Builder withDeletedAt(Long deletedAt) {
-      userPO.deletedAt = deletedAt;
-      return this;
-    }
-
     private void validate() {
-      Preconditions.checkArgument(userPO.userId != null, "User id is required");
-      Preconditions.checkArgument(userPO.userName != null, "User name is required");
-      Preconditions.checkArgument(userPO.passwordHash != null, "Password hash is required");
-      Preconditions.checkArgument(userPO.currentVersion != null, "Current version is required");
-      Preconditions.checkArgument(userPO.lastVersion != null, "Last version is required");
-      Preconditions.checkArgument(userPO.deletedAt != null, "Deleted at is required");
+      Preconditions.checkArgument(userId != null, "User id is required");
+      Preconditions.checkArgument(userName != null, "User name is required");
+      Preconditions.checkArgument(passwordHash != null, "Password hash is required");
+      Preconditions.checkArgument(currentVersion != null, "Current version is required");
+      Preconditions.checkArgument(lastVersion != null, "Last version is required");
+      Preconditions.checkArgument(deletedAt != null, "Deleted at is required");
     }
 
     public IdpUserPO build() {
       validate();
-      IdpUserPO userPO = new IdpUserPO();
-      userPO.userId = this.userPO.userId;
-      userPO.userName = this.userPO.userName;
-      userPO.passwordHash = this.userPO.passwordHash;
-      userPO.currentVersion = this.userPO.currentVersion;
-      userPO.lastVersion = this.userPO.lastVersion;
-      userPO.deletedAt = this.userPO.deletedAt;
-      return userPO;
+      return new IdpUserPO(userId, userName, passwordHash, currentVersion, lastVersion, deletedAt);
     }
-  }
-
-  /**
-   * Creates a new instance of {@link Builder}.
-   *
-   * @return The new instance.
-   */
-  public static Builder builder() {
-    return new Builder();
   }
 }

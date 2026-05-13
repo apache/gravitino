@@ -48,10 +48,13 @@ class BackendTestExtension implements TestTemplateInvocationContextProvider {
   @Override
   public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(
       ExtensionContext context) {
+    BackendTypes backendTypes = context.getRequiredTestClass().getAnnotation(BackendTypes.class);
     List<String> backends =
-        "true".equalsIgnoreCase(System.getenv(DOCKER_TEST_FLAG))
-            ? List.of("h2", "mysql", "postgresql")
-            : List.of("h2");
+        backendTypes != null
+            ? List.of(backendTypes.value())
+            : ("true".equalsIgnoreCase(System.getenv(DOCKER_TEST_FLAG))
+                ? List.of("h2", "mysql", "postgresql")
+                : List.of("h2"));
     return backends.stream().map(BackendInvocationContext::new);
   }
 

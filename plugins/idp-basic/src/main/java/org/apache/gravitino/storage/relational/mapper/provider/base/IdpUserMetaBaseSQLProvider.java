@@ -26,16 +26,16 @@ import org.apache.ibatis.annotations.Param;
 
 public class IdpUserMetaBaseSQLProvider {
 
-  public String selectIdpUser(@Param("userName") String userName) {
+  public String selectIdpUser(@Param("username") String username) {
     return "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " WHERE user_name = #{userName} AND deleted_at = 0";
+        + " WHERE user_name = #{username} AND deleted_at = 0";
   }
 
-  public String selectIdpUsers(@Param("userNames") List<String> userNames) {
+  public String selectIdpUsers(@Param("usernames") List<String> usernames) {
     return "<script>"
         + "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
         + " current_version as currentVersion,"
@@ -44,9 +44,9 @@ public class IdpUserMetaBaseSQLProvider {
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " WHERE deleted_at = 0 "
         + "<choose>"
-        + "<when test='userNames != null and userNames.size() > 0'>"
+        + "<when test='usernames != null and usernames.size() > 0'>"
         + "AND user_name IN ("
-        + "<foreach item='item' collection='userNames' separator=','>"
+        + "<foreach item='item' collection='usernames' separator=','>"
         + "#{item}"
         + "</foreach>"
         + ") "
@@ -75,16 +75,13 @@ public class IdpUserMetaBaseSQLProvider {
   public String updateIdpUserPassword(
       @Param("userId") Long userId,
       @Param("passwordHash") String passwordHash,
-      @Param("currentVersion") Long currentVersion,
-      @Param("newCurrentVersion") Long newCurrentVersion,
       @Param("newLastVersion") Long newLastVersion) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET password_hash = #{passwordHash},"
-        + " current_version = #{newCurrentVersion},"
+        + " current_version = #{newLastVersion},"
         + " last_version = #{newLastVersion}"
         + " WHERE user_id = #{userId}"
-        + " AND current_version = #{currentVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -92,9 +89,7 @@ public class IdpUserMetaBaseSQLProvider {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000,"
-        + " current_version = current_version + 1,"
-        + " last_version = last_version + 1"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
