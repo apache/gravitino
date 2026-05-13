@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.ServiceLoader;
+import org.apache.gravitino.storage.relational.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +33,8 @@ public class TestIdpBasicMapperPackageProvider {
   public void testGetMapperClasses() {
     MapperPackageProvider provider = new IdpBasicMapperPackageProvider();
 
-    assertEquals(List.of(IdpUserMetaMapper.class), provider.getMapperClasses());
+    assertEquals(
+        List.of(IdpUserMetaMapper.class, IdpGroupMetaMapper.class), provider.getMapperClasses());
   }
 
   @Test

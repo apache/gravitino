@@ -29,6 +29,7 @@ import java.sql.Statement;
 import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
 import org.apache.gravitino.storage.relational.JDBCBackend;
+import org.apache.gravitino.storage.relational.po.IdpGroupPO;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
@@ -48,11 +49,14 @@ abstract class IdpMapperTestBase {
   protected JDBCBackend backend;
   protected SqlSession sharedSession;
   protected IdpUserMetaMapper idpUserMetaMapper;
+  protected static IdpGroupMetaMapper idpGroupMetaMapper;
+  protected IdpGroupMetaMapper idpGroupMetaMapper;
 
   @BeforeEach
   void openSession() {
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
+    idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
     truncateTables();
   }
 
@@ -70,8 +74,10 @@ abstract class IdpMapperTestBase {
       try (Connection connection = sqlSession.getConnection();
           Statement statement = connection.createStatement()) {
         if ("postgresql".equalsIgnoreCase(backendType)) {
+          statement.execute("TRUNCATE TABLE idp_group_meta RESTART IDENTITY CASCADE");
           statement.execute("TRUNCATE TABLE idp_user_meta RESTART IDENTITY CASCADE");
         } else {
+          statement.execute("TRUNCATE TABLE idp_group_meta");
           statement.execute("TRUNCATE TABLE idp_user_meta");
         }
       }
@@ -98,6 +104,20 @@ abstract class IdpMapperTestBase {
             .build();
     idpUserMetaMapper.insertIdpUser(userPO);
     return userPO;
+  }
+
+  protected IdpGroupPO insertGroup(
+      long groupId, String groupName, long currentVersion, long lastVersion, long deletedAt) {
+    IdpGroupPO groupPO =
+        IdpGroupPO.builder()
+            .withGroupId(groupId)
+            .withGroupName(groupName)
+            .withCurrentVersion(currentVersion)
+            .withLastVersion(lastVersion)
+            .withDeletedAt(deletedAt)
+            .build();
+    idpGroupMetaMapper.insertIdpGroup(groupPO);
+    return groupPO;
   }
 
   protected long queryLongValue(String table, String column, String idColumn, long idValue) {
