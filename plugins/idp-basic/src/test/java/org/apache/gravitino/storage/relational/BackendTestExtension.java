@@ -25,7 +25,6 @@ import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -127,18 +126,16 @@ class BackendTestExtension implements TestTemplateInvocationContextProvider {
         config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "root");
         config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.postgresql.Driver");
       } else {
-        String jdbcStorePath =
-            "/tmp/gravitino_jdbc_idpMappers_" + UUID.randomUUID().toString().replace("-", "");
-        h2Path = Path.of(jdbcStorePath);
         try {
-          Files.createDirectories(h2Path);
+          h2Path = Files.createTempDirectory("gravitino_jdbc_idpMappers_");
         } catch (IOException e) {
-          throw new RuntimeException("Create H2 test directory failed: " + h2Path, e);
+          throw new RuntimeException("Create H2 test directory failed", e);
         }
 
+        Path jdbcStorePath = h2Path.resolve("testdb");
         config.set(
             Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL,
-            String.format("jdbc:h2:file:%s/testdb;DB_CLOSE_DELAY=-1;MODE=MYSQL", jdbcStorePath));
+            String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", jdbcStorePath));
         config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "root");
         config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "123456");
         config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
