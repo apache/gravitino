@@ -26,10 +26,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.po.IdpGroupPO;
+import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
@@ -50,12 +52,14 @@ abstract class IdpMapperTestBase {
   protected SqlSession sharedSession;
   protected IdpUserMetaMapper idpUserMetaMapper;
   protected IdpGroupMetaMapper idpGroupMetaMapper;
+  protected IdpGroupUserRelMapper idpGroupUserRelMapper;
 
   @BeforeEach
   void openSession() {
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
     idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
+    idpGroupUserRelMapper = sharedSession.getMapper(IdpGroupUserRelMapper.class);
     truncateTables();
   }
 
@@ -73,9 +77,11 @@ abstract class IdpMapperTestBase {
       try (Connection connection = sqlSession.getConnection();
           Statement statement = connection.createStatement()) {
         if ("postgresql".equalsIgnoreCase(backendType)) {
+          statement.execute("TRUNCATE TABLE idp_group_user_rel RESTART IDENTITY CASCADE");
           statement.execute("TRUNCATE TABLE idp_group_meta RESTART IDENTITY CASCADE");
           statement.execute("TRUNCATE TABLE idp_user_meta RESTART IDENTITY CASCADE");
         } else {
+          statement.execute("TRUNCATE TABLE idp_group_user_rel");
           statement.execute("TRUNCATE TABLE idp_group_meta");
           statement.execute("TRUNCATE TABLE idp_user_meta");
         }
@@ -117,6 +123,21 @@ abstract class IdpMapperTestBase {
             .build();
     idpGroupMetaMapper.insertIdpGroup(groupPO);
     return groupPO;
+  }
+
+  protected IdpGroupUserRelPO insertRelation(
+      long id, long groupId, long userId, long currentVersion, long lastVersion, long deletedAt) {
+    IdpGroupUserRelPO relationPO =
+        IdpGroupUserRelPO.builder()
+            .withId(id)
+            .withGroupId(groupId)
+            .withUserId(userId)
+            .withCurrentVersion(currentVersion)
+            .withLastVersion(lastVersion)
+            .withDeletedAt(deletedAt)
+            .build();
+    idpGroupUserRelMapper.batchInsertIdpGroupUsers(List.of(relationPO));
+    return relationPO;
   }
 
   protected long queryLongValue(String table, String column, String idColumn, long idValue) {
