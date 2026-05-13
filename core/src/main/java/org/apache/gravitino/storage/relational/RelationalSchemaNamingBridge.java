@@ -26,6 +26,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -142,14 +143,24 @@ public final class RelationalSchemaNamingBridge {
   /**
    * Normalizes {@link GenericEntity#name()} when it holds a dotted metadata-object path whose
    * schema segment uses physical hierarchical encoding, for API callers above {@link JDBCBackend}.
+   *
+   * <p>Only processes entity types that correspond to a {@link MetadataObject.Type} (e.g. TABLE,
+   * SCHEMA). Types without a {@link MetadataObject.Type} equivalent (e.g. TABLE_STATISTIC,
+   * MODEL_VERSION) are returned unchanged.
    */
   public static GenericEntity genericEntityMetadataFullNameForApi(GenericEntity entity) {
     String name = entity.name();
     if (name == null || name.isEmpty()) {
       return entity;
     }
+    final MetadataObject.Type moType;
+    try {
+      moType = MetadataObject.Type.valueOf(entity.type().name());
+    } catch (IllegalArgumentException e) {
+      return entity;
+    }
     NameIdentifier ident = NameIdentifier.parse(SENTINEL_METALAKE + "." + name);
-    NameIdentifier converted = nameIdentifierForApi(ident, entity.type());
+    NameIdentifier converted = nameIdentifierForApi(ident, MetadataObjectUtil.toEntityType(moType));
     if (converted.equals(ident)) {
       return entity;
     }
