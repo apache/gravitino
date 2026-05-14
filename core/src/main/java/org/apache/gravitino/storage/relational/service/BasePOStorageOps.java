@@ -27,21 +27,28 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public abstract class BasePOStorageOps<PO, Mapper> {
   public void insertPO(Mapper mapper, PO po, boolean overwrite) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException(
+        "insertPO is not supported by " + getClass().getSimpleName());
   }
 
   public void batchInsertPOs(Mapper mapper, List<PO> pos, boolean overwrite) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException(
+        "batchInsertPOs is not supported by " + getClass().getSimpleName());
   }
 
   public Integer updatePO(Mapper mapper, PO newPO, PO oldPO) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException(
+        "updatePO is not supported by " + getClass().getSimpleName());
   }
 
   public final PO getPO(Mapper mapper, NameIdentifier identifier) {
     if (!capabilities().contains(Capability.GET_BY_NS_UID)
         && !capabilities().contains(Capability.GET_BY_NAME)) {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(
+          "getPO requires GET_BY_NS_UID or GET_BY_NAME for "
+              + entityType()
+              + ", but capabilities are "
+              + capabilities());
     }
 
     if (GravitinoEnv.getInstance().cacheEnabled()
@@ -59,7 +66,11 @@ public abstract class BasePOStorageOps<PO, Mapper> {
   public final List<PO> listPOs(Mapper mapper, Namespace namespace) {
     if (!capabilities().contains(Capability.LIST_BY_NS_UID)
         && !capabilities().contains(Capability.LIST_BY_NS_NAME)) {
-      throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException(
+          "listPOs requires LIST_BY_NS_UID or LIST_BY_NS_NAME for "
+              + entityType()
+              + ", but capabilities are "
+              + capabilities());
     }
 
     if (GravitinoEnv.getInstance().cacheEnabled()
@@ -75,27 +86,33 @@ public abstract class BasePOStorageOps<PO, Mapper> {
   }
 
   public PO getPO(Mapper mapper, Long parentId, String name) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException(
+        "getPO by parent id is not supported by " + getClass().getSimpleName());
   }
 
   public List<PO> listPOs(Mapper mapper, Long parentId) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException(
+        "listPOs by parent id is not supported by " + getClass().getSimpleName());
   }
 
   public List<PO> listPOs(Mapper mapper, Namespace namespace, List<String> names) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException(
+        "listPOs by namespace and names is not supported by " + getClass().getSimpleName());
   }
 
   public List<PO> listPOs(Mapper mapper, List<Long> uuids) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException(
+        "listPOs by uuids is not supported by " + getClass().getSimpleName());
   }
 
   protected PO getPOByFullName(Mapper mapper, NameIdentifier identifier) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException(
+        "getPOByFullName is not supported by " + getClass().getSimpleName());
   }
 
   protected List<PO> listPOsByNSFullName(Mapper mapper, Namespace namespace) {
-    throw new UnsupportedOperationException();
+    throw new UnsupportedOperationException(
+        "listPOsByNSFullName is not supported by " + getClass().getSimpleName());
   }
 
   public abstract List<Capability> capabilities();
