@@ -560,6 +560,7 @@ public class CatalogClickHouseIT extends BaseIT {
   void testCreateAndLoadWithPartitionTransforms() {
     assertPartitionRoundTrip("identity_part", Transforms.identity("event_time"));
     assertPartitionRoundTrip("year_part", Transforms.year("event_time"));
+    assertPartitionRoundTrip("month_part", Transforms.month("event_time"));
     assertPartitionRoundTrip("day_part", Transforms.day("event_time"));
   }
 
