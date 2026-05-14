@@ -251,20 +251,32 @@ public class GlueTable extends BaseTable {
   }
 
   /**
-   * Sets the partitioning of the table.
+   * Sets the partitioning of the table. Package-private: only {@link GlueIcebergTableHelper} should
+   * call this to enrich a table loaded from Glue with Iceberg-specific partition metadata.
    *
    * @param partitioning the partitioning transforms
    */
-  public void setPartitioning(Transform[] partitioning) {
+  void setPartitioning(Transform[] partitioning) {
     this.partitioning = partitioning;
   }
 
   /**
-   * Sets the sort orders of the table.
+   * Sets the sort orders of the table. Package-private: only {@link GlueIcebergTableHelper} should
+   * call this to enrich a table loaded from Glue with Iceberg-specific sort order metadata.
    *
    * @param sortOrders the sort orders
    */
-  public void setSortOrders(SortOrder[] sortOrders) {
+  void setSortOrders(SortOrder[] sortOrders) {
     this.sortOrders = sortOrders;
+  }
+
+  /**
+   * Sets the properties of the table. Package-private: only {@link GlueIcebergTableHelper} should
+   * call this to merge Iceberg metadata properties into a table loaded from Glue.
+   *
+   * @param properties the properties map
+   */
+  void setProperties(Map<String, String> properties) {
+    this.properties = properties;
   }
 }

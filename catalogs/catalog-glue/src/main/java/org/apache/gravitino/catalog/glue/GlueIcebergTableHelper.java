@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
@@ -72,6 +74,7 @@ final class GlueIcebergTableHelper {
    * <p>Checks for {@code table_type=ICEBERG} in {@code Table.parameters()}.
    */
   static boolean isIcebergTable(software.amazon.awssdk.services.glue.model.Table glueTable) {
+    Preconditions.checkArgument(glueTable != null, "glueTable cannot be null");
     if (!glueTable.hasParameters()) return false;
     return GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(
         glueTable.parameters().get(GlueConstants.TABLE_TYPE_PARAM));
@@ -130,6 +133,17 @@ final class GlueIcebergTableHelper {
    */
   static void loadTable(Catalog icebergCatalog, String dbName, String tableName, GlueTable table) {
     Table icebergTable = icebergCatalog.loadTable(TableIdentifier.of(dbName, tableName));
+    if (icebergTable == null) {
+      throw new NoSuchTableException(
+          "Iceberg table %s.%s not found in Iceberg catalog", dbName, tableName);
+    }
+
+    // Merge Iceberg table properties (stored in metadata.json) into the Gravitino properties.
+    // Iceberg properties take precedence over Glue parameters for overlapping keys.
+    Map<String, String> mergedProps = new HashMap<>(table.properties());
+    mergedProps.putAll(icebergTable.properties());
+    table.setProperties(mergedProps);
+
     if (!icebergTable.spec().fields().isEmpty()) {
       table.setPartitioning(convertPartitionSpec(icebergTable.spec(), icebergTable.schema()));
     }
@@ -157,10 +171,10 @@ final class GlueIcebergTableHelper {
       String dbName,
       String tableName,
       Column[] columns,
-      String comment,
+      @Nullable String comment,
       Map<String, String> properties,
-      Transform[] partitions,
-      SortOrder[] sortOrders) {
+      @Nullable Transform[] partitions,
+      @Nullable SortOrder[] sortOrders) {
 
     Schema schema = toIcebergSchema(columns);
     PartitionSpec spec = toPartitionSpec(schema, partitions);
@@ -180,17 +194,29 @@ final class GlueIcebergTableHelper {
       tableProps.put("write.format.default", format.toLowerCase(Locale.ROOT));
     }
 
+    String tableFormat = properties.get(GlueConstants.TABLE_FORMAT);
+    if (tableFormat != null) {
+      tableProps.put(GlueConstants.TABLE_FORMAT, tableFormat);
+    }
+
     TableIdentifier tableId = TableIdentifier.of(dbName, tableName);
 
     LOG.info("Creating Iceberg table {} at location {} via Iceberg SDK", tableId, location);
 
-    icebergCatalog
-        .buildTable(tableId, schema)
-        .withLocation(location)
-        .withPartitionSpec(spec)
-        .withSortOrder(icebergSortOrder)
-        .withProperties(tableProps)
-        .create();
+    try {
+      icebergCatalog
+          .buildTable(tableId, schema)
+          .withLocation(location)
+          .withPartitionSpec(spec)
+          .withSortOrder(icebergSortOrder)
+          .withProperties(tableProps)
+          .create();
+    } catch (org.apache.iceberg.exceptions.AlreadyExistsException e) {
+      throw new org.apache.gravitino.exceptions.TableAlreadyExistsException(
+          e, "Table %s.%s already exists", dbName, tableName);
+    } catch (org.apache.iceberg.exceptions.ValidationException e) {
+      throw new IllegalArgumentException("Invalid table definition: " + e.getMessage(), e);
+    }
   }
 
   /**
@@ -198,6 +224,10 @@ final class GlueIcebergTableHelper {
    *
    * <p>Delegates schema changes to {@link UpdateSchema} and property changes to {@link
    * UpdateProperties}.
+   *
+   * <p><b>Note:</b> Schema changes and property changes are committed in two separate transactions.
+   * If the schema commit succeeds but the property commit fails, the table is left in a partially
+   * altered state. This is a known limitation of the current Iceberg SDK integration.
    *
    * @param icebergCatalog the Iceberg Glue catalog
    * @param dbName the Glue database name
@@ -238,7 +268,11 @@ final class GlueIcebergTableHelper {
           Preconditions.checkArgument(
               del.fieldName().length == 1, "Nested column deletions are not supported");
           if (del.getIfExists()) {
-            update.deleteColumn(del.fieldName()[0]);
+            try {
+              update.deleteColumn(del.fieldName()[0]);
+            } catch (IllegalArgumentException e) {
+              // Column does not exist; ignore as requested by ifExists=true.
+            }
           } else {
             update.deleteColumn(del.fieldName()[0]);
           }
@@ -317,14 +351,10 @@ final class GlueIcebergTableHelper {
               } else if (transformStr.startsWith("hour")) {
                 return Transforms.hour(colName);
               } else if (transformStr.startsWith("bucket")) {
-                int numBuckets =
-                    Integer.parseInt(
-                        field.transform().toString().replaceAll(".*\\[(\\d+)\\]", "$1"));
+                int numBuckets = extractTransformParam(field.transform().toString());
                 return Transforms.bucket(numBuckets, new String[] {colName});
               } else if (transformStr.startsWith("truncate")) {
-                int width =
-                    Integer.parseInt(
-                        field.transform().toString().replaceAll(".*\\[(\\d+)\\]", "$1"));
+                int width = extractTransformParam(field.transform().toString());
                 return Transforms.truncate(width, new String[] {colName});
               } else {
                 throw new IllegalArgumentException(
@@ -363,6 +393,8 @@ final class GlueIcebergTableHelper {
 
   private static Schema toIcebergSchema(Column[] columns) {
     List<org.apache.iceberg.types.Types.NestedField> fields = new java.util.ArrayList<>();
+    // Field IDs are assigned sequentially starting from 0. This is the Iceberg convention
+    // for initial schema creation. Schema evolution reuses existing IDs from the table.
     for (int i = 0; i < columns.length; i++) {
       Column col = columns[i];
       org.apache.iceberg.types.Type icebergType = toIcebergType(col.dataType());
@@ -448,6 +480,7 @@ final class GlueIcebergTableHelper {
     }
     PartitionSpec.Builder builder = PartitionSpec.builderFor(schema);
     for (Transform transform : partitions) {
+      Preconditions.checkArgument(transform != null, "Partition transform cannot be null");
       if (transform instanceof Transforms.IdentityTransform) {
         String colName = String.join(DOT, ((Transforms.IdentityTransform) transform).fieldName());
         builder.identity(colName);
@@ -551,7 +584,12 @@ final class GlueIcebergTableHelper {
     Preconditions.checkArgument(
         expr instanceof Literal, "Expected literal, got: %s", expr.getClass().getSimpleName());
     Object value = ((Literal<?>) expr).value();
-    return Integer.parseInt(String.valueOf(value));
+    try {
+      return Integer.parseInt(String.valueOf(value));
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Expected integer literal, got: " + value + " in expression: " + expr, e);
+    }
   }
 
   private static org.apache.iceberg.SortDirection toIcebergDirection(SortDirection direction) {
@@ -562,5 +600,25 @@ final class GlueIcebergTableHelper {
 
   private static NullOrder toIcebergNullOrder(NullOrdering ordering) {
     return ordering == NullOrdering.NULLS_FIRST ? NullOrder.NULLS_FIRST : NullOrder.NULLS_LAST;
+  }
+
+  /**
+   * Extracts an integer parameter from an Iceberg transform string (e.g. "bucket[16]" or
+   * "truncate[8]").
+   *
+   * <p>TODO: Replace with typed Iceberg Transform API when available.
+   */
+  private static int extractTransformParam(String transformStr) {
+    String param = transformStr.replaceAll(".*\\[(\\d+)\\]", "$1");
+    if (param.equals(transformStr)) {
+      throw new IllegalArgumentException(
+          "Cannot extract numeric parameter from transform: " + transformStr);
+    }
+    try {
+      return Integer.parseInt(param);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid numeric parameter in transform: " + transformStr, e);
+    }
   }
 }

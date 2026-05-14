@@ -134,7 +134,7 @@ class TestAwsGlueCatalogOperations {
     Column col = Column.of("id", Types.LongType.get(), "pk", false, false, null);
     Map<String, String> props = new HashMap<>();
     props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.LOCATION, "s3://gravitino-test-bucket/iceberg/" + tableName);
+    props.put(GlueConstants.LOCATION, "s3://ice-glue-test-01/iceberg/" + tableName);
 
     try {
       Table created =
@@ -169,7 +169,7 @@ class TestAwsGlueCatalogOperations {
     Column col = Column.of("id", Types.LongType.get(), "pk", false, false, null);
     Map<String, String> props = new HashMap<>();
     props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.LOCATION, "s3://gravitino-test-bucket/iceberg/" + tableName);
+    props.put(GlueConstants.LOCATION, "s3://ice-glue-test-01/iceberg/" + tableName);
 
     try {
       ops.createTable(
@@ -202,7 +202,7 @@ class TestAwsGlueCatalogOperations {
     Column col = Column.of("id", Types.LongType.get(), "pk", false, false, null);
     Map<String, String> props = new HashMap<>();
     props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.LOCATION, "s3://gravitino-test-bucket/iceberg/" + tableName);
+    props.put(GlueConstants.LOCATION, "s3://ice-glue-test-01/iceberg/" + tableName);
 
     try {
       ops.createTable(
