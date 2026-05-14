@@ -57,14 +57,14 @@ import org.slf4j.LoggerFactory;
 public class FunctionMetaService {
   private static final Logger LOG = LoggerFactory.getLogger(FunctionMetaService.class);
   private static final FunctionMetaService INSTANCE = new FunctionMetaService();
-  private FunctionPOStorageOps ops;
+  private BasePOStorageOps<FunctionPO, FunctionMetaMapper> ops;
 
   public static FunctionMetaService getInstance() {
     return INSTANCE;
   }
 
   private FunctionMetaService() {
-    this.ops = new FunctionPOStorageOps();
+    this.ops = new HierarchicalSchemaPOStorageOps<>(new FunctionPOStorageOps());
   }
 
   @Monitored(

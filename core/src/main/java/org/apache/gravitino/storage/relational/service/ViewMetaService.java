@@ -55,14 +55,14 @@ import org.apache.gravitino.utils.NamespaceUtil;
 public class ViewMetaService {
 
   private static final ViewMetaService INSTANCE = new ViewMetaService();
-  private ViewPOStorageOps ops;
+  private BasePOStorageOps<ViewPO, ViewMetaMapper> ops;
 
   public static ViewMetaService getInstance() {
     return INSTANCE;
   }
 
   private ViewMetaService() {
-    this.ops = new ViewPOStorageOps();
+    this.ops = new HierarchicalSchemaPOStorageOps<>(new ViewPOStorageOps());
   }
 
   @Monitored(

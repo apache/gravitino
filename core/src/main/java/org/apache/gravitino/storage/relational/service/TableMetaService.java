@@ -57,14 +57,14 @@ import org.apache.gravitino.utils.NamespaceUtil;
 /** The service class for table metadata. It provides the basic database operations for table. */
 public class TableMetaService {
   private static final TableMetaService INSTANCE = new TableMetaService();
-  private TablePOStorageOps ops;
+  private BasePOStorageOps<TablePO, TableMetaMapper> ops;
 
   public static TableMetaService getInstance() {
     return INSTANCE;
   }
 
   private TableMetaService() {
-    this.ops = new TablePOStorageOps();
+    this.ops = new HierarchicalSchemaPOStorageOps<>(new TablePOStorageOps());
   }
 
   @Monitored(
