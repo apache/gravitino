@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.HashMap;
@@ -25,6 +27,7 @@ import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrders;
@@ -118,6 +121,104 @@ class TestAwsGlueCatalogOperations {
       assertThrows(
           UnsupportedOperationException.class,
           () -> ops.alterTable(ident, TableChange.rename("new_name")));
+    } finally {
+      ops.dropTable(ident);
+    }
+  }
+
+  @Test
+  void testCreateIcebergTable() {
+    String tableName = "iceberg_create_" + System.currentTimeMillis();
+    NameIdentifier ident = NameIdentifier.of(NS.level(0), NS.level(1), TEST_SCHEMA, tableName);
+
+    Column col = Column.of("id", Types.LongType.get(), "pk", false, false, null);
+    Map<String, String> props = new HashMap<>();
+    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
+    props.put(GlueConstants.LOCATION, "s3://gravitino-test-bucket/iceberg/" + tableName);
+
+    try {
+      Table created =
+          ops.createTable(
+              ident,
+              new Column[] {col},
+              "iceberg table",
+              props,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              SortOrders.NONE,
+              Indexes.EMPTY_INDEXES);
+
+      assertEquals("iceberg table", created.comment());
+      assertEquals(1, created.columns().length);
+      assertEquals("id", created.columns()[0].name());
+      assertEquals(Types.LongType.get(), created.columns()[0].dataType());
+
+      Table loaded = ops.loadTable(ident);
+      assertEquals("ICEBERG", loaded.properties().get(GlueConstants.TABLE_FORMAT));
+      assertNotNull(loaded.properties().get(GlueConstants.METADATA_LOCATION));
+    } finally {
+      ops.dropTable(ident);
+    }
+  }
+
+  @Test
+  void testAlterIcebergTableAddColumn() {
+    String tableName = "iceberg_alter_col_" + System.currentTimeMillis();
+    NameIdentifier ident = NameIdentifier.of(NS.level(0), NS.level(1), TEST_SCHEMA, tableName);
+
+    Column col = Column.of("id", Types.LongType.get(), "pk", false, false, null);
+    Map<String, String> props = new HashMap<>();
+    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
+    props.put(GlueConstants.LOCATION, "s3://gravitino-test-bucket/iceberg/" + tableName);
+
+    try {
+      ops.createTable(
+          ident,
+          new Column[] {col},
+          "iceberg table",
+          props,
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          SortOrders.NONE,
+          Indexes.EMPTY_INDEXES);
+
+      ops.alterTable(
+          ident, TableChange.addColumn(new String[] {"score"}, Types.DoubleType.get(), true));
+
+      Table loaded = ops.loadTable(ident);
+      assertEquals(2, loaded.columns().length);
+      assertEquals("score", loaded.columns()[1].name());
+      assertEquals(Types.DoubleType.get(), loaded.columns()[1].dataType());
+    } finally {
+      ops.dropTable(ident);
+    }
+  }
+
+  @Test
+  void testAlterIcebergTableSetProperty() {
+    String tableName = "iceberg_alter_prop_" + System.currentTimeMillis();
+    NameIdentifier ident = NameIdentifier.of(NS.level(0), NS.level(1), TEST_SCHEMA, tableName);
+
+    Column col = Column.of("id", Types.LongType.get(), "pk", false, false, null);
+    Map<String, String> props = new HashMap<>();
+    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
+    props.put(GlueConstants.LOCATION, "s3://gravitino-test-bucket/iceberg/" + tableName);
+
+    try {
+      ops.createTable(
+          ident,
+          new Column[] {col},
+          "iceberg table",
+          props,
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          SortOrders.NONE,
+          Indexes.EMPTY_INDEXES);
+
+      ops.alterTable(ident, TableChange.setProperty("write.format.default", "parquet"));
+
+      Table loaded = ops.loadTable(ident);
+      assertEquals("parquet", loaded.properties().get("write.format.default"));
     } finally {
       ops.dropTable(ident);
     }
