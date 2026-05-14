@@ -246,17 +246,17 @@ class IcebergViewCatalogOperations {
       LoadViewResponse current = icebergCatalogWrapper.loadView(viewId);
       ViewMetadata metadata = current.metadata();
 
-      Map<String, String> setProps = new HashMap<>();
-      Set<String> removeProps = new HashSet<>();
-      Optional<ViewChange.ReplaceView> replaceOpt =
-          collectPropertyChanges(changes, setProps, removeProps);
-
-      replaceOpt.ifPresent(replace -> applyReplaceViewProperties(replace, setProps, removeProps));
+      GroupedViewChanges groupedChanges = groupViewChanges(changes);
 
       List<MetadataUpdate> updates =
-          new ArrayList<>(buildPropertyMetadataUpdates(setProps, removeProps));
-      replaceOpt.ifPresent(
-          replaceView -> updates.addAll(buildNewViewVersionUpdates(ident, replaceView, metadata)));
+          new ArrayList<>(
+              buildPropertyMetadataUpdates(
+                  groupedChanges.setProperties(), groupedChanges.removedProperties()));
+      groupedChanges
+          .replaceView()
+          .ifPresent(
+              replaceView ->
+                  updates.addAll(buildNewViewVersionUpdates(ident, replaceView, metadata)));
 
       if (updates.isEmpty()) {
         return loadView(ident);
@@ -272,13 +272,42 @@ class IcebergViewCatalogOperations {
     }
   }
 
+  /** Grouped result of processing view changes. */
+  private static final class GroupedViewChanges {
+
+    private final Map<String, String> setProperties;
+    private final Set<String> removedProperties;
+    private final ViewChange.ReplaceView replaceView;
+
+    private GroupedViewChanges(
+        Map<String, String> setProperties,
+        Set<String> removedProperties,
+        ViewChange.ReplaceView replaceView) {
+      this.setProperties = setProperties;
+      this.removedProperties = removedProperties;
+      this.replaceView = replaceView;
+    }
+
+    private Map<String, String> setProperties() {
+      return setProperties;
+    }
+
+    private Set<String> removedProperties() {
+      return removedProperties;
+    }
+
+    private Optional<ViewChange.ReplaceView> replaceView() {
+      return Optional.ofNullable(replaceView);
+    }
+  }
+
   /**
-   * Iterates {@code changes} collecting SetProperty/RemoveProperty entries into {@code setProps}
-   * and {@code removeProps}, resolving conflicts so the last change for a key wins. Returns the
-   * last {@link ViewChange.ReplaceView} change found, or empty if none.
+   * Groups view changes by processing them in order so the last change for a key wins. The method
+   * also captures the last {@link ViewChange.ReplaceView} if present.
    */
-  private static Optional<ViewChange.ReplaceView> collectPropertyChanges(
-      ViewChange[] changes, Map<String, String> setProps, Set<String> removeProps) {
+  private static GroupedViewChanges groupViewChanges(ViewChange[] changes) {
+    Map<String, String> setProps = new HashMap<>();
+    Set<String> removeProps = new HashSet<>();
     ViewChange.ReplaceView replace = null;
     for (ViewChange change : changes) {
       if (change instanceof ViewChange.SetProperty) {
@@ -292,18 +321,20 @@ class IcebergViewCatalogOperations {
         setProps.remove(property);
       } else if (change instanceof ViewChange.ReplaceView) {
         replace = (ViewChange.ReplaceView) change;
+        applyReplaceViewProperties(replace, setProps, removeProps);
       } else {
         throw new IllegalArgumentException(
             "Unsupported view change type: " + change.getClass().getSimpleName());
       }
     }
-    return Optional.ofNullable(replace);
+    return new GroupedViewChanges(setProps, removeProps, replace);
   }
 
   /**
    * Applies the implicit property side-effects of a {@link ViewChange.ReplaceView}: sets or removes
    * {@code comment} and {@code default-catalog}, and always sets the {@code
-   * replace.drop-dialect.allowed} flag.
+   * replace.drop-dialect.allowed} flag. This should be invoked in the order changes are processed
+   * so subsequent explicit property changes can override these values.
    */
   private static void applyReplaceViewProperties(
       ViewChange.ReplaceView replace, Map<String, String> setProps, Set<String> removeProps) {
@@ -415,27 +446,10 @@ class IcebergViewCatalogOperations {
 
   private static SQLRepresentation normalizeSqlRepresentation(Representation representation) {
     Preconditions.checkArgument(
-        representation != null, "Iceberg catalog only supports SQLRepresentation, but got: null");
-    if (representation instanceof SQLRepresentation) {
-      return (SQLRepresentation) representation;
-    }
-
-    Preconditions.checkArgument(
-        Representation.TYPE_SQL.equalsIgnoreCase(representation.type()),
+        representation instanceof SQLRepresentation,
         "Iceberg catalog only supports SQLRepresentation, but got: %s",
-        representation.getClass().getSimpleName());
-    try {
-      String dialect =
-          (String) representation.getClass().getMethod("dialect").invoke(representation);
-      String sql = (String) representation.getClass().getMethod("sql").invoke(representation);
-      return SQLRepresentation.builder().withDialect(dialect).withSql(sql).build();
-    } catch (ReflectiveOperationException e) {
-      throw new IllegalArgumentException(
-          String.format(
-              "SQL representation %s must expose dialect() and sql() methods",
-              representation.getClass().getSimpleName()),
-          e);
-    }
+        representation == null ? "null" : representation.getClass().getSimpleName());
+    return (SQLRepresentation) representation;
   }
 
   private static String currentUser() {

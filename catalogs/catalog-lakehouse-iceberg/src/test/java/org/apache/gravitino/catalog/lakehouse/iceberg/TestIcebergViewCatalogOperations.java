@@ -20,16 +20,22 @@ package org.apache.gravitino.catalog.lakehouse.iceberg;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceFailureException;
@@ -75,6 +81,61 @@ public class TestIcebergViewCatalogOperations {
 
     Assertions.assertTrue(operations.viewExists(ident));
     verify(wrapper).viewExists(any(TableIdentifier.class));
+  }
+
+  @Test
+  public void testAlterViewRejectsRenameWithOtherChanges() {
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            operations.alterView(
+                ident, ViewChange.rename("view2"), ViewChange.setProperty("k", "v")));
+
+    verify(wrapper, never()).renameView(any());
+  }
+
+  @Test
+  public void testCreateViewRejectsSqlLikeRepresentationWithoutSqlRepresentationClass()
+      throws Exception {
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    Representation sqlLikeRepresentation =
+        new Representation() {
+          @Override
+          public String type() {
+            return Representation.TYPE_SQL;
+          }
+
+          public String dialect() {
+            return "spark";
+          }
+
+          public String sql() {
+            return "SELECT id FROM t";
+          }
+        };
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                operations.createView(
+                    ident,
+                    null,
+                    columns,
+                    new Representation[] {sqlLikeRepresentation},
+                    null,
+                    null,
+                    Collections.emptyMap()));
+    Assertions.assertTrue(exception.getMessage().contains(SQLRepresentation.class.getSimpleName()));
   }
 
   @Test

@@ -1975,6 +1975,100 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   }
 
   @Test
+  void testAlterViewReplaceThenSetPropertyOverridesReplaceProperties() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("replace_then_set_view");
+    NameIdentifier ident = NameIdentifier.of(schemaName, viewName);
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+
+    viewCatalog.createView(
+        ident,
+        "original comment",
+        columns,
+        new SQLRepresentation[] {sparkRep},
+        null,
+        null,
+        Collections.singletonMap("keep_key", "keep_val"));
+
+    SQLRepresentation trinoRep =
+        SQLRepresentation.builder()
+            .withDialect(TRINO_DIALECT)
+            .withSql("SELECT id, name FROM updated_table")
+            .build();
+    Column[] replacedColumns = {
+      Column.of("id", Types.LongType.get(), null), Column.of("name", Types.StringType.get(), null)
+    };
+
+    View altered =
+        viewCatalog.alterView(
+            ident,
+            ViewChange.replaceView(
+                replacedColumns,
+                new SQLRepresentation[] {trinoRep},
+                "replace_catalog",
+                schemaName,
+                "replace comment"),
+            ViewChange.setProperty("comment", "property comment"),
+            ViewChange.setProperty("default-catalog", "property_catalog"));
+
+    Assertions.assertEquals("property comment", altered.comment());
+    Assertions.assertEquals("property_catalog", altered.defaultCatalog());
+    Assertions.assertEquals("keep_val", altered.properties().get("keep_key"));
+    Assertions.assertEquals(2, altered.columns().length);
+    Assertions.assertEquals("name", altered.columns()[1].name());
+    Assertions.assertTrue(altered.sqlFor(TRINO_DIALECT).isPresent());
+  }
+
+  @Test
+  void testAlterViewSetPropertyThenReplaceUsesReplaceProperties() {
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    String viewName = GravitinoITUtils.genRandomName("set_then_replace_view");
+    NameIdentifier ident = NameIdentifier.of(schemaName, viewName);
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
+
+    viewCatalog.createView(
+        ident,
+        "original comment",
+        columns,
+        new SQLRepresentation[] {sparkRep},
+        null,
+        null,
+        Collections.singletonMap("keep_key", "keep_val"));
+
+    SQLRepresentation trinoRep =
+        SQLRepresentation.builder()
+            .withDialect(TRINO_DIALECT)
+            .withSql("SELECT id, name FROM updated_table")
+            .build();
+    Column[] replacedColumns = {
+      Column.of("id", Types.LongType.get(), null), Column.of("name", Types.StringType.get(), null)
+    };
+
+    View altered =
+        viewCatalog.alterView(
+            ident,
+            ViewChange.setProperty("comment", "property comment"),
+            ViewChange.setProperty("default-catalog", "property_catalog"),
+            ViewChange.replaceView(
+                replacedColumns,
+                new SQLRepresentation[] {trinoRep},
+                "replace_catalog",
+                schemaName,
+                "replace comment"));
+
+    Assertions.assertEquals("replace comment", altered.comment());
+    Assertions.assertEquals("replace_catalog", altered.defaultCatalog());
+    Assertions.assertEquals("keep_val", altered.properties().get("keep_key"));
+    Assertions.assertEquals(2, altered.columns().length);
+    Assertions.assertEquals("name", altered.columns()[1].name());
+    Assertions.assertTrue(altered.sqlFor(TRINO_DIALECT).isPresent());
+  }
+
+  @Test
   void testListViewsInNonExistentSchema() {
     ViewCatalog viewCatalog = catalog.asViewCatalog();
     Assertions.assertThrows(
