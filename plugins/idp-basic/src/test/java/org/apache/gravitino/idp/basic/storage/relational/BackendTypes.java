@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.storage.relational.mapper.it;
+package org.apache.gravitino.idp.basic.storage.relational;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

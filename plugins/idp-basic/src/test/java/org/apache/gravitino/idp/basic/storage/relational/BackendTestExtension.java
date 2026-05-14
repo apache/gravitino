@@ -17,39 +17,57 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.storage.relational.mapper.it;
+package org.apache.gravitino.idp.basic.storage.relational;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
-import org.apache.gravitino.idp.basic.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.storage.relational.JDBCBackend;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.junit.jupiter.api.extension.AfterAllCallback;
-import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.Extension;
 import org.junit.jupiter.api.extension.ExtensionContext;
-import org.junit.jupiter.api.extension.ExtensionContext.Namespace;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
 
 public class BackendTestExtension
     implements TestTemplateInvocationContextProvider, BeforeAllCallback, AfterAllCallback {
+
   private static final String DOCKER_TEST_FLAG = "dockerTest";
-  private static final Namespace NAMESPACE = Namespace.create(BackendTestExtension.class);
-  private static final String BACKEND_RESOURCES_KEY = "backendResources";
-  private static final Object SQL_SESSION_FACTORY_MUTEX = new Object();
+  private static final ExtensionContext.Namespace NAMESPACE =
+      ExtensionContext.Namespace.create(BackendTestExtension.class);
+  private static final String STORE_KEY = "BACKEND_MAP";
+
+  @Override
+  public void beforeAll(ExtensionContext context) {
+    context.getStore(NAMESPACE).put(STORE_KEY, new ConcurrentHashMap<String, BackendResource>());
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public void afterAll(ExtensionContext context) throws Exception {
+    ConcurrentHashMap<String, BackendResource> map =
+        (ConcurrentHashMap<String, BackendResource>) context.getStore(NAMESPACE).get(STORE_KEY);
+    if (map != null) {
+      for (BackendResource backendResource : map.values()) {
+        backendResource.close();
+      }
+      map.clear();
+    }
+  }
 
   @Override
   public boolean supportsTestTemplate(ExtensionContext context) {
@@ -57,49 +75,28 @@ public class BackendTestExtension
   }
 
   @Override
-  public void beforeAll(ExtensionContext context) {
-    context
-        .getRoot()
-        .getStore(NAMESPACE)
-        .put(resourceKey(context), new ConcurrentHashMap<String, BackendResource>());
-  }
-
-  @Override
-  public void afterAll(ExtensionContext context) throws Exception {
-    synchronized (SQL_SESSION_FACTORY_MUTEX) {
-      SqlSessionFactoryHelper.getInstance().close();
-      Map<String, BackendResource> backendResources = getBackendResources(context);
-      for (BackendResource backendResource : backendResources.values()) {
-        backendResource.close();
-      }
-      backendResources.clear();
-    }
-  }
-
-  @Override
   public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(
       ExtensionContext context) {
-    List<String> backends = resolveBackends(context.getRequiredTestClass());
-    return backends.stream().map(BackendInvocationContext::new);
+    return resolveBackends(context.getRequiredTestClass()).stream()
+        .map(BackendInvocationContext::new);
   }
 
-  public static boolean isDockerTestEnabled() {
-    String dockerTestProperty = System.getProperty(DOCKER_TEST_FLAG);
-    if (dockerTestProperty != null) {
-      return Boolean.parseBoolean(dockerTestProperty);
+  private List<String> resolveBackends(Class<?> testClass) {
+    BackendTypes backendTypes = findBackendTypes(testClass);
+    if (backendTypes != null) {
+      return List.of(backendTypes.value());
     }
 
-    return Boolean.parseBoolean(System.getenv(DOCKER_TEST_FLAG));
+    List<String> backendsToTest = new ArrayList<>();
+    backendsToTest.add("h2");
+    if ("true".equalsIgnoreCase(System.getenv(DOCKER_TEST_FLAG))) {
+      backendsToTest.add("mysql");
+      backendsToTest.add("postgresql");
+    }
+    return backendsToTest;
   }
 
-  public static List<String> resolveBackends(Class<?> testClass) {
-    BackendTypes backendTypes = findBackendTypes(testClass);
-    return backendTypes != null
-        ? List.of(backendTypes.value())
-        : (isDockerTestEnabled() ? List.of("h2", "mysql", "postgresql") : List.of("h2"));
-  }
-
-  private static BackendTypes findBackendTypes(Class<?> testClass) {
+  private BackendTypes findBackendTypes(Class<?> testClass) {
     Class<?> current = testClass;
     while (current != null) {
       BackendTypes backendTypes = current.getDeclaredAnnotation(BackendTypes.class);
@@ -125,11 +122,11 @@ public class BackendTestExtension
 
     @Override
     public List<Extension> getAdditionalExtensions() {
-      return List.of(new BackendSetupCallback(backendType));
+      return Collections.singletonList(new BackendSetupCallback(backendType));
     }
   }
 
-  private static class BackendSetupCallback implements BeforeEachCallback, AfterEachCallback {
+  private static class BackendSetupCallback implements BeforeEachCallback {
     private final String backendType;
 
     private BackendSetupCallback(String backendType) {
@@ -138,23 +135,18 @@ public class BackendTestExtension
 
     @Override
     public void beforeEach(ExtensionContext context) throws Exception {
-      synchronized (SQL_SESSION_FACTORY_MUTEX) {
-        BackendResource backendResource = getOrCreateBackendResource(context, backendType);
-        backendResource.activate();
-        Object testInstance = context.getRequiredTestInstance();
-        if (testInstance instanceof TestJDBCBackend) {
-          ((TestJDBCBackend) testInstance).setBackendType(backendType);
-          ((TestJDBCBackend) testInstance).setBackend(backendResource.backend());
-        }
+      BackendResource backendResource = getOrCreateBackendResource(context, backendType);
+      Object testInstance = context.getRequiredTestInstance();
+      if (testInstance instanceof TestJDBCBackend) {
+        ((TestJDBCBackend) testInstance).setBackend(backendResource.backend());
+        ((TestJDBCBackend) testInstance).setBackendType(backendType);
       }
     }
+  }
 
-    @Override
-    public void afterEach(ExtensionContext context) throws Exception {
-      synchronized (SQL_SESSION_FACTORY_MUTEX) {
-        SqlSessionFactoryHelper.getInstance().close();
-      }
-    }
+  @SuppressWarnings("unchecked")
+  private static Map<String, BackendResource> getBackendResources(ExtensionContext context) {
+    return (Map<String, BackendResource>) context.getStore(NAMESPACE).get(STORE_KEY, Map.class);
   }
 
   private static BackendResource getOrCreateBackendResource(
@@ -168,16 +160,6 @@ public class BackendTestExtension
     backendResource = createBackendResource(backendType);
     backendResources.put(backendType, backendResource);
     return backendResource;
-  }
-
-  @SuppressWarnings("unchecked")
-  private static Map<String, BackendResource> getBackendResources(ExtensionContext context) {
-    return (Map<String, BackendResource>)
-        context.getRoot().getStore(NAMESPACE).get(resourceKey(context), Map.class);
-  }
-
-  private static String resourceKey(ExtensionContext context) {
-    return context.getRequiredTestClass().getName() + "." + BACKEND_RESOURCES_KEY;
   }
 
   private static BackendResource createBackendResource(String backendType) throws SQLException {
@@ -201,44 +183,42 @@ public class BackendTestExtension
       config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.postgresql.Driver");
     } else {
       try {
-        h2Path = Files.createTempDirectory("gravitino_jdbc_idpMappers_");
+        String uuid = UUID.randomUUID().toString().replace("-", "");
+        h2Path = Path.of("/tmp", "gravitino_jdbc_test_h2_" + uuid);
+        Files.createDirectories(h2Path);
       } catch (IOException e) {
         throw new RuntimeException("Create H2 test directory failed", e);
       }
 
-      Path jdbcStorePath = h2Path.resolve("testdb");
       config.set(
           Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL,
-          String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", jdbcStorePath));
+          String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", h2Path));
       config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "root");
       config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "123456");
       config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
     }
 
-    SqlSessionFactoryHelper.getInstance().close();
     JDBCBackend jdbcBackend = new JDBCBackend();
+    try {
+      jdbcBackend.close();
+    } catch (IOException e) {
+      throw new RuntimeException("Close JDBC backend before initialization failed", e);
+    }
     jdbcBackend.initialize(config);
-    return new BackendResource(jdbcBackend, config, h2Path);
+    return new BackendResource(jdbcBackend, h2Path);
   }
 
   private static class BackendResource {
     private final JDBCBackend backend;
-    private final Config config;
     private final Path h2Path;
 
-    private BackendResource(JDBCBackend backend, Config config, Path h2Path) {
+    private BackendResource(JDBCBackend backend, Path h2Path) {
       this.backend = backend;
-      this.config = config;
       this.h2Path = h2Path;
     }
 
     private JDBCBackend backend() {
       return backend;
-    }
-
-    private void activate() {
-      SqlSessionFactoryHelper.getInstance().close();
-      SqlSessionFactoryHelper.getInstance().init(config);
     }
 
     private void close() throws Exception {

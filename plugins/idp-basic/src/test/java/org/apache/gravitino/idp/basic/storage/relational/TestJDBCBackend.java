@@ -29,7 +29,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.gravitino.idp.basic.storage.relational.mapper.it.BackendTestExtension;
 import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
 import org.apache.gravitino.storage.relational.JDBCBackend;
@@ -38,10 +37,8 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.parallel.ResourceLock;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@ResourceLock("idp-basic-sql-session-factory")
 @ExtendWith({
   BackendTestExtension.class,
   PrintFuncNameExtension.class,
@@ -149,9 +146,13 @@ public abstract class TestJDBCBackend {
         return;
       }
 
-      String truncateCommand =
-          String.format("TRUNCATE TABLE %s RESTART IDENTITY CASCADE", String.join(", ", tableList));
-      statement.execute(truncateCommand);
+      StringBuilder pgTruncateCommand = new StringBuilder("DO $$ BEGIN\n");
+      for (String table : tableList) {
+        pgTruncateCommand.append(
+            String.format("TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", table));
+      }
+      pgTruncateCommand.append("END $$;");
+      statement.execute(pgTruncateCommand.toString());
     }
   }
 }

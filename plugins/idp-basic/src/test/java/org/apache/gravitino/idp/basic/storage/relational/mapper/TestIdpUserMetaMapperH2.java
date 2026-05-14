@@ -22,7 +22,7 @@ package org.apache.gravitino.idp.basic.storage.relational.mapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.apache.gravitino.idp.basic.storage.relational.mapper.it.BackendTypes;
+import org.apache.gravitino.idp.basic.storage.relational.BackendTypes;
 import org.junit.jupiter.api.TestTemplate;
 
 @BackendTypes({"h2"})
