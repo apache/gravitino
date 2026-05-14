@@ -69,18 +69,17 @@ public class ViewMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getViewIdBySchemaIdAndName")
   public Long getViewIdBySchemaIdAndName(Long schemaId, String viewName) {
-    Long viewId =
+    ViewPO viewPO =
         SessionUtils.getWithoutCommit(
-            ViewMetaMapper.class,
-            mapper -> mapper.selectViewIdBySchemaIdAndName(schemaId, viewName));
+            ViewMetaMapper.class, mapper -> ops.getPO(mapper, schemaId, viewName));
 
-    if (viewId == null) {
+    if (viewPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.VIEW.name().toLowerCase(),
           viewName);
     }
-    return viewId;
+    return viewPO.getViewId();
   }
 
   @Monitored(
