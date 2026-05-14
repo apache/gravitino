@@ -347,15 +347,7 @@ spark.sql.catalog.${catalog_name}.token-exchange-enabled=false
 If you are using Flink, set the following catalog properties to disable token exchange:
 
 ```sql
-CREATE CATALOG irc WITH (
-  'type' = 'iceberg',
-  'catalog-type' = 'rest',
-  'uri' = 'http://127.0.0.1:9001/iceberg/',
-  'credential' = '<client-id>:<client-secret>',
-  'oauth2-server-uri' = 'http://127.0.0.1:8080/realms/gravitinorealm/protocol/openid-connect/token',
-  'scope' = 'openid profile email',
-  'token-exchange-enable'='false'
-);
+  'token-exchange-enable' = 'false'
 ```
 
 **Trino**
