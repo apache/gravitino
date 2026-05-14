@@ -336,7 +336,7 @@ The following Apache Iceberg change is relevant to this behavior:
 
 **Spark**
 
-If you are using Spark, set the following catalog property to disable token exchange:
+Set the following catalog property to disable token exchange:
 
 ```text
 spark.sql.catalog.${catalog_name}.token-exchange-enabled=false
@@ -344,7 +344,7 @@ spark.sql.catalog.${catalog_name}.token-exchange-enabled=false
 
 **Flink**
 
-If you are using Flink, set the following catalog properties to disable token exchange:
+Set the following catalog property to disable token exchange:
 
 ```sql
   'token-exchange-enable' = 'false'
@@ -352,7 +352,7 @@ If you are using Flink, set the following catalog properties to disable token ex
 
 **Trino**
 
-If you are using Trino, use Trino 479 or later and set the following properties in the catalog configuration:
+Use Trino 479 or later, and set the following properties in the catalog configuration:
 
 ```properties
 iceberg.rest-catalog.session=NONE
