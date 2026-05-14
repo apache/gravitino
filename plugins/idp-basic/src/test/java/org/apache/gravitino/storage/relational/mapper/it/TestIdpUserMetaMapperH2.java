@@ -61,6 +61,11 @@ public class TestIdpUserMetaMapperH2 extends IdpMapperTestBase implements IdpUse
   }
 
   @TestTemplate
+  public void testSoftDeleteIdpUserReturnsZeroForDeletedUser() {
+    IdpUserMetaMapperTest.super.testSoftDeleteIdpUserReturnsZeroForDeletedUser();
+  }
+
+  @TestTemplate
   public void testDeleteIdpUserMetasByLegacyTimeline() {
     IdpUserMetaMapperTest.super.testDeleteIdpUserMetasByLegacyTimeline();
   }

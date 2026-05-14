@@ -64,6 +64,11 @@ public class TestIdpUserMetaMapperPostgreSQL extends IdpMapperTestBase
   }
 
   @TestTemplate
+  public void testSoftDeleteIdpUserReturnsZeroForDeletedUser() {
+    IdpUserMetaMapperTest.super.testSoftDeleteIdpUserReturnsZeroForDeletedUser();
+  }
+
+  @TestTemplate
   public void testDeleteIdpUserMetasByLegacyTimeline() {
     IdpUserMetaMapperTest.super.testDeleteIdpUserMetasByLegacyTimeline();
   }
