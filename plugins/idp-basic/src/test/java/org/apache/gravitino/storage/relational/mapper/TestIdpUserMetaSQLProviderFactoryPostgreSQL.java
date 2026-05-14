@@ -23,14 +23,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.gravitino.storage.relational.BackendTypes;
 import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.IdpUserMetaPostgreSQLProvider;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestTemplate;
 
-@BackendTypes({"h2"})
-public class TestIdpUserMetaSQLProviderFactory extends IdpMapperTestBase {
+@Tag("gravitino-docker-test")
+@BackendTypes({"postgresql"})
+public class TestIdpUserMetaSQLProviderFactoryPostgreSQL extends IdpMapperTestBase {
 
   @TestTemplate
-  void testGetProviderReturnsH2Provider() {
+  void testGetProviderReturnsPostgreSQLProvider() {
     IdpUserMetaBaseSQLProvider provider = IdpUserMetaSQLProviderFactory.getProvider();
-    assertEquals(IdpUserMetaBaseSQLProvider.class, provider.getClass());
+    assertEquals(IdpUserMetaPostgreSQLProvider.class, provider.getClass());
   }
 }

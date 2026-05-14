@@ -48,8 +48,8 @@ public class TestIdpUserMetaMapperMySQL extends IdpMapperTestBase implements Idp
   }
 
   @TestTemplate
-  public void testUpdateIdpUserPasswordReturnsZeroForVersionMismatch() {
-    IdpUserMetaMapperTest.super.testUpdateIdpUserPasswordReturnsZeroForVersionMismatch();
+  public void testUpdateIdpUserPasswordKeepsVersionsUnchanged() {
+    IdpUserMetaMapperTest.super.testUpdateIdpUserPasswordKeepsVersionsUnchanged();
   }
 
   @TestTemplate

@@ -23,14 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.gravitino.storage.relational.BackendTypes;
 import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestTemplate;
 
-@BackendTypes({"h2"})
-public class TestIdpUserMetaSQLProviderFactory extends IdpMapperTestBase {
+@Tag("gravitino-docker-test")
+@BackendTypes({"mysql"})
+public class TestIdpUserMetaSQLProviderFactoryMySQL extends IdpMapperTestBase {
 
   @TestTemplate
-  void testGetProviderReturnsH2Provider() {
+  void testGetProviderReturnsMySQLProvider() {
     IdpUserMetaBaseSQLProvider provider = IdpUserMetaSQLProviderFactory.getProvider();
-    assertEquals(IdpUserMetaBaseSQLProvider.class, provider.getClass());
+    assertEquals(IdpUserMetaSQLProviderFactory.IdpUserMetaMySQLProvider.class, provider.getClass());
   }
 }

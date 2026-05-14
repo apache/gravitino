@@ -46,8 +46,8 @@ public class TestIdpUserMetaMapperH2 extends IdpMapperTestBase implements IdpUse
   }
 
   @TestTemplate
-  public void testUpdateIdpUserPasswordReturnsZeroForVersionMismatch() {
-    IdpUserMetaMapperTest.super.testUpdateIdpUserPasswordReturnsZeroForVersionMismatch();
+  public void testUpdateIdpUserPasswordKeepsVersionsUnchanged() {
+    IdpUserMetaMapperTest.super.testUpdateIdpUserPasswordKeepsVersionsUnchanged();
   }
 
   @TestTemplate

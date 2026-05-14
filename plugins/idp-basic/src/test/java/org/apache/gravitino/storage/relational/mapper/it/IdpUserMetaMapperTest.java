@@ -70,7 +70,7 @@ interface IdpUserMetaMapperTest {
     assertEquals(0L, testBase.idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
   }
 
-  default void testUpdateIdpUserPasswordReturnsZeroForVersionMismatch() {
+  default void testUpdateIdpUserPasswordKeepsVersionsUnchanged() {
     IdpMapperTestBase testBase = testBase();
     testBase.insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
 
