@@ -352,8 +352,17 @@ public class TableMetaService {
 
   private TablePO getTablePOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
-    return SessionUtils.getWithoutCommit(
-        TableMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+    TablePO tablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+    if (tablePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.TABLE.name().toLowerCase(),
+          identifier.name());
+    }
+
+    return tablePO;
   }
 
   private List<TablePO> listTablePOs(Namespace namespace) {

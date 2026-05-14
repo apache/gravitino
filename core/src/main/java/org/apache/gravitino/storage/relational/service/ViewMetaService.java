@@ -278,8 +278,17 @@ public class ViewMetaService {
 
   private ViewPO getViewPOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkView(identifier);
-    return SessionUtils.getWithoutCommit(
-        ViewMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+    ViewPO viewPO =
+        SessionUtils.getWithoutCommit(
+            ViewMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+    if (viewPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.VIEW.name().toLowerCase(),
+          identifier.name());
+    }
+
+    return viewPO;
   }
 
   private List<ViewPO> listViewPOs(Namespace namespace) {

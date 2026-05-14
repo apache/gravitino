@@ -225,8 +225,16 @@ public class FunctionMetaService {
       baseMetricName = "getFunctionPOByIdentifier")
   FunctionPO getFunctionPOByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkFunction(ident);
-    return SessionUtils.getWithoutCommit(
-        FunctionMetaMapper.class, mapper -> ops.getPO(mapper, ident));
+    FunctionPO functionPO =
+        SessionUtils.getWithoutCommit(FunctionMetaMapper.class, mapper -> ops.getPO(mapper, ident));
+
+    if (functionPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.FUNCTION.name().toLowerCase(Locale.ROOT),
+          ident.name());
+    }
+    return functionPO;
   }
 
   @Monitored(
