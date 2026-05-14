@@ -34,7 +34,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.servlet.http.HttpServlet;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -66,7 +65,7 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/health")
 @Produces(MediaType.APPLICATION_JSON)
-public class HealthOperations extends HttpServlet {
+public class HealthOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(HealthOperations.class);
 

@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.inject.Inject;
-import javax.servlet.http.HttpServlet;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -50,7 +49,7 @@ import org.apache.gravitino.metrics.MetricNames;
  */
 @Path("/health")
 @Produces(MediaType.APPLICATION_JSON)
-public class IcebergHealthOperations extends HttpServlet {
+public class IcebergHealthOperations {
 
   private static final String CHECK_HTTP_SERVER = "httpServer";
   private static final String CHECK_CATALOG_WRAPPER_MANAGER = "catalogWrapperManager";
