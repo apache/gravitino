@@ -21,6 +21,7 @@ package org.apache.gravitino.cache;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Ticker;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
@@ -84,8 +85,12 @@ public class CaffeineGravitinoCache<K, V> implements GravitinoCache<K, V> {
 
   @Override
   public long size() {
-    cache.cleanUp();
     return cache.estimatedSize();
+  }
+
+  @VisibleForTesting
+  void cleanUp() {
+    cache.cleanUp();
   }
 
   @Override

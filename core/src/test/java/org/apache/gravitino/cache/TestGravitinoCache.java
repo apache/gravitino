@@ -22,6 +22,7 @@ import com.github.benmanes.caffeine.cache.Ticker;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -230,13 +231,16 @@ public class TestGravitinoCache {
       for (long i = 0; i < 50L; i++) {
         cache.put(i, i);
       }
-      // Caffeine eviction is asynchronous but bounded; size must respect maxSize within slack
-      Assertions.assertTrue(
-          cache.size() <= 50L,
-          "Cache size must not exceed inserted count, but eviction should kick in");
-      Assertions.assertTrue(
-          cache.size() <= 10L,
-          "Eviction should trim entries close to maxSize=5; observed: " + cache.size());
+
+      Awaitility.await()
+          .atMost(2, TimeUnit.SECONDS)
+          .untilAsserted(
+              () -> {
+                cache.cleanUp();
+                Assertions.assertTrue(
+                    cache.size() <= 10L,
+                    "Eviction should trim entries close to maxSize=5; observed: " + cache.size());
+              });
     } finally {
       cache.close();
     }

@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.junit.jupiter.api.Test;
@@ -178,6 +179,49 @@ public class TestAuthorizationRequestContext {
         });
 
     assertEquals(2, loaderCalls.get());
+  }
+
+  @Test
+  public void testComputeGroupInfoIfAbsentCachesPresentAndAbsentResults() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger loaderCalls = new AtomicInteger();
+
+    GroupUpdatedAt groupInfo = new GroupUpdatedAt(42L, 1234L);
+    Optional<GroupUpdatedAt> presentFirst =
+        context.computeGroupInfoIfAbsent(
+            "ml::group1",
+            k -> {
+              loaderCalls.incrementAndGet();
+              return Optional.of(groupInfo);
+            });
+    Optional<GroupUpdatedAt> presentSecond =
+        context.computeGroupInfoIfAbsent(
+            "ml::group1",
+            k -> {
+              loaderCalls.incrementAndGet();
+              return Optional.empty();
+            });
+
+    Optional<GroupUpdatedAt> absentFirst =
+        context.computeGroupInfoIfAbsent(
+            "ml::missing-group",
+            k -> {
+              loaderCalls.incrementAndGet();
+              return Optional.empty();
+            });
+    Optional<GroupUpdatedAt> absentSecond =
+        context.computeGroupInfoIfAbsent(
+            "ml::missing-group",
+            k -> {
+              loaderCalls.incrementAndGet();
+              return Optional.of(new GroupUpdatedAt(99L, 9999L));
+            });
+
+    assertEquals(Optional.of(groupInfo), presentFirst);
+    assertEquals(Optional.of(groupInfo), presentSecond);
+    assertFalse(absentFirst.isPresent());
+    assertFalse(absentSecond.isPresent(), "Absent group result must also be cached");
+    assertEquals(2, loaderCalls.get(), "Loader must fire once per distinct group key");
   }
 
   @Test
