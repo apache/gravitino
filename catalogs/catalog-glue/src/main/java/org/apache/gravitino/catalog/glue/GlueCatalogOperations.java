@@ -32,7 +32,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -60,10 +59,8 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
-import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
-import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
@@ -85,16 +82,12 @@ import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTablesRequest;
 import software.amazon.awssdk.services.glue.model.GetTablesResponse;
 import software.amazon.awssdk.services.glue.model.GlueException;
-import software.amazon.awssdk.services.glue.model.IcebergTableUpdate;
 import software.amazon.awssdk.services.glue.model.Order;
 import software.amazon.awssdk.services.glue.model.SerDeInfo;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.Table;
 import software.amazon.awssdk.services.glue.model.TableInput;
 import software.amazon.awssdk.services.glue.model.UpdateDatabaseRequest;
-import software.amazon.awssdk.services.glue.model.UpdateIcebergInput;
-import software.amazon.awssdk.services.glue.model.UpdateIcebergTableInput;
-import software.amazon.awssdk.services.glue.model.UpdateOpenTableFormatInput;
 import software.amazon.awssdk.services.glue.model.UpdateTableRequest;
 
 /**
@@ -154,7 +147,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
               .map(s -> s.toLowerCase(Locale.ROOT))
               .collect(Collectors.toSet());
     }
-    this.icebergGlueCatalog = GlueIcebergCatalogHelper.createGlueCatalog(config);
+    this.icebergGlueCatalog = GlueIcebergTableHelper.createGlueCatalog(config);
   }
 
   @Override
@@ -385,18 +378,9 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       // Recover Iceberg-specific partitioning and sort orders from the Iceberg metadata.
       // AWS Glue Table.partitionKeys() is empty for Iceberg tables, so we load the Iceberg
       // Table to obtain the accurate partition spec and sort order.
-      if (GlueIcebergHelper.isIcebergTable(rawGlueTable) && icebergGlueCatalog != null) {
+      if (GlueIcebergTableHelper.isIcebergTable(rawGlueTable) && icebergGlueCatalog != null) {
         try {
-          org.apache.iceberg.Table icebergTable =
-              icebergGlueCatalog.loadTable(
-                  org.apache.iceberg.catalog.TableIdentifier.of(dbName, ident.name()));
-          if (!icebergTable.spec().fields().isEmpty()) {
-            table.setPartitioning(convertPartitionSpec(icebergTable.spec(), icebergTable.schema()));
-          }
-          if (!icebergTable.sortOrder().fields().isEmpty()) {
-            table.setSortOrders(
-                convertIcebergSortOrder(icebergTable.sortOrder(), icebergTable.schema()));
-          }
+          GlueIcebergTableHelper.loadTable(icebergGlueCatalog, dbName, ident.name(), table);
         } catch (Exception e) {
           LOG.warn(
               "Failed to load Iceberg metadata for table {}.{}: {}",
@@ -460,7 +444,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       boolean registerMode = props.containsKey(GlueConstants.METADATA_LOCATION);
       if (!registerMode) {
         // Use Iceberg SDK to create the table (writes metadata.json to S3 and registers in Glue).
-        GlueIcebergCatalogHelper.createTable(
+        GlueIcebergTableHelper.createTable(
             icebergGlueCatalog,
             dbName,
             ident.name(),
@@ -530,7 +514,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
     }
 
-    if (GlueIcebergHelper.isIcebergTable(rawGlueTable)) {
+    if (GlueIcebergTableHelper.isIcebergTable(rawGlueTable)) {
       return alterIcebergTable(ident, dbName, rawGlueTable, changes);
     }
 
@@ -602,50 +586,44 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private GlueTable alterIcebergTable(
       NameIdentifier ident, String dbName, Table rawGlueTable, TableChange... changes) {
+    // Register-mode tables (created with METADATA_LOCATION) are not backed by the Iceberg SDK
+    // GlueCatalog, so we fall back to the native Glue SDK update path.
+    if (rawGlueTable.hasParameters()
+        && rawGlueTable.parameters().containsKey(GlueConstants.METADATA_LOCATION)) {
+      return alterRegisterModeIcebergTable(ident, dbName, rawGlueTable, changes);
+    }
+    GlueIcebergTableHelper.alterTable(icebergGlueCatalog, dbName, ident.name(), changes);
+    return loadTable(ident);
+  }
 
-    GlueIcebergHelper.validateChanges(changes);
-
-    Optional<IcebergTableUpdate> schemaUpdate =
-        GlueIcebergHelper.buildSchemaUpdate(rawGlueTable, changes);
-    Map<String, String> propUpdates = GlueIcebergHelper.extractSetProperties(changes);
-
-    if (schemaUpdate.isEmpty() && propUpdates.isEmpty()) {
-      LOG.debug("No-op alterIcebergTable for {}.{}", dbName, ident.name());
-      return loadTable(ident);
+  private GlueTable alterRegisterModeIcebergTable(
+      NameIdentifier ident, String dbName, Table rawGlueTable, TableChange... changes) {
+    Map<String, String> newParams = new HashMap<>(rawGlueTable.parameters());
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.SetProperty) {
+        TableChange.SetProperty sp = (TableChange.SetProperty) change;
+        newParams.put(sp.getProperty(), sp.getValue());
+      } else if (change instanceof TableChange.RemoveProperty) {
+        newParams.remove(((TableChange.RemoveProperty) change).getProperty());
+      } else {
+        throw new IllegalArgumentException(
+            "Unsupported change for register-mode Iceberg table: "
+                + change.getClass().getSimpleName());
+      }
     }
 
-    if (schemaUpdate.isPresent()) {
-      UpdateIcebergTableInput icebergTableInput =
-          UpdateIcebergTableInput.builder().updates(schemaUpdate.get()).build();
-      UpdateIcebergInput icebergInput =
-          UpdateIcebergInput.builder().updateIcebergTableInput(icebergTableInput).build();
-      UpdateOpenTableFormatInput openFormatInput =
-          UpdateOpenTableFormatInput.builder().updateIcebergInput(icebergInput).build();
-      executeUpdateTable(
-          ident,
-          UpdateTableRequest.builder()
-              .databaseName(dbName)
-              .updateOpenTableFormatInput(openFormatInput));
-      LOG.info("Altered Iceberg table {}.{} schema via Glue native API", dbName, ident.name());
-      // Re-fetch to pick up server-side parameter changes (e.g., current-schema-id update)
-      // before using rawGlueTable.parameters() for the property update below.
-      GetTableRequest.Builder rawReq =
-          GetTableRequest.builder().databaseName(dbName).name(ident.name());
-      applyCatalogId(catalogId, rawReq::catalogId);
-      rawGlueTable = glueClient.getTable(rawReq.build()).table();
-    }
+    TableInput input =
+        TableInput.builder()
+            .name(rawGlueTable.name())
+            .description(rawGlueTable.description())
+            .tableType(rawGlueTable.tableType())
+            .parameters(newParams)
+            .storageDescriptor(rawGlueTable.storageDescriptor())
+            .build();
 
-    if (!propUpdates.isEmpty()) {
-      Map<String, String> newParams = new HashMap<>(rawGlueTable.parameters());
-      newParams.putAll(propUpdates);
-      executeUpdateTable(
-          ident,
-          UpdateTableRequest.builder()
-              .databaseName(dbName)
-              .tableInput(tableInputFromRaw(rawGlueTable, newParams)));
-      LOG.info("Altered Iceberg table {}.{} properties directly", dbName, ident.name());
-    }
-
+    executeUpdateTable(ident, UpdateTableRequest.builder().databaseName(dbName).tableInput(input));
+    LOG.info(
+        "Altered register-mode Iceberg table {}.{} properties via Glue SDK", dbName, ident.name());
     return loadTable(ident);
   }
 
@@ -681,7 +659,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     String fmt = table.hasParameters() ? table.parameters().get(GlueConstants.TABLE_FORMAT) : null;
     // Fall back to checking native Glue table_type for tables created without the Gravitino
     // table-format property (e.g. created via default-table-format config or external tooling).
-    if (fmt == null && GlueIcebergHelper.isIcebergTable(table)) {
+    if (fmt == null && GlueIcebergTableHelper.isIcebergTable(table)) {
       fmt = GlueConstants.ICEBERG_TABLE_TYPE_VALUE;
     }
     String normalized =
@@ -708,21 +686,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     } catch (GlueException e) {
       throw GlueExceptionConverter.toTableException(e, "table " + ident.name());
     }
-  }
-
-  /** Copies fields from {@code rawGlueTable} into a {@link TableInput} with updated parameters. */
-  private static TableInput tableInputFromRaw(Table rawGlueTable, Map<String, String> newParams) {
-    TableInput.Builder b =
-        TableInput.builder()
-            .name(rawGlueTable.name())
-            .description(rawGlueTable.description())
-            .tableType(rawGlueTable.tableType())
-            .parameters(newParams);
-    if (rawGlueTable.storageDescriptor() != null) {
-      b.storageDescriptor(rawGlueTable.storageDescriptor())
-          .partitionKeys(rawGlueTable.partitionKeys());
-    }
-    return b.build();
   }
 
   private TableInput buildTableInput(
@@ -995,68 +958,5 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         .withComment(comment)
         .withNullable(src.nullable())
         .build();
-  }
-
-  /**
-   * Converts an Iceberg {@link org.apache.iceberg.PartitionSpec} to Gravitino {@link Transform}s.
-   *
-   * <p>Supports identity, year, month, day, hour, bucket, and truncate transforms.
-   */
-  private static Transform[] convertPartitionSpec(
-      org.apache.iceberg.PartitionSpec spec, org.apache.iceberg.Schema schema) {
-    return spec.fields().stream()
-        .map(
-            field -> {
-              String colName = schema.findColumnName(field.sourceId());
-              String transformStr = field.transform().toString().toLowerCase(Locale.ROOT);
-              if (transformStr.startsWith("identity")) {
-                return Transforms.identity(colName);
-              } else if (transformStr.startsWith("year")) {
-                return Transforms.year(colName);
-              } else if (transformStr.startsWith("month")) {
-                return Transforms.month(colName);
-              } else if (transformStr.startsWith("day")) {
-                return Transforms.day(colName);
-              } else if (transformStr.startsWith("hour")) {
-                return Transforms.hour(colName);
-              } else if (transformStr.startsWith("bucket")) {
-                int numBuckets =
-                    Integer.parseInt(
-                        field.transform().toString().replaceAll(".*\\[(\\d+)\\]", "$1"));
-                return Transforms.bucket(numBuckets, new String[] {colName});
-              } else if (transformStr.startsWith("truncate")) {
-                int width =
-                    Integer.parseInt(
-                        field.transform().toString().replaceAll(".*\\[(\\d+)\\]", "$1"));
-                return Transforms.truncate(width, new String[] {colName});
-              } else {
-                throw new IllegalArgumentException(
-                    "Unsupported partition transform: " + transformStr);
-              }
-            })
-        .toArray(Transform[]::new);
-  }
-
-  /** Converts an Iceberg {@link org.apache.iceberg.SortOrder} to Gravitino {@link SortOrder}s. */
-  private static SortOrder[] convertIcebergSortOrder(
-      org.apache.iceberg.SortOrder iceSortOrder, org.apache.iceberg.Schema schema) {
-    if (iceSortOrder == null || iceSortOrder.fields().isEmpty()) {
-      return new SortOrder[0];
-    }
-    return iceSortOrder.fields().stream()
-        .map(
-            field -> {
-              String colName = schema.findColumnName(field.sourceId());
-              SortDirection direction =
-                  field.direction() == org.apache.iceberg.SortDirection.ASC
-                      ? SortDirection.ASCENDING
-                      : SortDirection.DESCENDING;
-              NullOrdering nullOrdering =
-                  field.nullOrder() == org.apache.iceberg.NullOrder.NULLS_FIRST
-                      ? NullOrdering.NULLS_FIRST
-                      : NullOrdering.NULLS_LAST;
-              return SortOrders.of(NamedReference.field(colName), direction, nullOrdering);
-            })
-        .toArray(SortOrder[]::new);
   }
 }

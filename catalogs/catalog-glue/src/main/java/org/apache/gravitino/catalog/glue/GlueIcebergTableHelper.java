@@ -20,15 +20,18 @@ package org.apache.gravitino.catalog.glue;
 
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Type;
@@ -36,6 +39,9 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.UpdateProperties;
+import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.aws.glue.GlueCatalog;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -45,20 +51,31 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Helper that delegates Iceberg table creation to the Iceberg SDK's {@code GlueCatalog}.
+ * Helper that delegates all Iceberg table operations to the Iceberg SDK's {@code GlueCatalog}.
  *
  * <p>Unlike the native AWS Glue SDK {@code OpenTableFormatInput} approach, the Iceberg SDK writes
  * the {@code metadata.json} file to S3 and registers the table in Glue with the correct {@code
  * metadata_location} parameter, making the table usable by Trino Lakehouse connector and other
  * Iceberg-native query engines.
  */
-final class GlueIcebergCatalogHelper {
+final class GlueIcebergTableHelper {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GlueIcebergCatalogHelper.class);
+  private static final Logger LOG = LoggerFactory.getLogger(GlueIcebergTableHelper.class);
 
   private static final String DOT = ".";
 
-  private GlueIcebergCatalogHelper() {}
+  private GlueIcebergTableHelper() {}
+
+  /**
+   * Returns true if the Glue table is an Iceberg-format table.
+   *
+   * <p>Checks for {@code table_type=ICEBERG} in {@code Table.parameters()}.
+   */
+  static boolean isIcebergTable(software.amazon.awssdk.services.glue.model.Table glueTable) {
+    if (!glueTable.hasParameters()) return false;
+    return GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(
+        glueTable.parameters().get(GlueConstants.TABLE_TYPE_PARAM));
+  }
 
   /**
    * Creates an Iceberg {@link Catalog} backed by AWS Glue.
@@ -101,6 +118,24 @@ final class GlueIcebergCatalogHelper {
     glueCatalog.initialize("gravitino-glue-iceberg", icebergProps);
     LOG.info("Initialized Iceberg GlueCatalog for region {}", region);
     return glueCatalog;
+  }
+
+  /**
+   * Loads an Iceberg table and recovers partitioning and sort orders.
+   *
+   * @param icebergCatalog the Iceberg Glue catalog
+   * @param dbName the Glue database name
+   * @param tableName the table name
+   * @param table the GlueTable to populate with recovered metadata
+   */
+  static void loadTable(Catalog icebergCatalog, String dbName, String tableName, GlueTable table) {
+    Table icebergTable = icebergCatalog.loadTable(TableIdentifier.of(dbName, tableName));
+    if (!icebergTable.spec().fields().isEmpty()) {
+      table.setPartitioning(convertPartitionSpec(icebergTable.spec(), icebergTable.schema()));
+    }
+    if (!icebergTable.sortOrder().fields().isEmpty()) {
+      table.setSortOrders(convertIcebergSortOrder(icebergTable.sortOrder(), icebergTable.schema()));
+    }
   }
 
   /**
@@ -158,12 +193,176 @@ final class GlueIcebergCatalogHelper {
         .create();
   }
 
+  /**
+   * Alters an Iceberg table via the Iceberg SDK.
+   *
+   * <p>Delegates schema changes to {@link UpdateSchema} and property changes to {@link
+   * UpdateProperties}.
+   *
+   * @param icebergCatalog the Iceberg Glue catalog
+   * @param dbName the Glue database name
+   * @param tableName the table name
+   * @param changes the table changes to apply
+   */
+  static void alterTable(
+      Catalog icebergCatalog, String dbName, String tableName, TableChange... changes) {
+    Table table = icebergCatalog.loadTable(TableIdentifier.of(dbName, tableName));
+
+    boolean hasSchemaChange = false;
+    boolean hasPropChange = false;
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.ColumnChange) {
+        hasSchemaChange = true;
+      } else if (change instanceof TableChange.SetProperty
+          || change instanceof TableChange.RemoveProperty) {
+        hasPropChange = true;
+      } else {
+        throw new IllegalArgumentException(
+            "Unsupported table change for Iceberg table: " + change.getClass().getSimpleName());
+      }
+    }
+
+    if (hasSchemaChange) {
+      UpdateSchema update = table.updateSchema();
+      for (TableChange change : changes) {
+        if (change instanceof TableChange.AddColumn) {
+          TableChange.AddColumn add = (TableChange.AddColumn) change;
+          Preconditions.checkArgument(
+              add.fieldName().length == 1, "Nested column additions are not supported");
+          update.addColumn(add.fieldName()[0], toIcebergType(add.getDataType()), add.getComment());
+          if (!add.isNullable()) {
+            update.requireColumn(add.fieldName()[0]);
+          }
+        } else if (change instanceof TableChange.DeleteColumn) {
+          TableChange.DeleteColumn del = (TableChange.DeleteColumn) change;
+          Preconditions.checkArgument(
+              del.fieldName().length == 1, "Nested column deletions are not supported");
+          if (del.getIfExists()) {
+            update.deleteColumn(del.fieldName()[0]);
+          } else {
+            update.deleteColumn(del.fieldName()[0]);
+          }
+        } else if (change instanceof TableChange.RenameColumn) {
+          TableChange.RenameColumn rename = (TableChange.RenameColumn) change;
+          Preconditions.checkArgument(
+              rename.fieldName().length == 1, "Nested column renames are not supported");
+          update.renameColumn(rename.fieldName()[0], rename.getNewName());
+        } else if (change instanceof TableChange.UpdateColumnType) {
+          TableChange.UpdateColumnType upd = (TableChange.UpdateColumnType) change;
+          Preconditions.checkArgument(
+              upd.fieldName().length == 1, "Nested column type updates are not supported");
+          update.updateColumn(
+              upd.fieldName()[0],
+              (org.apache.iceberg.types.Type.PrimitiveType) toIcebergType(upd.getNewDataType()));
+        } else if (change instanceof TableChange.UpdateColumnComment) {
+          TableChange.UpdateColumnComment upd = (TableChange.UpdateColumnComment) change;
+          Preconditions.checkArgument(
+              upd.fieldName().length == 1, "Nested column comment updates are not supported");
+          update.updateColumnDoc(upd.fieldName()[0], upd.getNewComment());
+        } else if (change instanceof TableChange.UpdateColumnNullability) {
+          TableChange.UpdateColumnNullability upd = (TableChange.UpdateColumnNullability) change;
+          Preconditions.checkArgument(
+              upd.fieldName().length == 1, "Nested column nullability updates are not supported");
+          if (upd.nullable()) {
+            update.makeColumnOptional(upd.fieldName()[0]);
+          } else {
+            update.requireColumn(upd.fieldName()[0]);
+          }
+        }
+      }
+      update.commit();
+      LOG.info("Altered Iceberg table {}.{} schema via Iceberg SDK", dbName, tableName);
+    }
+
+    if (hasPropChange) {
+      UpdateProperties update = table.updateProperties();
+      for (TableChange change : changes) {
+        if (change instanceof TableChange.SetProperty) {
+          TableChange.SetProperty sp = (TableChange.SetProperty) change;
+          update.set(sp.getProperty(), sp.getValue());
+        } else if (change instanceof TableChange.RemoveProperty) {
+          TableChange.RemoveProperty rp = (TableChange.RemoveProperty) change;
+          update.remove(rp.getProperty());
+        }
+      }
+      update.commit();
+      LOG.info("Altered Iceberg table {}.{} properties via Iceberg SDK", dbName, tableName);
+    }
+  }
+
   // ---------------------------------------------------------------------------
-  // Type conversion
+  // Partition / sort conversion (Iceberg -> Gravitino)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Converts an Iceberg {@link org.apache.iceberg.PartitionSpec} to Gravitino {@link Transform}s.
+   *
+   * <p>Supports identity, year, month, day, hour, bucket, and truncate transforms.
+   */
+  static Transform[] convertPartitionSpec(
+      org.apache.iceberg.PartitionSpec spec, org.apache.iceberg.Schema schema) {
+    return spec.fields().stream()
+        .map(
+            field -> {
+              String colName = schema.findColumnName(field.sourceId());
+              String transformStr = field.transform().toString().toLowerCase(Locale.ROOT);
+              if (transformStr.startsWith("identity")) {
+                return Transforms.identity(colName);
+              } else if (transformStr.startsWith("year")) {
+                return Transforms.year(colName);
+              } else if (transformStr.startsWith("month")) {
+                return Transforms.month(colName);
+              } else if (transformStr.startsWith("day")) {
+                return Transforms.day(colName);
+              } else if (transformStr.startsWith("hour")) {
+                return Transforms.hour(colName);
+              } else if (transformStr.startsWith("bucket")) {
+                int numBuckets =
+                    Integer.parseInt(
+                        field.transform().toString().replaceAll(".*\\[(\\d+)\\]", "$1"));
+                return Transforms.bucket(numBuckets, new String[] {colName});
+              } else if (transformStr.startsWith("truncate")) {
+                int width =
+                    Integer.parseInt(
+                        field.transform().toString().replaceAll(".*\\[(\\d+)\\]", "$1"));
+                return Transforms.truncate(width, new String[] {colName});
+              } else {
+                throw new IllegalArgumentException(
+                    "Unsupported partition transform: " + transformStr);
+              }
+            })
+        .toArray(Transform[]::new);
+  }
+
+  /** Converts an Iceberg {@link org.apache.iceberg.SortOrder} to Gravitino {@link SortOrder}s. */
+  static SortOrder[] convertIcebergSortOrder(
+      org.apache.iceberg.SortOrder iceSortOrder, org.apache.iceberg.Schema schema) {
+    if (iceSortOrder == null || iceSortOrder.fields().isEmpty()) {
+      return new SortOrder[0];
+    }
+    return iceSortOrder.fields().stream()
+        .map(
+            field -> {
+              String colName = schema.findColumnName(field.sourceId());
+              SortDirection direction =
+                  field.direction() == org.apache.iceberg.SortDirection.ASC
+                      ? SortDirection.ASCENDING
+                      : SortDirection.DESCENDING;
+              NullOrdering nullOrdering =
+                  field.nullOrder() == org.apache.iceberg.NullOrder.NULLS_FIRST
+                      ? NullOrdering.NULLS_FIRST
+                      : NullOrdering.NULLS_LAST;
+              return SortOrders.of(NamedReference.field(colName), direction, nullOrdering);
+            })
+        .toArray(SortOrder[]::new);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Type conversion (Gravitino -> Iceberg)
   // ---------------------------------------------------------------------------
 
   private static Schema toIcebergSchema(Column[] columns) {
-    java.util.List<org.apache.iceberg.types.Types.NestedField> fields = new java.util.ArrayList<>();
+    List<org.apache.iceberg.types.Types.NestedField> fields = new java.util.ArrayList<>();
     for (int i = 0; i < columns.length; i++) {
       Column col = columns[i];
       org.apache.iceberg.types.Type icebergType = toIcebergType(col.dataType());
@@ -240,7 +439,7 @@ final class GlueIcebergCatalogHelper {
   }
 
   // ---------------------------------------------------------------------------
-  // Partition conversion
+  // Partition / sort conversion (Gravitino -> Iceberg)
   // ---------------------------------------------------------------------------
 
   private static PartitionSpec toPartitionSpec(Schema schema, Transform[] partitions) {
@@ -277,10 +476,6 @@ final class GlueIcebergCatalogHelper {
     }
     return builder.build();
   }
-
-  // ---------------------------------------------------------------------------
-  // Sort order conversion
-  // ---------------------------------------------------------------------------
 
   private static org.apache.iceberg.SortOrder toSortOrder(Schema schema, SortOrder[] sortOrders) {
     if (sortOrders == null || sortOrders.length == 0) {
