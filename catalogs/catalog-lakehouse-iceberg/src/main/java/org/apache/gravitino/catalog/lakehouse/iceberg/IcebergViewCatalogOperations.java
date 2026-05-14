@@ -23,7 +23,6 @@ import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -48,6 +47,7 @@ import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.UpdateRequirements;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
@@ -258,7 +258,8 @@ class IcebergViewCatalogOperations {
       }
 
       UpdateTableRequest request =
-          UpdateTableRequest.create(viewId, Collections.emptyList(), updates);
+          UpdateTableRequest.create(
+              viewId, UpdateRequirements.forReplaceView(metadata, updates), updates);
       LoadViewResponse response = icebergCatalogWrapper.updateView(viewId, request);
       LOG.info("Altered Iceberg view {}", ident);
       return IcebergView.fromLoadViewResponse(response, ident.name());

@@ -33,6 +33,7 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
+import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.view.SQLViewRepresentation;
 import org.apache.iceberg.view.ViewMetadata;
 import org.apache.iceberg.view.ViewVersion;
@@ -200,12 +201,10 @@ public class TestIcebergView {
     ViewVersion mockVersion = mock(ViewVersion.class);
     when(mockVersion.representations()).thenReturn(Collections.emptyList());
 
-    org.apache.iceberg.types.Types.NestedField field1 =
-        org.apache.iceberg.types.Types.NestedField.optional(
-            1, "id", org.apache.iceberg.types.Types.LongType.get(), "id column");
-    org.apache.iceberg.types.Types.NestedField field2 =
-        org.apache.iceberg.types.Types.NestedField.required(
-            2, "name", org.apache.iceberg.types.Types.StringType.get());
+    NestedField field1 =
+        NestedField.optional(1, "id", org.apache.iceberg.types.Types.LongType.get(), "id column");
+    NestedField field2 =
+        NestedField.required(2, "name", org.apache.iceberg.types.Types.StringType.get());
 
     Schema schema = new Schema(Arrays.asList(field1, field2));
 

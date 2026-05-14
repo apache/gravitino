@@ -38,6 +38,8 @@ import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.UpdateRequirement;
+import org.apache.iceberg.UpdateRequirements;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.rest.requests.ImmutableCreateViewRequest;
@@ -220,7 +222,8 @@ public class TestIcebergViewCatalogOperations {
     IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
-    when(wrapper.loadView(any(TableIdentifier.class))).thenReturn(mockLoadViewResponse());
+    LoadViewResponse loaded = mockLoadViewResponseWithUuid("view-uuid");
+    when(wrapper.loadView(any(TableIdentifier.class))).thenReturn(loaded);
 
     doAnswer(
             invocation -> {
@@ -246,7 +249,8 @@ public class TestIcebergViewCatalogOperations {
     IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
-    when(wrapper.loadView(any(TableIdentifier.class))).thenReturn(mockLoadViewResponse());
+    LoadViewResponse loaded = mockLoadViewResponseWithUuid("view-uuid");
+    when(wrapper.loadView(any(TableIdentifier.class))).thenReturn(loaded);
 
     doAnswer(
             invocation -> {
@@ -275,6 +279,7 @@ public class TestIcebergViewCatalogOperations {
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
 
     ViewMetadata metadata = Mockito.mock(ViewMetadata.class);
+    when(metadata.uuid()).thenReturn("view-uuid");
     when(metadata.schemas()).thenReturn(Collections.emptyList());
 
     LoadViewResponse loaded = Mockito.mock(LoadViewResponse.class);
@@ -305,8 +310,53 @@ public class TestIcebergViewCatalogOperations {
     verify(wrapper).updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
   }
 
+  @Test
+  public void testAlterViewBuildsOptimisticConcurrencyRequirements() throws Exception {
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+
+    ViewMetadata metadata = Mockito.mock(ViewMetadata.class);
+    when(metadata.uuid()).thenReturn("view-uuid");
+
+    LoadViewResponse loaded = Mockito.mock(LoadViewResponse.class);
+    when(loaded.metadata()).thenReturn(metadata);
+    when(wrapper.loadView(any(TableIdentifier.class))).thenReturn(loaded);
+
+    doAnswer(
+            invocation -> {
+              UpdateTableRequest request = invocation.getArgument(1);
+              List<UpdateRequirement> expectedRequirements =
+                  UpdateRequirements.forReplaceView(metadata, request.updates());
+              Assertions.assertEquals(expectedRequirements.size(), request.requirements().size());
+              for (int i = 0; i < expectedRequirements.size(); i++) {
+                Assertions.assertEquals(
+                    expectedRequirements.get(i).getClass(),
+                    request.requirements().get(i).getClass());
+              }
+              Assertions.assertFalse(request.requirements().isEmpty());
+              return mockLoadViewResponse();
+            })
+        .when(wrapper)
+        .updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+
+    operations.alterView(ident, ViewChange.setProperty("k", "v"));
+
+    verify(wrapper).updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+  }
+
   private static LoadViewResponse mockLoadViewResponse() {
     return Mockito.mock(LoadViewResponse.class);
+  }
+
+  private static LoadViewResponse mockLoadViewResponseWithUuid(String uuid) {
+    ViewMetadata metadata = Mockito.mock(ViewMetadata.class);
+    when(metadata.uuid()).thenReturn(uuid);
+
+    LoadViewResponse response = Mockito.mock(LoadViewResponse.class);
+    when(response.metadata()).thenReturn(metadata);
+    return response;
   }
 
   private static Map<String, String> extractSetProperties(List<MetadataUpdate> updates) {
