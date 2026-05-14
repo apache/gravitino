@@ -23,6 +23,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public abstract class BasePOStorageOps<PO, Mapper> {
   public void insertPO(Mapper mapper, PO po, boolean overwrite) {
@@ -47,7 +48,8 @@ public abstract class BasePOStorageOps<PO, Mapper> {
         && capabilities().contains(Capability.GET_BY_NS_UID)) {
       Long parentId =
           EntityIdService.getEntityId(
-              NameIdentifier.of(identifier.namespace().toString()), entityType());
+              NameIdentifier.parse(identifier.namespace().toString()),
+              NameIdentifierUtil.parentEntityType(entityType()));
       return getPO(mapper, parentId, identifier.name());
     }
 
@@ -63,7 +65,9 @@ public abstract class BasePOStorageOps<PO, Mapper> {
     if (GravitinoEnv.getInstance().cacheEnabled()
         && capabilities().contains(Capability.LIST_BY_NS_UID)) {
       Long parentId =
-          EntityIdService.getEntityId(NameIdentifier.of(namespace.toString()), entityType());
+          EntityIdService.getEntityId(
+              NameIdentifier.parse(namespace.toString()),
+              NameIdentifierUtil.parentEntityType(entityType()));
       return listPOs(mapper, parentId);
     }
 
