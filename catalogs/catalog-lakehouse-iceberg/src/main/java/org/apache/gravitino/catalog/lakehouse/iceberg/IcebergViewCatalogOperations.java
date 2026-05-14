@@ -332,13 +332,11 @@ class IcebergViewCatalogOperations {
 
   /**
    * Applies the implicit property side-effects of a {@link ViewChange.ReplaceView}: sets or removes
-   * {@code comment} and {@code default-catalog}, and always sets the {@code
-   * replace.drop-dialect.allowed} flag. This should be invoked in the order changes are processed
-   * so subsequent explicit property changes can override these values.
+   * {@code comment} and {@code default-catalog}. This should be invoked in the order changes are
+   * processed so subsequent explicit property changes can override these values.
    */
   private static void applyReplaceViewProperties(
       ViewChange.ReplaceView replace, Map<String, String> setProps, Set<String> removeProps) {
-    setProps.put("replace.drop-dialect.allowed", "true");
     if (replace.getComment() == null) {
       removeProps.add("comment");
       setProps.remove("comment");

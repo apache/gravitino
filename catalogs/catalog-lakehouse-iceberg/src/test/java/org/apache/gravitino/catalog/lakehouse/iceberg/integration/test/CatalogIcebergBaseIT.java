@@ -1945,7 +1945,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         new SQLRepresentation[] {sparkRep},
         null,
         null,
-        Collections.emptyMap());
+        Collections.singletonMap("replace.drop-dialect.allowed", "true"));
 
     SQLRepresentation trinoRep =
         SQLRepresentation.builder()
@@ -1983,6 +1983,10 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     SQLRepresentation sparkRep =
         SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
 
+    Map<String, String> createProps = Maps.newHashMap();
+    createProps.put("keep_key", "keep_val");
+    createProps.put("replace.drop-dialect.allowed", "true");
+
     viewCatalog.createView(
         ident,
         "original comment",
@@ -1990,7 +1994,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         new SQLRepresentation[] {sparkRep},
         null,
         null,
-        Collections.singletonMap("keep_key", "keep_val"));
+        createProps);
 
     SQLRepresentation trinoRep =
         SQLRepresentation.builder()
@@ -2030,6 +2034,10 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     SQLRepresentation sparkRep =
         SQLRepresentation.builder().withDialect(SPARK_DIALECT).withSql("SELECT id FROM t").build();
 
+    Map<String, String> createProps = Maps.newHashMap();
+    createProps.put("keep_key", "keep_val");
+    createProps.put("replace.drop-dialect.allowed", "true");
+
     viewCatalog.createView(
         ident,
         "original comment",
@@ -2037,7 +2045,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
         new SQLRepresentation[] {sparkRep},
         null,
         null,
-        Collections.singletonMap("keep_key", "keep_val"));
+        createProps);
 
     SQLRepresentation trinoRep =
         SQLRepresentation.builder()
