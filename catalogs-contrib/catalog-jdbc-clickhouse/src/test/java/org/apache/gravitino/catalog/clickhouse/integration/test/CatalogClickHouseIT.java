@@ -485,7 +485,7 @@ public class CatalogClickHouseIT extends BaseIT {
     NameIdentifier ident = NameIdentifier.of(schemaName, table);
     Column[] cols =
         new Column[] {
-          Column.of("id", Types.LongType.get(), "id"),
+          Column.of("id", Types.LongType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
           Column.of(
               "event_time",
               Types.TimestampType.withoutTimeZone(),
