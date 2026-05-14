@@ -35,8 +35,10 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.ResourceLock;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@ResourceLock("idp-basic-sql-session-factory")
 @ExtendWith({
   BackendTestExtension.class,
   PrintFuncNameExtension.class,
@@ -132,13 +134,9 @@ public abstract class TestJDBCBackend {
         return;
       }
 
-      StringBuilder pgTruncateCommand = new StringBuilder("DO $$ BEGIN\n");
-      for (String table : tableList) {
-        pgTruncateCommand.append(
-            String.format("TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", table));
-      }
-      pgTruncateCommand.append("END $$;");
-      statement.execute(pgTruncateCommand.toString());
+      String truncateCommand =
+          String.format("TRUNCATE TABLE %s RESTART IDENTITY CASCADE", String.join(", ", tableList));
+      statement.execute(truncateCommand);
     }
   }
 }

@@ -39,6 +39,7 @@ import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
 
 class BackendTestExtension implements TestTemplateInvocationContextProvider {
   private static final String DOCKER_TEST_FLAG = "dockerTest";
+  private static final Object SQL_SESSION_FACTORY_MUTEX = new Object();
 
   @Override
   public boolean supportsTestTemplate(ExtensionContext context) {
@@ -48,11 +49,7 @@ class BackendTestExtension implements TestTemplateInvocationContextProvider {
   @Override
   public Stream<TestTemplateInvocationContext> provideTestTemplateInvocationContexts(
       ExtensionContext context) {
-    BackendTypes backendTypes = context.getRequiredTestClass().getAnnotation(BackendTypes.class);
-    List<String> backends =
-        backendTypes != null
-            ? List.of(backendTypes.value())
-            : (isDockerTestEnabled() ? List.of("h2", "mysql", "postgresql") : List.of("h2"));
+    List<String> backends = resolveBackends(context.getRequiredTestClass());
     return backends.stream().map(BackendInvocationContext::new);
   }
 
@@ -63,6 +60,25 @@ class BackendTestExtension implements TestTemplateInvocationContextProvider {
     }
 
     return Boolean.parseBoolean(System.getenv(DOCKER_TEST_FLAG));
+  }
+
+  static List<String> resolveBackends(Class<?> testClass) {
+    BackendTypes backendTypes = findBackendTypes(testClass);
+    return backendTypes != null
+        ? List.of(backendTypes.value())
+        : (isDockerTestEnabled() ? List.of("h2", "mysql", "postgresql") : List.of("h2"));
+  }
+
+  private static BackendTypes findBackendTypes(Class<?> testClass) {
+    Class<?> current = testClass;
+    while (current != null) {
+      BackendTypes backendTypes = current.getDeclaredAnnotation(BackendTypes.class);
+      if (backendTypes != null) {
+        return backendTypes;
+      }
+      current = current.getSuperclass();
+    }
+    return null;
   }
 
   private static class BackendInvocationContext implements TestTemplateInvocationContext {
@@ -96,25 +112,29 @@ class BackendTestExtension implements TestTemplateInvocationContextProvider {
 
     @Override
     public void beforeEach(ExtensionContext context) throws Exception {
-      backend = startBackend();
-      Object testInstance = context.getRequiredTestInstance();
-      if (testInstance instanceof TestJDBCBackend) {
-        ((TestJDBCBackend) testInstance).setBackendType(backendType);
-        ((TestJDBCBackend) testInstance).setBackend(backend);
+      synchronized (SQL_SESSION_FACTORY_MUTEX) {
+        backend = startBackend();
+        Object testInstance = context.getRequiredTestInstance();
+        if (testInstance instanceof TestJDBCBackend) {
+          ((TestJDBCBackend) testInstance).setBackendType(backendType);
+          ((TestJDBCBackend) testInstance).setBackend(backend);
+        }
       }
     }
 
     @Override
     public void afterEach(ExtensionContext context) throws Exception {
-      SqlSessionFactoryHelper.getInstance().close();
-      if (backend != null) {
-        backend.close();
-        backend = null;
-      }
+      synchronized (SQL_SESSION_FACTORY_MUTEX) {
+        SqlSessionFactoryHelper.getInstance().close();
+        if (backend != null) {
+          backend.close();
+          backend = null;
+        }
 
-      if (h2Path != null && Files.exists(h2Path)) {
-        deleteDirectory(h2Path);
-        h2Path = null;
+        if (h2Path != null && Files.exists(h2Path)) {
+          deleteDirectory(h2Path);
+          h2Path = null;
+        }
       }
     }
 

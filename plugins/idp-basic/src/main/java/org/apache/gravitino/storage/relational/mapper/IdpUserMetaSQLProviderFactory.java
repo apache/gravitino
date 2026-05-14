@@ -48,6 +48,11 @@ public class IdpUserMetaSQLProviderFactory {
   }
 
   static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
+    if (databaseId == null) {
+      throw new IllegalStateException(
+          "MyBatis databaseId is not configured for IdP user SQL providers.");
+    }
+
     JDBCBackendType jdbcBackendType;
     try {
       jdbcBackendType = JDBCBackendType.fromString(databaseId);
@@ -59,7 +64,14 @@ public class IdpUserMetaSQLProviderFactory {
           e);
     }
 
-    IdpUserMetaBaseSQLProvider provider = IDP_USER_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return getProvider(jdbcBackendType, databaseId, IDP_USER_META_SQL_PROVIDER_MAP);
+  }
+
+  static IdpUserMetaBaseSQLProvider getProvider(
+      JDBCBackendType jdbcBackendType,
+      String databaseId,
+      Map<JDBCBackendType, IdpUserMetaBaseSQLProvider> providerMap) {
+    IdpUserMetaBaseSQLProvider provider = providerMap.get(jdbcBackendType);
     if (provider == null) {
       throw new IllegalStateException(
           String.format(

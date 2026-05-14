@@ -20,8 +20,10 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 public class TestBackendTestExtension {
@@ -55,4 +57,15 @@ public class TestBackendTestExtension {
       System.setProperty("dockerTest", originalValue);
     }
   }
+
+  @Test
+  public void testResolveBackendsUsesInheritedBackendTypes() {
+    assertIterableEquals(
+        List.of("postgresql"), BackendTestExtension.resolveBackends(ChildTest.class));
+  }
+
+  @BackendTypes({"postgresql"})
+  private static class ParentTest {}
+
+  private static class ChildTest extends ParentTest {}
 }

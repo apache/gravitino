@@ -31,8 +31,9 @@ import org.apache.ibatis.annotations.UpdateProvider;
  * A MyBatis mapper for built-in IdP user metadata operations.
  *
  * <p>This interface defines the SQL statements MyBatis executes for the built-in IdP user metadata
- * store. The SQLs can be provided by XML files or annotations on this mapper interface. See the <a
- * href="https://mybatis.org/mybatis-3/getting-started.html">MyBatis getting started guide</a>.
+ * store. The SQLs are provided through {@code *Provider} annotations on this mapper interface. See
+ * the <a href="https://mybatis.org/mybatis-3/getting-started.html">MyBatis getting started
+ * guide</a>.
  */
 public interface IdpUserMetaMapper {
   String IDP_USER_TABLE_NAME = "idp_user_meta";

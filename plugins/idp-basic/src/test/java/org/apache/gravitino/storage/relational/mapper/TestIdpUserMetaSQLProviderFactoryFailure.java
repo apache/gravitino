@@ -22,6 +22,8 @@ package org.apache.gravitino.storage.relational.mapper;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.junit.jupiter.api.Test;
 
 public class TestIdpUserMetaSQLProviderFactoryFailure {
@@ -34,5 +36,28 @@ public class TestIdpUserMetaSQLProviderFactoryFailure {
 
     assertTrue(exception.getMessage().contains("sqlite"));
     assertTrue(exception.getMessage().contains("supported backends"));
+  }
+
+  @Test
+  void testGetProviderThrowsForMissingDatabaseId() {
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class, () -> IdpUserMetaSQLProviderFactory.getProvider(null));
+
+    assertTrue(exception.getMessage().contains("databaseId"));
+    assertTrue(exception.getMessage().contains("not configured"));
+  }
+
+  @Test
+  void testGetProviderThrowsWhenResolvedBackendHasNoProvider() {
+    IllegalStateException exception =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                IdpUserMetaSQLProviderFactory.getProvider(
+                    JDBCBackendType.H2, "h2", ImmutableMap.of()));
+
+    assertTrue(exception.getMessage().contains("No IdP user SQL provider registered"));
+    assertTrue(exception.getMessage().contains("h2"));
   }
 }

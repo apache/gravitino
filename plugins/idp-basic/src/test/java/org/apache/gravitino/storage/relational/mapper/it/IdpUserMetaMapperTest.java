@@ -72,12 +72,12 @@ interface IdpUserMetaMapperTest {
 
   default void testUpdateIdpUserPasswordKeepsVersionsUnchanged() {
     IdpMapperTestBase testBase = testBase();
-    testBase.insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
+    testBase.insertUser(1L, "alice", "hash-a", 3L, 2L, 0L);
 
     assertEquals(1, testBase.idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
     assertEquals("hash-a-2", testBase.idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
-    assertEquals(1L, testBase.idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
-    assertEquals(0L, testBase.idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
+    assertEquals(3L, testBase.idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
+    assertEquals(2L, testBase.idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
   }
 
   default void testUpdateIdpUserPasswordReturnsZeroForDeletedUser() {
