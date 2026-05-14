@@ -15,4 +15,4 @@
 # specific language governing permissions and limitations
 # under the License.
 
-org.apache.gravitino.storage.relational.mapper.provider.IdpBasicMapperPackageProvider
+org.apache.gravitino.idp.basic.storage.relational.mapper.provider.IdpBasicMapperPackageProvider
