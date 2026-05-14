@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
@@ -152,14 +151,16 @@ public class BackendTestExtension
   private static BackendResource getOrCreateBackendResource(
       ExtensionContext context, String backendType) throws SQLException {
     Map<String, BackendResource> backendResources = getBackendResources(context);
-    BackendResource backendResource = backendResources.get(backendType);
-    if (backendResource != null) {
+    synchronized (backendResources) {
+      BackendResource backendResource = backendResources.get(backendType);
+      if (backendResource != null) {
+        return backendResource;
+      }
+
+      backendResource = createBackendResource(backendType);
+      backendResources.put(backendType, backendResource);
       return backendResource;
     }
-
-    backendResource = createBackendResource(backendType);
-    backendResources.put(backendType, backendResource);
-    return backendResource;
   }
 
   private static BackendResource createBackendResource(String backendType) throws SQLException {
@@ -183,9 +184,7 @@ public class BackendTestExtension
       config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.postgresql.Driver");
     } else {
       try {
-        String uuid = UUID.randomUUID().toString().replace("-", "");
-        h2Path = Path.of("/tmp", "gravitino_jdbc_test_h2_" + uuid);
-        Files.createDirectories(h2Path);
+        h2Path = Files.createTempDirectory("gravitino_jdbc_test_h2_");
       } catch (IOException e) {
         throw new RuntimeException("Create H2 test directory failed", e);
       }
@@ -200,6 +199,7 @@ public class BackendTestExtension
 
     JDBCBackend jdbcBackend = new JDBCBackend();
     try {
+      // Close any leftover shared SQL session state before initializing the next backend.
       jdbcBackend.close();
     } catch (IOException e) {
       throw new RuntimeException("Close JDBC backend before initialization failed", e);
