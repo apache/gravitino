@@ -116,7 +116,7 @@ You can omit `iceberg.rest-catalog.session=NONE` because the default value is `N
 
 ##### Alternative Dremio Iceberg OAuth 2.0 auth manager
 
-If Apache Iceberg cannot be upgraded, you can use the Dremio Iceberg OAuth 2.0 auth manager as an alternative.
+If version of iceberg on the client side can't be upgraded, you can use the Dremio Iceberg OAuth 2.0 auth manager as an alternative.
 
 - Repository: `https://github.com/dremio/iceberg-auth-manager`
 - Build command: `./gradlew --no-daemon :authmgr-oauth2-runtime:shadowJar`
