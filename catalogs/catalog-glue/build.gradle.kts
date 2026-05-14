@@ -36,9 +36,14 @@ dependencies {
   }
 
   implementation(libs.aws.glue)
+  implementation(libs.aws.kms)
+  implementation(libs.aws.s3)
   implementation(libs.aws.sts)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+  implementation(libs.iceberg.core)
+  implementation(libs.iceberg.api)
+  implementation(libs.iceberg.aws)
   implementation(libs.slf4j.api)
 
   annotationProcessor(libs.lombok)
