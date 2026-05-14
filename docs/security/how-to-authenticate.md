@@ -72,6 +72,102 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
+#### OAuth 2.0 token refresh for Iceberg REST clients
+
+When Gravitino is used as an Iceberg REST Catalog (IRC), some query engines may hit OAuth 2.0 token refresh issues during long-running sessions.
+This usually happens when the identity provider doesn't support token exchange, or when a child authentication session inherits the parent session's expiration time.
+
+For the native Apache Iceberg OAuth 2.0 implementation, the following upstream improvements are relevant:
+
+| Version | Change |
+| --- | --- |
+| Iceberg 1.11.0+ | Supports disabling token exchange and using client credentials for token renewal, and fixes child `AuthSession` expiration handling so the child session uses its own token lifetime. |
+
+Use the engine-specific settings below.
+
+##### Spark
+
+Disable token exchange in the catalog configuration:
+
+```text
+spark.sql.catalog.${catalog_name}.token-exchange-enabled=false
+```
+
+##### Flink
+
+Disable token exchange in the catalog properties:
+
+```sql
+'token-exchange-enable'='false'
+```
+
+##### Trino
+
+Set the following in the Trino catalog:
+
+```properties
+iceberg.rest-catalog.session=NONE
+iceberg.rest-catalog.oauth2.token-exchange-enabled=false
+```
+
+This setting can be omitted if you want the default behavior, because the default value is `NONE`.
+
+##### Alternative OAuth 2.0 auth manager for Spark and Flink
+
+If the native Apache Iceberg OAuth 2.0 implementation still doesn't meet your requirements, you can use the Dremio Iceberg OAuth 2.0 auth manager for Spark and Flink:
+
+- Repository: `https://github.com/dremio/iceberg-auth-manager`
+- Build command: `./gradlew --no-daemon :authmgr-oauth2-runtime:shadowJar`
+- Output jar: `${project}/oauth2/runtime/build/libs/authmgr-oauth2-runtime-<version>.jar`
+
+Place the runtime jar in:
+
+- `${SPARK_HOME}/jars` for Spark
+- `${FLINK_HOME}/lib` for Flink
+
+For Spark, also add the jar to both the driver and executor classpaths:
+
+```text
+spark.driver.extraClassPath=${SPARK_HOME}/jars/authmgr-oauth2-runtime-<version>.jar
+spark.executor.extraClassPath=${SPARK_HOME}/jars/authmgr-oauth2-runtime-<version>.jar
+```
+
+Example Spark configuration using client credentials token refresh:
+
+```text
+spark.sql.catalog.irc=org.apache.iceberg.spark.SparkCatalog
+spark.sql.catalog.irc.type=rest
+spark.sql.catalog.irc.uri=http://localhost:9001/iceberg/
+spark.sql.catalog.irc.warehouse=<catalog_name>
+spark.sql.catalog.irc.header.X-Iceberg-Access-Delegation=vended-credentials
+spark.sql.catalog.irc.rest.auth.type=com.dremio.iceberg.authmgr.oauth2.OAuth2Manager
+spark.sql.catalog.irc.rest.auth.oauth2.issuer-url=http://<issuer-host>/realms/<realm>
+spark.sql.catalog.irc.rest.auth.oauth2.client-id=<client-id>
+spark.sql.catalog.irc.rest.auth.oauth2.client-secret=<client-secret>
+spark.sql.catalog.irc.rest.auth.oauth2.scope=<scope>
+spark.sql.catalog.irc.rest.auth.oauth2.token-refresh.enabled=true
+```
+
+Example Flink configuration using client credentials token refresh:
+
+```sql
+CREATE CATALOG irc WITH (
+  'type' = 'iceberg',
+  'catalog-type' = 'rest',
+  'uri' = 'http://127.0.0.1:9001/iceberg/',
+  'rest.auth.type' = 'com.dremio.iceberg.authmgr.oauth2.OAuth2Manager',
+  'rest.auth.oauth2.token-endpoint' = 'http://<issuer-host>/realms/<realm>/protocol/openid-connect/token',
+  'rest.auth.oauth2.client-id' = '<client-id>',
+  'rest.auth.oauth2.client-secret' = '<client-secret>',
+  'rest.auth.oauth2.scope' = '<scope>',
+  'rest.auth.oauth2.token-refresh.enabled' = 'true'
+);
+```
+
+:::note
+At the time of writing, the Dremio auth manager doesn't support Trino. For Trino, prefer the native Iceberg configuration and set `iceberg.rest-catalog.session=NONE`.
+:::
+
 ### Kerberos mode
 
 To enable Kerberos mode, users must ensure that the server and client have the correct Kerberos configuration. On the server side, users should set `gravitino.authenticators` as `kerberos` and give
