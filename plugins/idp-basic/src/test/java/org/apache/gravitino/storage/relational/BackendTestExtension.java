@@ -52,10 +52,17 @@ class BackendTestExtension implements TestTemplateInvocationContextProvider {
     List<String> backends =
         backendTypes != null
             ? List.of(backendTypes.value())
-            : ("true".equalsIgnoreCase(System.getenv(DOCKER_TEST_FLAG))
-                ? List.of("h2", "mysql", "postgresql")
-                : List.of("h2"));
+            : (isDockerTestEnabled() ? List.of("h2", "mysql", "postgresql") : List.of("h2"));
     return backends.stream().map(BackendInvocationContext::new);
+  }
+
+  static boolean isDockerTestEnabled() {
+    String dockerTestProperty = System.getProperty(DOCKER_TEST_FLAG);
+    if (dockerTestProperty != null) {
+      return Boolean.parseBoolean(dockerTestProperty);
+    }
+
+    return Boolean.parseBoolean(System.getenv(DOCKER_TEST_FLAG));
   }
 
   private static class BackendInvocationContext implements TestTemplateInvocationContext {

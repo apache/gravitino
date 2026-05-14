@@ -44,8 +44,30 @@ public class IdpUserMetaSQLProviderFactory {
             .getConfiguration()
             .getDatabaseId();
 
-    JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-    return IDP_USER_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    return getProvider(databaseId);
+  }
+
+  static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
+    JDBCBackendType jdbcBackendType;
+    try {
+      jdbcBackendType = JDBCBackendType.fromString(databaseId);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalStateException(
+          String.format(
+              "Unsupported IdP user SQL provider databaseId: %s, supported backends: %s",
+              databaseId, IDP_USER_META_SQL_PROVIDER_MAP.keySet()),
+          e);
+    }
+
+    IdpUserMetaBaseSQLProvider provider = IDP_USER_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
+    if (provider == null) {
+      throw new IllegalStateException(
+          String.format(
+              "No IdP user SQL provider registered for backend %s (databaseId: %s)",
+              jdbcBackendType, databaseId));
+    }
+
+    return provider;
   }
 
   static class IdpUserMetaMySQLProvider extends IdpUserMetaBaseSQLProvider {}
