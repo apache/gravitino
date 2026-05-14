@@ -232,6 +232,13 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       Optional<ConnectorTableLayout> layout,
       RetryMode retryMode,
       boolean replace) {
+    // CREATE OR REPLACE TABLE AS SELECT is not supported because the Iceberg internal connector
+    // caches the table's UUID at query-plan time. When replace=true, we would need to drop and
+    // recreate the table inside beginCreateTable; however, the subsequent beginInsert call invokes
+    // beginTransaction -> refresh(), which compares the cached UUID against the newly created
+    // table's UUID and throws IllegalStateException ("Table UUID does not match"). There is no
+    // public API in the internal connector to reset this cache, so we reject replace=true with
+    // NOT_SUPPORTED rather than expose a broken code path.
     if (replace) {
       throw new TrinoException(NOT_SUPPORTED, "This connector does not support replacing a table");
     }
