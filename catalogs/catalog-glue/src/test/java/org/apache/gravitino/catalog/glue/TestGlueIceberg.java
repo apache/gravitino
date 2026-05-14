@@ -39,13 +39,15 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.Column;
-import software.amazon.awssdk.services.glue.model.CreateTableRequest;
-import software.amazon.awssdk.services.glue.model.CreateTableResponse;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.IcebergSchema;
@@ -63,15 +65,18 @@ class TestGlueIceberg {
 
   private GlueClient mockClient;
   private GlueCatalogOperations ops;
+  private Catalog mockIcebergCatalog;
 
   @BeforeEach
   void setup() {
     mockClient = mock(GlueClient.class);
+    mockIcebergCatalog = mock(Catalog.class);
     ops = new GlueCatalogOperations();
     ops.glueClient = mockClient;
     ops.catalogId = null;
     ops.tableFormatFilter = null;
     ops.defaultTableFormat = GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
+    ops.icebergGlueCatalog = mockIcebergCatalog;
   }
 
   // ---------------------------------------------------------------------------
@@ -347,7 +352,7 @@ class TestGlueIceberg {
   // ---------------------------------------------------------------------------
 
   @Test
-  void testCreateTable_icebergRoutesOpenTableFormatInput() {
+  void testCreateTable_icebergRoutesToIcebergSdk() {
     Table created =
         Table.builder()
             .name(TABLE)
@@ -360,8 +365,9 @@ class TestGlueIceberg {
             .storageDescriptor(StorageDescriptor.builder().build())
             .build();
 
-    when(mockClient.createTable(any(CreateTableRequest.class)))
-        .thenReturn(CreateTableResponse.builder().build());
+    Catalog.TableBuilder mockBuilder = mock(Catalog.TableBuilder.class, Mockito.RETURNS_SELF);
+    when(mockIcebergCatalog.buildTable(any(TableIdentifier.class), any(Schema.class)))
+        .thenReturn(mockBuilder);
     when(mockClient.getTable(any(GetTableRequest.class)))
         .thenReturn(GetTableResponse.builder().table(created).build());
 
@@ -380,12 +386,8 @@ class TestGlueIceberg {
         null,
         Indexes.EMPTY_INDEXES);
 
-    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
-    verify(mockClient).createTable(captor.capture());
-    CreateTableRequest req = captor.getValue();
-    assertNotNull(
-        req.openTableFormatInput(), "openTableFormatInput must be set for Iceberg tables");
-    assertNotNull(req.openTableFormatInput().icebergInput());
+    verify(mockIcebergCatalog).buildTable(any(TableIdentifier.class), any(Schema.class));
+    verify(mockBuilder).create();
   }
 
   // ---------------------------------------------------------------------------
@@ -479,7 +481,7 @@ class TestGlueIceberg {
   }
 
   @Test
-  void testCreateTable_defaultTableFormatIcebergRoutesOpenTableFormatInput() {
+  void testCreateTable_defaultTableFormatIcebergRoutesToIcebergSdk() {
     Table created =
         Table.builder()
             .name(TABLE)
@@ -487,13 +489,13 @@ class TestGlueIceberg {
                 Map.of(TABLE_TYPE_PARAM, ICEBERG_TABLE_TYPE_VALUE, "metadata_location", LOCATION))
             .storageDescriptor(StorageDescriptor.builder().build())
             .build();
-    when(mockClient.createTable(any(CreateTableRequest.class)))
-        .thenReturn(CreateTableResponse.builder().build());
+
+    Catalog.TableBuilder mockBuilder = mock(Catalog.TableBuilder.class, Mockito.RETURNS_SELF);
+    when(mockIcebergCatalog.buildTable(any(TableIdentifier.class), any(Schema.class)))
+        .thenReturn(mockBuilder);
     when(mockClient.getTable(any(GetTableRequest.class)))
         .thenReturn(GetTableResponse.builder().table(created).build());
 
-    // Set defaultTableFormat to iceberg so createTable without table-format property routes
-    // through OpenTableFormatInput
     ops.defaultTableFormat = "iceberg";
     NameIdentifier ident = NameIdentifier.of("cat", "ns", DB, TABLE);
     GlueColumn[] cols = {
@@ -509,11 +511,8 @@ class TestGlueIceberg {
         null,
         Indexes.EMPTY_INDEXES);
 
-    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
-    verify(mockClient).createTable(captor.capture());
-    assertNotNull(
-        captor.getValue().openTableFormatInput(),
-        "defaultTableFormat=iceberg should route through openTableFormatInput");
+    verify(mockIcebergCatalog).buildTable(any(TableIdentifier.class), any(Schema.class));
+    verify(mockBuilder).create();
   }
 
   @Test
