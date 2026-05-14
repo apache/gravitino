@@ -207,7 +207,7 @@ CREATE CATALOG irc WITH (
 
 ###### Trino
 
-At the time of writing, the Dremio auth manager does not support Trino. For Trino, prefer the native Iceberg configuration and set `iceberg.rest-catalog.session=NONE` and `iceberg.rest-catalog.oauth2.token-exchange-enabled=false`.
+At the time of writing, the Dremio auth manager does not support Trino. For Trino, make your Trino version 479 or higher and set `iceberg.rest-catalog.session=NONE` and `iceberg.rest-catalog.oauth2.token-exchange-enabled=false`.
 
 ### Kerberos mode
 
