@@ -70,7 +70,7 @@ public class BackendTestExtension
 
   @Override
   public boolean supportsTestTemplate(ExtensionContext context) {
-    return TestJDBCBackend.class.isAssignableFrom(context.getRequiredTestClass());
+    return BackendAware.class.isAssignableFrom(context.getRequiredTestClass());
   }
 
   @Override
@@ -136,9 +136,9 @@ public class BackendTestExtension
     public void beforeEach(ExtensionContext context) throws Exception {
       BackendResource backendResource = getOrCreateBackendResource(context, backendType);
       Object testInstance = context.getRequiredTestInstance();
-      if (testInstance instanceof TestJDBCBackend) {
-        ((TestJDBCBackend) testInstance).setBackend(backendResource.backend());
-        ((TestJDBCBackend) testInstance).setBackendType(backendType);
+      if (testInstance instanceof BackendAware) {
+        ((BackendAware) testInstance).setBackend(backendResource.backend());
+        ((BackendAware) testInstance).setBackendType(backendType);
       }
     }
   }

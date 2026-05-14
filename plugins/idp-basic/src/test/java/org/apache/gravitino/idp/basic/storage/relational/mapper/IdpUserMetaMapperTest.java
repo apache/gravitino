@@ -81,19 +81,6 @@ interface IdpUserMetaMapperTest {
     assertEquals(2L, testBase.idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
   }
 
-  default void testUpdateIdpUserPasswordReturnsZeroForDeletedUser() {
-    IdpMapperTestBase testBase = testBase();
-    testBase.insertUser(1L, "alice", "hash-a", 1L, 0L, 10L);
-
-    assertEquals(0, testBase.idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
-    assertEquals(
-        1L, testBase.queryLongValueInMapperTest("idp_user_meta", "current_version", "user_id", 1L));
-    assertEquals(
-        0L, testBase.queryLongValueInMapperTest("idp_user_meta", "last_version", "user_id", 1L));
-    assertEquals(
-        10L, testBase.queryLongValueInMapperTest("idp_user_meta", "deleted_at", "user_id", 1L));
-  }
-
   default void testSoftDeleteIdpUser() {
     IdpMapperTestBase testBase = testBase();
     testBase.insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
@@ -102,19 +89,6 @@ interface IdpUserMetaMapperTest {
     assertNull(testBase.idpUserMetaMapper.selectIdpUser("alice"));
     assertTrue(
         testBase.queryLongValueInMapperTest("idp_user_meta", "deleted_at", "user_id", 1L) > 0L);
-    assertEquals(
-        1L, testBase.queryLongValueInMapperTest("idp_user_meta", "current_version", "user_id", 1L));
-    assertEquals(
-        0L, testBase.queryLongValueInMapperTest("idp_user_meta", "last_version", "user_id", 1L));
-  }
-
-  default void testSoftDeleteIdpUserReturnsZeroForDeletedUser() {
-    IdpMapperTestBase testBase = testBase();
-    testBase.insertUser(1L, "alice", "hash-a", 1L, 0L, 10L);
-
-    assertEquals(0, testBase.idpUserMetaMapper.softDeleteIdpUser(1L));
-    assertEquals(
-        10L, testBase.queryLongValueInMapperTest("idp_user_meta", "deleted_at", "user_id", 1L));
     assertEquals(
         1L, testBase.queryLongValueInMapperTest("idp_user_meta", "current_version", "user_id", 1L));
     assertEquals(

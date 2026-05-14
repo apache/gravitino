@@ -19,19 +19,54 @@
 
 package org.apache.gravitino.idp.basic.storage.relational.mapper;
 
-import org.apache.gravitino.idp.basic.storage.relational.TestJDBCBackend;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.gravitino.idp.basic.storage.relational.BackendAware;
+import org.apache.gravitino.idp.basic.storage.relational.BackendTestExtension;
 import org.apache.gravitino.idp.basic.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.integration.test.util.CloseContainerExtension;
+import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
+import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.extension.ExtendWith;
 
-abstract class IdpMapperTestBase extends TestJDBCBackend {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@ExtendWith({
+  BackendTestExtension.class,
+  PrintFuncNameExtension.class,
+  CloseContainerExtension.class
+})
+abstract class IdpMapperTestBase implements BackendAware {
+  protected String backendType;
+  protected JDBCBackend backend;
   protected SqlSession sharedSession;
   protected IdpUserMetaMapper idpUserMetaMapper;
 
+  @Override
+  public void setBackendType(String backendType) {
+    this.backendType = backendType;
+  }
+
+  @Override
+  public void setBackend(JDBCBackend backend) {
+    this.backend = backend;
+  }
+
   @BeforeEach
-  void openSession() {
+  void setUp() throws SQLException {
+    truncateAllTables();
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
   }
@@ -70,5 +105,105 @@ abstract class IdpMapperTestBase extends TestJDBCBackend {
 
   int countRowsInMapperTest(String table, String idColumn, long idValue) {
     return countRows(table, idColumn, idValue);
+  }
+
+  protected long queryLongValue(String table, String column, String idColumn, long idValue) {
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection()) {
+        String query = "SELECT " + column + " FROM " + table + " WHERE " + idColumn + " = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+          statement.setLong(1, idValue);
+          try (ResultSet resultSet = statement.executeQuery()) {
+            assertTrue(resultSet.next());
+            return resultSet.getLong(1);
+          }
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Query " + column + " from " + table + " failed", e);
+    }
+  }
+
+  protected int countRows(String table, String idColumn, long idValue) {
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection()) {
+        String query = "SELECT COUNT(1) FROM " + table + " WHERE " + idColumn + " = ?";
+        try (PreparedStatement statement = connection.prepareStatement(query)) {
+          statement.setLong(1, idValue);
+          try (ResultSet resultSet = statement.executeQuery()) {
+            assertTrue(resultSet.next());
+            return resultSet.getInt(1);
+          }
+        }
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Count rows from " + table + " failed", e);
+    }
+  }
+
+  protected String currentJdbcUrl() {
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection()) {
+        DatabaseMetaData metaData = connection.getMetaData();
+        return metaData.getURL();
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Get current JDBC URL failed", e);
+    }
+  }
+
+  private void truncateAllTables() throws SQLException {
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection();
+          Statement statement = connection.createStatement()) {
+        if ("postgresql".equalsIgnoreCase(backendType)) {
+          truncateAllTablesForPostgreSQL(connection);
+        } else {
+          List<String> tableList = new ArrayList<>();
+          try (ResultSet rs = statement.executeQuery("SHOW TABLES")) {
+            while (rs.next()) {
+              tableList.add(rs.getString(1));
+            }
+          }
+          for (String table : tableList) {
+            statement.execute("TRUNCATE TABLE " + table);
+          }
+        }
+      }
+    }
+  }
+
+  private void truncateAllTablesForPostgreSQL(Connection connection) throws SQLException {
+    List<String> tableList = new ArrayList<>();
+    try (Statement statement = connection.createStatement()) {
+      String query =
+          "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()";
+      try (ResultSet rs = statement.executeQuery(query)) {
+        while (rs.next()) {
+          tableList.add(rs.getString(1));
+        }
+      }
+
+      if (tableList.isEmpty()) {
+        return;
+      }
+
+      StringBuilder pgTruncateCommand = new StringBuilder("DO $$ BEGIN\n");
+      for (String table : tableList) {
+        pgTruncateCommand.append(
+            String.format(
+                "TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", quotePostgreSqlIdentifier(table)));
+      }
+      pgTruncateCommand.append("END $$;");
+      statement.execute(pgTruncateCommand.toString());
+    }
+  }
+
+  private String quotePostgreSqlIdentifier(String identifier) {
+    return "\"" + identifier.replace("\"", "\"\"") + "\"";
   }
 }

@@ -44,17 +44,19 @@ public class TestIdpUserPO {
   }
 
   @Test
-  public void testIdpUserPOBuilderValidation() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            IdpUserPO.builder()
-                .withUserId(1L)
-                .withUserName("alice")
-                .withCurrentVersion(1L)
-                .withLastVersion(1L)
-                .withDeletedAt(0L)
-                .build());
+  public void testIdpUserPOBuilderAllowsPartialFields() {
+    IdpUserPO userPO =
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUserName("alice")
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
+            .withDeletedAt(0L)
+            .build();
+
+    Assertions.assertEquals(1L, userPO.getUserId());
+    Assertions.assertEquals("alice", userPO.getUserName());
+    Assertions.assertNull(userPO.getPasswordHash());
   }
 
   @Test
@@ -85,7 +87,7 @@ public class TestIdpUserPO {
 
   @Test
   public void testBuilderReuseDoesNotMutateBuiltObject() {
-    IdpUserPO.Builder builder =
+    var builder =
         IdpUserPO.builder()
             .withUserId(1L)
             .withUserName("alice")

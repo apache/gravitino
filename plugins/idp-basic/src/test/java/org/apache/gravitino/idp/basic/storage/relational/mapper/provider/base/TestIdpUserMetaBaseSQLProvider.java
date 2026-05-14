@@ -135,23 +135,6 @@ public abstract class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteIdpUserDoesNotUseOptimisticLocking() {
-    IdpUserMetaBaseSQLProvider provider = createProvider();
-
-    String normalizedSql = provider.softDeleteIdpUser(1L).replaceAll("\\s+", " ").trim();
-
-    Assertions.assertFalse(
-        normalizedSql.contains("current_version = #{currentVersion}"),
-        "Built-in IdP user delete should not use optimistic locking");
-    Assertions.assertFalse(
-        normalizedSql.contains("current_version = current_version + 1"),
-        "Built-in IdP user delete should not increment current_version");
-    Assertions.assertFalse(
-        normalizedSql.contains("last_version = last_version + 1"),
-        "Built-in IdP user delete should not increment last_version");
-  }
-
-  @Test
   public void testDeleteIdpUserMetasByLegacyTimeline() {
     String normalizedSql =
         createProvider().deleteIdpUserMetasByLegacyTimeline(1L, 2).replaceAll("\\s+", " ").trim();

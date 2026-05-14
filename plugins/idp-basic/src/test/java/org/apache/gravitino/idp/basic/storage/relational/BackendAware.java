@@ -16,27 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.basic.storage.relational.po;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+package org.apache.gravitino.idp.basic.storage.relational;
 
-@Getter
-@EqualsAndHashCode
-@ToString
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(setterPrefix = "with")
-public class IdpUserPO {
-  private Long userId;
-  private String userName;
-  private String passwordHash;
-  private Long currentVersion;
-  private Long lastVersion;
-  private Long deletedAt;
+import org.apache.gravitino.storage.relational.JDBCBackend;
+
+public interface BackendAware {
+  void setBackendType(String backendType);
+
+  void setBackend(JDBCBackend backend);
 }

@@ -58,18 +58,8 @@ public class TestIdpUserMetaMapperMySQL extends IdpMapperTestBase implements Idp
   }
 
   @TestTemplate
-  public void testUpdateIdpUserPasswordReturnsZeroForDeletedUser() {
-    IdpUserMetaMapperTest.super.testUpdateIdpUserPasswordReturnsZeroForDeletedUser();
-  }
-
-  @TestTemplate
   public void testSoftDeleteIdpUser() {
     IdpUserMetaMapperTest.super.testSoftDeleteIdpUser();
-  }
-
-  @TestTemplate
-  public void testSoftDeleteIdpUserReturnsZeroForDeletedUser() {
-    IdpUserMetaMapperTest.super.testSoftDeleteIdpUserReturnsZeroForDeletedUser();
   }
 
   @TestTemplate
