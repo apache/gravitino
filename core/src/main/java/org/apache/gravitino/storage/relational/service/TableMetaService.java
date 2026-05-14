@@ -475,13 +475,13 @@ public class TableMetaService extends RequireSchemaConventionService<TablePO> {
         : this::getPOForApiIdentifier;
   }
 
-    @Override
-    protected TablePO fetchPOByStorageIdentifier(NameIdentifier storageIdentifier) {
-        return getTablePOByFullQualifiedName(storageIdentifier);
-    }
+  @Override
+  protected TablePO fetchPOByStorageIdentifier(NameIdentifier storageIdentifier) {
+    return getTablePOByFullQualifiedName(storageIdentifier);
+  }
 
-    @Override
-    protected List<TablePO> fetchPOsByStorageNamespace(Namespace storageNamespace) {
-        return listTablePOsByFullQualifiedName(storageNamespace);
-    }
+  @Override
+  protected List<TablePO> fetchPOsByStorageNamespace(Namespace storageNamespace) {
+    return listTablePOsByFullQualifiedName(storageNamespace);
+  }
 }

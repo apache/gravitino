@@ -33,7 +33,6 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -80,29 +79,14 @@ import org.apache.gravitino.utils.NamespaceUtil;
 /** The service class for schema metadata. It provides the basic database operations for schema. */
 public class SchemaMetaService {
   private static final SchemaMetaService INSTANCE = new SchemaMetaService();
+  private SchemaPOStorageOps ops;
 
   public static SchemaMetaService getInstance() {
     return INSTANCE;
   }
 
-  private SchemaMetaService() {}
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getSchemaPOByCatalogIdAndName")
-  public SchemaPO getSchemaPOByCatalogIdAndName(Long catalogId, String schemaName) {
-    SchemaPO schemaPO =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaMetaByCatalogIdAndName(catalogId, schemaName));
-
-    if (schemaPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          schemaName);
-    }
-    return schemaPO;
+  private SchemaMetaService() {
+    this.ops = new SchemaPOStorageOps();
   }
 
   @Monitored(
@@ -110,39 +94,19 @@ public class SchemaMetaService {
       baseMetricName = "getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName")
   public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
       String metalakeName, String catalogName, String schemaName) {
-    SchemaIds schemaIds =
+    NameIdentifier identifier = NameIdentifier.of(metalakeName, catalogName, schemaName);
+    SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper ->
-                mapper.selectSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
-                    metalakeName, catalogName, schemaName));
+            SchemaMetaMapper.class, mapper -> ops.getPOByFullName(mapper, identifier));
 
-    if (schemaIds == null) {
+    if (schemaPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.SCHEMA.name().toLowerCase(),
           schemaName);
     }
 
-    return schemaIds;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getSchemaIdByCatalogIdAndName")
-  public Long getSchemaIdByCatalogIdAndName(Long catalogId, String schemaName) {
-    Long schemaId =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper -> mapper.selectSchemaIdByCatalogIdAndName(catalogId, schemaName));
-
-    if (schemaId == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          schemaName);
-    }
-    return schemaId;
+    return new SchemaIds(schemaPO.getMetalakeId(), schemaPO.getCatalogId(), schemaPO.getSchemaId());
   }
 
   @Monitored(
@@ -230,11 +194,7 @@ public class SchemaMetaService {
             SchemaPO leafPO = POConverters.initializeSchemaPOWithVersion(leafRow, leafBuilder);
             List<SchemaPO> schemaPosToInsert = new ArrayList<>(missingAncestorPOs);
             schemaPosToInsert.add(leafPO);
-            if (overwrite) {
-              mapper.batchInsertSchemaMetaOnDuplicateKeyUpdate(schemaPosToInsert);
-            } else {
-              mapper.batchInsertSchemaMeta(schemaPosToInsert);
-            }
+            ops.batchInsertPOs(mapper, schemaPosToInsert, overwrite);
           });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -271,7 +231,8 @@ public class SchemaMetaService {
                   SessionUtils.getWithoutCommit(
                       SchemaMetaMapper.class,
                       mapper ->
-                          mapper.updateSchemaMeta(
+                          ops.updatePO(
+                              mapper,
                               POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity),
                               oldSchemaPO))),
           () -> {
@@ -497,93 +458,20 @@ public class SchemaMetaService {
     return schemaPOFetcher().apply(identifier);
   }
 
-  private SchemaPO getSchemaByFullQualifiedName(
-      String metalakeName, String catalogName, String schemaName) {
-    SchemaPO schemaPO =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper ->
-                mapper.selectSchemaByFullQualifiedName(metalakeName, catalogName, schemaName));
-    if (schemaPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          EntityType.CATALOG.name().toLowerCase(),
-          schemaName);
-    }
-
-    return schemaPO;
-  }
-
   private List<SchemaPO> listSchemaPOs(Namespace namespace) {
     return schemaListFetcher().apply(namespace);
   }
 
-  private List<SchemaPO> listSchemaPOsByCatalogId(Namespace namespace) {
-    Long catalogId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(namespace.levels()), Entity.EntityType.CATALOG);
-
-    return SessionUtils.getWithoutCommit(
-        SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
-  }
-
-  private List<SchemaPO> listSchemaPOsByFullQualifiedName(Namespace namespace) {
-    String[] namespaceLevels = namespace.levels();
-    List<SchemaPO> schemaPOs =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class,
-            mapper ->
-                mapper.listSchemaPOsByFullQualifiedName(namespaceLevels[0], namespaceLevels[1]));
-    if (schemaPOs.isEmpty() || schemaPOs.get(0).getCatalogId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          namespaceLevels[1]);
-    }
-    return schemaPOs.stream().filter(po -> po.getSchemaId() != null).collect(Collectors.toList());
-  }
-
-  private SchemaPO getSchemaPOByCatalogId(NameIdentifier identifier) {
-    Long catalogId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.CATALOG);
-    return getSchemaPOByCatalogIdAndName(catalogId, identifier.name());
-  }
-
-  private SchemaPO getSchemaPOByFullQualifiedName(NameIdentifier identifier) {
-    String[] namespaceLevels = identifier.namespace().levels();
-    SchemaPO schemaPO =
-        getSchemaByFullQualifiedName(namespaceLevels[0], namespaceLevels[1], identifier.name());
-
-    if (schemaPO.getCatalogId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          namespaceLevels[1]);
-    }
-
-    if (schemaPO.getSchemaId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          identifier.name());
-    }
-
-    return schemaPO;
-  }
-
   private Function<Namespace, List<SchemaPO>> schemaListFetcher() {
-    // If cache is enabled, we can use catalog id to fetch schemas faster or else use full qualified
-    // name to join several tables to get the schema list.
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::listSchemaPOsByCatalogId
-        : this::listSchemaPOsByFullQualifiedName;
+    return namespace ->
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> ops.listPOs(mapper, namespace));
   }
 
   private Function<NameIdentifier, SchemaPO> schemaPOFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::getSchemaPOByCatalogId
-        : this::getSchemaPOByFullQualifiedName;
+    return identifier ->
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
@@ -605,12 +493,14 @@ public class SchemaMetaService {
     List<String> schemaNames =
         identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
 
-    return SessionUtils.doWithCommitAndFetchResult(
+    return SessionUtils.getWithoutCommit(
         SchemaMetaMapper.class,
         mapper -> {
           List<SchemaPO> schemaPOs =
-              mapper.batchSelectSchemaByIdentifier(
-                  catalogIdent.namespace().level(0), catalogIdent.name(), schemaNames);
+              ops.listPOs(
+                  mapper,
+                  Namespace.of(catalogIdent.namespace().levels()[0], catalogIdent.name()),
+                  schemaNames);
           return POConverters.fromSchemaPOs(schemaPOs, firstIdent.namespace());
         });
   }

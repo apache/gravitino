@@ -29,8 +29,8 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
  *
  * <p>API identifiers use the configured logical schema separator; persisted rows use the internal
  * physical separator. Subclasses implement {@link #fetchPOByStorageIdentifier} and {@link
- * #fetchPOsByStorageNamespace} after {@link #getPOForApiIdentifier} / {@link #listPOsForApiNamespace}
- * rewrite identifiers or namespaces as needed.
+ * #fetchPOsByStorageNamespace} after {@link #getPOForApiIdentifier} / {@link
+ * #listPOsForApiNamespace} rewrite identifiers or namespaces as needed.
  *
  * @param <E> persistent object type loaded for the entity
  */
