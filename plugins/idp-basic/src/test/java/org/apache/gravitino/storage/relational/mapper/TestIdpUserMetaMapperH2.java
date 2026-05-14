@@ -74,9 +74,8 @@ public class TestIdpUserMetaMapperH2 extends IdpMapperTestBase implements IdpUse
   }
 
   @TestTemplate
-  public void testSoftDeleteIdpUserRunsWithH2MysqlMode() {
+  public void testSoftDeleteIdpUserRunsWithH2Provider() {
     assertEquals("h2", backendType);
-    assertTrue(currentJdbcUrl().contains("MODE=MYSQL"));
 
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
     assertEquals(1, idpUserMetaMapper.softDeleteIdpUser(1L));

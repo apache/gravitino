@@ -19,19 +19,30 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
-import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.mapper.provider.base.TestIdpUserMetaBaseSQLProvider;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+
+import org.apache.gravitino.storage.relational.mapper.provider.h2.IdpUserMetaH2Provider;
 import org.apache.gravitino.storage.relational.mapper.provider.mysql.IdpUserMetaMySQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.IdpUserMetaPostgreSQLProvider;
+import org.junit.jupiter.api.Test;
 
-public class TestIdpUserMetaMySQLProvider extends TestIdpUserMetaBaseSQLProvider {
+public class TestIdpUserMetaSQLProviderFactory {
 
-  @Override
-  protected IdpUserMetaBaseSQLProvider createProvider() {
-    return new IdpUserMetaMySQLProvider();
+  @Test
+  void testGetProviderReturnsMySQLProvider() {
+    assertInstanceOf(
+        IdpUserMetaMySQLProvider.class, IdpUserMetaSQLProviderFactory.getProvider("mysql"));
   }
 
-  @Override
-  protected String expectedDeleteAtClause() {
-    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0)";
+  @Test
+  void testGetProviderReturnsH2Provider() {
+    assertInstanceOf(IdpUserMetaH2Provider.class, IdpUserMetaSQLProviderFactory.getProvider("h2"));
+  }
+
+  @Test
+  void testGetProviderReturnsPostgreSQLProvider() {
+    assertInstanceOf(
+        IdpUserMetaPostgreSQLProvider.class,
+        IdpUserMetaSQLProviderFactory.getProvider("postgresql"));
   }
 }

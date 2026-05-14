@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.h2.IdpUserMetaH2Provider;
+import org.apache.gravitino.storage.relational.mapper.provider.mysql.IdpUserMetaMySQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.postgresql.IdpUserMetaPostgreSQLProvider;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -34,7 +36,7 @@ public class IdpUserMetaSQLProviderFactory {
       IDP_USER_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
               JDBCBackendType.MYSQL, new IdpUserMetaMySQLProvider(),
-              JDBCBackendType.H2, new IdpUserMetaBaseSQLProvider(),
+              JDBCBackendType.H2, new IdpUserMetaH2Provider(),
               JDBCBackendType.POSTGRESQL, new IdpUserMetaPostgreSQLProvider());
 
   public static IdpUserMetaBaseSQLProvider getProvider() {
@@ -81,8 +83,6 @@ public class IdpUserMetaSQLProviderFactory {
 
     return provider;
   }
-
-  static class IdpUserMetaMySQLProvider extends IdpUserMetaBaseSQLProvider {}
 
   public static String selectIdpUser(@Param("username") String username) {
     return getProvider().selectIdpUser(username);

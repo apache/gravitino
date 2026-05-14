@@ -17,21 +17,21 @@
  * under the License.
  */
 
-package org.apache.gravitino.storage.relational.mapper;
+package org.apache.gravitino.storage.relational.mapper.provider.h2;
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TestIdpUserMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.mapper.provider.mysql.IdpUserMetaMySQLProvider;
 
-public class TestIdpUserMetaMySQLProvider extends TestIdpUserMetaBaseSQLProvider {
+public class TestIdpUserMetaH2Provider extends TestIdpUserMetaBaseSQLProvider {
 
   @Override
   protected IdpUserMetaBaseSQLProvider createProvider() {
-    return new IdpUserMetaMySQLProvider();
+    return new IdpUserMetaH2Provider();
   }
 
   @Override
   protected String expectedDeleteAtClause() {
-    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0)";
+    return "deleted_at = DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00',"
+        + " CURRENT_TIMESTAMP())";
   }
 }

@@ -24,7 +24,7 @@ import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 import org.apache.ibatis.annotations.Param;
 
-public class IdpUserMetaBaseSQLProvider {
+public abstract class IdpUserMetaBaseSQLProvider {
 
   public String selectIdpUser(@Param("username") String username) {
     return "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
@@ -81,18 +81,11 @@ public class IdpUserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  /**
-   * Generates the built-in IdP soft-delete SQL with the same MySQL/H2(MODE=MYSQL) convention used
-   * by the core relational base providers.
-   *
-   * <p>Gravitino's H2 backend is initialized in {@code MODE=MYSQL}, so {@code UNIX_TIMESTAMP()} is
-   * intentionally shared by the MySQL and H2 providers here. PostgreSQL overrides this method with
-   * its own timestamp expression.
-   */
   public String softDeleteIdpUser(@Param("userId") Long userId) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " SET deleted_at = "
+        + currentTimeMillisExpression()
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
@@ -102,4 +95,6 @@ public class IdpUserMetaBaseSQLProvider {
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
+
+  protected abstract String currentTimeMillisExpression();
 }

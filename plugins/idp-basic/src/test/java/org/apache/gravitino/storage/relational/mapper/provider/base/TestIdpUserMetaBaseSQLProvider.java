@@ -31,15 +31,11 @@ import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpUserMetaBaseSQLProvider {
+public abstract class TestIdpUserMetaBaseSQLProvider {
 
-  protected IdpUserMetaBaseSQLProvider createProvider() {
-    return new IdpUserMetaBaseSQLProvider();
-  }
+  protected abstract IdpUserMetaBaseSQLProvider createProvider();
 
-  protected String expectedDeleteAtClause() {
-    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0)";
-  }
+  protected abstract String expectedDeleteAtClause();
 
   protected String expectedDeleteIdpUserMetasByLegacyTimelineSql() {
     return "DELETE FROM idp_user_meta"
