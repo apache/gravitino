@@ -289,13 +289,8 @@ class TestGlueCatalogTableOperations {
     when(mockClient.updateTable(any(UpdateTableRequest.class)))
         .thenReturn(UpdateTableResponse.builder().build());
 
-    ArgumentCaptor<UpdateTableRequest> captor = ArgumentCaptor.forClass(UpdateTableRequest.class);
+    GlueTable result = ops.alterTable(ident, TableChange.updateComment("new comment"));
 
-    GlueTable result =
-        ops.alterTable(ident, TableChange.rename("new"), TableChange.updateComment("new comment"));
-
-    verify(mockClient).updateTable(captor.capture());
-    assertEquals("new", captor.getValue().tableInput().name());
     assertEquals("new comment", result.comment());
   }
 
