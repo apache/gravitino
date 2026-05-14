@@ -36,26 +36,27 @@ public abstract class IdpUserMetaBaseSQLProvider {
   }
 
   public String selectIdpUsers(@Param("usernames") List<String> usernames) {
-    return "<script>"
-        + "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
-        + " current_version as currentVersion,"
-        + " last_version as lastVersion, deleted_at as deletedAt"
-        + " FROM "
-        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " WHERE deleted_at = 0 "
-        + "<choose>"
-        + "<when test='usernames != null and usernames.size() > 0'>"
-        + "AND user_name IN ("
-        + "<foreach item='item' collection='usernames' separator=','>"
-        + "#{item}"
-        + "</foreach>"
-        + ") "
-        + "</when>"
-        + "<otherwise>"
-        + "AND 1 = 0 "
-        + "</otherwise>"
-        + "</choose>"
-        + "</script>";
+    if (usernames == null || usernames.isEmpty()) {
+      return "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
+          + " current_version as currentVersion,"
+          + " last_version as lastVersion, deleted_at as deletedAt"
+          + " FROM "
+          + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+          + " WHERE deleted_at = 0 AND 1 = 0";
+    } else {
+      return "<script>"
+          + "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
+          + " current_version as currentVersion,"
+          + " last_version as lastVersion, deleted_at as deletedAt"
+          + " FROM "
+          + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+          + " WHERE deleted_at = 0 "
+          + "<foreach collection='usernames' item='username'"
+          + " open='AND user_name IN (' separator=',' close=')'>"
+          + "#{username}"
+          + "</foreach>"
+          + "</script>";
+    }
   }
 
   public String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
