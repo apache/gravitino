@@ -1975,7 +1975,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   }
 
   @Test
-  void testAlterViewReplaceThenSetPropertyOverridesReplaceProperties() {
+  void testAlterViewReplaceThenSetCustomProperty() {
     ViewCatalog viewCatalog = catalog.asViewCatalog();
     String viewName = GravitinoITUtils.genRandomName("replace_then_set_view");
     NameIdentifier ident = NameIdentifier.of(schemaName, viewName);
@@ -2014,11 +2014,11 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
                 "replace_catalog",
                 schemaName,
                 "replace comment"),
-            ViewChange.setProperty("comment", "property comment"),
-            ViewChange.setProperty("default-catalog", "property_catalog"));
+            ViewChange.setProperty("custom_key", "custom_val"));
 
-    Assertions.assertEquals("property comment", altered.comment());
-    Assertions.assertEquals("property_catalog", altered.defaultCatalog());
+    Assertions.assertEquals("replace comment", altered.comment());
+    Assertions.assertEquals("replace_catalog", altered.defaultCatalog());
+    Assertions.assertEquals("custom_val", altered.properties().get("custom_key"));
     Assertions.assertEquals("keep_val", altered.properties().get("keep_key"));
     Assertions.assertEquals(2, altered.columns().length);
     Assertions.assertEquals("name", altered.columns()[1].name());
@@ -2026,7 +2026,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
   }
 
   @Test
-  void testAlterViewSetPropertyThenReplaceUsesReplaceProperties() {
+  void testAlterViewSetCustomPropertyThenReplaceKeepsProperty() {
     ViewCatalog viewCatalog = catalog.asViewCatalog();
     String viewName = GravitinoITUtils.genRandomName("set_then_replace_view");
     NameIdentifier ident = NameIdentifier.of(schemaName, viewName);
@@ -2059,8 +2059,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     View altered =
         viewCatalog.alterView(
             ident,
-            ViewChange.setProperty("comment", "property comment"),
-            ViewChange.setProperty("default-catalog", "property_catalog"),
+            ViewChange.setProperty("custom_key", "custom_val"),
             ViewChange.replaceView(
                 replacedColumns,
                 new SQLRepresentation[] {trinoRep},
@@ -2070,6 +2069,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
 
     Assertions.assertEquals("replace comment", altered.comment());
     Assertions.assertEquals("replace_catalog", altered.defaultCatalog());
+    Assertions.assertEquals("custom_val", altered.properties().get("custom_key"));
     Assertions.assertEquals("keep_val", altered.properties().get("keep_key"));
     Assertions.assertEquals(2, altered.columns().length);
     Assertions.assertEquals("name", altered.columns()[1].name());
