@@ -36,6 +36,7 @@ public class TestIdpUserMetaPostgreSQLProvider extends TestIdpUserMetaBaseSQLPro
 
   @Override
   protected String expectedDeleteIdpUserMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_user_meta WHERE user_id IN (SELECT user_id FROM idp_user_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+    return "DELETE FROM idp_user_meta WHERE user_id IN (SELECT user_id FROM idp_user_meta"
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }
