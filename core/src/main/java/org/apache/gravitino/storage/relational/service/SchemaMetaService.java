@@ -95,9 +95,7 @@ public class SchemaMetaService {
   public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
       String metalakeName, String catalogName, String schemaName) {
     NameIdentifier identifier = NameIdentifier.of(metalakeName, catalogName, schemaName);
-    SchemaPO schemaPO =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> ops.getPOByFullName(mapper, identifier));
+    SchemaPO schemaPO = schemaPOFetcher().apply(identifier);
 
     if (schemaPO == null) {
       throw new NoSuchEntityException(

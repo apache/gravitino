@@ -58,8 +58,10 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
 /** The service class for table metadata. It provides the basic database operations for table. */
-public class TableMetaService extends RequireSchemaConventionService<TablePO> {
+public class TableMetaService {
   private static final TableMetaService INSTANCE = new TableMetaService();
+
+  private final TablePOStorageOps ops = new TablePOStorageOps();
 
   public static TableMetaService getInstance() {
     return INSTANCE;
@@ -74,7 +76,7 @@ public class TableMetaService extends RequireSchemaConventionService<TablePO> {
     Long tableId =
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
-            mapper -> mapper.selectTableIdBySchemaIdAndName(schemaId, tableName));
+            mapper -> ops.getPO(mapper, schemaId, tableName)).getTableId();
 
     if (tableId == null) {
       throw new NoSuchEntityException(
@@ -124,11 +126,7 @@ public class TableMetaService extends RequireSchemaConventionService<TablePO> {
                   TableMetaMapper.class,
                   mapper -> {
                     tablePORef.set(po);
-                    if (overwrite) {
-                      mapper.insertTableMetaOnDuplicateKeyUpdate(po);
-                    } else {
-                      mapper.insertTableMeta(po);
-                    }
+                    ops.insertPO(mapper, po, overwrite);
                   }),
           () ->
               SessionUtils.doWithoutCommit(
@@ -202,9 +200,10 @@ public class TableMetaService extends RequireSchemaConventionService<TablePO> {
       SessionUtils.doMultipleWithCommit(
           () ->
               updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      TableMetaMapper.class,
-                      mapper -> mapper.updateTableMeta(newTablePO, oldTablePO, newSchemaId))),
+              SessionUtils.getWithoutCommit(
+                  TableMetaMapper.class,
+                  mapper ->
+                      ops.updatePO(mapper, newTablePO, oldTablePO))),
           () ->
               SessionUtils.doWithoutCommit(
                   TableVersionMapper.class,
@@ -347,11 +346,11 @@ public class TableMetaService extends RequireSchemaConventionService<TablePO> {
           Objects.equals(schemaIdent, NameIdentifierUtil.getSchemaIdentifier(ident)));
       tableNames.add(ident.name());
     }
-    Long schemaId = EntityIdService.getEntityId(schemaIdent, Entity.EntityType.SCHEMA);
     return SessionUtils.doWithCommitAndFetchResult(
         TableMetaMapper.class,
         mapper -> {
-          List<TablePO> tableList = mapper.batchSelectTableByIdentifier(schemaId, tableNames);
+          List<TablePO> tableList =
+              ops.listPOs(mapper, firstIdent.namespace(), tableNames);
           return POConverters.fromTablePOs(tableList, firstIdent.namespace());
         });
   }
@@ -376,7 +375,7 @@ public class TableMetaService extends RequireSchemaConventionService<TablePO> {
     TablePO tablePO =
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
-            mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, tableName));
+            mapper -> ops.getPO(mapper, schemaId, tableName));
     if (tablePO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -392,8 +391,10 @@ public class TableMetaService extends RequireSchemaConventionService<TablePO> {
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
             mapper ->
-                mapper.selectTableByFullQualifiedName(
-                    metalakeName, catalogName, schemaName, tableName));
+                ops.getPOByFullName(
+                    mapper,
+                    NameIdentifier.of(
+                        Namespace.of(metalakeName, catalogName, schemaName), tableName)));
     if (tablePO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -413,7 +414,7 @@ public class TableMetaService extends RequireSchemaConventionService<TablePO> {
         EntityIdService.getEntityId(
             NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
     return SessionUtils.getWithoutCommit(
-        TableMetaMapper.class, mapper -> mapper.listTablePOsBySchemaId(schemaId));
+        TableMetaMapper.class, mapper -> ops.listPOs(mapper, schemaId));
   }
 
   private List<TablePO> listTablePOsByFullQualifiedName(Namespace namespace) {
@@ -422,8 +423,9 @@ public class TableMetaService extends RequireSchemaConventionService<TablePO> {
         SessionUtils.getWithoutCommit(
             TableMetaMapper.class,
             mapper ->
-                mapper.listTablePOsByFullQualifiedName(
-                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
+                ops.listPOs(
+                    mapper,
+                    Namespace.of(namespaceLevels[0], namespaceLevels[1], namespaceLevels[2])));
     if (tablePOs.isEmpty() || tablePOs.get(0).getSchemaId() == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -470,18 +472,6 @@ public class TableMetaService extends RequireSchemaConventionService<TablePO> {
   }
 
   private Function<NameIdentifier, TablePO> tablePOFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::getTablePOBySchemaId
-        : this::getPOForApiIdentifier;
-  }
 
-  @Override
-  protected TablePO fetchPOByStorageIdentifier(NameIdentifier storageIdentifier) {
-    return getTablePOByFullQualifiedName(storageIdentifier);
-  }
-
-  @Override
-  protected List<TablePO> fetchPOsByStorageNamespace(Namespace storageNamespace) {
-    return listTablePOsByFullQualifiedName(storageNamespace);
   }
 }
