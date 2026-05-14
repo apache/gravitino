@@ -81,7 +81,7 @@ For the native Apache Iceberg OAuth 2.0 implementation, the following upstream i
 
 | Version | Change |
 | --- | --- |
-| Iceberg 1.11.0+ | Supports disabling token exchange and using client credentials for token renewal, and fixes child `AuthSession` expiration handling so the child session uses its own token lifetime. Gravitino's Iceberg catalog and Iceberg REST service currently use Apache Iceberg `1.10.1`. |
+| Iceberg 1.11.0+ | Supports disabling token exchange and using client credentials for token renewal, and fixes child `AuthSession` expiration handling so the child session uses its own token lifetime. |
 
 Use the engine-specific settings below.
 
