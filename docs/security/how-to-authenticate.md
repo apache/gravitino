@@ -114,27 +114,26 @@ iceberg.rest-catalog.oauth2.token-exchange-enabled=false
 
 You can omit `iceberg.rest-catalog.session=NONE` because the default value is `NONE`.
 
-##### Alternative OAuth 2.0 auth manager for Spark and Flink
+##### Alternative OAuth 2.0 auth manager
 
-If the native Apache Iceberg OAuth 2.0 implementation does not meet your requirements, you can use the Dremio Iceberg OAuth 2.0 auth manager for Spark and Flink:
+If the native Apache Iceberg OAuth 2.0 implementation does not meet your requirements, you can use the Dremio Iceberg OAuth 2.0 auth manager.
 
 - Repository: `https://github.com/dremio/iceberg-auth-manager`
 - Build command: `./gradlew --no-daemon :authmgr-oauth2-runtime:shadowJar`
 - Output jar: `${project}/oauth2/runtime/build/libs/authmgr-oauth2-runtime-<version>.jar`
 
-Place the runtime jar in:
+###### Spark
 
-- `${SPARK_HOME}/jars` for Spark
-- `${FLINK_HOME}/lib` for Flink
+Place the runtime jar in `${SPARK_HOME}/jars`.
 
-For Spark, also add the jar to both the driver and executor classpaths:
+Also add the jar to both the driver and executor classpaths:
 
 ```text
 spark.driver.extraClassPath=${SPARK_HOME}/jars/authmgr-oauth2-runtime-<version>.jar
 spark.executor.extraClassPath=${SPARK_HOME}/jars/authmgr-oauth2-runtime-<version>.jar
 ```
 
-Example Spark configuration using client credentials token refresh:
+Use the following configuration for client credentials token refresh:
 
 ```text
 spark.sql.catalog.irc.type=rest
@@ -149,7 +148,7 @@ spark.sql.catalog.irc.rest.auth.oauth2.scope=<scope>
 spark.sql.catalog.irc.rest.auth.oauth2.token-refresh.enabled=true
 ```
 
-Example Spark configuration using password grant token refresh:
+Use the following configuration for password grant token refresh:
 
 ```text
 spark.sql.catalog.irc.type=rest
@@ -167,7 +166,11 @@ spark.sql.catalog.irc.rest.auth.oauth2.resource-owner.password=<password>
 spark.sql.catalog.irc.rest.auth.oauth2.token-refresh.enabled=true
 ```
 
-Example Flink configuration using client credentials token refresh:
+###### Flink
+
+Place the runtime jar in `${FLINK_HOME}/lib`.
+
+Use the following configuration for client credentials token refresh:
 
 ```sql
 CREATE CATALOG irc WITH (
@@ -183,7 +186,7 @@ CREATE CATALOG irc WITH (
 );
 ```
 
-Example Flink configuration using password grant token refresh:
+Use the following configuration for password grant token refresh:
 
 ```sql
 CREATE CATALOG irc WITH (
@@ -202,9 +205,9 @@ CREATE CATALOG irc WITH (
 );
 ```
 
-:::note
-At the time of writing, the Dremio auth manager doesn't support Trino. For Trino, prefer the native Iceberg configuration and set `iceberg.rest-catalog.session=NONE` and `iceberg.rest-catalog.oauth2.token-exchange-enabled=false`.
-:::
+###### Trino
+
+At the time of writing, the Dremio auth manager does not support Trino. For Trino, prefer the native Iceberg configuration and set `iceberg.rest-catalog.session=NONE` and `iceberg.rest-catalog.oauth2.token-exchange-enabled=false`.
 
 ### Kerberos mode
 
