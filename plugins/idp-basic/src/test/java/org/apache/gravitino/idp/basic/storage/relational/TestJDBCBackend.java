@@ -149,10 +149,16 @@ public abstract class TestJDBCBackend {
       StringBuilder pgTruncateCommand = new StringBuilder("DO $$ BEGIN\n");
       for (String table : tableList) {
         pgTruncateCommand.append(
-            String.format("TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", table));
+            String.format(
+                "TRUNCATE TABLE %s RESTART IDENTITY CASCADE;",
+                quotePostgreSqlIdentifier(table)));
       }
       pgTruncateCommand.append("END $$;");
       statement.execute(pgTruncateCommand.toString());
     }
+  }
+
+  private String quotePostgreSqlIdentifier(String identifier) {
+    return "\"" + identifier.replace("\"", "\"\"") + "\"";
   }
 }
