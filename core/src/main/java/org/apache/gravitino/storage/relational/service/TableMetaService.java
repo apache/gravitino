@@ -64,7 +64,7 @@ public class TableMetaService {
   }
 
   private TableMetaService() {
-    this.ops = new HierarchicalSchemaPOStorageOps<>(new TablePOStorageOps());
+    this.ops = new HierarchicalConventionPOStorageOp<>(new TablePOStorageOps());
   }
 
   @Monitored(

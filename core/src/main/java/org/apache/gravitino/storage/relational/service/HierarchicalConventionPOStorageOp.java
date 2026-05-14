@@ -33,11 +33,11 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
  * @param <PO> persistent object type
  * @param <Mapper> MyBatis mapper type
  */
-public class HierarchicalSchemaPOStorageOps<PO, Mapper> extends BasePOStorageOps<PO, Mapper> {
+public class HierarchicalConventionPOStorageOp<PO, Mapper> extends BasePOStorageOps<PO, Mapper> {
 
   private final BasePOStorageOps<PO, Mapper> delegate;
 
-  public HierarchicalSchemaPOStorageOps(BasePOStorageOps<PO, Mapper> delegate) {
+  public HierarchicalConventionPOStorageOp(BasePOStorageOps<PO, Mapper> delegate) {
     this.delegate = delegate;
   }
 

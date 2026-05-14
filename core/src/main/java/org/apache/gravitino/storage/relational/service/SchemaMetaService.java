@@ -79,14 +79,14 @@ import org.apache.gravitino.utils.NamespaceUtil;
 /** The service class for schema metadata. It provides the basic database operations for schema. */
 public class SchemaMetaService {
   private static final SchemaMetaService INSTANCE = new SchemaMetaService();
-  private SchemaPOStorageOps ops;
+  private BasePOStorageOps<SchemaPO, SchemaMetaMapper> ops;
 
   public static SchemaMetaService getInstance() {
     return INSTANCE;
   }
 
   private SchemaMetaService() {
-    this.ops = new SchemaPOStorageOps();
+    this.ops = new HierarchicalConventionPOStorageOp<>(new SchemaPOStorageOps());
   }
 
   @Monitored(
@@ -95,7 +95,9 @@ public class SchemaMetaService {
   public SchemaIds getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
       String metalakeName, String catalogName, String schemaName) {
     NameIdentifier identifier = NameIdentifier.of(metalakeName, catalogName, schemaName);
-    SchemaPO schemaPO = schemaPOFetcher().apply(identifier);
+    SchemaPO schemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
 
     if (schemaPO == null) {
       throw new NoSuchEntityException(
@@ -453,23 +455,13 @@ public class SchemaMetaService {
 
   private SchemaPO getSchemaPOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkSchema(identifier);
-    return schemaPOFetcher().apply(identifier);
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
   }
 
   private List<SchemaPO> listSchemaPOs(Namespace namespace) {
-    return schemaListFetcher().apply(namespace);
-  }
-
-  private Function<Namespace, List<SchemaPO>> schemaListFetcher() {
-    return namespace ->
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> ops.listPOs(mapper, namespace));
-  }
-
-  private Function<NameIdentifier, SchemaPO> schemaPOFetcher() {
-    return identifier ->
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> ops.listPOs(mapper, namespace));
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
