@@ -429,6 +429,59 @@ public class CatalogHiveViewIT extends BaseIT {
   }
 
   @Test
+  public void testLoadViewCreatedByHiveCliReturnsColumns() {
+    String tableName = GravitinoITUtils.genRandomName("hive_client_cols_source");
+    String viewName = GravitinoITUtils.genRandomName("hive_client_cols_view");
+    String qualifiedTableName = qualifyHiveObject(tableName);
+    String qualifiedViewName = qualifyHiveObject(viewName);
+
+    try {
+      executeHiveSql(String.format("CREATE TABLE %s (id BIGINT, name STRING)", qualifiedTableName));
+      executeHiveSql(
+          String.format(
+              "CREATE VIEW %s AS SELECT id, name FROM %s", qualifiedViewName, qualifiedTableName));
+
+      View loaded = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+
+      Assertions.assertEquals(2, loaded.columns().length);
+      Assertions.assertEquals("id", loaded.columns()[0].name());
+      Assertions.assertEquals("name", loaded.columns()[1].name());
+    } finally {
+      executeHiveSql(String.format("DROP VIEW IF EXISTS %s", qualifiedViewName));
+      executeHiveSql(String.format("DROP TABLE IF EXISTS %s", qualifiedTableName));
+    }
+  }
+
+  @Test
+  public void testNativeHiveCreatedViewMetadataInHms() throws Exception {
+    String tableName = GravitinoITUtils.genRandomName("hive_native_meta_source");
+    String viewName = GravitinoITUtils.genRandomName("hive_native_meta_view");
+    String qualifiedTableName = qualifyHiveObject(tableName);
+    String qualifiedViewName = qualifyHiveObject(viewName);
+
+    try {
+      executeHiveSql(String.format("CREATE TABLE %s (id BIGINT, name STRING)", qualifiedTableName));
+      executeHiveSql(
+          String.format(
+              "CREATE VIEW %s COMMENT '%s' AS SELECT id, name FROM %s",
+              qualifiedViewName, VIEW_COMMENT, qualifiedTableName));
+
+      String describedMetadata = describeHiveObject(qualifiedViewName).toLowerCase(Locale.ROOT);
+      String normalizedMetadata = describedMetadata.replaceAll("\\s+", " ").trim();
+
+      Assertions.assertTrue(normalizedMetadata.contains("table type: virtual_view"));
+      Assertions.assertTrue(normalizedMetadata.contains("view original text:"));
+      Assertions.assertTrue(normalizedMetadata.contains("view expanded text:"));
+      Assertions.assertTrue(normalizedMetadata.contains("hive view comment"));
+      Assertions.assertTrue(normalizedMetadata.contains("id bigint"));
+      Assertions.assertTrue(normalizedMetadata.contains("name string"));
+    } finally {
+      executeHiveSql(String.format("DROP VIEW IF EXISTS %s", qualifiedViewName));
+      executeHiveSql(String.format("DROP TABLE IF EXISTS %s", qualifiedTableName));
+    }
+  }
+
+  @Test
   public void testHiveCliCanReadViewCreatedByGravitino() {
     String tableName = GravitinoITUtils.genRandomName("hive_client_read_source");
     String viewName = GravitinoITUtils.genRandomName("hive_client_read_view");
@@ -503,5 +556,19 @@ public class CatalogHiveViewIT extends BaseIT {
         String.format(
             "Cannot parse numeric result from query output. SQL: %s, stdout: %s",
             sql, result.getStdout()));
+  }
+
+  private String describeHiveObject(String qualifiedObjectName) {
+    ExecResult result =
+        containerSuite
+            .getHiveContainer()
+            .executeInContainer("hive", "-S", "-e", "DESCRIBE FORMATTED " + qualifiedObjectName);
+    Assertions.assertEquals(
+        0,
+        result.getExitCode(),
+        String.format(
+            "Failed to describe Hive object. Object: %s, stdout: %s, stderr: %s",
+            qualifiedObjectName, result.getStdout(), result.getStderr()));
+    return result.getStdout();
   }
 }

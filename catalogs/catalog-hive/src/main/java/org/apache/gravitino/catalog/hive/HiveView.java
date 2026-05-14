@@ -19,11 +19,13 @@
 package org.apache.gravitino.catalog.hive;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
@@ -39,10 +41,6 @@ import org.apache.gravitino.rel.View;
 @ToString
 public class HiveView implements View {
 
-  static final String HIVE_DIALECT = "hive";
-  static final String SPARK_DIALECT = "spark";
-  static final String TRINO_DIALECT = "trino";
-
   private static final String SPARK_VERSION_KEY = "spark.sql.create.version";
   private static final String TRINO_VIEW_MARKER_KEY = "presto_view";
   private static final String TRINO_VIEW_PREFIX = "/* Presto View:";
@@ -50,6 +48,8 @@ public class HiveView implements View {
   private String name;
   private String comment;
   private Column[] columns;
+  private String defaultCatalog;
+  private String defaultSchema;
   private Map<String, String> properties;
   private AuditInfo auditInfo;
   private SQLRepresentation[] representations;
@@ -69,6 +69,18 @@ public class HiveView implements View {
   @Override
   public Column[] columns() {
     return columns == null ? new Column[0] : columns;
+  }
+
+  @Override
+  @Nullable
+  public String defaultCatalog() {
+    return defaultCatalog;
+  }
+
+  @Override
+  @Nullable
+  public String defaultSchema() {
+    return defaultSchema;
   }
 
   @Override
@@ -95,15 +107,15 @@ public class HiveView implements View {
    */
   static String detectDialect(String viewOriginalText, Map<String, String> parameters) {
     if (parameters != null && "true".equalsIgnoreCase(parameters.get(TRINO_VIEW_MARKER_KEY))) {
-      return TRINO_DIALECT;
+      return Dialects.TRINO;
     }
     if (viewOriginalText != null && viewOriginalText.startsWith(TRINO_VIEW_PREFIX)) {
-      return TRINO_DIALECT;
+      return Dialects.TRINO;
     }
     if (parameters != null && parameters.containsKey(SPARK_VERSION_KEY)) {
-      return SPARK_DIALECT;
+      return Dialects.SPARK;
     }
-    return HIVE_DIALECT;
+    return Dialects.HIVE;
   }
 
   /**
@@ -153,6 +165,28 @@ public class HiveView implements View {
      */
     public Builder withColumns(Column[] columns) {
       view.columns = columns;
+      return this;
+    }
+
+    /**
+     * Sets the default catalog used to resolve unqualified identifiers in the view definition.
+     *
+     * @param defaultCatalog The default catalog, or {@code null} if unset.
+     * @return This builder.
+     */
+    public Builder withDefaultCatalog(@Nullable String defaultCatalog) {
+      view.defaultCatalog = defaultCatalog;
+      return this;
+    }
+
+    /**
+     * Sets the default schema used to resolve unqualified identifiers in the view definition.
+     *
+     * @param defaultSchema The default schema, or {@code null} if unset.
+     * @return This builder.
+     */
+    public Builder withDefaultSchema(@Nullable String defaultSchema) {
+      view.defaultSchema = defaultSchema;
       return this;
     }
 

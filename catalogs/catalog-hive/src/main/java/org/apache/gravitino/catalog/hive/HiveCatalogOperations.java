@@ -1074,8 +1074,12 @@ public class HiveCatalogOperations
    * @param comment An optional comment.
    * @param columns The output columns of the view.
    * @param representations The SQL representations (must contain exactly one {@code hive} dialect).
-   * @param defaultCatalog Ignored (Hive uses HMS-resolved identifiers in the original SQL text).
-   * @param defaultSchema Ignored (Hive uses HMS-resolved identifiers in the original SQL text).
+   * @param defaultCatalog The default catalog used to resolve unqualified identifiers referenced by
+   *     the view definition. For {@code hive} dialect this must be {@code null}; non-null values
+   *     are rejected.
+   * @param defaultSchema The default schema used to resolve unqualified identifiers referenced by
+   *     the view definition. For {@code hive} dialect this must be {@code null}; non-null values
+   *     are rejected.
    * @param properties Additional properties stored in HMS.
    * @return The created view.
    * @throws NoSuchSchemaException If the schema does not exist.

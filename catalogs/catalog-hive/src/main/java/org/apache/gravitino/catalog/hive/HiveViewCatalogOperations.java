@@ -26,10 +26,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.apache.gravitino.NameIdentifier;
@@ -41,6 +39,7 @@ import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
@@ -109,22 +108,20 @@ class HiveViewCatalogOperations implements ViewCatalog {
     if (!schemaExistsChecker.test(schemaIdent)) {
       throw new NoSuchSchemaException("Schema %s does not exist", schemaIdent);
     }
-    SQLRepresentation sqlRepresentation = extractSupportedSqlRepresentation(representations, ident);
+    SQLRepresentation sqlRepresentation =
+        validateSQLRepresentation(representations, defaultCatalog, defaultSchema, ident);
 
     try {
       Map<String, String> params =
           Maps.newHashMap(properties == null ? ImmutableMap.of() : properties);
-      if (comment != null) {
-        params.put(COMMENT, comment);
-      }
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
       String viewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
 
       HiveTable hiveTable =
           HiveTable.builder()
               .withName(ident.name())
-              .withComment(null)
-              .withColumns(new Column[0])
+              .withComment(comment)
+              .withColumns(copyColumns(columns))
               .withProperties(params)
               .withAuditInfo(
                   AuditInfo.builder()
@@ -144,7 +141,13 @@ class HiveViewCatalogOperations implements ViewCatalog {
               });
 
       LOG.info("Created Hive view {} in Hive Metastore", ident.name());
-      return loadHiveView(ident);
+      return toHiveView(
+          ident,
+          hiveTable.comment(),
+          hiveTable.properties(),
+          hiveTable.viewOriginalText(),
+          hiveTable.columns(),
+          hiveTable.auditInfo());
     } catch (Exception e) {
       if (isAlreadyExistsError(e)) {
         throw new ViewAlreadyExistsException("View %s already exists in Hive Metastore", ident);
@@ -158,17 +161,6 @@ class HiveViewCatalogOperations implements ViewCatalog {
       throws NoSuchViewException, ViewAlreadyExistsException {
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
 
-    for (ViewChange change : changes) {
-      if (change instanceof ViewChange.RenameView) {
-        NameIdentifier targetIdent =
-            NameIdentifier.of(ident.namespace(), ((ViewChange.RenameView) change).getNewName());
-        if (viewExists(targetIdent)) {
-          throw new ViewAlreadyExistsException(
-              "View %s already exists in Hive Metastore", targetIdent);
-        }
-      }
-    }
-
     try {
       HiveTable currentHiveTable =
           clientPool().run(c -> c.getTable(catalogName(), schemaIdent.name(), ident.name()));
@@ -178,49 +170,64 @@ class HiveViewCatalogOperations implements ViewCatalog {
         throw new NoSuchViewException("No view named %s (it is a table, not a view)", ident.name());
       }
 
-      Map<String, String> params = Maps.newHashMap(currentHiveTable.properties());
-      String newSql = currentHiveTable.viewOriginalText();
-      String newName = ident.name();
+      String newViewName = currentHiveTable.name();
+      String updatedViewOriginalText = currentHiveTable.viewOriginalText();
+      Map<String, String> updatedProperties = Maps.newHashMap(currentHiveTable.properties());
+      Column[] updatedColumns = copyColumns(currentHiveTable.columns());
+      String updatedComment = currentHiveTable.comment();
+      updatedProperties.remove(COMMENT);
 
       for (ViewChange change : changes) {
         if (change instanceof ViewChange.RenameView) {
-          newName = ((ViewChange.RenameView) change).getNewName();
+          String renameTarget = ((ViewChange.RenameView) change).getNewName();
+          NameIdentifier targetIdent = NameIdentifier.of(ident.namespace(), renameTarget);
+          if (viewExists(targetIdent)) {
+            throw new ViewAlreadyExistsException(
+                "View %s already exists in Hive Metastore", targetIdent);
+          }
+          newViewName = renameTarget;
         } else if (change instanceof ViewChange.SetProperty) {
           ViewChange.SetProperty sp = (ViewChange.SetProperty) change;
-          params.put(sp.getProperty(), sp.getValue());
+          if (COMMENT.equals(sp.getProperty())) {
+            updatedComment = sp.getValue();
+          } else {
+            updatedProperties.put(sp.getProperty(), sp.getValue());
+          }
         } else if (change instanceof ViewChange.RemoveProperty) {
-          params.remove(((ViewChange.RemoveProperty) change).getProperty());
+          String property = ((ViewChange.RemoveProperty) change).getProperty();
+          if (COMMENT.equals(property)) {
+            updatedComment = null;
+          } else {
+            updatedProperties.remove(property);
+          }
         } else if (change instanceof ViewChange.ReplaceView) {
           ViewChange.ReplaceView replace = (ViewChange.ReplaceView) change;
           SQLRepresentation sqlRepresentation =
-              extractSupportedSqlRepresentation(replace.getRepresentations(), ident);
-          if (replace.getComment() == null) {
-            params.remove(COMMENT);
-          } else {
-            params.put(COMMENT, replace.getComment());
-          }
-          newSql = toHmsViewOriginalText(sqlRepresentation, ident);
+              validateSQLRepresentation(
+                  replace.getRepresentations(),
+                  replace.getDefaultCatalog(),
+                  replace.getDefaultSchema(),
+                  ident);
+          updatedColumns = copyColumns(replace.getColumns());
+          updatedComment = replace.getComment();
+          updatedViewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
         } else {
           throw new IllegalArgumentException(
               "Unsupported view change type: " + change.getClass().getSimpleName());
         }
       }
 
-      final String originalName = ident.name();
-      final String finalNewName = newName;
-      final String finalSql = newSql;
       HiveTable updatedHiveTable =
-          HiveTable.builder()
-              .withName(finalNewName)
-              .withComment(null)
-              .withColumns(new Column[0])
-              .withProperties(params)
-              .withAuditInfo(currentHiveTable.auditInfo())
-              .withCatalogName(catalogName())
-              .withDatabaseName(schemaIdent.name())
-              .withViewOriginalText(finalSql)
-              .build();
+          buildAlteredHiveView(
+              currentHiveTable,
+              schemaIdent,
+              newViewName,
+              updatedComment,
+              updatedProperties,
+              updatedColumns,
+              updatedViewOriginalText);
 
+      final String originalName = ident.name();
       clientPool()
           .run(
               c -> {
@@ -228,9 +235,16 @@ class HiveViewCatalogOperations implements ViewCatalog {
                 return null;
               });
 
-      LOG.info("Altered Hive view {} (now {})", ident.name(), finalNewName);
-      return loadHiveView(NameIdentifier.of(ident.namespace(), finalNewName));
-    } catch (NoSuchViewException | ViewAlreadyExistsException e) {
+      LOG.info("Altered Hive view {} (now {})", ident.name(), newViewName);
+      NameIdentifier updatedIdent = NameIdentifier.of(ident.namespace(), newViewName);
+      return toHiveView(
+          updatedIdent,
+          updatedHiveTable.comment(),
+          updatedHiveTable.properties(),
+          updatedHiveTable.viewOriginalText(),
+          updatedHiveTable.columns(),
+          updatedHiveTable.auditInfo());
+    } catch (NoSuchViewException | ViewAlreadyExistsException | IllegalArgumentException e) {
       throw e;
     } catch (UnsupportedOperationException e) {
       throw e;
@@ -244,10 +258,36 @@ class HiveViewCatalogOperations implements ViewCatalog {
     }
   }
 
+  private HiveTable buildAlteredHiveView(
+      HiveTable currentHiveTable,
+      NameIdentifier schemaIdent,
+      String viewName,
+      String comment,
+      Map<String, String> properties,
+      Column[] columns,
+      String viewOriginalText) {
+    return HiveTable.builder()
+        .withName(viewName)
+        .withComment(comment)
+        .withColumns(copyColumns(columns))
+        .withProperties(properties)
+        .withAuditInfo(currentHiveTable.auditInfo())
+        .withCatalogName(catalogName())
+        .withDatabaseName(schemaIdent.name())
+        .withViewOriginalText(viewOriginalText)
+        .build();
+  }
+
   @Override
   public boolean dropView(NameIdentifier ident) {
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     try {
+      HiveTable hiveTable =
+          clientPool().run(c -> c.getTable(catalogName(), schemaIdent.name(), ident.name()));
+      if (!TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(hiveTable.properties().get(TABLE_TYPE))) {
+        return false;
+      }
+
       clientPool()
           .run(
               c -> {
@@ -283,38 +323,15 @@ class HiveViewCatalogOperations implements ViewCatalog {
         throw new NoSuchViewException("No view named %s (it is a table, not a view)", ident);
       }
 
-      Map<String, String> params =
-          Maps.newHashMap(
-              hiveTable.properties() != null ? hiveTable.properties() : ImmutableMap.of());
-      String viewOriginalText = hiveTable.viewOriginalText();
-      String detectedDialect = HiveView.detectDialect(viewOriginalText, params);
-      if (!HiveView.HIVE_DIALECT.equalsIgnoreCase(detectedDialect)) {
-        // TODO(design-docs/gravitino-logical-view-management.md): support loading trino/spark HMS
-        // views.
-        throw new UnsupportedOperationException(
-            String.format(
-                "Hive catalog currently supports only '%s' view dialect, but found '%s' for view %s",
-                HiveView.HIVE_DIALECT, detectedDialect, ident));
-      }
+      return toHiveView(
+          ident,
+          hiveTable.comment(),
+          hiveTable.properties(),
+          hiveTable.viewOriginalText(),
+          hiveTable.columns(),
+          hiveTable.auditInfo());
 
-      SQLRepresentation rep =
-          SQLRepresentation.builder()
-              .withDialect(HiveView.HIVE_DIALECT)
-              .withSql(viewOriginalText != null ? viewOriginalText : "")
-              .build();
-
-      return HiveView.builder()
-          .withName(ident.name())
-          .withComment(params.get(COMMENT))
-          .withColumns(new Column[0])
-          .withRepresentations(new SQLRepresentation[] {rep})
-          .withProperties(params)
-          .withAuditInfo(hiveTable.auditInfo())
-          .build();
-
-    } catch (NoSuchViewException e) {
-      throw e;
-    } catch (UnsupportedOperationException e) {
+    } catch (NoSuchViewException | UnsupportedOperationException e) {
       throw e;
     } catch (Exception e) {
       if (isNotFoundError(e)) {
@@ -324,54 +341,89 @@ class HiveViewCatalogOperations implements ViewCatalog {
     }
   }
 
-  private SQLRepresentation extractSupportedSqlRepresentation(
-      Representation[] representations, NameIdentifier ident) {
-    Preconditions.checkArgument(
-        representations != null && representations.length > 0,
-        "At least one representation is required to create a Hive view");
-    SQLRepresentation selected = null;
-    Set<String> dialects = new HashSet<>();
-    for (Representation rep : representations) {
-      if (rep instanceof SQLRepresentation) {
-        SQLRepresentation sqlRep = (SQLRepresentation) rep;
-        String dialect = normalizeDialect(sqlRep.dialect());
-        dialects.add(dialect);
-        if (selected == null) {
-          selected = sqlRep;
-        }
-      }
+  private HiveView toHiveView(
+      NameIdentifier ident,
+      String comment,
+      Map<String, String> properties,
+      String viewOriginalText,
+      Column[] columns,
+      AuditInfo auditInfo) {
+    Map<String, String> params =
+        Maps.newHashMap(properties != null ? properties : ImmutableMap.of());
+    String representationSql = viewOriginalText;
+    String detectedDialect = HiveView.detectDialect(representationSql, params);
+    if (!Dialects.HIVE.equalsIgnoreCase(detectedDialect)) {
+      // TODO(design-docs/gravitino-logical-view-management.md): support loading trino/spark HMS
+      // views.
+      throw new UnsupportedOperationException(
+          String.format(
+              "Hive catalog currently supports only '%s' view dialect, but found '%s' for view %s",
+              Dialects.HIVE, detectedDialect, ident));
     }
-    if (selected == null) {
-      throw new IllegalArgumentException(
-          "Hive catalog requires at least one SQL representation to create view " + ident);
-    }
-    Preconditions.checkArgument(
-        dialects.size() == 1,
-        "Hive catalog supports exactly one dialect per view in HMS, but got %s for view %s",
-        dialects,
-        ident);
 
-    String selectedDialect = normalizeDialect(selected.dialect());
-    if (!HiveView.HIVE_DIALECT.equals(selectedDialect)) {
+    SQLRepresentation rep =
+        SQLRepresentation.builder()
+            .withDialect(Dialects.HIVE)
+            .withSql(representationSql != null ? representationSql : "")
+            .build();
+
+    return HiveView.builder()
+        .withName(ident.name())
+        .withComment(comment)
+        .withColumns(copyColumns(columns))
+        .withRepresentations(new SQLRepresentation[] {rep})
+        .withProperties(params)
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private SQLRepresentation validateSQLRepresentation(
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      NameIdentifier ident) {
+    Preconditions.checkArgument(
+        representations.length == 1 && representations[0] instanceof SQLRepresentation,
+        "Hive catalog requires exactly one SQL representation for view %s, but got %s"
+            + " representation(s), first representation type is %s",
+        ident,
+        representations.length,
+        representations.length == 0 || representations[0] == null
+            ? "null"
+            : representations[0].getClass().getSimpleName());
+
+    SQLRepresentation selected = (SQLRepresentation) representations[0];
+    boolean isHiveDialect = Dialects.HIVE.equalsIgnoreCase(selected.dialect());
+    if (!isHiveDialect) {
       // TODO(design-docs/gravitino-logical-view-management.md): support creating trino/spark HMS
       // views.
       throw new UnsupportedOperationException(
           String.format(
               "Hive catalog currently supports only '%s' view dialect, but got '%s' for view %s",
-              HiveView.HIVE_DIALECT, selected.dialect(), ident));
+              Dialects.HIVE, selected.dialect(), ident));
+    }
+    if (isHiveDialect) {
+      Preconditions.checkArgument(
+          defaultCatalog == null && defaultSchema == null,
+          "Hive dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
+              + "defaultCatalog=%s, defaultSchema=%s for view %s",
+          Dialects.HIVE,
+          defaultCatalog,
+          defaultSchema,
+          ident);
     }
     return selected;
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
-    String dialect = normalizeDialect(representation.dialect());
-    if (!HiveView.HIVE_DIALECT.equals(dialect)) {
+    String dialect = representation.dialect().toLowerCase();
+    if (!Dialects.HIVE.equals(dialect)) {
       // TODO(design-docs/gravitino-logical-view-management.md): support serializing trino/spark HMS
       // view definitions.
       throw new UnsupportedOperationException(
           String.format(
               "Hive catalog currently supports only '%s' view dialect, but got '%s' for view %s",
-              HiveView.HIVE_DIALECT, representation.dialect(), ident));
+              Dialects.HIVE, representation.dialect(), ident));
     }
     return representation.sql();
   }
@@ -385,9 +437,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
     return originalName;
   }
 
-  private String normalizeDialect(String dialect) {
-    Preconditions.checkArgument(dialect != null, "View dialect cannot be null");
-    return dialect.toLowerCase();
+  private Column[] copyColumns(Column[] columns) {
+    return columns == null ? new Column[0] : columns.clone();
   }
 
   private boolean isAlreadyExistsError(Throwable t) {
