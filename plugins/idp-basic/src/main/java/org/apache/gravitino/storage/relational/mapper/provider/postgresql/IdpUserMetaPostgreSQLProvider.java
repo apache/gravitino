@@ -34,7 +34,8 @@ public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
   }
 
   @Override
-  public String deleteIdpUserMetasByLegacyTimeline(Long legacyTimeline, @Param("limit") int limit) {
+  public String deleteIdpUserMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " WHERE user_id IN (SELECT user_id FROM "
