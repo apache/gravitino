@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -68,21 +69,18 @@ final class ClickHouseTableSqlUtils {
 
   static String toPartitionExpression(Transform transform) {
     Preconditions.checkArgument(transform != null, "Partition transform cannot be null");
-    Preconditions.checkArgument(
-        isSupportedPartitionTransform(transform),
-        "Unsupported partition transform: " + transform.name());
-    String fieldName = partitionFieldName(transform);
-
-    if (StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_IDENTITY)) {
-      return quoteIdentifier(fieldName);
-    } else if (StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_YEAR)) {
-      return "toYear(%s)".formatted(quoteIdentifier(fieldName));
-    } else if (StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_MONTH)) {
-      return "toYYYYMM(%s)".formatted(quoteIdentifier(fieldName));
-    } else if (StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_DAY)) {
-      return "toDate(%s)".formatted(quoteIdentifier(fieldName));
-    }
-    throw new IllegalStateException("Unexpected partition transform: " + transform.name());
+    String name = transform.name().toLowerCase(Locale.ROOT);
+    return switch (name) {
+      case Transforms.NAME_OF_IDENTITY -> quoteIdentifier(partitionFieldName(transform));
+      case Transforms.NAME_OF_YEAR -> "toYear(%s)"
+          .formatted(quoteIdentifier(partitionFieldName(transform)));
+      case Transforms.NAME_OF_MONTH -> "toYYYYMM(%s)"
+          .formatted(quoteIdentifier(partitionFieldName(transform)));
+      case Transforms.NAME_OF_DAY -> "toDate(%s)"
+          .formatted(quoteIdentifier(partitionFieldName(transform)));
+      default -> throw new IllegalArgumentException(
+          "Unsupported partition transform: " + transform.name());
+    };
   }
 
   static List<String> extractShardingKeyColumns(String shardingKey) {
@@ -246,15 +244,8 @@ final class ClickHouseTableSqlUtils {
         transform.arguments().length == 1
             && transform.arguments()[0] instanceof NamedReference
             && ((NamedReference) transform.arguments()[0]).fieldName().length == 1,
-        "ClickHouse only supports single column partitioning");
+        "ClickHouse partition transform only supports a single column reference");
 
     return ((NamedReference) transform.arguments()[0]).fieldName()[0];
-  }
-
-  private static boolean isSupportedPartitionTransform(Transform transform) {
-    return StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_IDENTITY)
-        || StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_YEAR)
-        || StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_MONTH)
-        || StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_DAY);
   }
 }

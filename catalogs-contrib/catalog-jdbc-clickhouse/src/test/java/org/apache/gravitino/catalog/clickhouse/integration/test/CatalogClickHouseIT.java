@@ -557,6 +557,46 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testCreateAndLoadWithPartitionTransforms() {
+    assertPartitionRoundTrip("identity_part", Transforms.identity("event_time"));
+    assertPartitionRoundTrip("year_part", Transforms.year("event_time"));
+    assertPartitionRoundTrip("day_part", Transforms.day("event_time"));
+  }
+
+  private void assertPartitionRoundTrip(String prefix, Transform partition) {
+    String table = GravitinoITUtils.genRandomName(prefix);
+    NameIdentifier ident = NameIdentifier.of(schemaName, table);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "id"),
+          Column.of(
+              "event_time",
+              Types.TimestampType.withoutTimeZone(),
+              "ts",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET)
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "partition transform roundtrip",
+            createProperties(),
+            new Transform[] {partition},
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals(1, loaded.partitioning().length);
+    Assertions.assertEquals(partition.name(), loaded.partitioning()[0].name());
+    Assertions.assertEquals(
+        "event_time", ((NamedReference) loaded.partitioning()[0].arguments()[0]).fieldName()[0]);
+  }
+
+  @Test
   void testColumnNameWithKeyWords() {
     // Create table from Gravitino API
     Column[] columns = {
