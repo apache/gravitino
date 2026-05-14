@@ -64,7 +64,7 @@ public class FunctionMetaService {
   }
 
   private FunctionMetaService() {
-    this.ops = new HierarchicalConventionPOStorageOp<>(new FunctionPOStorageOps());
+    this.ops = new HierarchicalConventionPOStorageOps<>(new FunctionPOStorageOps());
   }
 
   @Monitored(

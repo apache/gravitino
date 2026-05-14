@@ -86,7 +86,7 @@ public class SchemaMetaService {
   }
 
   private SchemaMetaService() {
-    this.ops = new HierarchicalConventionPOStorageOp<>(new SchemaPOStorageOps());
+    this.ops = new HierarchicalConventionPOStorageOps<>(new SchemaPOStorageOps());
   }
 
   @Monitored(

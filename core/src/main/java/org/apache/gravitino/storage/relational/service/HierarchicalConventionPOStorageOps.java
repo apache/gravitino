@@ -19,6 +19,8 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -26,19 +28,27 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /**
- * Wraps a {@link BasePOStorageOps} so full-name lookups translate the schema segment from the
- * external logical separator used by the API into the internal physical separator used in storage.
- * Cache-keyed lookups already use API-form names, so they pass through unchanged.
+ * Wraps a {@link BasePOStorageOps} to bridge the hierarchical schema naming convention. Names that
+ * appear in API form (logical separator) are translated to storage form (physical separator) before
+ * delegating, and an optional rewriter can post-process POs returned from reads (typically used to
+ * translate a PO field from physical back to logical for callers).
  *
  * @param <PO> persistent object type
  * @param <Mapper> MyBatis mapper type
  */
-public class HierarchicalConventionPOStorageOp<PO, Mapper> extends BasePOStorageOps<PO, Mapper> {
+public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorageOps<PO, Mapper> {
 
   private final BasePOStorageOps<PO, Mapper> delegate;
+  private final UnaryOperator<PO> readRewriter;
 
-  public HierarchicalConventionPOStorageOp(BasePOStorageOps<PO, Mapper> delegate) {
+  public HierarchicalConventionPOStorageOps(BasePOStorageOps<PO, Mapper> delegate) {
+    this(delegate, UnaryOperator.identity());
+  }
+
+  public HierarchicalConventionPOStorageOps(
+      BasePOStorageOps<PO, Mapper> delegate, UnaryOperator<PO> readRewriter) {
     this.delegate = delegate;
+    this.readRewriter = readRewriter;
   }
 
   @Override
@@ -58,32 +68,37 @@ public class HierarchicalConventionPOStorageOp<PO, Mapper> extends BasePOStorage
 
   @Override
   public PO getPO(Mapper mapper, Long parentId, String name) {
-    return delegate.getPO(mapper, parentId, name);
+    return applyRead(delegate.getPO(mapper, parentId, toPhysicalIfHierarchical(name)));
   }
 
   @Override
   public List<PO> listPOs(Mapper mapper, Long parentId) {
-    return delegate.listPOs(mapper, parentId);
+    return applyRead(delegate.listPOs(mapper, parentId));
   }
 
   @Override
   public List<PO> listPOs(Mapper mapper, Namespace namespace, List<String> names) {
-    return delegate.listPOs(mapper, namespace, names);
+    Namespace storageNs = apiNamespaceToStorage(namespace);
+    List<String> storageNames =
+        names.stream()
+            .map(HierarchicalConventionPOStorageOps::toPhysicalIfHierarchical)
+            .collect(Collectors.toList());
+    return applyRead(delegate.listPOs(mapper, storageNs, storageNames));
   }
 
   @Override
   public List<PO> listPOs(Mapper mapper, List<Long> uuids) {
-    return delegate.listPOs(mapper, uuids);
+    return applyRead(delegate.listPOs(mapper, uuids));
   }
 
   @Override
   protected PO getPOByFullName(Mapper mapper, NameIdentifier identifier) {
-    return delegate.getPOByFullName(mapper, apiIdentifierToStorage(identifier));
+    return applyRead(delegate.getPOByFullName(mapper, apiIdentifierToStorage(identifier)));
   }
 
   @Override
   protected List<PO> listPOsByNSFullName(Mapper mapper, Namespace namespace) {
-    return delegate.listPOsByNSFullName(mapper, apiNamespaceToStorage(namespace));
+    return applyRead(delegate.listPOsByNSFullName(mapper, apiNamespaceToStorage(namespace)));
   }
 
   @Override
@@ -94,6 +109,28 @@ public class HierarchicalConventionPOStorageOp<PO, Mapper> extends BasePOStorage
   @Override
   protected Entity.EntityType entityType() {
     return delegate.entityType();
+  }
+
+  private PO applyRead(PO po) {
+    return po == null ? null : readRewriter.apply(po);
+  }
+
+  private List<PO> applyRead(List<PO> pos) {
+    if (pos == null || pos.isEmpty()) {
+      return pos;
+    }
+    return pos.stream().map(this::applyRead).collect(Collectors.toList());
+  }
+
+  private static String toPhysicalIfHierarchical(String name) {
+    if (StringUtils.isBlank(name)) {
+      return name;
+    }
+    String sep = HierarchicalSchemaUtil.schemaSeparator();
+    if (!name.contains(sep)) {
+      return name;
+    }
+    return HierarchicalSchemaUtil.logicalToPhysical(name, sep);
   }
 
   private static NameIdentifier apiIdentifierToStorage(NameIdentifier apiIdentifier) {
