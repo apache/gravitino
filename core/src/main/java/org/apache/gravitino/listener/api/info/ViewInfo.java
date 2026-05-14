@@ -88,37 +88,45 @@ public final class ViewInfo {
     this.auditInfo = auditInfo;
   }
 
+  /** Returns the view name. */
   public String name() {
     return name;
   }
 
+  /** Returns the output columns of the view. */
   public Column[] columns() {
     return columns;
   }
 
+  /** Returns the optional comment for the view. */
   @Nullable
   public String comment() {
     return comment;
   }
 
+  /** Returns the view representations. */
   public Representation[] representations() {
     return representations;
   }
 
+  /** Returns the optional default catalog used by the view definition. */
   @Nullable
   public String defaultCatalog() {
     return defaultCatalog;
   }
 
+  /** Returns the optional default schema used by the view definition. */
   @Nullable
   public String defaultSchema() {
     return defaultSchema;
   }
 
+  /** Returns the view properties. */
   public Map<String, String> properties() {
     return properties;
   }
 
+  /** Returns the optional audit information for the view. */
   @Nullable
   public Audit auditInfo() {
     return auditInfo;
