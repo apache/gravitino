@@ -85,7 +85,6 @@ public class IdpUserMetaBaseSQLProvider {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 

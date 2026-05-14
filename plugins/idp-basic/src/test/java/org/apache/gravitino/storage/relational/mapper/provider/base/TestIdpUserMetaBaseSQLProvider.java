@@ -38,8 +38,7 @@ public class TestIdpUserMetaBaseSQLProvider {
   }
 
   protected String expectedDeleteAtClause() {
-    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0)";
   }
 
   protected String expectedDeleteIdpUserMetasByLegacyTimelineSql() {
