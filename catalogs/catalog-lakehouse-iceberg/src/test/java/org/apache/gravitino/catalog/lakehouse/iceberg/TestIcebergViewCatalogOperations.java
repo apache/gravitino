@@ -90,11 +90,15 @@ public class TestIcebergViewCatalogOperations {
 
     NameIdentifier ident = NameIdentifier.of("schema1", "view1");
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            operations.alterView(
-                ident, ViewChange.rename("view2"), ViewChange.setProperty("k", "v")));
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                operations.alterView(
+                    ident, ViewChange.rename("view2"), ViewChange.setProperty("k", "v")));
+
+    Assertions.assertEquals(
+        "Rename cannot be combined with other view changes.", exception.getMessage());
 
     verify(wrapper, never()).renameView(any());
   }

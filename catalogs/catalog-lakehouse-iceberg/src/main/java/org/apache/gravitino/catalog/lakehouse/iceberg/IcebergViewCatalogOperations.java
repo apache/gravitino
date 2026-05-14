@@ -30,9 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.ConvertUtil;
@@ -196,14 +194,11 @@ class IcebergViewCatalogOperations {
     Optional<ViewChange> renameOptional =
         Arrays.stream(changes).filter(c -> c instanceof ViewChange.RenameView).reduce((a, b) -> b);
     if (renameOptional.isPresent()) {
-      String otherChange =
-          Arrays.stream(changes)
-              .filter(c -> !(c instanceof ViewChange.RenameView))
-              .map(String::valueOf)
-              .collect(Collectors.joining("\n"));
-      Preconditions.checkArgument(
-          StringUtils.isEmpty(otherChange),
-          "Rename cannot be combined with other view changes: " + otherChange);
+      long nonRenameChangeCount =
+          Arrays.stream(changes).filter(c -> !(c instanceof ViewChange.RenameView)).count();
+      if (nonRenameChangeCount > 0) {
+        throw new IllegalArgumentException("Rename cannot be combined with other view changes.");
+      }
       return renameView(ident, (ViewChange.RenameView) renameOptional.get());
     }
     return internalUpdateView(ident, changes);
