@@ -21,6 +21,7 @@ package org.apache.gravitino.lance.service.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.ws.rs.ext.ContextResolver;
 import javax.ws.rs.ext.Provider;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.openapitools.jackson.nullable.JsonNullableModule;
 
 /**
@@ -34,7 +35,7 @@ import org.openapitools.jackson.nullable.JsonNullableModule;
 public class JsonNullableMapperProvider implements ContextResolver<ObjectMapper> {
 
   private static final ObjectMapper MAPPER =
-      new ObjectMapper().registerModule(new JsonNullableModule());
+      ObjectMapperProvider.objectMapper().copy().registerModule(new JsonNullableModule());
 
   @Override
   public ObjectMapper getContext(Class<?> type) {

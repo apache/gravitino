@@ -40,7 +40,8 @@ use::
     distribution/package/bin/gravitino.sh stop
 
 Each test class will append its own metalake binding to ``gravitino.conf`` and
-restart the server itself, so back-to-back runs across versions are safe.
+restart the server itself. The matrix runner opts into keeping that binding
+between versions, so back-to-back runs avoid unnecessary Gravitino restarts.
 """
 
 from __future__ import annotations
@@ -204,6 +205,7 @@ def run_unittest(venv_python: Path, gravitino_home: Path) -> int:
     env["PYTHONPATH"] = str(PYTHON_CLIENT_DIR)
     env["GRAVITINO_HOME"] = str(gravitino_home)
     env["START_EXTERNAL_GRAVITINO"] = "true"
+    env["LANCE_RAY_KEEP_GRAVITINO_CONF"] = "true"
     cmd = [
         str(venv_python),
         "-m",
