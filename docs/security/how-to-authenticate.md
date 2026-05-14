@@ -74,14 +74,14 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 #### OAuth 2.0 token refresh for Iceberg REST clients
 
-When Gravitino is used as an Iceberg REST Catalog (IRC), some query engines may hit OAuth 2.0 token refresh issues.
-This usually happens when the identity provider doesn't support token exchange, or when a child authentication session inherits the parent session's expiration time.
+When Gravitino is used as an Iceberg REST Catalog (IRC), some query engines may encounter OAuth 2.0 token refresh issues.
+This usually occurs when the identity provider does not support token exchange, or when a child authentication session inherits the parent session's expiration time.
 
-For the native Apache Iceberg OAuth 2.0 implementation, the following upstream improvements are relevant:
+For the native Apache Iceberg OAuth 2.0 implementation, the following upstream improvement is relevant:
 
 | Version | Change |
 | --- | --- |
-| Iceberg 1.11.0+ | Supports disabling token exchange and using client credentials for token renewal, and fixes child `AuthSession` expiration handling so the child session uses its own token lifetime. |
+| Iceberg 1.11.0+ | Supports disabling token exchange, using client credentials for token renewal, and fixing child `AuthSession` expiration handling so that child sessions use their own token lifetime. |
 
 Use the engine-specific settings below.
 
@@ -103,20 +103,20 @@ Disable token exchange in the catalog properties:
 
 ##### Trino
 
-Trino requires version 479 or later.
+This configuration requires Trino 479 or later.
 
-Set the following in the Trino catalog properties:
+Add the following properties to the Trino catalog configuration:
 
 ```properties
 iceberg.rest-catalog.session=NONE
 iceberg.rest-catalog.oauth2.token-exchange-enabled=false
 ```
 
-You can omit `iceberg.rest-catalog.session=NONE` if you want the default behavior, because the default value is `NONE`.
+You can omit `iceberg.rest-catalog.session=NONE` because the default value is `NONE`.
 
 ##### Alternative OAuth 2.0 auth manager for Spark and Flink
 
-If the native Apache Iceberg OAuth 2.0 implementation still doesn't meet your requirements, you can use the Dremio Iceberg OAuth 2.0 auth manager for Spark and Flink:
+If the native Apache Iceberg OAuth 2.0 implementation does not meet your requirements, you can use the Dremio Iceberg OAuth 2.0 auth manager for Spark and Flink:
 
 - Repository: `https://github.com/dremio/iceberg-auth-manager`
 - Build command: `./gradlew --no-daemon :authmgr-oauth2-runtime:shadowJar`
