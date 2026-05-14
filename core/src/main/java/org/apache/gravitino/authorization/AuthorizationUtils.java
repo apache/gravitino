@@ -602,6 +602,10 @@ public class AuthorizationUtils {
         case TOPIC:
           // Topic doesn't have locations now.
           break;
+        case VIEW:
+          // Views are logical metadata objects without a single storage location; privilege plugins
+          // operate on metadata only (same idea as TOPIC).
+          break;
         default:
           throw new AuthorizationPluginException(
               "Failed to get location paths for metadata object %s type %s", ident, type);

@@ -33,6 +33,11 @@ public final class LoadViewEvent extends ViewEvent {
     this.loadedViewInfo = loadedViewInfo;
   }
 
+  /**
+   * Returns the loaded view information.
+   *
+   * @return the loaded view information
+   */
   public ViewInfo loadedViewInfo() {
     return loadedViewInfo;
   }
