@@ -111,6 +111,43 @@ public class GroupMetaService {
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetGroupByIdentifier")
+  public List<GroupEntity> batchGetGroupByIdentifier(List<NameIdentifier> identifiers) {
+    if (identifiers == null || identifiers.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    NameIdentifier firstIdent = identifiers.get(0);
+    Namespace namespace = firstIdent.namespace();
+    String metalake = NameIdentifierUtil.getMetalake(firstIdent);
+
+    for (NameIdentifier identifier : identifiers) {
+      AuthorizationUtils.checkGroup(identifier);
+      Preconditions.checkArgument(
+          identifier.namespace().equals(namespace),
+          "All group identifiers must belong to the same namespace, expected %s but got %s",
+          namespace,
+          identifier.namespace());
+    }
+
+    long metalakeId =
+        EntityIdService.getEntityId(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+    List<String> groupNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        GroupMetaMapper.class,
+        mapper -> {
+          List<ExtendedGroupPO> extendedPOs =
+              mapper.listExtendedGroupPOsByMetalakeIdAndNames(metalakeId, groupNames);
+          return extendedPOs.stream()
+              .map(po -> POConverters.fromExtendedGroupPO(po, namespace))
+              .collect(Collectors.toList());
+        });
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listGroupsByRoleIdent")
   public List<GroupEntity> listGroupsByRoleIdent(NameIdentifier roleIdent) {
     RoleEntity roleEntity = RoleMetaService.getInstance().getRoleByIdentifier(roleIdent);
@@ -259,7 +296,11 @@ public class GroupMetaService {
                 mapper ->
                     mapper.softDeleteGroupRoleRelByGroupAndRoles(
                         newEntity.id(), Lists.newArrayList(deleteRoleIds)));
-          });
+          },
+          () ->
+              SessionUtils.doWithoutCommit(
+                  GroupMetaMapper.class,
+                  mapper -> mapper.touchGroupUpdatedAt(oldGroupPO.getGroupId())));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());

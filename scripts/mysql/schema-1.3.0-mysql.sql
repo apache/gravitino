@@ -222,8 +222,10 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',
+    `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`group_id`),
-    UNIQUE KEY `uk_mid_gr_del` (`metalake_id`, `group_name`, `deleted_at`)
+    UNIQUE KEY `uk_mid_gr_del` (`metalake_id`, `group_name`, `deleted_at`),
+    KEY `idx_group_meta_name_del_upd` (`metalake_id`, `group_name`, `deleted_at`, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group metadata';
 
 CREATE TABLE IF NOT EXISTS `group_role_rel` (

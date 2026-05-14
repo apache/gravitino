@@ -24,14 +24,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -204,5 +211,107 @@ public class TestSchemaMetaService extends TestJDBCBackend {
 
     topicMetaService.deleteTopic(topic.nameIdentifier());
     schemaMetaService.deleteSchema(schema.nameIdentifier(), false);
+  }
+
+  @TestTemplate
+  public void testInsertHierarchicalSchemaCreatesAncestorsAndLeaf() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String logicalLeaf = "ns_a:ns_b:leaf";
+    String sep = HierarchicalSchemaUtil.schemaSeparator();
+    String physicalLeaf = HierarchicalSchemaUtil.logicalToPhysical(logicalLeaf, sep);
+    SchemaEntity hierarchical =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(physicalLeaf)
+            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
+            .withComment("nested")
+            .withProperties(Collections.emptyMap())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    schemaMetaService.insertSchema(hierarchical, false);
+
+    List<SchemaEntity> schemas =
+        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName));
+    Set<String> logicalNames =
+        schemas.stream()
+            .map(SchemaEntity::name)
+            .map(
+                n -> {
+                  if (n != null && n.contains(HierarchicalSchemaUtil.physicalSeparator())) {
+                    return HierarchicalSchemaUtil.physicalToLogical(n, sep);
+                  }
+                  return n;
+                })
+            .collect(Collectors.toSet());
+
+    Assertions.assertTrue(logicalNames.contains("ns_a"));
+    Assertions.assertTrue(logicalNames.contains("ns_a:ns_b"));
+    Assertions.assertTrue(logicalNames.contains(logicalLeaf));
+
+    SchemaEntity loaded =
+        schemaMetaService.getSchemaByIdentifier(
+            NameIdentifier.of(metalakeName, catalogName, physicalLeaf));
+    Assertions.assertEquals(physicalLeaf, loaded.name());
+    Assertions.assertEquals("nested", loaded.comment());
+  }
+
+  @TestTemplate
+  public void testInsertHierarchicalSecondLeafReusesAncestorsWithoutUpsert() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String sep = HierarchicalSchemaUtil.schemaSeparator();
+    String physSep = HierarchicalSchemaUtil.physicalSeparator();
+    String physicalLeaf1 = HierarchicalSchemaUtil.logicalToPhysical("ns_a:ns_b:leaf1", sep);
+    String physicalLeaf2 = HierarchicalSchemaUtil.logicalToPhysical("ns_a:ns_b:leaf2", sep);
+    String[] parts = physicalLeaf1.split(Pattern.quote(physSep), -1);
+    String ancestorA = parts[0];
+    String ancestorAB = String.join(physSep, Arrays.copyOfRange(parts, 0, 2));
+
+    SchemaEntity first =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(physicalLeaf1)
+            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
+            .withComment("first")
+            .withProperties(Collections.emptyMap())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    schemaMetaService.insertSchema(first, false);
+
+    long idA =
+        schemaMetaService
+            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorA))
+            .id();
+    long idAB =
+        schemaMetaService
+            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorAB))
+            .id();
+
+    SchemaEntity second =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(physicalLeaf2)
+            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
+            .withComment("second")
+            .withProperties(Collections.emptyMap())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    schemaMetaService.insertSchema(second, false);
+
+    Assertions.assertEquals(
+        idA,
+        schemaMetaService
+            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorA))
+            .id());
+    Assertions.assertEquals(
+        idAB,
+        schemaMetaService
+            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorAB))
+            .id());
   }
 }
