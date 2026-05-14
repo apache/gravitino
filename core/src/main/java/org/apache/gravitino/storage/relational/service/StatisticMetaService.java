@@ -58,7 +58,9 @@ public class StatisticMetaService {
             mapper ->
                 mapper.listStatisticPOsByEntityId(
                     namespacedEntityId.namespaceIds()[0], namespacedEntityId.entityId()));
-    return statisticPOs.stream().map(StatisticPO::fromStatisticPO).collect(Collectors.toList());
+    return statisticPOs.stream()
+        .map(po -> StatisticPO.fromStatisticPO(po, identifier))
+        .collect(Collectors.toList());
   }
 
   @Monitored(

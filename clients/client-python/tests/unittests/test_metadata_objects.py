@@ -67,6 +67,22 @@ class TestMetadataObjects(unittest.TestCase):
         self.assertEqual(MetadataObject.Type.TABLE, obj.type())
         self.assertEqual("catalog1.schema1", obj.parent())
 
+    def test_of_with_list_names_view(self):
+        obj = MetadataObjects.of(
+            ["catalog1", "schema1", "view1"], MetadataObject.Type.VIEW
+        )
+        self.assertEqual("view1", obj.name())
+        self.assertEqual(MetadataObject.Type.VIEW, obj.type())
+        self.assertEqual("catalog1.schema1", obj.parent())
+
+    def test_of_with_list_names_function(self):
+        obj = MetadataObjects.of(
+            ["catalog1", "schema1", "function1"], MetadataObject.Type.FUNCTION
+        )
+        self.assertEqual("function1", obj.name())
+        self.assertEqual(MetadataObject.Type.FUNCTION, obj.type())
+        self.assertEqual("catalog1.schema1", obj.parent())
+
     def test_of_with_list_names_column(self):
         obj = MetadataObjects.of(
             ["catalog1", "schema1", "table1", "col1"], MetadataObject.Type.COLUMN
@@ -101,7 +117,7 @@ class TestMetadataObjects(unittest.TestCase):
 
         with self.assertRaisesRegex(
             IllegalArgumentException,
-            "If the length of names is 3, it must be FILESET, TABLE, TOPIC or MODEL",
+            "If the length of names is 3, it must be FILESET, TABLE, TOPIC, MODEL, VIEW or FUNCTION",
         ):
             MetadataObjects.of(
                 ["catalog1", "schema1", "table1"], MetadataObject.Type.COLUMN
@@ -145,6 +161,26 @@ class TestMetadataObjects(unittest.TestCase):
         self.assertEqual(MetadataObject.Type.SCHEMA, parent.type())
         self.assertEqual("catalog1", parent.parent())
 
+    def test_parent_view(self):
+        obj = MetadataObjects.of(
+            ["catalog1", "schema1", "view1"], MetadataObject.Type.VIEW
+        )
+        parent = MetadataObjects.parent(obj)
+        self.assertIsNotNone(parent)
+        self.assertEqual("schema1", parent.name())
+        self.assertEqual(MetadataObject.Type.SCHEMA, parent.type())
+        self.assertEqual("catalog1", parent.parent())
+
+    def test_parent_function(self):
+        obj = MetadataObjects.of(
+            ["catalog1", "schema1", "function1"], MetadataObject.Type.FUNCTION
+        )
+        parent = MetadataObjects.parent(obj)
+        self.assertIsNotNone(parent)
+        self.assertEqual("schema1", parent.name())
+        self.assertEqual(MetadataObject.Type.SCHEMA, parent.type())
+        self.assertEqual("catalog1", parent.parent())
+
     def test_parent_column(self):
         obj = MetadataObjects.of(
             ["catalog1", "schema1", "table1", "col1"], MetadataObject.Type.COLUMN
@@ -170,7 +206,12 @@ class TestMetadataObjects(unittest.TestCase):
         self.assertEqual(
             "catalog1.schema1.table1",
             MetadataObjects.get_parent_full_name(
-                ["catalog1", "schema1", "table1", "col1"]
+                [
+                    "catalog1",
+                    "schema1",
+                    "table1",
+                    "col1",
+                ]
             ),
         )
 
@@ -223,6 +264,20 @@ class TestMetadataObjects(unittest.TestCase):
         )
         self.assertEqual("table1", obj.name())
         self.assertEqual(MetadataObject.Type.TABLE, obj.type())
+        self.assertEqual("catalog1.schema1", obj.parent())
+
+    def test_parse_view(self):
+        obj = MetadataObjects.parse("catalog1.schema1.view1", MetadataObject.Type.VIEW)
+        self.assertEqual("view1", obj.name())
+        self.assertEqual(MetadataObject.Type.VIEW, obj.type())
+        self.assertEqual("catalog1.schema1", obj.parent())
+
+    def test_parse_function(self):
+        obj = MetadataObjects.parse(
+            "catalog1.schema1.function1", MetadataObject.Type.FUNCTION
+        )
+        self.assertEqual("function1", obj.name())
+        self.assertEqual(MetadataObject.Type.FUNCTION, obj.type())
         self.assertEqual("catalog1.schema1", obj.parent())
 
     def test_parse_invalid_blank_name(self):

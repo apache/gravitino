@@ -97,6 +97,7 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
+  private static final String FORMAT_VERSION = "format-version";
   private final CatalogCredentialManager catalogCredentialManager;
 
   private volatile Map<String, String> catalogConfigToClients;
@@ -263,6 +264,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * <p>For {@link RESTCatalog}, uses {@link RESTCatalog#properties()} so defaults reflect the
    * remote catalog's config response merged with client properties (after REST handshake), not only
    * static Gravitino catalog configuration.
+   *
+   * <p>{@link IcebergConstants#IO_IMPL} is passed through when present (e.g. Iceberg {@link
+   * org.apache.iceberg.io.ResolvingFileIO}), so clients multiplex by URI scheme without server-side
+   * rewriting per table.
    */
   @VisibleForTesting
   static Map<String, String> buildCatalogConfigToClients(IcebergConfig config, Catalog catalog) {
@@ -354,7 +359,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
                 PrincipalUtils.getCurrentUserName(),
                 Collections.emptySet(),
                 ImmutableSet.copyOf(path));
-    Credential credential = catalogCredentialManager.getCredential(context);
+    Credential credential =
+        catalogCredentialManager.getCredentialByPath(tableMetadata.location(), context);
     if (credential == null) {
       throw new ServiceUnavailableException("Couldn't generate credential, %s", context);
     }
@@ -769,6 +775,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       tableBuilder.withPartitionSpec(changedTableMeta.spec());
       tableBuilder.withSortOrder(changedTableMeta.sortOrder());
       tableBuilder.withLocation(changedTableMeta.location());
+      tableBuilder.withProperty(FORMAT_VERSION, String.valueOf(changedTableMeta.formatVersion()));
       tableBuilder.withProperties(changedTableMeta.properties());
 
       Transaction transaction = tableBuilder.createOrReplaceTransaction();
@@ -905,6 +912,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   private static Map<String, String> retrieveFileIOProperties(FileIO fileIO) {
-    return fileIO instanceof InMemoryFileIO ? Maps.newHashMap() : fileIO.properties();
+    return fileIO instanceof InMemoryFileIO
+        ? Maps.newHashMap()
+        : new HashMap<>(fileIO.properties());
   }
 }
