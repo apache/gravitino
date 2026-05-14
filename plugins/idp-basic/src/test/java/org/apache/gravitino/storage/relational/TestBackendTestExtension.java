@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.it.BackendTestExtension;
+import org.apache.gravitino.storage.relational.mapper.it.BackendTypes;
 import org.junit.jupiter.api.Test;
 
 public class TestBackendTestExtension {

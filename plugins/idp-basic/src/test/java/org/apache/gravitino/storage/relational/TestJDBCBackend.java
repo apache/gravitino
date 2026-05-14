@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
+import org.apache.gravitino.storage.relational.mapper.it.BackendTestExtension;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;

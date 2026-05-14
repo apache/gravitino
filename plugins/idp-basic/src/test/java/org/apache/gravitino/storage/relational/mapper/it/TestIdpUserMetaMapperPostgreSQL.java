@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
-import org.apache.gravitino.storage.relational.BackendTypes;
+import org.apache.gravitino.storage.relational.mapper.it.BackendTypes;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.TestTemplate;
 

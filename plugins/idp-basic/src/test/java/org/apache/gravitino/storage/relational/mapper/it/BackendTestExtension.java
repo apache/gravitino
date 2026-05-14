@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.storage.relational;
+package org.apache.gravitino.storage.relational.mapper.it;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -29,6 +29,8 @@ import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.storage.relational.JDBCBackend;
+import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
@@ -37,7 +39,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContext;
 import org.junit.jupiter.api.extension.TestTemplateInvocationContextProvider;
 
-class BackendTestExtension implements TestTemplateInvocationContextProvider {
+public class BackendTestExtension implements TestTemplateInvocationContextProvider {
   private static final String DOCKER_TEST_FLAG = "dockerTest";
   private static final Object SQL_SESSION_FACTORY_MUTEX = new Object();
 
@@ -53,7 +55,7 @@ class BackendTestExtension implements TestTemplateInvocationContextProvider {
     return backends.stream().map(BackendInvocationContext::new);
   }
 
-  static boolean isDockerTestEnabled() {
+  public static boolean isDockerTestEnabled() {
     String dockerTestProperty = System.getProperty(DOCKER_TEST_FLAG);
     if (dockerTestProperty != null) {
       return Boolean.parseBoolean(dockerTestProperty);
@@ -62,7 +64,7 @@ class BackendTestExtension implements TestTemplateInvocationContextProvider {
     return Boolean.parseBoolean(System.getenv(DOCKER_TEST_FLAG));
   }
 
-  static List<String> resolveBackends(Class<?> testClass) {
+  public static List<String> resolveBackends(Class<?> testClass) {
     BackendTypes backendTypes = findBackendTypes(testClass);
     return backendTypes != null
         ? List.of(backendTypes.value())

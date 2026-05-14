@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.storage.relational;
+package org.apache.gravitino.storage.relational.mapper.it;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
