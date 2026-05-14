@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Optional;
@@ -290,6 +291,34 @@ public class TestAuthorizationRequestContext {
     assertFalse(absentFirst.isPresent());
     assertFalse(absentSecond.isPresent(), "Absent owner result must also be cached");
     assertEquals(2, loaderCalls.get(), "Loader must fire once per distinct metadataId");
+  }
+
+  @Test
+  public void testComputeHelpersRejectNullLoaderResults() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+
+    NullPointerException userError =
+        assertThrows(
+            NullPointerException.class,
+            () -> context.computeUserInfoIfAbsent("ml::user", key -> null));
+    assertTrue(userError.getMessage().contains("User info loader must not return null"));
+
+    NullPointerException groupError =
+        assertThrows(
+            NullPointerException.class,
+            () -> context.computeGroupInfoIfAbsent("ml::group", key -> null));
+    assertTrue(groupError.getMessage().contains("Group info loader must not return null"));
+
+    NullPointerException metadataError =
+        assertThrows(
+            NullPointerException.class,
+            () -> context.computeMetadataIdIfAbsent("ml::catalog", key -> null));
+    assertTrue(metadataError.getMessage().contains("Metadata id loader must not return null"));
+
+    NullPointerException ownerError =
+        assertThrows(
+            NullPointerException.class, () -> context.computeOwnerIfAbsent(1L, id -> null));
+    assertTrue(ownerError.getMessage().contains("Owner loader must not return null"));
   }
 
   @Test

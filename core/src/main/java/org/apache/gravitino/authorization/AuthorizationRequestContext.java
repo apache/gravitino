@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization;
 
 import java.security.Principal;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -143,7 +144,8 @@ public class AuthorizationRequestContext {
    */
   public Optional<UserUpdatedAt> computeUserInfoIfAbsent(
       String key, Function<String, Optional<UserUpdatedAt>> loader) {
-    return userInfoCache.computeIfAbsent(key, loader);
+    return userInfoCache.computeIfAbsent(
+        key, k -> Objects.requireNonNull(loader.apply(k), "User info loader must not return null"));
   }
 
   /**
@@ -152,12 +154,16 @@ public class AuthorizationRequestContext {
    */
   public Optional<GroupUpdatedAt> computeGroupInfoIfAbsent(
       String key, Function<String, Optional<GroupUpdatedAt>> loader) {
-    return groupInfoCache.computeIfAbsent(key, loader);
+    return groupInfoCache.computeIfAbsent(
+        key,
+        k -> Objects.requireNonNull(loader.apply(k), "Group info loader must not return null"));
   }
 
   /** Per-request name→id dedup. Loader must return a non-null id or throw. */
   public Long computeMetadataIdIfAbsent(String key, Function<String, Long> loader) {
-    return metadataIdCache.computeIfAbsent(key, loader);
+    return metadataIdCache.computeIfAbsent(
+        key,
+        k -> Objects.requireNonNull(loader.apply(k), "Metadata id loader must not return null"));
   }
 
   /**
@@ -166,7 +172,9 @@ public class AuthorizationRequestContext {
    */
   public Optional<OwnerInfo> computeOwnerIfAbsent(
       Long metadataId, Function<Long, Optional<OwnerInfo>> loader) {
-    return ownerCache.computeIfAbsent(metadataId, loader);
+    return ownerCache.computeIfAbsent(
+        metadataId,
+        id -> Objects.requireNonNull(loader.apply(id), "Owner loader must not return null"));
   }
 
   public String getOriginalAuthorizationExpression() {
