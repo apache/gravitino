@@ -19,7 +19,6 @@ import unittest
 from unittest.mock import patch
 
 from gravitino.client.gravitino_client import GravitinoClient
-from gravitino.client.gravitino_metalake import GravitinoMetalake
 from gravitino.dto.authorization.user_dto import UserDTO
 from gravitino.dto.requests.user_add_request import UserAddRequest
 from gravitino.dto.responses.remove_response import RemoveResponse
@@ -187,56 +186,83 @@ class TestGravitinoClientUserDelegates(unittest.TestCase):
     """Verify that GravitinoClient correctly delegates User operations."""
 
     def _make_client(self):
-        metalake = mock_base.mock_load_metalake()
         client = GravitinoClient.__new__(GravitinoClient)
-        client._metalake = metalake
-        return client, metalake
+        return client
 
     def test_client_add_user(self):
-        client, metalake = self._make_client()
+        client = self._make_client()
         user = _build_user_dto()
         mock_resp = mock_base.mock_http_response(UserResponse(0, user).to_json())
-        with patch(
-            "gravitino.utils.http_client.HTTPClient.post", return_value=mock_resp
+        with (
+            patch.object(
+                GravitinoClient,
+                "get_metalake",
+                return_value=mock_base.mock_load_metalake(),
+            ),
+            patch(
+                "gravitino.utils.http_client.HTTPClient.post", return_value=mock_resp
+            ),
         ):
             result = client.add_user("alice")
             self.assertEqual("alice", result.name())
 
     def test_client_get_user(self):
-        client, metalake = self._make_client()
+        client = self._make_client()
         user = _build_user_dto(roles=["r1"])
         mock_resp = mock_base.mock_http_response(UserResponse(0, user).to_json())
-        with patch(
-            "gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp
+        with (
+            patch.object(
+                GravitinoClient,
+                "get_metalake",
+                return_value=mock_base.mock_load_metalake(),
+            ),
+            patch("gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp),
         ):
             result = client.get_user("alice")
             self.assertEqual(["r1"], result.roles())
 
     def test_client_remove_user(self):
-        client, metalake = self._make_client()
+        client = self._make_client()
         mock_resp = mock_base.mock_http_response(RemoveResponse(0, True).to_json())
-        with patch(
-            "gravitino.utils.http_client.HTTPClient.delete", return_value=mock_resp
+        with (
+            patch.object(
+                GravitinoClient,
+                "get_metalake",
+                return_value=mock_base.mock_load_metalake(),
+            ),
+            patch(
+                "gravitino.utils.http_client.HTTPClient.delete", return_value=mock_resp
+            ),
         ):
             self.assertTrue(client.remove_user("alice"))
 
     def test_client_list_users(self):
-        client, metalake = self._make_client()
+        client = self._make_client()
         users = [_build_user_dto("alice"), _build_user_dto("bob")]
         mock_resp = mock_base.mock_http_response(UserListResponse(0, users).to_json())
-        with patch(
-            "gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp
+        with (
+            patch.object(
+                GravitinoClient,
+                "get_metalake",
+                return_value=mock_base.mock_load_metalake(),
+            ),
+            patch("gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp),
         ):
             result = client.list_users()
             self.assertEqual(["alice", "bob"], [u.name() for u in result])
 
     def test_client_list_user_names(self):
-        client, metalake = self._make_client()
+        client = self._make_client()
         mock_resp = mock_base.mock_http_response(
             UserNamesListResponse(0, ["alice", "bob"]).to_json()
         )
-        with patch(
-            "gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp
+        with (
+            patch.object(
+                GravitinoClient,
+                "get_metalake",
+                return_value=mock_base.mock_load_metalake(),
+            ),
+            patch("gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp),
         ):
             result = client.list_user_names()
             self.assertEqual(["alice", "bob"], result)
