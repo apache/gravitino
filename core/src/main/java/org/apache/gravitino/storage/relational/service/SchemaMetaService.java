@@ -93,41 +93,6 @@ public class SchemaMetaService {
             SchemaMetaService::logicalToPhysicalSchemaPO);
   }
 
-  private static SchemaPO physicalToLogicalSchemaPO(SchemaPO po) {
-    String name = po.getSchemaName();
-    if (name == null || !name.contains(HierarchicalSchemaUtil.physicalSeparator())) {
-      return po;
-    }
-    return copySchemaPOWithName(
-        po,
-        HierarchicalSchemaUtil.physicalToLogical(name, HierarchicalSchemaUtil.schemaSeparator()));
-  }
-
-  private static SchemaPO logicalToPhysicalSchemaPO(SchemaPO po) {
-    String name = po.getSchemaName();
-    if (name == null || !name.contains(HierarchicalSchemaUtil.schemaSeparator())) {
-      return po;
-    }
-    return copySchemaPOWithName(
-        po,
-        HierarchicalSchemaUtil.logicalToPhysical(name, HierarchicalSchemaUtil.schemaSeparator()));
-  }
-
-  private static SchemaPO copySchemaPOWithName(SchemaPO po, String name) {
-    return SchemaPO.builder()
-        .withSchemaId(po.getSchemaId())
-        .withSchemaName(name)
-        .withMetalakeId(po.getMetalakeId())
-        .withCatalogId(po.getCatalogId())
-        .withSchemaComment(po.getSchemaComment())
-        .withProperties(po.getProperties())
-        .withAuditInfo(po.getAuditInfo())
-        .withCurrentVersion(po.getCurrentVersion())
-        .withLastVersion(po.getLastVersion())
-        .withDeletedAt(po.getDeletedAt())
-        .build();
-  }
-
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName")
@@ -494,8 +459,16 @@ public class SchemaMetaService {
 
   private SchemaPO getSchemaPOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkSchema(identifier);
-    return SessionUtils.getWithoutCommit(
-        SchemaMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+    SchemaPO schemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+    if (schemaPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          identifier.name());
+    }
+    return schemaPO;
   }
 
   private List<SchemaPO> listSchemaPOs(Namespace namespace) {
@@ -541,5 +514,40 @@ public class SchemaMetaService {
           "IdGenerator is not initialized in GravitinoEnv; ensure it is set up before inserting nested schemas");
     }
     return generator.nextId();
+  }
+
+  private static SchemaPO physicalToLogicalSchemaPO(SchemaPO po) {
+    String name = po.getSchemaName();
+    if (name == null || !name.contains(HierarchicalSchemaUtil.physicalSeparator())) {
+      return po;
+    }
+    return copySchemaPOWithName(
+        po,
+        HierarchicalSchemaUtil.physicalToLogical(name, HierarchicalSchemaUtil.schemaSeparator()));
+  }
+
+  private static SchemaPO logicalToPhysicalSchemaPO(SchemaPO po) {
+    String name = po.getSchemaName();
+    if (name == null || !name.contains(HierarchicalSchemaUtil.schemaSeparator())) {
+      return po;
+    }
+    return copySchemaPOWithName(
+        po,
+        HierarchicalSchemaUtil.logicalToPhysical(name, HierarchicalSchemaUtil.schemaSeparator()));
+  }
+
+  private static SchemaPO copySchemaPOWithName(SchemaPO po, String name) {
+    return SchemaPO.builder()
+        .withSchemaId(po.getSchemaId())
+        .withSchemaName(name)
+        .withMetalakeId(po.getMetalakeId())
+        .withCatalogId(po.getCatalogId())
+        .withSchemaComment(po.getSchemaComment())
+        .withProperties(po.getProperties())
+        .withAuditInfo(po.getAuditInfo())
+        .withCurrentVersion(po.getCurrentVersion())
+        .withLastVersion(po.getLastVersion())
+        .withDeletedAt(po.getDeletedAt())
+        .build();
   }
 }
