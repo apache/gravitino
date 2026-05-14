@@ -243,6 +243,7 @@ tasks {
   // versions. Each version is exercised inside its own venv under
   // build/lance-ray-matrix/.venv-<version>/ (cached across runs).
   // Override the matrix with `-PlanceRayVersions=0.4.2,0.4.1,0.4.0`.
+  // Override the bootstrap interpreter with `-PlanceRayPython=/path/to/python`.
   register("lanceRayMatrixTest") {
     group = "verification"
     description =
@@ -252,6 +253,8 @@ tasks {
 
     val versions = project.findProperty("lanceRayVersions") as? String
     val keepGoing = project.hasProperty("lanceRayKeepGoing")
+    val pythonExecutable =
+      (project.findProperty("lanceRayPython") as? String)?.takeIf { it.isNotBlank() } ?: "python3"
     val script = projectDir.resolve("scripts/run_lance_ray_matrix.py")
     val gravitinoHome = file("${project.rootDir}/distribution/package")
 
@@ -261,8 +264,10 @@ tasks {
     doLast {
       try {
         val args = mutableListOf(
-          "python3",
+          pythonExecutable,
           script.absolutePath,
+          "--python",
+          pythonExecutable,
           "--gravitino-home",
           gravitinoHome.absolutePath,
         )
