@@ -74,14 +74,14 @@ GravitinoClient client = GravitinoClient.builder(uri)
 
 #### OAuth 2.0 token refresh for Iceberg REST clients
 
-When Gravitino is used as an Iceberg REST Catalog (IRC), some query engines may hit OAuth 2.0 token refresh issues during long-running sessions.
+When Gravitino is used as an Iceberg REST Catalog (IRC), some query engines may hit OAuth 2.0 token refresh issues.
 This usually happens when the identity provider doesn't support token exchange, or when a child authentication session inherits the parent session's expiration time.
 
 For the native Apache Iceberg OAuth 2.0 implementation, the following upstream improvements are relevant:
 
 | Version | Change |
 | --- | --- |
-| Iceberg 1.11.0+ | Supports disabling token exchange and using client credentials for token renewal, and fixes child `AuthSession` expiration handling so the child session uses its own token lifetime. |
+| Iceberg 1.11.0+ | Supports disabling token exchange and using client credentials for token renewal, and fixes child `AuthSession` expiration handling so the child session uses its own token lifetime. Gravitino's Iceberg catalog and Iceberg REST service currently use Apache Iceberg `1.10.1`. |
 
 Use the engine-specific settings below.
 
@@ -103,14 +103,16 @@ Disable token exchange in the catalog properties:
 
 ##### Trino
 
-Set the following in the Trino catalog:
+Trino requires version 479 or later.
+
+Set the following in the Trino catalog properties:
 
 ```properties
 iceberg.rest-catalog.session=NONE
 iceberg.rest-catalog.oauth2.token-exchange-enabled=false
 ```
 
-This setting can be omitted if you want the default behavior, because the default value is `NONE`.
+You can omit `iceberg.rest-catalog.session=NONE` if you want the default behavior, because the default value is `NONE`.
 
 ##### Alternative OAuth 2.0 auth manager for Spark and Flink
 
@@ -135,7 +137,6 @@ spark.executor.extraClassPath=${SPARK_HOME}/jars/authmgr-oauth2-runtime-<version
 Example Spark configuration using client credentials token refresh:
 
 ```text
-spark.sql.catalog.irc=org.apache.iceberg.spark.SparkCatalog
 spark.sql.catalog.irc.type=rest
 spark.sql.catalog.irc.uri=http://localhost:9001/iceberg/
 spark.sql.catalog.irc.warehouse=<catalog_name>
@@ -145,6 +146,24 @@ spark.sql.catalog.irc.rest.auth.oauth2.issuer-url=http://<issuer-host>/realms/<r
 spark.sql.catalog.irc.rest.auth.oauth2.client-id=<client-id>
 spark.sql.catalog.irc.rest.auth.oauth2.client-secret=<client-secret>
 spark.sql.catalog.irc.rest.auth.oauth2.scope=<scope>
+spark.sql.catalog.irc.rest.auth.oauth2.token-refresh.enabled=true
+```
+
+Example Spark configuration using password grant token refresh:
+
+```text
+spark.sql.catalog.irc.type=rest
+spark.sql.catalog.irc.uri=http://localhost:9001/iceberg/
+spark.sql.catalog.irc.warehouse=<catalog_name>
+spark.sql.catalog.irc.header.X-Iceberg-Access-Delegation=vended-credentials
+spark.sql.catalog.irc.rest.auth.type=com.dremio.iceberg.authmgr.oauth2.OAuth2Manager
+spark.sql.catalog.irc.rest.auth.oauth2.issuer-url=http://<issuer-host>/realms/<realm>
+spark.sql.catalog.irc.rest.auth.oauth2.grant-type=password
+spark.sql.catalog.irc.rest.auth.oauth2.client-id=<client-id>
+spark.sql.catalog.irc.rest.auth.oauth2.client-secret=<client-secret>
+spark.sql.catalog.irc.rest.auth.oauth2.scope=<scope>
+spark.sql.catalog.irc.rest.auth.oauth2.resource-owner.username=<username>
+spark.sql.catalog.irc.rest.auth.oauth2.resource-owner.password=<password>
 spark.sql.catalog.irc.rest.auth.oauth2.token-refresh.enabled=true
 ```
 
@@ -159,6 +178,25 @@ CREATE CATALOG irc WITH (
   'rest.auth.oauth2.token-endpoint' = 'http://<issuer-host>/realms/<realm>/protocol/openid-connect/token',
   'rest.auth.oauth2.client-id' = '<client-id>',
   'rest.auth.oauth2.client-secret' = '<client-secret>',
+  'rest.auth.oauth2.scope' = '<scope>',
+  'rest.auth.oauth2.token-refresh.enabled' = 'true'
+);
+```
+
+Example Flink configuration using password grant token refresh:
+
+```sql
+CREATE CATALOG irc WITH (
+  'type' = 'iceberg',
+  'catalog-type' = 'rest',
+  'uri' = 'http://127.0.0.1:9001/iceberg/',
+  'rest.auth.type' = 'com.dremio.iceberg.authmgr.oauth2.OAuth2Manager',
+  'rest.auth.oauth2.token-endpoint' = 'http://<issuer-host>/realms/<realm>/protocol/openid-connect/token',
+  'rest.auth.oauth2.grant-type' = 'password',
+  'rest.auth.oauth2.client-id' = '<client-id>',
+  'rest.auth.oauth2.client-secret' = '<client-secret>',
+  'rest.auth.oauth2.resource-owner.username' = '<username>',
+  'rest.auth.oauth2.resource-owner.password' = '<password>',
   'rest.auth.oauth2.scope' = '<scope>',
   'rest.auth.oauth2.token-refresh.enabled' = 'true'
 );
