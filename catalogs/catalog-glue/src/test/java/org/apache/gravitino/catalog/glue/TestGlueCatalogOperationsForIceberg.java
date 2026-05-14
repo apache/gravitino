@@ -48,7 +48,7 @@ import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 
-class TestGlueIceberg {
+class TestGlueCatalogOperationsForIceberg {
 
   private static final String DB = "mydb";
   private static final String TABLE = "ice1";
