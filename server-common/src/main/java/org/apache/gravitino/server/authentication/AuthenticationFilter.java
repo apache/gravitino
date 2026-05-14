@@ -132,7 +132,7 @@ public class AuthenticationFilter implements Filter {
     response.sendError(status, exception.getMessage());
   }
 
-  private static boolean isHealthCheckRequest(ServletRequest request) {
+  protected boolean isHealthCheckRequest(ServletRequest request) {
     if (!(request instanceof HttpServletRequest)) {
       return false;
     }

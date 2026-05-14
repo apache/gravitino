@@ -21,6 +21,8 @@ package org.apache.gravitino.iceberg.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import javax.servlet.ServletRequest;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
@@ -39,6 +41,21 @@ import org.eclipse.jetty.http.HttpStatus;
 public class IcebergAuthenticationFilter extends AuthenticationFilter {
 
   private static final ObjectMapper MAPPER = IcebergObjectMapper.getInstance();
+
+  @Override
+  protected boolean isHealthCheckRequest(ServletRequest request) {
+    if (super.isHealthCheckRequest(request)) {
+      return true;
+    }
+    if (!(request instanceof HttpServletRequest)) {
+      return false;
+    }
+    String path = ((HttpServletRequest) request).getRequestURI();
+    if (path == null) {
+      return false;
+    }
+    return path.equals("/iceberg/health") || path.startsWith("/iceberg/health/");
+  }
 
   @Override
   protected void sendAuthErrorResponse(HttpServletResponse response, Exception exception)
