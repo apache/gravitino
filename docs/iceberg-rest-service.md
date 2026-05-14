@@ -323,8 +323,8 @@ Please refer the following configuration If you are using Spark to access Iceber
 
 ##### OAuth 2.0 token refresh for Iceberg REST clients
 
-Some query engines may encounter OAuth 2.0 token refresh issues when using the Gravitino Iceberg REST Catalog (IRC).
-This typically occurs when the identity provider does not support token exchange or when a child authentication session inherits the parent session's expiration time.
+OAuth 2.0 token refresh challenges may arise in certain query engines when accessing the Gravitino Iceberg REST Catalog (IRC).
+These are often linked to identity providers without full token exchange support, or to authentication models in which child sessions inherit the expiration policies of their parent sessions.
 
 For the Apache Iceberg OAuth 2.0 implementation, the following upstream change is relevant:
 
