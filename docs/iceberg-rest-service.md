@@ -323,20 +323,20 @@ Please refer the following configuration If you are using Spark to access Iceber
 
 ##### OAuth 2.0 token refresh for Iceberg REST clients
 
-Some query engines may encounter OAuth 2.0 token refresh issues when connecting to the Gravitino Iceberg REST Catalog (IRC).
-This usually occurs when the identity provider does not support token exchange, or when a child authentication session inherits the parent session's expiration time.
+Some query engines may encounter OAuth 2.0 token refresh issues when using the Gravitino Iceberg REST Catalog (IRC).
+This typically occurs when the identity provider does not support token exchange or when a child authentication session inherits the parent session's expiration time.
 
-For the Apache Iceberg OAuth 2.0 implementation, the following upstream improvement is relevant:
+For the Apache Iceberg OAuth 2.0 implementation, the following upstream change is relevant:
 
 | Version         | Change                                                                                                                                                                                 |
 |-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Iceberg 1.11.0+ | Adds support for disabling token exchange and using client credentials for token renewal, and fixes child `AuthSession` expiration handling so that child sessions use their own token lifetime. |
+| Iceberg 1.11.0+ | Introduces support for disabling token exchange and using client credentials for token renewal, and fixes child `AuthSession` expiration handling so that each child session uses its own token lifetime. |
 
 ###### Apache Iceberg OAuth 2.0 implementation
 
 **Spark**
 
-Disable token exchange in the catalog configuration:
+Disable token exchange by setting the following catalog configuration:
 
 ```text
 spark.sql.catalog.${catalog_name}.token-exchange-enabled=false
@@ -344,7 +344,7 @@ spark.sql.catalog.${catalog_name}.token-exchange-enabled=false
 
 **Flink**
 
-Disable token exchange in the catalog properties:
+Disable token exchange by setting the following catalog property:
 
 ```sql
 'token-exchange-enable'='false'
@@ -352,7 +352,7 @@ Disable token exchange in the catalog properties:
 
 **Trino**
 
-This configuration requires Trino 479 or later.
+Trino 479 or later is required for this configuration.
 
 Add the following properties to the Trino catalog configuration:
 
