@@ -54,7 +54,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
 /** The service class for view metadata. It provides the basic database operations for view. */
-public class ViewMetaService extends RequireSchemaConventionService<ViewPO> {
+public class ViewMetaService {
 
   private static final ViewMetaService INSTANCE = new ViewMetaService();
 
@@ -295,13 +295,13 @@ public class ViewMetaService extends RequireSchemaConventionService<ViewPO> {
   private Function<Namespace, List<ViewPO>> viewListFetcher() {
     return GravitinoEnv.getInstance().cacheEnabled()
         ? this::listViewPOsBySchemaId
-        : this::listPOsForApiNamespace;
+        : this::listViewPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, ViewPO> viewPOFetcher() {
     return GravitinoEnv.getInstance().cacheEnabled()
         ? this::getViewPOBySchemaId
-        : this::getPOForApiIdentifier;
+        : this::getViewPOByFullQualifiedName;
   }
 
   private List<ViewPO> listViewPOsBySchemaId(Namespace namespace) {
@@ -371,15 +371,5 @@ public class ViewMetaService extends RequireSchemaConventionService<ViewPO> {
     }
 
     return viewPO;
-  }
-
-  @Override
-  protected ViewPO fetchPOByStorageIdentifier(NameIdentifier storageIdentifier) {
-    return getViewPOByFullQualifiedName(storageIdentifier);
-  }
-
-  @Override
-  protected List<ViewPO> fetchPOsByStorageNamespace(Namespace storageNamespace) {
-    return listViewPOsByFullQualifiedName(storageNamespace);
   }
 }

@@ -55,7 +55,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FunctionMetaService extends RequireSchemaConventionService<FunctionPO> {
+public class FunctionMetaService {
   public static FunctionMetaService getInstance() {
     return INSTANCE;
   }
@@ -346,23 +346,13 @@ public class FunctionMetaService extends RequireSchemaConventionService<Function
   private Function<Namespace, List<FunctionPO>> functionListFetcher() {
     return GravitinoEnv.getInstance().cacheEnabled()
         ? this::listFunctionPOsBySchemaId
-        : this::listPOsForApiNamespace;
+        : this::listFunctionPOsByFullQualifiedName;
   }
 
   private Function<NameIdentifier, FunctionPO> functionPOFetcher() {
     return GravitinoEnv.getInstance().cacheEnabled()
         ? this::getFunctionPOBySchemaId
-        : this::getPOForApiIdentifier;
-  }
-
-  @Override
-  protected FunctionPO fetchPOByStorageIdentifier(NameIdentifier storageIdentifier) {
-    return getFunctionPOByFullQualifiedName(storageIdentifier);
-  }
-
-  @Override
-  protected List<FunctionPO> fetchPOsByStorageNamespace(Namespace storageNamespace) {
-    return listFunctionPOsByFullQualifiedName(storageNamespace);
+        : this::getFunctionPOByFullQualifiedName;
   }
 
   private void fillFunctionPOBuilderParentEntityId(
