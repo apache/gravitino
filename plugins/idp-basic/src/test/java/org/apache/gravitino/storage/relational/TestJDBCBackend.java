@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -95,6 +96,18 @@ public abstract class TestJDBCBackend {
       }
     } catch (SQLException e) {
       throw new RuntimeException("Count rows from " + table + " failed", e);
+    }
+  }
+
+  protected String currentJdbcUrl() {
+    try (SqlSession sqlSession =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      try (Connection connection = sqlSession.getConnection()) {
+        DatabaseMetaData metaData = connection.getMetaData();
+        return metaData.getURL();
+      }
+    } catch (SQLException e) {
+      throw new RuntimeException("Get current JDBC URL failed", e);
     }
   }
 

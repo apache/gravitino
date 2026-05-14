@@ -81,6 +81,14 @@ public class IdpUserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  /**
+   * Generates the built-in IdP soft-delete SQL with the same MySQL/H2(MODE=MYSQL) convention used
+   * by the core relational base providers.
+   *
+   * <p>Gravitino's H2 backend is initialized in {@code MODE=MYSQL}, so {@code UNIX_TIMESTAMP()} is
+   * intentionally shared by the MySQL and H2 providers here. PostgreSQL overrides this method with
+   * its own timestamp expression.
+   */
   public String softDeleteIdpUser(@Param("userId") Long userId) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME

@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.storage.relational.mapper;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.apache.gravitino.storage.relational.mapper.it.BackendTypes;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -63,6 +66,16 @@ public class TestIdpUserMetaMapperH2 extends IdpMapperTestBase implements IdpUse
   @TestTemplate
   public void testSoftDeleteIdpUserReturnsZeroForDeletedUser() {
     IdpUserMetaMapperTest.super.testSoftDeleteIdpUserReturnsZeroForDeletedUser();
+  }
+
+  @TestTemplate
+  public void testSoftDeleteIdpUserRunsWithH2MysqlMode() {
+    assertEquals("h2", backendType);
+    assertTrue(currentJdbcUrl().contains("MODE=MYSQL"));
+
+    insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
+    assertEquals(1, idpUserMetaMapper.softDeleteIdpUser(1L));
+    assertTrue(queryLongValueInMapperTest("idp_user_meta", "deleted_at", "user_id", 1L) > 0L);
   }
 
   @TestTemplate
