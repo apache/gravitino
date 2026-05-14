@@ -29,10 +29,16 @@ ALTER TABLE `owner_meta`
     ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0
     COMMENT 'updated at';
 
+ALTER TABLE `group_meta`
+    ADD COLUMN `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0
+    COMMENT 'updated at';
+
 CREATE INDEX idx_user_meta_name_del_upd
     ON user_meta (metalake_id, user_name, deleted_at, updated_at);
 CREATE INDEX idx_owner_meta_del_upd_obj
     ON owner_meta (deleted_at, updated_at, metadata_object_id);
+CREATE INDEX idx_group_meta_name_del_upd
+    ON group_meta (metalake_id, group_name, deleted_at, updated_at);
 
 CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
@@ -78,3 +84,37 @@ CREATE TABLE IF NOT EXISTS `view_version_info` (
     KEY `idx_vvcid` (`catalog_id`),
     KEY `idx_vvsid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'view version info';
+
+CREATE TABLE IF NOT EXISTS `idp_user_meta` (
+    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
+    `user_name` VARCHAR(128) NOT NULL COMMENT 'idp username',
+    `password_hash` VARCHAR(1024) NOT NULL COMMENT 'idp user password hash',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp user deleted at',
+    PRIMARY KEY (`user_id`),
+    UNIQUE KEY `uk_iun_del` (`user_name`, `deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local IdP user metadata';
+
+CREATE TABLE IF NOT EXISTS `idp_group_meta` (
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
+    `group_name` VARCHAR(128) NOT NULL COMMENT 'idp group name',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp group deleted at',
+    PRIMARY KEY (`group_id`),
+    UNIQUE KEY `uk_ign_del` (`group_name`, `deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local IdP group metadata';
+
+CREATE TABLE IF NOT EXISTS `idp_group_user_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
+    `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_igiu_del` (`group_id`, `user_id`, `deleted_at`),
+    KEY `idx_iug_gid` (`group_id`),
+    KEY `idx_iug_uid` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local IdP group user relation';

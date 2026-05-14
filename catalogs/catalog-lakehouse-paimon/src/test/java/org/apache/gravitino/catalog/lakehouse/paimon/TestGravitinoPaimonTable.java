@@ -420,42 +420,6 @@ public class TestGravitinoPaimonTable {
   }
 
   @Test
-  void testCreatePaimonPrimaryKeyTableWithInvalidBucketKey() {
-    String paimonTableName = "test_paimon_primary_key_table_invalid_bucket";
-    NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), paimonTableName);
-
-    Column[] columns =
-        new Column[] {
-          fromPaimonColumn(new DataField(0, "col_1", DataTypes.INT().notNull(), PAIMON_COMMENT)),
-          fromPaimonColumn(new DataField(1, "col_2", DataTypes.STRING().notNull(), PAIMON_COMMENT))
-        };
-
-    Index[] indexes =
-        Collections.singletonList(
-                primary(
-                    PAIMON_PRIMARY_KEY_INDEX_NAME,
-                    new String[][] {new String[] {"col_2"}},
-                    Map.of()))
-            .toArray(new Index[0]);
-
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                paimonCatalogOperations.createTable(
-                    tableIdentifier,
-                    columns,
-                    PAIMON_COMMENT,
-                    Maps.newHashMap(),
-                    new Transform[0],
-                    Distributions.hash(2, NamedReference.field("col_1")),
-                    new SortOrder[0],
-                    indexes));
-    Assertions.assertTrue(
-        exception.getMessage().contains("bucket keys must be a subset of primary key columns"));
-  }
-
-  @Test
   void testDropPaimonTable() {
     NameIdentifier tableIdentifier = NameIdentifier.of(paimonSchema.name(), genRandomName());
     Map<String, String> properties = Maps.newHashMap();

@@ -22,9 +22,15 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
@@ -42,7 +48,9 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -61,9 +69,11 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 
@@ -159,18 +169,71 @@ public class SchemaMetaService {
   public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
-
-      SchemaPO.Builder builder = SchemaPO.builder();
-      fillSchemaPOBuilderParentEntityId(builder, schemaEntity.namespace());
+      // Callers above this service (e.g. JDBCBackend + naming bridge) pass storage-form schema
+      // names: nested paths use the internal physical separator, not the external logical one.
+      String physicalSep = HierarchicalSchemaUtil.physicalSeparator();
+      String schemaName = schemaEntity.name();
+      List<SchemaEntity> rowsToInsert = new ArrayList<>();
+      if (schemaName == null || !schemaName.contains(physicalSep)) {
+        rowsToInsert.add(schemaEntity);
+      } else {
+        // Segments of the storage-form name; e.g. [A, B, C] -> ancestor rows "A", "A"+sep+"B", then
+        // leaf.
+        String[] parts = schemaName.split(Pattern.quote(physicalSep), -1);
+        for (int nSeg = 1; nSeg < parts.length; nSeg++) {
+          String ancestorPhysical = String.join(physicalSep, Arrays.copyOf(parts, nSeg));
+          SchemaEntity ancestor =
+              SchemaEntity.builder()
+                  .withId(nextIdForNestedAncestor())
+                  .withName(ancestorPhysical)
+                  .withNamespace(schemaEntity.namespace())
+                  .withComment(null)
+                  .withProperties(Collections.emptyMap())
+                  .withAuditInfo(schemaEntity.auditInfo())
+                  .build();
+          rowsToInsert.add(ancestor);
+        }
+        rowsToInsert.add(schemaEntity);
+      }
 
       SessionUtils.doWithCommit(
           SchemaMetaMapper.class,
           mapper -> {
-            SchemaPO po = POConverters.initializeSchemaPOWithVersion(schemaEntity, builder);
+            int n = rowsToInsert.size();
+            List<SchemaPO> missingAncestorPOs = new ArrayList<>();
+            if (n > 1) {
+              SchemaEntity firstAncestor = rowsToInsert.get(0);
+              Namespace ancestorNs = firstAncestor.namespace();
+              List<String> ancestorPhysicalNames =
+                  rowsToInsert.subList(0, n - 1).stream()
+                      .map(SchemaEntity::name)
+                      .collect(Collectors.toList());
+              Set<String> existingAncestorNames =
+                  mapper
+                      .batchSelectSchemaByIdentifier(
+                          ancestorNs.level(0), ancestorNs.level(1), ancestorPhysicalNames)
+                      .stream()
+                      .map(SchemaPO::getSchemaName)
+                      .collect(Collectors.toSet());
+              for (SchemaEntity row : rowsToInsert.subList(0, n - 1)) {
+                if (existingAncestorNames.contains(row.name())) {
+                  continue;
+                }
+                SchemaPO.Builder builder = SchemaPO.builder();
+                fillSchemaPOBuilderParentEntityId(builder, row.namespace());
+                missingAncestorPOs.add(POConverters.initializeSchemaPOWithVersion(row, builder));
+              }
+            }
+            SchemaEntity leafRow = rowsToInsert.get(n - 1);
+            SchemaPO.Builder leafBuilder = SchemaPO.builder();
+            fillSchemaPOBuilderParentEntityId(leafBuilder, leafRow.namespace());
+            SchemaPO leafPO = POConverters.initializeSchemaPOWithVersion(leafRow, leafBuilder);
+            List<SchemaPO> schemaPosToInsert = new ArrayList<>(missingAncestorPOs);
+            schemaPosToInsert.add(leafPO);
             if (overwrite) {
-              mapper.insertSchemaMetaOnDuplicateKeyUpdate(po);
+              mapper.batchInsertSchemaMetaOnDuplicateKeyUpdate(schemaPosToInsert);
             } else {
-              mapper.insertSchemaMeta(po);
+              mapper.batchInsertSchemaMeta(schemaPosToInsert);
             }
           });
     } catch (RuntimeException re) {
@@ -186,7 +249,6 @@ public class SchemaMetaService {
   public <E extends Entity & HasIdentifier> SchemaEntity updateSchema(
       NameIdentifier identifier, Function<E, E> updater) throws IOException {
     SchemaPO oldSchemaPO = getSchemaPOByIdentifier(identifier);
-
     SchemaEntity oldSchemaEntity = POConverters.fromSchemaPO(oldSchemaPO, identifier.namespace());
     SchemaEntity newEntity = (SchemaEntity) updater.apply((E) oldSchemaEntity);
     Preconditions.checkArgument(
@@ -195,21 +257,42 @@ public class SchemaMetaService {
         newEntity.id(),
         oldSchemaEntity.id());
 
-    Integer updateResult;
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String oldFullName =
+        NameIdentifierUtil.ofSchema(metalakeName, catalogName, oldSchemaEntity.name()).toString();
+    boolean isRenamed = !Objects.equals(oldSchemaEntity.name(), newEntity.name());
+
+    AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      updateResult =
-          SessionUtils.doWithCommitAndFetchResult(
-              SchemaMetaMapper.class,
-              mapper ->
-                  mapper.updateSchemaMeta(
-                      POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity), oldSchemaPO));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              updateResult.set(
+                  SessionUtils.getWithoutCommit(
+                      SchemaMetaMapper.class,
+                      mapper ->
+                          mapper.updateSchemaMeta(
+                              POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity),
+                              oldSchemaPO))),
+          () -> {
+            if (isRenamed && updateResult.get() > 0) {
+              SessionUtils.doWithoutCommit(
+                  EntityChangeLogMapper.class,
+                  mapper ->
+                      mapper.insertEntityChange(
+                          metalakeName,
+                          Entity.EntityType.SCHEMA.name(),
+                          oldFullName,
+                          OperateType.ALTER));
+            }
+          });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.SCHEMA, newEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult > 0) {
+    if (updateResult.get() > 0) {
       return newEntity;
     } else {
       throw new IOException("Failed to update the entity: " + identifier);
@@ -225,6 +308,10 @@ public class SchemaMetaService {
     String schemaName = identifier.name();
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
     Long schemaId = schemaPO.getSchemaId();
+    String metalakeName = identifier.namespace().level(0);
+    String catalogName = identifier.namespace().level(1);
+    String schemaFullName =
+        NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName).toString();
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
@@ -289,7 +376,17 @@ public class SchemaMetaService {
                   mapper -> mapper.softDeleteStatisticsBySchemaId(schemaId)),
           () ->
               SessionUtils.doWithoutCommit(
-                  ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasBySchemaId(schemaId)));
+                  ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasBySchemaId(schemaId)),
+          () -> {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.SCHEMA.name(),
+                        schemaFullName,
+                        OperateType.DROP));
+          });
     } else {
       List<TableEntity> tableEntities =
           TableMetaService.getInstance()
@@ -369,7 +466,17 @@ public class SchemaMetaService {
                   PolicyMetadataObjectRelMapper.class,
                   mapper ->
                       mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                          schemaId, MetadataObject.Type.SCHEMA.name())));
+                          schemaId, MetadataObject.Type.SCHEMA.name())),
+          () -> {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.SCHEMA.name(),
+                        schemaFullName,
+                        OperateType.DROP));
+          });
     }
     return true;
   }
@@ -506,5 +613,14 @@ public class SchemaMetaService {
                   catalogIdent.namespace().level(0), catalogIdent.name(), schemaNames);
           return POConverters.fromSchemaPOs(schemaPOs, firstIdent.namespace());
         });
+  }
+
+  private static long nextIdForNestedAncestor() {
+    IdGenerator generator = GravitinoEnv.getInstance().idGenerator();
+    if (generator == null) {
+      throw new IllegalStateException(
+          "IdGenerator is not initialized in GravitinoEnv; ensure it is set up before inserting nested schemas");
+    }
+    return generator.nextId();
   }
 }

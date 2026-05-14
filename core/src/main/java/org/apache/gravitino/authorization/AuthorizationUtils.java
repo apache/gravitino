@@ -117,8 +117,13 @@ public class AuthorizationUtils {
   private AuthorizationUtils() {}
 
   public static void checkCurrentUser(String metalake, String user) {
+    checkCurrentUser(metalake, user, new AuthorizationRequestContext());
+  }
+
+  public static void checkCurrentUser(
+      String metalake, String user, AuthorizationRequestContext requestContext) {
     GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
-    if (authorizer != null && !authorizer.isMetalakeUser(metalake)) {
+    if (authorizer != null && !authorizer.isMetalakeUser(metalake, requestContext)) {
       throw new ForbiddenException(
           "Current user %s doesn't exist in the metalake %s, you should add the user to the metalake first",
           user, metalake);

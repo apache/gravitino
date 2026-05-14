@@ -88,7 +88,7 @@ public final class GlueClientProvider {
       builder.credentialsProvider(
           StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)));
     } else {
-      builder.credentialsProvider(DefaultCredentialsProvider.create());
+      builder.credentialsProvider(DefaultCredentialsProvider.builder().build());
     }
 
     // Optional custom endpoint override for VPC endpoints or LocalStack testing.

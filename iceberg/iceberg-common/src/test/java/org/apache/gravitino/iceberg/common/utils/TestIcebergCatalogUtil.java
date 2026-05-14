@@ -150,4 +150,28 @@ public class TestIcebergCatalogUtil {
                       }
                     })));
   }
+
+  @Test
+  void testApplyDefaultResolvingFileIOWhenMissing() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.WAREHOUSE, "s3://bucket/warehouse");
+
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
+
+    Assertions.assertEquals(
+        org.apache.iceberg.io.ResolvingFileIO.class.getName(),
+        properties.get(IcebergConstants.IO_IMPL));
+  }
+
+  @Test
+  void testApplyDefaultResolvingFileIODoesNotOverrideExplicitIOImpl() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.WAREHOUSE, "s3://bucket/warehouse");
+    properties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO");
+
+    IcebergCatalogUtil.applyDefaultResolvingFileIO(properties);
+
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", properties.get(IcebergConstants.IO_IMPL));
+  }
 }

@@ -94,6 +94,15 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().insertSchemaMetaOnDuplicateKeyUpdate(schemaPO);
   }
 
+  public static String batchInsertSchemaMeta(@Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return getProvider().batchInsertSchemaMeta(schemaMetas);
+  }
+
+  public static String batchInsertSchemaMetaOnDuplicateKeyUpdate(
+      @Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return getProvider().batchInsertSchemaMetaOnDuplicateKeyUpdate(schemaMetas);
+  }
+
   public static String updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO) {
     return getProvider().updateSchemaMeta(newSchemaPO, oldSchemaPO);
