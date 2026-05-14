@@ -326,17 +326,17 @@ Please refer the following configuration If you are using Spark to access Iceber
 OAuth 2.0 token refresh challenges may arise in certain query engines when accessing the Gravitino Iceberg REST Catalog (IRC).
 These are often linked to identity providers without full token exchange support, or to authentication models in which child sessions inherit the expiration policies of their parent sessions.
 
-For the Apache Iceberg OAuth 2.0 implementation, the following upstream change is relevant:
+The following upstream change in Apache Iceberg is relevant to this behavior:
 
 | Version         | Change                                                                                                                                                                                 |
 |-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Iceberg 1.11.0+ | Introduces support for disabling token exchange and using client credentials for token renewal, and fixes child `AuthSession` expiration handling so that each child session uses its own token lifetime. |
+| Iceberg 1.11.0+ | Supports disabling token exchange, renewing tokens with client credentials, and ensuring that child `AuthSession` instances use their own token lifetime instead of inheriting the parent session expiration. |
 
-###### Apache Iceberg OAuth 2.0 implementation
+###### Apache Iceberg OAuth 2.0 configuration
 
 **Spark**
 
-Disable token exchange by setting the following catalog configuration:
+For Spark, disable token exchange by setting the following catalog configuration:
 
 ```text
 spark.sql.catalog.${catalog_name}.token-exchange-enabled=false
@@ -344,7 +344,7 @@ spark.sql.catalog.${catalog_name}.token-exchange-enabled=false
 
 **Flink**
 
-Disable token exchange by setting the following catalog property:
+For Flink, disable token exchange by setting the following catalog property:
 
 ```sql
 'token-exchange-enable'='false'
@@ -352,16 +352,16 @@ Disable token exchange by setting the following catalog property:
 
 **Trino**
 
-Trino 479 or later is required for this configuration.
+For Trino, use version 479 or later.
 
-Add the following properties to the Trino catalog configuration:
+Then add the following properties to the catalog configuration:
 
 ```properties
 iceberg.rest-catalog.session=NONE
 iceberg.rest-catalog.oauth2.token-exchange-enabled=false
 ```
 
-You can omit `iceberg.rest-catalog.session=NONE` because the default value is `NONE`.
+You can omit `iceberg.rest-catalog.session=NONE` because `NONE` is the default value.
 
 #### HTTPS
 
