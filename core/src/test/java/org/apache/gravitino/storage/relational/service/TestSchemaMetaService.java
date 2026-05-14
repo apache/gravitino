@@ -254,7 +254,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     SchemaEntity loaded =
         schemaMetaService.getSchemaByIdentifier(
             NameIdentifier.of(metalakeName, catalogName, physicalLeaf));
-    Assertions.assertEquals(physicalLeaf, loaded.name());
+    Assertions.assertEquals(logicalLeaf, loaded.name());
     Assertions.assertEquals("nested", loaded.comment());
   }
 

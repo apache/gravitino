@@ -86,7 +86,46 @@ public class SchemaMetaService {
   }
 
   private SchemaMetaService() {
-    this.ops = new HierarchicalConventionPOStorageOps<>(new SchemaPOStorageOps());
+    this.ops =
+        new HierarchicalConventionPOStorageOps<>(
+            new SchemaPOStorageOps(),
+            SchemaMetaService::physicalToLogicalSchemaPO,
+            SchemaMetaService::logicalToPhysicalSchemaPO);
+  }
+
+  private static SchemaPO physicalToLogicalSchemaPO(SchemaPO po) {
+    String name = po.getSchemaName();
+    if (name == null || !name.contains(HierarchicalSchemaUtil.physicalSeparator())) {
+      return po;
+    }
+    return copySchemaPOWithName(
+        po,
+        HierarchicalSchemaUtil.physicalToLogical(name, HierarchicalSchemaUtil.schemaSeparator()));
+  }
+
+  private static SchemaPO logicalToPhysicalSchemaPO(SchemaPO po) {
+    String name = po.getSchemaName();
+    if (name == null || !name.contains(HierarchicalSchemaUtil.schemaSeparator())) {
+      return po;
+    }
+    return copySchemaPOWithName(
+        po,
+        HierarchicalSchemaUtil.logicalToPhysical(name, HierarchicalSchemaUtil.schemaSeparator()));
+  }
+
+  private static SchemaPO copySchemaPOWithName(SchemaPO po, String name) {
+    return SchemaPO.builder()
+        .withSchemaId(po.getSchemaId())
+        .withSchemaName(name)
+        .withMetalakeId(po.getMetalakeId())
+        .withCatalogId(po.getCatalogId())
+        .withSchemaComment(po.getSchemaComment())
+        .withProperties(po.getProperties())
+        .withAuditInfo(po.getAuditInfo())
+        .withCurrentVersion(po.getCurrentVersion())
+        .withLastVersion(po.getLastVersion())
+        .withDeletedAt(po.getDeletedAt())
+        .build();
   }
 
   @Monitored(

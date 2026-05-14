@@ -30,8 +30,10 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 /**
  * Wraps a {@link BasePOStorageOps} to bridge the hierarchical schema naming convention. Names that
  * appear in API form (logical separator) are translated to storage form (physical separator) before
- * delegating, and an optional rewriter can post-process POs returned from reads (typically used to
- * translate a PO field from physical back to logical for callers).
+ * delegating. Two optional PO rewriters allow callers to translate a PO field across the boundary:
+ * the read rewriter is applied to POs returned from read methods (typically physical→logical), and
+ * the write rewriter is applied to POs passed into write methods (typically logical→physical) so
+ * the SQL still receives storage-form values.
  *
  * @param <PO> persistent object type
  * @param <Mapper> MyBatis mapper type
@@ -40,30 +42,34 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
 
   private final BasePOStorageOps<PO, Mapper> delegate;
   private final UnaryOperator<PO> readRewriter;
+  private final UnaryOperator<PO> writeRewriter;
 
   public HierarchicalConventionPOStorageOps(BasePOStorageOps<PO, Mapper> delegate) {
-    this(delegate, UnaryOperator.identity());
+    this(delegate, UnaryOperator.identity(), UnaryOperator.identity());
   }
 
   public HierarchicalConventionPOStorageOps(
-      BasePOStorageOps<PO, Mapper> delegate, UnaryOperator<PO> readRewriter) {
+      BasePOStorageOps<PO, Mapper> delegate,
+      UnaryOperator<PO> readRewriter,
+      UnaryOperator<PO> writeRewriter) {
     this.delegate = delegate;
     this.readRewriter = readRewriter;
+    this.writeRewriter = writeRewriter;
   }
 
   @Override
   public void insertPO(Mapper mapper, PO po, boolean overwrite) {
-    delegate.insertPO(mapper, po, overwrite);
+    delegate.insertPO(mapper, writeRewriter.apply(po), overwrite);
   }
 
   @Override
   public void batchInsertPOs(Mapper mapper, List<PO> pos, boolean overwrite) {
-    delegate.batchInsertPOs(mapper, pos, overwrite);
+    delegate.batchInsertPOs(mapper, applyWrite(pos), overwrite);
   }
 
   @Override
   public Integer updatePO(Mapper mapper, PO newPO, PO oldPO) {
-    return delegate.updatePO(mapper, newPO, oldPO);
+    return delegate.updatePO(mapper, writeRewriter.apply(newPO), writeRewriter.apply(oldPO));
   }
 
   @Override
@@ -120,6 +126,13 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
       return pos;
     }
     return pos.stream().map(this::applyRead).collect(Collectors.toList());
+  }
+
+  private List<PO> applyWrite(List<PO> pos) {
+    if (pos == null || pos.isEmpty()) {
+      return pos;
+    }
+    return pos.stream().map(writeRewriter).collect(Collectors.toList());
   }
 
   private static String toPhysicalIfHierarchical(String name) {
