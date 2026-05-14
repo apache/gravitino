@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.glue;
 
-import static org.apache.gravitino.catalog.glue.GlueConstants.FORMAT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.INPUT_FORMAT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.METADATA_LOCATION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.OUTPUT_FORMAT;
@@ -64,14 +63,6 @@ public class GlueTablePropertiesMetadata extends BasePropertiesMetadata {
                 "Iceberg metadata file location stored in Table.parameters().",
                 false,
                 null,
-                false),
-            stringImmutablePropertyEntry(
-                FORMAT,
-                "The table file format (parquet, orc, textfile, etc.). When set, "
-                    + "input-format, output-format, and serde-lib are derived from this.",
-                false,
-                null,
-                false,
                 false),
             stringImmutablePropertyEntry(
                 INPUT_FORMAT,

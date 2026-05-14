@@ -249,22 +249,4 @@ public class GlueTable extends BaseTable {
   public static Builder builder() {
     return new Builder();
   }
-
-  /**
-   * Sets the partitioning of the table.
-   *
-   * @param partitioning the partitioning transforms
-   */
-  public void setPartitioning(Transform[] partitioning) {
-    this.partitioning = partitioning;
-  }
-
-  /**
-   * Sets the sort orders of the table.
-   *
-   * @param sortOrders the sort orders
-   */
-  public void setSortOrders(SortOrder[] sortOrders) {
-    this.sortOrders = sortOrders;
-  }
 }
