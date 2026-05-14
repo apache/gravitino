@@ -53,6 +53,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
 import org.lance.Dataset;
+import org.lance.ReadOptions;
 import org.lance.WriteParams;
 import org.lance.index.DistanceType;
 import org.lance.index.IndexOptions;
@@ -361,7 +362,9 @@ public class LanceTableOperations extends ManagedTableOperations {
    */
   long handleLanceTableChange(Table table, TableChange[] changes) {
     String location = table.properties().get(Table.PROPERTY_LOCATION);
-    try (Dataset dataset = openDataset(location)) {
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    try (Dataset dataset = openDataset(location, storageOptions)) {
       for (TableChange change : changes) {
         if (change instanceof TableChange.DeleteColumn deleteColumn) {
           dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
@@ -402,7 +405,15 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   Dataset openDataset(String location) {
-    return Dataset.open().allocator(new RootAllocator()).uri(location).build();
+    return openDataset(location, Map.of());
+  }
+
+  Dataset openDataset(String location, Map<String, String> storageOptions) {
+    return Dataset.open()
+        .allocator(new RootAllocator())
+        .uri(location)
+        .readOptions(new ReadOptions.Builder().setStorageOptions(storageOptions).build())
+        .build();
   }
 
   private IndexParams getIndexParamsByIndexType(IndexType indexType) {
