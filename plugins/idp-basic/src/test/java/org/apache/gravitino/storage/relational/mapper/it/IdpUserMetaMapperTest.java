@@ -29,6 +29,7 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.po.IdpUserPO;
 
 interface IdpUserMetaMapperTest {
+  IdpMapperTestBase testBase();
 
   default void testInsertIdpUserAndSelectIdpUser() {
     IdpMapperTestBase testBase = testBase();
@@ -130,9 +131,5 @@ interface IdpUserMetaMapperTest {
     assertEquals(0, testBase.countRowsInMapperTest("idp_user_meta", "user_id", 1L));
     assertEquals(1, testBase.countRowsInMapperTest("idp_user_meta", "user_id", 2L));
     assertEquals(1, testBase.countRowsInMapperTest("idp_user_meta", "user_id", 3L));
-  }
-
-  private IdpMapperTestBase testBase() {
-    return (IdpMapperTestBase) this;
   }
 }

@@ -28,6 +28,11 @@ import org.junit.jupiter.api.TestTemplate;
 @BackendTypes({"h2"})
 public class TestIdpUserMetaMapperH2 extends IdpMapperTestBase implements IdpUserMetaMapperTest {
 
+  @Override
+  public IdpMapperTestBase testBase() {
+    return this;
+  }
+
   @TestTemplate
   public void testInsertIdpUserAndSelectIdpUser() {
     IdpUserMetaMapperTest.super.testInsertIdpUserAndSelectIdpUser();

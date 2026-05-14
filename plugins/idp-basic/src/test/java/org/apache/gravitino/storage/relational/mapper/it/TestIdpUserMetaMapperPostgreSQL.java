@@ -28,6 +28,11 @@ import org.junit.jupiter.api.TestTemplate;
 public class TestIdpUserMetaMapperPostgreSQL extends IdpMapperTestBase
     implements IdpUserMetaMapperTest {
 
+  @Override
+  public IdpMapperTestBase testBase() {
+    return this;
+  }
+
   @TestTemplate
   public void testInsertIdpUserAndSelectIdpUser() {
     IdpUserMetaMapperTest.super.testInsertIdpUserAndSelectIdpUser();
