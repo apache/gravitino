@@ -79,8 +79,8 @@ This usually occurs when the identity provider does not support token exchange, 
 
 For the native Apache Iceberg OAuth 2.0 implementation, the following upstream improvement is relevant:
 
-| Version | Change |
-| --- | --- |
+| Version         | Change                                                                                                                                                                                 |
+|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Iceberg 1.11.0+ | Supports disabling token exchange, using client credentials for token renewal, and fixing child `AuthSession` expiration handling so that child sessions use their own token lifetime. |
 
 ##### Native Apache Iceberg OAuth 2.0 implementation
