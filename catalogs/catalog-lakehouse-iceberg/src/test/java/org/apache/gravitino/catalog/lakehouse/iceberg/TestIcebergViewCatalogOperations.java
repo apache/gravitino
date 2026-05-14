@@ -34,13 +34,16 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceFailureException;
+import org.apache.iceberg.rest.requests.ImmutableCreateViewRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
+import org.apache.iceberg.view.ViewMetadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -143,6 +146,75 @@ public class TestIcebergViewCatalogOperations {
   }
 
   @Test
+  public void testCreateViewStoresDefaultCatalogInViewVersion() throws Exception {
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation representation =
+        SQLRepresentation.builder().withDialect("spark").withSql("SELECT id FROM t").build();
+
+    doAnswer(
+            invocation -> {
+              ImmutableCreateViewRequest request = invocation.getArgument(1);
+              Assertions.assertEquals("catalog1", request.viewVersion().defaultCatalog());
+              Assertions.assertFalse(request.properties().containsKey("default-catalog"));
+              return mockLoadViewResponse();
+            })
+        .when(wrapper)
+        .createView(
+            any(org.apache.iceberg.catalog.Namespace.class), any(ImmutableCreateViewRequest.class));
+
+    View view =
+        operations.createView(
+            ident,
+            "test comment",
+            columns,
+            new Representation[] {representation},
+            "catalog1",
+            "schema1",
+            Collections.singletonMap("k", "v"));
+
+    Assertions.assertEquals("catalog1", view.defaultCatalog());
+    Assertions.assertEquals("schema1", view.defaultSchema());
+    Assertions.assertFalse(view.properties().containsKey("default-catalog"));
+  }
+
+  @Test
+  public void testCreateViewAllowsNullDefaultCatalogInViewVersion() throws Exception {
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation representation =
+        SQLRepresentation.builder().withDialect("spark").withSql("SELECT id FROM t").build();
+
+    doAnswer(
+            invocation -> {
+              ImmutableCreateViewRequest request = invocation.getArgument(1);
+              Assertions.assertNull(request.viewVersion().defaultCatalog());
+              return mockLoadViewResponse();
+            })
+        .when(wrapper)
+        .createView(
+            any(org.apache.iceberg.catalog.Namespace.class), any(ImmutableCreateViewRequest.class));
+
+    View view =
+        operations.createView(
+            ident,
+            "test comment",
+            columns,
+            new Representation[] {representation},
+            null,
+            "schema1",
+            Collections.singletonMap("k", "v"));
+
+    Assertions.assertNull(view.defaultCatalog());
+  }
+
+  @Test
   public void testAlterViewSetAfterRemoveKeepsProperty() throws Exception {
     IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
     IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
@@ -190,6 +262,45 @@ public class TestIcebergViewCatalogOperations {
 
     operations.alterView(
         ident, ViewChange.setProperty("k1", "v1"), ViewChange.removeProperty("k1"));
+
+    verify(wrapper).updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+  }
+
+  @Test
+  public void testAlterViewReplaceDoesNotApplyLegacyDefaultCatalogPropertyCleanup()
+      throws Exception {
+    IcebergCatalogWrapper wrapper = Mockito.mock(IcebergCatalogWrapper.class);
+    IcebergViewCatalogOperations operations = new IcebergViewCatalogOperations(wrapper);
+
+    NameIdentifier ident = NameIdentifier.of("schema1", "view1");
+
+    ViewMetadata metadata = Mockito.mock(ViewMetadata.class);
+    when(metadata.schemas()).thenReturn(Collections.emptyList());
+
+    LoadViewResponse loaded = Mockito.mock(LoadViewResponse.class);
+    when(loaded.metadata()).thenReturn(metadata);
+    when(wrapper.loadView(any(TableIdentifier.class))).thenReturn(loaded);
+
+    Column[] columns = {Column.of("id", Types.LongType.get(), null)};
+    SQLRepresentation representation =
+        SQLRepresentation.builder().withDialect("spark").withSql("SELECT id FROM t").build();
+
+    doAnswer(
+            invocation -> {
+              UpdateTableRequest request = invocation.getArgument(1);
+              Map<String, String> setProps = extractSetProperties(request.updates());
+              Set<String> removedProps = extractRemovedProperties(request.updates());
+              Assertions.assertFalse(setProps.containsKey("default-catalog"));
+              Assertions.assertFalse(removedProps.contains("default-catalog"));
+              return mockLoadViewResponse();
+            })
+        .when(wrapper)
+        .updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
+
+    operations.alterView(
+        ident,
+        ViewChange.replaceView(
+            columns, new Representation[] {representation}, null, "schema1", null));
 
     verify(wrapper).updateView(any(TableIdentifier.class), any(UpdateTableRequest.class));
   }

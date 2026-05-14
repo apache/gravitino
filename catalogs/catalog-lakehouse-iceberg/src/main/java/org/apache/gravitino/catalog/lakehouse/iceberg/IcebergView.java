@@ -46,6 +46,8 @@ public class IcebergView implements View {
 
   private String name;
   private String comment;
+  private String defaultCatalog;
+  private String defaultSchema;
   private Column[] columns;
   private Representation[] representations;
   private Map<String, String> properties;
@@ -76,6 +78,9 @@ public class IcebergView implements View {
     Map<String, String> properties =
         metadata.properties() != null ? Maps.newHashMap(metadata.properties()) : Maps.newHashMap();
     String comment = properties.get("comment");
+    ViewVersion currentVersion = metadata.currentVersion();
+    String defaultCatalog = currentVersion.defaultCatalog();
+    String defaultSchema = extractDefaultSchema(currentVersion);
 
     Column[] columns = extractColumns(metadata);
     Representation[] representations = extractRepresentations(metadata);
@@ -83,6 +88,8 @@ public class IcebergView implements View {
     return IcebergView.builder()
         .withName(viewName)
         .withComment(comment)
+        .withDefaultCatalog(defaultCatalog)
+        .withDefaultSchema(defaultSchema)
         .withColumns(columns)
         .withRepresentations(representations)
         .withProperties(properties)
@@ -98,6 +105,16 @@ public class IcebergView implements View {
   @Override
   public String comment() {
     return comment;
+  }
+
+  @Override
+  public String defaultCatalog() {
+    return defaultCatalog;
+  }
+
+  @Override
+  public String defaultSchema() {
+    return defaultSchema;
   }
 
   @Override
@@ -140,24 +157,29 @@ public class IcebergView implements View {
   private static Representation[] extractRepresentations(ViewMetadata metadata) {
     try {
       ViewVersion currentVersion = metadata.currentVersion();
-      if (currentVersion != null && currentVersion.representations() != null) {
-        return currentVersion.representations().stream()
-            .filter(r -> r instanceof SQLViewRepresentation)
-            .map(
-                r -> {
-                  SQLViewRepresentation sqlRep = (SQLViewRepresentation) r;
-                  return (Representation)
-                      SQLRepresentation.builder()
-                          .withDialect(sqlRep.dialect())
-                          .withSql(sqlRep.sql())
-                          .build();
-                })
-            .toArray(Representation[]::new);
-      }
+      return currentVersion.representations().stream()
+          .filter(r -> r instanceof SQLViewRepresentation)
+          .map(
+              r -> {
+                SQLViewRepresentation sqlRep = (SQLViewRepresentation) r;
+                return (Representation)
+                    SQLRepresentation.builder()
+                        .withDialect(sqlRep.dialect())
+                        .withSql(sqlRep.sql())
+                        .build();
+              })
+          .toArray(Representation[]::new);
     } catch (Exception e) {
       LOG.warn("Failed to extract representations from Iceberg view metadata", e);
     }
     return new Representation[0];
+  }
+
+  private static String extractDefaultSchema(ViewVersion currentVersion) {
+    if (currentVersion.defaultNamespace() == null) {
+      return null;
+    }
+    return currentVersion.defaultNamespace().toString();
   }
 
   /** Builder for IcebergView. */
@@ -175,6 +197,16 @@ public class IcebergView implements View {
 
     public Builder withComment(String comment) {
       view.comment = comment;
+      return this;
+    }
+
+    public Builder withDefaultCatalog(String defaultCatalog) {
+      view.defaultCatalog = defaultCatalog;
+      return this;
+    }
+
+    public Builder withDefaultSchema(String defaultSchema) {
+      view.defaultSchema = defaultSchema;
       return this;
     }
 

@@ -675,8 +675,7 @@ public class IcebergCatalogOperations
    * @param columns The view output columns.
    * @param representations The SQL representations of the view.
    * @param defaultCatalog The default catalog used to resolve unqualified identifiers in SQL
-   *     representations. Iceberg's view metadata does not record a default catalog, so this value
-   *     is preserved as a property on the view.
+   *     representations. This value is stored in Iceberg's view version metadata.
    * @param defaultSchema The default schema used to resolve unqualified identifiers in SQL
    *     representations. When provided, it is used as the default namespace for the view version.
    * @param properties The view properties.

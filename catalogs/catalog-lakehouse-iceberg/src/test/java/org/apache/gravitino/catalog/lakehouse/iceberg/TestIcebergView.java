@@ -31,6 +31,7 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.view.SQLViewRepresentation;
 import org.apache.iceberg.view.ViewMetadata;
@@ -44,8 +45,11 @@ public class TestIcebergView {
   public void testFromLoadViewResponse() {
     // Test with properties
     Map<String, String> properties = ImmutableMap.of("key1", "value1", "key2", "value2");
+    ViewVersion mockVersion = mock(ViewVersion.class);
+    when(mockVersion.representations()).thenReturn(Collections.emptyList());
     ViewMetadata mockMetadata = mock(ViewMetadata.class);
     when(mockMetadata.properties()).thenReturn(properties);
+    when(mockMetadata.currentVersion()).thenReturn(mockVersion);
 
     LoadViewResponse mockResponse = mock(LoadViewResponse.class);
     when(mockResponse.metadata()).thenReturn(mockMetadata);
@@ -74,8 +78,11 @@ public class TestIcebergView {
   @Test
   public void testFromLoadViewResponseWithNullMetadataProperties() {
     // Test with null properties in metadata
+    ViewVersion mockVersion = mock(ViewVersion.class);
+    when(mockVersion.representations()).thenReturn(Collections.emptyList());
     ViewMetadata mockMetadata = mock(ViewMetadata.class);
     when(mockMetadata.properties()).thenReturn(null);
+    when(mockMetadata.currentVersion()).thenReturn(mockVersion);
 
     LoadViewResponse mockResponse = mock(LoadViewResponse.class);
     when(mockResponse.metadata()).thenReturn(mockMetadata);
@@ -120,8 +127,11 @@ public class TestIcebergView {
   @Test
   public void testFromLoadViewResponseExtractsComment() {
     Map<String, String> properties = ImmutableMap.of("comment", "my view comment", "key", "val");
+    ViewVersion mockVersion = mock(ViewVersion.class);
+    when(mockVersion.representations()).thenReturn(Collections.emptyList());
     ViewMetadata mockMetadata = mock(ViewMetadata.class);
     when(mockMetadata.properties()).thenReturn(properties);
+    when(mockMetadata.currentVersion()).thenReturn(mockVersion);
 
     LoadViewResponse mockResponse = mock(LoadViewResponse.class);
     when(mockResponse.metadata()).thenReturn(mockMetadata);
@@ -161,8 +171,34 @@ public class TestIcebergView {
   }
 
   @Test
+  public void testFromLoadViewResponseExtractsDefaultCatalogAndSchema() {
+    Map<String, String> properties = ImmutableMap.of("k", "v");
+
+    ViewVersion mockVersion = mock(ViewVersion.class);
+    when(mockVersion.representations()).thenReturn(Collections.emptyList());
+    when(mockVersion.defaultCatalog()).thenReturn("current_cat");
+    when(mockVersion.defaultNamespace()).thenReturn(Namespace.of("schema1"));
+
+    ViewMetadata mockMetadata = mock(ViewMetadata.class);
+    when(mockMetadata.properties()).thenReturn(properties);
+    when(mockMetadata.currentVersion()).thenReturn(mockVersion);
+
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockResponse.metadata()).thenReturn(mockMetadata);
+
+    IcebergView view = IcebergView.fromLoadViewResponse(mockResponse, "default_view");
+
+    Assertions.assertEquals("current_cat", view.defaultCatalog());
+    Assertions.assertEquals("schema1", view.defaultSchema());
+    Assertions.assertEquals("v", view.properties().get("k"));
+  }
+
+  @Test
   public void testFromLoadViewResponseExtractsColumns() {
     Map<String, String> properties = ImmutableMap.of("key", "val");
+
+    ViewVersion mockVersion = mock(ViewVersion.class);
+    when(mockVersion.representations()).thenReturn(Collections.emptyList());
 
     org.apache.iceberg.types.Types.NestedField field1 =
         org.apache.iceberg.types.Types.NestedField.optional(
@@ -175,6 +211,7 @@ public class TestIcebergView {
 
     ViewMetadata mockMetadata = mock(ViewMetadata.class);
     when(mockMetadata.properties()).thenReturn(properties);
+    when(mockMetadata.currentVersion()).thenReturn(mockVersion);
     when(mockMetadata.schema()).thenReturn(schema);
 
     LoadViewResponse mockResponse = mock(LoadViewResponse.class);
@@ -204,6 +241,8 @@ public class TestIcebergView {
         IcebergView.builder()
             .withName("full_view")
             .withComment("full view")
+            .withDefaultCatalog("cat1")
+            .withDefaultSchema("schema1")
             .withColumns(new Column[] {mockCol})
             .withRepresentations(new Representation[] {rep})
             .withProperties(ImmutableMap.of("k", "v"))
@@ -212,6 +251,8 @@ public class TestIcebergView {
 
     Assertions.assertEquals("full_view", view.name());
     Assertions.assertEquals("full view", view.comment());
+    Assertions.assertEquals("cat1", view.defaultCatalog());
+    Assertions.assertEquals("schema1", view.defaultSchema());
     Assertions.assertEquals(1, view.columns().length);
     Assertions.assertEquals("c1", view.columns()[0].name());
     Assertions.assertEquals(1, view.representations().length);

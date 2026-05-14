@@ -150,15 +150,13 @@ class IcebergViewCatalogOperations {
             .defaultNamespace(defaultNamespace)
             .representations(viewRepresentations)
             .putSummary("operation", "create")
+            .defaultCatalog(defaultCatalog)
             .build();
 
     Map<String, String> allProperties =
         properties != null ? Maps.newHashMap(properties) : Maps.newHashMap();
     if (comment != null) {
       allProperties.put("comment", comment);
-    }
-    if (defaultCatalog != null) {
-      allProperties.put("default-catalog", defaultCatalog);
     }
 
     ImmutableCreateViewRequest request =
@@ -175,6 +173,8 @@ class IcebergViewCatalogOperations {
       return IcebergView.builder()
           .withName(ident.name())
           .withComment(comment)
+          .withDefaultCatalog(defaultCatalog)
+          .withDefaultSchema(defaultNamespace.toString())
           .withColumns(columns)
           .withRepresentations(sqlRepresentations)
           .withProperties(allProperties)
@@ -327,8 +327,8 @@ class IcebergViewCatalogOperations {
 
   /**
    * Applies the implicit property side-effects of a {@link ViewChange.ReplaceView}: sets or removes
-   * {@code comment} and {@code default-catalog}. This should be invoked in the order changes are
-   * processed so subsequent explicit property changes can override these values.
+   * {@code comment}. This should be invoked in the order changes are processed so subsequent
+   * explicit property changes can override these values.
    */
   private static void applyReplaceViewProperties(
       ViewChange.ReplaceView replace, Map<String, String> setProps, Set<String> removeProps) {
@@ -338,13 +338,6 @@ class IcebergViewCatalogOperations {
     } else {
       setProps.put("comment", replace.getComment());
       removeProps.remove("comment");
-    }
-    if (replace.getDefaultCatalog() == null) {
-      removeProps.add("default-catalog");
-      setProps.remove("default-catalog");
-    } else {
-      setProps.put("default-catalog", replace.getDefaultCatalog());
-      removeProps.remove("default-catalog");
     }
   }
 
@@ -410,6 +403,7 @@ class IcebergViewCatalogOperations {
             .defaultNamespace(defaultNamespace)
             .representations(newRepresentations)
             .putSummary("operation", "alter")
+            .defaultCatalog(replace.getDefaultCatalog())
             .build();
 
     updates.add(new MetadataUpdate.AddViewVersion(newVersion));
