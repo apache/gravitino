@@ -83,9 +83,9 @@ For the native Apache Iceberg OAuth 2.0 implementation, the following upstream i
 | --- | --- |
 | Iceberg 1.11.0+ | Supports disabling token exchange, using client credentials for token renewal, and fixing child `AuthSession` expiration handling so that child sessions use their own token lifetime. |
 
-Use the engine-specific settings below.
+##### Native Apache Iceberg OAuth 2.0 implementation
 
-##### Spark
+###### Spark
 
 Disable token exchange in the catalog configuration:
 
@@ -93,7 +93,7 @@ Disable token exchange in the catalog configuration:
 spark.sql.catalog.${catalog_name}.token-exchange-enabled=false
 ```
 
-##### Flink
+###### Flink
 
 Disable token exchange in the catalog properties:
 
@@ -101,7 +101,7 @@ Disable token exchange in the catalog properties:
 'token-exchange-enable'='false'
 ```
 
-##### Trino
+###### Trino
 
 This configuration requires Trino 479 or later.
 
@@ -114,9 +114,9 @@ iceberg.rest-catalog.oauth2.token-exchange-enabled=false
 
 You can omit `iceberg.rest-catalog.session=NONE` because the default value is `NONE`.
 
-##### Alternative OAuth 2.0 auth manager
+##### Alternative Dremio Iceberg OAuth 2.0 auth manager
 
-If the native Apache Iceberg OAuth 2.0 implementation does not meet your requirements, you can use the Dremio Iceberg OAuth 2.0 auth manager.
+If Apache Iceberg cannot be upgraded, you can use the Dremio Iceberg OAuth 2.0 auth manager as an alternative.
 
 - Repository: `https://github.com/dremio/iceberg-auth-manager`
 - Build command: `./gradlew --no-daemon :authmgr-oauth2-runtime:shadowJar`
