@@ -132,6 +132,13 @@ public class AuthenticationFilter implements Filter {
     response.sendError(status, exception.getMessage());
   }
 
+  /**
+   * Returns {@code true} if the request targets a health check endpoint that should bypass
+   * authentication. Subclasses may override this to add additional bypass paths.
+   *
+   * @param request the incoming servlet request
+   * @return {@code true} if the request should skip authentication
+   */
   protected boolean isHealthCheckRequest(ServletRequest request) {
     if (!(request instanceof HttpServletRequest)) {
       return false;

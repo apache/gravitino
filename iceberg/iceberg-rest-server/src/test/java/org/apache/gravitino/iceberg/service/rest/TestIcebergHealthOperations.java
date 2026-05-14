@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import static org.mockito.Mockito.mock;
+
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
@@ -48,8 +50,7 @@ public class TestIcebergHealthOperations {
 
   @Test
   public void testReadyReturns200WhenManagerInitialized() {
-    IcebergCatalogWrapperManager manager =
-        org.mockito.Mockito.mock(IcebergCatalogWrapperManager.class);
+    IcebergCatalogWrapperManager manager = mock(IcebergCatalogWrapperManager.class);
     IcebergHealthOperations ops = operationsWithManager(manager);
     Response resp = ops.ready();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
@@ -70,8 +71,7 @@ public class TestIcebergHealthOperations {
 
   @Test
   public void testHealthReturns200WhenManagerInitialized() {
-    IcebergCatalogWrapperManager manager =
-        org.mockito.Mockito.mock(IcebergCatalogWrapperManager.class);
+    IcebergCatalogWrapperManager manager = mock(IcebergCatalogWrapperManager.class);
     IcebergHealthOperations ops = operationsWithManager(manager);
     Response resp = ops.health();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());

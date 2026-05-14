@@ -23,6 +23,7 @@ import com.codahale.metrics.annotation.Timed;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -59,6 +60,11 @@ public class IcebergHealthOperations {
   /** Default constructor for Jersey auto-discovery. */
   public IcebergHealthOperations() {}
 
+  /**
+   * Liveness probe. Returns 200 as long as the HTTP thread can respond.
+   *
+   * @return 200 OK with an UP {@link HealthResponse}
+   */
   @GET
   @Path("/live")
   @Timed(name = "iceberg.health.live." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -68,6 +74,12 @@ public class IcebergHealthOperations {
     return ok(new HealthResponse(HealthCheckDTO.Status.UP, Collections.singletonList(check)));
   }
 
+  /**
+   * Readiness probe. Returns 200 when the {@link IcebergCatalogWrapperManager} is initialized, 503
+   * otherwise.
+   *
+   * @return 200 OK when ready, 503 Service Unavailable with a DOWN {@link HealthResponse} otherwise
+   */
   @GET
   @Path("/ready")
   @Timed(name = "iceberg.health.ready." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -79,6 +91,11 @@ public class IcebergHealthOperations {
     return overall == HealthCheckDTO.Status.UP ? ok(body) : serviceUnavailable(body);
   }
 
+  /**
+   * Aggregate health check. Returns 200 when both liveness and readiness pass, 503 otherwise.
+   *
+   * @return 200 OK when healthy, 503 Service Unavailable with failing checks described in the body
+   */
   @GET
   @Timed(name = "iceberg.health." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "iceberg.health", absolute = true)
@@ -109,7 +126,7 @@ public class IcebergHealthOperations {
     return catalogWrapperManager;
   }
 
-  private static HealthCheckDTO up(String name, java.util.Map<String, String> details) {
+  private static HealthCheckDTO up(String name, Map<String, String> details) {
     return new HealthCheckDTO(name, HealthCheckDTO.Status.UP, details);
   }
 
