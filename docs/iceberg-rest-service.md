@@ -351,7 +351,7 @@ CREATE CATALOG irc WITH (
   'type' = 'iceberg',
   'catalog-type' = 'rest',
   'uri' = 'http://127.0.0.1:9001/iceberg/',
-  'credential' = 'gravitino-client:q13WKxZYwUEt9L9XEtTHZjj3mxvGo0Pa',
+  'credential' = '<client-id>:<client-secret>',
   'oauth2-server-uri' = 'http://127.0.0.1:8080/realms/gravitinorealm/protocol/openid-connect/token',
   'scope' = 'openid profile email',
   'token-exchange-enable'='false'
