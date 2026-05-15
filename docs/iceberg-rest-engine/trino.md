@@ -171,7 +171,7 @@ To convert a `TIMESTAMP WITH TIME ZONE` value to the current client session time
 SELECT
   id,
   at_timezone(timestamp_with_timezone_column, current_timezone())
-FROM gravitino_irc.<namespace>.<table>;
+FROM <catalog>.<namespace>.<table>;
 ```
 
 ## Gravitino connector vs Iceberg REST
