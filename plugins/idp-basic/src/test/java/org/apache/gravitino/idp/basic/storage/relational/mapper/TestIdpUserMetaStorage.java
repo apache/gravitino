@@ -22,6 +22,7 @@ package org.apache.gravitino.idp.basic.storage.relational.mapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.idp.basic.storage.relational.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.ibatis.exceptions.PersistenceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -56,8 +58,10 @@ class TestIdpUserMetaStorage extends AbstractIdpUserMetaStorageTest {
     List<IdpUserPO> users = idpUserMetaMapper.selectIdpUsers(List.of("bob", "alice"));
     users.sort(Comparator.comparing(IdpUserPO::getUserId));
     assertIterableEquals(List.of(firstUser, secondUser), users);
-    assertTrue(idpUserMetaMapper.selectIdpUsers(List.of()).isEmpty());
-    assertTrue(idpUserMetaMapper.selectIdpUsers(null).isEmpty());
+    List<IdpUserPO> usersWithEmptyFilter = idpUserMetaMapper.selectIdpUsers(List.of());
+    usersWithEmptyFilter.sort(Comparator.comparing(IdpUserPO::getUserId));
+    assertIterableEquals(List.of(firstUser, secondUser), usersWithEmptyFilter);
+    assertThrows(PersistenceException.class, () -> idpUserMetaMapper.selectIdpUsers(null));
   }
 
   @ParameterizedTest

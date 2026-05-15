@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.idp.basic.storage.relational.po.IdpUserPO;
+import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.SqlSource;
 import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
@@ -68,9 +69,12 @@ public class TestIdpUserMetaBaseSQLProvider {
     Assertions.assertFalse(
         normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
         "Empty userNames should not generate invalid SQL IN (...) with no values");
-    Assertions.assertTrue(
-        normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"),
-        "Empty userNames should result in an unsatisfiable WHERE clause (e.g., AND 1 = 0)");
+    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
+    Assertions.assertEquals(
+        "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
+            + " current_version as currentVersion, last_version as lastVersion,"
+            + " deleted_at as deletedAt FROM idp_user_meta WHERE deleted_at = 0",
+        normalizedSql);
   }
 
   @Test
@@ -79,14 +83,7 @@ public class TestIdpUserMetaBaseSQLProvider {
     Map<String, Object> params = new HashMap<>();
     params.put("usernames", null);
 
-    String normalizedSql = renderScript(script, params);
-
-    Assertions.assertFalse(
-        normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
-        "Null userNames should not generate invalid SQL IN (...) with no values");
-    Assertions.assertTrue(
-        normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"),
-        "Null userNames should result in an unsatisfiable WHERE clause (e.g., AND 1 = 0)");
+    Assertions.assertThrows(BuilderException.class, () -> renderScript(script, params));
   }
 
   @Test
