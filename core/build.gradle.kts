@@ -54,6 +54,13 @@ dependencies {
     exclude(group = "com.fasterxml.jackson.jaxrs", module = "jackson-jaxrs-json-provider") // using gravitino's version
     exclude(group = "org.apache.httpcomponents.client5", module = "*") // provided by gravitino
     exclude(group = "org.lance", module = "lance-namespace-core") // This is unnecessary in the core module
+    // Same rationale as lance-namespace-core: lance-core 4.0.1 declares
+    // lance-namespace-apache-client as a transitive, but core never calls into it.
+    // Leaving it on the main classpath shadows the lance-rest aux service's own
+    // lance-namespace-apache-client (loaded via lance-rest-server/libs/), and
+    // because the aux classloader is parent-first, the older transitive wins
+    // on request deserialization (e.g. dropping fields like `check_declared`).
+    exclude(group = "org.lance", module = "lance-namespace-apache-client")
   }
   implementation(libs.mybatis)
 
