@@ -39,5 +39,11 @@ public final class Dialects {
   /** The Apache Flink SQL dialect. */
   public static final String FLINK = "flink";
 
+  /** The MySQL SQL dialect. */
+  public static final String MYSQL = "mysql";
+
+  /** The PostgreSQL SQL dialect. */
+  public static final String POSTGRESQL = "postgresql";
+
   private Dialects() {}
 }

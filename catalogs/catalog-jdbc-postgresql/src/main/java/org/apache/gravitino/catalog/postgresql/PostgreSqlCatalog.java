@@ -30,6 +30,7 @@ import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlExceptionConv
 import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter;
 import org.apache.gravitino.catalog.postgresql.operation.PostgreSqlSchemaOperations;
 import org.apache.gravitino.catalog.postgresql.operation.PostgreSqlTableOperations;
+import org.apache.gravitino.catalog.postgresql.operation.PostgreSqlViewOperations;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 
@@ -48,7 +49,8 @@ public class PostgreSqlCatalog extends JdbcCatalog {
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
-        createJdbcColumnDefaultValueConverter());
+        createJdbcColumnDefaultValueConverter(),
+        new PostgreSqlViewOperations());
   }
 
   @Override

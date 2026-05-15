@@ -192,6 +192,42 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Returns the data source used by this catalog.
+   *
+   * @return The JDBC data source.
+   */
+  protected DataSource getDataSource() {
+    return dataSource;
+  }
+
+  /**
+   * Returns the exception converter used by this catalog.
+   *
+   * @return The JDBC exception converter.
+   */
+  protected JdbcExceptionConverter getExceptionConverter() {
+    return exceptionConverter;
+  }
+
+  /**
+   * Returns the type converter used by this catalog.
+   *
+   * @return The JDBC type converter.
+   */
+  protected JdbcTypeConverter getJdbcTypeConverter() {
+    return jdbcTypeConverter;
+  }
+
+  /**
+   * Returns the database operation used by this catalog.
+   *
+   * @return The database operation.
+   */
+  protected DatabaseOperation getDatabaseOperation() {
+    return databaseOperation;
+  }
+
   /** Closes the Jdbc catalog and releases the associated client pool. */
   @Override
   public void close() {
