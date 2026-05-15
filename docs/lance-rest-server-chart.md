@@ -78,7 +78,7 @@ helm upgrade --install gravitino-lance oci://registry-1.docker.io/apache/graviti
   --create-namespace \
   --set lanceRest.gravitinoUri=http://gravitino:8090 \
   --set lanceRest.gravitinoMetalake=your-metalake \
-  --set replicas=2 \
+  --set replicaCount=2 \
   --set resources.requests.memory="4Gi" \
   --set resources.requests.cpu="2"
 ```
