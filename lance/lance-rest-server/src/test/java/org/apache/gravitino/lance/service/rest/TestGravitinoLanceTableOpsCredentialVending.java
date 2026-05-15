@@ -87,6 +87,7 @@ class TestGravitinoLanceTableOpsCredentialVending {
 
     // Common mock setup
     when(namespaceWrapper.loadAndValidateLakehouseCatalog(CATALOG_NAME)).thenReturn(catalog);
+    when(catalog.name()).thenReturn(CATALOG_NAME);
     when(catalog.asTableCatalog()).thenReturn(tableCatalog);
     when(tableCatalog.loadTable(NameIdentifier.of(SCHEMA_NAME, TABLE_NAME))).thenReturn(table);
     when(table.columns()).thenReturn(new Column[] {});
@@ -109,7 +110,8 @@ class TestGravitinoLanceTableOpsCredentialVending {
         .thenReturn(s3Credential);
 
     DescribeTableResponse response =
-        ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), CredentialPrivilege.WRITE);
+        ops.describeTable(
+            TABLE_ID, DELIMITER, Optional.empty(), Optional.of(CredentialPrivilege.WRITE));
 
     // Verify vended credential keys
     Map<String, String> storageOptions = response.getStorageOptions();
@@ -129,7 +131,8 @@ class TestGravitinoLanceTableOpsCredentialVending {
 
   @Test
   void testDescribeTableWithoutCredentialVending() {
-    DescribeTableResponse response = ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), null);
+    DescribeTableResponse response =
+        ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), Optional.empty());
 
     Map<String, String> storageOptions = response.getStorageOptions();
     assertNotNull(storageOptions);
@@ -149,7 +152,8 @@ class TestGravitinoLanceTableOpsCredentialVending {
         .thenThrow(new IllegalArgumentException("No credential providers configured"));
 
     DescribeTableResponse response =
-        ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), CredentialPrivilege.READ);
+        ops.describeTable(
+            TABLE_ID, DELIMITER, Optional.empty(), Optional.of(CredentialPrivilege.READ));
 
     // Should fall back to original storage options
     Map<String, String> storageOptions = response.getStorageOptions();
@@ -166,7 +170,9 @@ class TestGravitinoLanceTableOpsCredentialVending {
 
     assertThrows(
         ServiceUnavailableException.class,
-        () -> ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), CredentialPrivilege.WRITE));
+        () ->
+            ops.describeTable(
+                TABLE_ID, DELIMITER, Optional.empty(), Optional.of(CredentialPrivilege.WRITE)));
   }
 
   @Test
@@ -176,7 +182,8 @@ class TestGravitinoLanceTableOpsCredentialVending {
             any(String.class), any(PathBasedCredentialContext.class)))
         .thenReturn(s3Credential);
 
-    ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), CredentialPrivilege.WRITE);
+    ops.describeTable(
+        TABLE_ID, DELIMITER, Optional.empty(), Optional.of(CredentialPrivilege.WRITE));
 
     ArgumentCaptor<PathBasedCredentialContext> captor =
         ArgumentCaptor.forClass(PathBasedCredentialContext.class);
@@ -194,7 +201,7 @@ class TestGravitinoLanceTableOpsCredentialVending {
             any(String.class), any(PathBasedCredentialContext.class)))
         .thenReturn(s3Credential);
 
-    ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), CredentialPrivilege.READ);
+    ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), Optional.of(CredentialPrivilege.READ));
 
     ArgumentCaptor<PathBasedCredentialContext> captor =
         ArgumentCaptor.forClass(PathBasedCredentialContext.class);
@@ -224,7 +231,8 @@ class TestGravitinoLanceTableOpsCredentialVending {
         .thenReturn(s3Credential);
 
     DescribeTableResponse response =
-        ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), CredentialPrivilege.WRITE);
+        ops.describeTable(
+            TABLE_ID, DELIMITER, Optional.empty(), Optional.of(CredentialPrivilege.WRITE));
 
     Map<String, String> storageOptions = response.getStorageOptions();
     // Base options preserved

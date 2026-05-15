@@ -35,6 +35,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -1136,7 +1137,8 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     DescribeTableResponse expectedResponse = new DescribeTableResponse();
     expectedResponse.setLocation("/path/to/no_vend");
     expectedResponse.setStorageOptions(ImmutableMap.of("aws_region", "us-east-1"));
-    when(tableOps.describeTable(any(), any(), any(), eq(null))).thenReturn(expectedResponse);
+    when(tableOps.describeTable(any(), any(), any(), eq(Optional.empty())))
+        .thenReturn(expectedResponse);
 
     DescribeTableRequest request = new DescribeTableRequest();
     request.setVendCredentials(false);
@@ -1147,7 +1149,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
             .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    Mockito.verify(tableOps).describeTable(any(), any(), any(), eq(null));
+    Mockito.verify(tableOps).describeTable(any(), any(), any(), eq(Optional.empty()));
   }
 
   @Test

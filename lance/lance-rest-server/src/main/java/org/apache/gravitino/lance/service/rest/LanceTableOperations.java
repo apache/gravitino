@@ -104,7 +104,10 @@ public class LanceTableOperations {
           lanceNamespace
               .asTableOps()
               .describeTable(
-                  tableId, delimiter, Optional.ofNullable(request.getVersion()), privilege);
+                  tableId,
+                  delimiter,
+                  Optional.ofNullable(request.getVersion()),
+                  Optional.ofNullable(privilege));
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);

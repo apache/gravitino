@@ -41,7 +41,6 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -128,7 +127,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
       String tableId,
       String delimiter,
       Optional<Long> version,
-      @Nullable CredentialPrivilege credentialPrivilege) {
+      Optional<CredentialPrivilege> credentialPrivilege) {
     if (!version.isEmpty()) {
       throw new UnsupportedOperationException(
           "Describing specific table version is not supported. It should be null to indicate the"
@@ -139,8 +138,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
 
-    String catalogName = nsId.levelAtListPos(0);
-    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
     NameIdentifier tableIdentifier =
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
@@ -159,9 +157,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
         Optional.ofNullable(table.properties().get(LANCE_TABLE_VERSION))
             .map(Long::valueOf)
             .orElse(null));
-    if (credentialPrivilege != null) {
+    if (credentialPrivilege.isPresent()) {
       response.setStorageOptions(
-          buildVendedStorageOptions(catalogName, catalog, table, credentialPrivilege));
+          buildVendedStorageOptions(catalog, table, credentialPrivilege.get()));
     } else {
       response.setStorageOptions(
           LancePropertiesUtils.resolveLanceStorageOptions(
@@ -171,7 +169,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
   }
 
   private Map<String, String> buildVendedStorageOptions(
-      String catalogName, Catalog catalog, Table table, CredentialPrivilege credentialPrivilege) {
+      Catalog catalog, Table table, CredentialPrivilege credentialPrivilege) {
     String tableLocation = table.properties().get(LANCE_LOCATION);
     Preconditions.checkArgument(
         tableLocation != null && !tableLocation.isEmpty(),
@@ -187,7 +185,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     CatalogCredentialManager credManager =
         credentialManagers.computeIfAbsent(
-            catalogName, name -> new CatalogCredentialManager(name, catalog.properties()));
+            catalog.name(), name -> new CatalogCredentialManager(name, catalog.properties()));
 
     Credential credential;
     try {
@@ -195,7 +193,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     } catch (IllegalArgumentException e) {
       LOG.debug(
           "No credential providers configured for catalog {}, falling back to original storage options",
-          catalogName);
+          catalog.name());
       return LancePropertiesUtils.resolveLanceStorageOptions(
           catalog.properties(), table.properties());
     }
