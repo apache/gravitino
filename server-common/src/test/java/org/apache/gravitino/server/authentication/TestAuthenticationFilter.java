@@ -136,7 +136,10 @@ public class TestAuthenticationFilter {
       "/api/health",
       "/api/health/",
       "/api/health/live",
-      "/api/health/ready"
+      "/api/health/ready",
+      "/iceberg/health",
+      "/iceberg/health/live",
+      "/iceberg/health/ready"
     };
     for (String path : healthPaths) {
       Authenticator authenticator = mock(Authenticator.class);
@@ -161,7 +164,12 @@ public class TestAuthenticationFilter {
     // Regression guard against an overly broad exemption. Paths that merely contain
     // "health" or share a prefix with "/api/health" must still be authenticated.
     String[] nonHealthPaths = {
-      "/api/metalakes/health_metalake", "/api/healthcheck", "/api/version", "/api/metalakes"
+      "/api/metalakes/health_metalake",
+      "/api/healthcheck",
+      "/api/version",
+      "/api/metalakes",
+      "/iceberg/healthcheck",
+      "/iceberg/v1/namespaces"
     };
     for (String path : nonHealthPaths) {
       Authenticator authenticator = mock(Authenticator.class);
