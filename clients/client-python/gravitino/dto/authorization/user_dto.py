@@ -22,7 +22,6 @@ from typing import Optional
 
 from dataclasses_json import config, dataclass_json
 
-from gravitino.api.audit import Audit
 from gravitino.api.authorization.user import User
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.utils.precondition import Precondition
@@ -34,15 +33,18 @@ class UserDTO(User):
     """Represents a User Data Transfer Object (DTO)."""
 
     _name: str = field(metadata=config(field_name="name"))
-   _audit: Optional[AuditDTO] = field(
-           default=None, metadata=config(field_name="audit")
-       )
-    _roles: list[str] = field(default_factory=list, metadata=config(field_name="roles"))
+    _audit: Optional[AuditDTO] = field(
+        default=None, metadata=config(field_name="audit")
+    )
+    _roles: tuple[str, ...] = field(
+        default_factory=tuple, metadata=config(field_name="roles")
+    )
 
     def __post_init__(self) -> None:
         if self._roles is None:
-            self._roles = []
+            self._roles = tuple()
         self.validate()
+
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, UserDTO):
             return False
@@ -55,6 +57,7 @@ class UserDTO(User):
     def validate(self) -> None:
         Precondition.check_string_not_empty(self._name, "name cannot be null or empty")
         Precondition.check_argument(self._audit is not None, "audit cannot be null")
+
     def __hash__(self) -> int:
         return hash((self._name, tuple(self._roles), self._audit))
 
