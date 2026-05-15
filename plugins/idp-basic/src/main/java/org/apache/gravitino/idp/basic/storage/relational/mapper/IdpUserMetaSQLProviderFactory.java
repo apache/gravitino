@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.h2.IdpUserMetaH2Provider;
 import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.mysql.IdpUserMetaMySQLProvider;
 import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.postgresql.IdpUserMetaPostgreSQLProvider;
 import org.apache.gravitino.idp.basic.storage.relational.po.IdpUserPO;
@@ -119,13 +120,5 @@ public class IdpUserMetaSQLProviderFactory {
         .getSqlSessionFactory()
         .getConfiguration()
         .getDatabaseId();
-  }
-
-  static class IdpUserMetaH2Provider extends IdpUserMetaBaseSQLProvider {
-
-    @Override
-    protected String currentTimeMillisExpression() {
-      return "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
-    }
   }
 }
