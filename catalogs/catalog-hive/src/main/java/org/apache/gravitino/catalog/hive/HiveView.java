@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -229,6 +230,7 @@ public class HiveView implements View {
      * @return The constructed view.
      */
     public HiveView build() {
+      view.properties = view.properties == null ? new HashMap<>() : new HashMap<>(view.properties);
       return view;
     }
   }

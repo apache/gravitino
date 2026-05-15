@@ -45,6 +45,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.Catalog;
@@ -66,6 +67,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.ClientPool;
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
 import org.apache.thrift.TException;
@@ -248,8 +250,8 @@ class TestHiveCatalogOperations {
     HiveClient hiveClient = mock(HiveClient.class);
     HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
     Column[] columns = {
-      Column.of("id", org.apache.gravitino.rel.types.Types.LongType.get(), "id column"),
-      Column.of("name", org.apache.gravitino.rel.types.Types.StringType.get(), "name column")
+      Column.of("id", Types.LongType.get(), "id column"),
+      Column.of("name", Types.StringType.get(), "name column")
     };
     when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
 
@@ -284,6 +286,47 @@ class TestHiveCatalogOperations {
     Assertions.assertEquals(
         "SELECT id, name FROM t", hiveTableCaptor.getValue().viewOriginalText());
     Assertions.assertEquals(2, created.columns().length);
+  }
+
+  @Test
+  void testCreateViewWithUppercaseHiveDialectUnderTurkishLocale() throws Exception {
+    Locale originalDefault = Locale.getDefault();
+    Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+    try {
+      HiveCatalogOperations op = new HiveCatalogOperations();
+      op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+      CachedClientPool clientPool = mock(CachedClientPool.class);
+      HiveClient hiveClient = mock(HiveClient.class);
+      HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
+      when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+      when(clientPool.run(any()))
+          .thenAnswer(
+              invocation -> {
+                ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+                return action.run(hiveClient);
+              });
+      op.clientPool = clientPool;
+
+      View created =
+          Assertions.assertDoesNotThrow(
+              () ->
+                  op.createView(
+                      NameIdentifier.of("db", "v_hive_upper"),
+                      null,
+                      new Column[0],
+                      new SQLRepresentation[] {
+                        SQLRepresentation.builder().withDialect("HIVE").withSql("SELECT 1").build()
+                      },
+                      null,
+                      null,
+                      Maps.newHashMap()));
+
+      SQLRepresentation representation = (SQLRepresentation) created.representations()[0];
+      Assertions.assertEquals("SELECT 1", representation.sql());
+    } finally {
+      Locale.setDefault(originalDefault);
+    }
   }
 
   @Test
@@ -471,8 +514,8 @@ class TestHiveCatalogOperations {
     CachedClientPool clientPool = mock(CachedClientPool.class);
     HiveClient hiveClient = mock(HiveClient.class);
     Column[] columns = {
-      Column.of("id", org.apache.gravitino.rel.types.Types.LongType.get(), "id column"),
-      Column.of("name", org.apache.gravitino.rel.types.Types.StringType.get(), "name column")
+      Column.of("id", Types.LongType.get(), "id column"),
+      Column.of("name", Types.StringType.get(), "name column")
     };
     when(hiveClient.getTable(anyString(), anyString(), anyString()))
         .thenReturn(
@@ -588,12 +631,10 @@ class TestHiveCatalogOperations {
 
     CachedClientPool clientPool = mock(CachedClientPool.class);
     HiveClient hiveClient = mock(HiveClient.class);
-    Column[] currentColumns = {
-      Column.of("id", org.apache.gravitino.rel.types.Types.LongType.get(), "id column")
-    };
+    Column[] currentColumns = {Column.of("id", Types.LongType.get(), "id column")};
     Column[] replacementColumns = {
-      Column.of("id", org.apache.gravitino.rel.types.Types.LongType.get(), "id column"),
-      Column.of("name", org.apache.gravitino.rel.types.Types.StringType.get(), "name column")
+      Column.of("id", Types.LongType.get(), "id column"),
+      Column.of("name", Types.StringType.get(), "name column")
     };
     HiveTable currentTable =
         HiveTable.builder()

@@ -416,8 +416,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
-    String dialect = representation.dialect().toLowerCase();
-    if (!Dialects.HIVE.equals(dialect)) {
+    if (!Dialects.HIVE.equalsIgnoreCase(representation.dialect())) {
       // TODO(design-docs/gravitino-logical-view-management.md): support serializing trino/spark HMS
       // view definitions.
       throw new UnsupportedOperationException(

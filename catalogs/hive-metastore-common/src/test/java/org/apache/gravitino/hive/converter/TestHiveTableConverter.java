@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.hive.HiveTable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
@@ -175,8 +176,7 @@ public class TestHiveTableConverter {
             .withName("v_orders")
             .withDatabaseName("db")
             .withColumns(columns)
-            .withProperties(
-                new HashMap<>(java.util.Map.of(TABLE_TYPE, TableType.VIRTUAL_VIEW.name())))
+            .withProperties(new HashMap<>(Map.of(TABLE_TYPE, TableType.VIRTUAL_VIEW.name())))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
             .withViewOriginalText("SELECT id, name FROM t")
@@ -200,8 +200,7 @@ public class TestHiveTableConverter {
             .withName("v_orders")
             .withDatabaseName("db")
             .withColumns(columns)
-            .withProperties(
-                new HashMap<>(java.util.Map.of(TABLE_TYPE, TableType.VIRTUAL_VIEW.name())))
+            .withProperties(new HashMap<>(Map.of(TABLE_TYPE, TableType.VIRTUAL_VIEW.name())))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
             .withViewOriginalText("SELECT `db`.`t`.`id` FROM `db`.`t`")
