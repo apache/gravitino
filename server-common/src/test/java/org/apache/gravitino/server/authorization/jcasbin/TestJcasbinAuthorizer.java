@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -37,7 +36,6 @@ import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.security.Principal;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -56,6 +54,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.GroupEntity;
@@ -64,10 +63,12 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
-import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer.OwnerInfo;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
+import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -114,6 +115,10 @@ public class TestJcasbinAuthorizer {
 
   private static MockedStatic<OwnerMetaService> ownerMetaServiceMockedStatic;
 
+  private static MockedStatic<SessionUtils> sessionUtilsMockedStatic;
+
+  private static OwnerMetaMapper ownerMetaMapper = mock(OwnerMetaMapper.class);
+
   private static JcasbinAuthorizer jcasbinAuthorizer;
 
   private static ObjectMapper objectMapper = new ObjectMapper();
@@ -123,6 +128,23 @@ public class TestJcasbinAuthorizer {
     OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
     ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
+
+    // The change poller probes entity_change_log + owner_meta on startup and owner lookups go via
+    // SessionUtils; mock SessionUtils to delegate to the mock OwnerMetaMapper so tests can stub
+    // owner state without opening a real MyBatis session. Other mappers default to null.
+    sessionUtilsMockedStatic = mockStatic(SessionUtils.class);
+    sessionUtilsMockedStatic
+        .when(() -> SessionUtils.getWithoutCommit(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              Class<?> mapperClass = invocation.getArgument(0);
+              java.util.function.Function<Object, Object> func = invocation.getArgument(1);
+              if (mapperClass == OwnerMetaMapper.class) {
+                return func.apply(ownerMetaMapper);
+              }
+              return null;
+            });
+
     gravitinoEnvMockedStatic = mockStatic(GravitinoEnv.class);
     gravitinoEnvMockedStatic.when(GravitinoEnv::getInstance).thenReturn(gravitinoEnv);
     when(gravitinoEnv.config()).thenReturn(new ServerConfig());
@@ -169,6 +191,9 @@ public class TestJcasbinAuthorizer {
     }
     if (ownerMetaServiceMockedStatic != null) {
       ownerMetaServiceMockedStatic.close();
+    }
+    if (sessionUtilsMockedStatic != null) {
+      sessionUtilsMockedStatic.close();
     }
     if (gravitinoEnvMockedStatic != null) {
       gravitinoEnvMockedStatic.close();
@@ -258,23 +283,23 @@ public class TestJcasbinAuthorizer {
   @Test
   public void testAuthorizeByOwner() throws Exception {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
-    assertFalse(doAuthorizeOwner(currentPrincipal));
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
-    List<UserEntity> owners = ImmutableList.of(getUserEntity());
-    doReturn(owners)
-        .when(supportsRelationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.OWNER_REL),
-            eq(catalogIdent),
-            eq(Entity.EntityType.CATALOG));
+
+    // No owner set — should fail
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(null);
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+    assertFalse(doAuthorizeOwner(currentPrincipal));
+
+    // Set owner to current user
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(USER_ID, "USER"));
     getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
     assertTrue(doAuthorizeOwner(currentPrincipal));
-    doReturn(new ArrayList<>())
-        .when(supportsRelationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.OWNER_REL),
-            eq(catalogIdent),
-            eq(Entity.EntityType.CATALOG));
+
+    // Remove owner via change hook
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(null);
     jcasbinAuthorizer.handleMetadataOwnerChange(
         METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG);
     assertFalse(doAuthorizeOwner(currentPrincipal));
@@ -311,26 +336,18 @@ public class TestJcasbinAuthorizer {
                     .withAuditInfo(AuditInfo.EMPTY)
                     .build()));
 
-    // Mock owner relation returning a GroupEntity
-    List<GroupEntity> owners = ImmutableList.of(getGroupEntity());
-    doReturn(owners)
-        .when(supportsRelationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.OWNER_REL),
-            eq(catalogIdent),
-            eq(Entity.EntityType.CATALOG));
+    // Mock owner_meta returning a GROUP-typed owner with GROUP_ID
+    OwnerInfo groupOwnerInfo = new OwnerInfo(GROUP_ID, "GROUP");
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(groupOwnerInfo);
     getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
 
     // The principal belongs to the owning group, so isOwner should return true
     assertTrue(doAuthorizeOwner(groupPrincipal));
 
     // Clear owner and verify it returns false
-    doReturn(new ArrayList<>())
-        .when(supportsRelationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.OWNER_REL),
-            eq(catalogIdent),
-            eq(Entity.EntityType.CATALOG));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(null);
     jcasbinAuthorizer.handleMetadataOwnerChange(
         METALAKE, GROUP_ID, catalogIdent, Entity.EntityType.CATALOG);
     assertFalse(doAuthorizeOwner(groupPrincipal));
@@ -342,13 +359,8 @@ public class TestJcasbinAuthorizer {
     principalUtilsMockedStatic
         .when(PrincipalUtils::getCurrentPrincipal)
         .thenReturn(nonMemberPrincipal);
-    // Re-populate the owner cache with the group owner
-    doReturn(ImmutableList.of(getGroupEntity()))
-        .when(supportsRelationOperations)
-        .listEntitiesByRelation(
-            eq(SupportsRelationOperations.Type.OWNER_REL),
-            eq(catalogIdent),
-            eq(Entity.EntityType.CATALOG));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(groupOwnerInfo);
     getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
     assertFalse(doAuthorizeOwner(nonMemberPrincipal));
 
@@ -984,14 +996,13 @@ public class TestJcasbinAuthorizer {
 
   @Test
   public void testOwnerCacheInvalidation() throws Exception {
-    // Get the ownerRel cache via reflection
-    Cache<Long, Optional<OwnerInfo>> ownerRel = getOwnerRelCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache = getOwnerRelCache(jcasbinAuthorizer);
 
     // Manually add an owner relation to the cache
-    ownerRel.put(CATALOG_ID, Optional.of(new OwnerInfo(USER_ID, Entity.EntityType.USER, USERNAME)));
+    ownerRelCache.put(CATALOG_ID, Optional.of(new OwnerInfo(USER_ID, "USER")));
 
     // Verify it's in the cache
-    assertNotNull(ownerRel.getIfPresent(CATALOG_ID));
+    assertTrue(ownerRelCache.getIfPresent(CATALOG_ID).isPresent());
 
     // Create a mock NameIdentifier for the metadata object
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
@@ -1001,7 +1012,7 @@ public class TestJcasbinAuthorizer {
         METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG);
 
     // Verify it's removed from the cache
-    assertNull(ownerRel.getIfPresent(CATALOG_ID));
+    assertFalse(ownerRelCache.getIfPresent(CATALOG_ID).isPresent());
   }
 
   @Test
@@ -1043,10 +1054,10 @@ public class TestJcasbinAuthorizer {
   public void testCacheInitialization() throws Exception {
     // Verify that caches are initialized
     Cache<Long, Boolean> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
-    Cache<Long, Optional<OwnerInfo>> ownerRel = getOwnerRelCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache = getOwnerRelCache(jcasbinAuthorizer);
 
     assertNotNull(loadedRoles, "loadedRoles cache should be initialized");
-    assertNotNull(ownerRel, "ownerRel cache should be initialized");
+    assertNotNull(ownerRelCache, "ownerRelCache should be initialized");
   }
 
   /** Tests {@link JcasbinAuthorizer#hasMetadataPrivilegePermission} hierarchy walk */
@@ -1199,11 +1210,11 @@ public class TestJcasbinAuthorizer {
   }
 
   @SuppressWarnings("unchecked")
-  private static Cache<Long, Optional<OwnerInfo>> getOwnerRelCache(JcasbinAuthorizer authorizer)
-      throws Exception {
-    Field field = JcasbinAuthorizer.class.getDeclaredField("ownerRel");
+  private static GravitinoCache<Long, Optional<OwnerInfo>> getOwnerRelCache(
+      JcasbinAuthorizer authorizer) throws Exception {
+    Field field = JcasbinAuthorizer.class.getDeclaredField("ownerRelCache");
     field.setAccessible(true);
-    return (Cache<Long, Optional<OwnerInfo>>) field.get(authorizer);
+    return (GravitinoCache<Long, Optional<OwnerInfo>>) field.get(authorizer);
   }
 
   private static Enforcer getAllowEnforcer(JcasbinAuthorizer authorizer) throws Exception {
