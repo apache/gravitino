@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -66,6 +67,17 @@ final class GlueIcebergTableHelper {
 
   private static final String DOT = ".";
 
+  // Iceberg GlueCatalog properties (not defined in IcebergConstants).
+  private static final String CATALOG_IMPL = "catalog-impl";
+  private static final String GLUE_CATALOG = "GlueCatalog";
+  private static final String GLUE_ID = "glue.id";
+  private static final String GLUE_ENDPOINT = "glue.endpoint";
+  private static final String CLIENT_CREDENTIALS_PROVIDER = "client.credentials-provider";
+  private static final String CLIENT_CREDENTIALS_PROVIDER_ACCESS_KEY_ID =
+      "client.credentials-provider.access-key-id";
+  private static final String CLIENT_CREDENTIALS_PROVIDER_SECRET_ACCESS_KEY =
+      "client.credentials-provider.secret-access-key";
+
   private GlueIcebergTableHelper() {}
 
   /**
@@ -93,29 +105,36 @@ final class GlueIcebergTableHelper {
     Map<String, String> icebergProps = new HashMap<>();
     // Warehouse is required by Iceberg catalog initialization but is not used when each table
     // provides an explicit location.
-    icebergProps.put("warehouse", "/tmp/gravitino-glue-iceberg");
-    icebergProps.put("catalog-impl", "GlueCatalog");
-    icebergProps.put("client.region", region);
+    icebergProps.put(IcebergConstants.WAREHOUSE, "/tmp/gravitino-glue-iceberg");
+    icebergProps.put(CATALOG_IMPL, GLUE_CATALOG);
+    icebergProps.put(IcebergConstants.AWS_S3_REGION, region);
 
     String catalogId = config.get(GlueConstants.AWS_GLUE_CATALOG_ID);
     if (catalogId != null) {
-      icebergProps.put("glue.id", catalogId);
+      icebergProps.put(GLUE_ID, catalogId);
     }
 
     String accessKey = config.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
     if (accessKey != null && secretKey != null) {
-      icebergProps.put("client.access-key-id", accessKey);
-      icebergProps.put("client.secret-access-key", secretKey);
+      icebergProps.put(
+          CLIENT_CREDENTIALS_PROVIDER, GravitinoGlueCredentialsProvider.class.getName());
+      icebergProps.put(CLIENT_CREDENTIALS_PROVIDER_ACCESS_KEY_ID, accessKey);
+      icebergProps.put(CLIENT_CREDENTIALS_PROVIDER_SECRET_ACCESS_KEY, secretKey);
     }
 
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
     if (endpoint != null) {
-      icebergProps.put("client.endpoint", endpoint);
-      icebergProps.put("s3.endpoint", endpoint);
+      icebergProps.put(GLUE_ENDPOINT, endpoint);
+      icebergProps.put(IcebergConstants.ICEBERG_S3_ENDPOINT, endpoint);
     }
 
-    icebergProps.put("io-impl", "org.apache.iceberg.aws.s3.S3FileIO");
+    if (accessKey != null && secretKey != null) {
+      icebergProps.put(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID, accessKey);
+      icebergProps.put(IcebergConstants.ICEBERG_S3_SECRET_ACCESS_KEY, secretKey);
+    }
+
+    icebergProps.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.aws.s3.S3FileIO");
 
     GlueCatalog glueCatalog = new GlueCatalog();
     glueCatalog.initialize("gravitino-glue-iceberg", icebergProps);

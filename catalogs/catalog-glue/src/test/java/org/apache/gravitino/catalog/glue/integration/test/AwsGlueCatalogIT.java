@@ -18,11 +18,28 @@
  */
 package org.apache.gravitino.catalog.glue.integration.test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Runs {@link AbstractGlueCatalogIT} scenarios against a real AWS Glue endpoint.
@@ -41,6 +58,21 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
 
+  private static final Logger LOG = LoggerFactory.getLogger(AwsGlueCatalogIT.class);
+
+  @BeforeAll
+  void checkAwsEnvironment() {
+    Assumptions.assumeTrue(
+        System.getenv("AWS_SECRET_ACCESS_KEY") != null,
+        "Skipped: AWS_SECRET_ACCESS_KEY is not set");
+    if (System.getenv("AWS_DEFAULT_REGION") == null) {
+      LOG.info("AWS_DEFAULT_REGION is not set, using default us-east-1");
+    }
+    if (System.getenv("AWS_S3_TEST_BUCKET") == null) {
+      LOG.info("AWS_S3_TEST_BUCKET is not set, testAlterIcebergMetadata will be skipped");
+    }
+  }
+
   @Override
   protected Map<String, String> catalogConfig() {
     Map<String, String> config = new HashMap<>();
@@ -53,5 +85,37 @@ class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
       config.put(GlueConstants.AWS_GLUE_CATALOG_ID, catalogId);
     }
     return config;
+  }
+
+  @Test
+  void testAlterIcebergMetadata() {
+    String bucket = System.getenv("AWS_S3_TEST_BUCKET");
+    Assumptions.assumeTrue(bucket != null, "Skipped: set AWS_S3_TEST_BUCKET to enable");
+
+    String schema = "glue_it_" + System.nanoTime();
+    ops.createSchema(NameIdentifier.of("ml", "cat", schema), null, Collections.emptyMap());
+
+    Map<String, String> props = new HashMap<>();
+    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
+    props.put(GlueConstants.LOCATION, "s3://" + bucket + "/" + schema + "/");
+    ops.createTable(
+        NameIdentifier.of("ml", "cat", schema, "iceberg_alter"),
+        new Column[] {Column.of("id", Types.LongType.get(), null)},
+        null,
+        props,
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+
+    ops.alterTable(
+        NameIdentifier.of("ml", "cat", schema, "iceberg_alter"),
+        TableChange.setProperty("comment", "updated comment"));
+
+    Table loaded = ops.loadTable(NameIdentifier.of("ml", "cat", schema, "iceberg_alter"));
+    assertEquals("updated comment", loaded.properties().get("comment"));
+
+    ops.dropTable(NameIdentifier.of("ml", "cat", schema, "iceberg_alter"));
+    ops.dropSchema(NameIdentifier.of("ml", "cat", schema), false);
   }
 }
