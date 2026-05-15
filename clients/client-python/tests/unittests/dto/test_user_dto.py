@@ -21,6 +21,7 @@ import unittest
 
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.authorization.user_dto import UserDTO
+from tests.unittests.mock_base import build_audit_info
 
 
 class TestUserDTO(unittest.TestCase):
@@ -44,7 +45,12 @@ class TestUserDTO(unittest.TestCase):
         self.assertEqual(deser_dict["audit"]["creator"], "admin")
 
     def test_user_dto_without_roles(self):
-        user_dto = UserDTO.builder().with_name("test_user_no_roles").build()
+        user_dto = (
+            UserDTO.builder()
+            .with_name("test_user_no_roles")
+            .with_audit(build_audit_info())
+            .build()
+        )
 
         ser_json = _json.dumps(user_dto.to_dict()).encode("utf-8")
         deser_dict = _json.loads(ser_json)
@@ -55,12 +61,12 @@ class TestUserDTO(unittest.TestCase):
         user_dto = (
             UserDTO.builder()
             .with_name("method_user")
+            .with_audit(build_audit_info())
             .with_roles(["admin_role"])
             .build()
         )
         self.assertEqual(user_dto.name(), "method_user")
         self.assertEqual(user_dto.roles(), ["admin_role"])
-        self.assertIsNone(user_dto.audit_info())
 
     def test_builder_empty_name_raises(self):
         with self.assertRaises(ValueError):
@@ -96,11 +102,23 @@ class TestUserDTO(unittest.TestCase):
         self.assertNotEqual(user1, user3)
 
     def test_roles_returns_list_type(self):
-        user_dto = UserDTO.builder().with_name("test").with_roles(["r1"]).build()
+        user_dto = (
+            UserDTO.builder()
+            .with_name("test")
+            .with_audit(build_audit_info())
+            .with_roles(["r1"])
+            .build()
+        )
         self.assertIsInstance(user_dto.roles(), list)
 
     def test_roles_immutability(self):
-        user_dto = UserDTO.builder().with_name("test").with_roles(["r1", "r2"]).build()
+        user_dto = (
+            UserDTO.builder()
+            .with_name("test")
+            .with_audit(build_audit_info())
+            .with_roles(["r1", "r2"])
+            .build()
+        )
         roles = user_dto.roles()
         roles.append("r3")
         self.assertEqual(["r1", "r2"], user_dto.roles())

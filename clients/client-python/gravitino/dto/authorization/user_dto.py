@@ -33,9 +33,7 @@ class UserDTO(User):
     """Represents a User Data Transfer Object (DTO)."""
 
     _name: str = field(metadata=config(field_name="name"))
-    _audit: Optional[AuditDTO] = field(
-        default=None, metadata=config(field_name="audit")
-    )
+    _audit: AuditDTO = field(metadata=config(field_name="audit"))
     _roles: tuple[str, ...] = field(
         default_factory=tuple, metadata=config(field_name="roles")
     )
@@ -98,4 +96,8 @@ class UserDTO(User):
         def build(self) -> UserDTO:
             if not self._name:
                 raise ValueError("name cannot be null or empty")
-            return UserDTO(self._name, self._roles, self._audit)
+            return UserDTO(
+                self._name,
+                self._audit,
+                self._roles,
+            )

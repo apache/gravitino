@@ -26,11 +26,14 @@ from gravitino.dto.responses.user_response import (
     UserNamesListResponse,
     UserResponse,
 )
+from tests.unittests.mock_base import build_audit_info
 
 
 class TestUserResponses(unittest.TestCase):
     def test_user_response(self):
-        user_dto = UserDTO.builder().with_name("user1").build()
+        user_dto = (
+            UserDTO.builder().with_name("user1").with_audit(build_audit_info()).build()
+        )
         resp = UserResponse(0, user_dto)
 
         resp.validate()
@@ -62,8 +65,16 @@ class TestUserResponses(unittest.TestCase):
         self.assertListEqual(names, deser_dict["names"])
 
     def test_user_list_response(self):
-        user1 = UserDTO.builder().with_name("user1").with_roles(["r1"]).build()
-        user2 = UserDTO.builder().with_name("user2").build()
+        user1 = (
+            UserDTO.builder()
+            .with_name("user1")
+            .with_audit(build_audit_info())
+            .with_roles(["r1"])
+            .build()
+        )
+        user2 = (
+            UserDTO.builder().with_name("user2").with_audit(build_audit_info()).build()
+        )
 
         resp = UserListResponse(0, [user1, user2])
 
