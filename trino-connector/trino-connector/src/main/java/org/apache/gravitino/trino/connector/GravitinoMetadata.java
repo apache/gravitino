@@ -294,16 +294,25 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
   @Override
   public Optional<ConnectorTableLayout> getNewTableLayout(
       ConnectorSession session, ConnectorTableMetadata tableMetadata) {
-    return internalMetadata
-        .getNewTableLayout(session, tableMetadata)
-        .map(
-            result ->
-                result.getPartitioning().isPresent()
-                    ? new ConnectorTableLayout(
-                        new GravitinoPartitioningHandle(result.getPartitioning().get()),
-                        result.getPartitionColumns(),
-                        result.supportsMultipleWritersPerPartition())
-                    : new ConnectorTableLayout(result.getPartitionColumns()));
+    try {
+      return internalMetadata
+          .getNewTableLayout(session, tableMetadata)
+          .map(
+              result ->
+                  result.getPartitioning().isPresent()
+                      ? new ConnectorTableLayout(
+                          new GravitinoPartitioningHandle(result.getPartitioning().get()),
+                          result.getPartitionColumns(),
+                          result.supportsMultipleWritersPerPartition())
+                      : new ConnectorTableLayout(result.getPartitionColumns()));
+    } catch (ClassCastException e) {
+      // Property type mismatch between Gravitino's and the internal connector's metadata
+      // (e.g., Hive 'format' is a String in Gravitino but HiveStorageFormat enum internally).
+      // Returning empty is correct for non-bucketed CTAS.
+      LOG.debug(
+          "Skipping internal getNewTableLayout due to property type mismatch: {}", e.getMessage());
+      return Optional.empty();
+    }
   }
 
   @Override
