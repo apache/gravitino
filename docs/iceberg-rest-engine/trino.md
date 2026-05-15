@@ -164,10 +164,6 @@ For `TIMESTAMP WITH TIME ZONE` values, Trino does not adjust query results based
 endpoint time zone. Unlike Spark and Flink, Trino displays these values according to how they are
 stored.
 
-This behavior is consistent with Trino's design. A previous attempt to change it was discussed in
-[trinodb/trino#21929](https://github.com/trinodb/trino/pull/21929), but the proposal was not
-accepted.
-
 If you need to convert a `TIMESTAMP WITH TIME ZONE` value to the current client session time zone,
 use `at_timezone` together with `current_timezone()`:
 
