@@ -47,13 +47,8 @@ public class IcebergAuthenticationFilter extends AuthenticationFilter {
     if (super.isHealthCheckRequest(request)) {
       return true;
     }
-    if (!(request instanceof HttpServletRequest)) {
-      return false;
-    }
+
     String path = ((HttpServletRequest) request).getRequestURI();
-    if (path == null) {
-      return false;
-    }
     return path.equals("/iceberg/health") || path.startsWith("/iceberg/health/");
   }
 
