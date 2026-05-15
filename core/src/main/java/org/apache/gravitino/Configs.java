@@ -316,7 +316,10 @@ public class Configs {
 
   public static final ConfigEntry<Long> GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE =
       new ConfigBuilder("gravitino.authorization.jcasbin.roleCacheSize")
-          .doc("The maximum size of the role cache for authorization")
+          .doc(
+              "The maximum size of the role-related caches used by the JcasbinAuthorizer. "
+                  + "Shared by the user-role, group-role, and loaded-role caches, so the "
+                  + "effective memory footprint is up to roughly 3x this value.")
           .version(ConfigConstants.VERSION_1_1_1)
           .longConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_ROLE_CACHE_SIZE);

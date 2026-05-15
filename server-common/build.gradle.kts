@@ -25,6 +25,9 @@ plugins {
 }
 
 dependencies {
+  annotationProcessor(libs.lombok)
+  compileOnly(libs.lombok)
+
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":common")) {
@@ -54,6 +57,9 @@ dependencies {
   implementation(libs.ognl)
   implementation(libs.prometheus.servlet)
   implementation(libs.nimbus.jose.jwt)
+
+  testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
 
   testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
