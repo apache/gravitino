@@ -30,9 +30,6 @@ class User(Auditable):
         """
         The name of the user.
 
-        Raises:
-            NotImplementedError: If the method is not implemented.
-
         Returns:
             str: The name of the user.
         """
@@ -43,9 +40,6 @@ class User(Auditable):
         """
         The roles of the user. A user can have multiple roles.
         Every role binds several privileges.
-
-        Raises:
-            NotImplementedError: If not implemented
 
         Returns:
             list[str]: The role names of the user.
