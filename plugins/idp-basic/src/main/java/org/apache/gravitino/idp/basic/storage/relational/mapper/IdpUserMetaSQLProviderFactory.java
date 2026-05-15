@@ -46,8 +46,7 @@ public class IdpUserMetaSQLProviderFactory {
               JDBCBackendType.H2, IDP_USER_META_H2_PROVIDER,
               JDBCBackendType.POSTGRESQL, IDP_USER_META_POSTGRESQL_PROVIDER);
 
-  static IdpUserMetaBaseSQLProvider getProvider(
-      String databaseId, Map<JDBCBackendType, IdpUserMetaBaseSQLProvider> providerMap) {
+  static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
     if (databaseId == null) {
       throw new IllegalStateException(
           "MyBatis databaseId is not configured for IdP user SQL providers.");
@@ -55,7 +54,7 @@ public class IdpUserMetaSQLProviderFactory {
 
     try {
       JDBCBackendType jdbcBackendType = JDBCBackendType.fromString(databaseId);
-      IdpUserMetaBaseSQLProvider provider = providerMap.get(jdbcBackendType);
+      IdpUserMetaBaseSQLProvider provider = IDP_USER_META_SQL_PROVIDER_MAP.get(jdbcBackendType);
       if (provider != null) {
         return provider;
       }
@@ -68,7 +67,7 @@ public class IdpUserMetaSQLProviderFactory {
       throw new IllegalStateException(
           String.format(
               "Unsupported IdP user SQL provider databaseId: %s, supported backends: %s",
-              databaseId, providerMap.keySet()),
+              databaseId, IDP_USER_META_SQL_PROVIDER_MAP.keySet()),
           e);
     }
   }
@@ -86,32 +85,29 @@ public class IdpUserMetaSQLProviderFactory {
   }
 
   public static String selectIdpUser(@Param("username") String username) {
-    return getProvider(currentDatabaseId(), IDP_USER_META_SQL_PROVIDER_MAP).selectIdpUser(username);
+    return getProvider(currentDatabaseId()).selectIdpUser(username);
   }
 
   public static String selectIdpUsers(@Param("usernames") List<String> usernames) {
-    return getProvider(currentDatabaseId(), IDP_USER_META_SQL_PROVIDER_MAP)
-        .selectIdpUsers(usernames);
+    return getProvider(currentDatabaseId()).selectIdpUsers(usernames);
   }
 
   public static String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
-    return getProvider(currentDatabaseId(), IDP_USER_META_SQL_PROVIDER_MAP).insertIdpUser(userPO);
+    return getProvider(currentDatabaseId()).insertIdpUser(userPO);
   }
 
   public static String updateIdpUserPassword(
       @Param("userId") Long userId, @Param("passwordHash") String passwordHash) {
-    return getProvider(currentDatabaseId(), IDP_USER_META_SQL_PROVIDER_MAP)
-        .updateIdpUserPassword(userId, passwordHash);
+    return getProvider(currentDatabaseId()).updateIdpUserPassword(userId, passwordHash);
   }
 
   public static String softDeleteIdpUser(@Param("userId") Long userId) {
-    return getProvider(currentDatabaseId(), IDP_USER_META_SQL_PROVIDER_MAP)
-        .softDeleteIdpUser(userId);
+    return getProvider(currentDatabaseId()).softDeleteIdpUser(userId);
   }
 
   public static String deleteIdpUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return getProvider(currentDatabaseId(), IDP_USER_META_SQL_PROVIDER_MAP)
+    return getProvider(currentDatabaseId())
         .deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit);
   }
 
