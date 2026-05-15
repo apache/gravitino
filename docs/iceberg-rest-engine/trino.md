@@ -160,12 +160,12 @@ WITH (
 
 ## Timestamp with time zone behavior
 
-For `TIMESTAMP WITH TIME ZONE` values, Trino does not adjust query results based on the client
-endpoint time zone. Unlike Spark and Flink, Trino displays these values according to how they are
-stored.
+For `TIMESTAMP WITH TIME ZONE` values, Trino does not adjust query results according to the client
+session time zone. Unlike Spark and Flink, Trino displays these values based on the stored
+timestamp-with-time-zone value.
 
-If you need to convert a `TIMESTAMP WITH TIME ZONE` value to the current client session time zone,
-use `at_timezone` together with `current_timezone()`:
+To convert a `TIMESTAMP WITH TIME ZONE` value to the current client session time zone, use
+`at_timezone` together with `current_timezone()`:
 
 ```sql
 SELECT
