@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -36,6 +38,7 @@ import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.security.Principal;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -64,6 +67,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
@@ -120,6 +124,8 @@ public class TestJcasbinAuthorizer {
 
   private static OwnerMetaMapper ownerMetaMapper = mock(OwnerMetaMapper.class);
 
+  private static EntityChangeLogMapper entityChangeLogMapper = mock(EntityChangeLogMapper.class);
+
   private static JcasbinAuthorizer jcasbinAuthorizer;
 
   private static ObjectMapper objectMapper = new ObjectMapper();
@@ -129,10 +135,15 @@ public class TestJcasbinAuthorizer {
     OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
     ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
+    when(ownerMetaMapper.selectMaxChangeId()).thenReturn(0L);
+    when(ownerMetaMapper.selectChangedOwners(anyLong())).thenReturn(Collections.emptyList());
+    when(entityChangeLogMapper.selectMaxChangeId()).thenReturn(0L);
+    when(entityChangeLogMapper.selectEntityChanges(anyLong(), anyInt()))
+        .thenReturn(Collections.emptyList());
 
     // The change poller probes entity_change_log + owner_meta on startup and owner lookups go via
-    // SessionUtils; mock SessionUtils to delegate to the mock OwnerMetaMapper so tests can stub
-    // owner state without opening a real MyBatis session. Other mappers default to null.
+    // SessionUtils; mock SessionUtils to delegate to mapper mocks so tests can stub owner state
+    // without opening a real MyBatis session. Poller-only mapper calls return safe empty defaults.
     sessionUtilsMockedStatic = mockStatic(SessionUtils.class);
     sessionUtilsMockedStatic
         .when(() -> SessionUtils.getWithoutCommit(any(), any()))
@@ -142,6 +153,9 @@ public class TestJcasbinAuthorizer {
               Function<Object, Object> func = invocation.getArgument(1);
               if (mapperClass == OwnerMetaMapper.class) {
                 return func.apply(ownerMetaMapper);
+              }
+              if (mapperClass == EntityChangeLogMapper.class) {
+                return func.apply(entityChangeLogMapper);
               }
               return null;
             });

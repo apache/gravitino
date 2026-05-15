@@ -54,8 +54,8 @@ public class JcasbinChangePoller implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinChangePoller.class);
 
-  /** Max rows to fetch per poller cycle. */
-  private static final int POLLER_MAX_ROWS = 500;
+  /** Max entity-change rows to fetch per poller cycle. */
+  private static final int ENTITY_CHANGE_POLLER_MAX_ROWS = 500;
 
   private final GravitinoCache<String, Long> metadataIdCache;
   private final GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache;
@@ -165,7 +165,7 @@ public class JcasbinChangePoller implements AutoCloseable {
     List<EntityChangeRecord> changes =
         SessionUtils.getWithoutCommit(
             EntityChangeLogMapper.class,
-            m -> m.selectEntityChanges(entityPollHighWaterId, POLLER_MAX_ROWS));
+            m -> m.selectEntityChanges(entityPollHighWaterId, ENTITY_CHANGE_POLLER_MAX_ROWS));
 
     long maxSeenId = entityPollHighWaterId;
     for (EntityChangeRecord change : changes) {
