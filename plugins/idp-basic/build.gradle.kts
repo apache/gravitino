@@ -27,6 +27,7 @@ dependencies {
   annotationProcessor(libs.lombok)
 
   implementation(project(":core"))
+
   implementation(libs.bcprov.jdk18on)
   implementation(libs.commons.lang3)
   implementation(libs.guava)

@@ -17,32 +17,31 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.storage.relational.mapper;
+package org.apache.gravitino.idp.storage.mapper;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
-import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.h2.IdpUserMetaH2Provider;
-import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.mysql.IdpUserMetaMySQLProvider;
-import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.postgresql.IdpUserMetaPostgreSQLProvider;
-import org.apache.gravitino.idp.basic.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.apache.gravitino.idp.storage.mapper.provider.h2.IdpUserMetaH2Provider;
+import org.apache.gravitino.idp.storage.mapper.provider.postgresql.IdpUserMetaPostgreSQLProvider;
+import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpUserMetaSQLProviderFactory {
+  private static final IdpUserMetaBaseSQLProvider IDP_USER_META_BASE_PROVIDER =
+      new IdpUserMetaBaseSQLProvider();
   private static final IdpUserMetaBaseSQLProvider IDP_USER_META_H2_PROVIDER =
       new IdpUserMetaH2Provider();
-  private static final IdpUserMetaBaseSQLProvider IDP_USER_META_MYSQL_PROVIDER =
-      new IdpUserMetaMySQLProvider();
   private static final IdpUserMetaBaseSQLProvider IDP_USER_META_POSTGRESQL_PROVIDER =
       new IdpUserMetaPostgreSQLProvider();
 
   private static final Map<JDBCBackendType, IdpUserMetaBaseSQLProvider>
       IDP_USER_META_SQL_PROVIDER_MAP =
           ImmutableMap.of(
-              JDBCBackendType.MYSQL, IDP_USER_META_MYSQL_PROVIDER,
+              JDBCBackendType.MYSQL, IDP_USER_META_BASE_PROVIDER,
               JDBCBackendType.H2, IDP_USER_META_H2_PROVIDER,
               JDBCBackendType.POSTGRESQL, IDP_USER_META_POSTGRESQL_PROVIDER);
 
@@ -77,7 +76,7 @@ public class IdpUserMetaSQLProviderFactory {
   }
 
   public static IdpUserMetaBaseSQLProvider mysqlProvider() {
-    return IDP_USER_META_MYSQL_PROVIDER;
+    return IDP_USER_META_BASE_PROVIDER;
   }
 
   public static IdpUserMetaBaseSQLProvider postgresqlProvider() {

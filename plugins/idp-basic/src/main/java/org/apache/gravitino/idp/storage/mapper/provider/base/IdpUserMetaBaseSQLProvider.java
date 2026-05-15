@@ -17,14 +17,14 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.storage.relational.mapper.provider.base;
+package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import java.util.List;
-import org.apache.gravitino.idp.basic.storage.relational.mapper.IdpUserMetaMapper;
-import org.apache.gravitino.idp.basic.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
+import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.ibatis.annotations.Param;
 
-public abstract class IdpUserMetaBaseSQLProvider {
+public class IdpUserMetaBaseSQLProvider {
   public String selectIdpUser(@Param("username") String username) {
     return "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
         + " current_version as currentVersion,"
@@ -87,5 +87,7 @@ public abstract class IdpUserMetaBaseSQLProvider {
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 
-  protected abstract String currentTimeMillisExpression();
+  protected String currentTimeMillisExpression() {
+    return "(UNIX_TIMESTAMP() * 1000.0)";
+  }
 }

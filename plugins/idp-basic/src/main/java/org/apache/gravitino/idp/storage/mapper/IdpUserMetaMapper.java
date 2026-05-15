@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.storage.relational.mapper;
+package org.apache.gravitino.idp.storage.mapper;
 
 import java.util.List;
-import org.apache.gravitino.idp.basic.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;

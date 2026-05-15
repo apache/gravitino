@@ -17,9 +17,9 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.storage.relational.mapper.provider.h2;
+package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
-import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserMetaBaseSQLProvider;
 
 /** SQL provider for IdP user metadata statements on H2 backends. */
 public class IdpUserMetaH2Provider extends IdpUserMetaBaseSQLProvider {

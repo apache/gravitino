@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.storage.relational.mapper.provider.postgresql;
+package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
 
-import org.apache.gravitino.idp.basic.storage.relational.mapper.IdpUserMetaMapper;
-import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
+import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserMetaBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {

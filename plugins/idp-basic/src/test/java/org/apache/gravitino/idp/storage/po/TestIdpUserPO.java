@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.basic.storage.relational.po;
+package org.apache.gravitino.idp.storage.po;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

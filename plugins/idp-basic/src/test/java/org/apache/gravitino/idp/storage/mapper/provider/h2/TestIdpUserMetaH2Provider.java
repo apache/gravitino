@@ -17,14 +17,19 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.storage.relational.mapper.provider.mysql;
+package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
-import org.apache.gravitino.idp.basic.storage.relational.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class IdpUserMetaMySQLProvider extends IdpUserMetaBaseSQLProvider {
+class TestIdpUserMetaH2Provider {
 
-  @Override
-  protected String currentTimeMillisExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0)";
+  @Test
+  void testCurrentTimeMillisExpression() {
+    IdpUserMetaH2Provider provider = new IdpUserMetaH2Provider();
+
+    Assertions.assertEquals(
+        "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())",
+        provider.currentTimeMillisExpression());
   }
 }

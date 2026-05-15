@@ -17,17 +17,29 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.storage.relational.mapper.provider.mysql;
+package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpUserMetaMySQLProvider {
+public class TestIdpUserMetaPostgreSQLProvider {
 
   @Test
   void testCurrentTimeMillisExpression() {
-    IdpUserMetaMySQLProvider provider = new IdpUserMetaMySQLProvider();
+    IdpUserMetaPostgreSQLProvider provider = new IdpUserMetaPostgreSQLProvider();
 
-    Assertions.assertEquals("(UNIX_TIMESTAMP() * 1000.0)", provider.currentTimeMillisExpression());
+    Assertions.assertEquals(
+        "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)",
+        provider.currentTimeMillisExpression());
+  }
+
+  @Test
+  void testDeleteIdpUserMetasByLegacyTimeline() {
+    IdpUserMetaPostgreSQLProvider provider = new IdpUserMetaPostgreSQLProvider();
+
+    Assertions.assertEquals(
+        "DELETE FROM idp_user_meta WHERE user_id IN (SELECT user_id FROM idp_user_meta"
+            + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})",
+        provider.deleteIdpUserMetasByLegacyTimeline(1L, 2));
   }
 }

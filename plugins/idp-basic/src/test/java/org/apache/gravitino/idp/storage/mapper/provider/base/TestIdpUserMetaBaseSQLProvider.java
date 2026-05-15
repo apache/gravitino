@@ -17,13 +17,13 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.basic.storage.relational.mapper.provider.base;
+package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.gravitino.idp.basic.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.SqlSource;
@@ -131,6 +131,13 @@ public class TestIdpUserMetaBaseSQLProvider {
         "DELETE FROM idp_user_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
             + " LIMIT #{limit}",
         normalizedSql);
+  }
+
+  @Test
+  void testCurrentTimeMillisExpression() {
+    Assertions.assertEquals(
+        "(UNIX_TIMESTAMP() * 1000.0)",
+        new IdpUserMetaBaseSQLProvider().currentTimeMillisExpression());
   }
 
   private IdpUserMetaBaseSQLProvider createProvider() {

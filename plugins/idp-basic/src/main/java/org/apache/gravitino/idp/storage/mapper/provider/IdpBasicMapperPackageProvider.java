@@ -16,27 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.basic.storage.relational.po;
+package org.apache.gravitino.idp.storage.mapper.provider;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import com.google.common.collect.ImmutableList;
+import java.util.List;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
 
-@Getter
-@EqualsAndHashCode
-@ToString
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(setterPrefix = "with")
-public class IdpUserPO {
-  private Long userId;
-  private String userName;
-  private String passwordHash;
-  private Long currentVersion;
-  private Long lastVersion;
-  private Long deletedAt;
+/** Supplies built-in IdP mapper classes from the idp-basic plugin. */
+public class IdpBasicMapperPackageProvider implements MapperPackageProvider {
+
+  @Override
+  public List<Class<?>> getMapperClasses() {
+    return ImmutableList.of(IdpUserMetaMapper.class);
+  }
 }
