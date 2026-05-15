@@ -102,7 +102,7 @@ licenseReport {
 repositories {
   mavenCentral()
   maven {
-    url = uri("https://repository.apache.org/content/repositories/orgapacheiceberg-1277/")
+    url = uri("https://repository.apache.org/content/repositories/orgapacheiceberg-1281/")
     mavenContent {
       releasesOnly()
     }
@@ -120,7 +120,7 @@ allprojects {
     mavenCentral()
     mavenLocal()
     maven {
-      url = uri("https://repository.apache.org/content/repositories/orgapacheiceberg-1277/")
+      url = uri("https://repository.apache.org/content/repositories/orgapacheiceberg-1281/")
       mavenContent {
         releasesOnly()
       }
