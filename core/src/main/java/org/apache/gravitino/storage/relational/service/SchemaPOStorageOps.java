@@ -19,9 +19,11 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 
@@ -51,8 +53,22 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
   @Override
   protected SchemaPO getPOByFullName(SchemaMetaMapper mapper, NameIdentifier identifier) {
     Namespace namespace = identifier.namespace();
-    return mapper.selectSchemaByFullQualifiedName(
-        namespace.level(0), namespace.level(1), identifier.name());
+    SchemaPO po =
+        mapper.selectSchemaByFullQualifiedName(
+            namespace.level(0), namespace.level(1), identifier.name());
+    // INNER JOIN on metalake/catalog: a null PO means the metalake or catalog does not exist.
+    if (po == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          namespace.level(1));
+    }
+    // LEFT JOIN on schema_meta: a row with non-null catalogId but null schemaId means
+    // the catalog exists but the schema does not.
+    if (po.getSchemaId() == null) {
+      return null;
+    }
+    return po;
   }
 
   @Override
@@ -75,8 +91,18 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
   @Override
   protected List<SchemaPO> listPOsByNSFullName(
       SchemaMetaMapper schemaMetaMapper, Namespace namespace) {
-    return schemaMetaMapper.listSchemaPOsByFullQualifiedName(
-        namespace.level(0), namespace.level(1));
+    List<SchemaPO> pos =
+        schemaMetaMapper.listSchemaPOsByFullQualifiedName(namespace.level(0), namespace.level(1));
+    // An empty result means the parent metalake or catalog does not exist.
+    if (pos.isEmpty()) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          namespace.level(1));
+    }
+    // Same LEFT JOIN behavior as getPOByFullName: filter out the placeholder row that
+    // represents an existing catalog without any matching schema.
+    return pos.stream().filter(po -> po.getSchemaId() != null).collect(Collectors.toList());
   }
 
   @Override
