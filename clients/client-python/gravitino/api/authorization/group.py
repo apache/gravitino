@@ -17,18 +17,36 @@
 
 from __future__ import annotations
 
-from gravitino.api.authorization.group import Group
-from gravitino.api.authorization.owner import Owner
-from gravitino.api.authorization.privileges import Privileges
-from gravitino.api.authorization.role import Role
-from gravitino.api.authorization.securable_objects import SecurableObjects
-from gravitino.api.authorization.user import User
+from abc import abstractmethod
 
-__all__ = [
-    "Role",
-    "SecurableObjects",
-    "Privileges",
-    "Group",
-    "User",
-    "Owner",
-]
+from gravitino.api.auditable import Auditable
+
+
+class Group(Auditable):
+    """The interface of a Group. The Group is the entity which contains users."""
+
+    @abstractmethod
+    def name(self) -> str:
+        """
+        The name of the group.
+
+        Raises:
+            NotImplementedError: if not implemented
+
+        Returns:
+            str: The name of the group.
+        """
+        raise NotImplementedError("Not implemented")
+
+    @abstractmethod
+    def roles(self) -> list[str]:
+        """
+        The roles of the group.
+
+        Raises:
+            NotImplementedError: if not implemented
+
+        Returns:
+            list[str]: The roles of the group.
+        """
+        raise NotImplementedError("Not implemented")

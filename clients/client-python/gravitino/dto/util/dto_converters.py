@@ -19,6 +19,12 @@ from functools import singledispatchmethod
 from typing import Optional, cast, overload
 
 from gravitino.api.audit import Audit
+from gravitino.api.authorization.group import Group
+from gravitino.api.authorization.owner import Owner
+from gravitino.api.authorization.privileges import Privilege
+from gravitino.api.authorization.role import Role
+from gravitino.api.authorization.securable_objects import SecurableObject
+from gravitino.api.authorization.user import User
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
@@ -55,6 +61,12 @@ from gravitino.api.rel.table_change import (
     UpdateColumnType,
 )
 from gravitino.api.rel.types.types import Types
+from gravitino.dto.authorization.group_dto import GroupDTO
+from gravitino.dto.authorization.owner_dto import OwnerDTO
+from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
+from gravitino.dto.authorization.role_dto import RoleDTO
+from gravitino.dto.authorization.securable_object_dto import SecurableObjectDTO
+from gravitino.dto.authorization.user_dto import UserDTO
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
@@ -626,6 +638,83 @@ class DTOConverters:
             ],
         )
 
+    @to_dto.register
+    @staticmethod
+    def _(obj: SecurableObject) -> SecurableObjectDTO:
+        if isinstance(obj, SecurableObjectDTO):
+            return obj
+
+        return SecurableObjectDTO(
+            _full_name=obj.full_name(),
+            _type=obj.type(),
+            _privileges=[
+                cast(PrivilegeDTO, DTOConverters.to_dto(privilege))
+                for privilege in obj.privileges()
+            ],
+        )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: User) -> UserDTO:
+        if isinstance(obj, UserDTO):
+            return obj
+
+        return UserDTO(
+            _name=obj.name(),
+            _audit=obj.audit_info(),
+            _roles=obj.roles(),
+        )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Group) -> GroupDTO:
+        if isinstance(obj, GroupDTO):
+            return obj
+
+        return GroupDTO(
+            _name=obj.name(),
+            _audit=obj.audit_info(),
+            _roles=obj.roles(),
+        )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Role) -> RoleDTO:
+        if isinstance(obj, RoleDTO):
+            return obj
+
+        return RoleDTO(
+            _name=obj.name(),
+            _audit=obj.audit_info(),
+            _properties=obj.properties(),
+            _securable_objects=[
+                cast(SecurableObjectDTO, DTOConverters.to_dto(securable_object))
+                for securable_object in obj.securable_objects()
+            ],
+        )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Owner) -> OwnerDTO:
+        if isinstance(obj, OwnerDTO):
+            return obj
+
+        return OwnerDTO(
+            _name=obj.name(),
+            _type=obj.type(),
+        )
+
+    @to_dto.register
+    @staticmethod
+    def _(obj: Privilege) -> PrivilegeDTO:
+        if isinstance(obj, PrivilegeDTO):
+            return obj
+
+        return PrivilegeDTO(
+            _name=obj.name(),
+            _condition=obj.condition(),
+        )
+
     @overload
     @staticmethod
     def to_dtos(dtos: list[Column]) -> list[ColumnDTO]: ...  # pragma: no cover
@@ -653,6 +742,14 @@ class DTOConverters:
     @overload
     @staticmethod
     def to_dtos(dtos: list[Partitioning]) -> list[Partitioning]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[User]) -> list[UserDTO]: ...  # pragma: no cover
+
+    @overload
+    @staticmethod
+    def to_dtos(dtos: list[Group]) -> list[GroupDTO]: ...
 
     @staticmethod
     def to_dtos(dtos):

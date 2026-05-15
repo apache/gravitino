@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -15,6 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import unittest
 from datetime import date, datetime
 from itertools import product
@@ -22,6 +24,17 @@ from random import randint, random
 from typing import Dict, cast
 from unittest.mock import MagicMock, patch
 
+from gravitino.api.audit import Audit
+from gravitino.api.authorization.group import Group
+from gravitino.api.authorization.owner import Owner
+from gravitino.api.authorization.privileges import Privilege, Privileges
+from gravitino.api.authorization.role import Role
+from gravitino.api.authorization.securable_objects import (
+    SecurableObject,
+    SecurableObjects,
+)
+from gravitino.api.authorization.user import User
+from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
 from gravitino.api.rel.expressions.distributions.strategy import Strategy
@@ -42,6 +55,13 @@ from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.api.rel.table import Table
 from gravitino.api.rel.types.types import Types
+from gravitino.dto.audit_dto import AuditDTO
+from gravitino.dto.authorization.group_dto import GroupDTO
+from gravitino.dto.authorization.owner_dto import OwnerDTO
+from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
+from gravitino.dto.authorization.role_dto import RoleDTO
+from gravitino.dto.authorization.securable_object_dto import SecurableObjectDTO
+from gravitino.dto.authorization.user_dto import UserDTO
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
 from gravitino.dto.rel.expressions.field_reference_dto import FieldReferenceDTO
@@ -74,6 +94,7 @@ from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.base import IllegalArgumentException
+from tests.unittests.mock_base import build_audit_info
 
 
 class TestDTOConverters(unittest.TestCase):
@@ -984,3 +1005,258 @@ class TestDTOConverters(unittest.TestCase):
 
         self.assertEqual(DTOConverters.to_dto(Distributions.NONE), DistributionDTO.NONE)
         self.assertEqual(DTOConverters.to_dto(distribution_dto), distribution_dto)
+
+    def test_to_user_dto(self) -> None:
+        class MockUser(User):
+            mock_audit_info: Audit = build_audit_info()
+            mock_user_name = "mock user"
+            mock_user_roles = ["role1", "role2"]
+
+            def name(self) -> str:
+                return MockUser.mock_user_name
+
+            def roles(self) -> list[str]:
+                return MockUser.mock_user_roles
+
+            def audit_info(self) -> Audit:
+                return MockUser.mock_audit_info
+
+        test_user = MockUser()
+        user_dto: UserDTO = DTOConverters.to_dto(test_user)
+
+        self.assertIsInstance(user_dto, UserDTO)
+        self.assertEqual(MockUser.mock_user_name, user_dto.name())
+        self.assertEqual(MockUser.mock_user_roles, user_dto.roles())
+        self.assertEqual(MockUser.mock_audit_info, user_dto.audit_info())
+
+    def test_to_group_dto(self) -> None:
+        class MockGroup(Group):
+            mock_group_name = "mock group"
+            mock_audit_info = build_audit_info()
+            mock_group_roles = ["role1", "role2"]
+
+            def name(self) -> str:
+                return MockGroup.mock_group_name
+
+            def audit_info(self) -> Audit:
+                return MockGroup.mock_audit_info
+
+            def roles(self) -> list[str]:
+                return MockGroup.mock_group_roles
+
+        test_group = MockGroup()
+        group_dto: GroupDTO = DTOConverters.to_dto(test_group)
+
+        self.assertIsInstance(group_dto, GroupDTO)
+        self.assertEqual(MockGroup.mock_group_name, group_dto.name())
+        self.assertEqual(MockGroup.mock_audit_info, group_dto.audit_info())
+        self.assertEqual(MockGroup.mock_group_roles, group_dto.roles())
+
+    def test_to_securable_object_dto(self) -> None:
+        securable_object = SecurableObjects.of(
+            MetadataObject.Type.TABLE,
+            ["catalog", "schema", "table"],
+            [Privileges.allow(Privilege.Name.SELECT_TABLE.name)],
+        )
+
+        dto: SecurableObjectDTO = DTOConverters.to_dto(securable_object)
+
+        self.assertEqual(securable_object.full_name(), dto.full_name())
+        self.assertEqual(securable_object.type(), dto.type())
+        self.assertIsInstance(dto.privileges()[0], PrivilegeDTO)
+        self.assertIsInstance(dto.to_json(), str)
+
+    def test_to_role_dto(self) -> None:
+        class MockRole(Role):
+            mock_role_name = "mock role"
+            mock_role_properties = {"key": "value"}
+            mock_role_audit_info = build_audit_info()
+            mock_securable_objects = [
+                SecurableObjects.of(
+                    MetadataObject.Type.TABLE,
+                    ["catalog", "schema", "table"],
+                    [Privileges.allow(Privilege.Name.SELECT_TABLE.name)],
+                )
+            ]
+
+            def name(self) -> str:
+                return MockRole.mock_role_name
+
+            def properties(self) -> Dict[str, str]:
+                return MockRole.mock_role_properties
+
+            def securable_objects(self) -> list[SecurableObject]:
+                return MockRole.mock_securable_objects
+
+            def audit_info(self) -> Audit:
+                return MockRole.mock_role_audit_info
+
+        test_role = MockRole()
+        dto: RoleDTO = DTOConverters.to_dto(test_role)
+        self.assertEqual(MockRole.mock_role_name, dto.name())
+        self.assertEqual(MockRole.mock_role_properties, dto.properties())
+        self.assertEqual(MockRole.mock_role_audit_info, dto.audit_info())
+        securable_object_dto = dto.securable_objects()[0]
+        self.assertIsInstance(securable_object_dto, SecurableObjectDTO)
+        self.assertEqual(
+            MockRole.mock_securable_objects[0].full_name(),
+            securable_object_dto.full_name(),
+        )
+        self.assertEqual(
+            MockRole.mock_securable_objects[0].type(),
+            securable_object_dto.type(),
+        )
+        self.assertIsInstance(securable_object_dto.privileges()[0], PrivilegeDTO)
+        self.assertIsInstance(dto.to_json(), str)
+
+    def test_to_owner_dto(self) -> None:
+        class MockOwner(Owner):
+            mock_owner_name = "mock_owner_name"
+            mock_owner_type = Owner.Type.USER
+
+            def name(self) -> str:
+                return MockOwner.mock_owner_name
+
+            def type(self) -> Owner.Type:
+                return MockOwner.mock_owner_type
+
+        test_owner = MockOwner()
+        dto: OwnerDTO = DTOConverters.to_dto(test_owner)
+        self.assertEqual(MockOwner.mock_owner_name, dto.name())
+        self.assertEqual(MockOwner.mock_owner_type, dto.type())
+
+    def test_to_privilege_dto(self) -> None:
+        class MockPrivilege(Privilege):
+            mock_privilege_name = Privilege.Name.SELECT_TABLE
+            mock_privilege_simple_string = "mock_privilege_simple_string"
+            mock_privilege_condition = Privilege.Condition.ALLOW
+
+            def name(self) -> Privilege.Name:
+                return MockPrivilege.mock_privilege_name
+
+            def simple_string(self) -> str:
+                return MockPrivilege.mock_privilege_simple_string
+
+            def condition(self) -> Privilege.Condition:
+                return MockPrivilege.mock_privilege_condition
+
+            def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+                return False
+
+        test_privilege = MockPrivilege()
+        dto: PrivilegeDTO = DTOConverters.to_dto(test_privilege)
+
+        self.assertEqual(MockPrivilege.mock_privilege_name, dto.name())
+        self.assertEqual("ALLOW select table", dto.simple_string())
+        self.assertEqual(Privilege.Condition.ALLOW, dto.condition())
+        self.assertTrue(dto.can_bind_to(MetadataObject.Type.TABLE))
+
+    def setUp(self) -> None:
+        self.audit = AuditDTO("creator")
+        self.privilege = PrivilegeDTO(
+            Privilege.Name.SELECT_TABLE, Privilege.Condition.ALLOW
+        )
+
+    def test_privilege_dto_validate(self) -> None:
+        self.assertEqual(Privilege.Name.SELECT_TABLE, self.privilege.name())
+        self.assertEqual(Privilege.Condition.ALLOW, self.privilege.condition())
+
+        privilege_json = json.loads(self.privilege.to_json())
+        self.assertEqual("SELECT_TABLE", privilege_json["name"])
+        self.assertEqual("ALLOW", privilege_json["condition"])
+
+        parsed = PrivilegeDTO.from_json('{"name":"SELECT_TABLE","condition":"ALLOW"}')
+        self.assertEqual(Privilege.Name.SELECT_TABLE, parsed.name())
+        self.assertEqual(Privilege.Condition.ALLOW, parsed.condition())
+
+        with self.assertRaisesRegex(IllegalArgumentException, "name cannot be null"):
+            PrivilegeDTO(None, Privilege.Condition.ALLOW)
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "condition cannot be null"
+        ):
+            PrivilegeDTO(Privilege.Name.SELECT_TABLE, None)
+
+    def test_securable_object_dto_validate(self) -> None:
+        securable_object = SecurableObjectDTO(
+            "catalog.schema.table", MetadataObject.Type.TABLE, [self.privilege]
+        )
+
+        self.assertEqual("catalog.schema", securable_object.parent())
+        self.assertEqual("table", securable_object.name())
+        self.assertEqual([self.privilege], securable_object.privileges())
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "full name cannot be null or empty"
+        ):
+            SecurableObjectDTO(None, MetadataObject.Type.TABLE, [self.privilege])
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "full name cannot be null or empty"
+        ):
+            SecurableObjectDTO(" ", MetadataObject.Type.TABLE, [self.privilege])
+
+        with self.assertRaisesRegex(IllegalArgumentException, "type cannot be null"):
+            SecurableObjectDTO("catalog.schema.table", None, [self.privilege])
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "privileges can't be null or empty"
+        ):
+            SecurableObjectDTO("catalog.schema.table", MetadataObject.Type.TABLE, None)
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "privileges can't be null or empty"
+        ):
+            SecurableObjectDTO("catalog.schema.table", MetadataObject.Type.TABLE, [])
+
+    def test_role_dto_validate(self) -> None:
+        role = RoleDTO("role", self.audit, {}, [])
+
+        self.assertEqual("role", role.name())
+        self.assertEqual([], role.securable_objects())
+
+        securable_object = SecurableObjectDTO(
+            "catalog.schema.table", MetadataObject.Type.TABLE, [self.privilege]
+        )
+        role_with_object = RoleDTO("role", self.audit, {}, [securable_object])
+        self.assertEqual([securable_object], role_with_object.securable_objects())
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "name cannot be null or empty"
+        ):
+            RoleDTO(" ", self.audit, {}, [])
+
+        with self.assertRaisesRegex(IllegalArgumentException, "audit cannot be null"):
+            RoleDTO("role", None, {}, [])
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "securable objects can't null"
+        ):
+            RoleDTO("role", self.audit, {}, None)
+
+    def test_user_and_group_dto_validate(self) -> None:
+        user = UserDTO("user", self.audit, None)
+        group = GroupDTO("group", self.audit, None)
+        user_without_roles = UserDTO("user", self.audit)
+        group_without_roles = GroupDTO("group", self.audit)
+
+        self.assertEqual([], user.roles())
+        self.assertEqual([], group.roles())
+        self.assertEqual([], user_without_roles.roles())
+        self.assertEqual([], group_without_roles.roles())
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "name cannot be null or empty"
+        ):
+            UserDTO(" ", self.audit, [])
+
+        with self.assertRaisesRegex(IllegalArgumentException, "audit cannot be null"):
+            UserDTO("user", None, [])
+
+        with self.assertRaisesRegex(
+            IllegalArgumentException, "name cannot be null or empty"
+        ):
+            GroupDTO(" ", self.audit, [])
+
+        with self.assertRaisesRegex(IllegalArgumentException, "audit cannot be null"):
+            GroupDTO("group", None, [])

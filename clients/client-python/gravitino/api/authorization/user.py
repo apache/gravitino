@@ -23,25 +23,32 @@ from gravitino.api.auditable import Auditable
 
 
 class User(Auditable):
-    """The interface of a user. The user is a basic entity in the authorization system."""
+    """The interface of a user. The user is the entity which executes every operation."""
 
     @abstractmethod
     def name(self) -> str:
         """
-        The name of the user.
+        The name of the user. It's the identifier of User. It must be unique.
+        Usually the name comes from an external user management system like LDAP,
+        IAM and so on.
+
+        Raises:
+            NotImplementedError: If the method is not implemented.
 
         Returns:
             str: The name of the user.
         """
-        raise NotImplementedError()
+        raise NotImplementedError("Not implemented")
 
     @abstractmethod
     def roles(self) -> list[str]:
         """
-        The roles of the user. A user can have multiple roles.
-        Every role binds several privileges.
+        The roles of the user. A user can have multiple roles. Every role binds several privileges.
+
+        Raises:
+            NotImplementedError: If not implemented
 
         Returns:
             list[str]: The role names of the user.
         """
-        raise NotImplementedError()
+        raise NotImplementedError("Not implemented")
