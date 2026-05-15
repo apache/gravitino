@@ -168,7 +168,7 @@ public class FunctionMetaBaseSQLProvider {
             %s fm ON sm.schema_id = fm.schema_id
             AND fm.function_name = #{functionName}
             AND fm.deleted_at = 0
-        LEFT JOIN
+        INNER JOIN
             %s vi ON fm.function_id = vi.function_id
             AND fm.function_current_version = vi.version
             AND vi.deleted_at = 0

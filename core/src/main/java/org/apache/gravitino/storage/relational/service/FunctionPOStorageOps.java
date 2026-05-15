@@ -53,30 +53,8 @@ public class FunctionPOStorageOps extends BasePOStorageOps<FunctionPO, FunctionM
   @Override
   protected FunctionPO getPOByFullName(FunctionMetaMapper mapper, NameIdentifier identifier) {
     Namespace namespace = identifier.namespace();
-    FunctionPO po =
-        mapper.selectFunctionMetaByFullQualifiedName(
-            namespace.level(0), namespace.level(1), namespace.level(2), identifier.name());
-    // INNER JOIN on metalake/catalog: a null PO means the metalake or catalog does not exist.
-    if (po == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          namespace.level(1));
-    }
-    // LEFT JOIN on schema_meta: a row with non-null catalogId but null schemaId means
-    // the catalog exists but the schema does not.
-    if (po.schemaId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          namespace.level(2));
-    }
-    // LEFT JOIN on function_meta: a row with non-null schemaId but null functionId means
-    // the schema exists but the function does not.
-    if (po.functionId() == null) {
-      return null;
-    }
-    return po;
+    return mapper.selectFunctionMetaByFullQualifiedName(
+        namespace.level(0), namespace.level(1), namespace.level(2), identifier.name());
   }
 
   @Override
