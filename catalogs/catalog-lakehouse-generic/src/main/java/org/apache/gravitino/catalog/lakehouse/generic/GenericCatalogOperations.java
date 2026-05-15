@@ -44,6 +44,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
+import org.apache.gravitino.catalog.lakehouse.lance.LanceTableOperations;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -76,6 +77,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   private final Map<String, Supplier<ManagedTableOperations>> tableOpsCache;
 
   private Optional<String> catalogLocation;
+
+  private Map<String, String> catalogProperties = Map.of();
 
   private HasPropertyMetadata propertiesMetadata;
 
@@ -125,6 +128,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   public void initialize(
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
+    this.catalogProperties = conf == null ? Map.of() : Maps.newHashMap(conf);
     String location =
         (String)
             propertiesMetadata
@@ -246,7 +250,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     // Get the table operations for the specified table format.
     Supplier<ManagedTableOperations> tableOpsSupplier = tableOpsCache.get(format);
     Preconditions.checkArgument(tableOpsSupplier != null, "Unsupported table format: %s", format);
-    ManagedTableOperations tableOps = tableOpsSupplier.get();
+    ManagedTableOperations tableOps = configureTableOps(tableOpsSupplier.get());
 
     Table createdTable =
         tableOps.createTable(
@@ -339,7 +343,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
                 return format.toLowerCase(Locale.ROOT);
               });
 
-      ManagedTableOperations ops = tableOpsCache.get(tableFormat).get();
+      ManagedTableOperations ops = configureTableOps(tableOpsCache.get(tableFormat).get());
       Preconditions.checkArgument(
           ops != null, "No table operations found for table format %s", tableFormat);
       return ops;
@@ -359,5 +363,13 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
             String.format("Unexpected exception when loading table %s", tableIdent), t);
       }
     }
+  }
+
+  private ManagedTableOperations configureTableOps(ManagedTableOperations ops) {
+    if (ops instanceof LanceTableOperations) {
+      ((LanceTableOperations) ops).setCatalogProperties(catalogProperties);
+    }
+
+    return ops;
   }
 }

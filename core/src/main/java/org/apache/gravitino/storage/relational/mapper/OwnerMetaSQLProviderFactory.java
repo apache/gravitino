@@ -121,7 +121,11 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().selectOwnerByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
 
-  public static String selectChangedOwners(@Param("updatedAtFrom") long updatedAtFrom) {
-    return getProvider().selectChangedOwners(updatedAtFrom);
+  public static String selectChangedOwners(@Param("lastConsumedId") long lastConsumedId) {
+    return getProvider().selectChangedOwners(lastConsumedId);
+  }
+
+  public static String selectMaxChangeId() {
+    return getProvider().selectMaxChangeId();
   }
 }
