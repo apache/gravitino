@@ -164,7 +164,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
           buildVendedStorageOptions(catalogName, catalog, table, credentialPrivilege));
     } else {
       response.setStorageOptions(
-          LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), table.properties()));
+          LancePropertiesUtils.resolveLanceStorageOptions(
+              catalog.properties(), table.properties()));
     }
     return response;
   }
@@ -190,12 +191,13 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
     Credential credential;
     try {
-      credential = credManager.getCredential(context);
+      credential = credManager.getCredentialByPath(tableLocation, context);
     } catch (IllegalArgumentException e) {
       LOG.debug(
           "No credential providers configured for catalog {}, falling back to original storage options",
           catalogName);
-      return LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), table.properties());
+      return LancePropertiesUtils.resolveLanceStorageOptions(
+          catalog.properties(), table.properties());
     }
 
     if (credential == null) {

@@ -104,7 +104,8 @@ class TestGravitinoLanceTableOpsCredentialVending {
   @Test
   void testDescribeTableWithCredentialVending() {
     S3TokenCredential s3Credential = new S3TokenCredential("ak", "sk", "session-token", 12345L);
-    when(credentialManager.getCredential(any(PathBasedCredentialContext.class)))
+    when(credentialManager.getCredentialByPath(
+            any(String.class), any(PathBasedCredentialContext.class)))
         .thenReturn(s3Credential);
 
     DescribeTableResponse response =
@@ -143,7 +144,8 @@ class TestGravitinoLanceTableOpsCredentialVending {
   @Test
   void testDescribeTableCredentialFallbackOnNoProviders() {
     // Simulates catalog with no credential providers configured
-    when(credentialManager.getCredential(any(PathBasedCredentialContext.class)))
+    when(credentialManager.getCredentialByPath(
+            any(String.class), any(PathBasedCredentialContext.class)))
         .thenThrow(new IllegalArgumentException("No credential providers configured"));
 
     DescribeTableResponse response =
@@ -158,7 +160,9 @@ class TestGravitinoLanceTableOpsCredentialVending {
 
   @Test
   void testDescribeTableNullCredentialThrowsServiceUnavailable() {
-    when(credentialManager.getCredential(any(PathBasedCredentialContext.class))).thenReturn(null);
+    when(credentialManager.getCredentialByPath(
+            any(String.class), any(PathBasedCredentialContext.class)))
+        .thenReturn(null);
 
     assertThrows(
         ServiceUnavailableException.class,
@@ -168,14 +172,15 @@ class TestGravitinoLanceTableOpsCredentialVending {
   @Test
   void testDescribeTableWritePrivilegePassesWritePaths() {
     S3TokenCredential s3Credential = new S3TokenCredential("ak", "sk", "token", 100L);
-    when(credentialManager.getCredential(any(PathBasedCredentialContext.class)))
+    when(credentialManager.getCredentialByPath(
+            any(String.class), any(PathBasedCredentialContext.class)))
         .thenReturn(s3Credential);
 
     ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), CredentialPrivilege.WRITE);
 
     ArgumentCaptor<PathBasedCredentialContext> captor =
         ArgumentCaptor.forClass(PathBasedCredentialContext.class);
-    verify(credentialManager).getCredential(captor.capture());
+    verify(credentialManager).getCredentialByPath(any(String.class), captor.capture());
 
     PathBasedCredentialContext context = captor.getValue();
     assertTrue(context.getWritePaths().contains(TABLE_LOCATION));
@@ -185,14 +190,15 @@ class TestGravitinoLanceTableOpsCredentialVending {
   @Test
   void testDescribeTableReadPrivilegePassesReadPaths() {
     S3TokenCredential s3Credential = new S3TokenCredential("ak", "sk", "token", 100L);
-    when(credentialManager.getCredential(any(PathBasedCredentialContext.class)))
+    when(credentialManager.getCredentialByPath(
+            any(String.class), any(PathBasedCredentialContext.class)))
         .thenReturn(s3Credential);
 
     ops.describeTable(TABLE_ID, DELIMITER, Optional.empty(), CredentialPrivilege.READ);
 
     ArgumentCaptor<PathBasedCredentialContext> captor =
         ArgumentCaptor.forClass(PathBasedCredentialContext.class);
-    verify(credentialManager).getCredential(captor.capture());
+    verify(credentialManager).getCredentialByPath(any(String.class), captor.capture());
 
     PathBasedCredentialContext context = captor.getValue();
     assertTrue(context.getReadPaths().contains(TABLE_LOCATION));
@@ -213,7 +219,8 @@ class TestGravitinoLanceTableOpsCredentialVending {
                 "https://s3.example.com"));
 
     S3TokenCredential s3Credential = new S3TokenCredential("ak", "sk", "token", 500L);
-    when(credentialManager.getCredential(any(PathBasedCredentialContext.class)))
+    when(credentialManager.getCredentialByPath(
+            any(String.class), any(PathBasedCredentialContext.class)))
         .thenReturn(s3Credential);
 
     DescribeTableResponse response =
