@@ -34,6 +34,7 @@ import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.web.Utils;
 
 /**
  * Health check endpoints for the Iceberg REST server. Follows the same MicroProfile Health
@@ -71,7 +72,7 @@ public class IcebergHealthOperations {
   @ResponseMetered(name = "iceberg.health.live", absolute = true)
   public Response live() {
     HealthCheckDTO check = up(CHECK_HTTP_SERVER, Collections.emptyMap());
-    return ok(new HealthResponse(HealthCheckDTO.Status.UP, Collections.singletonList(check)));
+    return Utils.ok(new HealthResponse(HealthCheckDTO.Status.UP, Collections.singletonList(check)));
   }
 
   /**
@@ -88,7 +89,7 @@ public class IcebergHealthOperations {
     HealthCheckDTO managerCheck = checkCatalogWrapperManager();
     HealthCheckDTO.Status overall = managerCheck.getStatus();
     HealthResponse body = new HealthResponse(overall, Collections.singletonList(managerCheck));
-    return overall == HealthCheckDTO.Status.UP ? ok(body) : serviceUnavailable(body);
+    return overall == HealthCheckDTO.Status.UP ? Utils.ok(body) : Utils.serviceUnavailable(body);
   }
 
   /**
@@ -110,7 +111,7 @@ public class IcebergHealthOperations {
             : HealthCheckDTO.Status.UP;
 
     HealthResponse body = new HealthResponse(overall, checks);
-    return overall == HealthCheckDTO.Status.UP ? ok(body) : serviceUnavailable(body);
+    return overall == HealthCheckDTO.Status.UP ? Utils.ok(body) : Utils.serviceUnavailable(body);
   }
 
   private HealthCheckDTO checkCatalogWrapperManager() {
@@ -133,19 +134,5 @@ public class IcebergHealthOperations {
   private static HealthCheckDTO down(String name, String detailKey, String detailValue) {
     return new HealthCheckDTO(
         name, HealthCheckDTO.Status.DOWN, Collections.singletonMap(detailKey, detailValue));
-  }
-
-  private static Response ok(HealthResponse body) {
-    return Response.status(Response.Status.OK)
-        .entity(body)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
-  }
-
-  private static Response serviceUnavailable(HealthResponse body) {
-    return Response.status(Response.Status.SERVICE_UNAVAILABLE)
-        .entity(body)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
   }
 }
