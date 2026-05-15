@@ -103,15 +103,18 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--ray-spec",
-        default="ray",
-        help="Pip spec for ray. Pin it (e.g. 'ray==2.55.1') if you need "
-        "reproducibility. Default: pip picks a compatible version per "
-        "lance-ray.",
+        default="ray==2.55.1",
+        help="Pip spec for ray. Pinned by default so the matrix is "
+        "reproducible across runs and does not drift with PyPI. Override "
+        "(e.g. 'ray') to let pip pick a compatible version per lance-ray. "
+        "Default: %(default)s",
     )
     p.add_argument(
         "--lance-namespace-spec",
-        default="lance-namespace",
-        help="Pip spec for lance-namespace. Default: latest.",
+        default="lance-namespace==0.7.5",
+        help="Pip spec for lance-namespace. Pinned by default so the "
+        "matrix is reproducible and does not drift with PyPI. Override "
+        "(e.g. 'lance-namespace') for latest. Default: %(default)s",
     )
     p.add_argument(
         "--keep-going",

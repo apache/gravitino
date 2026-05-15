@@ -40,4 +40,4 @@ banks==2.4.1
 # its own per-version venvs and does not consume these pins.
 ray==2.55.1
 lance-ray==0.4.2
-lance-namespace==0.7.6
+lance-namespace==0.7.5
