@@ -16,6 +16,7 @@
 # under the License.
 
 import logging
+import os
 from random import randint
 
 from gravitino import (
@@ -42,10 +43,29 @@ class TestOwner(IntegrationTestEnv):
     catalog_name: str = "test_owner_catalog" + str(randint(1, 10000))
     test_user: str = "test_owner_user"
 
-    gravitino_admin_client: GravitinoAdminClient = GravitinoAdminClient(
-        uri="http://localhost:8090"
-    )
+    gravitino_admin_client: GravitinoAdminClient = None
     gravitino_client: GravitinoClient = None
+
+    @classmethod
+    def setUpClass(cls):
+        if not (
+            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
+            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
+        ):
+            cls._get_gravitino_home()
+            conf_path = os.path.join(
+                cls.gravitino_home, "conf", "gravitino.conf"
+            )
+            cls._reset_conf(
+                {"gravitino.authorization.enable": "true"}, conf_path
+            )
+            cls._append_conf(
+                {"gravitino.authorization.enable": "true"}, conf_path
+            )
+        super().setUpClass()
+        cls.gravitino_admin_client = GravitinoAdminClient(
+            uri="http://localhost:8090"
+        )
 
     def setUp(self):
         self.init_test_env()
