@@ -25,7 +25,6 @@ import org.apache.gravitino.idp.basic.storage.relational.po.IdpUserPO;
 import org.apache.ibatis.annotations.Param;
 
 public abstract class IdpUserMetaBaseSQLProvider {
-
   public String selectIdpUser(@Param("username") String username) {
     return "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
         + " current_version as currentVersion,"

@@ -31,19 +31,10 @@ import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public abstract class TestIdpUserMetaBaseSQLProvider {
-
-  protected abstract IdpUserMetaBaseSQLProvider createProvider();
-
-  protected abstract String expectedDeleteAtClause();
-
-  protected String expectedDeleteIdpUserMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_user_meta"
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
-  }
+public class TestIdpUserMetaBaseSQLProvider {
 
   @Test
-  public void testSelectIdpUser() {
+  void testSelectIdpUser() {
     String normalizedSql = createProvider().selectIdpUser("tom").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT user_id as userId"));
@@ -53,7 +44,7 @@ public abstract class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSelectIdpUsers() {
+  void testSelectIdpUsers() {
     String script = createProvider().selectIdpUsers(Arrays.asList("tom", "jerry"));
     Map<String, Object> params = new HashMap<>();
     params.put("usernames", Arrays.asList("tom", "jerry"));
@@ -67,7 +58,7 @@ public abstract class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSelectIdpUsersWithEmptyUserNames() {
+  void testSelectIdpUsersWithEmptyUserNames() {
     String script = createProvider().selectIdpUsers(Collections.emptyList());
     Map<String, Object> params = new HashMap<>();
     params.put("usernames", Collections.emptyList());
@@ -83,7 +74,7 @@ public abstract class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSelectIdpUsersWithNullUserNames() {
+  void testSelectIdpUsersWithNullUserNames() {
     String script = createProvider().selectIdpUsers(null);
     Map<String, Object> params = new HashMap<>();
     params.put("usernames", null);
@@ -99,7 +90,7 @@ public abstract class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testInsertIdpUser() {
+  void testInsertIdpUser() {
     String normalizedSql =
         createProvider().insertIdpUser(newUserPO()).replaceAll("\\s+", " ").trim();
 
@@ -115,7 +106,7 @@ public abstract class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testUpdateIdpUserPassword() {
+  void testUpdateIdpUserPassword() {
     String normalizedSql =
         createProvider().updateIdpUserPassword(1L, "hash").replaceAll("\\s+", " ").trim();
 
@@ -126,20 +117,32 @@ public abstract class TestIdpUserMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteIdpUser() {
+  void testSoftDeleteIdpUser() {
     String normalizedSql = createProvider().softDeleteIdpUser(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_meta"));
-    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
+    Assertions.assertTrue(normalizedSql.contains("CURRENT_TIME_MILLIS()"));
     Assertions.assertTrue(normalizedSql.contains("WHERE user_id = #{userId} AND deleted_at = 0"));
   }
 
   @Test
-  public void testDeleteIdpUserMetasByLegacyTimeline() {
+  void testDeleteIdpUserMetasByLegacyTimeline() {
     String normalizedSql =
         createProvider().deleteIdpUserMetasByLegacyTimeline(1L, 2).replaceAll("\\s+", " ").trim();
 
-    Assertions.assertEquals(expectedDeleteIdpUserMetasByLegacyTimelineSql(), normalizedSql);
+    Assertions.assertEquals(
+        "DELETE FROM idp_user_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+            + " LIMIT #{limit}",
+        normalizedSql);
+  }
+
+  private IdpUserMetaBaseSQLProvider createProvider() {
+    return new IdpUserMetaBaseSQLProvider() {
+      @Override
+      protected String currentTimeMillisExpression() {
+        return "CURRENT_TIME_MILLIS()";
+      }
+    };
   }
 
   private String renderScript(String script, Map<String, Object> params) {

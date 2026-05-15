@@ -21,62 +21,73 @@ package org.apache.gravitino.idp.basic.storage.relational.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.List;
-import org.apache.gravitino.idp.basic.storage.relational.BackendAware;
-import org.apache.gravitino.idp.basic.storage.relational.BackendTestExtension;
+import java.util.Comparator;
+import java.util.stream.Stream;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.idp.basic.storage.relational.po.IdpUserPO;
-import org.apache.gravitino.integration.test.util.CloseContainerExtension;
-import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.extension.ExtendWith;
 
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@ExtendWith({
-  BackendTestExtension.class,
-  PrintFuncNameExtension.class,
-  CloseContainerExtension.class
-})
-abstract class IdpMapperTestBase implements BackendAware {
+abstract class AbstractIdpUserMetaStorageTest {
   protected String backendType;
   protected JDBCBackend backend;
   protected SqlSession sharedSession;
   protected IdpUserMetaMapper idpUserMetaMapper;
 
-  @Override
-  public void setBackendType(String backendType) {
-    this.backendType = backendType;
+  private Config config;
+  private Path h2Path;
+
+  static Stream<String> storageProvider() {
+    return Stream.of("h2", "mysql", "postgresql");
   }
 
-  @Override
-  public void setBackend(JDBCBackend backend) {
-    this.backend = backend;
+  @AfterEach
+  void closeSuite() throws IOException {
+    closeSession();
+    if (backend != null) {
+      backend.close();
+      backend = null;
+    }
+
+    SqlSessionFactoryHelper.getInstance().close();
+    ContainerSuite.getInstance().close();
+
+    if (h2Path != null && Files.exists(h2Path)) {
+      deleteDirectory(h2Path);
+      h2Path = null;
+    }
   }
 
-  @BeforeEach
-  void setUp() throws SQLException {
-    truncateAllTables();
+  protected void init(String type) throws IOException {
+    backendType = type;
+    config = createBackendConfig(type);
+    backend = new JDBCBackend();
+    backend.close();
+    backend.initialize(config);
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
   }
 
-  @AfterEach
-  void closeSession() {
-    if (sharedSession != null) {
-      sharedSession.close();
-      sharedSession = null;
-    }
+  protected void restartBackend() throws IOException {
+    closeSession();
+    backend.close();
+    backend = new JDBCBackend();
+    backend.initialize(config);
+    sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+    idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
   }
 
   protected IdpUserPO insertUser(
@@ -97,14 +108,6 @@ abstract class IdpMapperTestBase implements BackendAware {
             .build();
     idpUserMetaMapper.insertIdpUser(userPO);
     return userPO;
-  }
-
-  long queryLongValueInMapperTest(String table, String column, String idColumn, long idValue) {
-    return queryLongValue(table, column, idColumn, idValue);
-  }
-
-  int countRowsInMapperTest(String table, String idColumn, long idValue) {
-    return countRows(table, idColumn, idValue);
   }
 
   protected long queryLongValue(String table, String column, String idColumn, long idValue) {
@@ -155,55 +158,56 @@ abstract class IdpMapperTestBase implements BackendAware {
     }
   }
 
-  private void truncateAllTables() throws SQLException {
-    try (SqlSession sqlSession =
-        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
-      try (Connection connection = sqlSession.getConnection();
-          Statement statement = connection.createStatement()) {
-        if ("postgresql".equalsIgnoreCase(backendType)) {
-          truncateAllTablesForPostgreSQL(connection);
-        } else {
-          List<String> tableList = new ArrayList<>();
-          try (ResultSet rs = statement.executeQuery("SHOW TABLES")) {
-            while (rs.next()) {
-              tableList.add(rs.getString(1));
-            }
-          }
-          for (String table : tableList) {
-            statement.execute("TRUNCATE TABLE " + table);
-          }
-        }
-      }
+  protected void closeSession() {
+    if (sharedSession != null) {
+      sharedSession.close();
+      sharedSession = null;
     }
   }
 
-  private void truncateAllTablesForPostgreSQL(Connection connection) throws SQLException {
-    List<String> tableList = new ArrayList<>();
-    try (Statement statement = connection.createStatement()) {
-      String query =
-          "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema()";
-      try (ResultSet rs = statement.executeQuery(query)) {
-        while (rs.next()) {
-          tableList.add(rs.getString(1));
-        }
-      }
+  private Config createBackendConfig(String type) throws IOException {
+    BaseIT baseIT = new BaseIT();
+    Config backendConfig = new Config(false) {};
+    backendConfig.set(Configs.ENTITY_STORE, Configs.RELATIONAL_ENTITY_STORE);
+    backendConfig.set(Configs.ENTITY_RELATIONAL_STORE, type);
+    backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS, 20);
+    backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS, 1000L);
 
-      if (tableList.isEmpty()) {
-        return;
-      }
+    if ("mysql".equals(type)) {
+      backendConfig.set(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, baseIT.startAndInitMySQLBackend());
+      backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "root");
+      backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "root");
+      backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "com.mysql.cj.jdbc.Driver");
+    } else if ("postgresql".equals(type)) {
+      backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, baseIT.startAndInitPGBackend());
+      backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "root");
+      backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "root");
+      backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.postgresql.Driver");
+    } else {
+      h2Path = Files.createTempDirectory("gravitino_idp_basic_h2_");
+      backendConfig.set(
+          Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL,
+          String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", h2Path));
+      backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "root");
+      backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "123456");
+      backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
+    }
 
-      StringBuilder pgTruncateCommand = new StringBuilder("DO $$ BEGIN\n");
-      for (String table : tableList) {
-        pgTruncateCommand.append(
-            String.format(
-                "TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", quotePostgreSqlIdentifier(table)));
-      }
-      pgTruncateCommand.append("END $$;");
-      statement.execute(pgTruncateCommand.toString());
+    return backendConfig;
+  }
+
+  private void deleteDirectory(Path directory) throws IOException {
+    try (Stream<Path> paths = Files.walk(directory)) {
+      paths.sorted(Comparator.reverseOrder()).forEach(this::deletePath);
     }
   }
 
-  private String quotePostgreSqlIdentifier(String identifier) {
-    return "\"" + identifier.replace("\"", "\"\"") + "\"";
+  private void deletePath(Path path) {
+    try {
+      Files.deleteIfExists(path);
+    } catch (IOException e) {
+      throw new RuntimeException("Delete path failed: " + path, e);
+    }
   }
 }
