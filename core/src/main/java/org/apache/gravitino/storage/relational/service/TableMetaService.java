@@ -28,10 +28,7 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.Entity.EntityType;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -60,29 +57,31 @@ import org.apache.gravitino.utils.NamespaceUtil;
 /** The service class for table metadata. It provides the basic database operations for table. */
 public class TableMetaService {
   private static final TableMetaService INSTANCE = new TableMetaService();
+  private BasePOStorageOps<TablePO, TableMetaMapper> ops;
 
   public static TableMetaService getInstance() {
     return INSTANCE;
   }
 
-  private TableMetaService() {}
+  private TableMetaService() {
+    this.ops = new HierarchicalConventionPOStorageOps<>(new TablePOStorageOps());
+  }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getTableIdBySchemaIdAndName")
   public Long getTableIdBySchemaIdAndName(Long schemaId, String tableName) {
-    Long tableId =
+    TablePO tablePO =
         SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper -> mapper.selectTableIdBySchemaIdAndName(schemaId, tableName));
+            TableMetaMapper.class, mapper -> ops.getPO(mapper, schemaId, tableName));
 
-    if (tableId == null) {
+    if (tablePO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.TABLE.name().toLowerCase(),
           tableName);
     }
-    return tableId;
+    return tablePO.getTableId();
   }
 
   @Monitored(
@@ -124,11 +123,7 @@ public class TableMetaService {
                   TableMetaMapper.class,
                   mapper -> {
                     tablePORef.set(po);
-                    if (overwrite) {
-                      mapper.insertTableMetaOnDuplicateKeyUpdate(po);
-                    } else {
-                      mapper.insertTableMeta(po);
-                    }
+                    ops.insertPO(mapper, po, overwrite);
                   }),
           () ->
               SessionUtils.doWithoutCommit(
@@ -204,7 +199,7 @@ public class TableMetaService {
               updateResult.set(
                   SessionUtils.getWithoutCommit(
                       TableMetaMapper.class,
-                      mapper -> mapper.updateTableMeta(newTablePO, oldTablePO, newSchemaId))),
+                      mapper -> ops.updatePO(mapper, newTablePO, oldTablePO))),
           () ->
               SessionUtils.doWithoutCommit(
                   TableVersionMapper.class,
@@ -347,13 +342,32 @@ public class TableMetaService {
           Objects.equals(schemaIdent, NameIdentifierUtil.getSchemaIdentifier(ident)));
       tableNames.add(ident.name());
     }
-    Long schemaId = EntityIdService.getEntityId(schemaIdent, Entity.EntityType.SCHEMA);
     return SessionUtils.doWithCommitAndFetchResult(
         TableMetaMapper.class,
         mapper -> {
-          List<TablePO> tableList = mapper.batchSelectTableByIdentifier(schemaId, tableNames);
+          List<TablePO> tableList = ops.listPOs(mapper, firstIdent.namespace(), tableNames);
           return POConverters.fromTablePOs(tableList, firstIdent.namespace());
         });
+  }
+
+  private TablePO getTablePOByIdentifier(NameIdentifier identifier) {
+    NameIdentifierUtil.checkTable(identifier);
+    TablePO tablePO =
+        SessionUtils.getWithoutCommit(
+            TableMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+    if (tablePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.TABLE.name().toLowerCase(),
+          identifier.name());
+    }
+
+    return tablePO;
+  }
+
+  private List<TablePO> listTablePOs(Namespace namespace) {
+    return SessionUtils.getWithoutCommit(
+        TableMetaMapper.class, mapper -> ops.listPOs(mapper, namespace));
   }
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {
@@ -364,114 +378,5 @@ public class TableMetaService {
     builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
     builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
     builder.withSchemaId(namespacedEntityId.entityId());
-  }
-
-  private TablePO getTablePOByIdentifier(NameIdentifier identifier) {
-    NameIdentifierUtil.checkTable(identifier);
-
-    return tablePOFetcher().apply(identifier);
-  }
-
-  private TablePO getTablePOBySchemaIdAndName(Long schemaId, String tableName) {
-    TablePO tablePO =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper -> mapper.selectTableMetaBySchemaIdAndName(schemaId, tableName));
-    if (tablePO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.TABLE.name().toLowerCase(),
-          tableName);
-    }
-    return tablePO;
-  }
-
-  private TablePO getTableByFullQualifiedName(
-      String metalakeName, String catalogName, String schemaName, String tableName) {
-    TablePO tablePO =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper ->
-                mapper.selectTableByFullQualifiedName(
-                    metalakeName, catalogName, schemaName, tableName));
-    if (tablePO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.TABLE.name().toLowerCase(),
-          tableName);
-    }
-
-    return tablePO;
-  }
-
-  private List<TablePO> listTablePOs(Namespace namespace) {
-    return tableListFetcher().apply(namespace);
-  }
-
-  private List<TablePO> listTablePOsBySchemaId(Namespace namespace) {
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
-    return SessionUtils.getWithoutCommit(
-        TableMetaMapper.class, mapper -> mapper.listTablePOsBySchemaId(schemaId));
-  }
-
-  private List<TablePO> listTablePOsByFullQualifiedName(Namespace namespace) {
-    String[] namespaceLevels = namespace.levels();
-    List<TablePO> tablePOs =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper ->
-                mapper.listTablePOsByFullQualifiedName(
-                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
-    if (tablePOs.isEmpty() || tablePOs.get(0).getSchemaId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          EntityType.SCHEMA.name().toLowerCase(),
-          namespaceLevels[2]);
-    }
-    return tablePOs.stream().filter(po -> po.getTableId() != null).collect(Collectors.toList());
-  }
-
-  private TablePO getTablePOBySchemaId(NameIdentifier identifier) {
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(identifier.namespace().levels()), Entity.EntityType.SCHEMA);
-    return getTablePOBySchemaIdAndName(schemaId, identifier.name());
-  }
-
-  private TablePO getTablePOByFullQualifiedName(NameIdentifier identifier) {
-    String[] namespaceLevels = identifier.namespace().levels();
-    TablePO tablePO =
-        getTableByFullQualifiedName(
-            namespaceLevels[0], namespaceLevels[1], namespaceLevels[2], identifier.name());
-
-    if (tablePO.getSchemaId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          EntityType.SCHEMA.name().toLowerCase(),
-          namespaceLevels[2]);
-    }
-
-    if (tablePO.getTableId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          EntityType.TABLE.name().toLowerCase(),
-          identifier.name());
-    }
-
-    return tablePO;
-  }
-
-  private Function<Namespace, List<TablePO>> tableListFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::listTablePOsBySchemaId
-        : this::listTablePOsByFullQualifiedName;
-  }
-
-  private Function<NameIdentifier, TablePO> tablePOFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::getTablePOBySchemaId
-        : this::getTablePOByFullQualifiedName;
   }
 }

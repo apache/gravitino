@@ -33,7 +33,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -56,14 +55,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class FunctionMetaService {
+  private static final Logger LOG = LoggerFactory.getLogger(FunctionMetaService.class);
+  private static final FunctionMetaService INSTANCE = new FunctionMetaService();
+  private BasePOStorageOps<FunctionPO, FunctionMetaMapper> ops;
+
   public static FunctionMetaService getInstance() {
     return INSTANCE;
   }
 
-  private static final Logger LOG = LoggerFactory.getLogger(FunctionMetaService.class);
-  private static final FunctionMetaService INSTANCE = new FunctionMetaService();
-
-  private FunctionMetaService() {}
+  private FunctionMetaService() {
+    this.ops = new HierarchicalConventionPOStorageOps<>(new FunctionPOStorageOps());
+  }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -87,18 +89,17 @@ public class FunctionMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getFunctionIdBySchemaIdAndFunctionName")
   public Long getFunctionIdBySchemaIdAndFunctionName(Long schemaId, String functionName) {
-    Long functionId =
+    FunctionPO functionPO =
         SessionUtils.getWithoutCommit(
-            FunctionMetaMapper.class,
-            mapper -> mapper.selectFunctionIdBySchemaIdAndFunctionName(schemaId, functionName));
+            FunctionMetaMapper.class, mapper -> ops.getPO(mapper, schemaId, functionName));
 
-    if (functionId == null) {
+    if (functionPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.FUNCTION.name().toLowerCase(Locale.ROOT),
           functionName);
     }
-    return functionId;
+    return functionPO.functionId();
   }
 
   @Monitored(
@@ -115,14 +116,7 @@ public class FunctionMetaService {
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
-                  FunctionMetaMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertFunctionMetaOnDuplicateKeyUpdate(po);
-                    } else {
-                      mapper.insertFunctionMeta(po);
-                    }
-                  }),
+                  FunctionMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
           () ->
               SessionUtils.doWithoutCommit(
                   FunctionVersionMetaMapper.class,
@@ -231,8 +225,16 @@ public class FunctionMetaService {
       baseMetricName = "getFunctionPOByIdentifier")
   FunctionPO getFunctionPOByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkFunction(ident);
+    FunctionPO functionPO =
+        SessionUtils.getWithoutCommit(FunctionMetaMapper.class, mapper -> ops.getPO(mapper, ident));
 
-    return functionPOFetcher().apply(ident);
+    if (functionPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.FUNCTION.name().toLowerCase(Locale.ROOT),
+          ident.name());
+    }
+    return functionPO;
   }
 
   @Monitored(
@@ -260,7 +262,7 @@ public class FunctionMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   FunctionMetaMapper.class,
-                  mapper -> mapper.updateFunctionMeta(newFunctionPO, oldFunctionPO)));
+                  mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO)));
 
       return newEntity;
     } catch (RuntimeException re) {
@@ -270,89 +272,9 @@ public class FunctionMetaService {
     }
   }
 
-  private Function<NameIdentifier, FunctionPO> functionPOFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::getFunctionPOBySchemaId
-        : this::getFunctionPOByFullQualifiedName;
-  }
-
-  private FunctionPO getFunctionPOBySchemaId(NameIdentifier ident) {
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(ident.namespace().levels()), Entity.EntityType.SCHEMA);
-
-    FunctionPO functionPO =
-        SessionUtils.getWithoutCommit(
-            FunctionMetaMapper.class,
-            mapper -> mapper.selectFunctionMetaBySchemaIdAndName(schemaId, ident.name()));
-
-    if (functionPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.FUNCTION.name().toLowerCase(Locale.ROOT),
-          ident.toString());
-    }
-    return functionPO;
-  }
-
-  private FunctionPO getFunctionPOByFullQualifiedName(NameIdentifier ident) {
-    String[] namespaceLevels = ident.namespace().levels();
-    FunctionPO functionPO =
-        SessionUtils.getWithoutCommit(
-            FunctionMetaMapper.class,
-            mapper ->
-                mapper.selectFunctionMetaByFullQualifiedName(
-                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2], ident.name()));
-
-    if (functionPO == null || functionPO.functionId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.FUNCTION.name().toLowerCase(Locale.ROOT),
-          ident.name());
-    }
-
-    if (functionPO.schemaId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          namespaceLevels[2]);
-    }
-    return functionPO;
-  }
-
   private List<FunctionPO> listFunctionPOs(Namespace namespace) {
-    return functionListFetcher().apply(namespace);
-  }
-
-  private List<FunctionPO> listFunctionPOsBySchemaId(Namespace namespace) {
-    Long schemaId =
-        EntityIdService.getEntityId(
-            NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA);
     return SessionUtils.getWithoutCommit(
-        FunctionMetaMapper.class, mapper -> mapper.listFunctionPOsBySchemaId(schemaId));
-  }
-
-  private Function<Namespace, List<FunctionPO>> functionListFetcher() {
-    return GravitinoEnv.getInstance().cacheEnabled()
-        ? this::listFunctionPOsBySchemaId
-        : this::listFunctionPOsByFullQualifiedName;
-  }
-
-  private List<FunctionPO> listFunctionPOsByFullQualifiedName(Namespace namespace) {
-    String[] namespaceLevels = namespace.levels();
-    List<FunctionPO> functionPOs =
-        SessionUtils.getWithoutCommit(
-            FunctionMetaMapper.class,
-            mapper ->
-                mapper.listFunctionPOsByFullQualifiedName(
-                    namespaceLevels[0], namespaceLevels[1], namespaceLevels[2]));
-    if (functionPOs.isEmpty() || functionPOs.get(0).schemaId() == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.SCHEMA.name().toLowerCase(),
-          namespaceLevels[2]);
-    }
-    return functionPOs.stream().filter(po -> po.functionId() != null).collect(Collectors.toList());
+        FunctionMetaMapper.class, mapper -> ops.listPOs(mapper, namespace));
   }
 
   private void fillFunctionPOBuilderParentEntityId(
