@@ -93,8 +93,8 @@ public class TablePOStorageOps extends BasePOStorageOps<TablePO, TableMetaMapper
   }
 
   @Override
-  public List<TablePO> listPOs(TableMetaMapper mapper, List<Long> uuids) {
-    return mapper.listTablePOsByTableIds(uuids);
+  public List<TablePO> listPOs(TableMetaMapper mapper, List<Long> entityIds) {
+    return mapper.listTablePOsByTableIds(entityIds);
   }
 
   @Override

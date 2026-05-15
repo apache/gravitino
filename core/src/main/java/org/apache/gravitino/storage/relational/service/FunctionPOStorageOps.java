@@ -63,8 +63,8 @@ public class FunctionPOStorageOps extends BasePOStorageOps<FunctionPO, FunctionM
   }
 
   @Override
-  public List<FunctionPO> listPOs(FunctionMetaMapper mapper, List<Long> uuids) {
-    return mapper.listFunctionPOsByFunctionIds(uuids);
+  public List<FunctionPO> listPOs(FunctionMetaMapper mapper, List<Long> entityIds) {
+    return mapper.listFunctionPOsByFunctionIds(entityIds);
   }
 
   @Override

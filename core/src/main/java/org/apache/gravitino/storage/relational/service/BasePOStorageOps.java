@@ -62,9 +62,9 @@ public abstract class BasePOStorageOps<PO, Mapper> {
         "listPOs by namespace and names is not supported by " + getClass().getSimpleName());
   }
 
-  public List<PO> listPOs(Mapper mapper, List<Long> uuids) {
+  public List<PO> listPOs(Mapper mapper, List<Long> entityIds) {
     throw new UnsupportedOperationException(
-        "listPOs by uuids is not supported by " + getClass().getSimpleName());
+        "listPOs by entityIds is not supported by " + getClass().getSimpleName());
   }
 
   public PO getPOByFullName(Mapper mapper, NameIdentifier identifier) {

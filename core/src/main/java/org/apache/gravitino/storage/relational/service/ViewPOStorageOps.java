@@ -85,8 +85,8 @@ public class ViewPOStorageOps extends BasePOStorageOps<ViewPO, ViewMetaMapper> {
   }
 
   @Override
-  public List<ViewPO> listPOs(ViewMetaMapper mapper, List<Long> uuids) {
-    return mapper.listViewPOsByViewIds(uuids);
+  public List<ViewPO> listPOs(ViewMetaMapper mapper, List<Long> entityIds) {
+    return mapper.listViewPOsByViewIds(entityIds);
   }
 
   @Override

@@ -95,8 +95,8 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
   }
 
   @Override
-  public List<PO> listPOs(Mapper mapper, List<Long> uuids) {
-    return applyRead(delegate.listPOs(mapper, uuids));
+  public List<PO> listPOs(Mapper mapper, List<Long> entityIds) {
+    return applyRead(delegate.listPOs(mapper, entityIds));
   }
 
   @Override

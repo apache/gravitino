@@ -84,8 +84,8 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
   }
 
   @Override
-  public List<SchemaPO> listPOs(SchemaMetaMapper schemaMetaMapper, List<Long> uuids) {
-    return schemaMetaMapper.listSchemaPOsBySchemaIds(uuids);
+  public List<SchemaPO> listPOs(SchemaMetaMapper schemaMetaMapper, List<Long> entityIds) {
+    return schemaMetaMapper.listSchemaPOsBySchemaIds(entityIds);
   }
 
   @Override
