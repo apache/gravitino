@@ -168,15 +168,14 @@ public interface GravitinoAuthorizer extends Closeable {
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type);
 
   /**
-   * Called when an entity undergoes a structural change (rename or drop) that invalidates cached
-   * name-to-id mappings in the authorizer. Implementations evict the cache key for the given entity
-   * and all of its descendants (cascade invalidation).
+   * Called when an entity name-to-id mapping may have changed because of a rename or drop.
+   * Implementations evict the cache key for the given entity and all of its descendants.
    *
    * @param metalake the metalake name
    * @param nameIdentifier the entity name identifier
    * @param type the entity type
    */
-  default void handleEntityStructuralChange(
+  default void handleEntityNameIdMappingChange(
       String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
     // default no-op for backward compatibility
   }

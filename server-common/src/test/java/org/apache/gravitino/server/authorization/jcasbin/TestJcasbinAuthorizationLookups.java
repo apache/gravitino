@@ -70,27 +70,29 @@ public class TestJcasbinAuthorizationLookups {
         "ml1::cat1::sch1::fs1::FILESET", JcasbinAuthorizationLookups.buildCacheKey("ml1", fileset));
   }
 
-  // ---------- isNonLeaf ----------
+  // ---------- isContainerType ----------
 
   @Test
-  void testIsNonLeafContainerTypes() {
-    Assertions.assertTrue(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.METALAKE));
-    Assertions.assertTrue(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.CATALOG));
-    Assertions.assertTrue(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.SCHEMA));
+  void testIsContainerTypeContainerTypes() {
+    Assertions.assertTrue(
+        JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.SCHEMA));
   }
 
   @Test
-  void testIsNonLeafLeafTypes() {
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.TABLE));
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.VIEW));
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.FILESET));
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.TOPIC));
+  void testIsContainerTypeLeafTypes() {
+    Assertions.assertFalse(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.VIEW));
+    Assertions.assertFalse(
+        JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.TOPIC));
   }
 
-  // ---------- Cascade prefix hierarchy ----------
+  // ---------- Prefix invalidation ----------
 
   @Test
-  void testCascadeInvalidationKeyHierarchy() {
+  void testPrefixInvalidationCoversContainerPath() {
     // Dropping a catalog should use a prefix that covers all schemas and tables below it.
     MetadataObject catalog =
         MetadataObjects.of(Collections.singletonList("cat1"), MetadataObject.Type.CATALOG);

@@ -58,8 +58,8 @@ public interface GravitinoCache<K, V> extends Closeable {
 
   /**
    * Evicts all entries whose key is a String and starts with the given prefix. Only meaningful when
-   * K = String. Used by metadataIdCache for hierarchical cascade invalidation: dropping a catalog
-   * evicts the catalog entry plus all schema/table/fileset/... entries beneath it.
+   * K = String. Used by metadataIdCache for path-based invalidation: dropping a catalog evicts the
+   * catalog entry plus all schema/table/fileset/... entries under that catalog name path.
    *
    * @param prefix the prefix to match against key strings
    */

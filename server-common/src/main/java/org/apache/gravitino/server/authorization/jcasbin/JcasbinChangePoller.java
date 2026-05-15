@@ -187,7 +187,7 @@ public class JcasbinChangePoller implements AutoCloseable {
       MetadataObject mdObj = metadataObjectFromChangeLog(metalake, fullName, mdType);
       String cacheKey = JcasbinAuthorizationLookups.buildCacheKey(metalake, mdObj);
 
-      if (JcasbinAuthorizationLookups.isNonLeaf(mdType)) {
+      if (JcasbinAuthorizationLookups.isContainerType(mdType)) {
         metadataIdCache.invalidateByPrefix(cacheKey);
       } else {
         metadataIdCache.invalidate(cacheKey);

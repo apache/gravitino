@@ -95,7 +95,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Cache<Long, Boolean> loadedRoles;
 
-  /** Hierarchical {@code metalake::catalog::schema::object::TYPE} → entity id. */
+  /** Path-based {@code metalake::catalog::schema::object::TYPE} → entity id. */
   private GravitinoCache<String, Long> metadataIdCache;
 
   /** {@code metadataObjectId} → {@link Optional} of {@link OwnerInfo}. */
@@ -455,12 +455,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public void handleEntityStructuralChange(
+  public void handleEntityNameIdMappingChange(
       String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     String cacheKey = JcasbinAuthorizationLookups.buildCacheKey(metalake, metadataObject);
-    if (JcasbinAuthorizationLookups.isNonLeaf(metadataObject.type())) {
-      // Cascade invalidation: metalake::catalog:: prefix removes catalog + all children
+    if (JcasbinAuthorizationLookups.isContainerType(metadataObject.type())) {
+      // Prefix invalidation: metalake::catalog:: removes catalog + all children.
       metadataIdCache.invalidateByPrefix(cacheKey);
     } else {
       metadataIdCache.invalidate(cacheKey);
