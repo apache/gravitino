@@ -37,27 +37,6 @@ The following table outlines the tested compatibility between Gravitino versions
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
 
-#### Reproducing the matrix locally
-
-Both connectors ship with a multi-version integration test driver so the
-matrix can be re-verified (and extended) without ad-hoc scripting:
-
-```bash
-# lance-spark — runs LanceSparkRESTServiceIT once per bundle version
-./gradlew :lance:lance-rest-server:lanceSparkMatrixTest \
-    -PlanceSparkBundleVersions=0.1.0,0.1.1,0.2.0,0.4.0 \
-    -PskipDockerTests=true
-# Per-version JUnit reports land under
-# lance/lance-rest-server/build/reports/lance-spark-matrix/<version>/.
-
-# lance-ray — provisions a venv per version under
-# clients/client-python/build/lance-ray-matrix/.venv-<version>/ and runs
-# tests/integration/test_lance_ray.py against each. The Gradle wrapper
-# below starts / stops Gravitino automatically.
-./gradlew :clients:client-python:lanceRayMatrixTest \
-    -PlanceRayVersions=0.4.2,0.3.0
-```
-
 ### Why Maintain a Compatibility Matrix?
 
 The Lance ecosystem is under active development, with frequent updates to APIs and features. Gravitino's Lance REST service depends on specific connector behaviors to ensure reliable operation. Using incompatible versions may result in:
@@ -184,7 +163,8 @@ pip install lance-ray
 
 :::info
 - Ray will be automatically installed if not already present
-- The lance-namespace version must be less than or equal to 0.4.5.
+- For Gravitino 1.3.0, use a `lance-namespace` client compatible with
+  server-side `lance-namespace-core` 0.7.5 or newer.
 - Ensure Ray version compatibility in your environment before deployment
 :::
 
