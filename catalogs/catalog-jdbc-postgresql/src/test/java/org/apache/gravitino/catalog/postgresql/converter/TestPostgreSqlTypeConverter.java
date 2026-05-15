@@ -27,6 +27,8 @@ import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeCo
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BOOL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BPCHAR;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BYTEA;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.DEFAULT_NUMERIC_PRECISION;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.DEFAULT_NUMERIC_SCALE;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.FLOAT_4;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.FLOAT_8;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_2;
@@ -70,8 +72,14 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), NUMERIC, 10, 2, 0);
     // Unconstrained NUMERIC (no precision) returns columnSize=0 from JDBC metadata;
     // mapped to Gravitino's maximum supported decimal as a compatibility tradeoff.
-    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 18), NUMERIC, 0, 0, 0);
-    checkJdbcTypeToGravitinoType(Types.DecimalType.of(38, 18), NUMERIC, null, null, 0);
+    checkJdbcTypeToGravitinoType(
+        Types.DecimalType.of(DEFAULT_NUMERIC_PRECISION, DEFAULT_NUMERIC_SCALE), NUMERIC, 0, 0, 0);
+    checkJdbcTypeToGravitinoType(
+        Types.DecimalType.of(DEFAULT_NUMERIC_PRECISION, DEFAULT_NUMERIC_SCALE),
+        NUMERIC,
+        null,
+        null,
+        0);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(9, 0), NUMERIC, 9, 0, 0);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(18, 0), NUMERIC, 18, 0, 0);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(20, 0), NUMERIC, 20, 0, 0);
