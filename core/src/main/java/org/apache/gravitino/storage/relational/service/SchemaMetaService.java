@@ -101,7 +101,9 @@ public class SchemaMetaService {
     NameIdentifier identifier = NameIdentifier.of(metalakeName, catalogName, schemaName);
     SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+            SchemaMetaMapper.class,
+            mapper ->
+                POStorageReadRouting.getPO(mapper, identifier, ops, Entity.EntityType.SCHEMA));
 
     if (schemaPO == null) {
       throw new NoSuchEntityException(
@@ -461,7 +463,9 @@ public class SchemaMetaService {
     NameIdentifierUtil.checkSchema(identifier);
     SchemaPO schemaPO =
         SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+            SchemaMetaMapper.class,
+            mapper ->
+                POStorageReadRouting.getPO(mapper, identifier, ops, Entity.EntityType.SCHEMA));
     if (schemaPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -473,7 +477,8 @@ public class SchemaMetaService {
 
   private List<SchemaPO> listSchemaPOs(Namespace namespace) {
     return SessionUtils.getWithoutCommit(
-        SchemaMetaMapper.class, mapper -> ops.listPOs(mapper, namespace));
+        SchemaMetaMapper.class,
+        mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.SCHEMA));
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {

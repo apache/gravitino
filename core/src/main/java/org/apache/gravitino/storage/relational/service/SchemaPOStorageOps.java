@@ -51,7 +51,7 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
   }
 
   @Override
-  protected SchemaPO getPOByFullName(SchemaMetaMapper mapper, NameIdentifier identifier) {
+  public SchemaPO getPOByFullName(SchemaMetaMapper mapper, NameIdentifier identifier) {
     Namespace namespace = identifier.namespace();
     SchemaPO po =
         mapper.selectSchemaByFullQualifiedName(
@@ -89,7 +89,7 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
   }
 
   @Override
-  protected List<SchemaPO> listPOsByNSFullName(
+  public List<SchemaPO> listPOsByNSFullName(
       SchemaMetaMapper schemaMetaMapper, Namespace namespace) {
     List<SchemaPO> pos =
         schemaMetaMapper.listSchemaPOsByFullQualifiedName(namespace.level(0), namespace.level(1));
@@ -106,16 +106,8 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
   }
 
   @Override
-  public List<Capability> capabilities() {
-    return List.of(
-        Capability.BATCH_INSERT,
-        Capability.UPDATE,
-        Capability.GET_BY_NAME,
-        Capability.GET_BY_NS_UID,
-        Capability.LIST_BY_NS_NAME,
-        Capability.LIST_BY_NS_UID,
-        Capability.LIST_BY_NAME_FILTER,
-        Capability.LIST_BY_UID_FILTER);
+  public boolean supportsParentIdRelationalRead() {
+    return true;
   }
 
   @Override

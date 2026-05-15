@@ -354,7 +354,8 @@ public class TableMetaService {
     NameIdentifierUtil.checkTable(identifier);
     TablePO tablePO =
         SessionUtils.getWithoutCommit(
-            TableMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+            TableMetaMapper.class,
+            mapper -> POStorageReadRouting.getPO(mapper, identifier, ops, Entity.EntityType.TABLE));
     if (tablePO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -367,7 +368,8 @@ public class TableMetaService {
 
   private List<TablePO> listTablePOs(Namespace namespace) {
     return SessionUtils.getWithoutCommit(
-        TableMetaMapper.class, mapper -> ops.listPOs(mapper, namespace));
+        TableMetaMapper.class,
+        mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.TABLE));
   }
 
   private void fillTablePOBuilderParentEntityId(TablePO.Builder builder, Namespace namespace) {

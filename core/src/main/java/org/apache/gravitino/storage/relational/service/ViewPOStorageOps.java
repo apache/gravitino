@@ -51,7 +51,7 @@ public class ViewPOStorageOps extends BasePOStorageOps<ViewPO, ViewMetaMapper> {
   }
 
   @Override
-  protected ViewPO getPOByFullName(ViewMetaMapper mapper, NameIdentifier identifier) {
+  public ViewPO getPOByFullName(ViewMetaMapper mapper, NameIdentifier identifier) {
     Namespace namespace = identifier.namespace();
     ViewPO po =
         mapper.selectViewByFullQualifiedName(
@@ -90,7 +90,7 @@ public class ViewPOStorageOps extends BasePOStorageOps<ViewPO, ViewMetaMapper> {
   }
 
   @Override
-  protected List<ViewPO> listPOsByNSFullName(ViewMetaMapper mapper, Namespace namespace) {
+  public List<ViewPO> listPOsByNSFullName(ViewMetaMapper mapper, Namespace namespace) {
     List<ViewPO> pos =
         mapper.listViewPOsByFullQualifiedName(
             namespace.level(0), namespace.level(1), namespace.level(2));
@@ -114,15 +114,8 @@ public class ViewPOStorageOps extends BasePOStorageOps<ViewPO, ViewMetaMapper> {
   }
 
   @Override
-  public List<Capability> capabilities() {
-    return List.of(
-        Capability.INSERT,
-        Capability.UPDATE,
-        Capability.GET_BY_NAME,
-        Capability.GET_BY_NS_UID,
-        Capability.LIST_BY_NS_UID,
-        Capability.LIST_BY_NS_NAME,
-        Capability.LIST_BY_UID_FILTER);
+  public boolean supportsParentIdRelationalRead() {
+    return true;
   }
 
   @Override

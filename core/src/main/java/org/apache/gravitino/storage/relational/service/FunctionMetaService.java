@@ -226,7 +226,9 @@ public class FunctionMetaService {
   FunctionPO getFunctionPOByIdentifier(NameIdentifier ident) {
     NameIdentifierUtil.checkFunction(ident);
     FunctionPO functionPO =
-        SessionUtils.getWithoutCommit(FunctionMetaMapper.class, mapper -> ops.getPO(mapper, ident));
+        SessionUtils.getWithoutCommit(
+            FunctionMetaMapper.class,
+            mapper -> POStorageReadRouting.getPO(mapper, ident, ops, Entity.EntityType.FUNCTION));
 
     if (functionPO == null) {
       throw new NoSuchEntityException(
@@ -274,7 +276,8 @@ public class FunctionMetaService {
 
   private List<FunctionPO> listFunctionPOs(Namespace namespace) {
     return SessionUtils.getWithoutCommit(
-        FunctionMetaMapper.class, mapper -> ops.listPOs(mapper, namespace));
+        FunctionMetaMapper.class,
+        mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.FUNCTION));
   }
 
   private void fillFunctionPOBuilderParentEntityId(

@@ -51,7 +51,7 @@ public class TablePOStorageOps extends BasePOStorageOps<TablePO, TableMetaMapper
   }
 
   @Override
-  protected TablePO getPOByFullName(TableMetaMapper mapper, NameIdentifier identifier) {
+  public TablePO getPOByFullName(TableMetaMapper mapper, NameIdentifier identifier) {
     Namespace namespace = identifier.namespace();
     TablePO po =
         mapper.selectTableByFullQualifiedName(
@@ -98,7 +98,7 @@ public class TablePOStorageOps extends BasePOStorageOps<TablePO, TableMetaMapper
   }
 
   @Override
-  protected List<TablePO> listPOsByNSFullName(TableMetaMapper mapper, Namespace namespace) {
+  public List<TablePO> listPOsByNSFullName(TableMetaMapper mapper, Namespace namespace) {
     List<TablePO> pos =
         mapper.listTablePOsByFullQualifiedName(
             namespace.level(0), namespace.level(1), namespace.level(2));
@@ -122,16 +122,8 @@ public class TablePOStorageOps extends BasePOStorageOps<TablePO, TableMetaMapper
   }
 
   @Override
-  public List<Capability> capabilities() {
-    return List.of(
-        Capability.INSERT,
-        Capability.UPDATE,
-        Capability.GET_BY_NAME,
-        Capability.GET_BY_NS_UID,
-        Capability.LIST_BY_NS_UID,
-        Capability.LIST_BY_NS_NAME,
-        Capability.LIST_BY_NAME_FILTER,
-        Capability.LIST_BY_UID_FILTER);
+  public boolean supportsParentIdRelationalRead() {
+    return true;
   }
 
   @Override

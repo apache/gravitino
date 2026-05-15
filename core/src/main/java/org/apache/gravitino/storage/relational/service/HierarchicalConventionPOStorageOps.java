@@ -28,12 +28,13 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /**
- * Wraps a {@link BasePOStorageOps} to bridge the hierarchical schema naming convention. Names that
- * appear in API form (logical separator) are translated to storage form (physical separator) before
- * delegating. Two optional PO rewriters allow callers to translate a PO field across the boundary:
- * the read rewriter is applied to POs returned from read methods (typically physical→logical), and
- * the write rewriter is applied to POs passed into write methods (typically logical→physical) so
- * the SQL still receives storage-form values.
+ * Wraps a {@link BasePOStorageOps} to bridge the hierarchical schema naming convention. Identifiers
+ * and namespace segments in logical form (logical separator) are translated to physical form
+ * (physical separator) before delegating. Two optional PO rewriters allow callers to translate a PO
+ * field across the boundary: {@code physicalToLogicalRewriter} is applied to POs returned from read
+ * methods (typically physical→logical), and {@code logicalToPhysicalRewriter} is applied to POs
+ * passed into write methods (typically logical→physical) so the SQL still receives storage-form
+ * values.
  *
  * @param <PO> persistent object type
  * @param <Mapper> MyBatis mapper type
@@ -41,8 +42,8 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorageOps<PO, Mapper> {
 
   private final BasePOStorageOps<PO, Mapper> delegate;
-  private final UnaryOperator<PO> readRewriter;
-  private final UnaryOperator<PO> writeRewriter;
+  private final UnaryOperator<PO> physicalToLogicalRewriter;
+  private final UnaryOperator<PO> logicalToPhysicalRewriter;
 
   public HierarchicalConventionPOStorageOps(BasePOStorageOps<PO, Mapper> delegate) {
     this(delegate, UnaryOperator.identity(), UnaryOperator.identity());
@@ -50,16 +51,16 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
 
   public HierarchicalConventionPOStorageOps(
       BasePOStorageOps<PO, Mapper> delegate,
-      UnaryOperator<PO> readRewriter,
-      UnaryOperator<PO> writeRewriter) {
+      UnaryOperator<PO> physicalToLogicalRewriter,
+      UnaryOperator<PO> logicalToPhysicalRewriter) {
     this.delegate = delegate;
-    this.readRewriter = readRewriter;
-    this.writeRewriter = writeRewriter;
+    this.physicalToLogicalRewriter = physicalToLogicalRewriter;
+    this.logicalToPhysicalRewriter = logicalToPhysicalRewriter;
   }
 
   @Override
   public void insertPO(Mapper mapper, PO po, boolean overwrite) {
-    delegate.insertPO(mapper, writeRewriter.apply(po), overwrite);
+    delegate.insertPO(mapper, logicalToPhysicalRewriter.apply(po), overwrite);
   }
 
   @Override
@@ -69,7 +70,8 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
 
   @Override
   public Integer updatePO(Mapper mapper, PO newPO, PO oldPO) {
-    return delegate.updatePO(mapper, writeRewriter.apply(newPO), writeRewriter.apply(oldPO));
+    return delegate.updatePO(
+        mapper, logicalToPhysicalRewriter.apply(newPO), logicalToPhysicalRewriter.apply(oldPO));
   }
 
   @Override
@@ -83,13 +85,13 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
   }
 
   @Override
-  public List<PO> listPOs(Mapper mapper, Namespace namespace, List<String> names) {
-    Namespace storageNs = apiNamespaceToStorage(namespace);
-    List<String> storageNames =
+  public List<PO> listPOs(Mapper mapper, Namespace logicalNamespace, List<String> names) {
+    Namespace physicalNamespace = logicalToPhysicalNamespace(logicalNamespace);
+    List<String> physicalNames =
         names.stream()
             .map(HierarchicalConventionPOStorageOps::toPhysicalIfHierarchical)
             .collect(Collectors.toList());
-    return applyRead(delegate.listPOs(mapper, storageNs, storageNames));
+    return applyRead(delegate.listPOs(mapper, physicalNamespace, physicalNames));
   }
 
   @Override
@@ -98,18 +100,20 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
   }
 
   @Override
-  protected PO getPOByFullName(Mapper mapper, NameIdentifier identifier) {
-    return applyRead(delegate.getPOByFullName(mapper, apiIdentifierToStorage(identifier)));
+  public PO getPOByFullName(Mapper mapper, NameIdentifier logical) {
+    NameIdentifier physical = logicalToPhysicalIdentifier(logical);
+    return applyRead(delegate.getPOByFullName(mapper, physical));
   }
 
   @Override
-  protected List<PO> listPOsByNSFullName(Mapper mapper, Namespace namespace) {
-    return applyRead(delegate.listPOsByNSFullName(mapper, apiNamespaceToStorage(namespace)));
+  public List<PO> listPOsByNSFullName(Mapper mapper, Namespace logical) {
+    Namespace physical = logicalToPhysicalNamespace(logical);
+    return applyRead(delegate.listPOsByNSFullName(mapper, physical));
   }
 
   @Override
-  public List<Capability> capabilities() {
-    return delegate.capabilities();
+  public boolean supportsParentIdRelationalRead() {
+    return delegate.supportsParentIdRelationalRead();
   }
 
   @Override
@@ -118,7 +122,7 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
   }
 
   private PO applyRead(PO po) {
-    return po == null ? null : readRewriter.apply(po);
+    return po == null ? null : physicalToLogicalRewriter.apply(po);
   }
 
   private List<PO> applyRead(List<PO> pos) {
@@ -132,7 +136,7 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
     if (pos == null || pos.isEmpty()) {
       return pos;
     }
-    return pos.stream().map(writeRewriter).collect(Collectors.toList());
+    return pos.stream().map(logicalToPhysicalRewriter).collect(Collectors.toList());
   }
 
   private static String toPhysicalIfHierarchical(String name) {
@@ -146,50 +150,49 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
     return HierarchicalSchemaUtil.logicalToPhysical(name, sep);
   }
 
-  private static NameIdentifier apiIdentifierToStorage(NameIdentifier apiIdentifier) {
-    String[] levels = apiIdentifier.namespace().levels();
+  private static NameIdentifier logicalToPhysicalIdentifier(NameIdentifier logical) {
+    String[] levels = logical.namespace().levels();
     if (levels.length == 2) {
-      String rawName = apiIdentifier.name();
-      String storageName =
+      String rawName = logical.name();
+      String physicalName =
           StringUtils.isNotBlank(rawName)
               ? HierarchicalSchemaUtil.logicalToPhysical(
                   rawName, HierarchicalSchemaUtil.schemaSeparator())
               : rawName;
-      if (storageName.equals(apiIdentifier.name())) {
-        return apiIdentifier;
+      if (physicalName.equals(logical.name())) {
+        return logical;
       }
-      return NameIdentifier.of(apiIdentifier.namespace(), storageName);
+      return NameIdentifier.of(logical.namespace(), physicalName);
     }
     if (levels.length == 3) {
       String rawSeg = levels[2];
-      String storageSchema =
+      String physicalSchema =
           StringUtils.isNotBlank(rawSeg)
               ? HierarchicalSchemaUtil.logicalToPhysical(
                   rawSeg, HierarchicalSchemaUtil.schemaSeparator())
               : rawSeg;
-      if (storageSchema.equals(levels[2])) {
-        return apiIdentifier;
+      if (physicalSchema.equals(levels[2])) {
+        return logical;
       }
-      return NameIdentifier.of(
-          Namespace.of(levels[0], levels[1], storageSchema), apiIdentifier.name());
+      return NameIdentifier.of(Namespace.of(levels[0], levels[1], physicalSchema), logical.name());
     }
-    return apiIdentifier;
+    return logical;
   }
 
-  private static Namespace apiNamespaceToStorage(Namespace apiNamespace) {
-    String[] levels = apiNamespace.levels();
+  private static Namespace logicalToPhysicalNamespace(Namespace logical) {
+    String[] levels = logical.levels();
     if (levels.length != 3) {
-      return apiNamespace;
+      return logical;
     }
     String rawSeg = levels[2];
-    String storageSchema =
+    String physicalSchema =
         StringUtils.isNotBlank(rawSeg)
             ? HierarchicalSchemaUtil.logicalToPhysical(
                 rawSeg, HierarchicalSchemaUtil.schemaSeparator())
             : rawSeg;
-    if (storageSchema.equals(levels[2])) {
-      return apiNamespace;
+    if (physicalSchema.equals(levels[2])) {
+      return logical;
     }
-    return Namespace.of(levels[0], levels[1], storageSchema);
+    return Namespace.of(levels[0], levels[1], physicalSchema);
   }
 }

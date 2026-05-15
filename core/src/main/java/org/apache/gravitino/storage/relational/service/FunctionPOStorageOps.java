@@ -51,7 +51,7 @@ public class FunctionPOStorageOps extends BasePOStorageOps<FunctionPO, FunctionM
   }
 
   @Override
-  protected FunctionPO getPOByFullName(FunctionMetaMapper mapper, NameIdentifier identifier) {
+  public FunctionPO getPOByFullName(FunctionMetaMapper mapper, NameIdentifier identifier) {
     Namespace namespace = identifier.namespace();
     return mapper.selectFunctionMetaByFullQualifiedName(
         namespace.level(0), namespace.level(1), namespace.level(2), identifier.name());
@@ -68,7 +68,7 @@ public class FunctionPOStorageOps extends BasePOStorageOps<FunctionPO, FunctionM
   }
 
   @Override
-  protected List<FunctionPO> listPOsByNSFullName(FunctionMetaMapper mapper, Namespace namespace) {
+  public List<FunctionPO> listPOsByNSFullName(FunctionMetaMapper mapper, Namespace namespace) {
     List<FunctionPO> pos =
         mapper.listFunctionPOsByFullQualifiedName(
             namespace.level(0), namespace.level(1), namespace.level(2));
@@ -92,15 +92,8 @@ public class FunctionPOStorageOps extends BasePOStorageOps<FunctionPO, FunctionM
   }
 
   @Override
-  public List<Capability> capabilities() {
-    return List.of(
-        Capability.INSERT,
-        Capability.UPDATE,
-        Capability.GET_BY_NAME,
-        Capability.GET_BY_NS_UID,
-        Capability.LIST_BY_NS_UID,
-        Capability.LIST_BY_NS_NAME,
-        Capability.LIST_BY_UID_FILTER);
+  public boolean supportsParentIdRelationalRead() {
+    return true;
   }
 
   @Override

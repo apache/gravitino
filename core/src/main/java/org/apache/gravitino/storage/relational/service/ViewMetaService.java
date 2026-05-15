@@ -280,7 +280,8 @@ public class ViewMetaService {
     NameIdentifierUtil.checkView(identifier);
     ViewPO viewPO =
         SessionUtils.getWithoutCommit(
-            ViewMetaMapper.class, mapper -> ops.getPO(mapper, identifier));
+            ViewMetaMapper.class,
+            mapper -> POStorageReadRouting.getPO(mapper, identifier, ops, Entity.EntityType.VIEW));
     if (viewPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
@@ -293,6 +294,7 @@ public class ViewMetaService {
 
   private List<ViewPO> listViewPOs(Namespace namespace) {
     return SessionUtils.getWithoutCommit(
-        ViewMetaMapper.class, mapper -> ops.listPOs(mapper, namespace));
+        ViewMetaMapper.class,
+        mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.VIEW));
   }
 }

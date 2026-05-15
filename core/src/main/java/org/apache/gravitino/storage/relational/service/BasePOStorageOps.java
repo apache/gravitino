@@ -20,10 +20,8 @@ package org.apache.gravitino.storage.relational.service;
 
 import java.util.List;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 
 public abstract class BasePOStorageOps<PO, Mapper> {
   public void insertPO(Mapper mapper, PO po, boolean overwrite) {
@@ -41,48 +39,12 @@ public abstract class BasePOStorageOps<PO, Mapper> {
         "updatePO is not supported by " + getClass().getSimpleName());
   }
 
-  public final PO getPO(Mapper mapper, NameIdentifier identifier) {
-    if (!capabilities().contains(Capability.GET_BY_NS_UID)
-        && !capabilities().contains(Capability.GET_BY_NAME)) {
-      throw new UnsupportedOperationException(
-          "getPO requires GET_BY_NS_UID or GET_BY_NAME for "
-              + entityType()
-              + ", but capabilities are "
-              + capabilities());
-    }
-
-    if (GravitinoEnv.getInstance().cacheEnabled()
-        && capabilities().contains(Capability.GET_BY_NS_UID)) {
-      Long parentId =
-          EntityIdService.getEntityId(
-              NameIdentifier.parse(identifier.namespace().toString()),
-              NameIdentifierUtil.parentEntityType(entityType()));
-      return getPO(mapper, parentId, identifier.name());
-    }
-
-    return getPOByFullName(mapper, identifier);
-  }
-
-  public final List<PO> listPOs(Mapper mapper, Namespace namespace) {
-    if (!capabilities().contains(Capability.LIST_BY_NS_UID)
-        && !capabilities().contains(Capability.LIST_BY_NS_NAME)) {
-      throw new UnsupportedOperationException(
-          "listPOs requires LIST_BY_NS_UID or LIST_BY_NS_NAME for "
-              + entityType()
-              + ", but capabilities are "
-              + capabilities());
-    }
-
-    if (GravitinoEnv.getInstance().cacheEnabled()
-        && capabilities().contains(Capability.LIST_BY_NS_UID)) {
-      Long parentId =
-          EntityIdService.getEntityId(
-              NameIdentifier.parse(namespace.toString()),
-              NameIdentifierUtil.parentEntityType(entityType()));
-      return listPOs(mapper, parentId);
-    }
-
-    return listPOsByNSFullName(mapper, namespace);
+  /**
+   * When {@code true} and the entity-id cache is enabled, callers may resolve rows by parent entity
+   * id plus short name via {@link #getPO} and {@link #listPOs}; see {@link POStorageReadRouting}.
+   */
+  public boolean supportsParentIdRelationalRead() {
+    return false;
   }
 
   public PO getPO(Mapper mapper, Long parentId, String name) {
@@ -105,29 +67,15 @@ public abstract class BasePOStorageOps<PO, Mapper> {
         "listPOs by uuids is not supported by " + getClass().getSimpleName());
   }
 
-  protected PO getPOByFullName(Mapper mapper, NameIdentifier identifier) {
+  public PO getPOByFullName(Mapper mapper, NameIdentifier identifier) {
     throw new UnsupportedOperationException(
         "getPOByFullName is not supported by " + getClass().getSimpleName());
   }
 
-  protected List<PO> listPOsByNSFullName(Mapper mapper, Namespace namespace) {
+  public List<PO> listPOsByNSFullName(Mapper mapper, Namespace namespace) {
     throw new UnsupportedOperationException(
         "listPOsByNSFullName is not supported by " + getClass().getSimpleName());
   }
 
-  public abstract List<Capability> capabilities();
-
   protected abstract Entity.EntityType entityType();
-
-  public enum Capability {
-    INSERT,
-    BATCH_INSERT,
-    UPDATE,
-    GET_BY_NAME,
-    GET_BY_NS_UID,
-    LIST_BY_NS_UID,
-    LIST_BY_NS_NAME,
-    LIST_BY_NAME_FILTER,
-    LIST_BY_UID_FILTER
-  }
 }
