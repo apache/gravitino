@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.GroupMetaMapper.GRO
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.GROUP_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.ibatis.annotations.Param;
@@ -84,6 +85,41 @@ public class GroupMetaBaseSQLProvider {
         + GROUP_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND group_name = #{groupName}"
         + " AND deleted_at = 0";
+  }
+
+  public String listExtendedGroupPOsByMetalakeIdAndNames(
+      @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
+    return "<script>"
+        + "SELECT gt.group_id as groupId, gt.group_name as groupName,"
+        + " gt.metalake_id as metalakeId,"
+        + " gt.audit_info as auditInfo,"
+        + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
+        + " gt.deleted_at as deletedAt,"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
+        + " FROM "
+        + GROUP_TABLE_NAME
+        + " gt LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + GROUP_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.group_id = gt.group_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
+        + " WHERE"
+        + " gt.deleted_at = 0 AND"
+        + " gt.metalake_id = #{metalakeId}"
+        + " AND gt.group_name IN ("
+        + "<foreach collection='groupNames' item='groupName' separator=','>"
+        + "#{groupName}"
+        + "</foreach>"
+        + " )"
+        + " GROUP BY gt.group_id, gt.group_name, gt.metalake_id, gt.audit_info,"
+        + " gt.current_version, gt.last_version, gt.deleted_at"
+        + "</script>";
   }
 
   public String insertGroupMeta(@Param("groupMeta") GroupPO groupPO) {
@@ -181,5 +217,26 @@ public class GroupMetaBaseSQLProvider {
     return "DELETE FROM "
         + GROUP_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String touchGroupUpdatedAt(@Param("groupId") long groupId) {
+    return "UPDATE "
+        + GROUP_TABLE_NAME
+        + " SET updated_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+  }
+
+  public String getGroupUpdatedAt(
+      @Param("metalakeName") String metalakeName, @Param("groupName") String groupName) {
+    return "SELECT gm.group_id as groupId, gm.updated_at as updatedAt"
+        + " FROM "
+        + GROUP_TABLE_NAME
+        + " gm"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON gm.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
+        + " WHERE mm.metalake_name = #{metalakeName} AND gm.group_name = #{groupName}"
+        + " AND gm.deleted_at = 0";
   }
 }

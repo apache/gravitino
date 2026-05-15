@@ -41,6 +41,13 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionParams;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.integration.test.util.CloseContainerExtension;
 import org.apache.gravitino.integration.test.util.PrintFuncNameExtension;
 import org.apache.gravitino.job.ShellJobTemplate;
@@ -49,7 +56,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
@@ -61,9 +68,14 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -539,12 +551,39 @@ public abstract class TestJDBCBackend {
         .build();
   }
 
-  protected GenericEntity createViewEntity(Long id, Namespace namespace, String viewName) {
-    return GenericEntity.builder()
+  protected ViewEntity createViewEntity(Long id, Namespace namespace, String viewName) {
+    return ViewEntity.builder()
         .withId(id)
         .withName(viewName)
         .withNamespace(namespace)
-        .withEntityType(Entity.EntityType.VIEW)
+        .withColumns(new Column[0])
+        .withRepresentations(
+            new Representation[] {
+              SQLRepresentation.builder().withDialect("unknown").withSql("SELECT 1").build()
+            })
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
+  protected FunctionEntity createFunctionEntity(
+      Long id, Namespace namespace, String name, AuditInfo auditInfo) {
+    FunctionParam param1 = FunctionParams.of("param1", Types.IntegerType.get());
+    FunctionParam param2 = FunctionParams.of("param2", Types.StringType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT param1 + 1");
+    FunctionDefinition definition =
+        FunctionDefinitions.of(
+            new FunctionParam[] {param1, param2},
+            Types.IntegerType.get(),
+            new FunctionImpl[] {impl});
+    return FunctionEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment("test function comment")
+        .withFunctionType(FunctionType.SCALAR)
+        .withDeterministic(false)
+        .withDefinitions(new FunctionDefinition[] {definition})
+        .withAuditInfo(auditInfo)
         .build();
   }
 

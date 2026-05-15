@@ -20,14 +20,17 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper.OWNER_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.OwnerMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.ibatis.annotations.Param;
 
 public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
@@ -96,6 +99,11 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
         + ViewMetaMapper.TABLE_NAME
         + " vt WHERE vt.catalog_id = #{catalogId} AND"
         + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.catalog_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
+        + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 
@@ -134,7 +142,27 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
         + ViewMetaMapper.TABLE_NAME
         + " vt WHERE vt.schema_id = #{schemaId} AND"
         + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.schema_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.schema_id = #{schemaId} AND"
+        + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
+  }
+
+  @Override
+  public String batchSoftDeleteOwnerRelByMetadataObjects(
+      @Param("deletions") List<OwnerRelForDeletion> deletions) {
+    return "<script>"
+        + "UPDATE "
+        + OWNER_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE deleted_at = 0 AND ("
+        + "<foreach collection='deletions' item='t' separator=' OR '>"
+        + "(metadata_object_id = #{t.metadataObjectId} AND metadata_object_type = #{t.metadataObjectType})"
+        + "</foreach>"
+        + ")"
+        + "</script>";
   }
 
   @Override

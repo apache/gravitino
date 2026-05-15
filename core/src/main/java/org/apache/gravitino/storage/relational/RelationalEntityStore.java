@@ -136,8 +136,9 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    E updatedEntity = backend.update(ident, entityType, updater);
     cache.invalidate(ident, entityType);
-    return backend.update(ident, entityType, updater);
+    return updatedEntity;
   }
 
   @Override
@@ -183,10 +184,12 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
     try {
-      cache.invalidate(ident, entityType);
-      return backend.delete(ident, entityType, cascade);
+      boolean deleted = backend.delete(ident, entityType, cascade);
+      return deleted;
     } catch (NoSuchEntityException e) {
       return false;
+    } finally {
+      cache.invalidate(ident, entityType);
     }
   }
 
@@ -319,9 +322,9 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       Entity.EntityType dstType,
       boolean override)
       throws IOException {
+    backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
     cache.invalidate(srcIdentifier, srcType, relType);
     cache.invalidate(dstIdentifier, dstType, relType);
-    backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
   }
 
   @Override
@@ -333,11 +336,12 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
 
-    // We need to clear the cache of the source entity and all destination entities being added or
-    // removed. This ensures that any subsequent reads will fetch the updated relations from the
-    // backend. For example, if we are adding a tag to table, we need to invalidate the cache for
-    // that table and the tag being added or removed. Otherwise, we might return stale data if we
-    // list all tags for that table or all tables for that tag.
+    // Invalidate after the backend write, not before. Invalidating before creates a window where
+    // a concurrent read can repopulate the cache with stale pre-commit data.
+    List<E> result =
+        backend.updateEntityRelations(
+            relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+
     cache.invalidate(srcEntityIdent, srcEntityType, relType);
     for (NameIdentifier destToAdd : destEntitiesToAdd) {
       cache.invalidate(destToAdd, srcEntityType, relType);
@@ -347,8 +351,7 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       cache.invalidate(destToRemove, srcEntityType, relType);
     }
 
-    return backend.updateEntityRelations(
-        relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+    return result;
   }
 
   @Override

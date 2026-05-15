@@ -29,6 +29,7 @@ import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
+import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
 import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
@@ -67,6 +68,7 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
           Entity.EntityType.TOPIC,
           Entity.EntityType.MODEL,
           Entity.EntityType.COLUMN,
+          Entity.EntityType.FUNCTION,
           Entity.EntityType.VIEW);
 
   @Override
@@ -232,6 +234,17 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
                 .getViewIdBySchemaIdAndName(schemaIds.getSchemaId(), nameIdentifier.name());
         return new NamespacedEntityId(
             viewId, schemaIds.getMetalakeId(), schemaIds.getCatalogId(), schemaIds.getSchemaId());
+
+      case FUNCTION:
+        long functionId =
+            FunctionMetaService.getInstance()
+                .getFunctionIdBySchemaIdAndFunctionName(
+                    schemaIds.getSchemaId(), nameIdentifier.name());
+        return new NamespacedEntityId(
+            functionId,
+            schemaIds.getMetalakeId(),
+            schemaIds.getCatalogId(),
+            schemaIds.getSchemaId());
 
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + type);

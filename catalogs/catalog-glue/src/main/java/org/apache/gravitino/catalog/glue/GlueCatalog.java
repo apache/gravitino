@@ -32,7 +32,6 @@ import org.apache.gravitino.connector.capability.Capability;
  */
 public class GlueCatalog extends BaseCatalog<GlueCatalog> {
 
-  // TODO PR-02: replace stubs with real implementations
   static final GlueCatalogPropertiesMetadata CATALOG_PROPERTIES_METADATA =
       new GlueCatalogPropertiesMetadata();
 
@@ -60,13 +59,11 @@ public class GlueCatalog extends BaseCatalog<GlueCatalog> {
    */
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    // TODO PR-04: initialize GlueClient and wire up real operations
     return new GlueCatalogOperations();
   }
 
   @Override
   public Capability newCapability() {
-    // TODO PR-02: implement GlueCatalogCapability
     return new GlueCatalogCapability();
   }
 

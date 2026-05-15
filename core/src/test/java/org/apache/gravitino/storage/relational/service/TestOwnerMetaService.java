@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
@@ -37,7 +38,7 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -45,6 +46,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -248,12 +250,19 @@ class TestOwnerMetaService extends TestJDBCBackend {
             null,
             AUDIT_INFO);
     backend.insert(model, false);
-    GenericEntity view =
+    ViewEntity view =
         createViewEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "view");
     backend.insert(view, false);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "function",
+            AUDIT_INFO);
+    backend.insert(function, false);
 
     UserEntity user =
         createUserEntity(
@@ -277,43 +286,50 @@ class TestOwnerMetaService extends TestJDBCBackend {
         .setOwner(model.nameIdentifier(), model.type(), user.nameIdentifier(), user.type());
     OwnerMetaService.getInstance()
         .setOwner(view.nameIdentifier(), view.type(), user.nameIdentifier(), user.type());
+    OwnerMetaService.getInstance()
+        .setOwner(function.nameIdentifier(), function.type(), user.nameIdentifier(), user.type());
 
-    Assertions.assertEquals(7, countAllOwnerRel(user.id()));
-    Assertions.assertEquals(7, countActiveOwnerRel(user.id()));
+    Assertions.assertEquals(8, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(8, countActiveOwnerRel(user.id()));
 
     // Test to delete view
     ViewMetaService.getInstance().deleteView(view.nameIdentifier());
-    Assertions.assertEquals(7, countAllOwnerRel(user.id()));
-    Assertions.assertEquals(6, countActiveOwnerRel(user.id()));
+    Assertions.assertEquals(8, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(7, countActiveOwnerRel(user.id()));
 
     // Test to delete model
     ModelMetaService.getInstance().deleteModel(model.nameIdentifier());
-    Assertions.assertEquals(7, countAllOwnerRel(user.id()));
-    Assertions.assertEquals(5, countActiveOwnerRel(user.id()));
+    Assertions.assertEquals(8, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(6, countActiveOwnerRel(user.id()));
 
     // Test to delete table
     TableMetaService.getInstance().deleteTable(table.nameIdentifier());
-    Assertions.assertEquals(7, countAllOwnerRel(user.id()));
-    Assertions.assertEquals(4, countActiveOwnerRel(user.id()));
+    Assertions.assertEquals(8, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(5, countActiveOwnerRel(user.id()));
 
     // Test to delete topic
     TopicMetaService.getInstance().deleteTopic(topic.nameIdentifier());
-    Assertions.assertEquals(7, countAllOwnerRel(user.id()));
-    Assertions.assertEquals(3, countActiveOwnerRel(user.id()));
+    Assertions.assertEquals(8, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(4, countActiveOwnerRel(user.id()));
 
     // Test to delete fileset
     FilesetMetaService.getInstance().deleteFileset(fileset.nameIdentifier());
-    Assertions.assertEquals(7, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(8, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(3, countActiveOwnerRel(user.id()));
+
+    // Test to delete function
+    FunctionMetaService.getInstance().deleteFunction(function.nameIdentifier());
+    Assertions.assertEquals(8, countAllOwnerRel(user.id()));
     Assertions.assertEquals(2, countActiveOwnerRel(user.id()));
 
     // Test to delete schema
     SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), false);
-    Assertions.assertEquals(7, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(8, countAllOwnerRel(user.id()));
     Assertions.assertEquals(1, countActiveOwnerRel(user.id()));
 
     // Test to delete catalog
     CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), false);
-    Assertions.assertEquals(7, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(8, countAllOwnerRel(user.id()));
     Assertions.assertEquals(0, countActiveOwnerRel(user.id()));
 
     // Test to delete catalog with cascade mode
@@ -370,6 +386,13 @@ class TestOwnerMetaService extends TestJDBCBackend {
             Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "view");
     backend.insert(view, false);
+    FunctionEntity function2 =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "function",
+            AUDIT_INFO);
+    backend.insert(function2, false);
 
     OwnerMetaService.getInstance()
         .setOwner(catalog.nameIdentifier(), catalog.type(), user.nameIdentifier(), user.type());
@@ -385,9 +408,11 @@ class TestOwnerMetaService extends TestJDBCBackend {
         .setOwner(model.nameIdentifier(), model.type(), user.nameIdentifier(), user.type());
     OwnerMetaService.getInstance()
         .setOwner(view.nameIdentifier(), view.type(), user.nameIdentifier(), user.type());
+    OwnerMetaService.getInstance()
+        .setOwner(function2.nameIdentifier(), function2.type(), user.nameIdentifier(), user.type());
 
     CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), true);
-    Assertions.assertEquals(14, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(16, countAllOwnerRel(user.id()));
     Assertions.assertEquals(0, countActiveOwnerRel(user.id()));
 
     // Test to delete schema with cascade mode
@@ -448,6 +473,13 @@ class TestOwnerMetaService extends TestJDBCBackend {
             Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "view");
     backend.insert(view, false);
+    FunctionEntity function3 =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "function",
+            AUDIT_INFO);
+    backend.insert(function3, false);
 
     OwnerMetaService.getInstance()
         .setOwner(schema.nameIdentifier(), schema.type(), user.nameIdentifier(), user.type());
@@ -463,9 +495,11 @@ class TestOwnerMetaService extends TestJDBCBackend {
         .setOwner(model.nameIdentifier(), model.type(), user.nameIdentifier(), user.type());
     OwnerMetaService.getInstance()
         .setOwner(view.nameIdentifier(), view.type(), user.nameIdentifier(), user.type());
+    OwnerMetaService.getInstance()
+        .setOwner(function3.nameIdentifier(), function3.type(), user.nameIdentifier(), user.type());
 
     SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true);
-    Assertions.assertEquals(21, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(24, countAllOwnerRel(user.id()));
     Assertions.assertEquals(1, countActiveOwnerRel(user.id()));
 
     // Test to delete user
@@ -516,6 +550,13 @@ class TestOwnerMetaService extends TestJDBCBackend {
             Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "view");
     backend.insert(view, false);
+    FunctionEntity function4 =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(TestOwnerMetaService.METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "function",
+            AUDIT_INFO);
+    backend.insert(function4, false);
 
     OwnerMetaService.getInstance()
         .setOwner(schema.nameIdentifier(), schema.type(), user.nameIdentifier(), user.type());
@@ -531,9 +572,11 @@ class TestOwnerMetaService extends TestJDBCBackend {
         .setOwner(model.nameIdentifier(), model.type(), user.nameIdentifier(), user.type());
     OwnerMetaService.getInstance()
         .setOwner(view.nameIdentifier(), view.type(), user.nameIdentifier(), user.type());
+    OwnerMetaService.getInstance()
+        .setOwner(function4.nameIdentifier(), function4.type(), user.nameIdentifier(), user.type());
 
     UserMetaService.getInstance().deleteUser(user.nameIdentifier());
-    Assertions.assertEquals(28, countAllOwnerRel(user.id()));
+    Assertions.assertEquals(32, countAllOwnerRel(user.id()));
     Assertions.assertEquals(0, countActiveOwnerRel(user.id()));
   }
 
@@ -691,6 +734,154 @@ class TestOwnerMetaService extends TestJDBCBackend {
             .batchGetOwner(Collections.emptyList(), Entity.EntityType.TABLE);
     Assertions.assertNotNull(relations);
     Assertions.assertTrue(relations.isEmpty());
+  }
+
+  @TestTemplate
+  void testBatchSetOwnersWithEmptyInput() {
+    OwnerMetaService.getInstance()
+        .batchSetOwners(
+            Collections.emptyList(),
+            Entity.EntityType.TABLE,
+            NameIdentifier.of(METALAKE_NAME, "u"),
+            Entity.EntityType.USER);
+  }
+
+  @TestTemplate
+  void testBatchSetOwnersAssignsSameUserToMultipleTables() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    TableEntity table1 =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME,
+            AUDIT_INFO);
+    TableEntity table2 =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME + "_2",
+            AUDIT_INFO);
+    backend.insert(table1, false);
+    backend.insert(table2, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "batch_owner",
+            AUDIT_INFO);
+    backend.insert(user, false);
+
+    OwnerMetaService.getInstance()
+        .batchSetOwners(
+            List.of(table1.nameIdentifier(), table2.nameIdentifier()),
+            Entity.EntityType.TABLE,
+            user.nameIdentifier(),
+            user.type());
+
+    Assertions.assertEquals(
+        user.nameIdentifier(),
+        ((HasIdentifier)
+                OwnerMetaService.getInstance()
+                    .getOwner(table1.nameIdentifier(), table1.type())
+                    .get())
+            .nameIdentifier());
+    Assertions.assertEquals(
+        user.nameIdentifier(),
+        ((HasIdentifier)
+                OwnerMetaService.getInstance()
+                    .getOwner(table2.nameIdentifier(), table2.type())
+                    .get())
+            .nameIdentifier());
+  }
+
+  @TestTemplate
+  void testBatchSetOwnersReplacesPriorOwner() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME,
+            AUDIT_INFO);
+    backend.insert(table, false);
+
+    UserEntity user1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "u1",
+            AUDIT_INFO);
+    UserEntity user2 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "u2",
+            AUDIT_INFO);
+    backend.insert(user1, false);
+    backend.insert(user2, false);
+
+    OwnerMetaService.getInstance()
+        .setOwner(table.nameIdentifier(), table.type(), user1.nameIdentifier(), user1.type());
+    OwnerMetaService.getInstance()
+        .batchSetOwners(
+            List.of(table.nameIdentifier()),
+            Entity.EntityType.TABLE,
+            user2.nameIdentifier(),
+            user2.type());
+
+    Assertions.assertEquals(
+        user2.nameIdentifier(),
+        ((HasIdentifier)
+                OwnerMetaService.getInstance().getOwner(table.nameIdentifier(), table.type()).get())
+            .nameIdentifier());
+  }
+
+  @TestTemplate
+  void testBatchSetOwnersRequiresSingleMetalake() throws IOException {
+    String ml2 = METALAKE_NAME + "_other";
+    createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertMakeLake(ml2);
+    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertCatalog(ml2, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    createAndInsertSchema(ml2, CATALOG_NAME, SCHEMA_NAME);
+    TableEntity table1 =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME,
+            AUDIT_INFO);
+    TableEntity table2 =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            Namespace.of(ml2, CATALOG_NAME, SCHEMA_NAME),
+            TABLE_NAME,
+            AUDIT_INFO);
+    backend.insert(table1, false);
+    backend.insert(table2, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "u",
+            AUDIT_INFO);
+    backend.insert(user, false);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            OwnerMetaService.getInstance()
+                .batchSetOwners(
+                    List.of(table1.nameIdentifier(), table2.nameIdentifier()),
+                    Entity.EntityType.TABLE,
+                    user.nameIdentifier(),
+                    user.type()));
   }
 
   @TestTemplate

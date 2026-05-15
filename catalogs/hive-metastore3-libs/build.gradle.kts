@@ -29,12 +29,20 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
-  implementation(libs.hadoop2.common) {
+  // Force libthrift upgrade from the outdated 0.9.3 pulled by Hive Metastore transitive deps
+  constraints {
+    implementation(libs.thrift)
+  }
+
+  implementation(libs.hadoop3.common) {
     exclude(group = "ch.qos.logback")
+    exclude(group = "ch.qos.reload4j")
     exclude(group = "com.fasterxml.jackson.core")
+    exclude(group = "com.github.pjfanning", module = "jersey-json")
     exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
+    exclude(group = "com.sun.jersey")
     exclude(group = "log4j")
     exclude(group = "net.java.dev.jets3t")
     exclude(group = "org.apache.avro")
@@ -59,6 +67,7 @@ dependencies {
     exclude(group = "junit")
     exclude(group = "org.apache.ant")
     exclude(group = "org.apache.avro")
+    exclude(group = "org.apache.derby")
     exclude(group = "org.apache.hadoop", module = "hadoop-yarn-server-resourcemanager")
     exclude(group = "org.apache.hbase")
     exclude(group = "org.apache.logging.log4j")

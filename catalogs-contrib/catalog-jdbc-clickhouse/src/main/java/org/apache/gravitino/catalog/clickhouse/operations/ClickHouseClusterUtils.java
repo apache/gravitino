@@ -166,4 +166,8 @@ public final class ClickHouseClusterUtils {
   public static String escapeSingleQuotes(String text) {
     return text.replace("'", "''");
   }
+
+  public static String unescapeSingleQuotes(String text) {
+    return text.replace("''", "'");
+  }
 }

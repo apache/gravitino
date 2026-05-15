@@ -41,13 +41,20 @@ public class TestPropertiesMetadata {
     PropertiesMetadata catalogPropertiesMetadata = genericCatalog.catalogPropertiesMetadata();
     Assertions.assertNotNull(catalogPropertiesMetadata);
 
-    Map<String, String> catalogProperties = ImmutableMap.of("location", "/tmp/test1");
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(
+            "location", "/tmp/test1",
+            "lance.storage.endpoint", "http://minio:9000");
 
     String catalogLocation =
         (String)
             catalogPropertiesMetadata.getOrDefault(
                 catalogProperties, GenericCatalog.PROPERTY_LOCATION);
     Assertions.assertEquals("/tmp/test1", catalogLocation);
+    Assertions.assertTrue(catalogPropertiesMetadata.containsProperty("lance.storage.endpoint"));
+    Assertions.assertEquals(
+        "http://minio:9000",
+        catalogPropertiesMetadata.getOrDefault(catalogProperties, "lance.storage.endpoint"));
   }
 
   @Test

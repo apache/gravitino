@@ -37,7 +37,7 @@ Apache Gravitino, as a unified metadata management system, is well-positioned to
 2. **Unified View Management**: Provide standard CRUD operations for views:
    - Create view
    - Get/List views
-   - Alter view (update SQL, add representations, modify properties)
+   - Alter view (rename, update SQL, add/remove representations, replace the view body, modify properties)
    - Drop view
 
 3. **Capability-Driven Storage Strategy**: Automatically select the optimal storage strategy based on each catalog's capabilities — no user-facing storage mode configuration needed. Gravitino transparently handles delegation, extension, and full management per catalog type.
@@ -75,7 +75,7 @@ metalake
               └── view
 ```
 
-This is consistent with Gravitino's existing namespace design for tables and functions. **Views and tables share the same namespace within a schema** — a view and a table cannot have the same name under the same schema. This follows the standard behavior of most relational databases (MySQL, PostgreSQL, Hive, etc.).
+This is consistent with Gravitino's existing namespace design for tables and functions. In the current common implementation, views are addressed as `schema.view`. Whether views and tables share one underlying namespace, including same-name conflict handling, is delegated to the catalog implementation rather than enforced by the shared view layer.
 
 ---
 
@@ -85,22 +85,16 @@ This is consistent with Gravitino's existing namespace design for tables and fun
 
 ```
 View
-├── name: string                          # View name (unique within schema, shared namespace with tables)
+├── name: string                          # View name
 ├── comment: string                       # Optional description
-├── columns: array<ViewColumn>            # View schema definition
-│   └── ViewColumn
-│       ├── name: string
-│       ├── type: DataType
-│       └── comment: string (optional)
-├── representations: array<Representation>    # Multi-dialect view definitions (one per dialect)
-│   └── Representation
-│       ├── type: string                      # Representation type, currently only "sql"
-│       └── SQLRepresentation (type="sql")
-│           ├── dialect: string               # e.g., "trino", "spark", "hive" (unique within a view)
-│           ├── sql: string                   # The view definition SQL
-│           ├── defaultCatalog: string        # Default catalog for unqualified refs
-│           └── defaultSchema: string         # Default schema for unqualified refs
-├── securityMode: enum                    # DEFINER | INVOKER
+├── columns: array<Column>                # Reuses Gravitino Column model; may be empty
+├── representations: array<Representation>
+│   └── SQLRepresentation (type="sql")
+│       ├── dialect: string               # e.g., "trino", "spark", "hive"
+│       └── sql: string                   # The view definition SQL
+├── defaultCatalog: string                # Optional, shared across all representations
+├── defaultSchema: string                 # Optional, shared across all representations
+├── securityMode: enum                    # DEFINER | INVOKER (planned field)
 ├── properties: map<string, string>       # Extensible key-value properties
 └── auditInfo: AuditInfo                  # Creation/modification timestamps and users
 ```
@@ -121,8 +115,9 @@ View
   - Gravitino provides a set of standard dialect constants (e.g., `Dialects.TRINO`, `Dialects.SPARK`) for engine connectors to use, reducing the risk of typos while preserving extensibility.
   - Engine connectors use this value to locate the appropriate representation when loading a view.
 
-- **defaultCatalog / defaultSchema**: The catalog and schema context in which the SQL was authored. Optional, per-representation.
+- **defaultCatalog / defaultSchema**: The catalog and schema context in which the SQL was authored. Optional, stored at the view level and shared across all representations.
   - Used by engines to resolve unqualified table references (e.g., `FROM orders` → `FROM defaultCatalog.defaultSchema.orders`).
+    - In storage, these fields are versioned together with the rest of the replaceable view body.
   - View SQL may contain cross-catalog references (e.g., `catalog_a.schema.table JOIN catalog_b.schema.table`). The SQL is stored as-is; neither Gravitino, the IRC, nor the HMS validates, rewrites, or transforms view SQL at any point. The compute engine is responsible for resolving and executing cross-catalog queries at runtime.
 
 - **securityMode**: Declares the security execution model of the view. This is a metadata property stored by Gravitino and **passed through to the compute engine** — Gravitino does not enforce it. Whether it takes effect depends on the engine's capability (e.g., MySQL natively supports DEFINER/INVOKER; Iceberg and Hive do not).
@@ -294,20 +289,20 @@ CREATE TABLE IF NOT EXISTS `view_meta` (
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view audit info (JSON)',
-    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version pointer',
-    `latest_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'latest version number',
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'soft delete timestamp',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'view current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'view last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'view deleted at',
     PRIMARY KEY (`view_id`),
     UNIQUE KEY `uk_sid_vn_del` (`schema_id`, `view_name`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`)
+    KEY `idx_vemid` (`metalake_id`),
+    KEY `idx_vecid` (`catalog_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'view metadata';
 ```
 
 #### view_version_info table
 
-Each alter operation creates a new version. The version table stores version-specific metadata including comment, columns snapshot, properties, representations, and audit info. Representations are stored as a JSON array.
+Each stored alter operation creates a new version row. The version table stores version-specific metadata including comment, columns snapshot, properties, shared default catalog/schema, representations, and audit info. Representations are stored as a JSON array.
 
 ```sql
 CREATE TABLE IF NOT EXISTS `view_version_info` (
@@ -317,18 +312,19 @@ CREATE TABLE IF NOT EXISTS `view_version_info` (
     `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
     `view_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'view id',
     `version` INT UNSIGNED NOT NULL COMMENT 'view version',
-    `view_comment` TEXT DEFAULT NULL COMMENT 'version-specific comment',
-    `columns` MEDIUMTEXT NOT NULL COMMENT 'view columns definition snapshot (JSON)',
+    `view_comment` TEXT DEFAULT NULL COMMENT 'view version comment',
+    `columns` MEDIUMTEXT NOT NULL COMMENT 'view columns snapshot (JSON)',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'view properties (JSON)',
-    `security_mode` VARCHAR(32) NOT NULL DEFAULT 'DEFINER' COMMENT 'DEFINER or INVOKER, immutable in V1',
-    `representations` MEDIUMTEXT NOT NULL COMMENT 'SQL representations (JSON array)',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'version audit info (JSON)',
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'soft delete timestamp',
+    `default_catalog` VARCHAR(128) DEFAULT NULL COMMENT 'default catalog for view SQL resolution',
+    `default_schema` VARCHAR(128) DEFAULT NULL COMMENT 'default schema for view SQL resolution',
+    `representations` MEDIUMTEXT NOT NULL COMMENT 'view representations (JSON array)',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'view version audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'view version deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_vid_ver_del` (`view_id`, `version`, `deleted_at`),
-    KEY `idx_mid` (`metalake_id`),
-    KEY `idx_cid` (`catalog_id`),
-    KEY `idx_sid` (`schema_id`)
+    KEY `idx_vvmid` (`metalake_id`),
+    KEY `idx_vvcid` (`catalog_id`),
+    KEY `idx_vvsid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'view version info';
 ```
 
@@ -553,33 +549,59 @@ POST /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views
 {
   "name": "customer_summary",
   "comment": "Aggregated customer data view",
-  "columns": [
-    {"name": "customer_id", "type": "bigint", "comment": "Customer identifier"},
-    {"name": "total_orders", "type": "int", "comment": "Total number of orders"},
-    {"name": "total_amount", "type": "decimal(18,2)", "comment": "Total order amount"}
-  ],
+  "columns": [],
   "representations": [
     {
+      "type": "sql",
       "dialect": "trino",
-      "sql": "SELECT customer_id, COUNT(*) as total_orders, SUM(amount) as total_amount FROM orders GROUP BY customer_id",
-      "defaultCatalog": "iceberg_prod",
-      "defaultSchema": "sales"
+      "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
     },
     {
+      "type": "sql",
       "dialect": "spark",
-      "sql": "SELECT customer_id, COUNT(*) as total_orders, SUM(amount) as total_amount FROM orders GROUP BY customer_id",
-      "defaultCatalog": "iceberg_prod",
-      "defaultSchema": "sales"
+      "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
     }
   ],
-  "securityMode": "DEFINER",
+  "defaultCatalog": "iceberg_prod",
+  "defaultSchema": "sales",
   "properties": {
     "description": "Customer order summary for analytics"
   }
 }
 ```
 
-**Response:** `200 OK` with the created view object.
+**Response:** `200 OK`
+
+```json
+{
+  "code": 0,
+  "view": {
+    "name": "customer_summary",
+    "comment": "Aggregated customer data view",
+    "columns": [],
+    "representations": [
+      {
+        "type": "sql",
+        "dialect": "trino",
+        "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
+      }
+    ],
+    "defaultCatalog": "iceberg_prod",
+    "defaultSchema": "sales",
+    "properties": {
+      "description": "Customer order summary for analytics"
+    },
+    "audit": {
+      "creator": "admin",
+      "createTime": "2026-01-31T10:00:00Z",
+      "lastModifier": "admin",
+      "lastModifiedTime": "2026-01-31T10:00:00Z"
+    }
+  }
+}
+```
+
+> **Planned field:** `securityMode` remains part of the API design, but the current shared REST DTOs (`ViewCreateRequest`, `ViewDTO`, `ViewUpdateRequest`) do not expose it yet.
 
 ##### Get View
 
@@ -591,17 +613,29 @@ GET /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}
 
 ```json
 {
-  "name": "customer_summary",
-  "comment": "Aggregated customer data view",
-  "columns": [...],
-  "representations": [...],
-  "securityMode": "...",
-  "properties": {...},
-  "auditInfo": {
-    "creator": "admin",
-    "createTime": "2026-01-31T10:00:00Z",
-    "lastModifier": "admin",
-    "lastModifiedTime": "2026-01-31T10:00:00Z"
+  "code": 0,
+  "view": {
+    "name": "customer_summary",
+    "comment": "Aggregated customer data view",
+    "columns": [],
+    "representations": [
+      {
+        "type": "sql",
+        "dialect": "trino",
+        "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id"
+      }
+    ],
+    "defaultCatalog": "iceberg_prod",
+    "defaultSchema": "sales",
+    "properties": {
+      "description": "Customer order summary for analytics"
+    },
+    "audit": {
+      "creator": "admin",
+      "createTime": "2026-01-31T10:00:00Z",
+      "lastModifier": "admin",
+      "lastModifiedTime": "2026-01-31T10:00:00Z"
+    }
   }
 }
 ```
@@ -616,9 +650,10 @@ GET /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views
 
 ```json
 {
+  "code": 0,
   "identifiers": [
-    {"namespace": ["catalog", "schema"], "name": "customer_summary"},
-    {"namespace": ["catalog", "schema"], "name": "order_details"}
+    {"namespace": ["metalake", "catalog", "schema"], "name": "customer_summary"},
+    {"namespace": ["metalake", "catalog", "schema"], "name": "order_details"}
   ]
 }
 ```
@@ -627,19 +662,22 @@ GET /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views
 
 Alter View supports fine-grained modification operations, following the same `ViewChange` pattern as `TableChange` and `FunctionChange`. Multiple changes can be submitted in a single request and are applied atomically.
 
+The current shared implementation already supports `rename`, `setProperty`, `removeProperty`, and `replaceView`. Other designed change types below are retained here as planned API surface.
+
 **Supported change types:**
 
-| Change Type | Description | Notes |
-|------------|-------------|-------|
-| `rename` | Rename the view | Also renames in the underlying catalog if delegated |
-| `updateComment` | Update view comment | |
-| `setProperty` | Set a view property | |
-| `removeProperty` | Remove a view property | |
-| `addRepresentation` | Add a new dialect representation | If the dialect matches the underlying catalog's native dialect, the operation is also delegated to the underlying catalog |
-| `updateRepresentation` | Update SQL for an existing dialect | If the dialect matches the underlying catalog's native dialect, the update is also synced to the underlying catalog |
-| `removeRepresentation` | Remove a dialect representation | Delegated to the underlying catalog if dialect matches; removing the last representation is prohibited — use `dropView` instead |
+| Change Type | Description | Notes | Status |
+|------------|-------------|-------|--------|
+| `rename` | Rename the view | Also renames in the underlying catalog if delegated | Implemented |
+| `updateComment` | Update view comment | | Planned |
+| `setProperty` | Set a view property | | Implemented |
+| `removeProperty` | Remove a view property | | Implemented |
+| `addRepresentation` | Add a new dialect representation | If the dialect matches the underlying catalog's native dialect, the operation is also delegated to the underlying catalog | Planned |
+| `updateRepresentation` | Update SQL for an existing dialect | If the dialect matches the underlying catalog's native dialect, the update is also synced to the underlying catalog | Planned |
+| `removeRepresentation` | Remove a dialect representation | Delegated to the underlying catalog if dialect matches; removing the last representation is prohibited and callers should use `dropView` instead | Planned |
+| `replaceView` | Atomically replace `columns`, `representations`, `defaultCatalog`, `defaultSchema`, and `comment` | The current implementation uses this coarse-grained operation for view body replacement | Implemented |
 
-**Versioning behavior**: Every alter operation internally creates a new version in storage (comment, columns snapshot, and all representations are captured as a new version). This is transparent to the user in V1 — no version management API is exposed. Future versions may add `listVersions` / `rollbackToVersion` capabilities.
+**Versioning behavior**: Every stored alter operation creates a new version in relational storage. In the current shared implementation, each successful alter writes a new `view_version_info` row. This is transparent to the user in V1 — no version management API is exposed. Future versions may add `listVersions` / `rollbackToVersion` capabilities.
 
 ```
 PUT /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}
@@ -647,39 +685,38 @@ PUT /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}
 
 **Request Body:**
 
+The example below uses only the update types that are currently implemented in the shared REST layer.
+
 ```json
 {
   "updates": [
     {
-      "@type": "updateComment",
-      "newComment": "Updated customer summary view"
-    },
-    {
-      "@type": "addRepresentation",
-      "representation": {
-        "dialect": "hive",
-        "sql": "SELECT customer_id, COUNT(*) as total_orders, SUM(amount) as total_amount FROM orders GROUP BY customer_id",
-        "defaultCatalog": "hive_prod",
-        "defaultSchema": "sales"
-      }
-    },
-    {
-      "@type": "updateRepresentation",
-      "dialect": "trino",
-      "newSql": "SELECT customer_id, COUNT(*) as total_orders, SUM(amount) as total_amount, MAX(order_date) as last_order FROM orders GROUP BY customer_id"
-    },
-    {
-      "@type": "removeRepresentation",
-      "dialect": "spark"
+      "@type": "replaceView",
+      "columns": [],
+      "representations": [
+        {
+          "type": "sql",
+          "dialect": "trino",
+          "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount, MAX(order_date) AS last_order FROM orders GROUP BY customer_id"
+        },
+        {
+          "type": "sql",
+          "dialect": "spark",
+          "sql": "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount, MAX(order_date) AS last_order FROM orders GROUP BY customer_id"
+        }
+      ],
+      "defaultCatalog": "iceberg_prod",
+      "defaultSchema": "sales",
+      "comment": "Updated customer summary view"
     },
     {
       "@type": "setProperty",
-      "property": "key",
-      "value": "value"
+      "property": "description",
+      "value": "Customer order summary for analytics"
     },
     {
       "@type": "removeProperty",
-      "property": "key"
+      "property": "deprecatedKey"
     }
   ]
 }
@@ -693,59 +730,83 @@ DELETE /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view
 
 **Response:** `200 OK`
 
+```json
+{
+  "code": 0,
+  "dropped": true
+}
+```
+
 ---
 
 #### Java API
+
+The current `client-java` surface exposes the implemented subset above, so alter examples use `replaceView` / property changes today. Planned fine-grained helpers such as `addRepresentation`, `updateRepresentation`, and `updateComment` are not exposed yet. The design-level `securityMode` field is also not part of the current `createView(...)` signature.
 
 ```java
 // Get ViewCatalog interface from catalog
 ViewCatalog viewCatalog = catalog.asViewCatalog();
 
-// Create a view with multiple dialect representations
-View view = viewCatalog.createView(
-    NameIdentifier.of("analytics_schema", "customer_summary"),
-    ViewBuilder.builder()
-        .withComment("Aggregated customer data view")
-        .withColumn("customer_id", Types.LongType.get(), "Customer identifier")
-        .withColumn("total_orders", Types.IntegerType.get(), "Total number of orders")
-        .withColumn("total_amount", Types.DecimalType.of(18, 2), "Total order amount")
-        .withRepresentation(
-            SQLRepresentation.builder()
-                .withDialect("trino")
-                .withSql("SELECT customer_id, COUNT(*) as total_orders, SUM(amount) as total_amount FROM orders GROUP BY customer_id")
-                .withDefaultCatalog("iceberg_prod")
-                .withDefaultSchema("sales")
-                .build())
-        .withRepresentation(
-            SQLRepresentation.builder()
-                .withDialect("spark")
-                .withSql("SELECT customer_id, COUNT(*) as total_orders, SUM(amount) as total_amount FROM orders GROUP BY customer_id")
-                .withDefaultCatalog("iceberg_prod")
-                .withDefaultSchema("sales")
-                .build())
-        .withSecurityMode(SecurityMode.DEFINER)
-        .withProperty("description", "Customer order summary for analytics")
-        .build());
+Column[] columns =
+    new Column[] {
+      Column.of("customer_id", Types.LongType.get(), "Customer identifier"),
+      Column.of("total_orders", Types.IntegerType.get(), "Total number of orders"),
+      Column.of("total_amount", Types.DecimalType.of(18, 2), "Total order amount")
+    };
+
+Representation[] representations =
+    new Representation[] {
+      SQLRepresentation.builder()
+          .withDialect(Dialects.TRINO)
+          .withSql(
+              "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id")
+          .build(),
+      SQLRepresentation.builder()
+          .withDialect(Dialects.SPARK)
+          .withSql(
+              "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount FROM orders GROUP BY customer_id")
+          .build()
+    };
+
+View view =
+    viewCatalog.createView(
+        NameIdentifier.of("analytics_schema", "customer_summary"),
+        "Aggregated customer data view",
+        columns,
+        representations,
+        "iceberg_prod",
+        "sales",
+        ImmutableMap.of("description", "Customer order summary for analytics"));
 
 // Get a view
 View gotView = viewCatalog.loadView(NameIdentifier.of("analytics_schema", "customer_summary"));
 
 // Get SQL for specific dialect
-Optional<SQLRepresentation> trinoSql = gotView.getRepresentation("trino");
+Optional<SQLRepresentation> trinoSql = gotView.sqlFor(Dialects.TRINO);
 
 // List views in a schema
 NameIdentifier[] views = viewCatalog.listViews(Namespace.of("analytics_schema"));
 
-// Alter a view - add new representation
+// Alter a view
 ViewChange[] changes = {
-    ViewChange.addRepresentation(
-        SQLRepresentation.builder()
-            .withDialect("hive")
-            .withSql("SELECT customer_id, COUNT(*) as total_orders, SUM(amount) as total_amount FROM orders GROUP BY customer_id")
-            .withDefaultCatalog("hive_prod")
-            .withDefaultSchema("sales")
-            .build()),
-    ViewChange.updateComment("Updated customer summary view")
+    ViewChange.replaceView(
+        columns,
+        new Representation[] {
+          SQLRepresentation.builder()
+              .withDialect(Dialects.TRINO)
+              .withSql(
+                  "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount, MAX(order_date) AS last_order FROM orders GROUP BY customer_id")
+              .build(),
+          SQLRepresentation.builder()
+              .withDialect(Dialects.SPARK)
+              .withSql(
+                  "SELECT customer_id, COUNT(*) AS total_orders, SUM(amount) AS total_amount, MAX(order_date) AS last_order FROM orders GROUP BY customer_id")
+              .build()
+        },
+        "iceberg_prod",
+        "sales",
+        "Updated customer summary view"),
+    ViewChange.setProperty("description", "Customer order summary for analytics")
 };
 View alteredView = viewCatalog.alterView(
     NameIdentifier.of("analytics_schema", "customer_summary"), 
