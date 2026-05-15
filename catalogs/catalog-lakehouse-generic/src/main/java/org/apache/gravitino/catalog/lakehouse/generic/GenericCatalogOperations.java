@@ -253,7 +253,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     // Merge format-specific properties from catalog and schema levels
     LakehouseTableDelegator delegator = delegators.get(format);
     Preconditions.checkArgument(delegator != null, "Unsupported table format: %s", format);
-    Map<String, String> inheritedProps = delegator.inheritProperties(catalogProperties, schema, newProperties);
+    Map<String, String> inheritedProps =
+        delegator.inheritProperties(catalogProperties, schema, newProperties);
     newProperties.putAll(inheritedProps);
 
     // Get the table operations for the specified table format.
