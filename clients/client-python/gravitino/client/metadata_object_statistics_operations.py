@@ -79,7 +79,7 @@ class MetadataObjectStatisticsOperations(SupportsStatistics):
         req.validate()
         resp = self._rest_client.put(
             endpoint=self.request_path,
-            json=req.to_json(),
+            json=req,
             error_handler=STATISTICS_ERROR_HANDLER,
         )
         BaseResponse.from_json(resp.body, infer_missing=True).validate()
@@ -93,7 +93,7 @@ class MetadataObjectStatisticsOperations(SupportsStatistics):
         req.validate()
         resp = self._rest_client.post(
             endpoint=self.request_path,
-            json=req.to_json(),
+            json=req,
             error_handler=STATISTICS_ERROR_HANDLER,
         )
         drop_response = DropResponse.from_json(resp.body, infer_missing=True)
