@@ -132,7 +132,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
         Optional.ofNullable(table.properties().get(LANCE_TABLE_VERSION))
             .map(Long::valueOf)
             .orElse(null));
-    response.setStorageOptions(LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+    response.setStorageOptions(
+        LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), table.properties()));
     return response;
   }
 
@@ -183,11 +184,11 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
             .createTable(
                 tableIdentifier, columns.toArray(new Column[0]), null, createTableProperties);
     Map<String, String> properties = t.properties();
+    Map<String, String> effectiveStorageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), properties);
 
     CreateTableResponse response = new CreateTableResponse();
-    // Extract storage options from table properties. All storage options stores in table
-    // properties.
-    response.setStorageOptions(LancePropertiesUtils.getLanceStorageOptions(properties));
+    response.setStorageOptions(effectiveStorageOptions);
     response.setVersion(
         Optional.ofNullable(properties.get(LANCE_TABLE_VERSION)).map(Long::valueOf).orElse(null));
     response.setLocation(properties.get(LANCE_LOCATION));
