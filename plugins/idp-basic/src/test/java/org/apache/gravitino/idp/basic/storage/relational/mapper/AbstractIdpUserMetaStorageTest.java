@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -152,17 +151,6 @@ abstract class AbstractIdpUserMetaStorageTest {
       }
     } catch (SQLException e) {
       throw new RuntimeException("Count rows from " + table + " failed", e);
-    }
-  }
-
-  protected String currentJdbcUrl() {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection()) {
-      DatabaseMetaData metaData = connection.getMetaData();
-      return metaData.getURL();
-    } catch (SQLException e) {
-      throw new RuntimeException("Get current JDBC URL failed", e);
     }
   }
 
