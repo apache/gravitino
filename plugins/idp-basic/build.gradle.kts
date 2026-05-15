@@ -24,10 +24,31 @@ plugins {
 }
 
 dependencies {
+  annotationProcessor(libs.lombok)
+
+  implementation(project(":core"))
+
   implementation(libs.bcprov.jdk18on)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+  implementation(libs.mybatis)
+
+  compileOnly(libs.lombok)
+
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
+
+  testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.commons.io)
+  testImplementation(libs.mysql.driver)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.mysql)
+  testImplementation(libs.testcontainers.postgresql)
+
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
