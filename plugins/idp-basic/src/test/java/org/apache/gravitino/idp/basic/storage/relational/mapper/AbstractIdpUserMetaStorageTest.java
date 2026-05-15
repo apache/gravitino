@@ -87,7 +87,6 @@ abstract class AbstractIdpUserMetaStorageTest {
   protected void init(String type) throws IOException {
     config = createBackendConfig(type);
     backend = new JDBCBackend();
-    backend.close();
     backend.initialize(config);
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
