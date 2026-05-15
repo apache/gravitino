@@ -19,9 +19,11 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.ViewPO;
 
@@ -51,8 +53,30 @@ public class ViewPOStorageOps extends BasePOStorageOps<ViewPO, ViewMetaMapper> {
   @Override
   protected ViewPO getPOByFullName(ViewMetaMapper mapper, NameIdentifier identifier) {
     Namespace namespace = identifier.namespace();
-    return mapper.selectViewByFullQualifiedName(
-        namespace.level(0), namespace.level(1), namespace.level(2), identifier.name());
+    ViewPO po =
+        mapper.selectViewByFullQualifiedName(
+            namespace.level(0), namespace.level(1), namespace.level(2), identifier.name());
+    // INNER JOIN on metalake/catalog: a null PO means the metalake or catalog does not exist.
+    if (po == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          namespace.level(1));
+    }
+    // LEFT JOIN on schema_meta: a row with non-null catalogId but null schemaId means
+    // the catalog exists but the schema does not.
+    if (po.getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          namespace.level(2));
+    }
+    // LEFT JOIN on view_meta: a row with non-null schemaId but null viewId means
+    // the schema exists but the view does not.
+    if (po.getViewId() == null) {
+      return null;
+    }
+    return po;
   }
 
   @Override
@@ -67,8 +91,26 @@ public class ViewPOStorageOps extends BasePOStorageOps<ViewPO, ViewMetaMapper> {
 
   @Override
   protected List<ViewPO> listPOsByNSFullName(ViewMetaMapper mapper, Namespace namespace) {
-    return mapper.listViewPOsByFullQualifiedName(
-        namespace.level(0), namespace.level(1), namespace.level(2));
+    List<ViewPO> pos =
+        mapper.listViewPOsByFullQualifiedName(
+            namespace.level(0), namespace.level(1), namespace.level(2));
+    // INNER JOIN on metalake/catalog: an empty result means the metalake or catalog does not exist.
+    if (pos.isEmpty()) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          namespace.level(1));
+    }
+    // LEFT JOIN on schema_meta: rows with non-null catalogId but null schemaId mean the
+    // catalog exists but the schema does not.
+    if (pos.get(0).getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(),
+          namespace.level(2));
+    }
+    // LEFT JOIN on view_meta: filter out the placeholder row for a schema without views.
+    return pos.stream().filter(po -> po.getViewId() != null).collect(Collectors.toList());
   }
 
   @Override
