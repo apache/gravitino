@@ -39,6 +39,7 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
@@ -138,7 +139,7 @@ public class TestJcasbinAuthorizer {
         .thenAnswer(
             invocation -> {
               Class<?> mapperClass = invocation.getArgument(0);
-              java.util.function.Function<Object, Object> func = invocation.getArgument(1);
+              Function<Object, Object> func = invocation.getArgument(1);
               if (mapperClass == OwnerMetaMapper.class) {
                 return func.apply(ownerMetaMapper);
               }
@@ -183,6 +184,13 @@ public class TestJcasbinAuthorizer {
 
   @AfterAll
   public static void stop() {
+    if (jcasbinAuthorizer != null) {
+      try {
+        jcasbinAuthorizer.close();
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to close JcasbinAuthorizer", e);
+      }
+    }
     if (principalUtilsMockedStatic != null) {
       principalUtilsMockedStatic.close();
     }

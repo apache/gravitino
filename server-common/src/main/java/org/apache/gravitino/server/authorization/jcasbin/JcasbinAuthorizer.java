@@ -128,7 +128,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             .config()
             .get(Configs.GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS);
 
-    long ttlMs = cacheExpirationSecs * 1000L;
+    long ttlMs = TimeUnit.SECONDS.toMillis(cacheExpirationSecs);
 
     // Initialize enforcers before the caches that reference them in removal listeners
     allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
@@ -149,6 +149,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                   }
                 })
             .build();
+    // The change poller is the primary HA invalidation path. These write-based TTLs bound the
+    // stale window if a poll cycle misses a change; access-based TTLs could keep hot stale entries
+    // alive indefinitely.
     metadataIdCache = new CaffeineGravitinoCache<>(ttlMs, metadataIdCacheSize);
     ownerRelCache = new CaffeineGravitinoCache<>(ttlMs, ownerCacheSize);
     lookups = new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
