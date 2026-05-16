@@ -17,28 +17,21 @@
  *  under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.view;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.listener.api.event.OperationType;
 
-/** Pre-event before altering a view. */
+/** Pre-event before loading a view. */
 @DeveloperApi
-public class AlterViewPreEvent extends ViewPreEvent {
-  private final ViewChange[] viewChanges;
-
-  public AlterViewPreEvent(String user, NameIdentifier identifier, ViewChange[] viewChanges) {
+public class LoadViewPreEvent extends ViewPreEvent {
+  public LoadViewPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
-    this.viewChanges = viewChanges;
-  }
-
-  public ViewChange[] viewChanges() {
-    return viewChanges;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.ALTER_VIEW;
+    return OperationType.LOAD_VIEW;
   }
 }

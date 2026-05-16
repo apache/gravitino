@@ -17,28 +17,16 @@
  *  under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.view;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.ViewInfo;
+import org.apache.gravitino.listener.api.event.PreEvent;
 
-/** Pre-event before creating a view. */
+/** Pre-event base class for view operations. */
 @DeveloperApi
-public class CreateViewPreEvent extends ViewPreEvent {
-  private final ViewInfo createViewRequest;
-
-  public CreateViewPreEvent(String user, NameIdentifier identifier, ViewInfo createViewRequest) {
+public abstract class ViewPreEvent extends PreEvent {
+  protected ViewPreEvent(String user, NameIdentifier identifier) {
     super(user, identifier);
-    this.createViewRequest = createViewRequest;
-  }
-
-  public ViewInfo createViewRequest() {
-    return createViewRequest;
-  }
-
-  @Override
-  public OperationType operationType() {
-    return OperationType.CREATE_VIEW;
   }
 }

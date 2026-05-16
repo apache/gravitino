@@ -17,28 +17,21 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.view;
 
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
 
-/** Failure event for listing views. */
+/** Failure event for dropping a view. */
 @DeveloperApi
-public final class ListViewFailureEvent extends ViewFailureEvent {
-  private final Namespace namespace;
-
-  public ListViewFailureEvent(String user, Namespace namespace, Exception exception) {
-    super(user, NameIdentifier.of(namespace.levels()), exception);
-    this.namespace = namespace;
-  }
-
-  public Namespace namespace() {
-    return namespace;
+public final class DropViewFailureEvent extends ViewFailureEvent {
+  public DropViewFailureEvent(String user, NameIdentifier identifier, Exception exception) {
+    super(user, identifier, exception);
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.LIST_VIEW;
+    return OperationType.DROP_VIEW;
   }
 }

@@ -17,16 +17,30 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.view;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
+import org.apache.gravitino.listener.api.info.ViewInfo;
 
-/** Failure event for loading a view. */
+/** Successful load-view event. */
 @DeveloperApi
-public final class LoadViewFailureEvent extends ViewFailureEvent {
-  public LoadViewFailureEvent(String user, NameIdentifier identifier, Exception exception) {
-    super(user, identifier, exception);
+public final class LoadViewEvent extends ViewEvent {
+  private final ViewInfo loadedViewInfo;
+
+  public LoadViewEvent(String user, NameIdentifier identifier, ViewInfo loadedViewInfo) {
+    super(user, identifier);
+    this.loadedViewInfo = loadedViewInfo;
+  }
+
+  /**
+   * Returns the loaded view information.
+   *
+   * @return the loaded view information
+   */
+  public ViewInfo loadedViewInfo() {
+    return loadedViewInfo;
   }
 
   @Override

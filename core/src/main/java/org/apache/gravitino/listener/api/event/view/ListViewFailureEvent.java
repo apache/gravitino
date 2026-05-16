@@ -17,22 +17,20 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.view;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.OperationType;
 
-/**
- * Successful list-views event. Like {@link ListTableEvent}, listed identifiers are not stored on
- * the event.
- */
+/** Failure event for listing views. */
 @DeveloperApi
-public final class ListViewEvent extends ViewEvent {
+public final class ListViewFailureEvent extends ViewFailureEvent {
   private final Namespace namespace;
 
-  public ListViewEvent(String user, Namespace namespace) {
-    super(user, NameIdentifier.of(namespace.levels()));
+  public ListViewFailureEvent(String user, Namespace namespace, Exception exception) {
+    super(user, NameIdentifier.of(namespace.levels()), exception);
     this.namespace = namespace;
   }
 

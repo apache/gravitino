@@ -17,10 +17,12 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.view;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.OperationStatus;
 
 /** Base class for successful view operation events. */
 @DeveloperApi

@@ -17,29 +17,32 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.view;
 
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.listener.api.event.OperationType;
 
-/** Failure event for altering a view. */
+/**
+ * Successful list-views event. Like {@link org.apache.gravitino.listener.api.event.ListTableEvent},
+ * listed identifiers are not stored on the event.
+ */
 @DeveloperApi
-public final class AlterViewFailureEvent extends ViewFailureEvent {
-  private final ViewChange[] viewChanges;
+public final class ListViewEvent extends ViewEvent {
+  private final Namespace namespace;
 
-  public AlterViewFailureEvent(
-      String user, NameIdentifier identifier, Exception exception, ViewChange[] viewChanges) {
-    super(user, identifier, exception);
-    this.viewChanges = viewChanges.clone();
+  public ListViewEvent(String user, Namespace namespace) {
+    super(user, NameIdentifier.of(namespace.levels()));
+    this.namespace = namespace;
   }
 
-  public ViewChange[] viewChanges() {
-    return viewChanges;
+  public Namespace namespace() {
+    return namespace;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.ALTER_VIEW;
+    return OperationType.LIST_VIEW;
   }
 }

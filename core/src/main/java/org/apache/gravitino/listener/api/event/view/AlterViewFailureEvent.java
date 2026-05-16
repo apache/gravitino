@@ -17,28 +17,22 @@
  * under the License.
  */
 
-package org.apache.gravitino.listener.api.event;
+package org.apache.gravitino.listener.api.event.view;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.ViewInfo;
+import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.rel.ViewChange;
 
-/** Successful alter-view event. */
+/** Failure event for altering a view. */
 @DeveloperApi
-public final class AlterViewEvent extends ViewEvent {
-  private final ViewInfo updatedViewInfo;
+public final class AlterViewFailureEvent extends ViewFailureEvent {
   private final ViewChange[] viewChanges;
 
-  public AlterViewEvent(
-      String user, NameIdentifier identifier, ViewChange[] viewChanges, ViewInfo updatedViewInfo) {
-    super(user, identifier);
+  public AlterViewFailureEvent(
+      String user, NameIdentifier identifier, Exception exception, ViewChange[] viewChanges) {
+    super(user, identifier, exception);
     this.viewChanges = viewChanges.clone();
-    this.updatedViewInfo = updatedViewInfo;
-  }
-
-  public ViewInfo updatedViewInfo() {
-    return updatedViewInfo;
   }
 
   public ViewChange[] viewChanges() {
