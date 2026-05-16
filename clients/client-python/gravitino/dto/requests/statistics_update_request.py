@@ -51,6 +51,10 @@ class StatisticsUpdateRequest(RESTRequest):
         return self._updates
 
     def validate(self) -> None:
+        Precondition.check_argument(
+            self._updates is not None and len(self._updates) > 0,
+            '"updates" must not be null or empty',
+        )
         for name, value in self._updates.items():
             Precondition.check_string_not_empty(
                 name, 'statistic "name" must not be null or empty'

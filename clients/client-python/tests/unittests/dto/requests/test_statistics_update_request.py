@@ -87,3 +87,12 @@ class TestStatisticsUpdateRequest(unittest.TestCase):
         )
         request = StatisticsUpdateRequest.from_json(json_str)
         self.assertDictEqual(request.updates, self.test_updates)
+
+    def test_validate_failure_null_or_empty_updates(self):
+        invalid_updates = (None, {})
+        for updates in invalid_updates:
+            request = StatisticsUpdateRequest(_updates=updates)
+            with self.assertRaisesRegex(
+                IllegalArgumentException, '"updates" must not be null or empty'
+            ):
+                request.validate()
