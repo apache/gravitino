@@ -18,10 +18,15 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.meta.AuditInfo;
@@ -38,6 +43,9 @@ import org.apache.gravitino.rel.View;
  * views.
  */
 @Unstable
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder(setterPrefix = "with", builderClassName = "Builder")
 @EqualsAndHashCode
 @ToString
 public class HiveView implements View {
@@ -54,8 +62,6 @@ public class HiveView implements View {
   private Map<String, String> properties;
   private AuditInfo auditInfo;
   private SQLRepresentation[] representations;
-
-  private HiveView() {}
 
   @Override
   public String name() {
@@ -119,119 +125,34 @@ public class HiveView implements View {
     return Dialects.HIVE;
   }
 
-  /**
-   * Returns a new {@link Builder} for constructing a {@code HiveView}.
-   *
-   * @return A fresh builder instance.
-   */
-  public static Builder builder() {
-    return new Builder();
-  }
-
   /** Builder for {@link HiveView}. */
   public static class Builder {
-    private final HiveView view;
-
-    private Builder() {
-      view = new HiveView();
-    }
-
-    /**
-     * Sets the view name.
-     *
-     * @param name The view name.
-     * @return This builder.
-     */
-    public Builder withName(String name) {
-      view.name = name;
-      return this;
-    }
-
-    /**
-     * Sets the view comment.
-     *
-     * @param comment The view comment.
-     * @return This builder.
-     */
-    public Builder withComment(String comment) {
-      view.comment = comment;
-      return this;
-    }
-
-    /**
-     * Sets the output columns.
-     *
-     * @param columns The view output columns.
-     * @return This builder.
-     */
-    public Builder withColumns(Column[] columns) {
-      view.columns = columns;
-      return this;
-    }
-
-    /**
-     * Sets the default catalog used to resolve unqualified identifiers in the view definition.
-     *
-     * @param defaultCatalog The default catalog, or {@code null} if unset.
-     * @return This builder.
-     */
-    public Builder withDefaultCatalog(@Nullable String defaultCatalog) {
-      view.defaultCatalog = defaultCatalog;
-      return this;
-    }
-
-    /**
-     * Sets the default schema used to resolve unqualified identifiers in the view definition.
-     *
-     * @param defaultSchema The default schema, or {@code null} if unset.
-     * @return This builder.
-     */
-    public Builder withDefaultSchema(@Nullable String defaultSchema) {
-      view.defaultSchema = defaultSchema;
-      return this;
-    }
-
-    /**
-     * Sets the view properties.
-     *
-     * @param properties The properties map.
-     * @return This builder.
-     */
-    public Builder withProperties(Map<String, String> properties) {
-      view.properties = properties;
-      return this;
-    }
-
-    /**
-     * Sets the audit info.
-     *
-     * @param auditInfo The audit info.
-     * @return This builder.
-     */
-    public Builder withAuditInfo(AuditInfo auditInfo) {
-      view.auditInfo = auditInfo;
-      return this;
-    }
-
-    /**
-     * Sets the SQL representations.
-     *
-     * @param representations The representations array.
-     * @return This builder.
-     */
-    public Builder withRepresentations(SQLRepresentation[] representations) {
-      view.representations = representations;
-      return this;
-    }
-
     /**
      * Builds the {@link HiveView} instance.
      *
      * @return The constructed view.
      */
     public HiveView build() {
-      view.properties = view.properties == null ? new HashMap<>() : new HashMap<>(view.properties);
-      return view;
+      Preconditions.checkArgument(name != null && !name.isEmpty(), "View name is required");
+      Preconditions.checkArgument(
+          representations != null && representations.length > 0,
+          "Representations must not be null or empty");
+      for (SQLRepresentation representation : representations) {
+        Preconditions.checkArgument(
+            representation != null, "Representations must not contain null elements");
+      }
+
+      Map<String, String> normalizedProperties =
+          properties == null ? new HashMap<>() : new HashMap<>(properties);
+      return new HiveView(
+          name,
+          comment,
+          columns,
+          defaultCatalog,
+          defaultSchema,
+          normalizedProperties,
+          auditInfo,
+          representations);
     }
   }
 }

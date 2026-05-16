@@ -33,7 +33,9 @@ import java.util.function.Supplier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.HiveTable;
@@ -148,10 +150,11 @@ class HiveViewCatalogOperations implements ViewCatalog {
           hiveTable.viewOriginalText(),
           hiveTable.columns(),
           hiveTable.auditInfo());
+    } catch (TableAlreadyExistsException e) {
+      throw new ViewAlreadyExistsException(e, "View %s already exists in Hive Metastore", ident);
+    } catch (InterruptedException e) {
+      throw new RuntimeException("Failed to create Hive view " + ident, e);
     } catch (Exception e) {
-      if (isAlreadyExistsError(e)) {
-        throw new ViewAlreadyExistsException("View %s already exists in Hive Metastore", ident);
-      }
       throw new RuntimeException("Failed to create Hive view " + ident, e);
     }
   }
@@ -244,16 +247,20 @@ class HiveViewCatalogOperations implements ViewCatalog {
           updatedHiveTable.viewOriginalText(),
           updatedHiveTable.columns(),
           updatedHiveTable.auditInfo());
+    } catch (NoSuchTableException e) {
+      throw new NoSuchViewException(e, "View %s does not exist in Hive Metastore", ident);
+    } catch (TableAlreadyExistsException e) {
+      throw new ViewAlreadyExistsException(
+          e,
+          "View %s already exists in Hive Metastore",
+          NameIdentifier.of(ident.namespace(), extractRenameTargetName(ident.name(), changes)));
     } catch (NoSuchViewException | ViewAlreadyExistsException | IllegalArgumentException e) {
       throw e;
     } catch (UnsupportedOperationException e) {
       throw e;
+    } catch (InterruptedException e) {
+      throw new RuntimeException("Failed to alter Hive view " + ident, e);
     } catch (Exception e) {
-      if (isAlreadyExistsError(e)) {
-        throw new ViewAlreadyExistsException(
-            "View %s already exists in Hive Metastore",
-            NameIdentifier.of(ident.namespace(), extractRenameTargetName(ident.name(), changes)));
-      }
       throw new RuntimeException("Failed to alter Hive view " + ident, e);
     }
   }
@@ -296,10 +303,11 @@ class HiveViewCatalogOperations implements ViewCatalog {
               });
       LOG.info("Dropped Hive view {}", ident.name());
       return true;
+    } catch (NoSuchTableException e) {
+      return false;
+    } catch (InterruptedException e) {
+      throw new RuntimeException("Failed to drop Hive view " + ident, e);
     } catch (Exception e) {
-      if (isNotFoundError(e)) {
-        return false;
-      }
       throw new RuntimeException("Failed to drop Hive view " + ident, e);
     }
   }
@@ -333,10 +341,11 @@ class HiveViewCatalogOperations implements ViewCatalog {
 
     } catch (NoSuchViewException | UnsupportedOperationException e) {
       throw e;
+    } catch (NoSuchTableException e) {
+      throw new NoSuchViewException(e, "View %s does not exist in Hive Metastore", ident);
+    } catch (InterruptedException e) {
+      throw new RuntimeException("Failed to load Hive view " + ident, e);
     } catch (Exception e) {
-      if (isNotFoundError(e)) {
-        throw new NoSuchViewException(e, "View %s does not exist in Hive Metastore", ident);
-      }
       throw new RuntimeException("Failed to load Hive view " + ident, e);
     }
   }
@@ -438,27 +447,6 @@ class HiveViewCatalogOperations implements ViewCatalog {
 
   private Column[] copyColumns(Column[] columns) {
     return columns == null ? new Column[0] : columns.clone();
-  }
-
-  private boolean isAlreadyExistsError(Throwable t) {
-    Throwable current = t;
-    while (current != null) {
-      String className = current.getClass().getSimpleName();
-      String message = current.getMessage();
-      if (className.contains("AlreadyExistsException")
-          || className.contains("TableAlreadyExistsException")
-          || (message != null && message.contains("AlreadyExistsException"))) {
-        return true;
-      }
-      current = current.getCause();
-    }
-    return false;
-  }
-
-  private boolean isNotFoundError(Exception e) {
-    return e.getMessage() != null
-        && (e.getMessage().contains("NoSuchObjectException")
-            || e.getMessage().contains("does not exist"));
   }
 
   private CachedClientPool clientPool() {

@@ -20,17 +20,27 @@ package org.apache.gravitino.catalog.hive;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.rel.Dialects;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.junit.jupiter.api.Test;
 
 class TestHiveView {
 
+  private static SQLRepresentation[] hiveRepresentations() {
+    return new SQLRepresentation[] {
+      SQLRepresentation.builder().withDialect(Dialects.HIVE).withSql("select 1").build()
+    };
+  }
+
   @Test
   void testBuildWithoutPropertiesReturnsEmptyMap() {
-    HiveView view = HiveView.builder().withName("v1").build();
+    HiveView view =
+        HiveView.builder().withName("v1").withRepresentations(hiveRepresentations()).build();
 
     assertNotNull(view.properties());
     assertTrue(view.properties().isEmpty());
@@ -41,10 +51,20 @@ class TestHiveView {
     Map<String, String> sourceProperties = new HashMap<>();
     sourceProperties.put("k1", "v1");
 
-    HiveView view = HiveView.builder().withName("v1").withProperties(sourceProperties).build();
+    HiveView view =
+        HiveView.builder()
+            .withName("v1")
+            .withRepresentations(hiveRepresentations())
+            .withProperties(sourceProperties)
+            .build();
     sourceProperties.put("k2", "v2");
 
     assertEquals(1, view.properties().size());
     assertEquals("v1", view.properties().get("k1"));
+  }
+
+  @Test
+  void testBuildWithoutRepresentationsThrows() {
+    assertThrows(IllegalArgumentException.class, () -> HiveView.builder().withName("v1").build());
   }
 }
