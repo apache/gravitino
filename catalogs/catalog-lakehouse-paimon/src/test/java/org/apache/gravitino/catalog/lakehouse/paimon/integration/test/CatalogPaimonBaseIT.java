@@ -904,6 +904,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
         String.format("SELECT id, name FROM paimon.%s.%s", schemaName, baseTableIdentifier.name());
     Representation[] representations =
         new Representation[] {
+          SQLRepresentation.builder().withDialect("query").withSql(query).build(),
           SQLRepresentation.builder().withDialect("spark").withSql(query).build()
         };
     ViewCatalog viewCatalog = catalog.asViewCatalog();
@@ -1116,6 +1117,9 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
   }
 
   private NameIdentifier createSimplePaimonTableForViewInterop(String tablePrefix) {
+    Preconditions.checkNotNull(
+        spark, "Spark session is required for Spark view interoperability tests, but it is null.");
+
     String tableName = GravitinoITUtils.genRandomName(tablePrefix);
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
     catalog

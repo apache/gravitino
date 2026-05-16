@@ -44,16 +44,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.utils.PaimonViewTestCatalogHelper;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.ColumnPosition;
 import org.apache.gravitino.rel.TableChange.UpdateColumnComment;
@@ -65,8 +64,6 @@ import org.apache.paimon.catalog.Catalog.ColumnAlreadyExistException;
 import org.apache.paimon.catalog.Catalog.ColumnNotExistException;
 import org.apache.paimon.catalog.Catalog.DatabaseNotExistException;
 import org.apache.paimon.catalog.Catalog.TableAlreadyExistException;
-import org.apache.paimon.catalog.CatalogLoader;
-import org.apache.paimon.catalog.DelegateCatalog;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.schema.SchemaChange;
@@ -179,7 +176,8 @@ public class TestPaimonCatalogOps {
 
   @Test
   void testCreateLoadAlterRenameAndDropViewOperations() throws Exception {
-    paimonCatalogOps.catalog = createViewSupportedCatalog(paimonCatalogOps.catalog);
+    paimonCatalogOps.catalog =
+        PaimonViewTestCatalogHelper.createViewSupportedCatalog(paimonCatalogOps.catalog);
 
     org.apache.paimon.view.View createdView =
         new ViewImpl(
@@ -222,154 +220,6 @@ public class TestPaimonCatalogOps {
     assertThrowsExactly(
         Catalog.ViewNotExistException.class,
         () -> paimonCatalogOps.loadView(renamedViewIdentifier.toString()));
-  }
-
-  private Catalog createViewSupportedCatalog(Catalog wrappedCatalog) {
-    Map<Identifier, org.apache.paimon.view.View> viewStore = new HashMap<>();
-    return new DelegateCatalog(wrappedCatalog) {
-      @Override
-      public CatalogLoader catalogLoader() {
-        return wrapped().catalogLoader();
-      }
-
-      @Override
-      public List<String> listViews(String databaseName) {
-        return viewStore.keySet().stream()
-            .filter(identifier -> identifier.getDatabaseName().equals(databaseName))
-            .map(Identifier::getObjectName)
-            .collect(Collectors.toList());
-      }
-
-      @Override
-      public org.apache.paimon.view.View getView(Identifier identifier)
-          throws Catalog.ViewNotExistException {
-        org.apache.paimon.view.View storedView = viewStore.get(identifier);
-        if (storedView == null) {
-          throw new Catalog.ViewNotExistException(identifier);
-        }
-        return storedView;
-      }
-
-      @Override
-      public void createView(
-          Identifier identifier, org.apache.paimon.view.View view, boolean ignoreIfExists)
-          throws Catalog.ViewAlreadyExistException, Catalog.DatabaseNotExistException {
-        if (viewStore.containsKey(identifier)) {
-          if (!ignoreIfExists) {
-            throw new Catalog.ViewAlreadyExistException(identifier);
-          }
-          return;
-        }
-
-        if (!listDatabases().contains(identifier.getDatabaseName())) {
-          throw new Catalog.DatabaseNotExistException(identifier.getDatabaseName());
-        }
-
-        viewStore.put(identifier, copyView(identifier, view));
-      }
-
-      @Override
-      public void alterView(
-          Identifier identifier, List<ViewChange> changes, boolean ignoreIfNotExists)
-          throws Catalog.ViewNotExistException, Catalog.DialectAlreadyExistException,
-              Catalog.DialectNotExistException {
-        org.apache.paimon.view.View storedView = viewStore.get(identifier);
-        if (storedView == null) {
-          if (!ignoreIfNotExists) {
-            throw new Catalog.ViewNotExistException(identifier);
-          }
-          return;
-        }
-
-        Map<String, String> updatedOptions = new HashMap<>(storedView.options());
-        Map<String, String> updatedDialects = new HashMap<>(storedView.dialects());
-        String updatedComment = storedView.comment().orElse(null);
-
-        for (ViewChange change : changes) {
-          if (change instanceof ViewChange.SetViewOption) {
-            ViewChange.SetViewOption setViewOption = (ViewChange.SetViewOption) change;
-            updatedOptions.put(setViewOption.key(), setViewOption.value());
-          } else if (change instanceof ViewChange.RemoveViewOption) {
-            ViewChange.RemoveViewOption removeViewOption = (ViewChange.RemoveViewOption) change;
-            updatedOptions.remove(removeViewOption.key());
-          } else if (change instanceof ViewChange.UpdateViewComment) {
-            ViewChange.UpdateViewComment updateViewComment = (ViewChange.UpdateViewComment) change;
-            updatedComment = updateViewComment.comment();
-          } else if (change instanceof ViewChange.AddDialect) {
-            ViewChange.AddDialect addDialect = (ViewChange.AddDialect) change;
-            if (updatedDialects.containsKey(addDialect.dialect())) {
-              throw new Catalog.DialectAlreadyExistException(identifier, addDialect.dialect());
-            }
-            updatedDialects.put(addDialect.dialect(), addDialect.query());
-          } else if (change instanceof ViewChange.UpdateDialect) {
-            ViewChange.UpdateDialect updateDialect = (ViewChange.UpdateDialect) change;
-            if (!updatedDialects.containsKey(updateDialect.dialect())) {
-              throw new Catalog.DialectNotExistException(identifier, updateDialect.dialect());
-            }
-            updatedDialects.put(updateDialect.dialect(), updateDialect.query());
-          } else if (change instanceof ViewChange.DropDialect) {
-            ViewChange.DropDialect dropDialect = (ViewChange.DropDialect) change;
-            if (!updatedDialects.containsKey(dropDialect.dialect())) {
-              throw new Catalog.DialectNotExistException(identifier, dropDialect.dialect());
-            }
-            updatedDialects.remove(dropDialect.dialect());
-          }
-        }
-
-        String updatedQuery =
-            updatedDialects.isEmpty()
-                ? storedView.query()
-                : updatedDialects.values().iterator().next();
-        viewStore.put(
-            identifier,
-            new ViewImpl(
-                identifier,
-                storedView.rowType().getFields(),
-                updatedQuery,
-                updatedDialects,
-                updatedComment,
-                updatedOptions));
-      }
-
-      @Override
-      public void renameView(
-          Identifier fromIdentifier, Identifier toIdentifier, boolean ignoreIfNotExists)
-          throws Catalog.ViewNotExistException, Catalog.ViewAlreadyExistException {
-        org.apache.paimon.view.View storedView = viewStore.remove(fromIdentifier);
-        if (storedView == null) {
-          if (!ignoreIfNotExists) {
-            throw new Catalog.ViewNotExistException(fromIdentifier);
-          }
-          return;
-        }
-
-        if (viewStore.containsKey(toIdentifier)) {
-          viewStore.put(fromIdentifier, storedView);
-          throw new Catalog.ViewAlreadyExistException(toIdentifier);
-        }
-
-        viewStore.put(toIdentifier, copyView(toIdentifier, storedView));
-      }
-
-      @Override
-      public void dropView(Identifier identifier, boolean ignoreIfNotExists)
-          throws Catalog.ViewNotExistException {
-        if (viewStore.remove(identifier) == null && !ignoreIfNotExists) {
-          throw new Catalog.ViewNotExistException(identifier);
-        }
-      }
-    };
-  }
-
-  private org.apache.paimon.view.View copyView(
-      Identifier identifier, org.apache.paimon.view.View view) {
-    return new ViewImpl(
-        identifier,
-        view.rowType().getFields(),
-        view.query(),
-        new HashMap<>(view.dialects()),
-        view.comment().orElse(null),
-        new HashMap<>(view.options()));
   }
 
   @Test

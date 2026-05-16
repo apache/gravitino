@@ -24,12 +24,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
@@ -148,23 +146,28 @@ final class PaimonViewCatalogOps {
       return loadView(identifier);
     }
 
-    Optional<ViewChange> renameViewOpt =
+    List<ViewChange.RenameView> renameViewChanges =
         Arrays.stream(changes)
             .filter(viewChange -> viewChange instanceof ViewChange.RenameView)
-            .reduce((a, b) -> b);
-    if (renameViewOpt.isPresent()) {
-      String otherChanges =
+            .map(viewChange -> (ViewChange.RenameView) viewChange)
+            .collect(Collectors.toList());
+    if (!renameViewChanges.isEmpty()) {
+      Preconditions.checkArgument(
+          renameViewChanges.size() == 1,
+          "Only one rename operation is allowed, but found: %s",
+          renameViewChanges.size());
+
+      List<String> otherChanges =
           Arrays.stream(changes)
               .filter(viewChange -> !(viewChange instanceof ViewChange.RenameView))
               .map(String::valueOf)
-              .collect(Collectors.joining("\n"));
+              .collect(Collectors.toList());
       Preconditions.checkArgument(
-          StringUtils.isEmpty(otherChanges),
-          String.format(
-              "The operation to change the view name cannot be performed together with other operations. "
-                  + "The list of operations that you cannot perform includes: \n%s",
-              otherChanges));
-      return renameView(identifier, (ViewChange.RenameView) renameViewOpt.get());
+          otherChanges.isEmpty(),
+          "The operation to change the view name cannot be performed together with other operations. "
+              + "The list of operations that you cannot perform includes: \n%s",
+          String.join("\n", otherChanges));
+      return renameView(identifier, renameViewChanges.get(0));
     }
 
     if (containsReplaceView(changes)) {
@@ -245,6 +248,10 @@ final class PaimonViewCatalogOps {
 
     try {
       if (sourceIdentifier.equals(targetIdentifier)) {
+        // Paimon does not provide a native replace-view API. To align with Paimon Spark's
+        // CREATE OR REPLACE VIEW behavior, replace on the same identifier is executed as
+        // drop-then-create. This path is intentionally non-atomic: if create fails after drop,
+        // the original view remains dropped and no rollback is attempted.
         paimonCatalogOps.dropView(sourceIdentifier.toString());
         paimonCatalogOps.createView(sourceIdentifier.toString(), paimonView);
       } else {

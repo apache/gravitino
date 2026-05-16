@@ -25,7 +25,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.AuditInfo;
@@ -43,7 +42,7 @@ final class PaimonView implements View {
   static final String DEFAULT_CATALOG_PROPERTY = "gravitino.view.default-catalog";
   static final String DEFAULT_SCHEMA_PROPERTY = "gravitino.view.default-schema";
 
-  private static final String DEFAULT_DIALECT = "default";
+  private static final String PAIMON_VIEW_QUERY = "query";
 
   private final String name;
   @Nullable private final String comment;
@@ -94,17 +93,15 @@ final class PaimonView implements View {
   static org.apache.paimon.view.View toPaimonView(
       NameIdentifier ident,
       @Nullable String comment,
-      Column[] columns,
+      @Nullable Column[] columns,
       Representation[] representations,
       @Nullable String defaultCatalog,
       @Nullable String defaultSchema,
       Map<String, String> properties) {
     Preconditions.checkArgument(ident != null, "View identifier must not be null");
-
-    Representation[] safeRepresentations =
-        representations == null ? new Representation[0] : representations;
     Preconditions.checkArgument(
-        safeRepresentations.length > 0, "representations must not be null or empty");
+        representations != null && representations.length > 0,
+        "representations must not be null or empty");
 
     Column[] safeColumns = columns == null ? new Column[0] : columns;
     List<DataField> fields = new ArrayList<>(safeColumns.length);
@@ -114,19 +111,25 @@ final class PaimonView implements View {
 
     Map<String, String> dialectQueries = new HashMap<>();
     String query = null;
-    for (Representation representation : safeRepresentations) {
+    for (Representation representation : representations) {
       Preconditions.checkArgument(
           representation instanceof SQLRepresentation, "Paimon only supports SQL representations");
       SQLRepresentation sqlRepresentation = (SQLRepresentation) representation;
-      if (query == null) {
+      if (PAIMON_VIEW_QUERY.equalsIgnoreCase(sqlRepresentation.dialect())) {
+        Preconditions.checkArgument(
+            query == null,
+            "Only one representation with dialect '%s' is allowed",
+            PAIMON_VIEW_QUERY);
         query = sqlRepresentation.sql();
+      } else {
+        dialectQueries.put(sqlRepresentation.dialect(), sqlRepresentation.sql());
       }
-
-      dialectQueries.put(sqlRepresentation.dialect(), sqlRepresentation.sql());
     }
 
     Preconditions.checkArgument(
-        query != null && !query.isEmpty(), "View SQL must not be null or empty");
+        query != null && !query.isEmpty(),
+        "View representation with dialect '%s' must not be null or empty",
+        PAIMON_VIEW_QUERY);
 
     Map<String, String> options = properties == null ? new HashMap<>() : new HashMap<>(properties);
     if (defaultCatalog != null) {
@@ -195,19 +198,17 @@ final class PaimonView implements View {
 
     Map<String, String> safeDialects =
         dialects == null ? Collections.emptyMap() : new HashMap<>(dialects);
-    List<Representation> sqlRepresentations = new ArrayList<>();
-    safeDialects.forEach(
-        (dialect, sql) ->
-            sqlRepresentations.add(
-                SQLRepresentation.builder().withDialect(dialect).withSql(sql).build()));
+    List<Representation> sqlRepresentations = new ArrayList<>(safeDialects.size() + 1);
+    sqlRepresentations.add(
+        SQLRepresentation.builder().withDialect(PAIMON_VIEW_QUERY).withSql(query).build());
 
-    boolean queryCovered =
-        safeDialects.values().stream()
-            .anyMatch(dialectQuery -> Objects.equals(dialectQuery, query));
-    if (sqlRepresentations.isEmpty() || !queryCovered) {
-      sqlRepresentations.add(
-          SQLRepresentation.builder().withDialect(DEFAULT_DIALECT).withSql(query).build());
-    }
+    safeDialects.forEach(
+        (dialect, sql) -> {
+          if (!PAIMON_VIEW_QUERY.equalsIgnoreCase(dialect)) {
+            sqlRepresentations.add(
+                SQLRepresentation.builder().withDialect(dialect).withSql(sql).build());
+          }
+        });
 
     return sqlRepresentations.toArray(new Representation[0]);
   }
