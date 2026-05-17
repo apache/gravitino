@@ -17,7 +17,7 @@ jobs:
   start-runner:
     name: JDK${{ inputs.java-version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:
