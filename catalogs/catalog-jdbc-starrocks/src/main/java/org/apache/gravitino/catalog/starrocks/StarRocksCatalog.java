@@ -27,6 +27,8 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.JdbcViewOperations;
+import org.apache.gravitino.catalog.jdbc.operation.MysqlViewOperations;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksExceptionConverter;
 import org.apache.gravitino.catalog.starrocks.converter.StarRocksTypeConverter;
@@ -53,7 +55,13 @@ public class StarRocksCatalog extends JdbcCatalog {
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
+        createJdbcViewOperations(),
         createJdbcColumnDefaultValueConverter());
+  }
+
+  @Override
+  protected JdbcViewOperations createJdbcViewOperations() {
+    return new MysqlViewOperations();
   }
 
   @Override

@@ -64,6 +64,12 @@ public class TestJdbcCatalogCredential {
     protected JdbcColumnDefaultValueConverter createJdbcColumnDefaultValueConverter() {
       throw new UnsupportedOperationException("Not needed for credential test");
     }
+
+    @Override
+    protected org.apache.gravitino.catalog.jdbc.operation.JdbcViewOperations
+        createJdbcViewOperations() {
+      throw new UnsupportedOperationException("Not needed for credential test");
+    }
   }
 
   @Test

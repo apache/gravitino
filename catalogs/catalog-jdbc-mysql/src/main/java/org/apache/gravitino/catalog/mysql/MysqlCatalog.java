@@ -25,6 +25,8 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConvert
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.JdbcViewOperations;
+import org.apache.gravitino.catalog.jdbc.operation.MysqlViewOperations;
 import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import org.apache.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
@@ -52,7 +54,13 @@ public class MysqlCatalog extends JdbcCatalog {
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
+        createJdbcViewOperations(),
         createJdbcColumnDefaultValueConverter());
+  }
+
+  @Override
+  protected JdbcViewOperations createJdbcViewOperations() {
+    return new MysqlViewOperations();
   }
 
   @Override

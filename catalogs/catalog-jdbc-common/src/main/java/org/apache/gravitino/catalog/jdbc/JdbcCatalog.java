@@ -29,6 +29,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.JdbcViewOperations;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
@@ -36,6 +37,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.rel.ViewCatalog;
 
 /** Implementation of an Jdbc catalog in Gravitino. */
 public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
@@ -55,6 +57,16 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
       };
 
   /**
+   * Returns this catalog as a {@link ViewCatalog} for read-only view discovery.
+   *
+   * @return The view catalog operations.
+   */
+  @Override
+  public ViewCatalog asViewCatalog() {
+    return (ViewCatalog) ops();
+  }
+
+  /**
    * Creates a new instance of {@link JdbcCatalogOperations} with the provided configuration.
    *
    * @param config The configuration map for the Jdbc catalog operations.
@@ -69,9 +81,15 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
             jdbcTypeConverter,
             createJdbcDatabaseOperations(),
             createJdbcTableOperations(),
+            createJdbcViewOperations(),
             createJdbcColumnDefaultValueConverter());
     return ops;
   }
+
+  /**
+   * @return The {@link JdbcViewOperations} used to read views from the underlying database.
+   */
+  protected abstract JdbcViewOperations createJdbcViewOperations();
 
   @Override
   public Capability newCapability() {

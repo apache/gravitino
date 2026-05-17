@@ -27,6 +27,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.operation.ViewOperation;
 
 public class PostgreSQLCatalogOperations extends JdbcCatalogOperations {
 
@@ -35,12 +36,14 @@ public class PostgreSQLCatalogOperations extends JdbcCatalogOperations {
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
       JdbcTableOperations tableOperation,
+      ViewOperation viewOperation,
       JdbcColumnDefaultValueConverter columnDefaultValueConverter) {
     super(
         exceptionConverter,
         jdbcTypeConverter,
         databaseOperation,
         tableOperation,
+        viewOperation,
         columnDefaultValueConverter);
   }
 

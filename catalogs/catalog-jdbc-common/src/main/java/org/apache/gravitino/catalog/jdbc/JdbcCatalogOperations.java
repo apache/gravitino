@@ -53,6 +53,7 @@ import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.TableOperation;
+import org.apache.gravitino.catalog.jdbc.operation.ViewOperation;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -61,6 +62,7 @@ import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -68,9 +70,13 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JdbcCatalogMetricsSource;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -82,7 +88,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with the Jdbc catalog in Apache Gravitino. */
-public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+public class JdbcCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog {
+
+  private static final String JDBC_VIEW_WRITE_UNSUPPORTED_MSG =
+      "CREATE, ALTER, and DROP VIEW are not supported for JDBC catalogs. "
+          + "Use an IRC-backed catalog (for example Iceberg) for managed views.";
 
   private static final String GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG =
       "The Gravitino id attribute does not exist in properties";
@@ -100,6 +111,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   private final DatabaseOperation databaseOperation;
 
   private final TableOperation tableOperation;
+
+  private final ViewOperation viewOperation;
 
   private DataSource dataSource;
   private String jdbcUrl;
@@ -129,6 +142,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * @param jdbcTypeConverter The type converter to be used by the operations.
    * @param databaseOperation The database operations to be used by the operations.
    * @param tableOperation The table operations to be used by the operations.
+   * @param viewOperation The view operations to be used by the operations.
    * @param columnDefaultValueConverter The column default value converter to be used by the
    *     operations.
    */
@@ -137,11 +151,13 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
       JdbcTableOperations tableOperation,
+      ViewOperation viewOperation,
       JdbcColumnDefaultValueConverter columnDefaultValueConverter) {
     this.exceptionConverter = exceptionConverter;
     this.jdbcTypeConverter = jdbcTypeConverter;
     this.databaseOperation = databaseOperation;
     this.tableOperation = tableOperation;
+    this.viewOperation = viewOperation;
     this.columnDefaultValueConverter = columnDefaultValueConverter;
   }
 
@@ -178,6 +194,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
     this.tableOperation.initialize(
         dataSource, exceptionConverter, jdbcTypeConverter, columnDefaultValueConverter, resultConf);
+    this.viewOperation.initialize(dataSource, exceptionConverter, jdbcTypeConverter, resultConf);
     if (tableOperation instanceof RequireDatabaseOperation) {
       ((RequireDatabaseOperation) tableOperation).setDatabaseOperation(databaseOperation);
     }
@@ -543,6 +560,75 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   public boolean purgeTable(NameIdentifier tableIdent) throws UnsupportedOperationException {
     String databaseName = NameIdentifier.of(tableIdent.namespace().levels()).name();
     return tableOperation.purge(databaseName, tableIdent.name());
+  }
+
+  /**
+   * Lists all views under the specified namespace by reading view metadata from the underlying
+   * database.
+   *
+   * @param namespace The namespace to list views for.
+   * @return An array of view identifiers in the namespace.
+   * @throws NoSuchSchemaException If the schema with the provided namespace does not exist.
+   */
+  @Override
+  public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
+    String databaseName = NameIdentifier.of(namespace.levels()).name();
+    return viewOperation.listViews(databaseName).stream()
+        .map(view -> NameIdentifier.of(namespace, view))
+        .toArray(NameIdentifier[]::new);
+  }
+
+  /**
+   * Loads a view from the underlying JDBC database.
+   *
+   * @param ident The identifier of the view to load.
+   * @return The loaded view metadata.
+   * @throws NoSuchViewException If the specified view does not exist.
+   */
+  @Override
+  public View loadView(NameIdentifier ident) throws NoSuchViewException {
+    String databaseName = NameIdentifier.of(ident.namespace().levels()).name();
+    return viewOperation.load(databaseName, ident.name());
+  }
+
+  /**
+   * Creates a view in the JDBC catalog.
+   *
+   * @throws UnsupportedOperationException Always thrown because JDBC catalogs only support
+   *     read-only view discovery.
+   */
+  @Override
+  public View createView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties) {
+    throw new UnsupportedOperationException(JDBC_VIEW_WRITE_UNSUPPORTED_MSG);
+  }
+
+  /**
+   * Alters a view in the JDBC catalog.
+   *
+   * @throws UnsupportedOperationException Always thrown because JDBC catalogs only support
+   *     read-only view discovery.
+   */
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes) {
+    throw new UnsupportedOperationException(JDBC_VIEW_WRITE_UNSUPPORTED_MSG);
+  }
+
+  /**
+   * Drops a view from the JDBC catalog.
+   *
+   * @throws UnsupportedOperationException Always thrown because JDBC catalogs only support
+   *     read-only view discovery.
+   */
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    throw new UnsupportedOperationException(JDBC_VIEW_WRITE_UNSUPPORTED_MSG);
   }
 
   /**

@@ -25,6 +25,7 @@ import java.sql.Statement;
 
 public final class JdbcConnectorUtils {
   public static final ImmutableList<String> TABLE_TYPES = ImmutableList.of("TABLE");
+  public static final ImmutableList<String> VIEW_TYPES = ImmutableList.of("VIEW");
 
   private JdbcConnectorUtils() {}
 
@@ -45,5 +46,9 @@ public final class JdbcConnectorUtils {
 
   public static String[] getTableTypes() {
     return TABLE_TYPES.toArray(new String[0]);
+  }
+
+  public static String[] getViewTypes() {
+    return VIEW_TYPES.toArray(new String[0]);
   }
 }
