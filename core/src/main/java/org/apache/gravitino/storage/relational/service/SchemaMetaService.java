@@ -175,24 +175,16 @@ public class SchemaMetaService {
             if (n > 1) {
               SchemaEntity firstAncestor = rowsToInsert.get(0);
               Namespace ancestorNs = firstAncestor.namespace();
-              // The mapper queries storage (physical) form names directly, so convert before
-              // the lookup and compare in physical form.
-              List<String> ancestorPhysicalNames =
+              List<String> ancestorNames =
                   rowsToInsert.subList(0, n - 1).stream()
                       .map(SchemaEntity::name)
-                      .map(name -> HierarchicalSchemaUtil.logicalToPhysical(name, logicalSep))
                       .collect(Collectors.toList());
-              Set<String> existingPhysicalNames =
-                  mapper
-                      .batchSelectSchemaByIdentifier(
-                          ancestorNs.level(0), ancestorNs.level(1), ancestorPhysicalNames)
-                      .stream()
+              Set<String> existingLogicalNames =
+                  ops.listPOs(mapper, ancestorNs, ancestorNames).stream()
                       .map(SchemaPO::getSchemaName)
                       .collect(Collectors.toSet());
               for (SchemaEntity row : rowsToInsert.subList(0, n - 1)) {
-                String physicalName =
-                    HierarchicalSchemaUtil.logicalToPhysical(row.name(), logicalSep);
-                if (existingPhysicalNames.contains(physicalName)) {
+                if (existingLogicalNames.contains(row.name())) {
                   continue;
                 }
                 SchemaPO.Builder builder = SchemaPO.builder();
