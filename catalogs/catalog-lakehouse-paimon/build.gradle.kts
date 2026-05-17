@@ -125,6 +125,17 @@ dependencies {
     exclude("*")
   }
 
+  // Required by Paimon HiveCatalog#createView, which calls hive ql metadata Table APIs.
+  runtimeOnly(libs.hive2.exec) {
+    // Use the lightweight core artifact instead of the shaded hive-exec fat jar.
+    artifact {
+      classifier = "core"
+    }
+    exclude("org.apache.hadoop")
+    exclude("org.apache.logging.log4j")
+    exclude("org.slf4j")
+  }
+
   annotationProcessor(libs.lombok)
 
   testImplementation(project(":api"))

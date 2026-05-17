@@ -88,7 +88,6 @@ import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.commons.util.StringUtils;
@@ -865,22 +864,33 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
 
   @Test
   void testSparkCreateViewAndLoadByGravitino() {
-    Assumptions.assumeTrue(
-        isSparkViewInteropSupported(),
-        String.format("Paimon backend %s does not support Spark-View interoperability", TYPE));
-
     NameIdentifier baseTableIdentifier =
         createSimplePaimonTableForViewInterop("spark_create_view_source_table");
     String viewName = GravitinoITUtils.genRandomName("spark_create_view");
     String viewIdentifier = String.join(".", schemaName, viewName);
     String tableIdentifier = String.join(".", schemaName, baseTableIdentifier.name());
 
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    if (!isSparkViewInteropSupported()) {
+      Throwable throwable =
+          Assertions.assertThrows(
+              Throwable.class,
+              () -> {
+                spark.sql(
+                    String.format(
+                        "CREATE VIEW paimon.%s AS SELECT id, name FROM paimon.%s",
+                        viewIdentifier, tableIdentifier));
+                viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+              });
+      assertViewInteropUnsupported(throwable);
+      return;
+    }
+
     spark.sql(
         String.format(
             "CREATE VIEW paimon.%s AS SELECT id, name FROM paimon.%s",
             viewIdentifier, tableIdentifier));
 
-    ViewCatalog viewCatalog = catalog.asViewCatalog();
     View loadedView = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
     Assertions.assertEquals(viewName, loadedView.name());
     Assertions.assertEquals(2, loadedView.columns().length);
@@ -891,10 +901,6 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
 
   @Test
   void testGravitinoCreateViewAndReadBySpark() {
-    Assumptions.assumeTrue(
-        isSparkViewInteropSupported(),
-        String.format("Paimon backend %s does not support Spark-View interoperability", TYPE));
-
     NameIdentifier baseTableIdentifier =
         createSimplePaimonTableForViewInterop("gravitino_create_view_source_table");
     String viewName = GravitinoITUtils.genRandomName("gravitino_create_view");
@@ -908,6 +914,33 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
           SQLRepresentation.builder().withDialect("spark").withSql(query).build()
         };
     ViewCatalog viewCatalog = catalog.asViewCatalog();
+
+    if (!isSparkViewInteropSupported()) {
+      Throwable throwable =
+          Assertions.assertThrows(
+              Throwable.class,
+              () -> {
+                viewCatalog.createView(
+                    viewIdentifier,
+                    "view_for_spark_read",
+                    new Column[] {
+                      Column.of("id", Types.IntegerType.get(), "id column"),
+                      Column.of("name", Types.StringType.get(), "name column")
+                    },
+                    representations,
+                    "paimon",
+                    schemaName,
+                    Collections.emptyMap());
+                spark
+                    .sql(
+                        String.format(
+                            "SELECT * FROM paimon.%s.%s ORDER BY id", schemaName, viewName))
+                    .collectAsList();
+              });
+      assertViewInteropUnsupported(throwable);
+      return;
+    }
+
     viewCatalog.createView(
         viewIdentifier,
         "view_for_spark_read",
@@ -1114,6 +1147,32 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
 
   private boolean isSparkViewInteropSupported() {
     return "hive".equalsIgnoreCase(TYPE);
+  }
+
+  private void assertViewInteropUnsupported(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      if (current instanceof UnsupportedOperationException) {
+        return;
+      }
+
+      String message = current.getMessage();
+      if (message != null) {
+        String lowerCaseMessage = message.toLowerCase(Locale.ROOT);
+        if (lowerCaseMessage.contains("unsupported")
+            || lowerCaseMessage.contains("not support")
+            || lowerCaseMessage.contains("does not support")) {
+          return;
+        }
+      }
+
+      current = current.getCause();
+    }
+
+    Assertions.fail(
+        String.format(
+            "Expected unsupported view interoperability for backend %s, but got: %s",
+            TYPE, throwable));
   }
 
   private NameIdentifier createSimplePaimonTableForViewInterop(String tablePrefix) {
