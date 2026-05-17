@@ -139,23 +139,24 @@ public class SchemaMetaService {
   public void insertSchema(SchemaEntity schemaEntity, boolean overwrite) throws IOException {
     try {
       NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
-      // Callers above this service (e.g. JDBCBackend + naming bridge) pass storage-form schema
-      // names: nested paths use the internal physical separator, not the external logical one.
-      String physicalSep = HierarchicalSchemaUtil.physicalSeparator();
+      // SchemaEntity arrives in API/logical form (separator = HierarchicalSchemaUtil
+      // .schemaSeparator()). We split here on the logical separator and build ancestor rows in
+      // logical form. HierarchicalConventionPOStorageOps.batchInsertPOs applies its write
+      // rewriter to translate each PO's name to storage form before SQL execution.
+      String logicalSep = HierarchicalSchemaUtil.schemaSeparator();
       String schemaName = schemaEntity.name();
       List<SchemaEntity> rowsToInsert = new ArrayList<>();
-      if (schemaName == null || !schemaName.contains(physicalSep)) {
+      if (schemaName == null || !schemaName.contains(logicalSep)) {
         rowsToInsert.add(schemaEntity);
       } else {
-        // Segments of the storage-form name; e.g. [A, B, C] -> ancestor rows "A", "A"+sep+"B", then
-        // leaf.
-        String[] parts = schemaName.split(Pattern.quote(physicalSep), -1);
+        // Segments of the logical name; e.g. "A:B:C" -> ancestor rows "A", "A:B", then leaf.
+        String[] parts = schemaName.split(Pattern.quote(logicalSep), -1);
         for (int nSeg = 1; nSeg < parts.length; nSeg++) {
-          String ancestorPhysical = String.join(physicalSep, Arrays.copyOf(parts, nSeg));
+          String ancestorLogical = String.join(logicalSep, Arrays.copyOf(parts, nSeg));
           SchemaEntity ancestor =
               SchemaEntity.builder()
                   .withId(nextIdForNestedAncestor())
-                  .withName(ancestorPhysical)
+                  .withName(ancestorLogical)
                   .withNamespace(schemaEntity.namespace())
                   .withComment(null)
                   .withProperties(Collections.emptyMap())
@@ -174,11 +175,14 @@ public class SchemaMetaService {
             if (n > 1) {
               SchemaEntity firstAncestor = rowsToInsert.get(0);
               Namespace ancestorNs = firstAncestor.namespace();
+              // The mapper queries storage (physical) form names directly, so convert before
+              // the lookup and compare in physical form.
               List<String> ancestorPhysicalNames =
                   rowsToInsert.subList(0, n - 1).stream()
                       .map(SchemaEntity::name)
+                      .map(name -> HierarchicalSchemaUtil.logicalToPhysical(name, logicalSep))
                       .collect(Collectors.toList());
-              Set<String> existingAncestorNames =
+              Set<String> existingPhysicalNames =
                   mapper
                       .batchSelectSchemaByIdentifier(
                           ancestorNs.level(0), ancestorNs.level(1), ancestorPhysicalNames)
@@ -186,7 +190,9 @@ public class SchemaMetaService {
                       .map(SchemaPO::getSchemaName)
                       .collect(Collectors.toSet());
               for (SchemaEntity row : rowsToInsert.subList(0, n - 1)) {
-                if (existingAncestorNames.contains(row.name())) {
+                String physicalName =
+                    HierarchicalSchemaUtil.logicalToPhysical(row.name(), logicalSep);
+                if (existingPhysicalNames.contains(physicalName)) {
                   continue;
                 }
                 SchemaPO.Builder builder = SchemaPO.builder();
