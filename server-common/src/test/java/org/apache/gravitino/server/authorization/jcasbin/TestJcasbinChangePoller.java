@@ -23,6 +23,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -125,6 +127,15 @@ public class TestJcasbinChangePoller {
     Assertions.assertEquals(List.of(key("ml1", "cat1", "")), metadataIdCache.invalidatedPrefixes);
     Assertions.assertEquals(
         List.of(key("ml1", "cat2", "sch1", "tbl1", "TABLE")), metadataIdCache.invalidatedKeys);
+  }
+
+  @Test
+  void testPollCursorAdvancementIsSynchronized() throws NoSuchMethodException {
+    Method pollOwnerChanges = JcasbinChangePoller.class.getDeclaredMethod("pollOwnerChanges");
+    Method pollEntityChanges = JcasbinChangePoller.class.getDeclaredMethod("pollEntityChanges");
+
+    Assertions.assertTrue(Modifier.isSynchronized(pollOwnerChanges.getModifiers()));
+    Assertions.assertTrue(Modifier.isSynchronized(pollEntityChanges.getModifiers()));
   }
 
   private static String key(String... parts) {

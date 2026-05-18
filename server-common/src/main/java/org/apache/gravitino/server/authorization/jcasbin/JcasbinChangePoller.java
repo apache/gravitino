@@ -139,7 +139,7 @@ public class JcasbinChangePoller implements AutoCloseable {
    * ownerRelCache} entries. Each row carries {@code metadataObjectId}, so invalidation is a direct
    * key removal — no name resolution needed.
    */
-  private void pollOwnerChanges() {
+  private synchronized void pollOwnerChanges() {
     List<ChangedOwnerInfo> changes =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class, m -> m.selectChangedOwners(ownerPollHighWaterId));
@@ -165,7 +165,7 @@ public class JcasbinChangePoller implements AutoCloseable {
    * have populated under that name. If a future change starts emitting the new post-rename name,
    * this invalidation will silently miss and stale entries will only clear via LRU eviction.
    */
-  private void pollEntityChanges() {
+  private synchronized void pollEntityChanges() {
     List<EntityChangeRecord> changes =
         SessionUtils.getWithoutCommit(
             EntityChangeLogMapper.class,
