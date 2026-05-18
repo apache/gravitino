@@ -139,8 +139,6 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     String nestedSchemaInIceberg = SCHEMA_NAME + ".nested";
     String tableName = "test_nested_create";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher imports the nested namespace into Gravitino.
     createNestedNamespaceViaIRC(SCHEMA_NAME, "nested");
     grantUseSchemaRole(nestedSchemaInGravitino);
     sql("USE %s;", nestedSchemaInIceberg);
@@ -165,8 +163,6 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_inherit";
     String tableName = "test_nested_inherited_create";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher imports the nested namespace into Gravitino.
     createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_inherit");
 
     Assertions.assertThrowsExactly(
@@ -198,8 +194,6 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_crud";
     String tableName = "test_nested_crud";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher imports the nested namespace into Gravitino.
     createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_crud");
     grantUseSchemaRole(nestedSchemaInGravitino);
     String createRole = grantCreateTableRole(nestedSchemaInGravitino);
@@ -248,8 +242,6 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
   void testListNestedNamespaceTablesWithInheritedParentPrivilege() {
     String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_list";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher imports the nested namespace and tables into Gravitino.
     createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_list");
     createTableViaIRC(new String[] {SCHEMA_NAME, "nested_list"}, "nested_list_t1");
     createTableViaIRC(new String[] {SCHEMA_NAME, "nested_list"}, "nested_list_t2");

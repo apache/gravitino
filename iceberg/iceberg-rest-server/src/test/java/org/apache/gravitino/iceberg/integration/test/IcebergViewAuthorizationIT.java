@@ -125,8 +125,6 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     String nestedBaseTable = "nested_base_table";
     String nestedView = "test_nested_view";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher imports the nested namespace and base table into Gravitino.
     createNestedNamespaceViaIRC(SCHEMA_NAME, "nested");
     createTableViaIRC(new String[] {SCHEMA_NAME, "nested"}, nestedBaseTable);
     grantUseSchemaRole(nestedSchemaInGravitino);
@@ -160,8 +158,6 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     String nestedBaseTable = "nested_inherited_base_table";
     String nestedView = "test_nested_inherited_view";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher imports the nested namespace and base table into Gravitino.
     createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_inherit");
     createTableViaIRC(new String[] {SCHEMA_NAME, "nested_inherit"}, nestedBaseTable);
 
@@ -200,8 +196,6 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     String nestedBaseTable = "nested_crud_base_table";
     String nestedView = "nested_crud_view";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher imports the nested namespace and base table into Gravitino.
     createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_crud");
     createTableViaIRC(new String[] {SCHEMA_NAME, "nested_crud"}, nestedBaseTable);
     grantUseSchemaRole(nestedSchemaInGravitino);
@@ -237,8 +231,6 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     String view1 = "nested_list_view_1";
     String view2 = "nested_list_view_2";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher imports the nested namespace and base table into Gravitino.
     createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_list");
     createTableViaIRC(new String[] {SCHEMA_NAME, "nested_list"}, nestedBaseTable);
     setSchemaOwner(SCHEMA_NAME, NORMAL_USER);

@@ -200,8 +200,6 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     String nestedNamespaceInGravitino = parentNamespace + ":child";
     String nestedNamespaceInIceberg = parentNamespace + ".child";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher auto-creates the parent namespace and imports both into Gravitino.
     createNestedNamespaceViaIRC(parentNamespace, "child");
 
     Assertions.assertThrowsExactly(
@@ -218,8 +216,6 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     String parentNamespace = "ns_nested_inherit_parent";
     String nestedNamespaceInIceberg = parentNamespace + ".child";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher auto-creates the parent namespace and imports both into Gravitino.
     createNestedNamespaceViaIRC(parentNamespace, "child");
 
     Assertions.assertThrowsExactly(
@@ -239,8 +235,6 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     String nestedNamespaceInGravitino = parentNamespace + ":child";
     String nestedNamespaceInIceberg = parentNamespace + ".child";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher auto-creates the parent namespace and imports both into Gravitino.
     createNestedNamespaceViaIRC(parentNamespace, "child");
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
 
@@ -271,8 +265,6 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     String nestedNamespaceInGravitino = parentNamespace + ":child";
     String nestedNamespaceInIceberg = parentNamespace + ".child";
 
-    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
-    // dispatcher auto-creates the parent namespace and imports both into Gravitino.
     createNestedNamespaceViaIRC(parentNamespace, "child");
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
 

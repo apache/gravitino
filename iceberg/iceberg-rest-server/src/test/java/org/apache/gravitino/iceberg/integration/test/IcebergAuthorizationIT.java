@@ -247,8 +247,7 @@ public class IcebergAuthorizationIT extends BaseIT {
 
   /**
    * Initialize a REST catalog client authenticated as {@link #SUPER_USER}. Tests use it to perform
-   * setup that the Gravitino REST API cannot — most notably creating hierarchical schemas whose
-   * names contain the configured separator, since the Gravitino REST boundary rejects those names.
+   * admin setup operations such as creating hierarchical schemas.
    */
   private void initAdminIcebergCatalog() {
     Map<String, String> props = Maps.newHashMap();
@@ -273,11 +272,7 @@ public class IcebergAuthorizationIT extends BaseIT {
     adminIcebergCatalog.createNamespace(Namespace.of(levels));
   }
 
-  /**
-   * Creates a 2-column Iceberg table via the IRC API as {@link #SUPER_USER}. Tests use this for
-   * setup that the Gravitino REST API cannot — most notably creating tables under hierarchical
-   * schemas whose names contain the configured separator.
-   */
+  /** Creates a 2-column Iceberg table via the IRC API as {@link #SUPER_USER}. */
   protected void createTableViaIRC(String[] namespaceLevels, String tableName) {
     Schema schema =
         new Schema(
