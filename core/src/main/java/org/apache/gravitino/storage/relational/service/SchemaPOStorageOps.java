@@ -117,7 +117,7 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
    * exact row plus everything starting with the prefix.
    */
   @Override
-  public List<SchemaPO> listPOsForCascade(
+  public List<SchemaPO> listPOsByNamePrefix(
       SchemaMetaMapper mapper, Long catalogId, String physicalName) {
     String descendantPrefix = physicalName + HierarchicalSchemaUtil.physicalSeparator();
     return mapper.listSchemaPOsByCatalogIdAndNamePrefix(catalogId, physicalName, descendantPrefix);

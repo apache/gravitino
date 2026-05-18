@@ -500,7 +500,8 @@ public class SchemaMetaService {
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
             mapper ->
-                ops.listPOsForCascade(mapper, schemaPO.getCatalogId(), schemaPO.getSchemaName()));
+                ops.listPOsByNamePrefix(
+                    mapper, schemaPO.getCatalogId(), schemaPO.getSchemaName()));
     if (matched == null || matched.isEmpty()) {
       return Collections.singletonList(schemaPO.getSchemaId());
     }
