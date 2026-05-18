@@ -27,7 +27,7 @@ import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpBaseSQLProviderFactory {
+public class TestSQLProviderFactoryHelper {
   private static final Map<JDBCBackendType, String> PROVIDER_MAP =
       ImmutableMap.of(
           JDBCBackendType.MYSQL, "mysql",
@@ -46,7 +46,7 @@ public class TestIdpBaseSQLProviderFactory {
     IllegalStateException exception =
         assertThrows(IllegalStateException.class, () -> provider(null));
     assertEquals(
-        "MyBatis databaseId is not configured for TestIdpBaseSQLProviderFactory.",
+        "MyBatis databaseId is not configured for TestSQLProviderFactoryHelper.",
         exception.getMessage());
   }
 
@@ -55,14 +55,14 @@ public class TestIdpBaseSQLProviderFactory {
     IllegalStateException exception =
         assertThrows(IllegalStateException.class, () -> provider("sqlite"));
     assertEquals(
-        "Unsupported TestIdpBaseSQLProviderFactory databaseId: sqlite, supported backends: [MYSQL,"
+        "Unsupported TestSQLProviderFactoryHelper databaseId: sqlite, supported backends: [MYSQL,"
             + " H2,"
             + " POSTGRESQL]",
         exception.getMessage());
   }
 
   private String provider(String databaseId) {
-    return IdpBaseSQLProviderFactory.getProvider(
-        databaseId, PROVIDER_MAP, TestIdpBaseSQLProviderFactory.class);
+    return SQLProviderFactoryHelper.getProvider(
+        databaseId, PROVIDER_MAP, TestSQLProviderFactoryHelper.class);
   }
 }

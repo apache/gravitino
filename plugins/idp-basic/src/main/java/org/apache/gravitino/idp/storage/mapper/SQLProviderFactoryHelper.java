@@ -23,8 +23,8 @@ import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 
-final class IdpBaseSQLProviderFactory {
-  private IdpBaseSQLProviderFactory() {}
+final class SQLProviderFactoryHelper {
+  private SQLProviderFactoryHelper() {}
 
   static <T> T getProvider(
       String databaseId, Map<JDBCBackendType, T> providerMap, Class<?> providerFactoryClass) {

@@ -46,12 +46,12 @@ public class IdpUserMetaSQLProviderFactory {
   private IdpUserMetaSQLProviderFactory() {}
 
   private static IdpUserMetaBaseSQLProvider currentProvider() {
-    return IdpBaseSQLProviderFactory.currentProvider(
+    return SQLProviderFactoryHelper.currentProvider(
         PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
   }
 
   static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
-    return IdpBaseSQLProviderFactory.getProvider(
+    return SQLProviderFactoryHelper.getProvider(
         databaseId, PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
   }
 
