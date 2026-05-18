@@ -325,7 +325,7 @@ public class TestFilesetCatalogOperations {
     MockedStatic<CatalogMetaService> catalogMetaServiceMockedStatic =
         Mockito.mockStatic(CatalogMetaService.class);
     MockedStatic<SchemaMetaService> schemaMetaServiceMockedStatic =
-        Mockito.mockStatic(SchemaMetaService.class);
+        Mockito.mockStatic(SchemaMetaService.class, Mockito.CALLS_REAL_METHODS);
 
     metalakeMetaServiceMockedStatic
         .when(MetalakeMetaService::getInstance)
