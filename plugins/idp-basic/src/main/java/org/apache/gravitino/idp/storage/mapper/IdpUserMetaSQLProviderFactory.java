@@ -32,7 +32,6 @@ public class IdpUserMetaSQLProviderFactory
 
   private IdpUserMetaSQLProviderFactory() {
     super(
-        "IdP user SQL provider",
         new IdpUserMetaBaseSQLProvider(),
         new IdpUserMetaH2Provider(),
         new IdpUserMetaPostgreSQLProvider());

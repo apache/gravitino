@@ -29,11 +29,8 @@ abstract class IdpBaseSQLProviderFactory<T> {
   private final T h2Provider;
   private final T postgresqlProvider;
   private final Map<JDBCBackendType, T> providerMap;
-  private final String providerName;
 
-  protected IdpBaseSQLProviderFactory(
-      String providerName, T mysqlProvider, T h2Provider, T postgresqlProvider) {
-    this.providerName = providerName;
+  protected IdpBaseSQLProviderFactory(T mysqlProvider, T h2Provider, T postgresqlProvider) {
     this.mysqlProvider = mysqlProvider;
     this.h2Provider = h2Provider;
     this.postgresqlProvider = postgresqlProvider;
@@ -66,7 +63,8 @@ abstract class IdpBaseSQLProviderFactory<T> {
   protected final T resolveProvider(String databaseId) {
     if (databaseId == null) {
       throw new IllegalStateException(
-          String.format("MyBatis databaseId is not configured for %s.", providerName));
+          String.format(
+              "MyBatis databaseId is not configured for %s.", getClass().getSimpleName()));
     }
 
     try {
@@ -79,12 +77,12 @@ abstract class IdpBaseSQLProviderFactory<T> {
       throw new IllegalStateException(
           String.format(
               "No %s registered for backend %s (databaseId: %s)",
-              providerName, jdbcBackendType, databaseId));
+              getClass().getSimpleName(), jdbcBackendType, databaseId));
     } catch (IllegalArgumentException e) {
       throw new IllegalStateException(
           String.format(
               "Unsupported %s databaseId: %s, supported backends: %s",
-              providerName, databaseId, providerMap.keySet()),
+              getClass().getSimpleName(), databaseId, providerMap.keySet()),
           e);
     }
   }

@@ -51,8 +51,7 @@ public class TestIdpBaseSQLProviderFactory {
 
     IllegalStateException exception =
         assertThrows(IllegalStateException.class, () -> factory.provider(null));
-    assertEquals(
-        "MyBatis databaseId is not configured for test SQL provider.", exception.getMessage());
+    assertEquals("MyBatis databaseId is not configured for TestFactory.", exception.getMessage());
   }
 
   @Test
@@ -62,14 +61,14 @@ public class TestIdpBaseSQLProviderFactory {
     IllegalStateException exception =
         assertThrows(IllegalStateException.class, () -> factory.provider("sqlite"));
     assertEquals(
-        "Unsupported test SQL provider databaseId: sqlite, supported backends: [MYSQL, H2,"
+        "Unsupported TestFactory databaseId: sqlite, supported backends: [MYSQL, H2,"
             + " POSTGRESQL]",
         exception.getMessage());
   }
 
   private static class TestFactory extends IdpBaseSQLProviderFactory<String> {
     private TestFactory() {
-      super("test SQL provider", "mysql", "h2", "postgresql");
+      super("mysql", "h2", "postgresql");
     }
 
     private String provider(String databaseId) {

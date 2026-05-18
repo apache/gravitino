@@ -33,7 +33,6 @@ public class IdpGroupMetaSQLProviderFactory
 
   private IdpGroupMetaSQLProviderFactory() {
     super(
-        "IdP group SQL provider",
         new IdpGroupMetaBaseSQLProvider(),
         new IdpGroupMetaH2Provider(),
         new IdpGroupMetaPostgreSQLProvider());
