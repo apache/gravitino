@@ -55,7 +55,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Relation store to store entities. This means we can store entities in a relational store. I.e.,
  * MySQL, PostgreSQL, etc. If you want to use a different backend, you can implement the {@link
- * RelationalBackend} interface
+ * RelationalBackend} interface. The default JDBC backend is {@link JDBCBackend}.
  */
 public class RelationalEntityStore implements EntityStore, SupportsRelationOperations {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
@@ -324,6 +324,26 @@ public class RelationalEntityStore implements EntityStore, SupportsRelationOpera
       throws IOException {
     backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
     cache.invalidate(srcIdentifier, srcType, relType);
+    cache.invalidate(dstIdentifier, dstType, relType);
+  }
+
+  @Override
+  public void batchInsertRelations(
+      Type relType,
+      List<NameIdentifier> srcIdentifiers,
+      Entity.EntityType srcType,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType,
+      boolean override)
+      throws IOException {
+    if (srcIdentifiers == null || srcIdentifiers.isEmpty()) {
+      return;
+    }
+    backend.batchInsertRelations(
+        relType, srcIdentifiers, srcType, dstIdentifier, dstType, override);
+    for (NameIdentifier ident : srcIdentifiers) {
+      cache.invalidate(ident, srcType, relType);
+    }
     cache.invalidate(dstIdentifier, dstType, relType);
   }
 

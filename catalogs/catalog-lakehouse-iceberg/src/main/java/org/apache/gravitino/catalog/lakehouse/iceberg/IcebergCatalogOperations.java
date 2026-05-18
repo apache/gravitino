@@ -50,6 +50,7 @@ import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
@@ -58,11 +59,13 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTabl
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -80,7 +83,6 @@ import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
-import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,6 +98,7 @@ public class IcebergCatalogOperations
   @VisibleForTesting IcebergCatalogWrapper icebergCatalogWrapper;
 
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper;
+  private IcebergViewCatalogOperations icebergViewCatalogOperations;
 
   /**
    * Initializes the Iceberg catalog operations with the provided configuration.
@@ -130,6 +133,7 @@ public class IcebergCatalogOperations
             : rawWrapper;
     this.icebergCatalogWrapperHelper =
         new IcebergCatalogWrapperHelper(icebergCatalogWrapper.getCatalog());
+    this.icebergViewCatalogOperations = new IcebergViewCatalogOperations(icebergCatalogWrapper);
   }
 
   /** Closes the Iceberg catalog and releases the associated client pool. */
@@ -636,16 +640,89 @@ public class IcebergCatalogOperations
    */
   @Override
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
-    try {
-      LoadViewResponse response =
-          icebergCatalogWrapper.loadView(
-              IcebergCatalogWrapperHelper.buildIcebergTableIdentifier(ident));
+    return viewCatalogOperations().loadView(ident);
+  }
 
-      return IcebergView.fromLoadViewResponse(response, ident.name());
-    } catch (Exception e) {
-      throw new NoSuchViewException(
-          e, "Failed to load view %s from Iceberg catalog: %s", ident, e.getMessage());
-    }
+  /**
+   * Checks whether a view exists in the Iceberg catalog.
+   *
+   * @param ident A view identifier.
+   * @return {@code true} if the view exists, {@code false} otherwise.
+   */
+  @Override
+  public boolean viewExists(NameIdentifier ident) {
+    return viewCatalogOperations().viewExists(ident);
+  }
+
+  /**
+   * Lists all views in the given namespace from the Iceberg catalog.
+   *
+   * @param namespace A namespace.
+   * @return An array of view identifiers in the namespace.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
+  @Override
+  public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
+    return viewCatalogOperations().listViews(namespace);
+  }
+
+  /**
+   * Creates a view in the Iceberg catalog with the specified columns, representations, and
+   * properties.
+   *
+   * @param ident A view identifier.
+   * @param comment A view comment.
+   * @param columns The view output columns.
+   * @param representations The SQL representations of the view.
+   * @param defaultCatalog The default catalog used to resolve unqualified identifiers in SQL
+   *     representations. This value is stored in Iceberg's view version metadata.
+   * @param defaultSchema The default schema used to resolve unqualified identifiers in SQL
+   *     representations. When provided, it is used as the default namespace for the view version.
+   * @param properties The view properties.
+   * @return The created view metadata.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws ViewAlreadyExistsException If the view already exists.
+   */
+  @Override
+  public View createView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties)
+      throws NoSuchSchemaException, ViewAlreadyExistsException {
+    return viewCatalogOperations()
+        .createView(
+            ident, comment, columns, representations, defaultCatalog, defaultSchema, properties);
+  }
+
+  /**
+   * Applies {@link ViewChange changes} to an existing view in the Iceberg catalog. Rename cannot be
+   * combined with other changes.
+   *
+   * @param ident A view identifier.
+   * @param changes View changes to apply.
+   * @return The updated view metadata.
+   * @throws NoSuchViewException If the view does not exist.
+   * @throws IllegalArgumentException If the change is rejected by the implementation.
+   */
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes)
+      throws NoSuchViewException, IllegalArgumentException {
+    return viewCatalogOperations().alterView(ident, changes);
+  }
+
+  /**
+   * Drops a view from the Iceberg catalog.
+   *
+   * @param ident A view identifier.
+   * @return {@code true} if the view was dropped, {@code false} if the view does not exist.
+   */
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    return viewCatalogOperations().dropView(ident);
   }
 
   private static Distribution getIcebergDefaultDistribution(
@@ -660,5 +737,9 @@ public class IcebergCatalogOperations
 
   private static String currentUser() {
     return PrincipalUtils.getCurrentUserName();
+  }
+
+  private IcebergViewCatalogOperations viewCatalogOperations() {
+    return icebergViewCatalogOperations;
   }
 }
