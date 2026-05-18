@@ -69,10 +69,6 @@ public class FilesetVersionSQLProviderFactory {
     return getProvider().softDeleteFilesetVersionsByCatalogId(catalogId);
   }
 
-  public static String softDeleteFilesetVersionsBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteFilesetVersionsBySchemaId(schemaId);
-  }
-
   public static String softDeleteFilesetVersionsBySchemaIds(
       @Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteFilesetVersionsBySchemaIds(schemaIds);

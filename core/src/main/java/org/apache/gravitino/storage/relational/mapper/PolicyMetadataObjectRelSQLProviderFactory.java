@@ -112,11 +112,6 @@ public class PolicyMetadataObjectRelSQLProviderFactory {
     return getProvider().softDeletePolicyMetadataObjectRelsByCatalogId(catalogId);
   }
 
-  public static String softDeletePolicyMetadataObjectRelsBySchemaId(
-      @Param("schemaId") Long schemaId) {
-    return getProvider().softDeletePolicyMetadataObjectRelsBySchemaId(schemaId);
-  }
-
   public static String softDeletePolicyMetadataObjectRelsBySchemaIds(
       @Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeletePolicyMetadataObjectRelsBySchemaIds(schemaIds);

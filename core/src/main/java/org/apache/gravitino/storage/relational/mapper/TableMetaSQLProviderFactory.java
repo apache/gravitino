@@ -116,10 +116,6 @@ public class TableMetaSQLProviderFactory {
     return getProvider().softDeleteTableMetasByCatalogId(catalogId);
   }
 
-  public static String softDeleteTableMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteTableMetasBySchemaId(schemaId);
-  }
-
   public static String softDeleteTableMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteTableMetasBySchemaIds(schemaIds);
   }

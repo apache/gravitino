@@ -281,14 +281,6 @@ public class SchemaMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteSchemaMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
   public String softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return "<script>"
         + "UPDATE "

@@ -107,10 +107,6 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().softDeleteFunctionMetasByMetalakeId(metalakeId);
   }
 
-  public static String softDeleteFunctionMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteFunctionMetasBySchemaId(schemaId);
-  }
-
   public static String softDeleteFunctionMetasBySchemaIds(
       @Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteFunctionMetasBySchemaIds(schemaIds);

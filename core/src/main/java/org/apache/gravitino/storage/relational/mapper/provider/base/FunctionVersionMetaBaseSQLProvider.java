@@ -56,14 +56,6 @@ public class FunctionVersionMetaBaseSQLProvider {
         + " deleted_at = #{functionVersionMeta.deletedAt}";
   }
 
-  public String softDeleteFunctionVersionMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
-        + FunctionVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
   public String softDeleteFunctionVersionMetasBySchemaIds(
       @Param("schemaIds") List<Long> schemaIds) {
     return "<script>"

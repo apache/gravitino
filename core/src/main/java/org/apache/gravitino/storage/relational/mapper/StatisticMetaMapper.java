@@ -61,11 +61,6 @@ public interface StatisticMetaMapper {
 
   @UpdateProvider(
       type = StatisticSQLProviderFactory.class,
-      method = "softDeleteStatisticsBySchemaId")
-  Integer softDeleteStatisticsBySchemaId(@Param("schemaId") Long schemaId);
-
-  @UpdateProvider(
-      type = StatisticSQLProviderFactory.class,
       method = "softDeleteStatisticsBySchemaIds")
   Integer softDeleteStatisticsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 

@@ -112,6 +112,12 @@ public class HierarchicalConversionPOStorageOps<PO, Mapper> extends BasePOStorag
   }
 
   @Override
+  public List<PO> listPOsForCascade(Mapper mapper, Long parentId, String logicalName) {
+    String physicalName = toPhysicalIfHierarchical(logicalName);
+    return convertPhysicalToLogical(delegate.listPOsForCascade(mapper, parentId, physicalName));
+  }
+
+  @Override
   public boolean supportsParentIdRelationalRead() {
     return delegate.supportsParentIdRelationalRead();
   }

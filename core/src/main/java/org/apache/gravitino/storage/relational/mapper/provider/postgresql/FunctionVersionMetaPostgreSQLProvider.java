@@ -46,14 +46,6 @@ public class FunctionVersionMetaPostgreSQLProvider extends FunctionVersionMetaBa
   }
 
   @Override
-  public String softDeleteFunctionVersionMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
-        + FunctionVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
-  @Override
   public String softDeleteFunctionVersionMetasBySchemaIds(
       @Param("schemaIds") List<Long> schemaIds) {
     return "<script>"

@@ -43,14 +43,6 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteFilesetMetasBySchemaId(Long schemaId) {
-    return "UPDATE "
-        + META_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
-  @Override
   public String softDeleteFilesetMetasBySchemaIds(List<Long> schemaIds) {
     return "<script>"
         + "UPDATE "

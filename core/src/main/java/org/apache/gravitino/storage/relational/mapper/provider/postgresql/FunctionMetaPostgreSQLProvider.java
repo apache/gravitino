@@ -125,14 +125,6 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
   }
 
   @Override
-  public String softDeleteFunctionMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
-        + FunctionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
-  @Override
   public String softDeleteFunctionMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return "<script>"
         + "UPDATE "

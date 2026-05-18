@@ -229,49 +229,6 @@ public class OwnerMetaBaseSQLProvider {
         + ")";
   }
 
-  public String softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
-        + OWNER_TABLE_NAME
-        + " ot SET ot.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE ot.deleted_at = 0 AND EXISTS ("
-        + " SELECT st.schema_id FROM "
-        + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.schema_id = #{schemaId} AND"
-        + " st.schema_id = ot.metadata_object_id AND ot.metadata_object_type = 'SCHEMA'"
-        + " UNION"
-        + " SELECT tt.schema_id FROM "
-        + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.schema_id = #{schemaId} AND"
-        + " tt.topic_id = ot.metadata_object_id AND ot.metadata_object_type = 'TOPIC'"
-        + " UNION"
-        + " SELECT tat.schema_id FROM "
-        + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.schema_id = #{schemaId} AND"
-        + " tat.table_id = ot.metadata_object_id AND ot.metadata_object_type = 'TABLE'"
-        + " UNION"
-        + " SELECT ft.schema_id FROM "
-        + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.schema_id = #{schemaId} AND"
-        + " ft.fileset_id = ot.metadata_object_id AND ot.metadata_object_type = 'FILESET'"
-        + " UNION"
-        + " SELECT mt.schema_id FROM "
-        + ModelMetaMapper.TABLE_NAME
-        + " mt WHERE mt.schema_id = #{schemaId} AND"
-        + " mt.model_id = ot.metadata_object_id AND ot.metadata_object_type = 'MODEL'"
-        + " UNION"
-        + " SELECT vt.schema_id FROM "
-        + ViewMetaMapper.TABLE_NAME
-        + " vt WHERE vt.schema_id = #{schemaId} AND"
-        + " vt.view_id = ot.metadata_object_id AND ot.metadata_object_type = 'VIEW'"
-        + " UNION"
-        + " SELECT fnt.schema_id FROM "
-        + FunctionMetaMapper.TABLE_NAME
-        + " fnt WHERE fnt.schema_id = #{schemaId} AND"
-        + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
-        + ")";
-  }
-
   public String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return "<script>"
         + "UPDATE "

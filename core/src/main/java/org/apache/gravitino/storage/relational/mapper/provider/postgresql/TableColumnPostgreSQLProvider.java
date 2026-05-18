@@ -50,14 +50,6 @@ public class TableColumnPostgreSQLProvider extends TableColumnBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteColumnsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
-        + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
-  @Override
   public String softDeleteColumnsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return "<script>"
         + "UPDATE "

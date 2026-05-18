@@ -85,10 +85,6 @@ public class ModelVersionAliasSQLProviderFactory {
     return getProvider().softDeleteModelVersionAliasRelsByModelIdAndAlias(modelId, alias);
   }
 
-  public static String softDeleteModelVersionAliasRelsBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteModelVersionAliasRelsBySchemaId(schemaId);
-  }
-
   public static String softDeleteModelVersionAliasRelsBySchemaIds(
       @Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteModelVersionAliasRelsBySchemaIds(schemaIds);

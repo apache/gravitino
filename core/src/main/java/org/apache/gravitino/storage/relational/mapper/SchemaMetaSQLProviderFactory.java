@@ -116,12 +116,7 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().updateSchemaMeta(newSchemaPO, oldSchemaPO);
   }
 
-  public static String softDeleteSchemaMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteSchemaMetasBySchemaId(schemaId);
-  }
-
-  public static String softDeleteSchemaMetasBySchemaIds(
-      @Param("schemaIds") List<Long> schemaIds) {
+  public static String softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteSchemaMetasBySchemaIds(schemaIds);
   }
 

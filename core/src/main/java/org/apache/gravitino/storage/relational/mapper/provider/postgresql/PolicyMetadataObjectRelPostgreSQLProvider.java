@@ -110,36 +110,6 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
   }
 
   @Override
-  public String softDeletePolicyMetadataObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
-        + POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " pe SET deleted_at ="
-        + DELETED_AT_NOW_EXPRESSION
-        + " FROM "
-        + POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " pe_alias"
-        + " LEFT JOIN "
-        + SchemaMetaMapper.TABLE_NAME
-        + " st ON pe_alias.metadata_object_id = st.schema_id AND pe_alias.metadata_object_type = 'SCHEMA'"
-        + " LEFT JOIN "
-        + TopicMetaMapper.TABLE_NAME
-        + " tt ON pe_alias.metadata_object_id = tt.topic_id AND pe_alias.metadata_object_type = 'TOPIC'"
-        + " LEFT JOIN "
-        + TableMetaMapper.TABLE_NAME
-        + " tat ON pe_alias.metadata_object_id = tat.table_id AND pe_alias.metadata_object_type = 'TABLE'"
-        + " LEFT JOIN "
-        + FilesetMetaMapper.META_TABLE_NAME
-        + " ft ON pe_alias.metadata_object_id = ft.fileset_id AND pe_alias.metadata_object_type = 'FILESET'"
-        + " LEFT JOIN "
-        + ModelMetaMapper.TABLE_NAME
-        + " mt ON pe_alias.metadata_object_id = mt.model_id AND pe_alias.metadata_object_type = 'MODEL'"
-        + " WHERE pe.id = pe_alias.id AND pe.deleted_at = 0 AND ("
-        + "   st.schema_id = #{schemaId} OR tt.schema_id = #{schemaId} OR tat.schema_id = #{schemaId}"
-        + "   OR ft.schema_id = #{schemaId} OR mt.schema_id = #{schemaId}"
-        + " )";
-  }
-
-  @Override
   public String softDeletePolicyMetadataObjectRelsBySchemaIds(
       @Param("schemaIds") List<Long> schemaIds) {
     return "<script>"

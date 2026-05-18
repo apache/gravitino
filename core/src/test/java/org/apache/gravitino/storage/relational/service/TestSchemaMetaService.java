@@ -244,6 +244,86 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDeleteHierarchicalSchemaCascadeRemovesDescendantsAndChildren()
+      throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    TopicMetaService topicMetaService = TopicMetaService.getInstance();
+
+    // Insert a leaf schema A:B:C; this auto-creates ancestor rows A and A:B.
+    String leafName = "anc_a:anc_b:leaf_c";
+    SchemaEntity leaf =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            leafName,
+            AUDIT_INFO);
+    schemaMetaService.insertSchema(leaf, false);
+
+    // Topic under the leaf, to verify child entities are also cascade-deleted.
+    TopicEntity leafTopic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, leafName),
+            "leaf_topic",
+            AUDIT_INFO);
+    topicMetaService.insertTopic(leafTopic, false);
+
+    // Topic under the middle ancestor A:B.
+    String middleName = "anc_a:anc_b";
+    TopicEntity middleTopic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, middleName),
+            "middle_topic",
+            AUDIT_INFO);
+    topicMetaService.insertTopic(middleTopic, false);
+
+    // A sibling schema outside the deleted subtree to confirm it survives.
+    String siblingName = "anc_a:sibling_d";
+    SchemaEntity sibling =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            siblingName,
+            AUDIT_INFO);
+    schemaMetaService.insertSchema(sibling, false);
+
+    TopicEntity siblingTopic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTopic(metalakeName, catalogName, siblingName),
+            "sibling_topic",
+            AUDIT_INFO);
+    topicMetaService.insertTopic(siblingTopic, false);
+
+    // Cascade-delete the middle ancestor; both A:B and A:B:C (plus their topics) must go.
+    schemaMetaService.deleteSchema(NameIdentifier.of(metalakeName, catalogName, middleName), true);
+
+    Assertions.assertFalse(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, middleName), Entity.EntityType.SCHEMA));
+    Assertions.assertFalse(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, leafName), Entity.EntityType.SCHEMA));
+    Assertions.assertFalse(backend.exists(leafTopic.nameIdentifier(), Entity.EntityType.TOPIC));
+    Assertions.assertFalse(backend.exists(middleTopic.nameIdentifier(), Entity.EntityType.TOPIC));
+
+    // Sibling subtree must still exist.
+    Assertions.assertTrue(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, siblingName), Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(backend.exists(siblingTopic.nameIdentifier(), Entity.EntityType.TOPIC));
+
+    // The shared top-level ancestor A is outside the deleted subtree and must remain too.
+    Assertions.assertTrue(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, "anc_a"), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
   public void testInsertHierarchicalSecondLeafReusesAncestorsWithoutUpsert() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);

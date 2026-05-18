@@ -80,14 +80,6 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteTableMetasBySchemaId(Long schemaId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
-  @Override
   public String softDeleteTableMetasBySchemaIds(List<Long> schemaIds) {
     return "<script>"
         + "UPDATE "

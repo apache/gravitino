@@ -26,6 +26,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMapper> {
 
@@ -108,5 +109,17 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
   @Override
   public boolean supportsParentIdRelationalRead() {
     return true;
+  }
+
+  /**
+   * For HierarchicalSchema, the name passed in is in storage (physical) form. Descendants are
+   * stored as {@code <name><physicalSeparator>...}; we build that prefix once and let SQL match the
+   * exact row plus everything starting with the prefix.
+   */
+  @Override
+  public List<SchemaPO> listPOsForCascade(
+      SchemaMetaMapper mapper, Long catalogId, String physicalName) {
+    String descendantPrefix = physicalName + HierarchicalSchemaUtil.physicalSeparator();
+    return mapper.listSchemaPOsByCatalogIdAndNamePrefix(catalogId, physicalName, descendantPrefix);
   }
 }

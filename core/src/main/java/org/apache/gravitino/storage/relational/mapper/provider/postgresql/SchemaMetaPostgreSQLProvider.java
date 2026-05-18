@@ -112,14 +112,6 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteSchemaMetasBySchemaId(Long schemaId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
-  }
-
-  @Override
   public String softDeleteSchemaMetasBySchemaIds(List<Long> schemaIds) {
     return "<script>"
         + "UPDATE "

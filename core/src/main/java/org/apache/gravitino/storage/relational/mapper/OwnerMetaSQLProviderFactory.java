@@ -99,10 +99,6 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().softDeleteOwnerRelByCatalogId(catalogId);
   }
 
-  public static String softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteOwnerRelBySchemaId(schemaId);
-  }
-
   public static String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteOwnerRelBySchemaIds(schemaIds);
   }
