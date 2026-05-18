@@ -20,71 +20,49 @@
 package org.apache.gravitino.idp.storage.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.junit.jupiter.api.Test;
 
 public class TestIdpBaseSQLProviderFactory {
-
-  @Test
-  void testProviderAccessors() {
-    TestFactory factory = new TestFactory();
-
-    assertSame("mysql", factory.mysqlProviderValue());
-    assertSame("h2", factory.h2ProviderValue());
-    assertSame("postgresql", factory.postgresqlProviderValue());
-  }
+  private static final Map<JDBCBackendType, String> PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL, "mysql",
+          JDBCBackendType.H2, "h2",
+          JDBCBackendType.POSTGRESQL, "postgresql");
 
   @Test
   void testGetProvider() {
-    TestFactory factory = new TestFactory();
-
-    assertEquals("mysql", factory.provider("mysql"));
-    assertEquals("h2", factory.provider("h2"));
-    assertEquals("postgresql", factory.provider("postgresql"));
+    assertEquals("mysql", provider("mysql"));
+    assertEquals("h2", provider("h2"));
+    assertEquals("postgresql", provider("postgresql"));
   }
 
   @Test
   void testGetProviderWithNullDatabaseId() {
-    TestFactory factory = new TestFactory();
-
     IllegalStateException exception =
-        assertThrows(IllegalStateException.class, () -> factory.provider(null));
-    assertEquals("MyBatis databaseId is not configured for TestFactory.", exception.getMessage());
+        assertThrows(IllegalStateException.class, () -> provider(null));
+    assertEquals(
+        "MyBatis databaseId is not configured for TestIdpBaseSQLProviderFactory.",
+        exception.getMessage());
   }
 
   @Test
   void testGetProviderWithUnsupportedDatabaseId() {
-    TestFactory factory = new TestFactory();
-
     IllegalStateException exception =
-        assertThrows(IllegalStateException.class, () -> factory.provider("sqlite"));
+        assertThrows(IllegalStateException.class, () -> provider("sqlite"));
     assertEquals(
-        "Unsupported TestFactory databaseId: sqlite, supported backends: [MYSQL, H2,"
+        "Unsupported TestIdpBaseSQLProviderFactory databaseId: sqlite, supported backends: [MYSQL,"
+            + " H2,"
             + " POSTGRESQL]",
         exception.getMessage());
   }
 
-  private static class TestFactory extends IdpBaseSQLProviderFactory<String> {
-    private TestFactory() {
-      super("mysql", "h2", "postgresql");
-    }
-
-    private String provider(String databaseId) {
-      return resolveProvider(databaseId);
-    }
-
-    private String mysqlProviderValue() {
-      return mysqlProviderInstance();
-    }
-
-    private String h2ProviderValue() {
-      return h2ProviderInstance();
-    }
-
-    private String postgresqlProviderValue() {
-      return postgresqlProviderInstance();
-    }
+  private String provider(String databaseId) {
+    return IdpBaseSQLProviderFactory.getProvider(
+        databaseId, PROVIDER_MAP, TestIdpBaseSQLProviderFactory.class);
   }
 }

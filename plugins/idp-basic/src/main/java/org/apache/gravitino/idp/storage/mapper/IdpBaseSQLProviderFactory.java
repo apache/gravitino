@@ -19,52 +19,20 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 
-abstract class IdpBaseSQLProviderFactory<T> {
-  private final T mysqlProvider;
-  private final T h2Provider;
-  private final T postgresqlProvider;
-  private final Map<JDBCBackendType, T> providerMap;
+final class IdpBaseSQLProviderFactory {
+  private IdpBaseSQLProviderFactory() {}
 
-  protected IdpBaseSQLProviderFactory(T mysqlProvider, T h2Provider, T postgresqlProvider) {
-    this.mysqlProvider = mysqlProvider;
-    this.h2Provider = h2Provider;
-    this.postgresqlProvider = postgresqlProvider;
-    this.providerMap =
-        ImmutableMap.of(
-            JDBCBackendType.MYSQL,
-            mysqlProvider,
-            JDBCBackendType.H2,
-            h2Provider,
-            JDBCBackendType.POSTGRESQL,
-            postgresqlProvider);
-  }
-
-  protected final T h2ProviderInstance() {
-    return h2Provider;
-  }
-
-  protected final T mysqlProviderInstance() {
-    return mysqlProvider;
-  }
-
-  protected final T postgresqlProviderInstance() {
-    return postgresqlProvider;
-  }
-
-  protected final T currentProviderInstance() {
-    return resolveProvider(currentDatabaseId());
-  }
-
-  protected final T resolveProvider(String databaseId) {
+  static <T> T getProvider(
+      String databaseId, Map<JDBCBackendType, T> providerMap, Class<?> providerFactoryClass) {
     if (databaseId == null) {
       throw new IllegalStateException(
           String.format(
-              "MyBatis databaseId is not configured for %s.", getClass().getSimpleName()));
+              "MyBatis databaseId is not configured for %s.",
+              providerFactoryClass.getSimpleName()));
     }
 
     try {
@@ -77,17 +45,21 @@ abstract class IdpBaseSQLProviderFactory<T> {
       throw new IllegalStateException(
           String.format(
               "No %s registered for backend %s (databaseId: %s)",
-              getClass().getSimpleName(), jdbcBackendType, databaseId));
+              providerFactoryClass.getSimpleName(), jdbcBackendType, databaseId));
     } catch (IllegalArgumentException e) {
       throw new IllegalStateException(
           String.format(
               "Unsupported %s databaseId: %s, supported backends: %s",
-              getClass().getSimpleName(), databaseId, providerMap.keySet()),
+              providerFactoryClass.getSimpleName(), databaseId, providerMap.keySet()),
           e);
     }
   }
 
-  private String currentDatabaseId() {
+  static <T> T currentProvider(Map<JDBCBackendType, T> providerMap, Class<?> providerFactoryClass) {
+    return getProvider(currentDatabaseId(), providerMap, providerFactoryClass);
+  }
+
+  static String currentDatabaseId() {
     return SqlSessionFactoryHelper.getInstance()
         .getSqlSessionFactory()
         .getConfiguration()

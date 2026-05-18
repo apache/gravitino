@@ -19,61 +19,61 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
 import org.apache.gravitino.idp.storage.mapper.provider.h2.IdpGroupMetaH2Provider;
 import org.apache.gravitino.idp.storage.mapper.provider.postgresql.IdpGroupMetaPostgreSQLProvider;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.ibatis.annotations.Param;
 
-public class IdpGroupMetaSQLProviderFactory
-    extends IdpBaseSQLProviderFactory<IdpGroupMetaBaseSQLProvider> {
-  private static final IdpGroupMetaSQLProviderFactory INSTANCE =
-      new IdpGroupMetaSQLProviderFactory();
+public class IdpGroupMetaSQLProviderFactory {
+  private static final IdpGroupMetaBaseSQLProvider MYSQL_PROVIDER =
+      new IdpGroupMetaBaseSQLProvider();
+  private static final IdpGroupMetaBaseSQLProvider H2_PROVIDER = new IdpGroupMetaH2Provider();
+  private static final IdpGroupMetaBaseSQLProvider POSTGRESQL_PROVIDER =
+      new IdpGroupMetaPostgreSQLProvider();
+  private static final Map<JDBCBackendType, IdpGroupMetaBaseSQLProvider> PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL,
+          MYSQL_PROVIDER,
+          JDBCBackendType.H2,
+          H2_PROVIDER,
+          JDBCBackendType.POSTGRESQL,
+          POSTGRESQL_PROVIDER);
 
-  private IdpGroupMetaSQLProviderFactory() {
-    super(
-        new IdpGroupMetaBaseSQLProvider(),
-        new IdpGroupMetaH2Provider(),
-        new IdpGroupMetaPostgreSQLProvider());
-  }
+  private IdpGroupMetaSQLProviderFactory() {}
 
-  public static IdpGroupMetaBaseSQLProvider h2Provider() {
-    return INSTANCE.h2ProviderInstance();
-  }
-
-  public static IdpGroupMetaBaseSQLProvider mysqlProvider() {
-    return INSTANCE.mysqlProviderInstance();
-  }
-
-  public static IdpGroupMetaBaseSQLProvider postgresqlProvider() {
-    return INSTANCE.postgresqlProviderInstance();
+  private static IdpGroupMetaBaseSQLProvider currentProvider() {
+    return IdpBaseSQLProviderFactory.currentProvider(
+        PROVIDER_MAP, IdpGroupMetaSQLProviderFactory.class);
   }
 
   static IdpGroupMetaBaseSQLProvider getProvider(String databaseId) {
-    return INSTANCE.resolveProvider(databaseId);
+    return IdpBaseSQLProviderFactory.getProvider(
+        databaseId, PROVIDER_MAP, IdpGroupMetaSQLProviderFactory.class);
   }
 
   public static String selectIdpGroup(@Param("groupName") String groupName) {
-    return INSTANCE.currentProviderInstance().selectIdpGroup(groupName);
+    return currentProvider().selectIdpGroup(groupName);
   }
 
   public static String selectIdpGroups(@Param("groupNames") List<String> groupNames) {
-    return INSTANCE.currentProviderInstance().selectIdpGroups(groupNames);
+    return currentProvider().selectIdpGroups(groupNames);
   }
 
   public static String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
-    return INSTANCE.currentProviderInstance().insertIdpGroup(groupPO);
+    return currentProvider().insertIdpGroup(groupPO);
   }
 
   public static String softDeleteIdpGroup(@Param("groupId") Long groupId) {
-    return INSTANCE.currentProviderInstance().softDeleteIdpGroup(groupId);
+    return currentProvider().softDeleteIdpGroup(groupId);
   }
 
   public static String deleteIdpGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return INSTANCE
-        .currentProviderInstance()
-        .deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit);
+    return currentProvider().deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }
