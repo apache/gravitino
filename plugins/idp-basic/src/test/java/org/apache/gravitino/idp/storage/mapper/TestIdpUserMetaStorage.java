@@ -26,10 +26,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
@@ -180,13 +176,11 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
 
     assertEquals(1, idpUserMetaMapper.softDeleteIdpUser(1L));
     assertNull(idpUserMetaMapper.selectIdpUser("alice"));
-    IdpUserPO deletedUser = queryIdpUserById(1L);
-    assertTrue(deletedUser.getDeletedAt() > 0L);
-    assertEquals(1L, deletedUser.getCurrentVersion());
-    assertEquals(0L, deletedUser.getLastVersion());
+    assertIterableEquals(List.of(), idpUserMetaMapper.selectIdpUsers(List.of("alice")));
     assertEquals(0, idpUserMetaMapper.softDeleteIdpUser(1L));
     assertEquals(0, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
     assertEquals(1, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
+    assertEquals(0, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
   }
 
   @ParameterizedTest
@@ -285,28 +279,5 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     List<IdpUserPO> users = idpUserMetaMapper.selectIdpUsers(List.of("bob", "alice"));
     users.sort(Comparator.comparing(IdpUserPO::getUserId));
     assertIterableEquals(List.of(expectedActiveUser), users);
-  }
-
-  private IdpUserPO queryIdpUserById(long userId) {
-    String sql =
-        "SELECT user_id, user_name, password_hash, current_version, last_version, deleted_at"
-            + " FROM idp_user_meta WHERE user_id = ?";
-    try (Connection connection = sharedSession.getConnection();
-        PreparedStatement statement = connection.prepareStatement(sql)) {
-      statement.setLong(1, userId);
-      try (ResultSet resultSet = statement.executeQuery()) {
-        assertTrue(resultSet.next());
-        return IdpUserPO.builder()
-            .withUserId(resultSet.getLong("user_id"))
-            .withUserName(resultSet.getString("user_name"))
-            .withPasswordHash(resultSet.getString("password_hash"))
-            .withCurrentVersion(resultSet.getLong("current_version"))
-            .withLastVersion(resultSet.getLong("last_version"))
-            .withDeletedAt(resultSet.getLong("deleted_at"))
-            .build();
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Query idp user by id failed: " + userId, e);
-    }
   }
 }
