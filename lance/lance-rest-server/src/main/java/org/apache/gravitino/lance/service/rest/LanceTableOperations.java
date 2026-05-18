@@ -136,6 +136,12 @@ public class LanceTableOperations {
   /**
    * Legacy create-empty endpoint kept for clients that still call it. It only records table
    * metadata, including its location, and does not touch Lance storage.
+   *
+   * <p>Slated for removal in 1.4.0 — upstream {@code lance-namespace-core} 0.7.5 dropped this
+   * operation, and lance-ray &lt; 0.3.0 / lance-spark &lt; 0.1.0 (the only clients that could still
+   * hit it) are already declared incompatible with Gravitino 1.3.0 in the <a
+   * href="../../../../docs/lance-rest-integration.md">compatibility matrix</a>. Kept for one
+   * release as a courtesy to any direct HTTP caller.
    */
   @POST
   @Path("/create-empty")
