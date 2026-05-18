@@ -27,6 +27,7 @@ import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /**
  * Two-tier metadata-id and owner resolution for {@link JcasbinAuthorizer}.
@@ -42,8 +43,8 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  */
 public class JcasbinAuthorizationLookups {
 
-  /** Key separator for path-based cache keys. */
-  static final String KEY_SEP = "::";
+  /** Key separator for internal path-based cache keys. */
+  static final String KEY_SEP = HierarchicalSchemaUtil.internalSeparator();
 
   private final GravitinoCache<String, Long> metadataIdCache;
   private final GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache;
@@ -72,15 +73,8 @@ public class JcasbinAuthorizationLookups {
     String cacheKey = buildCacheKey(metalake, metadataObject);
     return requestContext.computeMetadataIdIfAbsent(
         cacheKey,
-        k -> {
-          Optional<Long> cached = metadataIdCache.getIfPresent(k);
-          if (cached.isPresent()) {
-            return cached.get();
-          }
-          Long id = MetadataIdConverter.getID(metadataObject, metalake);
-          metadataIdCache.put(k, id);
-          return id;
-        });
+        k ->
+            metadataIdCache.get(k, ignored -> MetadataIdConverter.getID(metadataObject, metalake)));
   }
 
   /**
@@ -94,19 +88,16 @@ public class JcasbinAuthorizationLookups {
       AuthorizationRequestContext requestContext) {
     return requestContext.computeOwnerIfAbsent(
         metadataId,
-        id -> {
-          Optional<Optional<OwnerInfo>> cached = ownerRelCache.getIfPresent(id);
-          if (cached.isPresent()) {
-            return cached.get();
-          }
-          OwnerInfo ownerInfo =
-              SessionUtils.getWithoutCommit(
-                  OwnerMetaMapper.class,
-                  m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
-          Optional<OwnerInfo> owner = ownerInfo == null ? Optional.empty() : Optional.of(ownerInfo);
-          ownerRelCache.put(id, owner);
-          return owner;
-        });
+        id ->
+            ownerRelCache.get(
+                id,
+                ignored -> {
+                  OwnerInfo ownerInfo =
+                      SessionUtils.getWithoutCommit(
+                          OwnerMetaMapper.class,
+                          m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
+                  return ownerInfo == null ? Optional.empty() : Optional.of(ownerInfo);
+                }));
   }
 
   /** Underlying metadata-id cache; exposed for invalidation by the change hooks and the poller. */
@@ -120,11 +111,13 @@ public class JcasbinAuthorizationLookups {
   }
 
   /**
-   * Builds a path-based cache key for the metadataIdCache. Container objects end with "::" so a
-   * prefix invalidation can remove the container and all entries under the same name path.
+   * Builds a path-based cache key for the metadataIdCache. Container objects end with the internal
+   * separator so a prefix invalidation can remove the container and all entries under the same name
+   * path.
    *
-   * <p>Examples: {@code metalake::}, {@code metalake::catalog::}, {@code
-   * metalake::catalog::schema::}, {@code metalake::catalog::schema::table::TABLE}.
+   * <p>Examples: {@code metalake<sep>}, {@code metalake<sep>catalog<sep>}, {@code
+   * metalake<sep>catalog<sep>schema<sep>}, {@code
+   * metalake<sep>catalog<sep>schema<sep>table<sep>TABLE}.
    */
   @VisibleForTesting
   public static String buildCacheKey(String metalake, MetadataObject metadataObject) {

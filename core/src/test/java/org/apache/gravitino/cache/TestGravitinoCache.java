@@ -19,7 +19,13 @@
 package org.apache.gravitino.cache;
 
 import com.github.benmanes.caffeine.cache.Ticker;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.awaitility.Awaitility;
@@ -48,6 +54,56 @@ public class TestGravitinoCache {
       Assertions.assertFalse(missing.isPresent());
 
       Assertions.assertEquals(2, cache.size());
+    } finally {
+      cache.close();
+    }
+  }
+
+  @Test
+  void testCaffeineGetLoadsSameKeyAtomically() throws Exception {
+    CaffeineGravitinoCache<String, Long> cache = new CaffeineGravitinoCache<>(60_000L, 1000L);
+    ExecutorService executorService = Executors.newFixedThreadPool(8);
+    try {
+      AtomicLong loadCount = new AtomicLong();
+      CountDownLatch ready = new CountDownLatch(8);
+      CountDownLatch start = new CountDownLatch(1);
+      List<Future<Long>> futures = new ArrayList<>();
+
+      for (int i = 0; i < 8; i++) {
+        futures.add(
+            executorService.submit(
+                () -> {
+                  ready.countDown();
+                  start.await();
+                  return cache.get(
+                      "shared",
+                      key -> {
+                        loadCount.incrementAndGet();
+                        return 100L;
+                      });
+                }));
+      }
+
+      Assertions.assertTrue(ready.await(5, TimeUnit.SECONDS));
+      start.countDown();
+      for (Future<Long> future : futures) {
+        Assertions.assertEquals(100L, future.get(5, TimeUnit.SECONDS));
+      }
+
+      Assertions.assertEquals(1L, loadCount.get());
+      Assertions.assertEquals(1L, cache.size());
+    } finally {
+      executorService.shutdownNow();
+      cache.close();
+    }
+  }
+
+  @Test
+  void testCaffeineGetRejectsNullLoadResult() {
+    CaffeineGravitinoCache<String, Long> cache = new CaffeineGravitinoCache<>(60_000L, 1000L);
+    try {
+      Assertions.assertThrows(NullPointerException.class, () -> cache.get("key", key -> null));
+      Assertions.assertFalse(cache.getIfPresent("key").isPresent());
     } finally {
       cache.close();
     }
@@ -167,6 +223,23 @@ public class TestGravitinoCache {
       cache.invalidate("key1");
       cache.invalidateAll();
       cache.invalidateByPrefix("any");
+    } finally {
+      cache.close();
+    }
+  }
+
+  @Test
+  void testNoOpsGetAlwaysLoadsAndDoesNotCache() {
+    NoOpsGravitinoCache<String, Long> cache = new NoOpsGravitinoCache<>();
+    try {
+      AtomicLong loadCount = new AtomicLong();
+
+      Assertions.assertEquals(1L, cache.get("key", key -> loadCount.incrementAndGet()));
+      Assertions.assertEquals(2L, cache.get("key", key -> loadCount.incrementAndGet()));
+
+      Assertions.assertEquals(2L, loadCount.get());
+      Assertions.assertFalse(cache.getIfPresent("key").isPresent());
+      Assertions.assertEquals(0, cache.size());
     } finally {
       cache.close();
     }

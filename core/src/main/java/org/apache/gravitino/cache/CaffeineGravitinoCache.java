@@ -22,8 +22,10 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Ticker;
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * A Caffeine-backed implementation of {@link GravitinoCache}. Supports configurable TTL and maximum
@@ -59,6 +61,12 @@ public class CaffeineGravitinoCache<K, V> implements GravitinoCache<K, V> {
   public Optional<V> getIfPresent(K key) {
     V value = cache.getIfPresent(key);
     return Optional.ofNullable(value);
+  }
+
+  @Override
+  public V get(K key, Function<K, V> loader) {
+    return cache.get(
+        key, k -> Objects.requireNonNull(loader.apply(k), "Cache loader must not return null"));
   }
 
   @Override

@@ -19,6 +19,7 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -31,25 +32,31 @@ public class TestJcasbinChangePoller {
         JcasbinChangePoller.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1", MetadataObject.Type.CATALOG);
     Assertions.assertEquals(
-        "ml1::cat1::", JcasbinAuthorizationLookups.buildCacheKey("ml1", catalog));
+        key("ml1", "cat1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", catalog));
 
     MetadataObject schema =
         JcasbinChangePoller.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1.sch1", MetadataObject.Type.SCHEMA);
     Assertions.assertEquals(
-        "ml1::cat1::sch1::", JcasbinAuthorizationLookups.buildCacheKey("ml1", schema));
+        key("ml1", "cat1", "sch1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", schema));
 
     MetadataObject table =
         JcasbinChangePoller.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1.sch1.tbl1", MetadataObject.Type.TABLE);
     Assertions.assertEquals(
-        "ml1::cat1::sch1::tbl1::TABLE", JcasbinAuthorizationLookups.buildCacheKey("ml1", table));
+        key("ml1", "cat1", "sch1", "tbl1", "TABLE"),
+        JcasbinAuthorizationLookups.buildCacheKey("ml1", table));
   }
 
   @Test
   void testChangeLogFullNameForMetalakeKeepsItself() {
     MetadataObject metalake =
         JcasbinChangePoller.metadataObjectFromChangeLog("ml1", "ml1", MetadataObject.Type.METALAKE);
-    Assertions.assertEquals("ml1::", JcasbinAuthorizationLookups.buildCacheKey("ml1", metalake));
+    Assertions.assertEquals(
+        key("ml1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", metalake));
+  }
+
+  private static String key(String... parts) {
+    return String.join(HierarchicalSchemaUtil.internalSeparator(), parts);
   }
 }

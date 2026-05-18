@@ -41,8 +41,8 @@ import org.apache.gravitino.GravitinoEnv;
  */
 public final class HierarchicalSchemaUtil {
 
-  /** The internal separator used in EntityStore for HierarchicalSchema names. */
-  private static final String PHYSICAL_SEPARATOR = "\u0001";
+  /** The internal separator used in EntityStore and internal path-based keys. */
+  private static final String INTERNAL_SEPARATOR = "\u0001";
 
   private HierarchicalSchemaUtil() {}
 
@@ -61,9 +61,14 @@ public final class HierarchicalSchemaUtil {
     return StringUtils.defaultIfBlank(separator, Configs.SCHEMA_SEPARATOR.getDefaultValue());
   }
 
+  /** Returns the internal separator used in EntityStore and internal path-based keys. */
+  public static String internalSeparator() {
+    return INTERNAL_SEPARATOR;
+  }
+
   /** Returns the internal physical separator used in EntityStore. */
   public static String physicalSeparator() {
-    return PHYSICAL_SEPARATOR;
+    return internalSeparator();
   }
 
   /**
@@ -80,7 +85,7 @@ public final class HierarchicalSchemaUtil {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(logicalPath), "logicalPath must not be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(separator), "separator must not be blank");
-    return logicalPath.replace(separator, PHYSICAL_SEPARATOR);
+    return logicalPath.replace(separator, INTERNAL_SEPARATOR);
   }
 
   /**
@@ -97,7 +102,7 @@ public final class HierarchicalSchemaUtil {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(physicalName), "physicalName must not be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(separator), "separator must not be blank");
-    return physicalName.replace(PHYSICAL_SEPARATOR, separator);
+    return physicalName.replace(INTERNAL_SEPARATOR, separator);
   }
 
   /**

@@ -19,7 +19,9 @@
 package org.apache.gravitino.cache;
 
 import java.io.Closeable;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * A general-purpose cache interface used by the authorization subsystem. Implementations include a
@@ -37,6 +39,24 @@ public interface GravitinoCache<K, V> extends Closeable {
    * @return an Optional containing the cached value, or empty if absent
    */
   Optional<V> getIfPresent(K key);
+
+  /**
+   * Returns the value associated with the key, loading it if necessary. Implementations with real
+   * storage should make the load atomic for the same key.
+   *
+   * @param key the cache key
+   * @param loader the loader invoked when the key is absent
+   * @return the cached or loaded value
+   */
+  default V get(K key, Function<K, V> loader) {
+    Optional<V> value = getIfPresent(key);
+    if (value.isPresent()) {
+      return value.get();
+    }
+    V loaded = Objects.requireNonNull(loader.apply(key), "Cache loader must not return null");
+    put(key, loaded);
+    return loaded;
+  }
 
   /**
    * Associates the value with the key in the cache.
