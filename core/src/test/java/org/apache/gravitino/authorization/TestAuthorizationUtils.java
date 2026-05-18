@@ -289,4 +289,58 @@ class TestAuthorizationUtils {
     Assertions.assertEquals(1, locations.size());
     Assertions.assertEquals("schemaLocation", locations.get(0));
   }
+
+  @Test
+  void testRemovePrivilegesNotifiesEntityNameIdMappingChange() throws IllegalAccessException {
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    GravitinoAuthorizer originalAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    Object originalAccessControlDispatcher =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "accessControlDispatcher", true);
+    try {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", authorizer, true);
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", null, true);
+
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TABLE, Lists.newArrayList());
+
+      Mockito.verify(authorizer)
+          .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.TABLE);
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "gravitinoAuthorizer", originalAuthorizer, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(),
+          "accessControlDispatcher",
+          originalAccessControlDispatcher,
+          true);
+    }
+  }
+
+  @Test
+  void testRenamePrivilegesNotifiesOldEntityNameIdMappingChange() throws IllegalAccessException {
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    GravitinoAuthorizer originalAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    Object originalAccessControlDispatcher =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "accessControlDispatcher", true);
+    try {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", authorizer, true);
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", null, true);
+
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.TABLE, "new_table");
+
+      Mockito.verify(authorizer)
+          .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.TABLE);
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "gravitinoAuthorizer", originalAuthorizer, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(),
+          "accessControlDispatcher",
+          originalAccessControlDispatcher,
+          true);
+    }
+  }
 }

@@ -447,11 +447,15 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void handleMetadataOwnerChange(
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
-    Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    ownerRelCache.invalidate(metadataId);
     // Owner mutations may happen after drop/recreate with the same name. Invalidate the
     // name->id mapping as well to prevent using a stale metadataId from metadataIdCache.
     metadataIdCache.invalidate(JcasbinAuthorizationLookups.buildCacheKey(metalake, metadataObject));
+    try {
+      Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+      ownerRelCache.invalidate(metadataId);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to resolve metadata id for owner cache invalidation: {}", metadataObject, e);
+    }
   }
 
   @Override
@@ -476,6 +480,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       if (executor instanceof ThreadPoolExecutor) {
         ThreadPoolExecutor threadPoolExecutor = (ThreadPoolExecutor) executor;
         threadPoolExecutor.shutdown();
+        try {
+          if (!threadPoolExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+            threadPoolExecutor.shutdownNow();
+          }
+        } catch (InterruptedException e) {
+          threadPoolExecutor.shutdownNow();
+          Thread.currentThread().interrupt();
+        }
       }
     }
     if (metadataIdCache != null) {

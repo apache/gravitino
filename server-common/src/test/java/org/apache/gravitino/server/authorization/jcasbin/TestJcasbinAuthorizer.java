@@ -42,6 +42,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -79,6 +83,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.casbin.jcasbin.main.Enforcer;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -1038,6 +1043,49 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testOwnerChangeBestEffortWhenMetadataIdLookupFails() throws Exception {
+    GravitinoCache<String, Long> metadataIdCache = getMetadataIdCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache = getOwnerRelCache(jcasbinAuthorizer);
+    NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
+    String cacheKey =
+        JcasbinAuthorizationLookups.buildCacheKey(
+            METALAKE, NameIdentifierUtil.toMetadataObject(catalogIdent, Entity.EntityType.CATALOG));
+
+    metadataIdCache.put(cacheKey, CATALOG_ID);
+    ownerRelCache.put(CATALOG_ID, Optional.of(new OwnerInfo(USER_ID, "USER")));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenThrow(new RuntimeException("lookup failed"));
+
+    try {
+      Assertions.assertDoesNotThrow(
+          () ->
+              jcasbinAuthorizer.handleMetadataOwnerChange(
+                  METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG));
+
+      assertFalse(metadataIdCache.getIfPresent(cacheKey).isPresent());
+      assertTrue(ownerRelCache.getIfPresent(CATALOG_ID).isPresent());
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(CATALOG_ID);
+    }
+  }
+
+  @Test
+  public void testCloseAwaitsRoleLoadExecutorTermination() throws Exception {
+    RecordingThreadPoolExecutor executor = new RecordingThreadPoolExecutor();
+    Field field = JcasbinAuthorizer.class.getDeclaredField("executor");
+    field.setAccessible(true);
+    FieldUtils.writeField(field, jcasbinAuthorizer, executor);
+
+    jcasbinAuthorizer.close();
+
+    assertTrue(executor.shutdownCalled.get());
+    assertTrue(executor.awaitTerminationCalled.get());
+  }
+
+  @Test
   public void testRoleCacheSynchronousRemovalListenerDeletesPolicy() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
 
@@ -1239,6 +1287,14 @@ public class TestJcasbinAuthorizer {
     return (GravitinoCache<Long, Optional<OwnerInfo>>) field.get(authorizer);
   }
 
+  @SuppressWarnings("unchecked")
+  private static GravitinoCache<String, Long> getMetadataIdCache(JcasbinAuthorizer authorizer)
+      throws Exception {
+    Field field = JcasbinAuthorizer.class.getDeclaredField("metadataIdCache");
+    field.setAccessible(true);
+    return (GravitinoCache<String, Long>) field.get(authorizer);
+  }
+
   private static Enforcer getAllowEnforcer(JcasbinAuthorizer authorizer) throws Exception {
     Field field = JcasbinAuthorizer.class.getDeclaredField("allowEnforcer");
     field.setAccessible(true);
@@ -1249,5 +1305,26 @@ public class TestJcasbinAuthorizer {
     Field field = JcasbinAuthorizer.class.getDeclaredField("denyEnforcer");
     field.setAccessible(true);
     return (Enforcer) field.get(authorizer);
+  }
+
+  private static class RecordingThreadPoolExecutor extends ThreadPoolExecutor {
+    private final AtomicBoolean shutdownCalled = new AtomicBoolean();
+    private final AtomicBoolean awaitTerminationCalled = new AtomicBoolean();
+
+    private RecordingThreadPoolExecutor() {
+      super(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+    }
+
+    @Override
+    public void shutdown() {
+      shutdownCalled.set(true);
+      super.shutdown();
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+      awaitTerminationCalled.set(true);
+      return super.awaitTermination(timeout, unit);
+    }
   }
 }

@@ -19,12 +19,15 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -74,6 +77,7 @@ public class JcasbinChangePoller implements AutoCloseable {
       GravitinoCache<String, Long> metadataIdCache,
       GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache,
       long pollIntervalSecs) {
+    Preconditions.checkArgument(pollIntervalSecs > 0, "pollIntervalSecs must be positive");
     this.metadataIdCache = metadataIdCache;
     this.ownerRelCache = ownerRelCache;
     this.pollIntervalSecs = pollIntervalSecs;
@@ -93,11 +97,11 @@ public class JcasbinChangePoller implements AutoCloseable {
    */
   public void start() {
     ownerPollHighWaterId =
-        nullToZero(
+        getOrDefault(
             SessionUtils.getWithoutCommit(
                 OwnerMetaMapper.class, OwnerMetaMapper::selectMaxChangeId));
     entityPollHighWaterId =
-        nullToZero(
+        getOrDefault(
             SessionUtils.getWithoutCommit(
                 EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
 
@@ -168,6 +172,8 @@ public class JcasbinChangePoller implements AutoCloseable {
             m -> m.selectEntityChanges(entityPollHighWaterId, ENTITY_CHANGE_POLLER_MAX_ROWS));
 
     long maxSeenId = entityPollHighWaterId;
+    Set<String> containerPrefixes = new LinkedHashSet<>();
+    Set<String> leafKeys = new LinkedHashSet<>();
     for (EntityChangeRecord change : changes) {
       String metalake = change.getMetalakeName();
       String entityType = change.getEntityType();
@@ -188,15 +194,16 @@ public class JcasbinChangePoller implements AutoCloseable {
       String cacheKey = JcasbinAuthorizationLookups.buildCacheKey(metalake, mdObj);
 
       if (JcasbinAuthorizationLookups.isContainerType(mdType)) {
-        metadataIdCache.invalidateByPrefix(cacheKey);
+        addCoalescedPrefix(containerPrefixes, cacheKey);
       } else {
-        metadataIdCache.invalidate(cacheKey);
+        leafKeys.add(cacheKey);
       }
 
       if (change.getId() > maxSeenId) {
         maxSeenId = change.getId();
       }
     }
+    invalidateCoalescedKeys(containerPrefixes, leafKeys);
     entityPollHighWaterId = maxSeenId;
   }
 
@@ -227,7 +234,28 @@ public class JcasbinChangePoller implements AutoCloseable {
     return MetadataObjects.of(names, type);
   }
 
-  private static long nullToZero(Long value) {
+  private static long getOrDefault(Long value) {
     return value == null ? 0L : value;
+  }
+
+  private static void addCoalescedPrefix(Set<String> prefixes, String candidate) {
+    for (String prefix : prefixes) {
+      if (candidate.startsWith(prefix)) {
+        return;
+      }
+    }
+    prefixes.removeIf(prefix -> prefix.startsWith(candidate));
+    prefixes.add(candidate);
+  }
+
+  private void invalidateCoalescedKeys(Set<String> prefixes, Set<String> leafKeys) {
+    for (String prefix : prefixes) {
+      metadataIdCache.invalidateByPrefix(prefix);
+    }
+    for (String leafKey : leafKeys) {
+      if (prefixes.stream().noneMatch(leafKey::startsWith)) {
+        metadataIdCache.invalidate(leafKey);
+      }
+    }
   }
 }

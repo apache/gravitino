@@ -325,6 +325,7 @@ public class AuthorizationUtils {
 
   public static void authorizationPluginRemovePrivileges(
       NameIdentifier ident, Entity.EntityType type, List<String> locations) {
+    notifyEntityNameIdMappingChange(ident, type);
     // If we enable authorization, we should remove the privileges about the entity in the
     // authorization plugin.
     if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
@@ -363,6 +364,7 @@ public class AuthorizationUtils {
 
   public static void authorizationPluginRenamePrivileges(
       NameIdentifier ident, Entity.EntityType type, String newName, List<String> locations) {
+    notifyEntityNameIdMappingChange(ident, type);
     // If we enable authorization, we should rename the privileges about the entity in the
     // authorization plugin.
     if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
@@ -383,6 +385,21 @@ public class AuthorizationUtils {
           authorizationPlugin -> {
             authorizationPlugin.onMetadataUpdated(renameChange);
           });
+    }
+  }
+
+  private static void notifyEntityNameIdMappingChange(
+      NameIdentifier ident, Entity.EntityType type) {
+    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (gravitinoAuthorizer == null) {
+      return;
+    }
+    String metalake =
+        type == Entity.EntityType.METALAKE ? ident.name() : ident.namespace().level(0);
+    try {
+      gravitinoAuthorizer.handleEntityNameIdMappingChange(metalake, ident, type);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to notify entity name-id mapping change for {}", ident, e);
     }
   }
 
