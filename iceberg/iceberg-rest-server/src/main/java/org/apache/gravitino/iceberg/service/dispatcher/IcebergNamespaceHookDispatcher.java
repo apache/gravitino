@@ -69,35 +69,34 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
     String catalogName = context.catalogName();
     Namespace leaf = createRequest.namespace();
+    List<Namespace> newlyOwned = new ArrayList<>();
     // Lock the top-level branch root rather than the whole catalog: any race on shared ancestor
     // ownership has to share leaf.level(0), so serializing per top-level branch is sufficient
     // and lets disjoint branches (e.g. A:... and X:...) create in parallel.
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(metalake, catalogName, leaf.level(0)),
-        LockType.WRITE,
-        () -> {
-          // Pre-probe so we only claim ownership of truly-new ancestors, never overwriting
-          // an existing parent's owner.
-          List<Namespace> missingAncestors = getMissingAncestors(context, leaf);
-          CreateNamespaceResponse response = dispatcher.createNamespace(context, createRequest);
+    CreateNamespaceResponse createNamespaceResponse =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(metalake, catalogName, leaf.level(0)),
+            LockType.WRITE,
+            () -> {
+              // Pre-probe so we only claim ownership of truly-new ancestors, never overwriting
+              // an existing parent's owner.
+              getMissingAncestors(context, leaf);
+              return dispatcher.createNamespace(context, createRequest);
+            });
+    // SchemaMetaService.insertSchema splits the leaf's logical name and auto-creates a
+    // Gravitino entity row for each ancestor, so a single leaf import covers the branch.
+    // Failures propagate intentionally: swallowing would leave a namespace in Iceberg
+    // that Gravitino doesn't know about.
+    importSchema(catalogName, leaf);
 
-          // SchemaMetaService.insertSchema splits the leaf's logical name and auto-creates a
-          // Gravitino entity row for each ancestor, so a single leaf import covers the branch.
-          // Failures propagate intentionally: swallowing would leave a namespace in Iceberg
-          // that Gravitino doesn't know about.
-          importSchema(catalogName, leaf);
-
-          List<Namespace> newlyOwned = new ArrayList<>(missingAncestors);
-          newlyOwned.add(leaf);
-          IcebergOwnershipUtils.setSchemaOwners(
-              metalake,
-              catalogName,
-              newlyOwned,
-              context.userName(),
-              GravitinoEnv.getInstance().ownerDispatcher());
-
-          return response;
-        });
+    newlyOwned.add(leaf);
+    IcebergOwnershipUtils.setSchemaOwners(
+        metalake,
+        catalogName,
+        newlyOwned,
+        context.userName(),
+        GravitinoEnv.getInstance().ownerDispatcher());
+    return createNamespaceResponse;
   }
 
   /**
