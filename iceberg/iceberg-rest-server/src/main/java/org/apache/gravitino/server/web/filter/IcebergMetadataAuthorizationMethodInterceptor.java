@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
@@ -106,7 +108,8 @@ public class IcebergMetadataAuthorizationMethodInterceptor
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Parameter[] parameters, Object[] args) {
+      Method method, Parameter[] parameters, Object[] args) {
+    AuthorizationExpression authExpr = method.getAnnotation(AuthorizationExpression.class);
     for (Parameter parameter : parameters) {
       IcebergAuthorizationMetadata icebergMetadata =
           parameter.getAnnotation(IcebergAuthorizationMetadata.class);
@@ -115,7 +118,9 @@ public class IcebergMetadataAuthorizationMethodInterceptor
         RequestType type = icebergMetadata.type();
         switch (type) {
           case LOAD_TABLE:
-            return Optional.of(new LoadTableAuthzHandler(parameters, args));
+            return Optional.of(new LoadTableAuthzHandler(authExpr, parameters, args));
+          case LOAD_VIEW:
+            return Optional.of(new LoadViewAuthzHandler(authExpr, parameters, args));
           case RENAME_TABLE:
             return Optional.of(new RenameTableAuthzHandler(parameters, args));
           case RENAME_VIEW:

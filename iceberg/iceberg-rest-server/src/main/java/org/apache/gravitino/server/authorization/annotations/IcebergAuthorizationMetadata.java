@@ -30,6 +30,7 @@ import java.lang.annotation.Target;
 public @interface IcebergAuthorizationMetadata {
   enum RequestType {
     LOAD_TABLE,
+    LOAD_VIEW,
     RENAME_TABLE,
     RENAME_VIEW,
   }

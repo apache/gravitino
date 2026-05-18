@@ -159,6 +159,15 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   @Test
+  void testSelectTableAsTableOwnerWithUseCatalogAndUseSchema() {
+    String tableName = "test_select_table_owner_with_use";
+    createTable(SCHEMA_NAME, tableName);
+    setTableOwner(tableName);
+
+    Assertions.assertDoesNotThrow(() -> sql("SELECT * FROM %s", tableName));
+  }
+
+  @Test
   void testDropTable() {
     String tableName = "test_drop";
     createTable(SCHEMA_NAME, tableName);
