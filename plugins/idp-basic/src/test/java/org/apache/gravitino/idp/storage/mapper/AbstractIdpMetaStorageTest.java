@@ -47,7 +47,6 @@ abstract class AbstractIdpMetaStorageTest {
   private static final String H2_BACKEND = "h2";
   private static final String MYSQL_BACKEND = "mysql";
   private static final String POSTGRESQL_BACKEND = "postgresql";
-  private static final String STORAGE_BACKEND_PROPERTY = "idp.storage.test.backend";
   private static final TestDatabaseName MYSQL_TEST_DATABASE = TestDatabaseName.MYSQL_JDBC_BACKEND;
   private static final TestDatabaseName POSTGRESQL_TEST_DATABASE = TestDatabaseName.PG_JDBC_BACKEND;
 
