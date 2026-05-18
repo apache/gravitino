@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -146,13 +147,9 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         () -> {
           dispatcher.dropNamespace(context, namespace);
 
-          // Walk ancestors innermost-to-outermost and find the outermost ancestor that no
-          // longer exists in Iceberg (a phantom row from insertSchema's ancestor split). We
-          // delete that single ancestor with cascade so when the entity store grows hierarchical
-          // schema cascade support, the whole phantom sub-tree comes down in one call. If all
-          // ancestors still exist in Iceberg, just cascade-delete the target's row.
+          // TODO: Use cascade mode deletion
           String separator = HierarchicalSchemaUtil.schemaSeparator();
-          Namespace deleteTarget = namespace;
+          List<Namespace> deleteTargets = Lists.newArrayList(namespace);
           String namespaceName = String.join(separator, namespace.levels());
           List<String> ancestorNames =
               HierarchicalSchemaUtil.getAncestorNames(namespaceName, separator);
@@ -161,21 +158,22 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
             if (dispatcher.namespaceExists(context, ancestor)) {
               break;
             }
-            deleteTarget = ancestor;
+            deleteTargets.add(ancestor);
           }
 
           EntityStore store = GravitinoEnv.getInstance().entityStore();
           if (store != null) {
-            try {
-              store.delete(
-                  IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                      metalake, catalogName, deleteTarget, separator),
-                  Entity.EntityType.SCHEMA,
-                  true);
-            } catch (NoSuchEntityException ignore) {
-              // Already gone.
-            } catch (IOException ioe) {
-              throw new RuntimeException("io exception when deleting schema entity", ioe);
+            for (Namespace target : deleteTargets) {
+              try {
+                store.delete(
+                    IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+                        metalake, catalogName, target, separator),
+                    Entity.EntityType.SCHEMA);
+              } catch (NoSuchEntityException ignore) {
+                // Already gone.
+              } catch (IOException ioe) {
+                throw new RuntimeException("io exception when deleting schema entity", ioe);
+              }
             }
           }
           return null;
