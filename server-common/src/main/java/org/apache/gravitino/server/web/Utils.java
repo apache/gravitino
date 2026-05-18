@@ -191,6 +191,13 @@ public class Utils {
         .build();
   }
 
+  public static <T> Response serviceUnavailable(T t) {
+    return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+        .entity(t)
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
   public static Response doAs(
       HttpServletRequest httpRequest, PrivilegedExceptionAction<Response> action) throws Exception {
     UserPrincipal principal =
