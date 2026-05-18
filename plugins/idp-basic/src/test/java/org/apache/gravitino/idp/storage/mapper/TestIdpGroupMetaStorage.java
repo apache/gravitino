@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -36,36 +37,72 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testInsertIdpGroupAndSelectIdpGroup(String type) throws IOException {
     init(type);
-    IdpGroupPO group = insertGroup(10L, "dev", 1L, 0L, 0L);
+    IdpGroupPO firstGroup = insertGroup(1L, "dev", 1L, 0L, 0L);
 
-    assertEquals(group, idpGroupMetaMapper.selectIdpGroup("dev"));
+    assertEquals(firstGroup, idpGroupMetaMapper.selectIdpGroup("dev"));
     assertNull(idpGroupMetaMapper.selectIdpGroup("unknown"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testSelectIdpGroupIgnoresDeletedGroups(String type) throws IOException {
+    init(type);
+    IdpGroupPO activeGroup = insertGroup(1L, "dev", 1L, 0L, 0L);
+    insertGroup(2L, "ops", 1L, 0L, 10L);
+
+    assertEquals(activeGroup, idpGroupMetaMapper.selectIdpGroup("dev"));
+    assertNull(idpGroupMetaMapper.selectIdpGroup("ops"));
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
   void testSoftDeleteIdpGroup(String type) throws IOException {
     init(type);
-    insertGroup(10L, "dev", 1L, 0L, 0L);
+    insertGroup(1L, "dev", 1L, 0L, 0L);
 
-    assertEquals(1, idpGroupMetaMapper.softDeleteIdpGroup(10L));
+    assertEquals(1, idpGroupMetaMapper.softDeleteIdpGroup(1L));
     assertNull(idpGroupMetaMapper.selectIdpGroup("dev"));
-    assertTrue(queryLongValue("idp_group_meta", "deleted_at", "group_id", 10L) > 0L);
-    assertEquals(2L, queryLongValue("idp_group_meta", "current_version", "group_id", 10L));
-    assertEquals(1L, queryLongValue("idp_group_meta", "last_version", "group_id", 10L));
+    assertTrue(queryLongValue("idp_group_meta", "deleted_at", "group_id", 1L) > 0L);
+    assertEquals(2L, queryLongValue("idp_group_meta", "current_version", "group_id", 1L));
+    assertEquals(1L, queryLongValue("idp_group_meta", "last_version", "group_id", 1L));
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
   void testDeleteIdpGroupMetasByLegacyTimeline(String type) throws IOException {
     init(type);
-    insertGroup(10L, "legacy-group", 1L, 0L, 10L);
-    insertGroup(20L, "new-group", 1L, 0L, 30L);
-    insertGroup(30L, "active-group", 1L, 0L, 0L);
+    insertGroup(1L, "legacy-group", 1L, 0L, 10L);
+    insertGroup(2L, "new-group", 1L, 0L, 30L);
+    insertGroup(3L, "active-group", 1L, 0L, 0L);
 
     assertEquals(1, idpGroupMetaMapper.deleteIdpGroupMetasByLegacyTimeline(20L, 10));
-    assertEquals(0, countRows("idp_group_meta", "group_id", 10L));
-    assertEquals(1, countRows("idp_group_meta", "group_id", 20L));
-    assertEquals(1, countRows("idp_group_meta", "group_id", 30L));
+    assertEquals(0, countRows("idp_group_meta", "group_id", 1L));
+    assertEquals(1, countRows("idp_group_meta", "group_id", 2L));
+    assertEquals(1, countRows("idp_group_meta", "group_id", 3L));
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testRestart(String type) throws IOException {
+    init(type);
+    IdpGroupPO expectedActiveGroup = insertGroup(1L, "dev", 3L, 2L, 0L);
+    insertGroup(2L, "ops", 1L, 0L, 10L);
+
+    assertPersistedGroups(expectedActiveGroup);
+
+    restartBackend();
+
+    assertPersistedGroups(expectedActiveGroup);
+  }
+
+  private void assertPersistedGroups(IdpGroupPO expectedActiveGroup) {
+    assertTrue(
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .getConfiguration()
+            .hasMapper(IdpGroupMetaMapper.class));
+
+    assertEquals(expectedActiveGroup, idpGroupMetaMapper.selectIdpGroup("dev"));
+    assertNull(idpGroupMetaMapper.selectIdpGroup("ops"));
   }
 }
