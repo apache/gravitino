@@ -94,6 +94,11 @@ public interface TagMetadataObjectRelMapper {
 
   @UpdateProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsBySchemaIds")
+  void softDeleteTagMetadataObjectRelsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
+
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
       method = "softDeleteTagMetadataObjectRelsByTableId")
   void softDeleteTagMetadataObjectRelsByTableId(@Param("tableId") Long tableId);
 

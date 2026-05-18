@@ -85,6 +85,10 @@ public class SecurableObjectSQLProviderFactory {
     return getProvider().softDeleteObjectRelsBySchemaId(schemaId);
   }
 
+  public static String softDeleteObjectRelsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteObjectRelsBySchemaIds(schemaIds);
+  }
+
   public static String listSecurableObjectsByRoleId(@Param("roleId") Long roleId) {
     return getProvider().listSecurableObjectsByRoleId(roleId);
   }

@@ -87,6 +87,10 @@ public class TableColumnSQLProviderFactory {
     return getProvider().softDeleteColumnsBySchemaId(schemaId);
   }
 
+  public static String softDeleteColumnsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteColumnsBySchemaIds(schemaIds);
+  }
+
   public static String selectColumnIdByTableIdAndName(
       @Param("tableId") Long tableId, @Param("columnName") String name) {
     return getProvider().selectColumnIdByTableIdAndName(tableId, name);

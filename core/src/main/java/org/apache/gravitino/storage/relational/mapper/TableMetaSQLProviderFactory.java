@@ -120,6 +120,10 @@ public class TableMetaSQLProviderFactory {
     return getProvider().softDeleteTableMetasBySchemaId(schemaId);
   }
 
+  public static String softDeleteTableMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteTableMetasBySchemaIds(schemaIds);
+  }
+
   public static String deleteTableMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteTableMetasByLegacyTimeline(legacyTimeline, limit);

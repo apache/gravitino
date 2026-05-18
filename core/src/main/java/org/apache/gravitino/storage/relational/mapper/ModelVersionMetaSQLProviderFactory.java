@@ -94,6 +94,11 @@ public class ModelVersionMetaSQLProviderFactory {
     return getProvider().softDeleteModelVersionMetasBySchemaId(schemaId);
   }
 
+  public static String softDeleteModelVersionMetasBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteModelVersionMetasBySchemaIds(schemaIds);
+  }
+
   public static String softDeleteModelVersionMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return getProvider().softDeleteModelVersionMetasByCatalogId(catalogId);
   }

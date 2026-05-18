@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelVersionAliasRelBaseSQLProvider;
@@ -69,6 +70,24 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
         + " SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0) AND deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteModelVersionAliasRelsBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + ModelVersionAliasRelMapper.TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE model_id IN ("
+        + " SELECT model_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND deleted_at = 0) AND deleted_at = 0"
+        + "</script>";
   }
 
   @Override

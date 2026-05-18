@@ -171,6 +171,56 @@ public class StatisticBaseSQLProvider {
         + ")";
   }
 
+  public String softDeleteStatisticsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + STATISTIC_META_TABLE_NAME
+        + " stat "
+        + softDeleteSQL()
+        + " WHERE stat.deleted_at = 0 AND EXISTS ("
+        + " SELECT st.schema_id FROM "
+        + SchemaMetaMapper.TABLE_NAME
+        + " st WHERE st.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND st.schema_id = stat.metadata_object_id AND stat.metadata_object_type = 'SCHEMA'"
+        + " UNION"
+        + " SELECT tt.schema_id FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " tt WHERE tt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND tt.topic_id = stat.metadata_object_id AND stat.metadata_object_type = 'TOPIC'"
+        + " UNION"
+        + " SELECT tat.schema_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tat WHERE tat.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND tat.table_id = stat.metadata_object_id AND stat.metadata_object_type = 'TABLE'"
+        + " UNION"
+        + " SELECT ft.schema_id FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " ft WHERE ft.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND ft.fileset_id = stat.metadata_object_id AND stat.metadata_object_type = 'FILESET'"
+        + " UNION"
+        + " SELECT mt.schema_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mt WHERE mt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND mt.model_id = stat.metadata_object_id AND stat.metadata_object_type = 'MODEL'"
+        + ")"
+        + "</script>";
+  }
+
   public String deleteStatisticsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "

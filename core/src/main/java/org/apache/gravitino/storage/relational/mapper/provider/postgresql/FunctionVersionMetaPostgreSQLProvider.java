@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FunctionVersionMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.FunctionVersionPO;
@@ -50,6 +51,21 @@ public class FunctionVersionMetaPostgreSQLProvider extends FunctionVersionMetaBa
         + FunctionVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteFunctionVersionMetasBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + FunctionVersionMetaMapper.TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   @Override

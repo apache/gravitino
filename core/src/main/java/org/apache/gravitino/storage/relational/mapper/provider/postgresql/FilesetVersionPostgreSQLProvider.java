@@ -51,6 +51,20 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
   }
 
   @Override
+  public String softDeleteFilesetVersionsBySchemaIds(List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + VERSION_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
+  }
+
+  @Override
   public String softDeleteFilesetVersionsByFilesetId(Long filesetId) {
     return "UPDATE "
         + VERSION_TABLE_NAME

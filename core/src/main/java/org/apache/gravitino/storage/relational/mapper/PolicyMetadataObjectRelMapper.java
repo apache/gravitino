@@ -133,6 +133,11 @@ public interface PolicyMetadataObjectRelMapper {
 
   @UpdateProvider(
       type = PolicyMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeletePolicyMetadataObjectRelsBySchemaIds")
+  void softDeletePolicyMetadataObjectRelsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
+
+  @UpdateProvider(
+      type = PolicyMetadataObjectRelSQLProviderFactory.class,
       method = "softDeletePolicyMetadataObjectRelsByTableId")
   void softDeletePolicyMetadataObjectRelsByTableId(@Param("tableId") Long tableId);
 

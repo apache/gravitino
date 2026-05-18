@@ -99,6 +99,11 @@ public interface TopicMetaMapper {
       method = "softDeleteTopicMetasBySchemaId")
   Integer softDeleteTopicMetasBySchemaId(@Param("schemaId") Long schemaId);
 
+  @UpdateProvider(
+      type = TopicMetaSQLProviderFactory.class,
+      method = "softDeleteTopicMetasBySchemaIds")
+  Integer softDeleteTopicMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
+
   @DeleteProvider(
       type = TopicMetaSQLProviderFactory.class,
       method = "deleteTopicMetasByLegacyTimeline")

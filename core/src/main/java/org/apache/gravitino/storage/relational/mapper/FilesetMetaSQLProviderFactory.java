@@ -117,6 +117,11 @@ public class FilesetMetaSQLProviderFactory {
     return getProvider().softDeleteFilesetMetasBySchemaId(schemaId);
   }
 
+  public static String softDeleteFilesetMetasBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteFilesetMetasBySchemaIds(schemaIds);
+  }
+
   public String softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId) {
     return getProvider().softDeleteFilesetMetasByFilesetId(filesetId);
   }

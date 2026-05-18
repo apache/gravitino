@@ -111,6 +111,11 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().softDeleteFunctionMetasBySchemaId(schemaId);
   }
 
+  public static String softDeleteFunctionMetasBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteFunctionMetasBySchemaIds(schemaIds);
+  }
+
   public static String deleteFunctionMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteFunctionMetasByLegacyTimeline(legacyTimeline, limit);

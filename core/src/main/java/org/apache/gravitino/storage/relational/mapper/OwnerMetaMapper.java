@@ -104,6 +104,11 @@ public interface OwnerMetaMapper {
 
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelBySchemaIds")
+  void softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
+
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
       method = "deleteOwnerMetasByLegacyTimeline")
   Integer deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);

@@ -121,6 +121,24 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0) AND deleted_at = 0";
   }
 
+  public String softDeleteModelVersionAliasRelsBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + ModelVersionAliasRelMapper.TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE model_id IN ("
+        + " SELECT model_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND deleted_at = 0) AND deleted_at = 0"
+        + "</script>";
+  }
+
   public String softDeleteModelVersionAliasRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME

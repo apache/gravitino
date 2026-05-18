@@ -215,6 +215,50 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + " )";
   }
 
+  public String softDeletePolicyMetadataObjectRelsBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE deleted_at = 0 AND ("
+        + "   (metadata_object_type = 'SCHEMA' AND metadata_object_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ")"
+        + "   OR (metadata_object_type = 'TOPIC' AND metadata_object_id IN (SELECT topic_id FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "))"
+        + "   OR (metadata_object_type = 'TABLE' AND metadata_object_id IN (SELECT table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "))"
+        + "   OR (metadata_object_type = 'FILESET' AND metadata_object_id IN (SELECT fileset_id FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "))"
+        + "   OR (metadata_object_type = 'MODEL' AND metadata_object_id IN (SELECT model_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "))"
+        + " )"
+        + "</script>";
+  }
+
   public String softDeletePolicyMetadataObjectRelsByTableId(@Param("tableId") Long tableId) {
     return "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME

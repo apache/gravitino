@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
 import org.apache.gravitino.storage.relational.po.FunctionVersionPO;
 import org.apache.ibatis.annotations.Param;
@@ -61,6 +62,21 @@ public class FunctionVersionMetaBaseSQLProvider {
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+  }
+
+  public String softDeleteFunctionVersionMetasBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + FunctionVersionMetaMapper.TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   public String softDeleteFunctionVersionMetasByCatalogId(@Param("catalogId") Long catalogId) {

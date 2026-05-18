@@ -65,6 +65,11 @@ public interface FilesetVersionMapper {
 
   @UpdateProvider(
       type = FilesetVersionSQLProviderFactory.class,
+      method = "softDeleteFilesetVersionsBySchemaIds")
+  Integer softDeleteFilesetVersionsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
+
+  @UpdateProvider(
+      type = FilesetVersionSQLProviderFactory.class,
       method = "softDeleteFilesetVersionsByFilesetId")
   Integer softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId);
 

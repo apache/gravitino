@@ -192,6 +192,72 @@ public class SecurableObjectBaseSQLProvider {
         + ")";
   }
 
+  public String softDeleteObjectRelsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + SECURABLE_OBJECT_TABLE_NAME
+        + " sect SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE sect.deleted_at = 0 AND EXISTS ("
+        + " SELECT st.schema_id FROM "
+        + SchemaMetaMapper.TABLE_NAME
+        + " st WHERE st.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND st.schema_id = sect.metadata_object_id AND sect.type = 'SCHEMA'"
+        + " UNION"
+        + " SELECT tt.schema_id FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " tt WHERE tt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND tt.topic_id = sect.metadata_object_id AND sect.type = 'TOPIC'"
+        + " UNION"
+        + " SELECT tat.schema_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " tat WHERE tat.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND tat.table_id = sect.metadata_object_id AND sect.type = 'TABLE'"
+        + " UNION"
+        + " SELECT ft.schema_id FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " ft WHERE ft.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND ft.fileset_id = sect.metadata_object_id AND sect.type = 'FILESET'"
+        + " UNION"
+        + " SELECT mt.schema_id FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " mt WHERE mt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND mt.model_id = sect.metadata_object_id AND sect.type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.schema_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND vt.view_id = sect.metadata_object_id AND sect.type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.schema_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND fnt.function_id = sect.metadata_object_id AND sect.type = 'FUNCTION'"
+        + ")"
+        + "</script>";
+  }
+
   public String listSecurableObjectsByRoleId(@Param("roleId") Long roleId) {
     return "SELECT role_id as roleId, metadata_object_id as metadataObjectId,"
         + " type as type, privilege_names as privilegeNames,"

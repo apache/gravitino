@@ -119,6 +119,10 @@ public class TopicMetaSQLProviderFactory {
     return getProvider().softDeleteTopicMetasBySchemaId(schemaId);
   }
 
+  public static String softDeleteTopicMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteTopicMetasBySchemaIds(schemaIds);
+  }
+
   public static String deleteTopicMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteTopicMetasByLegacyTimeline(legacyTimeline, limit);
