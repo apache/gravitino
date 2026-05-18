@@ -30,6 +30,7 @@ import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.AddColumn;
 import org.apache.gravitino.rel.TableChange.After;
@@ -44,6 +45,7 @@ import org.apache.gravitino.rel.TableChange.UpdateColumnComment;
 import org.apache.gravitino.rel.TableChange.UpdateColumnPosition;
 import org.apache.gravitino.rel.TableChange.UpdateColumnType;
 import org.apache.gravitino.rel.TableChange.UpdateComment;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
@@ -292,6 +294,13 @@ public class IcebergCatalogWrapperHelper {
   }
 
   public static Namespace getIcebergNamespace(String... level) {
+    // A single schema-name string may encode a hierarchical (multi-level) namespace using the
+    // configured external separator (default ":"). Split it back into individual Iceberg
+    // namespace levels so the underlying catalog receives the correct multi-level Namespace.
+    if (level.length == 1) {
+      return IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
+          level[0], HierarchicalSchemaUtil.schemaSeparator());
+    }
     return Namespace.of(level);
   }
 

@@ -268,6 +268,14 @@ public class RangerAuthorizationPluginIT {
         rangerAuthPlugin.validAuthorizationOperation(
             Arrays.asList(createSchemaInMetalake, createSchemaInCatalog)));
 
+    SecurableObject createSchemaOnSchema =
+        SecurableObjects.parse(
+            String.format("catalog.schema"),
+            MetadataObject.Type.SCHEMA,
+            Lists.newArrayList(Privileges.CreateSchema.allow()));
+    Assertions.assertTrue(
+        rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(createSchemaOnSchema)));
+
     // Use schema operation
     SecurableObject useSchema =
         SecurableObjects.parse(
@@ -551,13 +559,6 @@ public class RangerAuthorizationPluginIT {
         rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(useCatalog2)));
 
     // Schema
-    SecurableObject createSchema1 =
-        SecurableObjects.parse(
-            String.format("catalog.schema"),
-            MetadataObject.Type.SCHEMA,
-            Lists.newArrayList(Privileges.CreateSchema.allow()));
-    Assertions.assertFalse(
-        rangerAuthPlugin.validAuthorizationOperation(Arrays.asList(createSchema1)));
     SecurableObject createSchema2 =
         SecurableObjects.parse(
             String.format("catalog.schema.table"),

@@ -18,9 +18,13 @@
  */
 package org.apache.gravitino.authorization;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -130,6 +134,89 @@ public class OwnerManager implements OwnerDispatcher {
           ownerName,
           metadataObject.fullName(),
           ioe);
+      throw new RuntimeException(ioe);
+    }
+  }
+
+  @Override
+  public void setOwners(
+      String metalake,
+      List<MetadataObject> metadataObjects,
+      String ownerName,
+      Owner.Type ownerType) {
+    Objects.requireNonNull(metadataObjects, "metadataObjects must not be null");
+    if (metadataObjects.isEmpty()) {
+      return;
+    }
+
+    List<Optional<Owner>> originOwners = new ArrayList<>(metadataObjects.size());
+    for (MetadataObject mo : metadataObjects) {
+      originOwners.add(getOwner(metalake, mo));
+    }
+
+    Entity.EntityType objectType = MetadataObjectUtil.toEntityType(metadataObjects.get(0));
+    for (int i = 1; i < metadataObjects.size(); i++) {
+      Preconditions.checkArgument(
+          MetadataObjectUtil.toEntityType(metadataObjects.get(i)) == objectType,
+          "All metadata objects in setOwners must share the same type");
+    }
+    List<NameIdentifier> owned =
+        metadataObjects.stream()
+            .map(mo -> MetadataObjectUtil.toEntityIdent(metalake, mo))
+            .collect(Collectors.toList());
+
+    OwnerImpl newOwner = new OwnerImpl();
+    try {
+      NameIdentifier ownerIdent;
+      Entity.EntityType ownerEntityType;
+      if (ownerType == Owner.Type.USER) {
+        ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
+        ownerEntityType = Entity.EntityType.USER;
+        newOwner.name = ownerName;
+        newOwner.type = Owner.Type.USER;
+      } else if (ownerType == Owner.Type.GROUP) {
+        ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
+        ownerEntityType = Entity.EntityType.GROUP;
+        newOwner.name = ownerName;
+        newOwner.type = Owner.Type.GROUP;
+      } else {
+        throw new IllegalArgumentException("Unsupported owner type: " + ownerType);
+      }
+
+      TreeLockUtils.doWithTreeLock(
+          ownerIdent,
+          LockType.READ,
+          () -> {
+            store
+                .relationOperations()
+                .batchInsertRelations(
+                    SupportsRelationOperations.Type.OWNER_REL,
+                    owned,
+                    objectType,
+                    ownerIdent,
+                    ownerEntityType,
+                    true);
+            return null;
+          });
+
+      for (int i = 0; i < metadataObjects.size(); i++) {
+        MetadataObject mo = metadataObjects.get(i);
+        Optional<Owner> originOwner = originOwners.get(i);
+        AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+            metalake,
+            mo,
+            authorizationPlugin ->
+                authorizationPlugin.onOwnerSet(mo, originOwner.orElse(null), newOwner));
+        originOwner.ifPresent(owner -> notifyOwnerChange(owner, metalake, mo));
+      }
+    } catch (NoSuchEntityException nse) {
+      LOG.warn(
+          "Metadata object or owner {} not found for batch setOwners: {}",
+          ownerName,
+          nse.getMessage());
+      throw new NotFoundException(nse, "Metadata object or owner %s is not found", ownerName);
+    } catch (IOException ioe) {
+      LOG.info("Fail to batch set owner {} on {} objects", ownerName, metadataObjects.size(), ioe);
       throw new RuntimeException(ioe);
     }
   }

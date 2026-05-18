@@ -34,6 +34,8 @@ import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.TreeLock;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
@@ -67,6 +69,11 @@ public class TestIcebergNamespaceHookDispatcher {
         GravitinoEnv.getInstance(), "schemaDispatcher", mockSchemaDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", mockTableDispatcher, true);
 
+    LockManager mockLockManager = mock(LockManager.class);
+    TreeLock mockTreeLock = mock(TreeLock.class);
+    when(mockLockManager.createTreeLock(any())).thenReturn(mockTreeLock);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", mockLockManager, true);
+
     IcebergConfigProvider mockConfigProvider = mock(IcebergConfigProvider.class);
     when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
     when(mockConfigProvider.getDefaultCatalogName()).thenReturn(TEST_CATALOG);
@@ -84,6 +91,7 @@ public class TestIcebergNamespaceHookDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", null, true);
 
     Class<?> holderClass =
         Arrays.stream(IcebergRESTServerContext.class.getDeclaredClasses())
@@ -104,7 +112,7 @@ public class TestIcebergNamespaceHookDispatcher {
 
     doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
-        .setOwner(any(), any(), any(), any());
+        .setOwners(any(), any(), any(), any());
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -154,7 +162,7 @@ public class TestIcebergNamespaceHookDispatcher {
             RuntimeException.class, () -> hookDispatcher.createNamespace(mockContext, mockRequest));
 
     Assertions.assertEquals("Import failed", thrown.getMessage());
-    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+    verify(mockOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
   }
 
   @Test

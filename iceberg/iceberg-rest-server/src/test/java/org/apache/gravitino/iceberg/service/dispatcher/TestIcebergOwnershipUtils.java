@@ -20,12 +20,22 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity.EntityType;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
@@ -34,6 +44,7 @@ import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -47,19 +58,28 @@ public class TestIcebergOwnershipUtils {
   private static final String SCHEMA_NAME = "test_schema";
   private static final String TABLE_NAME = "test_table";
   private static final String VIEW_NAME = "test_view";
+  private static final String SEPARATOR = ":";
 
   private OwnerDispatcher mockOwnerDispatcher;
 
   @BeforeEach
-  public void setUp() {
+  public void setUp() throws IllegalAccessException {
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
+    Config mockConfig = mock(Config.class);
+    when(mockConfig.get(Configs.SCHEMA_SEPARATOR)).thenReturn(SEPARATOR);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
+  }
+
+  @AfterEach
+  public void tearDown() throws IllegalAccessException {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", null, true);
   }
 
   @Test
   public void testSetSchemaOwner() {
     Namespace namespace = Namespace.of(SCHEMA_NAME);
     NameIdentifier expectedSchemaIdentifier =
-        IcebergIdentifierUtils.toGravitinoSchemaIdentifier(METALAKE, CATALOG, namespace);
+        IcebergIdentifierUtils.toGravitinoSchemaIdentifier(METALAKE, CATALOG, namespace, SEPARATOR);
     MetadataObject expectedMetadataObject =
         NameIdentifierUtil.toMetadataObject(expectedSchemaIdentifier, EntityType.SCHEMA);
 
@@ -74,7 +94,8 @@ public class TestIcebergOwnershipUtils {
     Namespace namespace = Namespace.of(SCHEMA_NAME);
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, TABLE_NAME);
     NameIdentifier expectedTableIdentifier =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, tableIdentifier);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            METALAKE, CATALOG, tableIdentifier, SEPARATOR);
     MetadataObject expectedMetadataObject =
         NameIdentifierUtil.toMetadataObject(expectedTableIdentifier, EntityType.TABLE);
 
@@ -83,6 +104,47 @@ public class TestIcebergOwnershipUtils {
 
     verify(mockOwnerDispatcher, times(1))
         .setOwner(eq(METALAKE), eq(expectedMetadataObject), eq(USER), eq(Owner.Type.USER));
+  }
+
+  @Test
+  public void testSetSchemaOwnersBatch() {
+    Namespace nsA = Namespace.of("A");
+    Namespace nsAB = Namespace.of("A", "B");
+    MetadataObject objectA =
+        NameIdentifierUtil.toMetadataObject(
+            IcebergIdentifierUtils.toGravitinoSchemaIdentifier(METALAKE, CATALOG, nsA, SEPARATOR),
+            EntityType.SCHEMA);
+    MetadataObject objectAB =
+        NameIdentifierUtil.toMetadataObject(
+            IcebergIdentifierUtils.toGravitinoSchemaIdentifier(METALAKE, CATALOG, nsAB, SEPARATOR),
+            EntityType.SCHEMA);
+
+    IcebergOwnershipUtils.setSchemaOwners(
+        METALAKE, CATALOG, Arrays.asList(nsA, nsAB), USER, mockOwnerDispatcher);
+
+    List<MetadataObject> expected = Arrays.asList(objectA, objectAB);
+    verify(mockOwnerDispatcher, times(1))
+        .setOwners(eq(METALAKE), eq(expected), eq(USER), eq(Owner.Type.USER));
+  }
+
+  @Test
+  public void testSetSchemaOwnersWithEmptyCollectionIsNoOp() {
+    IcebergOwnershipUtils.setSchemaOwners(
+        METALAKE, CATALOG, Collections.emptyList(), USER, mockOwnerDispatcher);
+
+    verify(mockOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
+    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testSetSchemaOwnersWithNullOwnerDispatcher() {
+    try {
+      IcebergOwnershipUtils.setSchemaOwners(
+          METALAKE, CATALOG, Collections.singletonList(Namespace.of(SCHEMA_NAME)), USER, null);
+    } catch (Exception e) {
+      fail(
+          "setSchemaOwners should handle null dispatcher gracefully, but threw: " + e.getMessage());
+    }
   }
 
   @Test
@@ -112,7 +174,8 @@ public class TestIcebergOwnershipUtils {
     Namespace namespace = Namespace.of(SCHEMA_NAME);
     TableIdentifier viewIdentifier = TableIdentifier.of(namespace, VIEW_NAME);
     NameIdentifier expectedViewIdentifier =
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(METALAKE, CATALOG, viewIdentifier);
+        IcebergIdentifierUtils.toGravitinoTableIdentifier(
+            METALAKE, CATALOG, viewIdentifier, SEPARATOR);
     MetadataObject expectedMetadataObject =
         NameIdentifierUtil.toMetadataObject(expectedViewIdentifier, EntityType.VIEW);
 

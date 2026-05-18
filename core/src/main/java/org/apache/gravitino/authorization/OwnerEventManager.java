@@ -20,6 +20,8 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
@@ -63,6 +65,40 @@ public class OwnerEventManager implements OwnerDispatcher {
       eventBus.dispatchEvent(new SetOwnerEvent(user, identifier, ownerInfo, type));
     } catch (Exception e) {
       eventBus.dispatchEvent(new SetOwnerFailureEvent(user, identifier, e, ownerInfo, type));
+      throw e;
+    }
+  }
+
+  @Override
+  public void setOwners(
+      String metalake,
+      List<MetadataObject> metadataObjects,
+      String ownerName,
+      Owner.Type ownerType) {
+    Objects.requireNonNull(metadataObjects, "metadataObjects must not be null");
+    if (metadataObjects.isEmpty()) {
+      return;
+    }
+    String user = PrincipalUtils.getCurrentUserName();
+    OwnerInfo ownerInfo = new OwnerInfo(ownerName, ownerType);
+    for (MetadataObject metadataObject : metadataObjects) {
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+      MetadataObject.Type type = metadataObject.type();
+      eventBus.dispatchEvent(new SetOwnerPreEvent(user, identifier, ownerInfo, type));
+    }
+    try {
+      ownerDispatcher.setOwners(metalake, metadataObjects, ownerName, ownerType);
+      for (MetadataObject metadataObject : metadataObjects) {
+        NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+        eventBus.dispatchEvent(
+            new SetOwnerEvent(user, identifier, ownerInfo, metadataObject.type()));
+      }
+    } catch (Exception e) {
+      for (MetadataObject metadataObject : metadataObjects) {
+        NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+        eventBus.dispatchEvent(
+            new SetOwnerFailureEvent(user, identifier, e, ownerInfo, metadataObject.type()));
+      }
       throw e;
     }
   }

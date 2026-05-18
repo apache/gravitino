@@ -47,7 +47,10 @@ import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -80,6 +83,10 @@ public class IcebergAuthorizationIT extends BaseIT {
 
   private static ContainerSuite containerSuite = ContainerSuite.getInstance();
   private SparkSession sparkSession;
+  // IRC REST catalog authenticated as SUPER_USER, used for setup operations that the Gravitino
+  // REST API cannot perform — e.g. creating hierarchical schemas whose names contain the
+  // configured schema separator (Gravitino rejects those names at the REST boundary).
+  protected RESTCatalog adminIcebergCatalog;
 
   @BeforeAll
   @Override
@@ -88,11 +95,19 @@ public class IcebergAuthorizationIT extends BaseIT {
     startGravitinoServerWithIcebergREST();
     initMetalakeAndCatalog();
     initSparkEnv();
+    initAdminIcebergCatalog();
   }
 
   @AfterAll
   @Override
   public void stopIntegrationTest() throws IOException, InterruptedException {
+    if (adminIcebergCatalog != null) {
+      try {
+        adminIcebergCatalog.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close admin Iceberg REST catalog", e);
+      }
+    }
     sparkSession.close();
     client.dropMetalake(METALAKE_NAME, true);
 
@@ -226,6 +241,34 @@ public class IcebergAuthorizationIT extends BaseIT {
             .asTableCatalog()
             .tableExists(NameIdentifier.of(schemaName, tableName));
     Assertions.assertTrue(exists);
+  }
+
+  /**
+   * Initialize a REST catalog client authenticated as {@link #SUPER_USER}. Tests use it to perform
+   * setup that the Gravitino REST API cannot — most notably creating hierarchical schemas whose
+   * names contain the configured separator, since the Gravitino REST boundary rejects those names.
+   */
+  private void initAdminIcebergCatalog() {
+    Map<String, String> props = Maps.newHashMap();
+    props.put(CatalogProperties.URI, getIcebergRestServiceUri());
+    props.put(CatalogProperties.CACHE_ENABLED, "false");
+    props.put("rest.auth.type", "basic");
+    props.put("rest.auth.basic.username", SUPER_USER);
+    props.put("rest.auth.basic.password", "mock");
+    RESTCatalog catalog = new RESTCatalog();
+    catalog.setConf(new Configuration());
+    catalog.initialize("admin", props);
+    adminIcebergCatalog = catalog;
+  }
+
+  /**
+   * Creates a nested Iceberg namespace via the IRC API as {@link #SUPER_USER}. The hook dispatcher
+   * auto-creates any missing parent namespaces and imports every newly-created namespace into
+   * Gravitino as a schema entity, so the test only needs to issue a single call for the deepest
+   * level.
+   */
+  protected void createNestedNamespaceViaIRC(String... levels) {
+    adminIcebergCatalog.createNamespace(Namespace.of(levels));
   }
 
   private void initSparkEnv() {

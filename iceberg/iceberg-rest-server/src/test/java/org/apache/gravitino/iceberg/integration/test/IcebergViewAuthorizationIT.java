@@ -119,6 +119,163 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   @Test
+  void testCreateViewInNestedNamespace() {
+    String nestedSchemaInGravitino = SCHEMA_NAME + ":nested";
+    String nestedSchemaInIceberg = SCHEMA_NAME + ".nested";
+    String nestedBaseTable = "nested_base_table";
+    String nestedView = "test_nested_view";
+
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(nestedSchemaInGravitino, "nested schema", new HashMap<>());
+    createTable(nestedSchemaInGravitino, nestedBaseTable);
+    grantUseSchemaRole(nestedSchemaInGravitino);
+    sql("USE %s;", nestedSchemaInIceberg);
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () -> sql("CREATE VIEW %s AS SELECT * FROM %s", nestedView, nestedBaseTable));
+
+    String createViewRole = grantCreateViewRole(nestedSchemaInGravitino);
+    String selectTableRole = grantSelectTableRole(nestedSchemaInGravitino, nestedBaseTable);
+    Assertions.assertDoesNotThrow(
+        () -> sql("CREATE VIEW %s AS SELECT * FROM %s", nestedView, nestedBaseTable));
+
+    Optional<Owner> owner =
+        metalakeClientWithAllPrivilege.getOwner(
+            MetadataObjects.of(
+                Arrays.asList(GRAVITINO_CATALOG_NAME, nestedSchemaInGravitino, nestedView),
+                MetadataObject.Type.VIEW));
+    Assertions.assertTrue(owner.isPresent());
+    Assertions.assertEquals(NORMAL_USER, owner.get().name());
+
+    revokeRole(createViewRole);
+    revokeRole(selectTableRole);
+  }
+
+  @Test
+  void testCreateViewInNestedNamespaceWithInheritedParentPrivilege() {
+    String nestedSchemaInGravitino = SCHEMA_NAME + ":nested_inherit";
+    String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_inherit";
+    String nestedBaseTable = "nested_inherited_base_table";
+    String nestedView = "test_nested_inherited_view";
+
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(nestedSchemaInGravitino, "nested schema", new HashMap<>());
+    createTable(nestedSchemaInGravitino, nestedBaseTable);
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () -> {
+          sql("USE %s;", nestedSchemaInIceberg);
+          sql("CREATE VIEW %s AS SELECT * FROM %s", nestedView, nestedBaseTable);
+        });
+
+    String createViewRole = grantCreateViewRole(SCHEMA_NAME);
+    String selectTableRole = grantSelectTableOnSchemaRole(SCHEMA_NAME);
+    Assertions.assertDoesNotThrow(
+        () -> {
+          sql("USE %s;", nestedSchemaInIceberg);
+          sql("CREATE VIEW %s AS SELECT * FROM %s", nestedView, nestedBaseTable);
+        },
+        "Schema-level privileges on parent namespace should be inherited by child namespace");
+
+    Optional<Owner> owner =
+        metalakeClientWithAllPrivilege.getOwner(
+            MetadataObjects.of(
+                Arrays.asList(GRAVITINO_CATALOG_NAME, nestedSchemaInGravitino, nestedView),
+                MetadataObject.Type.VIEW));
+    Assertions.assertTrue(owner.isPresent());
+    Assertions.assertEquals(NORMAL_USER, owner.get().name());
+
+    revokeRole(createViewRole);
+    revokeRole(selectTableRole);
+  }
+
+  @Test
+  void testLoadReplaceDropViewInNestedNamespace() {
+    String nestedSchemaInGravitino = SCHEMA_NAME + ":nested_crud";
+    String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_crud";
+    String nestedBaseTable = "nested_crud_base_table";
+    String nestedView = "nested_crud_view";
+
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(nestedSchemaInGravitino, "nested schema", new HashMap<>());
+    createTable(nestedSchemaInGravitino, nestedBaseTable);
+    grantUseSchemaRole(nestedSchemaInGravitino);
+    String createViewRole = grantCreateViewRole(nestedSchemaInGravitino);
+    String selectTableRole = grantSelectTableRole(nestedSchemaInGravitino, nestedBaseTable);
+    sql("USE %s;", nestedSchemaInIceberg);
+    sql("CREATE VIEW %s AS SELECT * FROM %s", nestedView, nestedBaseTable);
+    revokeRole(createViewRole);
+    revokeRole(selectTableRole);
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class, () -> sql("SELECT * FROM %s", nestedView));
+
+    String selectViewRole = grantSelectViewRole(nestedSchemaInGravitino, nestedView);
+    String selectBaseTableRole = grantSelectTableRole(nestedSchemaInGravitino, nestedBaseTable);
+    Assertions.assertDoesNotThrow(() -> sql("SELECT * FROM %s", nestedView));
+    revokeRole(selectViewRole);
+    revokeRole(selectBaseTableRole);
+
+    setSchemaOwner(SCHEMA_NAME, NORMAL_USER);
+    Assertions.assertDoesNotThrow(
+        () ->
+            sql("CREATE OR REPLACE VIEW %s AS SELECT col_1 FROM %s", nestedView, nestedBaseTable));
+    Assertions.assertDoesNotThrow(() -> sql("DROP VIEW %s", nestedView));
+    setSchemaOwner(SCHEMA_NAME, SUPER_USER);
+  }
+
+  @Test
+  void testListNestedNamespaceViewsWithInheritedParentPrivilege() {
+    String nestedSchemaInGravitino = SCHEMA_NAME + ":nested_list";
+    String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_list";
+    String nestedBaseTable = "nested_list_base_table";
+    String view1 = "nested_list_view_1";
+    String view2 = "nested_list_view_2";
+
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(nestedSchemaInGravitino, "nested schema", new HashMap<>());
+    createTable(nestedSchemaInGravitino, nestedBaseTable);
+    setSchemaOwner(SCHEMA_NAME, NORMAL_USER);
+    sql("USE %s;", nestedSchemaInIceberg);
+    sql("CREATE VIEW %s AS SELECT * FROM %s", view1, nestedBaseTable);
+    sql("CREATE VIEW %s AS SELECT col_1 FROM %s", view2, nestedBaseTable);
+
+    // Creator is the view owner, so both nested views are visible.
+    Set<String> viewNames = listViewNames(nestedSchemaInIceberg);
+    Assertions.assertEquals(2, viewNames.size());
+    Assertions.assertTrue(viewNames.contains(view1));
+    Assertions.assertTrue(viewNames.contains(view2));
+
+    // Transfer ownership away to verify inherited parent privilege behavior.
+    MetadataObject view1MetadataObject =
+        MetadataObjects.of(
+            Arrays.asList(GRAVITINO_CATALOG_NAME, nestedSchemaInGravitino, view1),
+            MetadataObject.Type.VIEW);
+    MetadataObject view2MetadataObject =
+        MetadataObjects.of(
+            Arrays.asList(GRAVITINO_CATALOG_NAME, nestedSchemaInGravitino, view2),
+            MetadataObject.Type.VIEW);
+    metalakeClientWithAllPrivilege.setOwner(view1MetadataObject, SUPER_USER, Owner.Type.USER);
+    metalakeClientWithAllPrivilege.setOwner(view2MetadataObject, SUPER_USER, Owner.Type.USER);
+    setSchemaOwner(SCHEMA_NAME, SUPER_USER);
+
+    viewNames = listViewNames(nestedSchemaInIceberg);
+    Assertions.assertEquals(0, viewNames.size());
+
+    setSchemaOwner(SCHEMA_NAME, NORMAL_USER);
+    viewNames = listViewNames(nestedSchemaInIceberg);
+    Assertions.assertTrue(viewNames.contains(view1));
+    Assertions.assertTrue(viewNames.contains(view2));
+    setSchemaOwner(SCHEMA_NAME, SUPER_USER);
+  }
+
+  @Test
   void testCreateViewRequiresSelectOnUnderlyingTable() {
     String viewName = "test_invoker_create_view";
 
@@ -533,6 +690,10 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   private String grantSelectViewRole(String viewName) {
+    return grantSelectViewRole(SCHEMA_NAME, viewName);
+  }
+
+  private String grantSelectViewRole(String schema, String viewName) {
     String roleName = "selectView_" + UUID.randomUUID();
     List<SecurableObject> securableObjects = new ArrayList<>();
     SecurableObject catalogObject =
@@ -541,7 +702,7 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     securableObjects.add(catalogObject);
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
-            catalogObject, SCHEMA_NAME, ImmutableList.of(Privileges.UseSchema.allow()));
+            catalogObject, schema, ImmutableList.of(Privileges.UseSchema.allow()));
     securableObjects.add(schemaObject);
     SecurableObject viewObject =
         SecurableObjects.ofView(
@@ -553,6 +714,28 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   private String grantSelectTableRole(String tableName) {
+    return grantSelectTableRole(SCHEMA_NAME, tableName);
+  }
+
+  private String grantSelectTableOnSchemaRole(String schema) {
+    String roleName = "selectTableOnSchema_" + UUID.randomUUID();
+    List<SecurableObject> securableObjects = new ArrayList<>();
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(
+            GRAVITINO_CATALOG_NAME, ImmutableList.of(Privileges.UseCatalog.allow()));
+    securableObjects.add(catalogObject);
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            catalogObject,
+            schema,
+            ImmutableList.of(Privileges.UseSchema.allow(), Privileges.SelectTable.allow()));
+    securableObjects.add(schemaObject);
+    metalakeClientWithAllPrivilege.createRole(roleName, new HashMap<>(), securableObjects);
+    metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
+    return roleName;
+  }
+
+  private String grantSelectTableRole(String schema, String tableName) {
     String roleName = "selectTable_" + UUID.randomUUID();
     List<SecurableObject> securableObjects = new ArrayList<>();
     SecurableObject catalogObject =
@@ -561,7 +744,7 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
     securableObjects.add(catalogObject);
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
-            catalogObject, SCHEMA_NAME, ImmutableList.of(Privileges.UseSchema.allow()));
+            catalogObject, schema, ImmutableList.of(Privileges.UseSchema.allow()));
     securableObjects.add(schemaObject);
     SecurableObject tableObject =
         SecurableObjects.ofTable(
@@ -586,9 +769,13 @@ public class IcebergViewAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   private void setSchemaOwner(String userName) {
+    setSchemaOwner(SCHEMA_NAME, userName);
+  }
+
+  private void setSchemaOwner(String schema, String userName) {
     MetadataObject schemaMetadataObject =
         MetadataObjects.of(
-            Arrays.asList(GRAVITINO_CATALOG_NAME, SCHEMA_NAME), MetadataObject.Type.SCHEMA);
+            Arrays.asList(GRAVITINO_CATALOG_NAME, schema), MetadataObject.Type.SCHEMA);
     metalakeClientWithAllPrivilege.setOwner(schemaMetadataObject, userName, Owner.Type.USER);
   }
 }
