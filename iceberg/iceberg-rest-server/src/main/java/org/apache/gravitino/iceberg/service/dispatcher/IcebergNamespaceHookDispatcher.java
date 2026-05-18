@@ -38,6 +38,8 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
@@ -137,23 +139,53 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
 
   @Override
   public void dropNamespace(IcebergRequestContext context, Namespace namespace) {
-    dispatcher.dropNamespace(context, namespace);
+    String catalogName = context.catalogName();
+    // Same top-level branch lock as createNamespace, so cascading parent-drop stays atomic
+    // against concurrent creates that might be adding children under our ancestors.
+    TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(metalake, catalogName, namespace.level(0)),
+        LockType.WRITE,
+        () -> {
+          dispatcher.dropNamespace(context, namespace);
+          deleteSchemaEntity(catalogName, namespace);
 
-    // Clean up the schema from Gravitino's entity store after successful drop
+          // Cascade up: drop ancestor namespaces that are now empty so namespaces auto-created
+          // on insertSchema don't outlive their last child. Walk innermost-to-outermost; stop
+          // as soon as an ancestor still has children (NamespaceNotEmptyException). On
+          // NoSuchNamespaceException the ancestor is a Gravitino-only phantom (some Iceberg
+          // backends don't materialize intermediate namespaces) — fall through to delete the
+          // stale Gravitino row.
+          String separator = HierarchicalSchemaUtil.schemaSeparator();
+          String namespaceName = String.join(separator, namespace.levels());
+          List<String> ancestorNames =
+              HierarchicalSchemaUtil.getAncestorNames(namespaceName, separator);
+          for (int i = ancestorNames.size() - 1; i >= 0; i--) {
+            Namespace ancestor = Namespace.of(ancestorNames.get(i).split(Pattern.quote(separator)));
+            try {
+              dispatcher.dropNamespace(context, ancestor);
+            } catch (NamespaceNotEmptyException notEmpty) {
+              break;
+            } catch (NoSuchNamespaceException missing) {
+              // Phantom — fall through to clean up Gravitino-side row.
+            }
+            deleteSchemaEntity(catalogName, ancestor);
+          }
+          return null;
+        });
+  }
+
+  private void deleteSchemaEntity(String catalogName, Namespace namespace) {
     EntityStore store = GravitinoEnv.getInstance().entityStore();
+    if (store == null) {
+      return;
+    }
     try {
-      if (store != null) {
-        // Delete the entity for the dropped namespace (schema).
-        store.delete(
-            IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                metalake,
-                context.catalogName(),
-                namespace,
-                HierarchicalSchemaUtil.schemaSeparator()),
-            Entity.EntityType.SCHEMA);
-      }
+      store.delete(
+          IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+              metalake, catalogName, namespace, HierarchicalSchemaUtil.schemaSeparator()),
+          Entity.EntityType.SCHEMA);
     } catch (NoSuchEntityException ignore) {
-      // Ignore if the schema entity does not exist.
+      // Already gone in Gravitino.
     } catch (IOException ioe) {
       throw new RuntimeException("io exception when deleting schema entity", ioe);
     }

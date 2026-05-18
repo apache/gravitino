@@ -32,6 +32,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -45,6 +47,8 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.TreeLock;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
@@ -64,6 +68,7 @@ public class TestIcebergNamespaceHookDispatcher {
   private IcebergNamespaceHookDispatcher hookDispatcher;
   private IcebergNamespaceOperationDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
+  private EntityStore mockEntityStore;
   private LockManager mockLockManager;
   private IcebergRequestContext mockContext;
 
@@ -78,6 +83,9 @@ public class TestIcebergNamespaceHookDispatcher {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "schemaDispatcher", mockSchemaDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", mockTableDispatcher, true);
+
+    mockEntityStore = mock(EntityStore.class);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", mockEntityStore, true);
 
     mockLockManager = mock(LockManager.class);
     TreeLock mockTreeLock = mock(TreeLock.class);
@@ -101,6 +109,7 @@ public class TestIcebergNamespaceHookDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", null, true);
 
     Class<?> holderClass =
@@ -247,5 +256,66 @@ public class TestIcebergNamespaceHookDispatcher {
     Assertions.assertEquals(
         Arrays.asList(TEST_CATALOG + ".A:B", TEST_CATALOG + ".A:B:C", TEST_CATALOG + ".A:B:C:D"),
         names);
+  }
+
+  @Test
+  public void testDropNamespaceCascadesDropsEmptyAncestors() throws Exception {
+    // Drop A:B:C; both A:B and A are empty afterwards, so both should be dropped from Iceberg
+    // (via dispatcher) and from Gravitino's entity store.
+    Namespace leaf = Namespace.of("A", "B", "C");
+    Namespace parent = Namespace.of("A", "B");
+    Namespace grandparent = Namespace.of("A");
+
+    hookDispatcher.dropNamespace(mockContext, leaf);
+
+    verify(mockDispatcher).dropNamespace(mockContext, leaf);
+    verify(mockDispatcher).dropNamespace(mockContext, parent);
+    verify(mockDispatcher).dropNamespace(mockContext, grandparent);
+    // Three Gravitino deletes: leaf + 2 ancestors.
+    verify(mockEntityStore, org.mockito.Mockito.times(3))
+        .delete(any(NameIdentifier.class), eq(Entity.EntityType.SCHEMA));
+  }
+
+  @Test
+  public void testDropNamespaceStopsCascadeOnNonEmptyAncestor() throws Exception {
+    // Drop A:B:C; A:B still has another child (A:B:D). dispatcher.dropNamespace(A:B) throws
+    // NamespaceNotEmptyException → cascade stops, A is NOT probed.
+    Namespace leaf = Namespace.of("A", "B", "C");
+    Namespace parent = Namespace.of("A", "B");
+    Namespace grandparent = Namespace.of("A");
+
+    doThrow(new NamespaceNotEmptyException("A:B not empty"))
+        .when(mockDispatcher)
+        .dropNamespace(mockContext, parent);
+
+    hookDispatcher.dropNamespace(mockContext, leaf);
+
+    verify(mockDispatcher).dropNamespace(mockContext, leaf);
+    verify(mockDispatcher).dropNamespace(mockContext, parent);
+    verify(mockDispatcher, never()).dropNamespace(mockContext, grandparent);
+    // Only the leaf's Gravitino row is deleted; A:B/A remain because A:B still has children.
+    verify(mockEntityStore, org.mockito.Mockito.times(1))
+        .delete(any(NameIdentifier.class), eq(Entity.EntityType.SCHEMA));
+  }
+
+  @Test
+  public void testDropNamespaceCleansUpPhantomAncestorGravitinoRow() throws Exception {
+    // Drop A:B; the Iceberg backend never materialized the parent A (NoSuchNamespaceException
+    // on the cascade attempt), but A's Gravitino entity row is a phantom from insertSchema's
+    // ancestor split. The hook should still delete the Gravitino row for A.
+    Namespace leaf = Namespace.of("A", "B");
+    Namespace parent = Namespace.of("A");
+
+    doThrow(new NoSuchNamespaceException("A not materialized"))
+        .when(mockDispatcher)
+        .dropNamespace(mockContext, parent);
+
+    hookDispatcher.dropNamespace(mockContext, leaf);
+
+    verify(mockDispatcher).dropNamespace(mockContext, leaf);
+    verify(mockDispatcher).dropNamespace(mockContext, parent);
+    // Two Gravitino deletes: leaf + phantom parent.
+    verify(mockEntityStore, org.mockito.Mockito.times(2))
+        .delete(any(NameIdentifier.class), eq(Entity.EntityType.SCHEMA));
   }
 }
