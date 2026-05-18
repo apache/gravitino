@@ -63,8 +63,8 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     assertEquals(1, idpGroupMetaMapper.softDeleteIdpGroup(1L));
     assertNull(idpGroupMetaMapper.selectIdpGroup("dev"));
     assertTrue(queryLongValue("idp_group_meta", "deleted_at", "group_id", 1L) > 0L);
-    assertEquals(2L, queryLongValue("idp_group_meta", "current_version", "group_id", 1L));
-    assertEquals(1L, queryLongValue("idp_group_meta", "last_version", "group_id", 1L));
+    assertEquals(1L, queryLongValue("idp_group_meta", "current_version", "group_id", 1L));
+    assertEquals(0L, queryLongValue("idp_group_meta", "last_version", "group_id", 1L));
   }
 
   @ParameterizedTest

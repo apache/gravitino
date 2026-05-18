@@ -21,4 +21,11 @@ package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
 
-public class IdpGroupMetaH2Provider extends IdpGroupMetaBaseSQLProvider {}
+/** SQL provider for IdP group metadata statements on H2 backends. */
+public class IdpGroupMetaH2Provider extends IdpGroupMetaBaseSQLProvider {
+
+  @Override
+  protected String currentTimeMillisExpression() {
+    return "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
+  }
+}

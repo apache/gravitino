@@ -52,8 +52,6 @@ public class IdpGroupMetaBaseSQLProvider {
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " SET deleted_at = "
         + currentTimeMillisExpression()
-        + ", current_version = current_version + 1,"
-        + " last_version = last_version + 1"
         + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 
@@ -65,6 +63,6 @@ public class IdpGroupMetaBaseSQLProvider {
   }
 
   protected String currentTimeMillisExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return "(UNIX_TIMESTAMP() * 1000.0)";
   }
 }

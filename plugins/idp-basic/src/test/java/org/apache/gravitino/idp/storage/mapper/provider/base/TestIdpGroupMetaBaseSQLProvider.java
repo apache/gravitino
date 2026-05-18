@@ -26,19 +26,25 @@ import org.junit.jupiter.api.Test;
 public class TestIdpGroupMetaBaseSQLProvider {
 
   protected IdpGroupMetaBaseSQLProvider createProvider() {
-    return new IdpGroupMetaBaseSQLProvider();
+    return new IdpGroupMetaBaseSQLProvider() {
+      @Override
+      protected String currentTimeMillisExpression() {
+        return "CURRENT_TIME_MILLIS()";
+      }
+    };
   }
 
   protected String expectedDeleteAtClause() {
-    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return "deleted_at = CURRENT_TIME_MILLIS()";
   }
 
   protected String expectedDeleteIdpGroupMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_group_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+    return "DELETE FROM idp_group_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " LIMIT #{limit}";
   }
 
   @Test
-  public void testSelectIdpGroup() {
+  void testSelectIdpGroup() {
     String normalizedSql = createProvider().selectIdpGroup("group").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT group_id as groupId"));
@@ -48,7 +54,7 @@ public class TestIdpGroupMetaBaseSQLProvider {
   }
 
   @Test
-  public void testInsertIdpGroup() {
+  void testInsertIdpGroup() {
     String normalizedSql =
         createProvider().insertIdpGroup(newGroupPO()).replaceAll("\\s+", " ").trim();
 
@@ -63,22 +69,27 @@ public class TestIdpGroupMetaBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteIdpGroup() {
+  void testSoftDeleteIdpGroup() {
     String normalizedSql = createProvider().softDeleteIdpGroup(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_meta"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("current_version = current_version + 1"));
-    Assertions.assertTrue(normalizedSql.contains("last_version = last_version + 1"));
     Assertions.assertTrue(normalizedSql.contains("WHERE group_id = #{groupId} AND deleted_at = 0"));
   }
 
   @Test
-  public void testDeleteIdpGroupMetasByLegacyTimeline() {
+  void testDeleteIdpGroupMetasByLegacyTimeline() {
     String normalizedSql =
         createProvider().deleteIdpGroupMetasByLegacyTimeline(1L, 2).replaceAll("\\s+", " ").trim();
 
     Assertions.assertEquals(expectedDeleteIdpGroupMetasByLegacyTimelineSql(), normalizedSql);
+  }
+
+  @Test
+  void testCurrentTimeMillisExpression() {
+    Assertions.assertEquals(
+        "(UNIX_TIMESTAMP() * 1000.0)",
+        new IdpGroupMetaBaseSQLProvider().currentTimeMillisExpression());
   }
 
   private IdpGroupPO newGroupPO() {

@@ -19,23 +19,27 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
 
-import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
-import org.apache.gravitino.idp.storage.mapper.provider.base.TestIdpGroupMetaBaseSQLProvider;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class TestIdpGroupMetaPostgreSQLProvider extends TestIdpGroupMetaBaseSQLProvider {
+public class TestIdpGroupMetaPostgreSQLProvider {
 
-  @Override
-  protected IdpGroupMetaBaseSQLProvider createProvider() {
-    return new IdpGroupMetaPostgreSQLProvider();
+  @Test
+  void testCurrentTimeMillisExpression() {
+    IdpGroupMetaPostgreSQLProvider provider = new IdpGroupMetaPostgreSQLProvider();
+
+    Assertions.assertEquals(
+        "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)",
+        provider.currentTimeMillisExpression());
   }
 
-  @Override
-  protected String expectedDeleteAtClause() {
-    return "deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
-  }
+  @Test
+  void testDeleteIdpGroupMetasByLegacyTimeline() {
+    IdpGroupMetaPostgreSQLProvider provider = new IdpGroupMetaPostgreSQLProvider();
 
-  @Override
-  protected String expectedDeleteIdpGroupMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_group_meta WHERE group_id IN (SELECT group_id FROM idp_group_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+    Assertions.assertEquals(
+        "DELETE FROM idp_group_meta WHERE group_id IN (SELECT group_id FROM idp_group_meta"
+            + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})",
+        provider.deleteIdpGroupMetasByLegacyTimeline(1L, 2));
   }
 }

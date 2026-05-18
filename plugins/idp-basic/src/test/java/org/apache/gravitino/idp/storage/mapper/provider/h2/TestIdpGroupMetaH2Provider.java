@@ -19,13 +19,17 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
-import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
-import org.apache.gravitino.idp.storage.mapper.provider.base.TestIdpGroupMetaBaseSQLProvider;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class TestIdpGroupMetaH2Provider extends TestIdpGroupMetaBaseSQLProvider {
+class TestIdpGroupMetaH2Provider {
 
-  @Override
-  protected IdpGroupMetaBaseSQLProvider createProvider() {
-    return new IdpGroupMetaH2Provider();
+  @Test
+  void testCurrentTimeMillisExpression() {
+    IdpGroupMetaH2Provider provider = new IdpGroupMetaH2Provider();
+
+    Assertions.assertEquals(
+        "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())",
+        provider.currentTimeMillisExpression());
   }
 }
