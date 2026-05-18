@@ -113,6 +113,7 @@ public class HiveCatalogOperations
   // The maximum number of tables that can be returned by the listTableNamesByFilter function.
   // The default value is -1, which means that all tables are returned.
   private static final short MAX_TABLES = -1;
+  static final String ALL_TABLE_PATTERN = "*";
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
@@ -386,11 +387,22 @@ public class HiveCatalogOperations
       // then based on
       // those names we can obtain metadata for each individual table and get the type we needed.
       List<String> allTables = clientPool.run(c -> c.getAllTables(catalogName, schemaIdent.name()));
+      // Always filter out VIRTUAL_VIEW entries so they don't appear in table listings
+      List<String> views =
+          clientPool.run(
+              c ->
+                  c.listTablesByType(
+                      catalogName,
+                      schemaIdent.name(),
+                      ALL_TABLE_PATTERN,
+                      TableType.VIRTUAL_VIEW.name()));
+      allTables.removeAll(views);
+
       if (!listAllTables) {
         // The reason for using the listTableNamesByFilter function is that the
         // getTableObjectiesByName function has poor performance. Currently, we focus on the
         // Iceberg, Paimon and Hudi table. In the future, if necessary, we will need to filter out
-        // other tables. In addition, the current return also includes tables of type VIRTUAL-VIEW.
+        // other tables.
         String icebergAndPaimonFilter = getIcebergAndPaimonFilter();
         List<String> icebergAndPaimonTables =
             clientPool.run(
@@ -408,16 +420,6 @@ public class HiveCatalogOperations
                         catalogName, schemaIdent.name(), hudiFilter, MAX_TABLES));
         removeHudiTables(allTables, hudiTables);
       }
-
-      // Always filter out VIRTUAL_VIEW entries so they don't appear in table listings
-      String viewFilter =
-          String.format("%stableType like \"VIRTUAL_VIEW\"", HIVE_FILTER_FIELD_PARAMS);
-      List<String> views =
-          clientPool.run(
-              c ->
-                  c.listTableNamesByFilter(
-                      catalogName, schemaIdent.name(), viewFilter, MAX_TABLES));
-      allTables.removeAll(views);
 
       return allTables.stream()
           .map(tbName -> NameIdentifier.of(namespace, tbName))

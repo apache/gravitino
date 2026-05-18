@@ -37,19 +37,26 @@ import static org.apache.gravitino.catalog.hive.TestHiveCatalog.HIVE_PROPERTIES_
 import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyShort;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
@@ -829,6 +836,66 @@ class TestHiveCatalogOperations {
         Assertions.assertThrows(
             RuntimeException.class, () -> op.dropView(NameIdentifier.of("db", "v1")));
     Assertions.assertTrue(exception.getMessage().contains("Failed to drop Hive view"));
+  }
+
+  @Test
+  void testListTablesFiltersViewsWithHiveTableTypeField() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(ImmutableMap.of(LIST_ALL_TABLES, "true"), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    when(hiveClient.getAllDatabases(anyString())).thenReturn(List.of("db"));
+    when(hiveClient.getAllTables(anyString(), anyString()))
+        .thenReturn(new ArrayList<>(List.of("v1", "t1")));
+    when(hiveClient.listTablesByType(anyString(), anyString(), anyString(), anyString()))
+        .thenReturn(List.of("v1"));
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    NameIdentifier[] tables = op.listTables(Namespace.of("metalake", "hive", "db"));
+
+    Assertions.assertEquals(1, tables.length);
+    Assertions.assertEquals("t1", tables[0].name());
+    verify(hiveClient).getAllTables(eq("hive"), eq("db"));
+    verify(hiveClient)
+        .listTablesByType(eq("hive"), eq("db"), eq("*"), eq(TableType.VIRTUAL_VIEW.name()));
+    verify(hiveClient, never())
+        .listTableNamesByFilter(anyString(), anyString(), anyString(), anyShort());
+  }
+
+  @Test
+  void testListViewsUsesTypeListing() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(ImmutableMap.of(LIST_ALL_TABLES, "true"), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    when(hiveClient.getAllDatabases(anyString())).thenReturn(List.of("db"));
+    when(hiveClient.listTablesByType(anyString(), anyString(), anyString(), anyString()))
+        .thenReturn(List.of("v1", "v2"));
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    NameIdentifier[] views = op.listViews(Namespace.of("metalake", "hive", "db"));
+
+    Assertions.assertEquals(2, views.length);
+    verify(hiveClient)
+        .listTablesByType(eq("hive"), eq("db"), eq("*"), eq(TableType.VIRTUAL_VIEW.name()));
+    verify(hiveClient, never()).getAllTables(anyString(), anyString());
+    verify(hiveClient, never()).getTable(anyString(), anyString(), anyString());
+    verify(hiveClient, never())
+        .listTableNamesByFilter(anyString(), anyString(), anyString(), anyShort());
   }
 
   @Test

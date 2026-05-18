@@ -422,6 +422,16 @@ public class CatalogHiveViewIT extends BaseIT {
       String normalizedSql = representation.sql().toLowerCase(Locale.ROOT);
       Assertions.assertTrue(normalizedSql.contains("select id, name"));
       Assertions.assertTrue(normalizedSql.contains(tableName.toLowerCase(Locale.ROOT)));
+
+      NameIdentifier[] views = viewCatalog.listViews(Namespace.of(schemaName));
+      boolean found = false;
+      for (NameIdentifier view : views) {
+        if (view.name().equals(viewName)) {
+          found = true;
+          break;
+        }
+      }
+      Assertions.assertTrue(found, "view created by Hive CLI not found in listViews");
     } finally {
       executeHiveSql(String.format("DROP VIEW IF EXISTS %s", qualifiedViewName));
       executeHiveSql(String.format("DROP TABLE IF EXISTS %s", qualifiedTableName));

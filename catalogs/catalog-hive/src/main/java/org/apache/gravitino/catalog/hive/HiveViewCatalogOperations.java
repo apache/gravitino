@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import static org.apache.gravitino.catalog.hive.HiveCatalogOperations.ALL_TABLE_PATTERN;
 import static org.apache.gravitino.catalog.hive.HiveConstants.COMMENT;
-import static org.apache.gravitino.catalog.hive.HiveConstants.HIVE_FILTER_FIELD_PARAMS;
 import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
 
 import com.google.common.base.Preconditions;
@@ -55,7 +55,6 @@ import org.slf4j.LoggerFactory;
 
 class HiveViewCatalogOperations implements ViewCatalog {
   private static final Logger LOG = LoggerFactory.getLogger(HiveViewCatalogOperations.class);
-  private static final short MAX_TABLES = -1;
 
   private final Supplier<CachedClientPool> clientPoolSupplier;
   private final Supplier<String> catalogNameSupplier;
@@ -77,14 +76,15 @@ class HiveViewCatalogOperations implements ViewCatalog {
       throw new NoSuchSchemaException("Schema %s does not exist", namespace);
     }
     try {
-      String viewFilter =
-          String.format("%stableType like \"VIRTUAL_VIEW\"", HIVE_FILTER_FIELD_PARAMS);
       List<String> views =
           clientPool()
               .run(
                   c ->
-                      c.listTableNamesByFilter(
-                          catalogName(), schemaIdent.name(), viewFilter, MAX_TABLES));
+                      c.listTablesByType(
+                          catalogName(),
+                          schemaIdent.name(),
+                          ALL_TABLE_PATTERN,
+                          TableType.VIRTUAL_VIEW.name()));
       return views.stream()
           .map(name -> NameIdentifier.of(namespace, name))
           .toArray(NameIdentifier[]::new);

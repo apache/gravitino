@@ -115,9 +115,6 @@ public class HiveTableConverter {
 
     // VIRTUAL_VIEW tables may have a minimal or absent StorageDescriptor — skip SD fields.
     if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(table.getTableType())) {
-      // Remove the HMS-internal "tableType" key added by Gravitino; the canonical TABLE_TYPE
-      // property (key "table-type") is set above via table.getTableType().
-      properties.remove("tableType");
       return properties;
     }
 
@@ -286,12 +283,6 @@ public class HiveTableConverter {
       parameters.put(EXTERNAL, "TRUE");
     } else {
       parameters.put(EXTERNAL, "FALSE");
-    }
-
-    // Add the HMS-native "tableType" key so listTableNamesByFilter can find VIRTUAL_VIEWs.
-    // HMS stores table type in TBLS.TBL_TYPE but the filter queries TABLE_PARAMS key "tableType".
-    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(table.properties().get(TABLE_TYPE))) {
-      parameters.put("tableType", TableType.VIRTUAL_VIEW.name());
     }
 
     parameters.remove(LOCATION);
