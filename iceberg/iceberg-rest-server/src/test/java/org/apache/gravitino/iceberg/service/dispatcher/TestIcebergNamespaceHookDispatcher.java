@@ -19,15 +19,24 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
@@ -45,6 +54,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 public class TestIcebergNamespaceHookDispatcher {
 
@@ -55,6 +65,7 @@ public class TestIcebergNamespaceHookDispatcher {
   private IcebergNamespaceHookDispatcher hookDispatcher;
   private IcebergNamespaceOperationDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
+  private LockManager mockLockManager;
   private IcebergRequestContext mockContext;
 
   @BeforeEach
@@ -69,7 +80,7 @@ public class TestIcebergNamespaceHookDispatcher {
         GravitinoEnv.getInstance(), "schemaDispatcher", mockSchemaDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", mockTableDispatcher, true);
 
-    LockManager mockLockManager = mock(LockManager.class);
+    mockLockManager = mock(LockManager.class);
     TreeLock mockTreeLock = mock(TreeLock.class);
     when(mockLockManager.createTreeLock(any())).thenReturn(mockTreeLock);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", mockLockManager, true);
@@ -187,5 +198,79 @@ public class TestIcebergNamespaceHookDispatcher {
 
     Assertions.assertEquals("Import failed", thrown.getMessage());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testCreateNamespaceLocksTopLevelBranchRoot() {
+    // Lock target must be the top-level branch root (metalake.catalog.A), not the catalog —
+    // that's what lets disjoint top-level branches create in parallel.
+    Namespace leaf = Namespace.of("A", "B", "C");
+    CreateNamespaceRequest request = mock(CreateNamespaceRequest.class);
+    when(request.namespace()).thenReturn(leaf);
+    when(mockDispatcher.createNamespace(mockContext, request))
+        .thenReturn(mock(CreateNamespaceResponse.class));
+
+    hookDispatcher.createNamespace(mockContext, request);
+
+    ArgumentCaptor<NameIdentifier> lockId = ArgumentCaptor.forClass(NameIdentifier.class);
+    verify(mockLockManager).createTreeLock(lockId.capture());
+    Assertions.assertArrayEquals(
+        new String[] {TEST_METALAKE, TEST_CATALOG}, lockId.getValue().namespace().levels());
+    Assertions.assertEquals("A", lockId.getValue().name());
+  }
+
+  @Test
+  public void testGetMissingAncestorsBinarySearchProbeCount() {
+    // Depth-5 leaf, only the outermost ancestor "A" exists. Linear short-circuit would need 4
+    // probes (innermost-to-outermost until we hit A). Binary search should need 3 (ceil log2 5).
+    Namespace leaf = Namespace.of("A", "B", "C", "D", "E");
+    Set<String> existing = ImmutableSet.of("A");
+    when(mockDispatcher.namespaceExists(eq(mockContext), any(Namespace.class)))
+        .thenAnswer(
+            inv -> {
+              Namespace ns = inv.getArgument(1, Namespace.class);
+              return existing.contains(String.join(":", ns.levels()));
+            });
+
+    CreateNamespaceRequest request = mock(CreateNamespaceRequest.class);
+    when(request.namespace()).thenReturn(leaf);
+    when(mockDispatcher.createNamespace(mockContext, request))
+        .thenReturn(mock(CreateNamespaceResponse.class));
+
+    hookDispatcher.createNamespace(mockContext, request);
+
+    // 4 ancestors (A, A:B, A:B:C, A:B:C:D). Binary search probes <= ceil(log2(5)) = 3.
+    verify(mockDispatcher, atMost(3)).namespaceExists(eq(mockContext), any(Namespace.class));
+  }
+
+  @Test
+  public void testCreateNestedNamespaceOwnsOnlyMissingAncestorsAndLeaf() {
+    // Depth-4 leaf, only A exists. Expect setOwners with [A:B, A:B:C, A:B:C:D] —
+    // missing ancestors (outermost first) + leaf; existing A is not re-owned.
+    Namespace leaf = Namespace.of("A", "B", "C", "D");
+    Set<String> existing = ImmutableSet.of("A");
+    when(mockDispatcher.namespaceExists(eq(mockContext), any(Namespace.class)))
+        .thenAnswer(
+            inv -> {
+              Namespace ns = inv.getArgument(1, Namespace.class);
+              return existing.contains(String.join(":", ns.levels()));
+            });
+
+    CreateNamespaceRequest request = mock(CreateNamespaceRequest.class);
+    when(request.namespace()).thenReturn(leaf);
+    when(mockDispatcher.createNamespace(mockContext, request))
+        .thenReturn(mock(CreateNamespaceResponse.class));
+
+    hookDispatcher.createNamespace(mockContext, request);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<MetadataObject>> captor = ArgumentCaptor.forClass(List.class);
+    verify(mockOwnerDispatcher)
+        .setOwners(eq(TEST_METALAKE), captor.capture(), eq(TEST_USER), eq(Owner.Type.USER));
+    List<String> names =
+        captor.getValue().stream().map(MetadataObject::fullName).collect(Collectors.toList());
+    Assertions.assertEquals(
+        Arrays.asList(TEST_CATALOG + ".A:B", TEST_CATALOG + ".A:B:C", TEST_CATALOG + ".A:B:C:D"),
+        names);
   }
 }

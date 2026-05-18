@@ -20,7 +20,6 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.apache.gravitino.Entity;
@@ -68,10 +67,11 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
       IcebergRequestContext context, CreateNamespaceRequest createRequest) {
     String catalogName = context.catalogName();
     Namespace leaf = createRequest.namespace();
-    // Catalog-level write lock keeps the pre-probe and create atomic, so two concurrent callers
-    // creating overlapping nested paths can't both claim ownership of the same ancestor.
+    // Lock the top-level branch root rather than the whole catalog: any race on shared ancestor
+    // ownership has to share leaf.level(0), so serializing per top-level branch is sufficient
+    // and lets disjoint branches (e.g. A:... and X:...) create in parallel.
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(metalake, catalogName),
+        NameIdentifier.of(metalake, catalogName, leaf.level(0)),
         LockType.WRITE,
         () -> {
           // Pre-probe so we only claim ownership of truly-new ancestors, never overwriting
@@ -100,29 +100,40 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
 
   /**
    * Returns all ancestor namespaces of {@code namespace} that do not currently exist in the
-   * catalog. Uses {@link HierarchicalSchemaUtil#getAncestorNames} (the same utility as the
-   * Gravitino REST API side) so the prefix-enumeration algorithm is shared.
+   * catalog, outermost-to-innermost. Uses {@link HierarchicalSchemaUtil#getAncestorNames} (the same
+   * utility as the Gravitino REST API side) so the prefix-enumeration algorithm is shared.
    *
-   * <p>For example, if {@code namespace} is {@code Namespace.of("A","B","C")} and only {@code
-   * Namespace.of("A")} already exists, this returns {@code [Namespace.of("A","B")]}.
+   * <p>Existence is monotonic across the chain (an inner ancestor existing implies all its outer
+   * ancestors exist), so we binary-search the boundary: O(log N) {@code namespaceExists} probes
+   * instead of O(N) in the worst case. Example: for {@code Namespace.of("A","B","C","D")} with only
+   * {@code A} existing, the result is {@code [A:B, A:B:C]}.
    */
   private List<Namespace> getMissingAncestors(IcebergRequestContext context, Namespace namespace) {
     String separator = HierarchicalSchemaUtil.schemaSeparator();
     String namespaceName = String.join(separator, namespace.levels());
     List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(namespaceName, separator);
-    // Iterate from innermost ancestor outward: in the hierarchical schema model the existence
-    // of an inner ancestor implies the existence of all its outer ancestors, so we can stop
-    // probing once we hit one that exists.
-    List<Namespace> missing = new ArrayList<>();
-    for (int i = ancestorNames.size() - 1; i >= 0; i--) {
-      Namespace ancestor = Namespace.of(ancestorNames.get(i).split(Pattern.quote(separator)));
-      if (dispatcher.namespaceExists(context, ancestor)) {
-        break;
-      }
-      missing.add(ancestor);
+    if (ancestorNames.isEmpty()) {
+      return new ArrayList<>();
     }
-    // Reverse so the result is outermost-to-innermost (the order callers consume).
-    Collections.reverse(missing);
+    // Find the largest index i with namespaceExists(ancestors[i]) == true. Everything past that
+    // is missing. -1 means even the outermost ancestor is missing.
+    int lo = 0;
+    int hi = ancestorNames.size() - 1;
+    int lastExisting = -1;
+    while (lo <= hi) {
+      int mid = (lo + hi) >>> 1;
+      Namespace candidate = Namespace.of(ancestorNames.get(mid).split(Pattern.quote(separator)));
+      if (dispatcher.namespaceExists(context, candidate)) {
+        lastExisting = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    List<Namespace> missing = new ArrayList<>(ancestorNames.size() - lastExisting - 1);
+    for (int i = lastExisting + 1; i < ancestorNames.size(); i++) {
+      missing.add(Namespace.of(ancestorNames.get(i).split(Pattern.quote(separator))));
+    }
     return missing;
   }
 
