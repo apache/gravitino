@@ -190,4 +190,26 @@ public class TestCredentialFactory {
     Assertions.assertEquals(storageAccountKey, azureAccountKeyCredential.accountKey());
     Assertions.assertEquals(expireTime, azureAccountKeyCredential.expireTimeInMs());
   }
+
+  @Test
+  void testJdbcCredential() {
+    String jdbcUser = "test-user";
+    String jdbcPassword = "test-password";
+    Map<String, String> jdbcCredentialInfo =
+        ImmutableMap.of(
+            JdbcCredential.GRAVITINO_JDBC_USER,
+            jdbcUser,
+            JdbcCredential.GRAVITINO_JDBC_PASSWORD,
+            jdbcPassword);
+    long expireTime = 0;
+    Credential credential =
+        CredentialFactory.create(
+            JdbcCredential.JDBC_CREDENTIAL_TYPE, jdbcCredentialInfo, expireTime);
+    Assertions.assertEquals(JdbcCredential.JDBC_CREDENTIAL_TYPE, credential.credentialType());
+    Assertions.assertInstanceOf(JdbcCredential.class, credential);
+    JdbcCredential jdbcCredential = (JdbcCredential) credential;
+    Assertions.assertEquals(jdbcUser, jdbcCredential.jdbcUser());
+    Assertions.assertEquals(jdbcPassword, jdbcCredential.jdbcPassword());
+    Assertions.assertEquals(expireTime, jdbcCredential.expireTimeInMs());
+  }
 }

@@ -33,7 +33,14 @@ CREATE SCHEMA catalog.schema_name
 ### Create table
 
 The Apache Gravitino Trino connector currently supports basic Iceberg table creation statements, such as defining fields,
-allowing null values, and adding comments. The Apache Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
+allowing null values, and adding comments. The Apache Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
+
+:::note
+`CREATE OR REPLACE TABLE AS SELECT` is not supported. The Iceberg connector caches the table's UUID
+at query-plan time; dropping and recreating the table inside the same transaction causes the
+subsequent insert phase to detect a UUID mismatch and fail. Use `DROP TABLE` followed by
+`CREATE TABLE AS SELECT` as an alternative.
+:::
 
 The following example shows how to create a table in the Iceberg catalog:
 
