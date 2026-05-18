@@ -260,7 +260,8 @@ public class TestIcebergNamespaceHookDispatcher {
   public void testDropNamespaceCleansUpAllPhantomAncestorRows() throws Exception {
     // Drop A:B:C. Neither A nor A:B exists in Iceberg (the backend never materialized them),
     // so both rows are Gravitino-side phantoms. dispatcher.dropNamespace is only called for the
-    // requested target; ancestor cleanup is purely entity-store side.
+    // requested target; ancestor cleanup is a single batchDelete(cascade=true) covering the
+    // leaf plus both phantom ancestors.
     Namespace leaf = Namespace.of("A", "B", "C");
     Namespace parent = Namespace.of("A", "B");
     Namespace grandparent = Namespace.of("A");
@@ -270,16 +271,21 @@ public class TestIcebergNamespaceHookDispatcher {
     verify(mockDispatcher).dropNamespace(mockContext, leaf);
     verify(mockDispatcher, never()).dropNamespace(mockContext, parent);
     verify(mockDispatcher, never()).dropNamespace(mockContext, grandparent);
-    // Three Gravitino deletes: leaf + 2 phantom ancestors.
-    verify(mockEntityStore, org.mockito.Mockito.times(3))
-        .delete(any(NameIdentifier.class), eq(Entity.EntityType.SCHEMA));
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<org.apache.commons.lang3.tuple.Pair<NameIdentifier, Entity.EntityType>>>
+        captor = ArgumentCaptor.forClass(List.class);
+    verify(mockEntityStore, org.mockito.Mockito.times(1)).batchDelete(captor.capture(), eq(true));
+    List<String> deletedNames =
+        captor.getValue().stream().map(p -> p.getLeft().name()).collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("A:B:C", "A:B", "A"), deletedNames);
   }
 
   @Test
   public void testDropNamespaceStopsCleanupOnExistingAncestor() throws Exception {
     // Drop A:B:C; A:B still exists in Iceberg as a real namespace, so its Gravitino row stays.
     // By the child-exists-implies-parent-exists invariant, A is therefore also live and not
-    // probed.
+    // probed. The single batchDelete covers only the leaf.
     Namespace leaf = Namespace.of("A", "B", "C");
     Namespace parent = Namespace.of("A", "B");
     Namespace grandparent = Namespace.of("A");
@@ -293,8 +299,13 @@ public class TestIcebergNamespaceHookDispatcher {
     verify(mockDispatcher, never()).dropNamespace(mockContext, grandparent);
     verify(mockDispatcher).namespaceExists(mockContext, parent);
     verify(mockDispatcher, never()).namespaceExists(mockContext, grandparent);
-    // Only the leaf's Gravitino row is deleted.
-    verify(mockEntityStore, org.mockito.Mockito.times(1))
-        .delete(any(NameIdentifier.class), eq(Entity.EntityType.SCHEMA));
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<org.apache.commons.lang3.tuple.Pair<NameIdentifier, Entity.EntityType>>>
+        captor = ArgumentCaptor.forClass(List.class);
+    verify(mockEntityStore, org.mockito.Mockito.times(1)).batchDelete(captor.capture(), eq(true));
+    List<String> deletedNames =
+        captor.getValue().stream().map(p -> p.getLeft().name()).collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("A:B:C"), deletedNames);
   }
 }
