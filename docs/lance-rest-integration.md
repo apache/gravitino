@@ -29,10 +29,22 @@ The following table outlines the tested compatibility between Gravitino versions
 - These version ranges show which versions are expected to work together.
 - For Gravitino 1.3.0, the explicitly verified release versions are
   `lance-spark` {0.1.0, 0.1.1, 0.2.0, 0.4.0} and `lance-ray`
-  {0.3.0, 0.4.2}. lance-ray 0.2.0 and earlier are *not* supported on 1.3.0
-  because pip resolves them with an older `lance-namespace` whose request
-  schema is incompatible with the upgraded server-side `lance-namespace-core`
-  (0.7.5+).
+  {0.3.0, 0.4.2}.
+- **lance-ray 0.2.0 and earlier are not supported on Gravitino 1.3.0.** They
+  install cleanly when `lance-namespace==0.7.5` is pinned, but the
+  `tests/integration/test_lance_ray.py` end-to-end run fails before reaching
+  the server with two distinct breakages:
+  - `lance-ray 0.1.0` exposes `write_lance(... namespace=<LanceNamespace>)`,
+    whereas the 0.2.0+ test path uses the new
+    `write_lance(... namespace_impl="rest", namespace_properties={...})`
+    signature. Calling it on 0.1.0 raises
+    `TypeError: write_lance() got an unexpected keyword argument 'namespace_impl'`.
+  - `lance-ray 0.2.0` matches the new signature, but at runtime
+    `lance_ray.utils.create_storage_options_provider` does
+    `from lance import LanceNamespaceStorageOptionsProvider`, which no longer
+    exists in the `pylance` 6.0.0 wheel that `lance-namespace==0.7.5` pulls
+    in, raising `ImportError: cannot import name
+    'LanceNamespaceStorageOptionsProvider' from 'lance'`.
 - Before using in production, please test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
