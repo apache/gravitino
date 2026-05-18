@@ -625,7 +625,7 @@ final class GlueIcebergTableHelper {
    * Extracts an integer parameter from an Iceberg transform string (e.g. "bucket[16]" or
    * "truncate[8]").
    *
-   * <p>TODO: Replace with typed Iceberg Transform API when available.
+   * <p>Iceberg does not expose transform parameters through a typed API, so string parsing is used.
    */
   private static int extractTransformParam(String transformStr) {
     String param = transformStr.replaceAll(".*\\[(\\d+)\\]", "$1");
