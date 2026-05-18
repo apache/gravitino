@@ -55,11 +55,18 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 class TestAwsGlueCatalogOperations {
 
   private static GlueCatalogOperations ops;
+  private static String s3TestBucket;
   private static final String TEST_SCHEMA = "aws_glue_ops_it_" + System.currentTimeMillis();
   private static final Namespace NS = Namespace.of("metalake", "catalog");
 
   @BeforeAll
   static void setup() {
+    s3TestBucket = System.getenv("AWS_S3_TEST_BUCKET");
+    if (s3TestBucket == null || s3TestBucket.isEmpty()) {
+      throw new IllegalStateException(
+          "AWS_S3_TEST_BUCKET is not set. Set it to a writable S3 bucket for Iceberg integration tests.");
+    }
+
     Map<String, String> config = new HashMap<>();
     config.put(
         GlueConstants.AWS_REGION, System.getenv().getOrDefault("AWS_DEFAULT_REGION", "us-east-1"));
@@ -134,7 +141,7 @@ class TestAwsGlueCatalogOperations {
     Column col = Column.of("id", Types.LongType.get(), "pk", false, false, null);
     Map<String, String> props = new HashMap<>();
     props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.LOCATION, "s3://ice-glue-test-01/iceberg/" + tableName);
+    props.put(GlueConstants.LOCATION, "s3://" + s3TestBucket + "/iceberg/" + tableName);
 
     try {
       Table created =
@@ -169,7 +176,7 @@ class TestAwsGlueCatalogOperations {
     Column col = Column.of("id", Types.LongType.get(), "pk", false, false, null);
     Map<String, String> props = new HashMap<>();
     props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.LOCATION, "s3://ice-glue-test-01/iceberg/" + tableName);
+    props.put(GlueConstants.LOCATION, "s3://" + s3TestBucket + "/iceberg/" + tableName);
 
     try {
       ops.createTable(
@@ -202,7 +209,7 @@ class TestAwsGlueCatalogOperations {
     Column col = Column.of("id", Types.LongType.get(), "pk", false, false, null);
     Map<String, String> props = new HashMap<>();
     props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.LOCATION, "s3://ice-glue-test-01/iceberg/" + tableName);
+    props.put(GlueConstants.LOCATION, "s3://" + s3TestBucket + "/iceberg/" + tableName);
 
     try {
       ops.createTable(

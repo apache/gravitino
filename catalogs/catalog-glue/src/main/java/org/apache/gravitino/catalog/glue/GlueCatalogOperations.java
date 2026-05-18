@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -65,7 +66,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.iceberg.catalog.Catalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.glue.GlueClient;
@@ -124,7 +124,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   @VisibleForTesting String defaultTableFormat;
 
   /** Iceberg SDK Glue catalog used for creating Iceberg-format tables. */
-  @VisibleForTesting Catalog icebergGlueCatalog;
+  @VisibleForTesting org.apache.iceberg.catalog.Catalog icebergGlueCatalog;
 
   private final GlueTypeConverter typeConverter = new GlueTypeConverter();
 
@@ -153,7 +153,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public void testConnection(
       NameIdentifier catalogIdent,
-      org.apache.gravitino.Catalog.Type type,
+      Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)
@@ -173,9 +173,9 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       glueClient.close();
       glueClient = null;
     }
-    if (icebergGlueCatalog instanceof AutoCloseable) {
+    if (icebergGlueCatalog instanceof AutoCloseable closeable) {
       try {
-        ((AutoCloseable) icebergGlueCatalog).close();
+        closeable.close();
       } catch (Exception e) {
         LOG.warn("Failed to close Iceberg GlueCatalog", e);
       }
@@ -382,7 +382,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         try {
           GlueIcebergTableHelper.loadTable(icebergGlueCatalog, dbName, ident.name(), table);
         } catch (Exception e) {
-          LOG.error(
+          LOG.warn(
               "Failed to load Iceberg metadata for table {}.{}. "
                   + "Partitioning and sort order information may be incomplete.",
               dbName,
@@ -535,7 +535,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
-        // RenameTable is not supported by Glue.
         throw new UnsupportedOperationException("Glue does not support table rename");
       } else if (change instanceof TableChange.UpdateComment) {
         newComment = ((TableChange.UpdateComment) change).getNewComment();

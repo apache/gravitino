@@ -18,7 +18,26 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import static org.apache.gravitino.rel.types.Types.BinaryType;
+import static org.apache.gravitino.rel.types.Types.BooleanType;
+import static org.apache.gravitino.rel.types.Types.ByteType;
+import static org.apache.gravitino.rel.types.Types.DateType;
+import static org.apache.gravitino.rel.types.Types.DecimalType;
+import static org.apache.gravitino.rel.types.Types.DoubleType;
+import static org.apache.gravitino.rel.types.Types.FixedCharType;
+import static org.apache.gravitino.rel.types.Types.FixedType;
+import static org.apache.gravitino.rel.types.Types.FloatType;
+import static org.apache.gravitino.rel.types.Types.IntegerType;
+import static org.apache.gravitino.rel.types.Types.LongType;
+import static org.apache.gravitino.rel.types.Types.ShortType;
+import static org.apache.gravitino.rel.types.Types.StringType;
+import static org.apache.gravitino.rel.types.Types.TimeType;
+import static org.apache.gravitino.rel.types.Types.TimestampType;
+import static org.apache.gravitino.rel.types.Types.UUIDType;
+import static org.apache.gravitino.rel.types.Types.VarCharType;
+
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -42,7 +61,6 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.NullOrder;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
@@ -52,8 +70,11 @@ import org.apache.iceberg.UpdateSchema;
 import org.apache.iceberg.aws.glue.GlueCatalog;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.expressions.UnboundTerm;
+import org.apache.iceberg.types.Types;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,7 +163,6 @@ final class GlueIcebergTableHelper {
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
     if (endpoint != null) {
       icebergProps.put(GLUE_ENDPOINT, endpoint);
-      icebergProps.put(IcebergConstants.ICEBERG_S3_ENDPOINT, endpoint);
     }
 
     if (accessKey != null && secretKey != null) {
@@ -253,10 +273,10 @@ final class GlueIcebergTableHelper {
           .withSortOrder(icebergSortOrder)
           .withProperties(tableProps)
           .create();
-    } catch (org.apache.iceberg.exceptions.AlreadyExistsException e) {
+    } catch (AlreadyExistsException e) {
       throw new org.apache.gravitino.exceptions.TableAlreadyExistsException(
           e, "Table %s.%s already exists", dbName, tableName);
-    } catch (org.apache.iceberg.exceptions.ValidationException e) {
+    } catch (ValidationException e) {
       throw new IllegalArgumentException("Invalid table definition: " + e.getMessage(), e);
     }
   }
@@ -375,8 +395,7 @@ final class GlueIcebergTableHelper {
    *
    * <p>Supports identity, year, month, day, hour, bucket, and truncate transforms.
    */
-  static Transform[] convertPartitionSpec(
-      org.apache.iceberg.PartitionSpec spec, org.apache.iceberg.Schema schema) {
+  static Transform[] convertPartitionSpec(PartitionSpec spec, Schema schema) {
     return spec.fields().stream()
         .map(
             field -> {
@@ -408,7 +427,7 @@ final class GlueIcebergTableHelper {
 
   /** Converts an Iceberg {@link org.apache.iceberg.SortOrder} to Gravitino {@link SortOrder}s. */
   static SortOrder[] convertIcebergSortOrder(
-      org.apache.iceberg.SortOrder iceSortOrder, org.apache.iceberg.Schema schema) {
+      org.apache.iceberg.SortOrder iceSortOrder, Schema schema) {
     if (iceSortOrder == null || iceSortOrder.fields().isEmpty()) {
       return new SortOrder[0];
     }
@@ -465,80 +484,74 @@ final class GlueIcebergTableHelper {
   // ---------------------------------------------------------------------------
 
   private static Schema toIcebergSchema(Column[] columns) {
-    List<org.apache.iceberg.types.Types.NestedField> fields = new java.util.ArrayList<>();
+    List<Types.NestedField> fields = new ArrayList<>();
     // Field IDs are assigned sequentially starting from 0. This is the Iceberg convention
     // for initial schema creation. Schema evolution reuses existing IDs from the table.
     for (int i = 0; i < columns.length; i++) {
       Column col = columns[i];
       org.apache.iceberg.types.Type icebergType = toIcebergType(col.dataType());
       if (col.nullable()) {
-        fields.add(
-            org.apache.iceberg.types.Types.NestedField.optional(
-                i, col.name(), icebergType, col.comment()));
+        fields.add(Types.NestedField.optional(i, col.name(), icebergType, col.comment()));
       } else {
-        fields.add(
-            org.apache.iceberg.types.Types.NestedField.required(
-                i, col.name(), icebergType, col.comment()));
+        fields.add(Types.NestedField.required(i, col.name(), icebergType, col.comment()));
       }
     }
     return new Schema(fields);
   }
 
   private static org.apache.iceberg.types.Type toIcebergType(Type type) {
-    if (type instanceof Types.BooleanType) {
-      return org.apache.iceberg.types.Types.BooleanType.get();
+    if (type instanceof BooleanType) {
+      return Types.BooleanType.get();
     }
-    if (type instanceof Types.ByteType
-        || type instanceof Types.ShortType
-        || type instanceof Types.IntegerType) {
-      return org.apache.iceberg.types.Types.IntegerType.get();
+    if (type instanceof ByteType || type instanceof ShortType || type instanceof IntegerType) {
+      return Types.IntegerType.get();
     }
-    if (type instanceof Types.LongType) {
-      return org.apache.iceberg.types.Types.LongType.get();
+    if (type instanceof LongType) {
+      return Types.LongType.get();
     }
-    if (type instanceof Types.FloatType) {
-      return org.apache.iceberg.types.Types.FloatType.get();
+    if (type instanceof FloatType) {
+      return Types.FloatType.get();
     }
-    if (type instanceof Types.DoubleType) {
-      return org.apache.iceberg.types.Types.DoubleType.get();
+    if (type instanceof DoubleType) {
+      return Types.DoubleType.get();
     }
-    if (type instanceof Types.StringType
-        || type instanceof Types.VarCharType
-        || type instanceof Types.FixedCharType) {
-      return org.apache.iceberg.types.Types.StringType.get();
+    if (type instanceof StringType
+        || type instanceof VarCharType
+        || type instanceof FixedCharType) {
+      return Types.StringType.get();
     }
-    if (type instanceof Types.DateType) {
-      return org.apache.iceberg.types.Types.DateType.get();
+    if (type instanceof DateType) {
+      return Types.DateType.get();
     }
-    if (type instanceof Types.TimeType) {
-      Types.TimeType timeType = (Types.TimeType) type;
+    if (type instanceof TimeType) {
+      TimeType timeType = (TimeType) type;
       if (!timeType.hasPrecisionSet() || timeType.precision() == 6) {
-        return org.apache.iceberg.types.Types.TimeType.get();
+        return Types.TimeType.get();
       }
       throw new IllegalArgumentException(
           "Iceberg only supports microsecond precision (6) for time type, got: "
               + timeType.precision());
     }
-    if (type instanceof Types.TimestampType) {
-      Types.TimestampType tsType = (Types.TimestampType) type;
+    if (type instanceof TimestampType) {
+      TimestampType tsType = (TimestampType) type;
       if (!tsType.hasPrecisionSet() || tsType.precision() == 6) {
         return tsType.hasTimeZone()
-            ? org.apache.iceberg.types.Types.TimestampType.withZone()
-            : org.apache.iceberg.types.Types.TimestampType.withoutZone();
+            ? Types.TimestampType.withZone()
+            : Types.TimestampType.withoutZone();
       }
       throw new IllegalArgumentException(
           "Iceberg only supports microsecond precision (6) for timestamp type, got: "
               + tsType.precision());
     }
-    if (type instanceof Types.DecimalType) {
-      Types.DecimalType dt = (Types.DecimalType) type;
-      return org.apache.iceberg.types.Types.DecimalType.of(dt.precision(), dt.scale());
+    if (type instanceof DecimalType) {
+      DecimalType dt = (DecimalType) type;
+      return Types.DecimalType.of(dt.precision(), dt.scale());
     }
-    if (type instanceof Types.BinaryType || type instanceof Types.FixedType) {
-      return org.apache.iceberg.types.Types.BinaryType.get();
+    if (type instanceof BinaryType || type instanceof FixedType) {
+      return Types.BinaryType.get();
     }
-    if (type instanceof Types.UUIDType) {
-      return org.apache.iceberg.types.Types.UUIDType.get();
+    if (type instanceof UUIDType) {
+      return Types.UUIDType.get();
     }
     throw new UnsupportedOperationException("Unsupported type for Iceberg: " + type.simpleString());
   }

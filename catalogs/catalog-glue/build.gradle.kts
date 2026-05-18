@@ -41,9 +41,9 @@ dependencies {
   implementation(libs.aws.sts)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
-  implementation(libs.iceberg.core)
   implementation(libs.iceberg.api)
   implementation(libs.iceberg.aws)
+  implementation(libs.iceberg.core)
   implementation(libs.slf4j.api)
 
   annotationProcessor(libs.lombok)

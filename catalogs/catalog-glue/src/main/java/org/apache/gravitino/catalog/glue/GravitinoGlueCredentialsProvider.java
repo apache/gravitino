@@ -39,6 +39,12 @@ class GravitinoGlueCredentialsProvider implements AwsCredentialsProvider {
   private final String accessKeyId;
   private final String secretAccessKey;
 
+  /**
+   * Creates a credentials provider from the given properties map.
+   *
+   * @param properties map containing {@code access-key-id} and {@code secret-access-key}
+   * @return a new {@link AwsCredentialsProvider} instance
+   */
   public static AwsCredentialsProvider create(Map<String, String> properties) {
     return new GravitinoGlueCredentialsProvider(
         properties.get(ACCESS_KEY_ID), properties.get(SECRET_ACCESS_KEY));
