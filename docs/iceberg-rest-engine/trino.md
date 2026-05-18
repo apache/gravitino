@@ -171,8 +171,8 @@ WITH (
 
 ### Trino does not support object names that differ only by letter case
 
-When Trino accesses Gravitino through the Iceberg REST catalog, it does not reliably distinguish
-schema or table names that differ only by letter case, such as `sales` and `Sales`.
+Trino does not reliably distinguish schema or table names that differ only by letter case, such as
+`sales` and `Sales`. This is a Trino limitation rather than behavior specific to Gravitino.
 
 For the best compatibility with Trino:
 
