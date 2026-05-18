@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
@@ -122,7 +123,12 @@ final class PaimonView implements View {
             PAIMON_VIEW_QUERY);
         query = sqlRepresentation.sql();
       } else {
-        dialectQueries.put(sqlRepresentation.dialect(), sqlRepresentation.sql());
+        String normalizedDialect = sqlRepresentation.dialect().toLowerCase(Locale.ROOT);
+        Preconditions.checkArgument(
+            !dialectQueries.containsKey(normalizedDialect),
+            "Only one representation per dialect is allowed (case-insensitive). Found duplicate: %s",
+            sqlRepresentation.dialect());
+        dialectQueries.put(normalizedDialect, sqlRepresentation.sql());
       }
     }
 

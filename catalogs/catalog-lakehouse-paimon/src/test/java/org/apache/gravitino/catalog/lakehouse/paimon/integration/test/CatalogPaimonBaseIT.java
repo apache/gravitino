@@ -61,7 +61,6 @@ import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
-import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -864,50 +863,26 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
 
   @Test
   void testSparkCreateViewAndLoadByGravitino() {
-    NameIdentifier baseTableIdentifier =
-        createSimplePaimonTableForViewInterop("spark_create_view_source_table");
     String viewName = GravitinoITUtils.genRandomName("spark_create_view");
     String viewIdentifier = String.join(".", schemaName, viewName);
-    String tableIdentifier = String.join(".", schemaName, baseTableIdentifier.name());
 
     ViewCatalog viewCatalog = catalog.asViewCatalog();
-    if (!isSparkViewInteropSupported()) {
-      Throwable throwable =
-          Assertions.assertThrows(
-              Throwable.class,
-              () -> {
-                spark.sql(
-                    String.format(
-                        "CREATE VIEW paimon.%s AS SELECT id, name FROM paimon.%s",
-                        viewIdentifier, tableIdentifier));
-                viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
-              });
-      assertViewInteropUnsupported(throwable);
-      return;
-    }
-
-    spark.sql(
-        String.format(
-            "CREATE VIEW paimon.%s AS SELECT id, name FROM paimon.%s",
-            viewIdentifier, tableIdentifier));
-
-    View loadedView = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
-    Assertions.assertEquals(viewName, loadedView.name());
-    Assertions.assertEquals(2, loadedView.columns().length);
-    Assertions.assertEquals("id", loadedView.columns()[0].name());
-    Assertions.assertEquals("name", loadedView.columns()[1].name());
-    Assertions.assertTrue(loadedView.representations().length > 0);
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> {
+          spark.sql(
+              String.format(
+                  "CREATE VIEW paimon.%s AS SELECT 1 AS id, 'name_1' AS name", viewIdentifier));
+          viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+        });
   }
 
   @Test
   void testGravitinoCreateViewAndReadBySpark() {
-    NameIdentifier baseTableIdentifier =
-        createSimplePaimonTableForViewInterop("gravitino_create_view_source_table");
     String viewName = GravitinoITUtils.genRandomName("gravitino_create_view");
     NameIdentifier viewIdentifier = NameIdentifier.of(schemaName, viewName);
 
-    String query =
-        String.format("SELECT id, name FROM paimon.%s.%s", schemaName, baseTableIdentifier.name());
+    String query = "SELECT 1 AS id, 'name_1' AS name";
     Representation[] representations =
         new Representation[] {
           SQLRepresentation.builder().withDialect("query").withSql(query).build(),
@@ -915,52 +890,24 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
         };
     ViewCatalog viewCatalog = catalog.asViewCatalog();
 
-    if (!isSparkViewInteropSupported()) {
-      Throwable throwable =
-          Assertions.assertThrows(
-              Throwable.class,
-              () -> {
-                viewCatalog.createView(
-                    viewIdentifier,
-                    "view_for_spark_read",
-                    new Column[] {
-                      Column.of("id", Types.IntegerType.get(), "id column"),
-                      Column.of("name", Types.StringType.get(), "name column")
-                    },
-                    representations,
-                    "paimon",
-                    schemaName,
-                    Collections.emptyMap());
-                spark
-                    .sql(
-                        String.format(
-                            "SELECT * FROM paimon.%s.%s ORDER BY id", schemaName, viewName))
-                    .collectAsList();
-              });
-      assertViewInteropUnsupported(throwable);
-      return;
-    }
-
-    viewCatalog.createView(
-        viewIdentifier,
-        "view_for_spark_read",
-        new Column[] {
-          Column.of("id", Types.IntegerType.get(), "id column"),
-          Column.of("name", Types.StringType.get(), "name column")
-        },
-        representations,
-        "paimon",
-        schemaName,
-        Collections.emptyMap());
-
-    Dataset<Row> rows =
-        spark.sql(String.format("SELECT * FROM paimon.%s.%s ORDER BY id", schemaName, viewName));
-    List<Row> results = rows.collectAsList();
-    Assertions.assertEquals(2, results.size());
-    Assertions.assertEquals(1, results.get(0).getInt(0));
-    Assertions.assertEquals("name_1", results.get(0).getString(1));
-    Assertions.assertEquals(2, results.get(1).getInt(0));
-    Assertions.assertEquals("name_2", results.get(1).getString(1));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> {
+          viewCatalog.createView(
+              viewIdentifier,
+              "view_for_spark_read",
+              new Column[] {
+                Column.of("id", Types.IntegerType.get(), "id column"),
+                Column.of("name", Types.StringType.get(), "name column")
+              },
+              representations,
+              "paimon",
+              schemaName,
+              Collections.emptyMap());
+          spark
+              .sql(String.format("SELECT * FROM paimon.%s.%s ORDER BY id", schemaName, viewName))
+              .collectAsList();
+        });
   }
 
   @Test
@@ -1145,37 +1092,7 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
     return values;
   }
 
-  private boolean isSparkViewInteropSupported() {
-    return "hive".equalsIgnoreCase(TYPE);
-  }
-
-  private void assertViewInteropUnsupported(Throwable throwable) {
-    Throwable current = throwable;
-    while (current != null) {
-      if (current instanceof UnsupportedOperationException) {
-        return;
-      }
-
-      String message = current.getMessage();
-      if (message != null) {
-        String lowerCaseMessage = message.toLowerCase(Locale.ROOT);
-        if (lowerCaseMessage.contains("unsupported")
-            || lowerCaseMessage.contains("not support")
-            || lowerCaseMessage.contains("does not support")) {
-          return;
-        }
-      }
-
-      current = current.getCause();
-    }
-
-    Assertions.fail(
-        String.format(
-            "Expected unsupported view interoperability for backend %s, but got: %s",
-            TYPE, throwable));
-  }
-
-  private NameIdentifier createSimplePaimonTableForViewInterop(String tablePrefix) {
+  protected NameIdentifier createSimplePaimonTableForViewInterop(String tablePrefix) {
     Preconditions.checkNotNull(
         spark, "Spark session is required for Spark view interoperability tests, but it is null.");
 

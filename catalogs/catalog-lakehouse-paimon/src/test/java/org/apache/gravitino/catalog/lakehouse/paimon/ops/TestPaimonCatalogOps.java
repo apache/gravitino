@@ -89,7 +89,7 @@ import org.junit.jupiter.api.io.TempDir;
 /** Tests for {@link org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps}. */
 public class TestPaimonCatalogOps {
 
-  private PaimonCatalogOps paimonCatalogOps;
+  private TestablePaimonCatalogOps paimonCatalogOps;
   @TempDir private File warehouse;
 
   private static final String DATABASE = "test_table_ops_database";
@@ -104,7 +104,7 @@ public class TestPaimonCatalogOps {
   @BeforeEach
   public void setUp() throws Exception {
     paimonCatalogOps =
-        new PaimonCatalogOps(
+        new TestablePaimonCatalogOps(
             new PaimonConfig(
                 ImmutableMap.of(PaimonCatalogPropertiesMetadata.WAREHOUSE, warehouse.getPath())));
     createDatabase();
@@ -176,8 +176,8 @@ public class TestPaimonCatalogOps {
 
   @Test
   void testCreateLoadAlterRenameAndDropViewOperations() throws Exception {
-    paimonCatalogOps.catalog =
-        PaimonViewTestCatalogHelper.createViewSupportedCatalog(paimonCatalogOps.catalog);
+    paimonCatalogOps.setCatalog(
+        PaimonViewTestCatalogHelper.createViewSupportedCatalog(paimonCatalogOps.catalog()));
 
     org.apache.paimon.view.View createdView =
         new ViewImpl(
@@ -487,5 +487,20 @@ public class TestPaimonCatalogOps {
     Assertions.assertEquals(1, paimonCatalogOps.listTables(DATABASE).size());
     paimonCatalogOps.dropDatabase(DATABASE, true);
     Assertions.assertTrue(paimonCatalogOps.listDatabases().isEmpty());
+  }
+
+  private static class TestablePaimonCatalogOps extends PaimonCatalogOps {
+
+    TestablePaimonCatalogOps(PaimonConfig paimonConfig) {
+      super(paimonConfig);
+    }
+
+    Catalog catalog() {
+      return catalog;
+    }
+
+    void setCatalog(Catalog catalog) {
+      this.catalog = catalog;
+    }
   }
 }

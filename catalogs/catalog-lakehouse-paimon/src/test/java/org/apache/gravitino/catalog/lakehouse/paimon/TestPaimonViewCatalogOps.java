@@ -31,6 +31,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import org.apache.gravitino.catalog.lakehouse.paimon.utils.PaimonViewTestCatalogHelper;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
@@ -161,7 +162,7 @@ public class TestPaimonViewCatalogOps {
     Representation[] representations =
         new Representation[] {
           SQLRepresentation.builder().withDialect("QUERY").withSql(query).build(),
-          SQLRepresentation.builder().withDialect("spark").withSql(query).build()
+          SQLRepresentation.builder().withDialect("Spark").withSql(query).build()
         };
 
     paimonViewCatalogOps.createView(
@@ -182,6 +183,71 @@ public class TestPaimonViewCatalogOps {
                         && "query".equals(((SQLRepresentation) representation).dialect())
                         && query.equals(((SQLRepresentation) representation).sql()));
     assertTrue(hasQueryRepresentation);
+
+    boolean hasNormalizedSparkRepresentation =
+        Arrays.stream(loadedView.representations())
+            .anyMatch(
+                representation ->
+                    representation instanceof SQLRepresentation
+                        && "spark".equals(((SQLRepresentation) representation).dialect())
+                        && query.equals(((SQLRepresentation) representation).sql()));
+    assertTrue(hasNormalizedSparkRepresentation);
+  }
+
+  @Test
+  public void testCreateViewRejectsCaseInsensitiveDuplicateDialects() {
+    String query = "SELECT col_1 FROM source_table";
+    Representation[] representations =
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("query").withSql(query).build(),
+          SQLRepresentation.builder().withDialect("Spark").withSql(query).build(),
+          SQLRepresentation.builder()
+              .withDialect("spark")
+              .withSql(query + " WHERE col_1 > 1")
+              .build()
+        };
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            paimonViewCatalogOps.createView(
+                NameIdentifier.of(Namespace.of(DATABASE), "duplicate_dialect_case"),
+                "test_view_comment",
+                new Column[] {Column.of("col_1", Types.IntegerType.get(), "col_1")},
+                representations,
+                "paimon",
+                DATABASE,
+                Maps.newHashMap()));
+  }
+
+  @Test
+  public void testCreateViewDatabaseNotExistUsesSchemaIdentifierInErrorMessage() {
+    String query = "SELECT col_1 FROM source_table";
+    NameIdentifier identifier = NameIdentifier.of(Namespace.of("missing_schema"), "missing_view");
+    Representation[] representations =
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("query").withSql(query).build()
+        };
+
+    PaimonViewCatalogOps bypassedSchemaCheckOps =
+        new PaimonViewCatalogOps(
+            paimonCatalogOps, this::buildPaimonNameIdentifier, schemaIdentifier -> true);
+
+    NoSuchSchemaException exception =
+        assertThrows(
+            NoSuchSchemaException.class,
+            () ->
+                bypassedSchemaCheckOps.createView(
+                    identifier,
+                    "test_view_comment",
+                    new Column[] {Column.of("col_1", Types.IntegerType.get(), "col_1")},
+                    representations,
+                    "paimon",
+                    "missing_schema",
+                    Maps.newHashMap()));
+
+    assertTrue(exception.getMessage().contains("missing_schema"));
+    assertFalse(exception.getMessage().contains("missing_view"));
   }
 
   private void createView(NameIdentifier identifier) throws Exception {

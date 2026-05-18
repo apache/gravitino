@@ -123,9 +123,12 @@ public class PaimonCatalogOps implements AutoCloseable {
     catalog.createView(viewIdentifier(viewName), view, false);
   }
 
-  public void alterView(String viewName, List<ViewChange> changes)
-      throws ViewNotExistException, DialectAlreadyExistException, DialectNotExistException {
-    catalog.alterView(viewIdentifier(viewName), changes, false);
+  public void alterView(String viewName, List<ViewChange> changes) throws ViewNotExistException {
+    try {
+      catalog.alterView(viewIdentifier(viewName), changes, false);
+    } catch (DialectAlreadyExistException | DialectNotExistException e) {
+      throw new IllegalArgumentException(e);
+    }
   }
 
   public void renameView(String fromViewName, String toViewName)

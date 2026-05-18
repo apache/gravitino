@@ -131,7 +131,7 @@ final class PaimonViewCatalogOps {
     try {
       paimonCatalogOps.createView(nameIdentifier.toString(), paimonView);
     } catch (Catalog.DatabaseNotExistException e) {
-      throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, identifier);
+      throw new NoSuchSchemaException(e, NO_SUCH_SCHEMA_EXCEPTION, schemaIdentifier);
     } catch (Catalog.ViewAlreadyExistException e) {
       throw new ViewAlreadyExistsException(e, VIEW_ALREADY_EXISTS_EXCEPTION, identifier);
     }
@@ -209,9 +209,12 @@ final class PaimonViewCatalogOps {
 
   private View replaceView(NameIdentifier identifier, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
+    Preconditions.checkArgument(
+        Arrays.stream(changes).noneMatch(change -> change instanceof ViewChange.RenameView),
+        "Rename view change cannot be combined with replace view change");
+
     View existingView = loadView(identifier);
     Map<String, String> finalProperties = new HashMap<>(existingView.properties());
-    NameIdentifier finalIdentifier = identifier;
     ViewChange.ReplaceView replaceView = null;
 
     for (ViewChange change : changes) {
@@ -220,9 +223,6 @@ final class PaimonViewCatalogOps {
         finalProperties.put(setProperty.getProperty(), setProperty.getValue());
       } else if (change instanceof ViewChange.RemoveProperty) {
         finalProperties.remove(((ViewChange.RemoveProperty) change).getProperty());
-      } else if (change instanceof ViewChange.RenameView) {
-        ViewChange.RenameView renameView = (ViewChange.RenameView) change;
-        finalIdentifier = NameIdentifier.of(identifier.namespace(), renameView.getNewName());
       } else if (change instanceof ViewChange.ReplaceView) {
         replaceView = (ViewChange.ReplaceView) change;
       } else {
@@ -235,7 +235,7 @@ final class PaimonViewCatalogOps {
 
     org.apache.paimon.view.View paimonView =
         PaimonView.toPaimonView(
-            finalIdentifier,
+            identifier,
             replaceView.getComment(),
             replaceView.getColumns(),
             replaceView.getRepresentations(),
@@ -244,7 +244,7 @@ final class PaimonViewCatalogOps {
             finalProperties);
 
     NameIdentifier sourceIdentifier = paimonIdentifierBuilder.apply(identifier);
-    NameIdentifier targetIdentifier = paimonIdentifierBuilder.apply(finalIdentifier);
+    NameIdentifier targetIdentifier = paimonIdentifierBuilder.apply(identifier);
 
     try {
       if (sourceIdentifier.equals(targetIdentifier)) {
@@ -255,18 +255,31 @@ final class PaimonViewCatalogOps {
         paimonCatalogOps.dropView(sourceIdentifier.toString());
         paimonCatalogOps.createView(sourceIdentifier.toString(), paimonView);
       } else {
+        // Cross-identifier replace is also intentionally non-atomic. The target is created first,
+        // then the source is dropped. If source drop fails after target creation, both views may
+        // coexist and no rollback is attempted.
         paimonCatalogOps.createView(targetIdentifier.toString(), paimonView);
-        paimonCatalogOps.dropView(sourceIdentifier.toString());
+        try {
+          paimonCatalogOps.dropView(sourceIdentifier.toString());
+        } catch (RuntimeException e) {
+          LOG.warn(
+              "Cross-identifier replace of Paimon view is non-atomic: target view {} was created, "
+                  + "but dropping source view {} failed. Both views may exist until cleanup.",
+              targetIdentifier,
+              sourceIdentifier,
+              e);
+          throw e;
+        }
       }
-      return loadView(finalIdentifier);
+      return loadView(identifier);
     } catch (Catalog.ViewNotExistException e) {
       throw new NoSuchViewException(e, NO_SUCH_VIEW_EXCEPTION, identifier);
     } catch (Catalog.ViewAlreadyExistException e) {
       throw new IllegalArgumentException(
-          String.format(VIEW_ALREADY_EXISTS_EXCEPTION, finalIdentifier), e);
+          String.format(VIEW_ALREADY_EXISTS_EXCEPTION, identifier), e);
     } catch (Catalog.DatabaseNotExistException e) {
       throw new IllegalArgumentException(
-          String.format(NO_SUCH_SCHEMA_EXCEPTION, finalIdentifier.namespace()), e);
+          String.format(NO_SUCH_SCHEMA_EXCEPTION, identifier.namespace()), e);
     }
   }
 
@@ -294,8 +307,6 @@ final class PaimonViewCatalogOps {
           paimonIdentifierBuilder.apply(identifier).toString(), paimonViewChanges);
     } catch (Catalog.ViewNotExistException e) {
       throw new NoSuchViewException(e, NO_SUCH_VIEW_EXCEPTION, identifier);
-    } catch (Catalog.DialectAlreadyExistException | Catalog.DialectNotExistException e) {
-      throw new IllegalArgumentException(e);
     }
 
     return loadView(identifier);
