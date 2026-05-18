@@ -169,11 +169,10 @@ WITH (
 
 ## Known issues
 
-### Metadata queries do not reliably resolve mixed-case schema or table names
+### Trino does not support object names that differ only by letter case
 
-When Trino accesses Gravitino through the Iceberg REST catalog, metadata queries such as `SHOW
-SCHEMAS`, `SHOW TABLES`, and `DESCRIBE` may not reliably resolve schema or table names that use
-mixed case.
+When Trino accesses Gravitino through the Iceberg REST catalog, it does not reliably distinguish
+schema or table names that differ only by letter case, such as `sales` and `Sales`.
 
 For the best compatibility with Trino:
 
