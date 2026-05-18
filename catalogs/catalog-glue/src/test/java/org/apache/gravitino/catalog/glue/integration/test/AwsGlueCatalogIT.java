@@ -108,14 +108,16 @@ class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
         new SortOrder[0],
         new Index[0]);
 
-    ops.alterTable(
-        NameIdentifier.of("ml", "cat", schema, "iceberg_alter"),
-        TableChange.setProperty("comment", "updated comment"));
+    try {
+      ops.alterTable(
+          NameIdentifier.of("ml", "cat", schema, "iceberg_alter"),
+          TableChange.setProperty("comment", "updated comment"));
 
-    Table loaded = ops.loadTable(NameIdentifier.of("ml", "cat", schema, "iceberg_alter"));
-    assertEquals("updated comment", loaded.properties().get("comment"));
-
-    ops.dropTable(NameIdentifier.of("ml", "cat", schema, "iceberg_alter"));
-    ops.dropSchema(NameIdentifier.of("ml", "cat", schema), false);
+      Table loaded = ops.loadTable(NameIdentifier.of("ml", "cat", schema, "iceberg_alter"));
+      assertEquals("updated comment", loaded.properties().get("comment"));
+    } finally {
+      ops.dropTable(NameIdentifier.of("ml", "cat", schema, "iceberg_alter"));
+      ops.dropSchema(NameIdentifier.of("ml", "cat", schema), false);
+    }
   }
 }

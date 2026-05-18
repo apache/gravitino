@@ -23,14 +23,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.NullOrdering;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -77,6 +81,18 @@ final class GlueIcebergTableHelper {
       "client.credentials-provider.access-key-id";
   private static final String CLIENT_CREDENTIALS_PROVIDER_SECRET_ACCESS_KEY =
       "client.credentials-provider.secret-access-key";
+
+  private static final Set<String> EXCLUDED_TABLE_PROPS =
+      Set.of(
+          GlueConstants.LOCATION,
+          GlueConstants.TABLE_TYPE,
+          GlueConstants.METADATA_LOCATION,
+          GlueConstants.INPUT_FORMAT,
+          GlueConstants.OUTPUT_FORMAT,
+          GlueConstants.SERDE_LIB);
+
+  // Iceberg 1.10+ uses "bucket[n]" / "truncate[w]" format for Transform.toString().
+  private static final Pattern TRANSFORM_PARAM_PATTERN = Pattern.compile(".*\\[(\\d+)\\]");
 
   private GlueIcebergTableHelper() {}
 
@@ -200,6 +216,13 @@ final class GlueIcebergTableHelper {
     org.apache.iceberg.SortOrder icebergSortOrder = toSortOrder(schema, sortOrders);
 
     Map<String, String> tableProps = new HashMap<>();
+    // Forward user-provided properties to Iceberg, excluding Gravitino/Glue internal keys.
+    properties.forEach(
+        (k, v) -> {
+          if (!EXCLUDED_TABLE_PROPS.contains(k)) {
+            tableProps.put(k, v);
+          }
+        });
     if (comment != null) {
       tableProps.put("comment", comment);
     }
@@ -401,7 +424,38 @@ final class GlueIcebergTableHelper {
                   field.nullOrder() == org.apache.iceberg.NullOrder.NULLS_FIRST
                       ? NullOrdering.NULLS_FIRST
                       : NullOrdering.NULLS_LAST;
-              return SortOrders.of(NamedReference.field(colName), direction, nullOrdering);
+
+              org.apache.iceberg.transforms.Transform<?, ?> transform = field.transform();
+              String transformStr = transform.toString().toLowerCase(Locale.ROOT);
+              if (transformStr.startsWith("identity")) {
+                return SortOrders.of(NamedReference.field(colName), direction, nullOrdering);
+              }
+
+              Expression expr;
+              if (transformStr.startsWith("year")) {
+                expr = FunctionExpression.of("year", NamedReference.field(colName));
+              } else if (transformStr.startsWith("month")) {
+                expr = FunctionExpression.of("month", NamedReference.field(colName));
+              } else if (transformStr.startsWith("day")) {
+                expr = FunctionExpression.of("day", NamedReference.field(colName));
+              } else if (transformStr.startsWith("hour")) {
+                expr = FunctionExpression.of("hour", NamedReference.field(colName));
+              } else if (transformStr.startsWith("bucket")) {
+                int numBuckets = extractTransformParam(transformStr);
+                expr =
+                    FunctionExpression.of(
+                        "bucket",
+                        Literals.integerLiteral(numBuckets),
+                        NamedReference.field(colName));
+              } else if (transformStr.startsWith("truncate")) {
+                int width = extractTransformParam(transformStr);
+                expr =
+                    FunctionExpression.of(
+                        "truncate", Literals.integerLiteral(width), NamedReference.field(colName));
+              } else {
+                expr = NamedReference.field(colName);
+              }
+              return SortOrders.of(expr, direction, nullOrdering);
             })
         .toArray(SortOrder[]::new);
   }
@@ -586,12 +640,12 @@ final class GlueIcebergTableHelper {
     }
   }
 
-  private static String getSingleField(org.apache.gravitino.rel.expressions.Expression[] args) {
+  private static String getSingleField(Expression[] args) {
     Preconditions.checkArgument(args.length == 1, "Sort function must have 1 argument");
     return getFieldName(args[0]);
   }
 
-  private static String getFieldName(org.apache.gravitino.rel.expressions.Expression expr) {
+  private static String getFieldName(Expression expr) {
     Preconditions.checkArgument(
         expr instanceof NamedReference.FieldReference,
         "Expected field reference, got: %s",
@@ -599,7 +653,7 @@ final class GlueIcebergTableHelper {
     return String.join(DOT, ((NamedReference.FieldReference) expr).fieldName());
   }
 
-  private static int getIntLiteral(org.apache.gravitino.rel.expressions.Expression expr) {
+  private static int getIntLiteral(Expression expr) {
     Preconditions.checkArgument(
         expr instanceof Literal, "Expected literal, got: %s", expr.getClass().getSimpleName());
     Object value = ((Literal<?>) expr).value();
@@ -628,7 +682,7 @@ final class GlueIcebergTableHelper {
    * <p>Iceberg does not expose transform parameters through a typed API, so string parsing is used.
    */
   private static int extractTransformParam(String transformStr) {
-    String param = transformStr.replaceAll(".*\\[(\\d+)\\]", "$1");
+    String param = TRANSFORM_PARAM_PATTERN.matcher(transformStr).replaceAll("$1");
     if (param.equals(transformStr)) {
       throw new IllegalArgumentException(
           "Cannot extract numeric parameter from transform: " + transformStr);
