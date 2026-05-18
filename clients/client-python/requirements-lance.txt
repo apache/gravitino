@@ -15,21 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-requests==2.32.5
-dataclasses-json==0.6.7
-pylint==4.0.5
-black==26.1.0
-twine==6.2.0
-coverage==7.13.4
-pandas==2.3.3
-pyarrow==23.0.1
-llama-index==0.13.0
-tenacity==9.1.4
-cachetools==7.0.1
-readerwriterlock==1.0.9
-docker==7.1.0
-pyjwt[crypto]==2.11.0
-jwcrypto==1.5.6
-sphinx==7.1.2
-furo==2024.8.6
-banks==2.4.1
+# Lance integration deps. Pinned so the lance-ray integration test runs
+# against a single, known-good server-side `lance-namespace-core` 0.7.5+
+# combination. Installed via the `lance` extra (e.g. `pip install -e .[lance]`)
+# so the heavy ray/pylance native wheels don't slow down the default `dev`
+# install used by lint and unit-test tasks.
+ray==2.55.1
+lance-ray==0.4.2
+lance-namespace==0.7.5

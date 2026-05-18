@@ -56,10 +56,17 @@ def _missing_lance_ray_deps() -> Optional[str]:
     return ", ".join(missing) if missing else None
 
 
+# Compute once at module import time so the @skipIf condition and message
+# don't trigger two rounds of import attempts.
+_MISSING_LANCE_RAY_DEPS = _missing_lance_ray_deps()
+
+
 @unittest.skipIf(
-    _missing_lance_ray_deps() is not None,
-    f"lance-ray test deps not installed: {_missing_lance_ray_deps()}. "
-    "Install with: pip install ray lance-ray lance-namespace",
+    _MISSING_LANCE_RAY_DEPS is not None,
+    f"lance-ray test deps not installed: {_MISSING_LANCE_RAY_DEPS}. "
+    "Install with: pip install -e .[lance] (or pip install ray lance-ray "
+    "lance-namespace). Requires the Gravitino server to expose a lance-rest "
+    "auxiliary service backed by lance-namespace-core >= 0.7.5.",
 )
 class TestLanceRayIntegration(IntegrationTestEnv):
     """End-to-end test for the lance-ray Python client against a Gravitino-backed
@@ -285,12 +292,15 @@ class TestLanceRayIntegration(IntegrationTestEnv):
 
     def test_write_read_filter_via_lance_ray(self):
         # Imports are deferred so the skipIf decorator handles missing deps
-        # cleanly without import errors at module load time.
-        # pylint: disable=import-outside-toplevel
+        # cleanly without import errors at module load time. The lance/ray
+        # extras live in `requirements-lance.txt` (and `setup.py`'s `lance`
+        # extra), so they aren't present in the default `dev` install used by
+        # pylint — silence the resulting import-error.
+        # pylint: disable=import-outside-toplevel,import-error
         import ray
         from lance_ray import read_lance, write_lance
 
-        # pylint: enable=import-outside-toplevel
+        # pylint: enable=import-outside-toplevel,import-error
 
         ns_properties = {"uri": LANCE_REST_BASE_URL}
         table_id = [self.CATALOG_NAME, self.SCHEMA_NAME, self.TABLE_NAME]
