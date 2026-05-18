@@ -49,7 +49,9 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Row;
@@ -269,6 +271,22 @@ public class IcebergAuthorizationIT extends BaseIT {
    */
   protected void createNestedNamespaceViaIRC(String... levels) {
     adminIcebergCatalog.createNamespace(Namespace.of(levels));
+  }
+
+  /**
+   * Creates a 2-column Iceberg table via the IRC API as {@link #SUPER_USER}. Tests use this for
+   * setup that the Gravitino REST API cannot — most notably creating tables under hierarchical
+   * schemas whose names contain the configured separator.
+   */
+  protected void createTableViaIRC(String[] namespaceLevels, String tableName) {
+    Schema schema =
+        new Schema(
+            org.apache.iceberg.types.Types.NestedField.required(
+                1, "col_1", org.apache.iceberg.types.Types.IntegerType.get(), "col_1_comment"),
+            org.apache.iceberg.types.Types.NestedField.required(
+                2, "col_2", org.apache.iceberg.types.Types.IntegerType.get(), "col_2_comment"));
+    adminIcebergCatalog.createTable(
+        TableIdentifier.of(Namespace.of(namespaceLevels), tableName), schema);
   }
 
   private void initSparkEnv() {

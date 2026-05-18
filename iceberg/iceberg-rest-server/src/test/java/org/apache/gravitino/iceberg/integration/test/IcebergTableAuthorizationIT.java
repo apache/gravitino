@@ -139,9 +139,9 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     String nestedSchemaInIceberg = SCHEMA_NAME + ".nested";
     String tableName = "test_nested_create";
 
-    catalogClientWithAllPrivilege
-        .asSchemas()
-        .createSchema(nestedSchemaInGravitino, "nested schema", new HashMap<>());
+    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
+    // dispatcher imports the nested namespace into Gravitino.
+    createNestedNamespaceViaIRC(SCHEMA_NAME, "nested");
     grantUseSchemaRole(nestedSchemaInGravitino);
     sql("USE %s;", nestedSchemaInIceberg);
 
@@ -165,9 +165,9 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_inherit";
     String tableName = "test_nested_inherited_create";
 
-    catalogClientWithAllPrivilege
-        .asSchemas()
-        .createSchema(nestedSchemaInGravitino, "nested schema", new HashMap<>());
+    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
+    // dispatcher imports the nested namespace into Gravitino.
+    createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_inherit");
 
     Assertions.assertThrowsExactly(
         ForbiddenException.class,
@@ -198,9 +198,9 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_crud";
     String tableName = "test_nested_crud";
 
-    catalogClientWithAllPrivilege
-        .asSchemas()
-        .createSchema(nestedSchemaInGravitino, "nested schema", new HashMap<>());
+    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
+    // dispatcher imports the nested namespace into Gravitino.
+    createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_crud");
     grantUseSchemaRole(nestedSchemaInGravitino);
     String createRole = grantCreateTableRole(nestedSchemaInGravitino);
     sql("USE %s;", nestedSchemaInIceberg);
@@ -246,14 +246,13 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
 
   @Test
   void testListNestedNamespaceTablesWithInheritedParentPrivilege() {
-    String nestedSchemaInGravitino = SCHEMA_NAME + ":nested_list";
     String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_list";
 
-    catalogClientWithAllPrivilege
-        .asSchemas()
-        .createSchema(nestedSchemaInGravitino, "nested schema", new HashMap<>());
-    createTable(nestedSchemaInGravitino, "nested_list_t1");
-    createTable(nestedSchemaInGravitino, "nested_list_t2");
+    // Gravitino REST API rejects names with the schema separator, so go through IRC; the hook
+    // dispatcher imports the nested namespace and tables into Gravitino.
+    createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_list");
+    createTableViaIRC(new String[] {SCHEMA_NAME, "nested_list"}, "nested_list_t1");
+    createTableViaIRC(new String[] {SCHEMA_NAME, "nested_list"}, "nested_list_t2");
 
     Set<String> tableNames = listTableNames(nestedSchemaInIceberg);
     Assertions.assertEquals(0, tableNames.size());
