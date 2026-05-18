@@ -19,6 +19,7 @@ package org.apache.gravitino.authorization;
 
 import java.io.Closeable;
 import java.security.Principal;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -160,12 +161,15 @@ public interface GravitinoAuthorizer extends Closeable {
    * changes.
    *
    * @param metalake metalake;
-   * @param oldOwnerId The old owner id;
+   * @param oldOwnerId The old owner id; null when setting the first owner.
    * @param nameIdentifier The metadata name identifier;
    * @param type entity type
    */
   void handleMetadataOwnerChange(
-      String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type);
+      String metalake,
+      @Nullable Long oldOwnerId,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType type);
 
   /**
    * Called when an entity name-to-id mapping may have changed because of a rename or drop.
