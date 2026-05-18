@@ -87,7 +87,7 @@ public class SchemaMetaService {
 
   private SchemaMetaService() {
     this.ops =
-        new HierarchicalConventionPOStorageOps<>(
+        new HierarchicalConversionPOStorageOps<>(
             new SchemaPOStorageOps(),
             SchemaMetaService::physicalToLogicalSchemaPO,
             SchemaMetaService::logicalToPhysicalSchemaPO);
@@ -141,7 +141,7 @@ public class SchemaMetaService {
       NameIdentifierUtil.checkSchema(schemaEntity.nameIdentifier());
       // SchemaEntity arrives in API/logical form (separator = HierarchicalSchemaUtil
       // .schemaSeparator()). We split here on the logical separator and build ancestor rows in
-      // logical form. HierarchicalConventionPOStorageOps.batchInsertPOs applies its write
+      // logical form. HierarchicalConversionPOStorageOps.batchInsertPOs applies its write
       // rewriter to translate each PO's name to storage form before SQL execution.
       String logicalSep = HierarchicalSchemaUtil.schemaSeparator();
       String schemaName = schemaEntity.name();

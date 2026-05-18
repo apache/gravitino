@@ -39,17 +39,17 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
  * @param <PO> persistent object type
  * @param <Mapper> MyBatis mapper type
  */
-public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorageOps<PO, Mapper> {
+public class HierarchicalConversionPOStorageOps<PO, Mapper> extends BasePOStorageOps<PO, Mapper> {
 
   private final BasePOStorageOps<PO, Mapper> delegate;
   private final UnaryOperator<PO> physicalToLogicalRewriter;
   private final UnaryOperator<PO> logicalToPhysicalRewriter;
 
-  public HierarchicalConventionPOStorageOps(BasePOStorageOps<PO, Mapper> delegate) {
+  public HierarchicalConversionPOStorageOps(BasePOStorageOps<PO, Mapper> delegate) {
     this(delegate, UnaryOperator.identity(), UnaryOperator.identity());
   }
 
-  public HierarchicalConventionPOStorageOps(
+  public HierarchicalConversionPOStorageOps(
       BasePOStorageOps<PO, Mapper> delegate,
       UnaryOperator<PO> physicalToLogicalRewriter,
       UnaryOperator<PO> logicalToPhysicalRewriter) {
@@ -89,7 +89,7 @@ public class HierarchicalConventionPOStorageOps<PO, Mapper> extends BasePOStorag
     Namespace physicalNamespace = logicalToPhysicalNamespace(logicalNamespace);
     List<String> physicalNames =
         names.stream()
-            .map(HierarchicalConventionPOStorageOps::toPhysicalIfHierarchical)
+            .map(HierarchicalConversionPOStorageOps::toPhysicalIfHierarchical)
             .collect(Collectors.toList());
     return applyRead(delegate.listPOs(mapper, physicalNamespace, physicalNames));
   }

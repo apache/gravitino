@@ -19,17 +19,14 @@
 package org.apache.gravitino.storage.relational;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -79,12 +76,10 @@ public class TestJDBCBackendBatchInsert extends TestJDBCBackend {
     createAndInsertCatalog(metalakeName, catalogName);
 
     String logicalLeaf = "ns_a:ns_b:leaf";
-    String sep = HierarchicalSchemaUtil.schemaSeparator();
-    String physicalLeaf = HierarchicalSchemaUtil.logicalToPhysical(logicalLeaf, sep);
     SchemaEntity hierarchical =
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(physicalLeaf)
+            .withName(logicalLeaf)
             .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
             .withComment("nested")
             .withProperties(Collections.emptyMap())
@@ -95,17 +90,7 @@ public class TestJDBCBackendBatchInsert extends TestJDBCBackend {
     List<SchemaEntity> schemas =
         backend.list(
             NamespaceUtil.ofSchema(metalakeName, catalogName), Entity.EntityType.SCHEMA, true);
-    Set<String> logicalNames =
-        schemas.stream()
-            .map(SchemaEntity::name)
-            .map(
-                n -> {
-                  if (n != null && n.contains(HierarchicalSchemaUtil.physicalSeparator())) {
-                    return HierarchicalSchemaUtil.physicalToLogical(n, sep);
-                  }
-                  return n;
-                })
-            .collect(Collectors.toSet());
+    Set<String> logicalNames = schemas.stream().map(SchemaEntity::name).collect(Collectors.toSet());
 
     Assertions.assertTrue(logicalNames.contains("ns_a"));
     Assertions.assertTrue(logicalNames.contains("ns_a:ns_b"));
@@ -114,7 +99,7 @@ public class TestJDBCBackendBatchInsert extends TestJDBCBackend {
     SchemaEntity loaded =
         (SchemaEntity)
             backend.get(
-                NameIdentifier.of(metalakeName, catalogName, physicalLeaf),
+                NameIdentifier.of(metalakeName, catalogName, logicalLeaf),
                 Entity.EntityType.SCHEMA);
     Assertions.assertEquals(logicalLeaf, loaded.name());
     Assertions.assertEquals("nested", loaded.comment());
@@ -127,18 +112,15 @@ public class TestJDBCBackendBatchInsert extends TestJDBCBackend {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
 
-    String sep = HierarchicalSchemaUtil.schemaSeparator();
-    String physSep = HierarchicalSchemaUtil.physicalSeparator();
-    String physicalLeaf1 = HierarchicalSchemaUtil.logicalToPhysical("ns_a:ns_b:leaf1", sep);
-    String physicalLeaf2 = HierarchicalSchemaUtil.logicalToPhysical("ns_a:ns_b:leaf2", sep);
-    String[] parts = physicalLeaf1.split(Pattern.quote(physSep), -1);
-    String ancestorA = parts[0];
-    String ancestorAB = String.join(physSep, Arrays.copyOfRange(parts, 0, 2));
+    String leaf1 = "ns_a:ns_b:leaf1";
+    String leaf2 = "ns_a:ns_b:leaf2";
+    String ancestorA = "ns_a";
+    String ancestorAB = "ns_a:ns_b";
 
     SchemaEntity first =
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(physicalLeaf1)
+            .withName(leaf1)
             .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
             .withComment("first")
             .withProperties(Collections.emptyMap())
@@ -162,7 +144,7 @@ public class TestJDBCBackendBatchInsert extends TestJDBCBackend {
     SchemaEntity second =
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(physicalLeaf2)
+            .withName(leaf2)
             .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
             .withComment("second")
             .withProperties(Collections.emptyMap())

@@ -62,7 +62,7 @@ public class ViewMetaService {
   }
 
   private ViewMetaService() {
-    this.ops = new HierarchicalConventionPOStorageOps<>(new ViewPOStorageOps());
+    this.ops = new HierarchicalConversionPOStorageOps<>(new ViewPOStorageOps());
   }
 
   @Monitored(

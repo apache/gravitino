@@ -41,7 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
-public class TestHierarchicalConventionPOStorageOps {
+public class TestHierarchicalConversionPOStorageOps {
 
   private static final String SEP = HierarchicalSchemaUtil.schemaSeparator();
   private static final String PHYS = HierarchicalSchemaUtil.physicalSeparator();
@@ -61,8 +61,8 @@ public class TestHierarchicalConventionPOStorageOps {
   @Test
   public void getPOByParentIdConvertsHierarchicalName() {
     when(delegate.getPO(eq(mapper), eq(7L), eq("ns_a" + PHYS + "ns_b"))).thenReturn("found");
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate);
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate);
 
     String result = wrapper.getPO(mapper, 7L, "ns_a" + SEP + "ns_b");
 
@@ -73,8 +73,8 @@ public class TestHierarchicalConventionPOStorageOps {
   @Test
   public void getPOByParentIdLeavesSimpleNameUnchanged() {
     when(delegate.getPO(eq(mapper), eq(7L), eq("plain"))).thenReturn("po");
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate);
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate);
 
     String result = wrapper.getPO(mapper, 7L, "plain");
 
@@ -85,8 +85,8 @@ public class TestHierarchicalConventionPOStorageOps {
   @Test
   public void getPOByParentIdReturnsNullWhenDelegateMisses() {
     when(delegate.getPO(any(), any(Long.class), any(String.class))).thenReturn(null);
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(
             delegate, s -> s + "-rewritten", UnaryOperator.identity());
 
     assertNull(wrapper.getPO(mapper, 1L, "missing"));
@@ -99,8 +99,8 @@ public class TestHierarchicalConventionPOStorageOps {
     when(delegate.listPOs(eq(mapper), eq(ns), any(List.class)))
         .thenReturn(Collections.singletonList("po"));
 
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate);
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate);
 
     wrapper.listPOs(mapper, ns, names);
 
@@ -116,8 +116,8 @@ public class TestHierarchicalConventionPOStorageOps {
     NameIdentifier ident = NameIdentifier.of(Namespace.of("ml", "cat"), "ns_a" + SEP + "ns_b");
     when(delegate.getPOByFullName(any(), any(NameIdentifier.class))).thenReturn("po");
 
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate);
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate);
 
     wrapper.getPOByFullName(mapper, ident);
 
@@ -134,8 +134,8 @@ public class TestHierarchicalConventionPOStorageOps {
         NameIdentifier.of(Namespace.of("ml", "cat", "ns_a" + SEP + "ns_b"), "tbl");
     when(delegate.getPOByFullName(any(), any(NameIdentifier.class))).thenReturn("po");
 
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate);
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate);
 
     wrapper.getPOByFullName(mapper, ident);
 
@@ -151,8 +151,8 @@ public class TestHierarchicalConventionPOStorageOps {
     NameIdentifier ident = NameIdentifier.of(Namespace.of("ml", "cat", "schema"), "tbl");
     when(delegate.getPOByFullName(any(), any(NameIdentifier.class))).thenReturn("po");
 
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate);
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate);
 
     wrapper.getPOByFullName(mapper, ident);
 
@@ -165,8 +165,8 @@ public class TestHierarchicalConventionPOStorageOps {
     when(delegate.listPOsByNSFullName(any(), any(Namespace.class)))
         .thenReturn(Collections.singletonList("po"));
 
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate);
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate);
 
     wrapper.listPOsByNSFullName(mapper, ns);
 
@@ -181,8 +181,8 @@ public class TestHierarchicalConventionPOStorageOps {
     when(delegate.listPOsByNSFullName(any(), any(Namespace.class)))
         .thenReturn(Collections.emptyList());
 
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate);
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate);
 
     wrapper.listPOsByNSFullName(mapper, ns);
 
@@ -194,8 +194,8 @@ public class TestHierarchicalConventionPOStorageOps {
   @Test
   public void physicalToLogicalRewriterAppliedToGetPOByParentId() {
     when(delegate.getPO(any(), any(Long.class), any(String.class))).thenReturn("raw");
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(
             delegate, s -> s + "-rewritten", UnaryOperator.identity());
 
     assertEquals("raw-rewritten", wrapper.getPO(mapper, 1L, "plain"));
@@ -204,8 +204,8 @@ public class TestHierarchicalConventionPOStorageOps {
   @Test
   public void physicalToLogicalRewriterAppliedToListPOsByParentId() {
     when(delegate.listPOs(any(), any(Long.class))).thenReturn(Arrays.asList("a", "b"));
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(
             delegate, s -> s.toUpperCase(), UnaryOperator.identity());
 
     assertEquals(Arrays.asList("A", "B"), wrapper.listPOs(mapper, 1L));
@@ -214,8 +214,8 @@ public class TestHierarchicalConventionPOStorageOps {
   @Test
   public void physicalToLogicalRewriterAppliedToListPOsByIds() {
     when(delegate.listPOs(any(), any(List.class))).thenReturn(Arrays.asList("x", "y"));
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate, s -> s + "!", UnaryOperator.identity());
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate, s -> s + "!", UnaryOperator.identity());
 
     List<Long> ids = Arrays.asList(1L, 2L);
     assertEquals(Arrays.asList("x!", "y!"), wrapper.listPOs(mapper, ids));
@@ -224,8 +224,8 @@ public class TestHierarchicalConventionPOStorageOps {
   @Test
   public void physicalToLogicalRewriterIsNotInvokedOnNullResult() {
     when(delegate.getPO(any(), any(Long.class), any(String.class))).thenReturn(null);
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(
             delegate,
             s -> {
               throw new AssertionError("rewriter must not be invoked on null");
@@ -238,8 +238,8 @@ public class TestHierarchicalConventionPOStorageOps {
   @Test
   public void physicalToLogicalRewriterIsNotInvokedOnEmptyList() {
     when(delegate.listPOs(any(), any(Long.class))).thenReturn(Collections.emptyList());
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(
             delegate,
             s -> {
               throw new AssertionError("rewriter must not be invoked on empty list");
@@ -253,8 +253,8 @@ public class TestHierarchicalConventionPOStorageOps {
 
   @Test
   public void logicalToPhysicalRewriterAppliedToInsertPO() {
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(
             delegate, UnaryOperator.identity(), s -> s + "-written");
 
     wrapper.insertPO(mapper, "logical", true);
@@ -264,8 +264,8 @@ public class TestHierarchicalConventionPOStorageOps {
 
   @Test
   public void logicalToPhysicalRewriterAppliedToBatchInsertPOs() {
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate, UnaryOperator.identity(), s -> s + "-W");
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate, UnaryOperator.identity(), s -> s + "-W");
 
     wrapper.batchInsertPOs(mapper, Arrays.asList("a", "b"), false);
 
@@ -277,8 +277,8 @@ public class TestHierarchicalConventionPOStorageOps {
   @Test
   public void logicalToPhysicalRewriterAppliedToBothPOsInUpdate() {
     when(delegate.updatePO(any(), eq("new-W"), eq("old-W"))).thenReturn(1);
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate, UnaryOperator.identity(), s -> s + "-W");
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate, UnaryOperator.identity(), s -> s + "-W");
 
     assertEquals(1, wrapper.updatePO(mapper, "new", "old"));
     verify(delegate).updatePO(mapper, "new-W", "old-W");
@@ -287,8 +287,8 @@ public class TestHierarchicalConventionPOStorageOps {
   @Test
   public void singleArgConstructorUsesIdentityRewritersForBothDirections() {
     when(delegate.getPO(any(), any(Long.class), any(String.class))).thenReturn("po");
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate);
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate);
 
     assertEquals("po", wrapper.getPO(mapper, 1L, "plain"));
     wrapper.insertPO(mapper, "raw", false);
@@ -307,8 +307,8 @@ public class TestHierarchicalConventionPOStorageOps {
     when(delegate.supportsParentIdRelationalRead()).thenReturn(true);
     when(delegate.entityType()).thenReturn(Entity.EntityType.SCHEMA);
 
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(delegate);
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(delegate);
 
     assertTrue(wrapper.supportsParentIdRelationalRead());
     assertSame(Entity.EntityType.SCHEMA, wrapper.entityType());
@@ -316,8 +316,8 @@ public class TestHierarchicalConventionPOStorageOps {
 
   @Test
   public void batchInsertEmptyListIsForwarded() {
-    HierarchicalConventionPOStorageOps<String, Object> wrapper =
-        new HierarchicalConventionPOStorageOps<>(
+    HierarchicalConversionPOStorageOps<String, Object> wrapper =
+        new HierarchicalConversionPOStorageOps<>(
             delegate,
             UnaryOperator.identity(),
             s -> {
