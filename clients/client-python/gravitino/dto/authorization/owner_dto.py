@@ -28,7 +28,12 @@ class OwnerDTO(Owner):
     """Represents an Owner Data Transfer Object (DTO)."""
 
     _name: str = field(metadata=config(field_name="name"))
-    _type: Owner.Type = field(metadata=config(field_name="type"))
+    _type: Owner.Type = field(
+        metadata=config(
+            field_name="type",
+            decoder=lambda v: Owner.Type(v.upper()) if isinstance(v, str) else v,
+        )
+    )
 
     def name(self) -> str:
         return self._name
