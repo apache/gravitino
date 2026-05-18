@@ -41,6 +41,10 @@ public interface IdpGroupMetaMapper {
   @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroup")
   IdpGroupPO selectIdpGroup(@Param("groupName") String groupName);
 
+  /**
+   * Selects active groups by name. An empty list returns all active groups; pass null for an
+   * explicit error.
+   */
   @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroups")
   List<IdpGroupPO> selectIdpGroups(@Param("groupNames") List<String> groupNames);
 
