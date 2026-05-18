@@ -25,13 +25,13 @@ import org.apache.ibatis.annotations.Param;
 
 public class IdpGroupMetaBaseSQLProvider {
 
-  public String selectIdpGroup(@Param("groupName") String groupName) {
-    return "SELECT group_id as groupId, group_name as groupName,"
+  public String selectIdpGroup(@Param("groupname") String groupname) {
+    return "SELECT group_id as groupId, group_name as groupname,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
-        + " WHERE group_name = #{groupName} AND deleted_at = 0";
+        + " WHERE group_name = #{groupname} AND deleted_at = 0";
   }
 
   public String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
@@ -40,7 +40,7 @@ public class IdpGroupMetaBaseSQLProvider {
         + " (group_id, group_name, current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{groupMeta.groupId},"
-        + " #{groupMeta.groupName},"
+        + " #{groupMeta.groupname},"
         + " #{groupMeta.currentVersion},"
         + " #{groupMeta.lastVersion},"
         + " #{groupMeta.deletedAt}"

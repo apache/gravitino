@@ -34,7 +34,7 @@ import lombok.ToString;
 @Builder(setterPrefix = "with")
 public class IdpGroupPO {
   private Long groupId;
-  private String groupName;
+  private String groupname;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;

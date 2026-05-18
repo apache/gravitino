@@ -40,7 +40,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     IdpGroupPO firstGroup =
         IdpGroupPO.builder()
             .withGroupId(1L)
-            .withGroupName("dev")
+            .withGroupname("dev")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -58,7 +58,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     IdpGroupPO activeGroup =
         IdpGroupPO.builder()
             .withGroupId(1L)
-            .withGroupName("dev")
+            .withGroupname("dev")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -67,7 +67,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
             .withGroupId(2L)
-            .withGroupName("ops")
+            .withGroupname("ops")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(10L)
@@ -84,7 +84,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
             .withGroupId(1L)
-            .withGroupName("dev")
+            .withGroupname("dev")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -104,7 +104,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
             .withGroupId(1L)
-            .withGroupName("legacy-group")
+            .withGroupname("legacy-group")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(10L)
@@ -112,7 +112,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
             .withGroupId(2L)
-            .withGroupName("new-group")
+            .withGroupname("new-group")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(30L)
@@ -120,7 +120,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
             .withGroupId(3L)
-            .withGroupName("active-group")
+            .withGroupname("active-group")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -139,7 +139,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     IdpGroupPO expectedActiveGroup =
         IdpGroupPO.builder()
             .withGroupId(1L)
-            .withGroupName("dev")
+            .withGroupname("dev")
             .withCurrentVersion(3L)
             .withLastVersion(2L)
             .withDeletedAt(0L)
@@ -148,7 +148,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
             .withGroupId(2L)
-            .withGroupName("ops")
+            .withGroupname("ops")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(10L)

@@ -50,7 +50,7 @@ public class TestIdpGroupMetaBaseSQLProvider {
     Assertions.assertTrue(normalizedSql.contains("SELECT group_id as groupId"));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta"));
     Assertions.assertTrue(
-        normalizedSql.contains("WHERE group_name = #{groupName} AND deleted_at = 0"));
+        normalizedSql.contains("WHERE group_name = #{groupname} AND deleted_at = 0"));
   }
 
   @Test
@@ -64,7 +64,7 @@ public class TestIdpGroupMetaBaseSQLProvider {
             "(group_id, group_name, current_version, last_version, deleted_at)"));
     Assertions.assertTrue(
         normalizedSql.contains(
-            "VALUES ( #{groupMeta.groupId}, #{groupMeta.groupName}, #{groupMeta.currentVersion},"
+            "VALUES ( #{groupMeta.groupId}, #{groupMeta.groupname}, #{groupMeta.currentVersion},"
                 + " #{groupMeta.lastVersion}, #{groupMeta.deletedAt} )"));
   }
 
@@ -95,7 +95,7 @@ public class TestIdpGroupMetaBaseSQLProvider {
   private IdpGroupPO newGroupPO() {
     return IdpGroupPO.builder()
         .withGroupId(1L)
-        .withGroupName("group")
+        .withGroupname("group")
         .withCurrentVersion(1L)
         .withLastVersion(1L)
         .withDeletedAt(0L)

@@ -38,7 +38,7 @@ public interface IdpGroupMetaMapper {
   String IDP_GROUP_TABLE_NAME = "idp_group_meta";
 
   @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroup")
-  IdpGroupPO selectIdpGroup(@Param("groupName") String groupName);
+  IdpGroupPO selectIdpGroup(@Param("groupname") String groupname);
 
   @InsertProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "insertIdpGroup")
   void insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO);
