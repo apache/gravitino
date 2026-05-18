@@ -167,6 +167,19 @@ WITH (
 | Supported engines        | Trino, Spark, Flink, Daft   | Any Iceberg-compatible engine |
 | Credential vending       | Varies                      | Yes (S3, GCS, OSS, ADLS)      |
 
+## Known issues
+
+### Metadata queries do not reliably resolve mixed-case schema or table names
+
+When Trino accesses Gravitino through the Iceberg REST catalog, metadata queries such as `SHOW
+SCHEMAS`, `SHOW TABLES`, and `DESCRIBE` may not reliably resolve schema or table names that use
+mixed case.
+
+For the best compatibility with Trino:
+
+- Use lowercase schema and table names.
+- Avoid creating objects whose names differ only by letter case.
+
 ## Related
 
 - [Iceberg REST catalog service](../iceberg-rest-service.md)
