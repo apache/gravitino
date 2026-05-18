@@ -20,7 +20,6 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import javax.servlet.http.HttpServlet;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -35,7 +34,7 @@ import org.apache.gravitino.server.web.Utils;
 @Path("/version")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
-public class VersionOperations extends HttpServlet {
+public class VersionOperations {
   @GET
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "version." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
