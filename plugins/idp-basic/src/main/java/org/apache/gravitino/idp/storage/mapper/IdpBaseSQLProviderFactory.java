@@ -47,23 +47,23 @@ abstract class IdpBaseSQLProviderFactory<T> {
             postgresqlProvider);
   }
 
-  public T h2Provider() {
+  protected final T h2ProviderInstance() {
     return h2Provider;
   }
 
-  public T mysqlProvider() {
+  protected final T mysqlProviderInstance() {
     return mysqlProvider;
   }
 
-  public T postgresqlProvider() {
+  protected final T postgresqlProviderInstance() {
     return postgresqlProvider;
   }
 
-  protected T currentProvider() {
-    return getProvider(currentDatabaseId());
+  protected final T currentProviderInstance() {
+    return resolveProvider(currentDatabaseId());
   }
 
-  protected T getProvider(String databaseId) {
+  protected final T resolveProvider(String databaseId) {
     if (databaseId == null) {
       throw new IllegalStateException(
           String.format("MyBatis databaseId is not configured for %s.", providerName));

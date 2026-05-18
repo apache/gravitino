@@ -28,7 +28,10 @@ import org.apache.ibatis.annotations.Param;
 
 public class IdpGroupMetaSQLProviderFactory
     extends IdpBaseSQLProviderFactory<IdpGroupMetaBaseSQLProvider> {
-  public IdpGroupMetaSQLProviderFactory() {
+  private static final IdpGroupMetaSQLProviderFactory INSTANCE =
+      new IdpGroupMetaSQLProviderFactory();
+
+  private IdpGroupMetaSQLProviderFactory() {
     super(
         "IdP group SQL provider",
         new IdpGroupMetaBaseSQLProvider(),
@@ -36,24 +39,42 @@ public class IdpGroupMetaSQLProviderFactory
         new IdpGroupMetaPostgreSQLProvider());
   }
 
-  public String selectIdpGroup(@Param("groupName") String groupName) {
-    return currentProvider().selectIdpGroup(groupName);
+  public static IdpGroupMetaBaseSQLProvider h2Provider() {
+    return INSTANCE.h2ProviderInstance();
   }
 
-  public String selectIdpGroups(@Param("groupNames") List<String> groupNames) {
-    return currentProvider().selectIdpGroups(groupNames);
+  public static IdpGroupMetaBaseSQLProvider mysqlProvider() {
+    return INSTANCE.mysqlProviderInstance();
   }
 
-  public String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
-    return currentProvider().insertIdpGroup(groupPO);
+  public static IdpGroupMetaBaseSQLProvider postgresqlProvider() {
+    return INSTANCE.postgresqlProviderInstance();
   }
 
-  public String softDeleteIdpGroup(@Param("groupId") Long groupId) {
-    return currentProvider().softDeleteIdpGroup(groupId);
+  static IdpGroupMetaBaseSQLProvider getProvider(String databaseId) {
+    return INSTANCE.resolveProvider(databaseId);
   }
 
-  public String deleteIdpGroupMetasByLegacyTimeline(
+  public static String selectIdpGroup(@Param("groupName") String groupName) {
+    return INSTANCE.currentProviderInstance().selectIdpGroup(groupName);
+  }
+
+  public static String selectIdpGroups(@Param("groupNames") List<String> groupNames) {
+    return INSTANCE.currentProviderInstance().selectIdpGroups(groupNames);
+  }
+
+  public static String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
+    return INSTANCE.currentProviderInstance().insertIdpGroup(groupPO);
+  }
+
+  public static String softDeleteIdpGroup(@Param("groupId") Long groupId) {
+    return INSTANCE.currentProviderInstance().softDeleteIdpGroup(groupId);
+  }
+
+  public static String deleteIdpGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return currentProvider().deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit);
+    return INSTANCE
+        .currentProviderInstance()
+        .deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }

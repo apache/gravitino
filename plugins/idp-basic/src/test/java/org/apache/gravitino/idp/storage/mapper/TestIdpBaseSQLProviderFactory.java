@@ -31,9 +31,9 @@ public class TestIdpBaseSQLProviderFactory {
   void testProviderAccessors() {
     TestFactory factory = new TestFactory();
 
-    assertSame("mysql", factory.mysqlProvider());
-    assertSame("h2", factory.h2Provider());
-    assertSame("postgresql", factory.postgresqlProvider());
+    assertSame("mysql", factory.mysqlProviderValue());
+    assertSame("h2", factory.h2ProviderValue());
+    assertSame("postgresql", factory.postgresqlProviderValue());
   }
 
   @Test
@@ -73,7 +73,19 @@ public class TestIdpBaseSQLProviderFactory {
     }
 
     private String provider(String databaseId) {
-      return getProvider(databaseId);
+      return resolveProvider(databaseId);
+    }
+
+    private String mysqlProviderValue() {
+      return mysqlProviderInstance();
+    }
+
+    private String h2ProviderValue() {
+      return h2ProviderInstance();
+    }
+
+    private String postgresqlProviderValue() {
+      return postgresqlProviderInstance();
     }
   }
 }

@@ -28,7 +28,9 @@ import org.apache.ibatis.annotations.Param;
 
 public class IdpUserMetaSQLProviderFactory
     extends IdpBaseSQLProviderFactory<IdpUserMetaBaseSQLProvider> {
-  public IdpUserMetaSQLProviderFactory() {
+  private static final IdpUserMetaSQLProviderFactory INSTANCE = new IdpUserMetaSQLProviderFactory();
+
+  private IdpUserMetaSQLProviderFactory() {
     super(
         "IdP user SQL provider",
         new IdpUserMetaBaseSQLProvider(),
@@ -36,29 +38,47 @@ public class IdpUserMetaSQLProviderFactory
         new IdpUserMetaPostgreSQLProvider());
   }
 
-  public String selectIdpUser(@Param("username") String username) {
-    return currentProvider().selectIdpUser(username);
+  public static IdpUserMetaBaseSQLProvider h2Provider() {
+    return INSTANCE.h2ProviderInstance();
   }
 
-  public String selectIdpUsers(@Param("usernames") List<String> usernames) {
-    return currentProvider().selectIdpUsers(usernames);
+  public static IdpUserMetaBaseSQLProvider mysqlProvider() {
+    return INSTANCE.mysqlProviderInstance();
   }
 
-  public String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
-    return currentProvider().insertIdpUser(userPO);
+  public static IdpUserMetaBaseSQLProvider postgresqlProvider() {
+    return INSTANCE.postgresqlProviderInstance();
   }
 
-  public String updateIdpUserPassword(
+  static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
+    return INSTANCE.resolveProvider(databaseId);
+  }
+
+  public static String selectIdpUser(@Param("username") String username) {
+    return INSTANCE.currentProviderInstance().selectIdpUser(username);
+  }
+
+  public static String selectIdpUsers(@Param("usernames") List<String> usernames) {
+    return INSTANCE.currentProviderInstance().selectIdpUsers(usernames);
+  }
+
+  public static String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
+    return INSTANCE.currentProviderInstance().insertIdpUser(userPO);
+  }
+
+  public static String updateIdpUserPassword(
       @Param("userId") Long userId, @Param("passwordHash") String passwordHash) {
-    return currentProvider().updateIdpUserPassword(userId, passwordHash);
+    return INSTANCE.currentProviderInstance().updateIdpUserPassword(userId, passwordHash);
   }
 
-  public String softDeleteIdpUser(@Param("userId") Long userId) {
-    return currentProvider().softDeleteIdpUser(userId);
+  public static String softDeleteIdpUser(@Param("userId") Long userId) {
+    return INSTANCE.currentProviderInstance().softDeleteIdpUser(userId);
   }
 
-  public String deleteIdpUserMetasByLegacyTimeline(
+  public static String deleteIdpUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return currentProvider().deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit);
+    return INSTANCE
+        .currentProviderInstance()
+        .deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }
