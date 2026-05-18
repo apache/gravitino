@@ -37,6 +37,12 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 @Tag("gravitino-docker-test")
 class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
+  private IdpGroupMetaMapper idpGroupMetaMapper;
+
+  @Override
+  protected void initializeMappers() {
+    idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
+  }
 
   @ParameterizedTest
   @MethodSource("storageProvider")

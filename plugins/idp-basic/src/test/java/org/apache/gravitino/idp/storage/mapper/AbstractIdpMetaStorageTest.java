@@ -47,13 +47,12 @@ abstract class AbstractIdpMetaStorageTest {
   private static final String H2_BACKEND = "h2";
   private static final String MYSQL_BACKEND = "mysql";
   private static final String POSTGRESQL_BACKEND = "postgresql";
+  private static final String STORAGE_BACKEND_PROPERTY = "idp.storage.test.backend";
   private static final TestDatabaseName MYSQL_TEST_DATABASE = TestDatabaseName.MYSQL_JDBC_BACKEND;
   private static final TestDatabaseName POSTGRESQL_TEST_DATABASE = TestDatabaseName.PG_JDBC_BACKEND;
 
   protected JDBCBackend backend;
   protected SqlSession sharedSession;
-  protected IdpGroupMetaMapper idpGroupMetaMapper;
-  protected IdpUserMetaMapper idpUserMetaMapper;
 
   private Config config;
   private Path h2Path;
@@ -84,8 +83,7 @@ abstract class AbstractIdpMetaStorageTest {
     backend = new JDBCBackend();
     backend.initialize(config);
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-    idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
-    idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
+    initializeMappers();
   }
 
   protected void restartBackend() throws IOException {
@@ -94,8 +92,7 @@ abstract class AbstractIdpMetaStorageTest {
     backend = new JDBCBackend();
     backend.initialize(config);
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-    idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
-    idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
+    initializeMappers();
   }
 
   protected void closeSession() {
@@ -104,6 +101,8 @@ abstract class AbstractIdpMetaStorageTest {
       sharedSession = null;
     }
   }
+
+  protected abstract void initializeMappers();
 
   private Config createBackendConfig(String type) throws IOException {
     Config backendConfig = new Config(false) {};
