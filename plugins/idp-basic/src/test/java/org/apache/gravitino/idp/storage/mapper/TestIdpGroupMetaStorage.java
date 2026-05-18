@@ -20,12 +20,17 @@
 package org.apache.gravitino.idp.storage.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.Comparator;
+import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.ibatis.exceptions.PersistenceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -53,6 +58,38 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
+  void testSelectIdpGroups(String type) throws IOException {
+    init(type);
+    IdpGroupPO firstGroup =
+        IdpGroupPO.builder()
+            .withGroupId(1L)
+            .withGroupName("dev")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    IdpGroupPO secondGroup =
+        IdpGroupPO.builder()
+            .withGroupId(2L)
+            .withGroupName("ops")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    idpGroupMetaMapper.insertIdpGroup(firstGroup);
+    idpGroupMetaMapper.insertIdpGroup(secondGroup);
+
+    List<IdpGroupPO> groups = idpGroupMetaMapper.selectIdpGroups(List.of("ops", "dev"));
+    groups.sort(Comparator.comparing(IdpGroupPO::getGroupId));
+    assertIterableEquals(List.of(firstGroup, secondGroup), groups);
+    List<IdpGroupPO> groupsWithEmptyFilter = idpGroupMetaMapper.selectIdpGroups(List.of());
+    groupsWithEmptyFilter.sort(Comparator.comparing(IdpGroupPO::getGroupId));
+    assertIterableEquals(List.of(firstGroup, secondGroup), groupsWithEmptyFilter);
+    assertThrows(PersistenceException.class, () -> idpGroupMetaMapper.selectIdpGroups(null));
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
   void testSelectIdpGroupIgnoresDeletedGroups(String type) throws IOException {
     init(type);
     IdpGroupPO activeGroup =
@@ -73,7 +110,8 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
             .withDeletedAt(10L)
             .build());
 
-    assertEquals(activeGroup, idpGroupMetaMapper.selectIdpGroup("dev"));
+    assertIterableEquals(
+        List.of(activeGroup), idpGroupMetaMapper.selectIdpGroups(List.of("dev", "ops")));
     assertNull(idpGroupMetaMapper.selectIdpGroup("ops"));
   }
 
@@ -92,9 +130,8 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
 
     assertEquals(1, idpGroupMetaMapper.softDeleteIdpGroup(1L));
     assertNull(idpGroupMetaMapper.selectIdpGroup("dev"));
-    assertTrue(queryLongValue("idp_group_meta", "deleted_at", "group_id", 1L) > 0L);
-    assertEquals(1L, queryLongValue("idp_group_meta", "current_version", "group_id", 1L));
-    assertEquals(0L, queryLongValue("idp_group_meta", "last_version", "group_id", 1L));
+    assertEquals(0, idpGroupMetaMapper.softDeleteIdpGroup(1L));
+    assertEquals(1, idpGroupMetaMapper.deleteIdpGroupMetasByLegacyTimeline(Long.MAX_VALUE, 10));
   }
 
   @ParameterizedTest
@@ -127,9 +164,12 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
             .build());
 
     assertEquals(1, idpGroupMetaMapper.deleteIdpGroupMetasByLegacyTimeline(20L, 10));
-    assertEquals(0, countRows("idp_group_meta", "group_id", 1L));
-    assertEquals(1, countRows("idp_group_meta", "group_id", 2L));
-    assertEquals(1, countRows("idp_group_meta", "group_id", 3L));
+    assertEquals(0, idpGroupMetaMapper.deleteIdpGroupMetasByLegacyTimeline(20L, 10));
+    assertEquals(1, idpGroupMetaMapper.deleteIdpGroupMetasByLegacyTimeline(40L, 10));
+    assertEquals(0, idpGroupMetaMapper.deleteIdpGroupMetasByLegacyTimeline(Long.MAX_VALUE, 10));
+    assertEquals("active-group", idpGroupMetaMapper.selectIdpGroup("active-group").getGroupName());
+    assertNull(idpGroupMetaMapper.selectIdpGroup("legacy-group"));
+    assertNull(idpGroupMetaMapper.selectIdpGroup("new-group"));
   }
 
   @ParameterizedTest

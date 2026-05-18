@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
+import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -39,6 +40,9 @@ public interface IdpGroupMetaMapper {
 
   @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroup")
   IdpGroupPO selectIdpGroup(@Param("groupName") String groupName);
+
+  @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroups")
+  List<IdpGroupPO> selectIdpGroups(@Param("groupNames") List<String> groupNames);
 
   @InsertProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "insertIdpGroup")
   void insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO);

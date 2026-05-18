@@ -176,9 +176,9 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
 
     assertEquals(1, idpUserMetaMapper.softDeleteIdpUser(1L));
     assertNull(idpUserMetaMapper.selectIdpUser("alice"));
-    assertTrue(queryLongValue("idp_user_meta", "deleted_at", "user_id", 1L) > 0L);
-    assertEquals(1L, queryLongValue("idp_user_meta", "current_version", "user_id", 1L));
-    assertEquals(0L, queryLongValue("idp_user_meta", "last_version", "user_id", 1L));
+    assertEquals(0, idpUserMetaMapper.softDeleteIdpUser(1L));
+    assertEquals(0, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
+    assertEquals(1, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
   }
 
   @ParameterizedTest
@@ -214,9 +214,12 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .build());
 
     assertEquals(1, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(20L, 10));
-    assertEquals(0, countRows("idp_user_meta", "user_id", 1L));
-    assertEquals(1, countRows("idp_user_meta", "user_id", 2L));
-    assertEquals(1, countRows("idp_user_meta", "user_id", 3L));
+    assertEquals(0, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(20L, 10));
+    assertEquals(1, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(40L, 10));
+    assertEquals(0, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
+    assertEquals("active-user", idpUserMetaMapper.selectIdpUser("active-user").getUserName());
+    assertNull(idpUserMetaMapper.selectIdpUser("legacy-user"));
+    assertNull(idpUserMetaMapper.selectIdpUser("new-user"));
   }
 
   @ParameterizedTest

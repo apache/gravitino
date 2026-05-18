@@ -19,7 +19,16 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.base;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
+import org.apache.ibatis.builder.BuilderException;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.mapping.SqlSource;
+import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
+import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -51,6 +60,48 @@ public class TestIdpGroupMetaBaseSQLProvider {
     Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta"));
     Assertions.assertTrue(
         normalizedSql.contains("WHERE group_name = #{groupName} AND deleted_at = 0"));
+  }
+
+  @Test
+  void testSelectIdpGroups() {
+    String script = createProvider().selectIdpGroups(Arrays.asList("dev", "ops"));
+    Map<String, Object> params = new HashMap<>();
+    params.put("groupNames", Arrays.asList("dev", "ops"));
+
+    String normalizedSql = renderScript(script, params);
+
+    Assertions.assertTrue(normalizedSql.contains("SELECT group_id as groupId"));
+    Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta"));
+    Assertions.assertTrue(normalizedSql.matches(".*group_name IN \\( \\? , \\? \\).*"));
+    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
+  }
+
+  @Test
+  void testSelectIdpGroupsWithEmptyGroupNames() {
+    String script = createProvider().selectIdpGroups(Collections.emptyList());
+    Map<String, Object> params = new HashMap<>();
+    params.put("groupNames", Collections.emptyList());
+
+    String normalizedSql = renderScript(script, params);
+
+    Assertions.assertFalse(
+        normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
+        "Empty groupNames should not generate invalid SQL IN (...) with no values");
+    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
+    Assertions.assertEquals(
+        "SELECT group_id as groupId, group_name as groupName, current_version as"
+            + " currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM"
+            + " idp_group_meta WHERE deleted_at = 0",
+        normalizedSql);
+  }
+
+  @Test
+  void testSelectIdpGroupsWithNullGroupNames() {
+    String script = createProvider().selectIdpGroups(null);
+    Map<String, Object> params = new HashMap<>();
+    params.put("groupNames", null);
+
+    Assertions.assertThrows(BuilderException.class, () -> renderScript(script, params));
   }
 
   @Test
@@ -100,5 +151,12 @@ public class TestIdpGroupMetaBaseSQLProvider {
         .withLastVersion(1L)
         .withDeletedAt(0L)
         .build();
+  }
+
+  private String renderScript(String script, Map<String, Object> params) {
+    SqlSource sqlSource =
+        new XMLLanguageDriver().createSqlSource(new Configuration(), script, Map.class);
+    BoundSql boundSql = sqlSource.getBoundSql(params);
+    return boundSql.getSql().replaceAll("\\s+", " ").trim();
   }
 }
