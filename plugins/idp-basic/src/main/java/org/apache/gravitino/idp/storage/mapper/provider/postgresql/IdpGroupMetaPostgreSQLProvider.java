@@ -16,19 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.storage.mapper.provider;
 
-import com.google.common.collect.ImmutableList;
-import java.util.List;
+package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
+
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
-import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
+import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
+import org.apache.ibatis.annotations.Param;
 
-/** Supplies built-in IdP mapper classes from the idp-basic plugin. */
-public class IdpBasicMapperPackageProvider implements MapperPackageProvider {
+public class IdpGroupMetaPostgreSQLProvider extends IdpGroupMetaBaseSQLProvider {
 
   @Override
-  public List<Class<?>> getMapperClasses() {
-    return ImmutableList.of(IdpUserMetaMapper.class, IdpGroupMetaMapper.class);
+  protected String currentTimeMillisExpression() {
+    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+  }
+
+  @Override
+  public String deleteIdpGroupMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " WHERE group_id IN (SELECT group_id FROM "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

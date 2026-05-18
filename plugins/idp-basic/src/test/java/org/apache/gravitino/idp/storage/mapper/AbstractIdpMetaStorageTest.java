@@ -38,6 +38,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigConstants;
+import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
@@ -57,6 +58,7 @@ abstract class AbstractIdpMetaStorageTest {
 
   protected JDBCBackend backend;
   protected SqlSession sharedSession;
+  protected IdpGroupMetaMapper idpGroupMetaMapper;
   protected IdpUserMetaMapper idpUserMetaMapper;
 
   private Config config;
@@ -88,6 +90,7 @@ abstract class AbstractIdpMetaStorageTest {
     backend = new JDBCBackend();
     backend.initialize(config);
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+    idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
   }
 
@@ -97,6 +100,7 @@ abstract class AbstractIdpMetaStorageTest {
     backend = new JDBCBackend();
     backend.initialize(config);
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+    idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
   }
 
@@ -118,6 +122,20 @@ abstract class AbstractIdpMetaStorageTest {
             .build();
     idpUserMetaMapper.insertIdpUser(userPO);
     return userPO;
+  }
+
+  protected IdpGroupPO insertGroup(
+      long groupId, String groupName, long currentVersion, long lastVersion, long deletedAt) {
+    IdpGroupPO groupPO =
+        IdpGroupPO.builder()
+            .withGroupId(groupId)
+            .withGroupName(groupName)
+            .withCurrentVersion(currentVersion)
+            .withLastVersion(lastVersion)
+            .withDeletedAt(deletedAt)
+            .build();
+    idpGroupMetaMapper.insertIdpGroup(groupPO);
+    return groupPO;
   }
 
   protected long queryLongValue(String table, String column, String idColumn, long idValue) {
