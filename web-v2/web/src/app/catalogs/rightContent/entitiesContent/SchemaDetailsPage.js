@@ -126,11 +126,13 @@ export default function SchemaDetailsPage() {
           anthEnable
             ? [
                 { label: 'Tables', key: 'Tables' },
+                { label: 'Views', key: 'Views' },
                 { label: 'Functions', key: 'Functions' },
                 { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Tables', key: 'Tables' },
+                { label: 'Views', key: 'Views' },
                 { label: 'Functions', key: 'Functions' }
               ]
         )
@@ -217,6 +219,18 @@ export default function SchemaDetailsPage() {
         children: undefined
       }
     })
+
+  const viewData = [...(store.views || [])]
+    .filter(c => {
+      if (search === '') return true
+
+      return c.name.includes(search)
+    })
+    .map(entity => ({
+      ...entity,
+      key: entity.name,
+      children: undefined
+    }))
 
   const tagContent = (
     <div>
@@ -441,9 +455,39 @@ export default function SchemaDetailsPage() {
     [nameCol, entityType, store.tableLoading, anthEnable, catalogData?.provider]
   )
 
+  const viewColumns = useMemo(
+    () => [
+      {
+        title: 'View Name',
+        dataIndex: 'name',
+        key: 'name',
+        width: 300,
+        ellipsis: true,
+        sorter: (a, b) => a?.name.toLowerCase().localeCompare(b?.name.toLowerCase()),
+        render: name => (
+          <Link
+            data-refer={`view-link-${name}`}
+            href={`/catalogs?metalake=${encodeURIComponent(currentMetalake)}&catalogType=${catalogType}&catalog=${encodeURIComponent(catalog)}&schema=${encodeURIComponent(schema)}&view=${encodeURIComponent(name)}`}
+          >
+            {name}
+          </Link>
+        )
+      }
+    ],
+    [currentMetalake, catalogType, catalog, schema]
+  )
+
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
     return { columns, minWidth: 100 }
   }, [columns])
+
+  const {
+    resizableColumns: viewResizableColumns,
+    components: viewComponents,
+    tableWidth: viewTableWidth
+  } = useAntdColumnResize(() => {
+    return { columns: viewColumns, minWidth: 100 }
+  }, [viewColumns])
 
   return (
     <div ref={ref}>
@@ -544,6 +588,24 @@ export default function SchemaDetailsPage() {
         />
       ) : tabKey === 'Functions' ? (
         <Functions metalake={currentMetalake} catalog={catalog} schema={schema} />
+      ) : tabKey === 'Views' ? (
+        <>
+          <Flex justify='flex-end' className='mb-4'>
+            <div className='flex w-1/3 gap-4'>
+              <Search name='searchViewInput' placeholder='Search...' value={search} onChange={onSearchTable} />
+            </div>
+          </Flex>
+          <Table
+            data-refer='view-list-grid'
+            size='small'
+            style={{ maxHeight: 'calc(100vh - 30rem)' }}
+            scroll={{ x: viewTableWidth, y: 'calc(100vh - 37rem)' }}
+            dataSource={viewData}
+            pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
+            columns={viewResizableColumns}
+            components={viewComponents}
+          />
+        </>
       ) : (
         <>
           <Flex justify='flex-end' className='mb-4'>

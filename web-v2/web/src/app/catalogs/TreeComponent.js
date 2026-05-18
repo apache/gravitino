@@ -302,6 +302,12 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
             <Icons.iconify icon='material-symbols:function' className='my-icon-small' />
           </span>
         )
+      case 'view':
+        return (
+          <span role='img' aria-label='view' className='anticon anticon-frown'>
+            <Icons.iconify icon='mdi:eye-outline' className='my-icon-small' />
+          </span>
+        )
       default:
         return <></>
     }
