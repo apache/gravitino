@@ -82,8 +82,8 @@ public class IdpGroupMetaSQLProviderFactory {
     return IDP_GROUP_META_POSTGRESQL_PROVIDER;
   }
 
-  public static String selectIdpGroup(@Param("groupname") String groupname) {
-    return getProvider(currentDatabaseId()).selectIdpGroup(groupname);
+  public static String selectIdpGroup(@Param("groupName") String groupName) {
+    return getProvider(currentDatabaseId()).selectIdpGroup(groupName);
   }
 
   public static String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {

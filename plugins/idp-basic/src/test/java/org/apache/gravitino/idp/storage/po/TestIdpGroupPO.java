@@ -28,14 +28,14 @@ public class TestIdpGroupPO {
     IdpGroupPO groupPO =
         IdpGroupPO.builder()
             .withGroupId(1L)
-            .withGroupname("engineering")
+            .withGroupName("engineering")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
     Assertions.assertEquals(1L, groupPO.getGroupId());
-    Assertions.assertEquals("engineering", groupPO.getGroupname());
+    Assertions.assertEquals("engineering", groupPO.getGroupName());
     Assertions.assertEquals(1L, groupPO.getCurrentVersion());
     Assertions.assertEquals(1L, groupPO.getLastVersion());
     Assertions.assertEquals(0L, groupPO.getDeletedAt());
@@ -46,7 +46,7 @@ public class TestIdpGroupPO {
     IdpGroupPO groupPO1 =
         IdpGroupPO.builder()
             .withGroupId(1L)
-            .withGroupname("engineering")
+            .withGroupName("engineering")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -55,7 +55,7 @@ public class TestIdpGroupPO {
     IdpGroupPO groupPO2 =
         IdpGroupPO.builder()
             .withGroupId(1L)
-            .withGroupname("engineering")
+            .withGroupName("engineering")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -70,15 +70,15 @@ public class TestIdpGroupPO {
     var builder =
         IdpGroupPO.builder()
             .withGroupId(1L)
-            .withGroupname("engineering")
+            .withGroupName("engineering")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L);
 
     IdpGroupPO firstGroup = builder.build();
-    IdpGroupPO secondGroup = builder.withGroupname("platform").build();
+    IdpGroupPO secondGroup = builder.withGroupName("platform").build();
 
-    Assertions.assertEquals("engineering", firstGroup.getGroupname());
-    Assertions.assertEquals("platform", secondGroup.getGroupname());
+    Assertions.assertEquals("engineering", firstGroup.getGroupName());
+    Assertions.assertEquals("platform", secondGroup.getGroupName());
   }
 }
