@@ -125,4 +125,9 @@ public class TablePOStorageOps extends BasePOStorageOps<TablePO, TableMetaMapper
   public boolean supportsParentIdRelationalRead() {
     return true;
   }
+
+  @Override
+  protected Entity.EntityType entityType() {
+    return Entity.EntityType.TABLE;
+  }
 }

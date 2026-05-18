@@ -148,5 +148,10 @@ public class TestPOStorageReadRouting {
       listByFullNsCalled = true;
       return Collections.emptyList();
     }
+
+    @Override
+    protected Entity.EntityType entityType() {
+      return Entity.EntityType.SCHEMA;
+    }
   }
 }

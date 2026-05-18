@@ -48,7 +48,6 @@ import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.PolicyContent;
@@ -57,7 +56,6 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -374,89 +372,6 @@ public class TestMetadataObjectService extends TestJDBCBackend {
         MetadataObjectService.fromGenericEntities(functionEntities);
 
     assertTrue(metadataObjects.isEmpty());
-  }
-
-  @TestTemplate
-  public void testGetSchemaObjectsFullNameReturnsLogicalSeparatorForNestedSchema()
-      throws IOException {
-    String catalogName = "test_nested_schema_catalog";
-    String nestedSchemaName = "ns_a:ns_b:leaf";
-    createAndInsertCatalog(METALAKE_NAME, catalogName);
-
-    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
-    SchemaEntity nestedSchema =
-        SchemaEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(nestedSchemaName)
-            .withNamespace(Namespace.of(METALAKE_NAME, catalogName))
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    schemaMetaService.insertSchema(nestedSchema, false);
-
-    SchemaEntity loaded =
-        schemaMetaService.getSchemaByIdentifier(
-            NameIdentifier.of(METALAKE_NAME, catalogName, nestedSchemaName));
-
-    List<GenericEntity> schemaEntities =
-        List.of(
-            GenericEntity.builder()
-                .withId(loaded.id())
-                .withName(loaded.name())
-                .withNamespace(loaded.namespace())
-                .withEntityType(Entity.EntityType.SCHEMA)
-                .build());
-
-    List<MetadataObject> metadataObjects =
-        MetadataObjectService.fromGenericEntities(schemaEntities);
-
-    assertEquals(1, metadataObjects.size());
-    MetadataObject schemaObject = metadataObjects.get(0);
-    assertEquals(MetadataObject.Type.SCHEMA, schemaObject.type());
-    assertEquals(catalogName + "." + nestedSchemaName, schemaObject.fullName());
-    assertTrue(
-        !schemaObject.fullName().contains(HierarchicalSchemaUtil.physicalSeparator()),
-        "Internal physical separator must not leak into metadata-object full names.");
-  }
-
-  @TestTemplate
-  public void testGetTableObjectsFullNameUsesLogicalSchemaSegmentForNestedSchema()
-      throws IOException {
-    String catalogName = "test_nested_table_catalog";
-    String nestedSchemaName = "ns_a:ns_b:leaf";
-    String tableName = "table_under_nested";
-    createAndInsertCatalog(METALAKE_NAME, catalogName);
-
-    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
-    SchemaEntity nestedSchema =
-        SchemaEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(nestedSchemaName)
-            .withNamespace(Namespace.of(METALAKE_NAME, catalogName))
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    schemaMetaService.insertSchema(nestedSchema, false);
-
-    Namespace tableNamespace = Namespace.of(METALAKE_NAME, catalogName, nestedSchemaName);
-    TableEntity table = createAndInsertTableEntity(tableNamespace, tableName);
-
-    List<GenericEntity> tableEntities =
-        List.of(
-            GenericEntity.builder()
-                .withId(table.id())
-                .withName(table.name())
-                .withNamespace(table.namespace())
-                .withEntityType(Entity.EntityType.TABLE)
-                .build());
-
-    List<MetadataObject> metadataObjects = MetadataObjectService.fromGenericEntities(tableEntities);
-
-    assertEquals(1, metadataObjects.size());
-    MetadataObject tableObject = metadataObjects.get(0);
-    assertEquals(MetadataObject.Type.TABLE, tableObject.type());
-    assertEquals(catalogName + "." + nestedSchemaName + "." + tableName, tableObject.fullName());
-    assertTrue(
-        !tableObject.fullName().contains(HierarchicalSchemaUtil.physicalSeparator()),
-        "Internal physical separator must not leak into metadata-object full names.");
   }
 
   private FunctionEntity createAndInsertFunctionEntity(Namespace namespace, String functionName)

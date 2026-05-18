@@ -26,17 +26,13 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -135,61 +131,6 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUpdateSchemaRenameAndProperties() throws IOException {
-    createAndInsertMakeLake(metalakeName);
-    createAndInsertCatalog(metalakeName, catalogName);
-
-    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
-    String originalName = "schema_to_rename";
-    String renamedName = "schema_renamed";
-
-    SchemaEntity schemaEntity =
-        SchemaEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(originalName)
-            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
-            .withComment("original comment")
-            .withProperties(Collections.singletonMap("k1", "v1"))
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    schemaMetaService.insertSchema(schemaEntity, false);
-
-    SchemaEntity updated =
-        schemaMetaService.updateSchema(
-            schemaEntity.nameIdentifier(),
-            entity -> {
-              SchemaEntity s = (SchemaEntity) entity;
-              return SchemaEntity.builder()
-                  .withId(s.id())
-                  .withName(renamedName)
-                  .withNamespace(s.namespace())
-                  .withComment("updated comment")
-                  .withProperties(Collections.singletonMap("k2", "v2"))
-                  .withAuditInfo(s.auditInfo())
-                  .build();
-            });
-
-    Assertions.assertEquals(renamedName, updated.name());
-    Assertions.assertEquals("updated comment", updated.comment());
-    Assertions.assertEquals(Map.of("k2", "v2"), updated.properties());
-
-    SchemaEntity loaded =
-        schemaMetaService.getSchemaByIdentifier(
-            NameIdentifier.of(metalakeName, catalogName, renamedName));
-    Assertions.assertEquals(schemaEntity.id(), loaded.id());
-    Assertions.assertEquals(renamedName, loaded.name());
-    Assertions.assertEquals("updated comment", loaded.comment());
-    Assertions.assertEquals(Map.of("k2", "v2"), loaded.properties());
-
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            schemaMetaService.getSchemaByIdentifier(
-                NameIdentifier.of(metalakeName, catalogName, originalName)),
-        "Original name must no longer resolve after rename.");
-  }
-
-  @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
@@ -267,84 +208,6 @@ public class TestSchemaMetaService extends TestJDBCBackend {
 
     topicMetaService.deleteTopic(topic.nameIdentifier());
     schemaMetaService.deleteSchema(schema.nameIdentifier(), false);
-  }
-
-  @TestTemplate
-  public void testDeleteSchemaNonCascadeFailsWhenNestedChildExists() throws IOException {
-    createAndInsertMakeLake(metalakeName);
-    createAndInsertCatalog(metalakeName, catalogName);
-
-    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
-    String leaf = "ns_a:ns_b";
-    String ancestorA = "ns_a";
-    SchemaEntity hierarchical =
-        SchemaEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(leaf)
-            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    schemaMetaService.insertSchema(hierarchical, false);
-
-    NameIdentifier ancestorIdent = NameIdentifier.of(metalakeName, catalogName, ancestorA);
-    Assertions.assertThrows(
-        NonEmptyEntityException.class,
-        () -> schemaMetaService.deleteSchema(ancestorIdent, false),
-        "Non-cascading delete must fail when nested descendant schemas exist.");
-
-    // Ancestor row must still exist after the rejected delete.
-    SchemaEntity stillThere = schemaMetaService.getSchemaByIdentifier(ancestorIdent);
-    Assertions.assertEquals(ancestorA, stillThere.name());
-  }
-
-  @TestTemplate
-  public void testDeleteSchemaCascadeRemovesNestedDescendants() throws IOException {
-    createAndInsertMakeLake(metalakeName);
-    createAndInsertCatalog(metalakeName, catalogName);
-
-    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
-    String leaf = "ns_a:ns_b:leaf";
-    String ancestorA = "ns_a";
-    String ancestorAB = "ns_a:ns_b";
-    SchemaEntity hierarchical =
-        SchemaEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(leaf)
-            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    schemaMetaService.insertSchema(hierarchical, false);
-
-    // Insert a table under the deepest schema so we can verify it is also removed.
-    Namespace leafNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, leaf);
-    TableEntity tableUnderLeaf =
-        createTableEntity(
-            RandomIdGenerator.INSTANCE.nextId(), leafNamespace, "table_under_leaf", AUDIT_INFO);
-    backend.insert(tableUnderLeaf, false);
-
-    NameIdentifier ancestorIdent = NameIdentifier.of(metalakeName, catalogName, ancestorA);
-    Assertions.assertTrue(schemaMetaService.deleteSchema(ancestorIdent, true));
-
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> schemaMetaService.getSchemaByIdentifier(ancestorIdent),
-        "Ancestor schema must be gone after cascade delete.");
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            schemaMetaService.getSchemaByIdentifier(
-                NameIdentifier.of(metalakeName, catalogName, ancestorAB)),
-        "Middle descendant schema must be gone after cascade delete.");
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            schemaMetaService.getSchemaByIdentifier(
-                NameIdentifier.of(metalakeName, catalogName, leaf)),
-        "Leaf descendant schema must be gone after cascade delete.");
-
-    Assertions.assertFalse(
-        backend.exists(tableUnderLeaf.nameIdentifier(), Entity.EntityType.TABLE),
-        "Table under deepest descendant schema must be removed by cascade delete.");
   }
 
   @TestTemplate

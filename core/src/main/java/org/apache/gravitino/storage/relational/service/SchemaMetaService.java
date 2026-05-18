@@ -278,120 +278,81 @@ public class SchemaMetaService {
     String schemaFullName =
         NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName).toString();
 
-    List<SchemaPO> descendantSchemaPOs = listDescendantSchemaPOs(schemaPO);
-
     if (cascade) {
-      List<Long> schemaIdsToDelete = new ArrayList<>();
-      schemaIdsToDelete.add(schemaId);
-      List<String> schemaFullNamesToLog = new ArrayList<>();
-      schemaFullNamesToLog.add(schemaFullName);
-      for (SchemaPO descendant : descendantSchemaPOs) {
-        schemaIdsToDelete.add(descendant.getSchemaId());
-        schemaFullNamesToLog.add(
-            NameIdentifierUtil.ofSchema(metalakeName, catalogName, descendant.getSchemaName())
-                .toString());
-      }
-
-      List<Runnable> operations = new ArrayList<>();
-      for (Long sid : schemaIdsToDelete) {
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TableColumnMapper.class, mapper -> mapper.softDeleteColumnsBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetMetaMapper.class,
-                    mapper -> mapper.softDeleteFilesetMetasBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FilesetVersionMapper.class,
-                    mapper -> mapper.softDeleteFilesetVersionsBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FunctionMetaMapper.class,
-                    mapper -> mapper.softDeleteFunctionMetasBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    FunctionVersionMetaMapper.class,
-                    mapper -> mapper.softDeleteFunctionVersionMetasBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SecurableObjectMapper.class,
-                    mapper -> mapper.softDeleteObjectRelsBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    TagMetadataObjectRelMapper.class,
-                    mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    PolicyMetadataObjectRelMapper.class,
-                    mapper -> mapper.softDeletePolicyMetadataObjectRelsBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ModelVersionAliasRelMapper.class,
-                    mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ModelVersionMetaMapper.class,
-                    mapper -> mapper.softDeleteModelVersionMetasBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ModelMetaMapper.class, mapper -> mapper.softDeleteModelMetasBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    StatisticMetaMapper.class,
-                    mapper -> mapper.softDeleteStatisticsBySchemaId(sid)));
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasBySchemaId(sid)));
-      }
-      for (String fullName : schemaFullNamesToLog) {
-        operations.add(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    EntityChangeLogMapper.class,
-                    mapper ->
-                        mapper.insertEntityChange(
-                            metalakeName,
-                            Entity.EntityType.SCHEMA.name(),
-                            fullName,
-                            OperateType.DROP)));
-      }
-      SessionUtils.doMultipleWithCommit(operations.toArray(new Runnable[0]));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SchemaMetaMapper.class,
+                  mapper -> mapper.softDeleteSchemaMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TableMetaMapper.class, mapper -> mapper.softDeleteTableMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TableColumnMapper.class, mapper -> mapper.softDeleteColumnsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetMetaMapper.class,
+                  mapper -> mapper.softDeleteFilesetMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FilesetVersionMapper.class,
+                  mapper -> mapper.softDeleteFilesetVersionsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TopicMetaMapper.class, mapper -> mapper.softDeleteTopicMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FunctionMetaMapper.class,
+                  mapper -> mapper.softDeleteFunctionMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  FunctionVersionMetaMapper.class,
+                  mapper -> mapper.softDeleteFunctionVersionMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class, mapper -> mapper.softDeleteOwnerRelBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SecurableObjectMapper.class,
+                  mapper -> mapper.softDeleteObjectRelsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TagMetadataObjectRelMapper.class,
+                  mapper -> mapper.softDeleteTagMetadataObjectRelsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyMetadataObjectRelMapper.class,
+                  mapper -> mapper.softDeletePolicyMetadataObjectRelsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ModelVersionAliasRelMapper.class,
+                  mapper -> mapper.softDeleteModelVersionAliasRelsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ModelVersionMetaMapper.class,
+                  mapper -> mapper.softDeleteModelVersionMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ModelMetaMapper.class, mapper -> mapper.softDeleteModelMetasBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  StatisticMetaMapper.class,
+                  mapper -> mapper.softDeleteStatisticsBySchemaId(schemaId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasBySchemaId(schemaId)),
+          () -> {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.SCHEMA.name(),
+                        schemaFullName,
+                        OperateType.DROP));
+          });
     } else {
-      if (!descendantSchemaPOs.isEmpty()) {
-        throw new NonEmptyEntityException(
-            "Entity %s has nested child schemas, you should remove sub-entities first or use cascade",
-            identifier);
-      }
       List<TableEntity> tableEntities =
           TableMetaService.getInstance()
               .listTablesByNamespace(
@@ -516,29 +477,6 @@ public class SchemaMetaService {
     return SessionUtils.getWithoutCommit(
         SchemaMetaMapper.class,
         mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.SCHEMA));
-  }
-
-  /**
-   * Returns descendant schema rows for a hierarchical schema. Both {@code parent} and the returned
-   * rows carry logical schema names (because {@code ops} is the hierarchical-conversion wrapper),
-   * so descendants are identified by a {@code parentName + separator} prefix on the logical name.
-   * Returns an empty list when the parent has no descendants or is not hierarchical.
-   */
-  private List<SchemaPO> listDescendantSchemaPOs(SchemaPO parent) {
-    String parentName = parent.getSchemaName();
-    if (parentName == null) {
-      return Collections.emptyList();
-    }
-    String prefix = parentName + HierarchicalSchemaUtil.schemaSeparator();
-    List<SchemaPO> siblings =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> ops.listPOs(mapper, parent.getCatalogId()));
-    if (siblings == null || siblings.isEmpty()) {
-      return Collections.emptyList();
-    }
-    return siblings.stream()
-        .filter(po -> po.getSchemaName() != null && po.getSchemaName().startsWith(prefix))
-        .collect(Collectors.toList());
   }
 
   private void fillSchemaPOBuilderParentEntityId(SchemaPO.Builder builder, Namespace namespace) {
