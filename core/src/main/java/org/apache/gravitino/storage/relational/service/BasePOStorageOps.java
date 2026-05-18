@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.util.List;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 
@@ -76,6 +75,4 @@ public abstract class BasePOStorageOps<PO, Mapper> {
     throw new UnsupportedOperationException(
         "listPOsByNSFullName is not supported by " + getClass().getSimpleName());
   }
-
-  protected abstract Entity.EntityType entityType();
 }

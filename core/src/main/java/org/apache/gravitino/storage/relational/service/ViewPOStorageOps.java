@@ -117,9 +117,4 @@ public class ViewPOStorageOps extends BasePOStorageOps<ViewPO, ViewMetaMapper> {
   public boolean supportsParentIdRelationalRead() {
     return true;
   }
-
-  @Override
-  protected Entity.EntityType entityType() {
-    return Entity.EntityType.VIEW;
-  }
 }

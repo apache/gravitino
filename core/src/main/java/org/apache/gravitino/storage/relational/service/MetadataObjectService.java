@@ -62,6 +62,7 @@ import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.po.ViewPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -648,11 +649,26 @@ public class MetadataObjectService {
             return;
           }
 
-          String fullName = DOT_JOINER.join(catalogName, schemaPO.getSchemaName());
+          String fullName =
+              DOT_JOINER.join(catalogName, toLogicalSchemaName(schemaPO.getSchemaName()));
 
           schemaIdAndNameMap.put(schemaPO.getSchemaId(), fullName);
         });
 
     return schemaIdAndNameMap;
+  }
+
+  /**
+   * The {@link SchemaPOStorageOps} in {@link #TYPE_TO_STORAGE_OPS_MAP} is unwrapped, so the schema
+   * name returned from the database is in physical form. Convert it back to the logical, API-facing
+   * form so the separator does not leak into metadata-object full names.
+   */
+  private static String toLogicalSchemaName(String physicalName) {
+    if (physicalName == null
+        || !physicalName.contains(HierarchicalSchemaUtil.physicalSeparator())) {
+      return physicalName;
+    }
+    return HierarchicalSchemaUtil.physicalToLogical(
+        physicalName, HierarchicalSchemaUtil.schemaSeparator());
   }
 }
