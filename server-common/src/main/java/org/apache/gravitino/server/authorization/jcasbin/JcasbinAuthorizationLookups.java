@@ -27,7 +27,6 @@ import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /**
  * Two-tier metadata-id and owner resolution for {@link JcasbinAuthorizer}.
@@ -43,8 +42,8 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
  */
 public class JcasbinAuthorizationLookups {
 
-  /** Key separator for internal path-based cache keys. */
-  static final String KEY_SEP = HierarchicalSchemaUtil.internalSeparator();
+  /** Unit Separator for internal path-based cache keys. */
+  static final String KEY_SEP = "\u001F";
 
   private final GravitinoCache<String, Long> metadataIdCache;
   private final GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache;

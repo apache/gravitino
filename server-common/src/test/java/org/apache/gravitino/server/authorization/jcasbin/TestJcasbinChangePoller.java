@@ -36,7 +36,6 @@ import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -129,7 +128,7 @@ public class TestJcasbinChangePoller {
   }
 
   private static String key(String... parts) {
-    return String.join(HierarchicalSchemaUtil.internalSeparator(), parts);
+    return String.join(JcasbinAuthorizationLookups.KEY_SEP, parts);
   }
 
   private static EntityChangeRecord change(long id, MetadataObject.Type type, String fullName) {

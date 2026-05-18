@@ -27,7 +27,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -158,7 +157,7 @@ public class TestJcasbinAuthorizationLookups {
   }
 
   private static String key(String... parts) {
-    return String.join(HierarchicalSchemaUtil.internalSeparator(), parts);
+    return String.join(JcasbinAuthorizationLookups.KEY_SEP, parts);
   }
 
   private static class CountingCache<K, V> implements GravitinoCache<K, V> {
