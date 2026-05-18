@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -373,7 +375,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
     SQLRepresentation rep =
         SQLRepresentation.builder()
             .withDialect(Dialects.HIVE)
-            .withSql(representationSql != null ? representationSql : "")
+            .withSql(StringUtils.defaultString(representationSql))
             .build();
 
     return HiveView.builder()
@@ -391,17 +393,18 @@ class HiveViewCatalogOperations implements ViewCatalog {
       String defaultCatalog,
       String defaultSchema,
       NameIdentifier ident) {
+    int representationCount = representations == null ? 0 : representations.length;
+    Representation firstRepresentation =
+        ArrayUtils.isEmpty(representations) ? null : representations[0];
     Preconditions.checkArgument(
-        representations.length == 1 && representations[0] instanceof SQLRepresentation,
+        representationCount == 1 && firstRepresentation instanceof SQLRepresentation,
         "Hive catalog requires exactly one SQL representation for view %s, but got %s"
             + " representation(s), first representation type is %s",
         ident,
-        representations.length,
-        representations.length == 0 || representations[0] == null
-            ? "null"
-            : representations[0].getClass().getSimpleName());
+        representationCount,
+        firstRepresentation == null ? "null" : firstRepresentation.getClass().getSimpleName());
 
-    SQLRepresentation selected = (SQLRepresentation) representations[0];
+    SQLRepresentation selected = (SQLRepresentation) firstRepresentation;
     boolean isHiveDialect = Dialects.HIVE.equalsIgnoreCase(selected.dialect());
     if (!isHiveDialect) {
       // TODO(design-docs/gravitino-logical-view-management.md): support creating trino/spark HMS

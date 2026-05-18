@@ -64,6 +64,16 @@ class TestHiveView {
   }
 
   @Test
+  void testBuildWithoutValidNameThrows() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> HiveView.builder().withRepresentations(hiveRepresentations()).build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> HiveView.builder().withName("").withRepresentations(hiveRepresentations()).build());
+  }
+
+  @Test
   void testBuildWithoutRepresentationsThrows() {
     assertThrows(IllegalArgumentException.class, () -> HiveView.builder().withName("v1").build());
   }

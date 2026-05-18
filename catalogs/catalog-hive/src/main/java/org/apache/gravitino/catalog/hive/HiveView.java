@@ -28,6 +28,8 @@ import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
@@ -116,7 +118,7 @@ public class HiveView implements View {
     if (parameters != null && "true".equalsIgnoreCase(parameters.get(TRINO_VIEW_MARKER_KEY))) {
       return Dialects.TRINO;
     }
-    if (viewOriginalText != null && viewOriginalText.startsWith(TRINO_VIEW_PREFIX)) {
+    if (StringUtils.startsWith(viewOriginalText, TRINO_VIEW_PREFIX)) {
       return Dialects.TRINO;
     }
     if (parameters != null && parameters.containsKey(SPARK_VERSION_KEY)) {
@@ -133,10 +135,9 @@ public class HiveView implements View {
      * @return The constructed view.
      */
     public HiveView build() {
-      Preconditions.checkArgument(name != null && !name.isEmpty(), "View name is required");
+      Preconditions.checkArgument(StringUtils.isNotEmpty(name), "View name is required");
       Preconditions.checkArgument(
-          representations != null && representations.length > 0,
-          "Representations must not be null or empty");
+          ArrayUtils.isNotEmpty(representations), "Representations must not be null or empty");
       for (SQLRepresentation representation : representations) {
         Preconditions.checkArgument(
             representation != null, "Representations must not contain null elements");

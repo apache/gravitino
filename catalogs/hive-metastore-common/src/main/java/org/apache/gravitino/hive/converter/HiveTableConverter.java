@@ -42,6 +42,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hive.StorageFormat;
 import org.apache.gravitino.hive.HiveColumn;
 import org.apache.gravitino.hive.HivePartition;
@@ -86,10 +87,8 @@ public class HiveTableConverter {
       // Hive2 doesn't have getCatName method, catalogName will be null
     }
 
-    String viewOriginalText = table.getViewOriginalText();
-    if (viewOriginalText == null) {
-      viewOriginalText = table.getViewExpandedText();
-    }
+    String viewOriginalText =
+        StringUtils.defaultString(table.getViewOriginalText(), table.getViewExpandedText());
 
     HiveTable hiveTable =
         HiveTable.builder()
