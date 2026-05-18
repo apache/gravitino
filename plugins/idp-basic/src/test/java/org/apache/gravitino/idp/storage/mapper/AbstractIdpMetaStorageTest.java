@@ -38,8 +38,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigConstants;
-import org.apache.gravitino.idp.storage.po.IdpGroupPO;
-import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
@@ -102,40 +100,6 @@ abstract class AbstractIdpMetaStorageTest {
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
     idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
-  }
-
-  protected IdpUserPO insertUser(
-      long userId,
-      String userName,
-      String passwordHash,
-      long currentVersion,
-      long lastVersion,
-      long deletedAt) {
-    IdpUserPO userPO =
-        IdpUserPO.builder()
-            .withUserId(userId)
-            .withUserName(userName)
-            .withPasswordHash(passwordHash)
-            .withCurrentVersion(currentVersion)
-            .withLastVersion(lastVersion)
-            .withDeletedAt(deletedAt)
-            .build();
-    idpUserMetaMapper.insertIdpUser(userPO);
-    return userPO;
-  }
-
-  protected IdpGroupPO insertGroup(
-      long groupId, String groupName, long currentVersion, long lastVersion, long deletedAt) {
-    IdpGroupPO groupPO =
-        IdpGroupPO.builder()
-            .withGroupId(groupId)
-            .withGroupName(groupName)
-            .withCurrentVersion(currentVersion)
-            .withLastVersion(lastVersion)
-            .withDeletedAt(deletedAt)
-            .build();
-    idpGroupMetaMapper.insertIdpGroup(groupPO);
-    return groupPO;
   }
 
   protected long queryLongValue(String table, String column, String idColumn, long idValue) {

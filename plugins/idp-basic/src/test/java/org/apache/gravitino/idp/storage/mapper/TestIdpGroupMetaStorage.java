@@ -37,7 +37,15 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testInsertIdpGroupAndSelectIdpGroup(String type) throws IOException {
     init(type);
-    IdpGroupPO firstGroup = insertGroup(1L, "dev", 1L, 0L, 0L);
+    IdpGroupPO firstGroup =
+        IdpGroupPO.builder()
+            .withGroupId(1L)
+            .withGroupName("dev")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    idpGroupMetaMapper.insertIdpGroup(firstGroup);
 
     assertEquals(firstGroup, idpGroupMetaMapper.selectIdpGroup("dev"));
     assertNull(idpGroupMetaMapper.selectIdpGroup("unknown"));
@@ -47,8 +55,23 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testSelectIdpGroupIgnoresDeletedGroups(String type) throws IOException {
     init(type);
-    IdpGroupPO activeGroup = insertGroup(1L, "dev", 1L, 0L, 0L);
-    insertGroup(2L, "ops", 1L, 0L, 10L);
+    IdpGroupPO activeGroup =
+        IdpGroupPO.builder()
+            .withGroupId(1L)
+            .withGroupName("dev")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    idpGroupMetaMapper.insertIdpGroup(activeGroup);
+    idpGroupMetaMapper.insertIdpGroup(
+        IdpGroupPO.builder()
+            .withGroupId(2L)
+            .withGroupName("ops")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(10L)
+            .build());
 
     assertEquals(activeGroup, idpGroupMetaMapper.selectIdpGroup("dev"));
     assertNull(idpGroupMetaMapper.selectIdpGroup("ops"));
@@ -58,7 +81,14 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testSoftDeleteIdpGroup(String type) throws IOException {
     init(type);
-    insertGroup(1L, "dev", 1L, 0L, 0L);
+    idpGroupMetaMapper.insertIdpGroup(
+        IdpGroupPO.builder()
+            .withGroupId(1L)
+            .withGroupName("dev")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build());
 
     assertEquals(1, idpGroupMetaMapper.softDeleteIdpGroup(1L));
     assertNull(idpGroupMetaMapper.selectIdpGroup("dev"));
@@ -71,9 +101,30 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testDeleteIdpGroupMetasByLegacyTimeline(String type) throws IOException {
     init(type);
-    insertGroup(1L, "legacy-group", 1L, 0L, 10L);
-    insertGroup(2L, "new-group", 1L, 0L, 30L);
-    insertGroup(3L, "active-group", 1L, 0L, 0L);
+    idpGroupMetaMapper.insertIdpGroup(
+        IdpGroupPO.builder()
+            .withGroupId(1L)
+            .withGroupName("legacy-group")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(10L)
+            .build());
+    idpGroupMetaMapper.insertIdpGroup(
+        IdpGroupPO.builder()
+            .withGroupId(2L)
+            .withGroupName("new-group")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(30L)
+            .build());
+    idpGroupMetaMapper.insertIdpGroup(
+        IdpGroupPO.builder()
+            .withGroupId(3L)
+            .withGroupName("active-group")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build());
 
     assertEquals(1, idpGroupMetaMapper.deleteIdpGroupMetasByLegacyTimeline(20L, 10));
     assertEquals(0, countRows("idp_group_meta", "group_id", 1L));
@@ -85,8 +136,23 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testRestart(String type) throws IOException {
     init(type);
-    IdpGroupPO expectedActiveGroup = insertGroup(1L, "dev", 3L, 2L, 0L);
-    insertGroup(2L, "ops", 1L, 0L, 10L);
+    IdpGroupPO expectedActiveGroup =
+        IdpGroupPO.builder()
+            .withGroupId(1L)
+            .withGroupName("dev")
+            .withCurrentVersion(3L)
+            .withLastVersion(2L)
+            .withDeletedAt(0L)
+            .build();
+    idpGroupMetaMapper.insertIdpGroup(expectedActiveGroup);
+    idpGroupMetaMapper.insertIdpGroup(
+        IdpGroupPO.builder()
+            .withGroupId(2L)
+            .withGroupName("ops")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(10L)
+            .build());
 
     assertPersistedGroups(expectedActiveGroup);
 
