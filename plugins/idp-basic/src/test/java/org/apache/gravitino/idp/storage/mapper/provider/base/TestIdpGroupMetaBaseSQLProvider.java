@@ -72,7 +72,8 @@ public class TestIdpGroupMetaBaseSQLProvider {
 
     Assertions.assertTrue(normalizedSql.contains("SELECT group_id as groupId"));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta"));
-    Assertions.assertTrue(normalizedSql.matches(".*group_name IN \\( \\? , \\? \\).*"));
+    Assertions.assertTrue(
+        normalizedSql.matches(".*group_name IN\\s*\\(\\s*\\?\\s*,\\s*\\?\\s*\\).*"));
     Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
   }
 
