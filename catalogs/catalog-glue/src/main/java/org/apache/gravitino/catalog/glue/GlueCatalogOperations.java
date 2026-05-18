@@ -173,13 +173,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       glueClient.close();
       glueClient = null;
     }
-    if (icebergGlueCatalog instanceof AutoCloseable closeable) {
-      try {
-        closeable.close();
-      } catch (Exception e) {
-        LOG.warn("Failed to close Iceberg GlueCatalog", e);
-      }
-    }
   }
 
   @Override
