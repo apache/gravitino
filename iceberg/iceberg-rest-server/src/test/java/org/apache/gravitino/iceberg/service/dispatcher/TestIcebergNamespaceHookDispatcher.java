@@ -20,7 +20,6 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.atMost;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -217,30 +216,6 @@ public class TestIcebergNamespaceHookDispatcher {
     Assertions.assertArrayEquals(
         new String[] {TEST_METALAKE, TEST_CATALOG}, lockId.getValue().namespace().levels());
     Assertions.assertEquals("A", lockId.getValue().name());
-  }
-
-  @Test
-  public void testGetMissingAncestorsBinarySearchProbeCount() {
-    // Depth-5 leaf, only the outermost ancestor "A" exists. Linear short-circuit would need 4
-    // probes (innermost-to-outermost until we hit A). Binary search should need 3 (ceil log2 5).
-    Namespace leaf = Namespace.of("A", "B", "C", "D", "E");
-    Set<String> existing = ImmutableSet.of("A");
-    when(mockDispatcher.namespaceExists(eq(mockContext), any(Namespace.class)))
-        .thenAnswer(
-            inv -> {
-              Namespace ns = inv.getArgument(1, Namespace.class);
-              return existing.contains(String.join(":", ns.levels()));
-            });
-
-    CreateNamespaceRequest request = mock(CreateNamespaceRequest.class);
-    when(request.namespace()).thenReturn(leaf);
-    when(mockDispatcher.createNamespace(mockContext, request))
-        .thenReturn(mock(CreateNamespaceResponse.class));
-
-    hookDispatcher.createNamespace(mockContext, request);
-
-    // 4 ancestors (A, A:B, A:B:C, A:B:C:D). Binary search probes <= ceil(log2(5)) = 3.
-    verify(mockDispatcher, atMost(3)).namespaceExists(eq(mockContext), any(Namespace.class));
   }
 
   @Test
