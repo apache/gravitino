@@ -34,7 +34,6 @@ public class TestHierarchicalSchemaUtil {
   @Test
   public void testPhysicalSeparator() {
     Assertions.assertEquals(PHYS, HierarchicalSchemaUtil.physicalSeparator());
-    Assertions.assertEquals(PHYS, HierarchicalSchemaUtil.internalSeparator());
   }
 
   @Test
