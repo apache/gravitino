@@ -37,12 +37,27 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 @Tag("gravitino-docker-test")
 class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
+  private IdpUserMetaMapper idpUserMetaMapper;
+
+  @Override
+  protected void initializeMappers() {
+    idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
+  }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
   void testInsertIdpUserAndSelectIdpUser(String type) throws IOException {
     init(type);
-    IdpUserPO firstUser = insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
+    IdpUserPO firstUser =
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUserName("alice")
+            .withPasswordHash("hash-a")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    idpUserMetaMapper.insertIdpUser(firstUser);
 
     assertEquals(firstUser, idpUserMetaMapper.selectIdpUser("alice"));
     assertNull(idpUserMetaMapper.selectIdpUser("unknown"));
@@ -52,8 +67,26 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testSelectIdpUsers(String type) throws IOException {
     init(type);
-    IdpUserPO firstUser = insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
-    IdpUserPO secondUser = insertUser(2L, "bob", "hash-b", 1L, 0L, 0L);
+    IdpUserPO firstUser =
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUserName("alice")
+            .withPasswordHash("hash-a")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    IdpUserPO secondUser =
+        IdpUserPO.builder()
+            .withUserId(2L)
+            .withUserName("bob")
+            .withPasswordHash("hash-b")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    idpUserMetaMapper.insertIdpUser(firstUser);
+    idpUserMetaMapper.insertIdpUser(secondUser);
 
     List<IdpUserPO> users = idpUserMetaMapper.selectIdpUsers(List.of("bob", "alice"));
     users.sort(Comparator.comparing(IdpUserPO::getUserId));
@@ -68,8 +101,25 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testSelectIdpUsersIgnoresDeletedUsers(String type) throws IOException {
     init(type);
-    IdpUserPO activeUser = insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
-    insertUser(2L, "bob", "hash-b", 1L, 0L, 10L);
+    IdpUserPO activeUser =
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUserName("alice")
+            .withPasswordHash("hash-a")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    idpUserMetaMapper.insertIdpUser(activeUser);
+    idpUserMetaMapper.insertIdpUser(
+        IdpUserPO.builder()
+            .withUserId(2L)
+            .withUserName("bob")
+            .withPasswordHash("hash-b")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(10L)
+            .build());
 
     assertIterableEquals(
         List.of(activeUser), idpUserMetaMapper.selectIdpUsers(List.of("alice", "bob")));
@@ -80,7 +130,15 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testUpdateIdpUserPassword(String type) throws IOException {
     init(type);
-    insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
+    idpUserMetaMapper.insertIdpUser(
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUserName("alice")
+            .withPasswordHash("hash-a")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build());
 
     assertEquals(1, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
     assertEquals("hash-a-2", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
@@ -92,7 +150,15 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testUpdateIdpUserPasswordKeepsVersionsUnchanged(String type) throws IOException {
     init(type);
-    insertUser(1L, "alice", "hash-a", 3L, 2L, 0L);
+    idpUserMetaMapper.insertIdpUser(
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUserName("alice")
+            .withPasswordHash("hash-a")
+            .withCurrentVersion(3L)
+            .withLastVersion(2L)
+            .withDeletedAt(0L)
+            .build());
 
     assertEquals(1, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
     assertEquals("hash-a-2", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
@@ -104,35 +170,89 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testSoftDeleteIdpUser(String type) throws IOException {
     init(type);
-    insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
+    idpUserMetaMapper.insertIdpUser(
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUserName("alice")
+            .withPasswordHash("hash-a")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build());
 
     assertEquals(1, idpUserMetaMapper.softDeleteIdpUser(1L));
     assertNull(idpUserMetaMapper.selectIdpUser("alice"));
-    assertTrue(queryLongValue("idp_user_meta", "deleted_at", "user_id", 1L) > 0L);
-    assertEquals(1L, queryLongValue("idp_user_meta", "current_version", "user_id", 1L));
-    assertEquals(0L, queryLongValue("idp_user_meta", "last_version", "user_id", 1L));
+    assertIterableEquals(List.of(), idpUserMetaMapper.selectIdpUsers(List.of("alice")));
+    assertEquals(0, idpUserMetaMapper.softDeleteIdpUser(1L));
+    assertEquals(0, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
+    assertEquals(1, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
+    assertEquals(0, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
   void testDeleteIdpUserMetasByLegacyTimeline(String type) throws IOException {
     init(type);
-    insertUser(1L, "legacy-user", "hash", 1L, 0L, 10L);
-    insertUser(2L, "new-user", "hash", 1L, 0L, 30L);
-    insertUser(3L, "active-user", "hash", 1L, 0L, 0L);
+    idpUserMetaMapper.insertIdpUser(
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUserName("legacy-user")
+            .withPasswordHash("hash")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(10L)
+            .build());
+    idpUserMetaMapper.insertIdpUser(
+        IdpUserPO.builder()
+            .withUserId(2L)
+            .withUserName("new-user")
+            .withPasswordHash("hash")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(30L)
+            .build());
+    idpUserMetaMapper.insertIdpUser(
+        IdpUserPO.builder()
+            .withUserId(3L)
+            .withUserName("active-user")
+            .withPasswordHash("hash")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build());
 
     assertEquals(1, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(20L, 10));
-    assertEquals(0, countRows("idp_user_meta", "user_id", 1L));
-    assertEquals(1, countRows("idp_user_meta", "user_id", 2L));
-    assertEquals(1, countRows("idp_user_meta", "user_id", 3L));
+    assertEquals(0, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(20L, 10));
+    assertEquals(1, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(40L, 10));
+    assertEquals(0, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
+    assertEquals("active-user", idpUserMetaMapper.selectIdpUser("active-user").getUserName());
+    assertNull(idpUserMetaMapper.selectIdpUser("legacy-user"));
+    assertNull(idpUserMetaMapper.selectIdpUser("new-user"));
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
   void testRestart(String type) throws IOException {
     init(type);
-    IdpUserPO expectedActiveUser = insertUser(1L, "alice", "hash-a", 3L, 2L, 0L);
-    insertUser(2L, "bob", "hash-b", 1L, 0L, 10L);
+    IdpUserPO expectedActiveUser =
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUserName("alice")
+            .withPasswordHash("hash-a")
+            .withCurrentVersion(3L)
+            .withLastVersion(2L)
+            .withDeletedAt(0L)
+            .build();
+    idpUserMetaMapper.insertIdpUser(expectedActiveUser);
+    idpUserMetaMapper.insertIdpUser(
+        IdpUserPO.builder()
+            .withUserId(2L)
+            .withUserName("bob")
+            .withPasswordHash("hash-b")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(10L)
+            .build());
     assertEquals(1, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
 
     expectedActiveUser =

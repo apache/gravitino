@@ -20,7 +20,7 @@
 package org.apache.gravitino.idp.storage.mapper;
 
 import java.util.List;
-import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -28,39 +28,35 @@ import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
- * A MyBatis mapper for built-in IdP user metadata operations.
+ * A MyBatis mapper for built-in IdP group metadata operations.
  *
- * <p>This interface defines the SQL statements MyBatis executes for the built-in IdP user metadata
+ * <p>This interface defines the SQL statements MyBatis executes for the built-in IdP group metadata
  * store. The SQLs are provided through {@code *Provider} annotations on this mapper interface. See
  * the <a href="https://mybatis.org/mybatis-3/getting-started.html">MyBatis getting started
  * guide</a>.
  */
-public interface IdpUserMetaMapper {
-  String IDP_USER_TABLE_NAME = "idp_user_meta";
+public interface IdpGroupMetaMapper {
+  String IDP_GROUP_TABLE_NAME = "idp_group_meta";
 
-  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUser")
-  IdpUserPO selectIdpUser(@Param("username") String username);
+  @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroup")
+  IdpGroupPO selectIdpGroup(@Param("groupName") String groupName);
 
   /**
-   * Selects active users by name. An empty list returns all active users; pass null for an explicit
-   * error.
+   * Selects active groups by name. An empty list returns all active groups; pass null for an
+   * explicit error.
    */
-  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUsers")
-  List<IdpUserPO> selectIdpUsers(@Param("usernames") List<String> usernames);
+  @SelectProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "selectIdpGroups")
+  List<IdpGroupPO> selectIdpGroups(@Param("groupNames") List<String> groupNames);
 
-  @InsertProvider(type = IdpUserMetaSQLProviderFactory.class, method = "insertIdpUser")
-  void insertIdpUser(@Param("userMeta") IdpUserPO userPO);
+  @InsertProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "insertIdpGroup")
+  void insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO);
 
-  @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "updateIdpUserPassword")
-  Integer updateIdpUserPassword(
-      @Param("userId") Long userId, @Param("passwordHash") String passwordHash);
-
-  @UpdateProvider(type = IdpUserMetaSQLProviderFactory.class, method = "softDeleteIdpUser")
-  Integer softDeleteIdpUser(@Param("userId") Long userId);
+  @UpdateProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "softDeleteIdpGroup")
+  Integer softDeleteIdpGroup(@Param("groupId") Long groupId);
 
   @DeleteProvider(
-      type = IdpUserMetaSQLProviderFactory.class,
-      method = "deleteIdpUserMetasByLegacyTimeline")
-  Integer deleteIdpUserMetasByLegacyTimeline(
+      type = IdpGroupMetaSQLProviderFactory.class,
+      method = "deleteIdpGroupMetasByLegacyTimeline")
+  Integer deleteIdpGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }
