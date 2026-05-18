@@ -38,8 +38,6 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
-import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
@@ -140,8 +138,8 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
   @Override
   public void dropNamespace(IcebergRequestContext context, Namespace namespace) {
     String catalogName = context.catalogName();
-    // Same top-level branch lock as createNamespace, so cascading parent-drop stays atomic
-    // against concurrent creates that might be adding children under our ancestors.
+    // Same top-level branch lock as createNamespace, so the phantom-row cleanup stays atomic
+    // against concurrent creates that could re-add children under our ancestors.
     TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(metalake, catalogName, namespace.level(0)),
         LockType.WRITE,
@@ -149,24 +147,20 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
           dispatcher.dropNamespace(context, namespace);
           deleteSchemaEntity(catalogName, namespace);
 
-          // Cascade up: drop ancestor namespaces that are now empty so namespaces auto-created
-          // on insertSchema don't outlive their last child. Walk innermost-to-outermost; stop
-          // as soon as an ancestor still has children (NamespaceNotEmptyException). On
-          // NoSuchNamespaceException the ancestor is a Gravitino-only phantom (some Iceberg
-          // backends don't materialize intermediate namespaces) — fall through to delete the
-          // stale Gravitino row.
+          // Clean up Gravitino-side phantom rows for ancestors that don't exist in Iceberg.
+          // We do NOT drop ancestor namespaces in Iceberg — those belong to the user. We only
+          // delete stale Gravitino entity rows that insertSchema's ancestor split created for
+          // intermediate namespaces the backend never materialized. Walk innermost-to-outermost;
+          // stop as soon as an ancestor exists in Iceberg (by the "child exists implies parent
+          // exists" invariant, all further-out ancestors also exist).
           String separator = HierarchicalSchemaUtil.schemaSeparator();
           String namespaceName = String.join(separator, namespace.levels());
           List<String> ancestorNames =
               HierarchicalSchemaUtil.getAncestorNames(namespaceName, separator);
           for (int i = ancestorNames.size() - 1; i >= 0; i--) {
             Namespace ancestor = Namespace.of(ancestorNames.get(i).split(Pattern.quote(separator)));
-            try {
-              dispatcher.dropNamespace(context, ancestor);
-            } catch (NamespaceNotEmptyException notEmpty) {
+            if (dispatcher.namespaceExists(context, ancestor)) {
               break;
-            } catch (NoSuchNamespaceException missing) {
-              // Phantom — fall through to clean up Gravitino-side row.
             }
             deleteSchemaEntity(catalogName, ancestor);
           }
