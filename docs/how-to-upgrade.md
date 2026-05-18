@@ -151,8 +151,11 @@ This section describes how to upgrade a Gravitino deployment managed by the Grav
 
 ### Step 1: Prepare the new values file
 
-Create a new values file for the target version (e.g., `values-1.3.0.yaml`) based on the
-previous one. Apply the following changes compared to `values-1.2.0.yaml`:
+Create a new values file for the target version (e.g., `values-<new-version>.yaml`) based on
+the previous one. Update `image.tag` to the target version and apply any version-specific field
+changes listed in the sections below.
+
+#### 1.2.0 → 1.3.0
 
 | Field | 1.2.0 | 1.3.0 |
 | --- | --- | --- |
@@ -167,9 +170,9 @@ Key points:
 ### Step 2: Run the Helm upgrade
 
 ```shell
-helm upgrade gravitino <path-to-gravitino-helm-chart>/gravitino-helm-1.3.0.tgz \
-  -n irc-e2e-env1 \
-  -f values-1.3.0.yaml
+helm upgrade gravitino <path-to-gravitino-helm-chart>/gravitino-helm-<new-version>.tgz \
+  -n <namespace> \
+  -f values-<new-version>.yaml
 ```
 
 ### Step 3: Verify the rollout
