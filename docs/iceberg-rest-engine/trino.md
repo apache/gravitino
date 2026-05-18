@@ -171,12 +171,13 @@ WITH (
 
 ### Trino does not support object names that differ only by letter case
 
-Trino does not reliably distinguish schema or table names that differ only by letter case, such as
-`sales` and `Sales`. This is a Trino limitation rather than behavior specific to Gravitino.
+Trino does not reliably distinguish metadata names such as catalog, schema, or table names that
+differ only by letter case, such as `sales` and `Sales`. This is a Trino limitation rather than
+behavior specific to Gravitino.
 
 For the best compatibility with Trino:
 
-- Use lowercase schema and table names.
+- Use lowercase metadata names.
 - Avoid creating objects whose names differ only by letter case.
 
 ## Related
