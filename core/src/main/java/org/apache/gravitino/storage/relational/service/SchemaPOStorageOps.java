@@ -109,9 +109,4 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
   public boolean supportsParentIdRelationalRead() {
     return true;
   }
-
-  @Override
-  protected Entity.EntityType entityType() {
-    return Entity.EntityType.SCHEMA;
-  }
 }

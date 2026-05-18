@@ -20,7 +20,6 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -33,7 +32,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.UnaryOperator;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
@@ -305,13 +303,11 @@ public class TestHierarchicalConversionPOStorageOps {
   @Test
   public void supportsParentIdRelationalReadAndEntityTypeDelegated() {
     when(delegate.supportsParentIdRelationalRead()).thenReturn(true);
-    when(delegate.entityType()).thenReturn(Entity.EntityType.SCHEMA);
 
     HierarchicalConversionPOStorageOps<String, Object> wrapper =
         new HierarchicalConversionPOStorageOps<>(delegate);
 
     assertTrue(wrapper.supportsParentIdRelationalRead());
-    assertSame(Entity.EntityType.SCHEMA, wrapper.entityType());
   }
 
   @Test

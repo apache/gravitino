@@ -22,18 +22,17 @@ import java.util.List;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /**
- * Wraps a {@link BasePOStorageOps} to bridge the hierarchical schema naming convention. Identifiers
- * and namespace segments in logical form (logical separator) are translated to physical form
- * (physical separator) before delegating. Two optional PO rewriters allow callers to translate a PO
- * field across the boundary: {@code physicalToLogicalRewriter} is applied to POs returned from read
- * methods (typically physical→logical), and {@code logicalToPhysicalRewriter} is applied to POs
- * passed into write methods (typically logical→physical) so the SQL still receives storage-form
+ * Wraps a {@link BasePOStorageOps} to bridge the hierarchical schema naming conversation.
+ * Identifiers and namespace segments in logical form (logical separator) are translated to physical
+ * form (physical separator) before delegating. Two optional PO rewriters allow callers to translate
+ * a PO field across the boundary: {@code physicalToLogicalRewriter} is applied to POs returned from
+ * read methods (typically physical→logical), and {@code logicalToPhysicalRewriter} is applied to
+ * POs passed into write methods (typically logical→physical) so the SQL still receives storage-form
  * values.
  *
  * @param <PO> persistent object type
@@ -65,7 +64,7 @@ public class HierarchicalConversionPOStorageOps<PO, Mapper> extends BasePOStorag
 
   @Override
   public void batchInsertPOs(Mapper mapper, List<PO> pos, boolean overwrite) {
-    delegate.batchInsertPOs(mapper, applyWrite(pos), overwrite);
+    delegate.batchInsertPOs(mapper, convertLogicalToPhysical(pos), overwrite);
   }
 
   @Override
@@ -76,12 +75,13 @@ public class HierarchicalConversionPOStorageOps<PO, Mapper> extends BasePOStorag
 
   @Override
   public PO getPO(Mapper mapper, Long parentId, String name) {
-    return applyRead(delegate.getPO(mapper, parentId, toPhysicalIfHierarchical(name)));
+    return convertPhysicalToLogical(
+        delegate.getPO(mapper, parentId, toPhysicalIfHierarchical(name)));
   }
 
   @Override
   public List<PO> listPOs(Mapper mapper, Long parentId) {
-    return applyRead(delegate.listPOs(mapper, parentId));
+    return convertPhysicalToLogical(delegate.listPOs(mapper, parentId));
   }
 
   @Override
@@ -91,24 +91,24 @@ public class HierarchicalConversionPOStorageOps<PO, Mapper> extends BasePOStorag
         names.stream()
             .map(HierarchicalConversionPOStorageOps::toPhysicalIfHierarchical)
             .collect(Collectors.toList());
-    return applyRead(delegate.listPOs(mapper, physicalNamespace, physicalNames));
+    return convertPhysicalToLogical(delegate.listPOs(mapper, physicalNamespace, physicalNames));
   }
 
   @Override
   public List<PO> listPOs(Mapper mapper, List<Long> entityIds) {
-    return applyRead(delegate.listPOs(mapper, entityIds));
+    return convertPhysicalToLogical(delegate.listPOs(mapper, entityIds));
   }
 
   @Override
   public PO getPOByFullName(Mapper mapper, NameIdentifier logical) {
     NameIdentifier physical = logicalToPhysicalIdentifier(logical);
-    return applyRead(delegate.getPOByFullName(mapper, physical));
+    return convertPhysicalToLogical(delegate.getPOByFullName(mapper, physical));
   }
 
   @Override
   public List<PO> listPOsByNSFullName(Mapper mapper, Namespace logical) {
     Namespace physical = logicalToPhysicalNamespace(logical);
-    return applyRead(delegate.listPOsByNSFullName(mapper, physical));
+    return convertPhysicalToLogical(delegate.listPOsByNSFullName(mapper, physical));
   }
 
   @Override
@@ -116,23 +116,18 @@ public class HierarchicalConversionPOStorageOps<PO, Mapper> extends BasePOStorag
     return delegate.supportsParentIdRelationalRead();
   }
 
-  @Override
-  protected Entity.EntityType entityType() {
-    return delegate.entityType();
-  }
-
-  private PO applyRead(PO po) {
+  private PO convertPhysicalToLogical(PO po) {
     return po == null ? null : physicalToLogicalRewriter.apply(po);
   }
 
-  private List<PO> applyRead(List<PO> pos) {
+  private List<PO> convertPhysicalToLogical(List<PO> pos) {
     if (pos == null || pos.isEmpty()) {
       return pos;
     }
-    return pos.stream().map(this::applyRead).collect(Collectors.toList());
+    return pos.stream().map(this::convertPhysicalToLogical).collect(Collectors.toList());
   }
 
-  private List<PO> applyWrite(List<PO> pos) {
+  private List<PO> convertLogicalToPhysical(List<PO> pos) {
     if (pos == null || pos.isEmpty()) {
       return pos;
     }

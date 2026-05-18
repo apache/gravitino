@@ -510,6 +510,10 @@ public class SchemaMetaService {
         });
   }
 
+  public BasePOStorageOps<SchemaPO, SchemaMetaMapper> ops() {
+    return ops;
+  }
+
   private static long nextIdForNestedAncestor() {
     IdGenerator generator = GravitinoEnv.getInstance().idGenerator();
     if (generator == null) {

@@ -350,6 +350,10 @@ public class TableMetaService {
         });
   }
 
+  public BasePOStorageOps<TablePO, TableMetaMapper> ops() {
+    return ops;
+  }
+
   private TablePO getTablePOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkTable(identifier);
     TablePO tablePO =

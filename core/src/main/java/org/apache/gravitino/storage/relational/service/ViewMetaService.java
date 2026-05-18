@@ -220,6 +220,10 @@ public class ViewMetaService {
     return versionDeletedCount + metaDeletedCount;
   }
 
+  public BasePOStorageOps<ViewPO, ViewMetaMapper> ops() {
+    return ops;
+  }
+
   private boolean deleteView(Long viewId, String metalakeName, String viewFullName) {
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(

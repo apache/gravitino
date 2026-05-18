@@ -274,6 +274,10 @@ public class FunctionMetaService {
     }
   }
 
+  public BasePOStorageOps<FunctionPO, FunctionMetaMapper> ops() {
+    return ops;
+  }
+
   private List<FunctionPO> listFunctionPOs(Namespace namespace) {
     return SessionUtils.getWithoutCommit(
         FunctionMetaMapper.class,

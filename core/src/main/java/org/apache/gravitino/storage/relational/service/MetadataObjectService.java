@@ -98,10 +98,10 @@ public class MetadataObjectService {
 
   static final Map<MetadataObject.Type, BasePOStorageOps<?, ?>> TYPE_TO_STORAGE_OPS_MAP =
       ImmutableMap.<MetadataObject.Type, BasePOStorageOps<?, ?>>builder()
-          .put(MetadataObject.Type.SCHEMA, new SchemaPOStorageOps())
-          .put(MetadataObject.Type.TABLE, new TablePOStorageOps())
-          .put(MetadataObject.Type.VIEW, new ViewPOStorageOps())
-          .put(MetadataObject.Type.FUNCTION, new FunctionPOStorageOps())
+          .put(MetadataObject.Type.SCHEMA, SchemaMetaService.getInstance().ops())
+          .put(MetadataObject.Type.TABLE, TableMetaService.getInstance().ops())
+          .put(MetadataObject.Type.VIEW, ViewMetaService.getInstance().ops())
+          .put(MetadataObject.Type.FUNCTION, FunctionMetaService.getInstance().ops())
           .build();
 
   private static Map<Long, String> getPolicyObjectsFullName(List<Long> policyIds) {
