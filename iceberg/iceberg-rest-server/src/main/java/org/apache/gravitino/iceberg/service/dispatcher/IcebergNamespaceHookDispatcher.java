@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -147,21 +146,13 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         () -> {
           dispatcher.dropNamespace(context, namespace);
 
-          // Collect the entity rows to clean up: the target plus any ancestor rows that are
-          // phantoms (no corresponding Iceberg namespace — insertSchema's ancestor split created
-          // them but the backend never materialized them). We do NOT drop ancestor namespaces in
-          // Iceberg — those belong to the user. Walk innermost-to-outermost and stop on the
-          // first ancestor that still exists in Iceberg (child-exists-implies-parent-exists
-          // makes further probes redundant). Then batchDelete with cascade so each row's
-          // dependent entities go away in a single call.
+          // Walk ancestors innermost-to-outermost and find the outermost ancestor that no
+          // longer exists in Iceberg (a phantom row from insertSchema's ancestor split). We
+          // delete that single ancestor with cascade so when the entity store grows hierarchical
+          // schema cascade support, the whole phantom sub-tree comes down in one call. If all
+          // ancestors still exist in Iceberg, just cascade-delete the target's row.
           String separator = HierarchicalSchemaUtil.schemaSeparator();
-          List<Pair<NameIdentifier, Entity.EntityType>> toDelete = new ArrayList<>();
-          toDelete.add(
-              Pair.of(
-                  IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                      metalake, catalogName, namespace, separator),
-                  Entity.EntityType.SCHEMA));
-
+          Namespace deleteTarget = namespace;
           String namespaceName = String.join(separator, namespace.levels());
           List<String> ancestorNames =
               HierarchicalSchemaUtil.getAncestorNames(namespaceName, separator);
@@ -170,21 +161,21 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
             if (dispatcher.namespaceExists(context, ancestor)) {
               break;
             }
-            toDelete.add(
-                Pair.of(
-                    IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                        metalake, catalogName, ancestor, separator),
-                    Entity.EntityType.SCHEMA));
+            deleteTarget = ancestor;
           }
 
           EntityStore store = GravitinoEnv.getInstance().entityStore();
           if (store != null) {
             try {
-              store.batchDelete(toDelete, true);
+              store.delete(
+                  IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+                      metalake, catalogName, deleteTarget, separator),
+                  Entity.EntityType.SCHEMA,
+                  true);
             } catch (NoSuchEntityException ignore) {
-              // Rows already gone.
+              // Already gone.
             } catch (IOException ioe) {
-              throw new RuntimeException("io exception when deleting schema entities", ioe);
+              throw new RuntimeException("io exception when deleting schema entity", ioe);
             }
           }
           return null;
