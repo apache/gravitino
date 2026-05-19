@@ -50,7 +50,11 @@ CREATE SCHEMA catalog.schema_name
 ### Create table
 
 The Gravitino Trino connector currently supports basic Hive table creation statements, such as defining fields,
-allowing null values, and adding comments. The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
+allowing null values, and adding comments. The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
+
+:::note
+`CREATE OR REPLACE TABLE AS SELECT` is not supported. Use `DROP TABLE` followed by `CREATE TABLE AS SELECT` as an alternative.
+:::
 
 The following example shows how to create a table in the Hive catalog:
 

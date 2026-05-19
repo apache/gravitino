@@ -96,6 +96,14 @@ public class MetadataObjectService {
                   MetadataObjectService::getJobTemplateObjectsFullName)
               .build();
 
+  static final Map<MetadataObject.Type, BasePOStorageOps<?, ?>> TYPE_TO_STORAGE_OPS_MAP =
+      ImmutableMap.<MetadataObject.Type, BasePOStorageOps<?, ?>>builder()
+          .put(MetadataObject.Type.SCHEMA, SchemaMetaService.getInstance().ops())
+          .put(MetadataObject.Type.TABLE, TableMetaService.getInstance().ops())
+          .put(MetadataObject.Type.VIEW, ViewMetaService.getInstance().ops())
+          .put(MetadataObject.Type.FUNCTION, FunctionMetaService.getInstance().ops())
+          .build();
+
   private static Map<Long, String> getPolicyObjectsFullName(List<Long> policyIds) {
     if (policyIds == null || policyIds.isEmpty()) {
       return Maps.newHashMap();
@@ -345,9 +353,13 @@ public class MetadataObjectService {
       return Maps.newHashMap();
     }
 
+    @SuppressWarnings("unchecked")
+    BasePOStorageOps<FunctionPO, FunctionMetaMapper> ops =
+        (BasePOStorageOps<FunctionPO, FunctionMetaMapper>)
+            TYPE_TO_STORAGE_OPS_MAP.get(MetadataObject.Type.FUNCTION);
     List<FunctionPO> functionPOs =
         SessionUtils.getWithoutCommit(
-            FunctionMetaMapper.class, mapper -> mapper.listFunctionPOsByFunctionIds(functionIds));
+            FunctionMetaMapper.class, mapper -> ops.listPOs(mapper, functionIds));
 
     if (functionPOs == null || functionPOs.isEmpty()) {
       return new HashMap<>();
@@ -395,9 +407,13 @@ public class MetadataObjectService {
       return Maps.newHashMap();
     }
 
+    @SuppressWarnings("unchecked")
+    BasePOStorageOps<TablePO, TableMetaMapper> ops =
+        (BasePOStorageOps<TablePO, TableMetaMapper>)
+            TYPE_TO_STORAGE_OPS_MAP.get(MetadataObject.Type.TABLE);
     List<TablePO> tablePOs =
         SessionUtils.getWithoutCommit(
-            TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(tableIds));
+            TableMetaMapper.class, mapper -> ops.listPOs(mapper, tableIds));
 
     if (tablePOs == null || tablePOs.isEmpty()) {
       return Maps.newHashMap();
@@ -534,9 +550,12 @@ public class MetadataObjectService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getViewObjectsFullName")
   public static Map<Long, String> getViewObjectsFullName(List<Long> viewIds) {
+    @SuppressWarnings("unchecked")
+    BasePOStorageOps<ViewPO, ViewMetaMapper> ops =
+        (BasePOStorageOps<ViewPO, ViewMetaMapper>)
+            TYPE_TO_STORAGE_OPS_MAP.get(MetadataObject.Type.VIEW);
     List<ViewPO> viewPOs =
-        SessionUtils.getWithoutCommit(
-            ViewMetaMapper.class, mapper -> mapper.listViewPOsByViewIds(viewIds));
+        SessionUtils.getWithoutCommit(ViewMetaMapper.class, mapper -> ops.listPOs(mapper, viewIds));
     if (viewPOs == null || viewPOs.isEmpty()) {
       return new HashMap<>();
     }
@@ -601,9 +620,13 @@ public class MetadataObjectService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getSchemaObjectsFullName")
   public static Map<Long, String> getSchemaObjectsFullName(List<Long> schemaIds) {
+    @SuppressWarnings("unchecked")
+    BasePOStorageOps<SchemaPO, SchemaMetaMapper> ops =
+        (BasePOStorageOps<SchemaPO, SchemaMetaMapper>)
+            TYPE_TO_STORAGE_OPS_MAP.get(MetadataObject.Type.SCHEMA);
     List<SchemaPO> schemaPOs =
         SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsBySchemaIds(schemaIds));
+            SchemaMetaMapper.class, mapper -> ops.listPOs(mapper, schemaIds));
 
     if (schemaPOs == null || schemaPOs.isEmpty()) {
       return new HashMap<>();

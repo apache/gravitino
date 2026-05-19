@@ -46,6 +46,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
@@ -178,6 +179,8 @@ public class BackendTestExtension
       Mockito.when(config.get(CACHE_ENABLED)).thenReturn(true);
 
       FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "idGenerator", RandomIdGenerator.INSTANCE, true);
 
       RelationalBackend backend = new JDBCBackend();
       if ("mysql".equals(type)) {
