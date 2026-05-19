@@ -143,15 +143,24 @@ public class JcasbinChangePoller implements AutoCloseable {
     List<ChangedOwnerInfo> changes =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class, m -> m.selectChangedOwners(ownerPollHighWaterId));
-
-    long maxSeenId = ownerPollHighWaterId;
-    for (ChangedOwnerInfo change : changes) {
-      ownerRelCache.invalidate(change.getMetadataObjectId());
-      if (change.getId() > maxSeenId) {
-        maxSeenId = change.getId();
-      }
+    if (changes.isEmpty()) {
+      return;
     }
-    ownerPollHighWaterId = maxSeenId;
+
+    long[] maxSeenId = {ownerPollHighWaterId};
+    // Hold the cache's exclusive invalidation lock for the whole batch so readers never observe
+    // a half-applied state where some of this batch's entries have been evicted and others are
+    // still hot.
+    ownerRelCache.runInvalidationBatch(
+        () -> {
+          for (ChangedOwnerInfo change : changes) {
+            ownerRelCache.invalidate(change.getMetadataObjectId());
+            if (change.getId() > maxSeenId[0]) {
+              maxSeenId[0] = change.getId();
+            }
+          }
+        });
+    ownerPollHighWaterId = maxSeenId[0];
   }
 
   /**
@@ -249,13 +258,21 @@ public class JcasbinChangePoller implements AutoCloseable {
   }
 
   private void invalidateCoalescedKeys(Set<String> prefixes, Set<String> leafKeys) {
-    for (String prefix : prefixes) {
-      metadataIdCache.invalidateByPrefix(prefix);
+    if (prefixes.isEmpty() && leafKeys.isEmpty()) {
+      return;
     }
-    for (String leafKey : leafKeys) {
-      if (prefixes.stream().noneMatch(leafKey::startsWith)) {
-        metadataIdCache.invalidate(leafKey);
-      }
-    }
+    // Hold the cache's exclusive invalidation lock for the whole batch so readers never observe
+    // a half-applied state where some prefix/leaf keys have been evicted and others have not.
+    metadataIdCache.runInvalidationBatch(
+        () -> {
+          for (String prefix : prefixes) {
+            metadataIdCache.invalidateByPrefix(prefix);
+          }
+          for (String leafKey : leafKeys) {
+            if (prefixes.stream().noneMatch(leafKey::startsWith)) {
+              metadataIdCache.invalidate(leafKey);
+            }
+          }
+        });
   }
 }

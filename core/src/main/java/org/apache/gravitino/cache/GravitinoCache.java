@@ -42,7 +42,9 @@ public interface GravitinoCache<K, V> extends Closeable {
 
   /**
    * Returns the value associated with the key, loading it if necessary. Implementations with real
-   * storage should make the load atomic for the same key.
+   * storage should make the load atomic for the same key, and should serialise concurrent reads
+   * against any {@link #invalidate(Object) invalidate} call so a reader cannot observe a partially
+   * invalidated cache.
    *
    * @param key the cache key
    * @param loader the loader invoked when the key is absent
@@ -84,6 +86,22 @@ public interface GravitinoCache<K, V> extends Closeable {
    * @param prefix the prefix to match against key strings
    */
   void invalidateByPrefix(String prefix);
+
+  /**
+   * Runs {@code batch} so that all {@link #invalidate}, {@link #invalidateAll}, and {@link
+   * #invalidateByPrefix} calls it makes appear atomic to concurrent readers — i.e. readers see
+   * either the state from before the batch or the state after, never an intermediate half-applied
+   * state.
+   *
+   * <p>Default implementation: just runs the runnable, suitable for caches without real storage
+   * (e.g. {@link NoOpsGravitinoCache}). Storage-backed implementations should hold an exclusive
+   * lock for the duration of the batch.
+   *
+   * @param batch the invalidation sequence to run atomically
+   */
+  default void runInvalidationBatch(Runnable batch) {
+    batch.run();
+  }
 
   /**
    * Returns the approximate number of entries in the cache.
