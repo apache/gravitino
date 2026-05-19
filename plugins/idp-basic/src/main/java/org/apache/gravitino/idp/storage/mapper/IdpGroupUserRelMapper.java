@@ -48,10 +48,6 @@ public interface IdpGroupUserRelMapper {
       method = "selectUsernamesByGroupId")
   List<String> selectUsernamesByGroupId(@Param("groupId") Long groupId);
 
-  @SelectProvider(type = IdpGroupUserRelSQLProviderFactory.class, method = "selectRelatedUserIds")
-  List<Long> selectRelatedUserIds(
-      @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds);
-
   @InsertProvider(type = IdpGroupUserRelSQLProviderFactory.class, method = "batchInsertRelations")
   void batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations);
 

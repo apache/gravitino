@@ -54,20 +54,6 @@ public class IdpGroupUserRelBaseSQLProvider {
         + " ORDER BY u.user_name";
   }
 
-  public String selectRelatedUserIds(
-      @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
-    return "<script>"
-        + "SELECT user_id"
-        + " FROM "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " WHERE group_id = #{groupId} AND deleted_at = 0 "
-        + "<foreach collection='userIds' item='userId'"
-        + " open='AND user_id IN (' separator=',' close=')'>"
-        + "#{userId}"
-        + "</foreach>"
-        + "</script>";
-  }
-
   public String batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations) {
     return "<script>"
         + "INSERT INTO "

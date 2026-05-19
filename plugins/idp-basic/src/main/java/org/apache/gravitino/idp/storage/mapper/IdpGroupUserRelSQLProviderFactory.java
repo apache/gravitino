@@ -64,11 +64,6 @@ public class IdpGroupUserRelSQLProviderFactory {
     return currentProvider().selectUsernamesByGroupId(groupId);
   }
 
-  public static String selectRelatedUserIds(
-      @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
-    return currentProvider().selectRelatedUserIds(groupId, userIds);
-  }
-
   public static String batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations) {
     return currentProvider().batchInsertRelations(relations);
   }

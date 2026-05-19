@@ -21,17 +21,14 @@ package org.apache.gravitino.idp.storage.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
-import org.apache.ibatis.exceptions.PersistenceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -153,128 +150,6 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
     assertIterableEquals(
         List.of("alice", "bob"), idpGroupUserRelMapper.selectUsernamesByGroupId(1L));
     assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUsernamesByGroupId(999L));
-  }
-
-  @ParameterizedTest
-  @MethodSource("storageProvider")
-  void testSelectRelatedUserIds(String type) throws IOException {
-    init(type);
-    idpGroupMetaMapper.insertIdpGroup(
-        IdpGroupPO.builder()
-            .withGroupId(1L)
-            .withGroupName("dev")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build());
-    idpUserMetaMapper.insertIdpUser(
-        IdpUserPO.builder()
-            .withUserId(1L)
-            .withUserName("alice")
-            .withPasswordHash("hash-a")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build());
-    idpUserMetaMapper.insertIdpUser(
-        IdpUserPO.builder()
-            .withUserId(2L)
-            .withUserName("bob")
-            .withPasswordHash("hash-b")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build());
-    idpUserMetaMapper.insertIdpUser(
-        IdpUserPO.builder()
-            .withUserId(3L)
-            .withUserName("carol")
-            .withPasswordHash("hash-c")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build());
-    idpGroupUserRelMapper.batchInsertRelations(
-        List.of(
-            IdpGroupUserRelPO.builder()
-                .withId(100L)
-                .withGroupId(1L)
-                .withUserId(1L)
-                .withCurrentVersion(1L)
-                .withLastVersion(0L)
-                .withDeletedAt(0L)
-                .build(),
-            IdpGroupUserRelPO.builder()
-                .withId(101L)
-                .withGroupId(1L)
-                .withUserId(2L)
-                .withCurrentVersion(1L)
-                .withLastVersion(0L)
-                .withDeletedAt(0L)
-                .build()));
-
-    List<Long> relatedUserIds = idpGroupUserRelMapper.selectRelatedUserIds(1L, List.of(2L, 3L, 1L));
-    relatedUserIds.sort(Comparator.comparingLong(Long::longValue));
-    assertIterableEquals(List.of(1L, 2L), relatedUserIds);
-    List<Long> relatedUserIdsWithEmptyFilter =
-        idpGroupUserRelMapper.selectRelatedUserIds(1L, List.of());
-    relatedUserIdsWithEmptyFilter.sort(Comparator.comparingLong(Long::longValue));
-    assertIterableEquals(List.of(1L, 2L), relatedUserIdsWithEmptyFilter);
-    assertThrows(
-        PersistenceException.class, () -> idpGroupUserRelMapper.selectRelatedUserIds(1L, null));
-  }
-
-  @ParameterizedTest
-  @MethodSource("storageProvider")
-  void testSelectRelatedUserIdsIgnoresDeletedRelations(String type) throws IOException {
-    init(type);
-    idpGroupMetaMapper.insertIdpGroup(
-        IdpGroupPO.builder()
-            .withGroupId(1L)
-            .withGroupName("dev")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build());
-    idpUserMetaMapper.insertIdpUser(
-        IdpUserPO.builder()
-            .withUserId(1L)
-            .withUserName("alice")
-            .withPasswordHash("hash-a")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build());
-    idpUserMetaMapper.insertIdpUser(
-        IdpUserPO.builder()
-            .withUserId(2L)
-            .withUserName("bob")
-            .withPasswordHash("hash-b")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build());
-    idpGroupUserRelMapper.batchInsertRelations(
-        List.of(
-            IdpGroupUserRelPO.builder()
-                .withId(100L)
-                .withGroupId(1L)
-                .withUserId(1L)
-                .withCurrentVersion(1L)
-                .withLastVersion(0L)
-                .withDeletedAt(0L)
-                .build(),
-            IdpGroupUserRelPO.builder()
-                .withId(101L)
-                .withGroupId(1L)
-                .withUserId(2L)
-                .withCurrentVersion(1L)
-                .withLastVersion(0L)
-                .withDeletedAt(10L)
-                .build()));
-
-    assertIterableEquals(
-        List.of(1L), idpGroupUserRelMapper.selectRelatedUserIds(1L, List.of(1L, 2L)));
   }
 
   @ParameterizedTest

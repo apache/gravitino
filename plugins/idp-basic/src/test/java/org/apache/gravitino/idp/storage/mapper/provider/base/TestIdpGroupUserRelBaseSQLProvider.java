@@ -77,48 +77,6 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  void testSelectRelatedUserIds() {
-    String script = createProvider().selectRelatedUserIds(1L, Arrays.asList(10L, 20L));
-    Map<String, Object> params = new HashMap<>();
-    params.put("groupId", 1L);
-    params.put("userIds", Arrays.asList(10L, 20L));
-
-    String normalizedSql = renderScript(script, params);
-
-    Assertions.assertTrue(normalizedSql.contains("SELECT user_id FROM idp_group_user_rel"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE group_id = ?"));
-    Assertions.assertTrue(normalizedSql.matches(".*user_id IN \\( \\? , \\? \\).*"));
-    Assertions.assertTrue(normalizedSql.contains("AND deleted_at = 0"));
-  }
-
-  @Test
-  void testSelectRelatedUserIdsWithEmptyUserIds() {
-    String script = createProvider().selectRelatedUserIds(1L, Collections.emptyList());
-    Map<String, Object> params = new HashMap<>();
-    params.put("groupId", 1L);
-    params.put("userIds", Collections.emptyList());
-
-    String normalizedSql = renderScript(script, params);
-
-    Assertions.assertFalse(
-        normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
-        "Empty userIds should not generate invalid SQL IN (...) with no values");
-    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
-    Assertions.assertEquals(
-        "SELECT user_id FROM idp_group_user_rel WHERE group_id = ? AND deleted_at = 0",
-        normalizedSql);
-  }
-
-  @Test
-  void testSelectRelatedUserIdsWithNullUserIds() {
-    String script = createProvider().selectRelatedUserIds(1L, null);
-    Map<String, Object> params = new HashMap<>();
-    params.put("groupId", 1L);
-
-    Assertions.assertThrows(BuilderException.class, () -> renderScript(script, params));
-  }
-
-  @Test
   void testBatchInsertIdpGroupUsers() {
     List<IdpGroupUserRelPO> relations =
         Arrays.asList(newRelation(1L, 10L, 20L), newRelation(2L, 10L, 21L));
