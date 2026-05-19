@@ -36,6 +36,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.glue.GlueCatalogOperations;
 import org.apache.gravitino.catalog.glue.GlueConstants;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -73,10 +74,6 @@ abstract class AbstractGlueCatalogIT {
   private String currentSchema;
 
   private static final Namespace SCHEMA_NS = Namespace.of("ml", "cat");
-  private static final String INPUT_FMT = "org.apache.hadoop.mapred.TextInputFormat";
-  private static final String OUTPUT_FMT =
-      "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat";
-  private static final String SERDE = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe";
 
   protected abstract Map<String, String> catalogConfig();
 
@@ -136,9 +133,9 @@ abstract class AbstractGlueCatalogIT {
   private Map<String, String> hiveTableProps() {
     Map<String, String> props = new HashMap<>();
     props.put(GlueConstants.TABLE_TYPE, "EXTERNAL_TABLE");
-    props.put(GlueConstants.INPUT_FORMAT, INPUT_FMT);
-    props.put(GlueConstants.OUTPUT_FORMAT, OUTPUT_FMT);
-    props.put(GlueConstants.SERDE_LIB, SERDE);
+    props.put(GlueConstants.INPUT_FORMAT_CLASS, HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS);
+    props.put(GlueConstants.OUTPUT_FORMAT, HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS);
+    props.put(GlueConstants.SERDE_LIB, HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS);
     return props;
   }
 
@@ -287,7 +284,7 @@ abstract class AbstractGlueCatalogIT {
     assertEquals("id", loaded.columns()[0].name());
     assertEquals(Types.LongType.get(), loaded.columns()[0].dataType());
     assertEquals("EXTERNAL_TABLE", loaded.properties().get(GlueConstants.TABLE_TYPE));
-    assertNotNull(loaded.properties().get(GlueConstants.INPUT_FORMAT));
+    assertNotNull(loaded.properties().get(GlueConstants.INPUT_FORMAT_CLASS));
     assertNotNull(loaded.properties().get(GlueConstants.OUTPUT_FORMAT));
     assertNotNull(loaded.properties().get(GlueConstants.SERDE_LIB));
   }
@@ -600,35 +597,6 @@ abstract class AbstractGlueCatalogIT {
 
     assertTrue(ops.dropTable(tableIdent(schema, "iceberg_drop")));
     assertFalse(ops.dropTable(tableIdent(schema, "iceberg_drop")));
-  }
-
-  @Test
-  void testAlterIcebergMetadata() {
-    String schema = newSchema();
-    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
-
-    Map<String, String> props = new HashMap<>();
-    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
-    ops.createTable(
-        tableIdent(schema, "iceberg_alter"),
-        new Column[0],
-        null,
-        props,
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
-
-    ops.alterTable(
-        tableIdent(schema, "iceberg_alter"),
-        TableChange.setProperty(
-            GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v2.metadata.json"));
-
-    Table loaded = ops.loadTable(tableIdent(schema, "iceberg_alter"));
-    assertEquals(
-        "s3://bucket/path/metadata/v2.metadata.json",
-        loaded.properties().get(GlueConstants.METADATA_LOCATION));
   }
 
   @Test

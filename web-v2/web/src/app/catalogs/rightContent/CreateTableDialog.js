@@ -1226,41 +1226,38 @@ export default function CreateTableDialog({ ...props }) {
     return (
       <div className='flex flex-col divide-y divide-solid border-b border-solid'>
         <div className='grid grid-cols-5 divide-x divide-solid'>
-          <div className='col-span-1 bg-gray-100 p-1 text-center'>Index Name</div>
-          <div className='col-span-2 bg-gray-100 p-1 text-center'>Field</div>
           <div className='col-span-1 bg-gray-100 p-1 text-center'>Index Type</div>
+          <div className='col-span-2 bg-gray-100 p-1 text-center'>Field</div>
+          <div className='col-span-1 bg-gray-100 p-1 text-center'>Index Name</div>
           <div className='col-span-1 bg-gray-100 p-1 text-center'>Action</div>
         </div>
         {fields.map(subField => (
           <div key={subField.name}>
             <div className='grid grid-cols-5'>
               <div className='col-span-1 px-2 py-1'>
-                <Form.Item
-                  noStyle
-                  name={[subField.name, 'name']}
-                  label=''
-                  rules={[
-                    ({ getFieldValue }) => ({
-                      validator(_, name) {
-                        if (name) {
-                          if (!nameRegex.test(name)) {
-                            return Promise.reject(new Error(mismatchName))
-                          }
-                          if (getFieldValue('indexes').length) {
-                            let names = getFieldValue('indexes').map(col => col?.name)
-                            names.splice(subField.name, 1)
-                            if (names.includes(name)) {
-                              return Promise.reject(new Error('The index name already exists!'))
-                            }
-                          }
-
-                          return Promise.resolve()
-                        }
+                <Form.Item noStyle name={[subField.name, 'indexType']} label='Index Type'>
+                  <Select
+                    size='small'
+                    className='w-full'
+                    placeholder='Index Type'
+                    disabled={!!editTable}
+                    onChange={value => {
+                      if (value === 'primary_key') {
+                        form.setFieldValue(['indexes', subField.name, 'name'], 'PRIMARY')
+                      } else {
+                        form.setFieldValue(['indexes', subField.name, 'name'], '')
                       }
-                    })
-                  ]}
-                >
-                  <Input size='small' placeholder='Index Name' disabled={!!editTable} />
+                    }}
+                  >
+                    {(indexesInfo || []).map(type => (
+                      <Select.Option key={type} value={type}>
+                        {type
+                          .split('_')
+                          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                          .join(' ')}
+                      </Select.Option>
+                    ))}
+                  </Select>
                 </Form.Item>
               </div>
               <div className='col-span-2 px-2 py-1'>
@@ -1278,15 +1275,45 @@ export default function CreateTableDialog({ ...props }) {
                 </Form.Item>
               </div>
               <div className='col-span-1 px-2 py-1'>
-                <Form.Item noStyle name={[subField.name, 'indexType']} label='Index Type'>
-                  <Select size='small' className='w-full' placeholder='Index Type' disabled={!!editTable}>
-                    <Select.Option key='primary_key' value='primary_key'>
-                      Primary Key
-                    </Select.Option>
-                    <Select.Option key='unique_key' value='unique_key'>
-                      Unique Key
-                    </Select.Option>
-                  </Select>
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prevValues, curValues) =>
+                    prevValues?.indexes?.[subField.name]?.indexType !== curValues?.indexes?.[subField.name]?.indexType
+                  }
+                >
+                  {({ getFieldValue }) => {
+                    const isPrimaryKeyIndex = getFieldValue(['indexes', subField.name, 'indexType']) === 'primary_key'
+
+                    return (
+                      <Form.Item
+                        noStyle
+                        name={[subField.name, 'name']}
+                        label=''
+                        rules={[
+                          ({ getFieldValue }) => ({
+                            validator(_, name) {
+                              if (name) {
+                                if (!nameRegex.test(name)) {
+                                  return Promise.reject(new Error(mismatchName))
+                                }
+                                if (getFieldValue('indexes').length) {
+                                  let names = getFieldValue('indexes').map(col => col?.name)
+                                  names.splice(subField.name, 1)
+                                  if (names.includes(name)) {
+                                    return Promise.reject(new Error('The index name already exists!'))
+                                  }
+                                }
+
+                                return Promise.resolve()
+                              }
+                            }
+                          })
+                        ]}
+                      >
+                        <Input size='small' placeholder='Index Name' disabled={!!editTable || isPrimaryKeyIndex} />
+                      </Form.Item>
+                    )
+                  }}
                 </Form.Item>
               </div>
               <div className='px-2 py-1'>
