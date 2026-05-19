@@ -80,7 +80,9 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
           baseCatalog
               .catalogCredentialManager()
               .getCredential(entry.getKey(), contextOptional.get());
-      credentials.add(credential);
+      if (credential != null) {
+        credentials.add(credential);
+      }
     }
     return credentials;
   }

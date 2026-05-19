@@ -18,15 +18,21 @@
  */
 package org.apache.gravitino.credential;
 
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.credential.PathContext;
+import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
 
@@ -96,5 +102,72 @@ public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
     PathBasedCredentialContext filteredPathBased = (PathBasedCredentialContext) filtered.get();
     Assertions.assertEquals(Set.of("s3://bucket/a"), filteredPathBased.getWritePaths());
     Assertions.assertEquals(Set.of("s3a://bucket/c"), filteredPathBased.getReadPaths());
+  }
+
+  @Test
+  public void testGetCredentialsSkipsNullCredential() throws Exception {
+    String nullType = "null-type";
+    String validType = "valid-type";
+
+    CredentialProvider nullProvider = mockCredentialProvider(nullType);
+    CredentialProvider validProvider = mockCredentialProvider(validType);
+
+    Credential validCredential = Mockito.mock(Credential.class);
+
+    CatalogCredentialManager credentialManager = Mockito.mock(CatalogCredentialManager.class);
+    Mockito.when(credentialManager.getCredentialProvider(nullType))
+        .thenReturn(Optional.of(nullProvider));
+    Mockito.when(credentialManager.getCredentialProvider(validType))
+        .thenReturn(Optional.of(validProvider));
+    Mockito.when(
+            credentialManager.getCredential(
+                Mockito.eq(nullType), Mockito.any(CredentialContext.class)))
+        .thenReturn(null);
+    Mockito.when(
+            credentialManager.getCredential(
+                Mockito.eq(validType), Mockito.any(CredentialContext.class)))
+        .thenReturn(validCredential);
+
+    CatalogOperations ops =
+        Mockito.mock(
+            CatalogOperations.class,
+            Mockito.withSettings().extraInterfaces(SupportsPathBasedCredentials.class));
+    Mockito.when(
+            ((SupportsPathBasedCredentials) ops).getPathContext(Mockito.any(NameIdentifier.class)))
+        .thenReturn(
+            Arrays.asList(
+                new PathContext("s3://bucket/a", nullType),
+                new PathContext("s3://bucket/b", validType)));
+
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(baseCatalog.catalogCredentialManager()).thenReturn(credentialManager);
+    Mockito.when(baseCatalog.ops()).thenReturn(ops);
+
+    CredentialOperationDispatcher dispatcher =
+        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator);
+
+    Method method =
+        CredentialOperationDispatcher.class.getDeclaredMethod(
+            "getCredentials", BaseCatalog.class, NameIdentifier.class, CredentialPrivilege.class);
+    method.setAccessible(true);
+
+    @SuppressWarnings("unchecked")
+    List<Credential> credentials =
+        (List<Credential>)
+            method.invoke(
+                dispatcher,
+                baseCatalog,
+                NameIdentifier.of(metalake, catalog, "schema", "fileset"),
+                CredentialPrivilege.READ);
+
+    Assertions.assertEquals(1, credentials.size());
+    Assertions.assertSame(validCredential, credentials.get(0));
+  }
+
+  private static CredentialProvider mockCredentialProvider(String credentialType) {
+    CredentialProvider provider = Mockito.mock(CredentialProvider.class);
+    Mockito.when(provider.credentialType()).thenReturn(credentialType);
+    Mockito.when(provider.supportsScheme(Mockito.anyString())).thenReturn(true);
+    return provider;
   }
 }
