@@ -20,20 +20,29 @@
 package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestIdpUserGroupRelH2Provider {
+class TestIdpUserGroupRelH2Provider extends AbstractIdpMetaStorageTest {
 
   @Test
   void testSoftDeleteRelations() {
     IdpUserGroupRelH2Provider provider = new IdpUserGroupRelH2Provider();
-    String normalizedSql =
-        provider.softDeleteRelations("dev", Arrays.asList("alice", "bob")).replaceAll("\\s+", " ");
+    String script = provider.softDeleteRelations("dev", Arrays.asList("alice", "bob"));
+    Map<String, Object> params = new HashMap<>();
+    params.put("groupName", "dev");
+    params.put("usernames", Arrays.asList("alice", "bob"));
+
+    String normalizedSql = renderScript(script, params);
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
-    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
-    Assertions.assertTrue(normalizedSql.contains("u.user_name IN (#{username},#{username})"));
+    Assertions.assertTrue(
+        normalizedSql.contains(
+            "r.group_id IN ( SELECT g.group_id FROM idp_group_meta g WHERE g.group_name = ?"));
+    Assertions.assertTrue(normalizedSql.matches(".*u.user_name IN \\( \\? , \\? \\).*"));
   }
 
   @Test

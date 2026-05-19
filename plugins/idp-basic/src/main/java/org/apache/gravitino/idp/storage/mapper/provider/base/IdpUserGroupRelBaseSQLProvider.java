@@ -86,12 +86,10 @@ public class IdpUserGroupRelBaseSQLProvider {
         + currentTimeMillisExpression()
         + " WHERE g.group_name = #{groupName}"
         + " AND r.deleted_at = 0"
-        + "<if test='usernames != null and usernames.size() &gt; 0'>"
         + "<foreach collection='usernames' item='username'"
         + " open=' AND u.user_name IN (' separator=',' close=')'>"
         + "#{username}"
         + "</foreach>"
-        + "</if>"
         + "</script>";
   }
 

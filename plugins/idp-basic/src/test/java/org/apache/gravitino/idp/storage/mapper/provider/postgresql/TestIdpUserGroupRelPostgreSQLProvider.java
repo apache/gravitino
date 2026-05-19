@@ -20,10 +20,13 @@
 package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpUserGroupRelPostgreSQLProvider {
+public class TestIdpUserGroupRelPostgreSQLProvider extends AbstractIdpMetaStorageTest {
 
   @Test
   void testCurrentTimeMillisExpression() {
@@ -37,13 +40,17 @@ public class TestIdpUserGroupRelPostgreSQLProvider {
   @Test
   void testSoftDeleteRelations() {
     IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
-    String normalizedSql =
-        provider.softDeleteRelations("dev", Arrays.asList("alice", "bob")).replaceAll("\\s+", " ");
+    String script = provider.softDeleteRelations("dev", Arrays.asList("alice", "bob"));
+    Map<String, Object> params = new HashMap<>();
+    params.put("groupName", "dev");
+    params.put("usernames", Arrays.asList("alice", "bob"));
+
+    String normalizedSql = renderScript(script, params);
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta g, idp_user_meta u"));
-    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
-    Assertions.assertTrue(normalizedSql.contains("u.user_name IN (#{username},#{username})"));
+    Assertions.assertTrue(normalizedSql.contains("g.group_name = ?"));
+    Assertions.assertTrue(normalizedSql.matches(".*u.user_name IN \\( \\? , \\? \\).*"));
   }
 
   @Test

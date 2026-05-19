@@ -24,16 +24,13 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
 import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.apache.ibatis.builder.BuilderException;
-import org.apache.ibatis.mapping.BoundSql;
-import org.apache.ibatis.mapping.SqlSource;
-import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
-import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpUserGroupRelBaseSQLProvider {
+public class TestIdpUserGroupRelBaseSQLProvider extends AbstractIdpMetaStorageTest {
 
   protected IdpUserGroupRelBaseSQLProvider createProvider() {
     return new IdpUserGroupRelBaseSQLProvider() {
@@ -144,6 +141,7 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     String script = createProvider().softDeleteRelations("dev", null);
     Map<String, Object> params = new HashMap<>();
     params.put("groupName", "dev");
+    params.put("usernames", null);
 
     Assertions.assertThrows(BuilderException.class, () -> renderScript(script, params));
   }
@@ -190,13 +188,6 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     Assertions.assertEquals(
         "(UNIX_TIMESTAMP() * 1000.0)",
         new IdpUserGroupRelBaseSQLProvider().currentTimeMillisExpression());
-  }
-
-  private String renderScript(String script, Map<String, Object> params) {
-    SqlSource sqlSource =
-        new XMLLanguageDriver().createSqlSource(new Configuration(), script, Map.class);
-    BoundSql boundSql = sqlSource.getBoundSql(params);
-    return boundSql.getSql().replaceAll("\\s+", " ").trim();
   }
 
   private int countOccurrences(String input, char expectedChar) {

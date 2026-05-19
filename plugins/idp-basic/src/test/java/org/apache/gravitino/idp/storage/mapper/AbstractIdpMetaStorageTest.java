@@ -28,6 +28,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -40,10 +41,14 @@ import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.ibatis.mapping.BoundSql;
+import org.apache.ibatis.mapping.SqlSource;
+import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
+import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 
-abstract class AbstractIdpMetaStorageTest {
+public abstract class AbstractIdpMetaStorageTest {
   private static final String H2_BACKEND = "h2";
   private static final String MYSQL_BACKEND = "mysql";
   private static final String POSTGRESQL_BACKEND = "postgresql";
@@ -92,7 +97,15 @@ abstract class AbstractIdpMetaStorageTest {
     }
   }
 
-  protected abstract void initializeMappers();
+  protected void initializeMappers() {}
+
+  /** Renders a MyBatis dynamic SQL script with the given parameters for unit testing. */
+  protected String renderScript(String script, Map<String, Object> params) {
+    SqlSource sqlSource =
+        new XMLLanguageDriver().createSqlSource(new Configuration(), script, Map.class);
+    BoundSql boundSql = sqlSource.getBoundSql(params);
+    return boundSql.getSql().replaceAll("\\s+", " ").trim();
+  }
 
   private Config createBackendConfig(String type) throws IOException {
     Config backendConfig = new Config(false) {};

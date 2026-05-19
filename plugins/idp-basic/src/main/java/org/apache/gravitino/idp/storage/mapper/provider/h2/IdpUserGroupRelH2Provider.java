@@ -46,7 +46,6 @@ public class IdpUserGroupRelH2Provider extends IdpUserGroupRelBaseSQLProvider {
         + " AND r.group_id IN (SELECT g.group_id FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g WHERE g.group_name = #{groupName} AND g.deleted_at = 0)"
-        + "<if test='usernames != null and usernames.size() &gt; 0'>"
         + " AND r.user_id IN (SELECT u.user_id FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " u WHERE u.deleted_at = 0"
@@ -55,7 +54,6 @@ public class IdpUserGroupRelH2Provider extends IdpUserGroupRelBaseSQLProvider {
         + "#{username}"
         + "</foreach>"
         + ")"
-        + "</if>"
         + "</script>";
   }
 

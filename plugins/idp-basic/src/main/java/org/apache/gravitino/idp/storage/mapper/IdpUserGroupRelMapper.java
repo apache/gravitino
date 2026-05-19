@@ -51,6 +51,10 @@ public interface IdpUserGroupRelMapper {
   @InsertProvider(type = IdpUserGroupRelSQLProviderFactory.class, method = "batchInsertRelations")
   void batchInsertRelations(@Param("relations") List<IdpUserGroupRelPO> relations);
 
+  /**
+   * Soft-deletes user-group relations in a group by user name. An empty list soft-deletes all
+   * active relations in the group; pass null for an explicit error.
+   */
   @UpdateProvider(type = IdpUserGroupRelSQLProviderFactory.class, method = "softDeleteRelations")
   Integer softDeleteRelations(
       @Param("groupName") String groupName, @Param("usernames") List<String> usernames);

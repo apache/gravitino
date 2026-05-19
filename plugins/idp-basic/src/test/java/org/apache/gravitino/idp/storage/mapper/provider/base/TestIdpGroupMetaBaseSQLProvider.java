@@ -23,16 +23,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.ibatis.builder.BuilderException;
-import org.apache.ibatis.mapping.BoundSql;
-import org.apache.ibatis.mapping.SqlSource;
-import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
-import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpGroupMetaBaseSQLProvider {
+public class TestIdpGroupMetaBaseSQLProvider extends AbstractIdpMetaStorageTest {
 
   protected IdpGroupMetaBaseSQLProvider createProvider() {
     return new IdpGroupMetaBaseSQLProvider() {
@@ -152,12 +149,5 @@ public class TestIdpGroupMetaBaseSQLProvider {
         .withLastVersion(1L)
         .withDeletedAt(0L)
         .build();
-  }
-
-  private String renderScript(String script, Map<String, Object> params) {
-    SqlSource sqlSource =
-        new XMLLanguageDriver().createSqlSource(new Configuration(), script, Map.class);
-    BoundSql boundSql = sqlSource.getBoundSql(params);
-    return boundSql.getSql().replaceAll("\\s+", " ").trim();
   }
 }
