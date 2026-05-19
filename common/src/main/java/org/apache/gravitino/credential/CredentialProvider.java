@@ -21,7 +21,7 @@ package org.apache.gravitino.credential;
 
 import java.io.Closeable;
 import java.util.Map;
-import javax.annotation.Nullable;
+import java.util.Optional;
 
 /**
  * An interface for providing credentials to access external systems.
@@ -66,9 +66,9 @@ public interface CredentialProvider extends Closeable {
    * Gets a credential based on the provided context information.
    *
    * @param context A context object providing necessary information for retrieving credentials.
-   * @return A Credential object containing the authentication information needed to access a system
-   *     or resource. Null will be returned if no credential is available.
+   * @return An {@link Optional} containing the {@link Credential} with the authentication
+   *     information needed to access a system or resource, or {@link Optional#empty()} if no
+   *     credential is available.
    */
-  @Nullable
-  Credential getCredential(CredentialContext context);
+  Optional<Credential> getCredential(CredentialContext context);
 }

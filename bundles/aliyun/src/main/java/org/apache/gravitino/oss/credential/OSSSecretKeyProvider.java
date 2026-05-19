@@ -20,6 +20,7 @@
 package org.apache.gravitino.oss.credential;
 
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
@@ -53,7 +54,7 @@ public class OSSSecretKeyProvider implements CredentialProvider {
   }
 
   @Override
-  public Credential getCredential(CredentialContext context) {
-    return new OSSSecretKeyCredential(accessKey, secretKey);
+  public Optional<Credential> getCredential(CredentialContext context) {
+    return Optional.of(new OSSSecretKeyCredential(accessKey, secretKey));
   }
 }

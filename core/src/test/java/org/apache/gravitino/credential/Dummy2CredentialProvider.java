@@ -22,6 +22,7 @@ package org.apache.gravitino.credential;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
@@ -49,15 +50,15 @@ public class Dummy2CredentialProvider implements CredentialProvider {
   }
 
   @Override
-  public Credential getCredential(CredentialContext context) {
+  public Optional<Credential> getCredential(CredentialContext context) {
     Preconditions.checkArgument(
         context instanceof PathBasedCredentialContext
             || context instanceof CatalogCredentialContext,
         "Doesn't support context: " + context.getClass().getSimpleName());
     if (context instanceof PathBasedCredentialContext) {
-      return new Dummy2Credential((PathBasedCredentialContext) context);
+      return Optional.of(new Dummy2Credential((PathBasedCredentialContext) context));
     }
-    return null;
+    return Optional.empty();
   }
 
   public static class Dummy2Credential implements Credential {

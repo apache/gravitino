@@ -79,8 +79,8 @@ public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
           }
 
           @Override
-          public Credential getCredential(CredentialContext context) {
-            return null;
+          public Optional<Credential> getCredential(CredentialContext context) {
+            return Optional.empty();
           }
 
           @Override
@@ -122,11 +122,11 @@ public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
     Mockito.when(
             credentialManager.getCredential(
                 Mockito.eq(nullType), Mockito.any(CredentialContext.class)))
-        .thenReturn(null);
+        .thenReturn(Optional.empty());
     Mockito.when(
             credentialManager.getCredential(
                 Mockito.eq(validType), Mockito.any(CredentialContext.class)))
-        .thenReturn(validCredential);
+        .thenReturn(Optional.of(validCredential));
 
     CatalogOperations ops =
         Mockito.mock(

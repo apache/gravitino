@@ -44,7 +44,7 @@ public class TestCredentialProvider {
 
     PathBasedCredentialContext locationContext =
         new PathBasedCredentialContext("user", writeLocations, readLocations);
-    Credential credential = dummyCredentialProvider.getCredential(locationContext);
+    Credential credential = dummyCredentialProvider.getCredential(locationContext).orElse(null);
     Assertions.assertTrue(credential instanceof DummyCredential);
     DummyCredential dummyCredential = (DummyCredential) credential;
 

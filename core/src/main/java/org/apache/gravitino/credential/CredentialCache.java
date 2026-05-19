@@ -25,6 +25,7 @@ import com.github.benmanes.caffeine.cache.Expiry;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.gravitino.credential.config.CredentialConfig;
@@ -87,8 +88,11 @@ public class CredentialCache<T> implements Closeable {
             .build();
   }
 
-  public Credential getCredential(T cacheKey, Function<T, Credential> credentialSupplier) {
-    return credentialCache.get(cacheKey, key -> credentialSupplier.apply(cacheKey));
+  public Optional<Credential> getCredential(
+      T cacheKey, Function<T, Optional<Credential>> credentialSupplier) {
+    Credential credential =
+        credentialCache.get(cacheKey, key -> credentialSupplier.apply(cacheKey).orElse(null));
+    return Optional.ofNullable(credential);
   }
 
   @Override
