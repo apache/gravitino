@@ -56,7 +56,7 @@ You can use either to manage metadata. See
 * [Manage relational metadata using Gravitino](./manage-relational-metadata-using-gravitino.md)
   to learn how to manage relational metadata.
 * [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md)
-  to learn how to manage relational views.
+  to learn how to manage view metadata.
 * [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
   how to manage fileset metadata.
 * [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage

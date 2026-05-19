@@ -28,7 +28,7 @@ extensible, but currently only SQL representations are supported.
 
 To use view management, please make sure that:
 
- - Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
+ - Gravitino server has started, and the host and port are [http://localhost:8090](http://localhost:8090).
  - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
  - A relational catalog has been created within the metalake.
  - A schema has been created within the catalog.

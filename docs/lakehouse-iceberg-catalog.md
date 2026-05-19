@@ -381,7 +381,7 @@ If you update a nullability column to non nullability, there may be compatibilit
 
 ### View capabilities
 
-- Supports create, load, alter, and drop for views managed by the underlying Iceberg REST, JDBC, or Hive backend.
+- Supports list, create, load, alter, and drop for views managed by the underlying Iceberg REST, JDBC, or Hive backend.
 - Supports dialects such as `trino`, `spark`, and `hive`.
 - Can preserve multiple SQL representations for the same logical view.
 

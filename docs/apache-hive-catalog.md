@@ -212,7 +212,7 @@ Support for altering partitions is under development.
 
 ### View capabilities
 
-- Supports create, load, alter, and drop for views stored in the Hive Metastore Service as `VIRTUAL_VIEW`.
+- Supports list, create, load, alter, and drop for views stored in the Hive Metastore Service as `VIRTUAL_VIEW`.
 - Each view must contain exactly one SQL representation.
 - Supports the `hive`, `trino`, and `spark` dialects.
 - When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `trino`, or `spark` dialect.
