@@ -283,7 +283,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .doc("Table metadata cache capacity")
           .version(ConfigConstants.VERSION_1_1_0)
           .intConf()
-          .createWithDefault(1000);
+          .createWithDefault(200);
 
   public static final ConfigEntry<Integer> TABLE_METADATA_CACHE_EXPIRE_MINUTES =
       new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES)
