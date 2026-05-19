@@ -133,7 +133,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 IcebergConstants.TABLE_METADATA_CACHE_CAPACITY,
                 "Table metadata cache capacity",
                 false /* immutable */,
-                200 /* defaultValue */,
+                1000 /* defaultValue */,
                 false /* hidden */),
             integerOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES,
