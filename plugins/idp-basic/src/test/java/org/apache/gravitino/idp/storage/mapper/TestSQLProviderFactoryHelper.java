@@ -22,25 +22,29 @@ package org.apache.gravitino.idp.storage.mapper;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import org.apache.gravitino.idp.storage.mapper.SQLProviderFactoryHelper.ProviderMap;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.junit.jupiter.api.Test;
 
 public class TestSQLProviderFactoryHelper {
-  private static final ProviderMap<String> PROVIDER_MAP =
-      SQLProviderFactoryHelper.providerMap(
-          TestSQLProviderFactoryHelper.class, "mysql", "h2", "postgresql");
+  private static final Map<JDBCBackendType, String> PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL, "mysql",
+          JDBCBackendType.H2, "h2",
+          JDBCBackendType.POSTGRESQL, "postgresql");
 
   @Test
   void testGetProvider() {
-    assertEquals("mysql", PROVIDER_MAP.getProvider("mysql"));
-    assertEquals("h2", PROVIDER_MAP.getProvider("h2"));
-    assertEquals("postgresql", PROVIDER_MAP.getProvider("postgresql"));
+    assertEquals("mysql", provider("mysql"));
+    assertEquals("h2", provider("h2"));
+    assertEquals("postgresql", provider("postgresql"));
   }
 
   @Test
   void testGetProviderWithNullDatabaseId() {
     IllegalStateException exception =
-        assertThrows(IllegalStateException.class, () -> PROVIDER_MAP.getProvider(null));
+        assertThrows(IllegalStateException.class, () -> provider(null));
     assertEquals(
         "MyBatis databaseId is not configured for TestSQLProviderFactoryHelper.",
         exception.getMessage());
@@ -49,11 +53,16 @@ public class TestSQLProviderFactoryHelper {
   @Test
   void testGetProviderWithUnsupportedDatabaseId() {
     IllegalStateException exception =
-        assertThrows(IllegalStateException.class, () -> PROVIDER_MAP.getProvider("sqlite"));
+        assertThrows(IllegalStateException.class, () -> provider("sqlite"));
     assertEquals(
         "Unsupported TestSQLProviderFactoryHelper databaseId: sqlite, supported backends: [MYSQL,"
             + " H2,"
             + " POSTGRESQL]",
         exception.getMessage());
+  }
+
+  private String provider(String databaseId) {
+    return SQLProviderFactoryHelper.getProvider(
+        databaseId, PROVIDER_MAP, TestSQLProviderFactoryHelper.class);
   }
 }

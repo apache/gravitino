@@ -19,26 +19,40 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
-import org.apache.gravitino.idp.storage.mapper.SQLProviderFactoryHelper.ProviderMap;
+import java.util.Map;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserMetaBaseSQLProvider;
 import org.apache.gravitino.idp.storage.mapper.provider.h2.IdpUserMetaH2Provider;
 import org.apache.gravitino.idp.storage.mapper.provider.postgresql.IdpUserMetaPostgreSQLProvider;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpUserMetaSQLProviderFactory {
-  private static final ProviderMap<IdpUserMetaBaseSQLProvider> PROVIDER_MAP =
-      SQLProviderFactoryHelper.providerMap(
-          IdpUserMetaSQLProviderFactory.class,
-          new IdpUserMetaBaseSQLProvider(),
-          new IdpUserMetaH2Provider(),
-          new IdpUserMetaPostgreSQLProvider());
+  private static final IdpUserMetaBaseSQLProvider MYSQL_PROVIDER = new IdpUserMetaBaseSQLProvider();
+  private static final IdpUserMetaBaseSQLProvider H2_PROVIDER = new IdpUserMetaH2Provider();
+  private static final IdpUserMetaBaseSQLProvider POSTGRESQL_PROVIDER =
+      new IdpUserMetaPostgreSQLProvider();
+  private static final Map<JDBCBackendType, IdpUserMetaBaseSQLProvider> PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL,
+          MYSQL_PROVIDER,
+          JDBCBackendType.H2,
+          H2_PROVIDER,
+          JDBCBackendType.POSTGRESQL,
+          POSTGRESQL_PROVIDER);
 
   private IdpUserMetaSQLProviderFactory() {}
 
   private static IdpUserMetaBaseSQLProvider currentProvider() {
-    return PROVIDER_MAP.currentProvider();
+    return SQLProviderFactoryHelper.currentProvider(
+        PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
+  }
+
+  static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
+    return SQLProviderFactoryHelper.getProvider(
+        databaseId, PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
   }
 
   public static String selectIdpUser(@Param("username") String username) {

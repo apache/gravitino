@@ -19,26 +19,41 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
-import org.apache.gravitino.idp.storage.mapper.SQLProviderFactoryHelper.ProviderMap;
+import java.util.Map;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupUserRelBaseSQLProvider;
 import org.apache.gravitino.idp.storage.mapper.provider.h2.IdpGroupUserRelH2Provider;
 import org.apache.gravitino.idp.storage.mapper.provider.postgresql.IdpGroupUserRelPostgreSQLProvider;
 import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpGroupUserRelSQLProviderFactory {
-  private static final ProviderMap<IdpGroupUserRelBaseSQLProvider> PROVIDER_MAP =
-      SQLProviderFactoryHelper.providerMap(
-          IdpGroupUserRelSQLProviderFactory.class,
-          new IdpGroupUserRelBaseSQLProvider(),
-          new IdpGroupUserRelH2Provider(),
-          new IdpGroupUserRelPostgreSQLProvider());
+  private static final IdpGroupUserRelBaseSQLProvider MYSQL_PROVIDER =
+      new IdpGroupUserRelBaseSQLProvider();
+  private static final IdpGroupUserRelBaseSQLProvider H2_PROVIDER = new IdpGroupUserRelH2Provider();
+  private static final IdpGroupUserRelBaseSQLProvider POSTGRESQL_PROVIDER =
+      new IdpGroupUserRelPostgreSQLProvider();
+  private static final Map<JDBCBackendType, IdpGroupUserRelBaseSQLProvider> PROVIDER_MAP =
+      ImmutableMap.of(
+          JDBCBackendType.MYSQL,
+          MYSQL_PROVIDER,
+          JDBCBackendType.H2,
+          H2_PROVIDER,
+          JDBCBackendType.POSTGRESQL,
+          POSTGRESQL_PROVIDER);
 
   private IdpGroupUserRelSQLProviderFactory() {}
 
   private static IdpGroupUserRelBaseSQLProvider currentProvider() {
-    return PROVIDER_MAP.currentProvider();
+    return SQLProviderFactoryHelper.currentProvider(
+        PROVIDER_MAP, IdpGroupUserRelSQLProviderFactory.class);
+  }
+
+  static IdpGroupUserRelBaseSQLProvider getProvider(String databaseId) {
+    return SQLProviderFactoryHelper.getProvider(
+        databaseId, PROVIDER_MAP, IdpGroupUserRelSQLProviderFactory.class);
   }
 
   public static String selectGroupNamesByUserId(@Param("userId") Long userId) {

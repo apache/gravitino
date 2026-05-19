@@ -19,46 +19,14 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 
-/** Resolves JDBC-backend-specific SQL providers for IdP mapper factories. */
 final class SQLProviderFactoryHelper {
   private SQLProviderFactoryHelper() {}
 
-  static <T> ProviderMap<T> providerMap(
-      Class<?> factoryClass, T mysqlProvider, T h2Provider, T postgresqlProvider) {
-    return new ProviderMap<>(factoryClass, mysqlProvider, h2Provider, postgresqlProvider);
-  }
-
-  static final class ProviderMap<T> {
-    private final Map<JDBCBackendType, T> providerMap;
-    private final Class<?> factoryClass;
-
-    private ProviderMap(
-        Class<?> factoryClass, T mysqlProvider, T h2Provider, T postgresqlProvider) {
-      this.factoryClass = factoryClass;
-      this.providerMap =
-          ImmutableMap.of(
-              JDBCBackendType.MYSQL, mysqlProvider,
-              JDBCBackendType.H2, h2Provider,
-              JDBCBackendType.POSTGRESQL, postgresqlProvider);
-    }
-
-    /** Returns the SQL provider for the current MyBatis database id. */
-    T currentProvider() {
-      return resolveProvider(currentDatabaseId(), providerMap, factoryClass);
-    }
-
-    /** Returns the SQL provider for the given MyBatis database id. */
-    T getProvider(String databaseId) {
-      return resolveProvider(databaseId, providerMap, factoryClass);
-    }
-  }
-
-  private static <T> T resolveProvider(
+  static <T> T getProvider(
       String databaseId, Map<JDBCBackendType, T> providerMap, Class<?> providerFactoryClass) {
     if (databaseId == null) {
       throw new IllegalStateException(
@@ -85,6 +53,10 @@ final class SQLProviderFactoryHelper {
               providerFactoryClass.getSimpleName(), databaseId, providerMap.keySet()),
           e);
     }
+  }
+
+  static <T> T currentProvider(Map<JDBCBackendType, T> providerMap, Class<?> providerFactoryClass) {
+    return getProvider(currentDatabaseId(), providerMap, providerFactoryClass);
   }
 
   static String currentDatabaseId() {
