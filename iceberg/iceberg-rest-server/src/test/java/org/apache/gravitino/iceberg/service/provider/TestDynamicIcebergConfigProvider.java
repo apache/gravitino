@@ -258,7 +258,7 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  void testParseRestServerCatalogConfigs() {
+  void testLoadServerCatalogConfigs() {
     Map<String, String> properties = new HashMap<>();
     properties.put(IcebergConstants.GRAVITINO_METALAKE, "test_metalake");
     properties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "default-cache");
@@ -266,7 +266,7 @@ public class TestDynamicIcebergConfigProvider {
     properties.put("catalog.jdbc_backend.jdbc.user", "static-user");
 
     Map<String, IcebergConfig> catalogConfigs =
-        IcebergRestServerCatalogConfigParser.parseFromServerProperties(properties);
+        ServerCatalogConfigLoader.loadFromServerProperties(properties);
 
     Assertions.assertEquals(
         "default-cache",
@@ -358,8 +358,7 @@ public class TestDynamicIcebergConfigProvider {
     properties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "server-cache");
     properties.put(IcebergConstants.TABLE_METADATA_CACHE_CAPACITY, "128");
 
-    IcebergRestServerCatalogConfigParser.mergeAbsentProperties(
-        icebergCatalogProperties, properties);
+    ServerCatalogConfigLoader.mergeAbsentProperties(icebergCatalogProperties, properties);
 
     Assertions.assertEquals(
         "server-cache", icebergCatalogProperties.get(IcebergConstants.TABLE_METADATA_CACHE_IMPL));

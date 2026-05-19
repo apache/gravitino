@@ -39,8 +39,7 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
 
   @Override
   public void initialize(Map<String, String> properties) {
-    this.catalogConfigs =
-        IcebergRestServerCatalogConfigParser.parseFromServerProperties(properties);
+    this.catalogConfigs = ServerCatalogConfigLoader.loadFromServerProperties(properties);
   }
 
   @Override

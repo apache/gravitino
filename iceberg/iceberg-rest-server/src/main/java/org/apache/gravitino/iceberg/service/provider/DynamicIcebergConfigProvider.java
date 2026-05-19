@@ -54,7 +54,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   private String gravitinoMetalake;
   private Optional<String> defaultDynamicCatalogName;
   private Map<String, String> properties;
-  private Map<String, IcebergConfig> restServerCatalogConfigs;
+  private Map<String, IcebergConfig> serverCatalogConfigs;
 
   private volatile CatalogFetcher catalogFetcher;
 
@@ -70,15 +70,14 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         Optional.ofNullable(
             properties.get(IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME));
     this.properties = properties;
-    this.restServerCatalogConfigs =
-        IcebergRestServerCatalogConfigParser.parseFromServerProperties(properties);
+    this.serverCatalogConfigs = ServerCatalogConfigLoader.loadFromServerProperties(properties);
   }
 
   @Override
   public Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogName), "blank catalogName is illegal");
-    String requestedCatalogName = catalogName;
+    String restServerCatalogKey = catalogName;
     if (catalogName.equals(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG)) {
       catalogName =
           defaultDynamicCatalogName.orElseThrow(
@@ -104,7 +103,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
     return Optional.of(
-        mergeWithRestServerCatalogConfig(catalog.properties(), requestedCatalogName));
+        mergeWithRestServerCatalogConfig(catalog.properties(), restServerCatalogKey));
   }
 
   /**
@@ -167,10 +166,9 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
       Map<String, String> catalogProperties, String restServerCatalogKey) {
     Map<String, String> merged =
         new HashMap<>(getIcebergConfigFromCatalogProperties(catalogProperties).getAllConfig());
-    IcebergConfig restServerConfig = restServerCatalogConfigs.get(restServerCatalogKey);
+    IcebergConfig restServerConfig = serverCatalogConfigs.get(restServerCatalogKey);
     if (restServerConfig != null) {
-      IcebergRestServerCatalogConfigParser.mergeAbsentProperties(
-          merged, restServerConfig.getAllConfig());
+      ServerCatalogConfigLoader.mergeAbsentProperties(merged, restServerConfig.getAllConfig());
     }
     return new IcebergConfig(merged);
   }

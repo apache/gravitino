@@ -29,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Parses Iceberg REST server properties into per-catalog {@link IcebergConfig} entries.
+ * Loads per-catalog {@link IcebergConfig} entries from Iceberg REST server properties.
  *
  * <p>Input is the flat property map loaded from {@code gravitino.conf} (for example {@code
  * gravitino.iceberg-rest.*}). Keys prefixed with {@code catalog.<name>.} become named catalog
@@ -37,18 +37,17 @@ import org.slf4j.LoggerFactory;
  * IcebergConstants#ICEBERG_REST_DEFAULT_CATALOG} for server-wide defaults such as {@code
  * table-metadata-cache-*}.
  */
-final class IcebergRestServerCatalogConfigParser {
+final class ServerCatalogConfigLoader {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(IcebergRestServerCatalogConfigParser.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ServerCatalogConfigLoader.class);
   private static final String CATALOG_PREFIX = "catalog.";
 
-  private IcebergRestServerCatalogConfigParser() {}
+  private ServerCatalogConfigLoader() {}
 
-  static Map<String, IcebergConfig> parseFromServerProperties(Map<String, String> properties) {
+  static Map<String, IcebergConfig> loadFromServerProperties(Map<String, String> properties) {
     Map<String, IcebergConfig> configs =
         properties.keySet().stream()
-            .map(IcebergRestServerCatalogConfigParser::parseCatalogName)
+            .map(ServerCatalogConfigLoader::parseCatalogName)
             .flatMap(Optional::stream)
             .distinct()
             .collect(
