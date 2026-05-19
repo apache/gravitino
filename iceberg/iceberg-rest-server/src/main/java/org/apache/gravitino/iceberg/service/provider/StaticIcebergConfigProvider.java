@@ -37,15 +37,9 @@ import org.slf4j.LoggerFactory;
  * gravitino.iceberg-rest.catalog.jdbc_proxy.uri = jdbc:mysql://{host}:{port}/{db} ...
  * gravitino.iceberg-rest.catalog.hive_proxy.catalog-backend = hive
  * gravitino.iceberg-rest.catalog.hive_proxy.uri = thrift://{host}:{port} ...
- *
- * <p>The full property map is also stored under {@link
- * IcebergConstants#ICEBERG_REST_DEFAULT_CATALOG} for server-wide defaults such as {@code
- * table-metadata-cache-*}.
  */
 public class StaticIcebergConfigProvider implements IcebergConfigProvider {
-
-  private static final Logger LOG = LoggerFactory.getLogger(StaticIcebergConfigProvider.class);
-  private static final String CATALOG_PREFIX = "catalog.";
+  public static final Logger LOG = LoggerFactory.getLogger(StaticIcebergConfigProvider.class);
 
   @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
 
@@ -62,17 +56,13 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
   @Override
   public void close() {}
 
-  /**
-   * Loads per-catalog {@link IcebergConfig} entries from Iceberg REST server properties.
-   *
-   * <p>Keys prefixed with {@code catalog.<name>.} become named catalog entries.
-   */
   @VisibleForTesting
   static Map<String, IcebergConfig> initCatalogConfigs(Map<String, String> properties) {
     Map<String, IcebergConfig> configs =
         properties.keySet().stream()
-            .map(StaticIcebergConfigProvider::parseCatalogName)
-            .flatMap(Optional::stream)
+            .map(StaticIcebergConfigProvider::getCatalogName)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
             .distinct()
             .collect(
                 Collectors.toMap(
@@ -80,22 +70,20 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
                     catalogName ->
                         new IcebergConfig(
                             MapUtils.getPrefixMap(
-                                properties, String.format("%s%s.", CATALOG_PREFIX, catalogName)))));
+                                properties, String.format("catalog.%s.", catalogName)))));
     configs.put(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, new IcebergConfig(properties));
     return configs;
   }
 
-  @VisibleForTesting
-  static Optional<String> parseCatalogName(String catalogConfigKey) {
-    if (!catalogConfigKey.startsWith(CATALOG_PREFIX)) {
+  private static Optional<String> getCatalogName(String catalogConfigKey) {
+    if (!catalogConfigKey.startsWith("catalog.")) {
       return Optional.empty();
     }
-    int catalogNameStart = CATALOG_PREFIX.length();
-    int catalogNameEnd = catalogConfigKey.indexOf('.', catalogNameStart);
-    if (catalogNameEnd < 0) {
+    // The catalogConfigKey's format is catalog.<catalog_name>.<param_name>
+    if (catalogConfigKey.split("\\.").length < 3) {
       LOG.warn("{} format is illegal", catalogConfigKey);
       return Optional.empty();
     }
-    return Optional.of(catalogConfigKey.substring(catalogNameStart, catalogNameEnd));
+    return Optional.of(catalogConfigKey.split("\\.")[1]);
   }
 }
