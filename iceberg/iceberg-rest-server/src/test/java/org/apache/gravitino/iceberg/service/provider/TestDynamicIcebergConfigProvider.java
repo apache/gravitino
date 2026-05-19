@@ -249,7 +249,7 @@ public class TestDynamicIcebergConfigProvider {
     catalogProperties.put("custom-k2", "custom-v2");
 
     IcebergConfig icebergConfig =
-        DynamicIcebergConfigProvider.fromGravitinoCatalogProperties(catalogProperties);
+        DynamicIcebergConfigProvider.getIcebergConfigFromCatalogProperties(catalogProperties);
     Assertions.assertEquals(
         icebergConfig.getIcebergCatalogProperties().get("custom-k1"), "custom-v1");
     Assertions.assertTrue(icebergConfig.getIcebergCatalogProperties().containsKey("custom-k2"));

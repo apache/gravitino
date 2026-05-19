@@ -78,7 +78,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   public Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogName), "blank catalogName is illegal");
-    String serverCatalogKey = catalogName;
     if (catalogName.equals(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG)) {
       catalogName =
           defaultDynamicCatalogName.orElseThrow(
@@ -103,7 +102,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    return Optional.of(mergeWithServerCatalogConfig(catalog.properties(), serverCatalogKey));
+    return Optional.of(mergeWithServerConfig(catalog.properties(), catalogName));
   }
 
   /**
@@ -113,19 +112,20 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
    * identified by {@code serverCatalogKey} (for example {@link
    * IcebergConstants#ICEBERG_REST_DEFAULT_CATALOG}).
    */
-  private IcebergConfig mergeWithServerCatalogConfig(
+  private IcebergConfig mergeWithServerConfig(
       Map<String, String> catalogProperties, String serverCatalogKey) {
-    Map<String, String> merged =
-        new HashMap<>(fromGravitinoCatalogProperties(catalogProperties).getAllConfig());
+    Map<String, String> catalogConfig =
+        new HashMap<>(getIcebergConfigFromCatalogProperties(catalogProperties).getAllConfig());
     IcebergConfig serverConfig = catalogConfigs.get(serverCatalogKey);
     if (serverConfig != null) {
-      serverConfig.getAllConfig().forEach(merged::putIfAbsent);
+      serverConfig.getAllConfig().forEach(catalogConfig::putIfAbsent);
     }
-    return new IcebergConfig(merged);
+    return new IcebergConfig(catalogConfig);
   }
 
   @VisibleForTesting
-  static IcebergConfig fromGravitinoCatalogProperties(Map<String, String> catalogProperties) {
+  static IcebergConfig getIcebergConfigFromCatalogProperties(
+      Map<String, String> catalogProperties) {
     Map<String, String> properties = new HashMap<>();
     properties.putAll(MapUtils.getPrefixMap(catalogProperties, CATALOG_BYPASS_PREFIX));
     properties.putAll(catalogProperties);
