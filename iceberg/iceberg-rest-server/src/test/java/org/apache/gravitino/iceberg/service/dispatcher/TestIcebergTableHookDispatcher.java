@@ -79,6 +79,11 @@ public class TestIcebergTableHookDispatcher {
   private OwnerDispatcher mockOwnerDispatcher;
   private IcebergRequestContext mockContext;
 
+  private Config previousConfig;
+  private EntityStore previousEntityStore;
+  private TableDispatcher previousTableDispatcher;
+  private OwnerDispatcher previousOwnerDispatcher;
+
   @BeforeEach
   public void setUp() throws IllegalAccessException {
     // Mock the underlying dispatcher
@@ -91,6 +96,13 @@ public class TestIcebergTableHookDispatcher {
 
     Config mockConfig = mock(Config.class);
     when(mockConfig.get(Configs.SCHEMA_SEPARATOR)).thenReturn(":");
+    previousConfig = (Config) FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
+    previousEntityStore =
+        (EntityStore) FieldUtils.readField(GravitinoEnv.getInstance(), "entityStore", true);
+    previousTableDispatcher =
+        (TableDispatcher) FieldUtils.readField(GravitinoEnv.getInstance(), "tableDispatcher", true);
+    previousOwnerDispatcher =
+        (OwnerDispatcher) FieldUtils.readField(GravitinoEnv.getInstance(), "ownerDispatcher", true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", mockEntityStore, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", mockTableDispatcher, true);
@@ -113,11 +125,14 @@ public class TestIcebergTableHookDispatcher {
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
-    // Clean up GravitinoEnv
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", null, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
+    // Restore GravitinoEnv to its prior state so this test doesn't leak singleton state
+    // into other tests that share the same JVM.
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", previousEntityStore, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "tableDispatcher", previousTableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "ownerDispatcher", previousOwnerDispatcher, true);
 
     // Reset IcebergRESTServerContext singleton
     Class<?> holderClass =

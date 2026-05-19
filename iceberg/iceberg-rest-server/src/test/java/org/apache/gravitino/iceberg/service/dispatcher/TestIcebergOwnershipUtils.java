@@ -61,18 +61,20 @@ public class TestIcebergOwnershipUtils {
   private static final String SEPARATOR = ":";
 
   private OwnerDispatcher mockOwnerDispatcher;
+  private Config previousConfig;
 
   @BeforeEach
   public void setUp() throws IllegalAccessException {
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     Config mockConfig = mock(Config.class);
     when(mockConfig.get(Configs.SCHEMA_SEPARATOR)).thenReturn(SEPARATOR);
+    previousConfig = (Config) FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", mockConfig, true);
   }
 
   @AfterEach
   public void tearDown() throws IllegalAccessException {
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
   }
 
   @Test
