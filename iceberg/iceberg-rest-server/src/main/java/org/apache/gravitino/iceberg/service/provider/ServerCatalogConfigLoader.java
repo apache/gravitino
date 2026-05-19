@@ -18,7 +18,10 @@
  */
 package org.apache.gravitino.iceberg.service.provider;
 
+import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
+
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -42,9 +45,48 @@ final class ServerCatalogConfigLoader {
   private static final Logger LOG = LoggerFactory.getLogger(ServerCatalogConfigLoader.class);
   private static final String CATALOG_PREFIX = "catalog.";
 
-  private ServerCatalogConfigLoader() {}
+  private final Map<String, IcebergConfig> serverCatalogConfigs;
+
+  private ServerCatalogConfigLoader(Map<String, IcebergConfig> serverCatalogConfigs) {
+    this.serverCatalogConfigs = serverCatalogConfigs;
+  }
+
+  static ServerCatalogConfigLoader fromServerProperties(Map<String, String> properties) {
+    return new ServerCatalogConfigLoader(parseServerCatalogConfigs(properties));
+  }
 
   static Map<String, IcebergConfig> loadFromServerProperties(Map<String, String> properties) {
+    return fromServerProperties(properties).serverCatalogConfigs;
+  }
+
+  /**
+   * Merges Gravitino catalog properties with server-side defaults for the given catalog key.
+   *
+   * <p>Catalog properties take precedence; missing keys are filled from the server config entry
+   * identified by {@code serverCatalogKey} (for example {@link
+   * IcebergConstants#ICEBERG_REST_DEFAULT_CATALOG}).
+   */
+  IcebergConfig mergeWithServerCatalogConfig(
+      Map<String, String> catalogProperties, String serverCatalogKey) {
+    Map<String, String> merged =
+        new HashMap<>(fromGravitinoCatalogProperties(catalogProperties).getAllConfig());
+    IcebergConfig serverConfig = serverCatalogConfigs.get(serverCatalogKey);
+    if (serverConfig != null) {
+      mergeAbsentProperties(merged, serverConfig.getAllConfig());
+    }
+    return new IcebergConfig(merged);
+  }
+
+  @VisibleForTesting
+  static IcebergConfig fromGravitinoCatalogProperties(Map<String, String> catalogProperties) {
+    Map<String, String> properties = new HashMap<>();
+    properties.putAll(MapUtils.getPrefixMap(catalogProperties, CATALOG_BYPASS_PREFIX));
+    properties.putAll(catalogProperties);
+    return new IcebergConfig(properties);
+  }
+
+  private static Map<String, IcebergConfig> parseServerCatalogConfigs(
+      Map<String, String> properties) {
     Map<String, IcebergConfig> configs =
         properties.keySet().stream()
             .map(ServerCatalogConfigLoader::parseCatalogName)

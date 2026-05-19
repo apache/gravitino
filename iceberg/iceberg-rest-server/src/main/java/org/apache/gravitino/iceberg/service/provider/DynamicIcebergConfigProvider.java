@@ -18,12 +18,9 @@
  */
 package org.apache.gravitino.iceberg.service.provider;
 
-import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
@@ -40,7 +37,6 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.web.JettyServerConfig;
-import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
@@ -51,10 +47,11 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  * <p>The catalogName is iceberg_catalog
  */
 public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
+
   private String gravitinoMetalake;
   private Optional<String> defaultDynamicCatalogName;
   private Map<String, String> properties;
-  private Map<String, IcebergConfig> serverCatalogConfigs;
+  private ServerCatalogConfigLoader serverCatalogConfigLoader;
 
   private volatile CatalogFetcher catalogFetcher;
 
@@ -70,14 +67,14 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         Optional.ofNullable(
             properties.get(IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME));
     this.properties = properties;
-    this.serverCatalogConfigs = ServerCatalogConfigLoader.loadFromServerProperties(properties);
+    this.serverCatalogConfigLoader = ServerCatalogConfigLoader.fromServerProperties(properties);
   }
 
   @Override
   public Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogName), "blank catalogName is illegal");
-    String restServerCatalogKey = catalogName;
+    String serverCatalogKey = catalogName;
     if (catalogName.equals(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG)) {
       catalogName =
           defaultDynamicCatalogName.orElseThrow(
@@ -103,7 +100,8 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
     return Optional.of(
-        mergeWithRestServerCatalogConfig(catalog.properties(), restServerCatalogKey));
+        serverCatalogConfigLoader.mergeWithServerCatalogConfig(
+            catalog.properties(), serverCatalogKey));
   }
 
   /**
@@ -150,27 +148,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   @Override
   public String getMetalakeName() {
     return gravitinoMetalake;
-  }
-
-  @VisibleForTesting
-  static IcebergConfig getIcebergConfigFromCatalogProperties(
-      Map<String, String> catalogProperties) {
-    Map<String, String> properties = new HashMap<>();
-    properties.putAll(MapUtils.getPrefixMap(catalogProperties, CATALOG_BYPASS_PREFIX));
-    properties.putAll(catalogProperties);
-
-    return new IcebergConfig(properties);
-  }
-
-  private IcebergConfig mergeWithRestServerCatalogConfig(
-      Map<String, String> catalogProperties, String restServerCatalogKey) {
-    Map<String, String> merged =
-        new HashMap<>(getIcebergConfigFromCatalogProperties(catalogProperties).getAllConfig());
-    IcebergConfig restServerConfig = serverCatalogConfigs.get(restServerCatalogKey);
-    if (restServerConfig != null) {
-      ServerCatalogConfigLoader.mergeAbsentProperties(merged, restServerConfig.getAllConfig());
-    }
-    return new IcebergConfig(merged);
   }
 
   @Override
