@@ -22,6 +22,10 @@ package org.apache.gravitino.spark.connector.jdbc;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -44,8 +48,32 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
+    applyJdbcCredential(gravitinoCatalogClient, all);
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     return jdbcTableCatalog;
+  }
+
+  /**
+   * Overwrites the Spark JDBC user and password in {@code sparkProperties} with credentials
+   * obtained from the server via credential vending, if available.
+   *
+   * @param catalog the Gravitino catalog client; must implement {@link SupportsCredentials} for
+   *     credential vending to take effect
+   * @param sparkProperties the mutable Spark properties map to update
+   */
+  static void applyJdbcCredential(Catalog catalog, Map<String, String> sparkProperties) {
+    if (!(catalog instanceof SupportsCredentials)) {
+      return;
+    }
+    for (Credential credential : ((SupportsCredentials) catalog).getCredentials()) {
+      if (credential instanceof JdbcCredential) {
+        JdbcCredential jdbcCredential = (JdbcCredential) credential;
+        sparkProperties.put(JdbcPropertiesConstants.SPARK_JDBC_USER, jdbcCredential.jdbcUser());
+        sparkProperties.put(
+            JdbcPropertiesConstants.SPARK_JDBC_PASSWORD, jdbcCredential.jdbcPassword());
+        return;
+      }
+    }
   }
 
   @Override

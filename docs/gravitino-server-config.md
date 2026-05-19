@@ -312,6 +312,7 @@ Below is a list of catalog properties that will be used by all Gravitino catalog
 | `package`           | The path of the catalog package, Gravitino leverages this path to load the related catalog libs and configurations. The package should consist two folders, `conf` (for catalog related configurations) and `libs` (for catalog related dependencies/jars) | (none)        | No       | 0.5.0            |
 | `cloud.name`        | The property to specify the cloud that the catalog is running on. The valid values are `aws`, `azure`, `gcp`, `on_premise` and `other`.                                                                                                                    | (none)        | No       | 0.6.0-incubating |
 | `cloud.region-code` | The property to specify the region code of the cloud that the catalog is running on.                                                                                                                                                                       | (none)        | No       | 0.6.0-incubating |
+| `gravitino.catalog.credential.backfillToProperties` | For backward compatibility only: if `true`, the server exposes hidden catalog credentials in plain catalog properties so that connectors that do not support credential vending can still read them. **Enabling this is a security risk** — credentials are visible to anyone who can read catalog properties. Disable once all connectors are upgraded. | `false` | No | 0.9.0 |
 
 
 The following table lists the catalog specific properties and their default paths:

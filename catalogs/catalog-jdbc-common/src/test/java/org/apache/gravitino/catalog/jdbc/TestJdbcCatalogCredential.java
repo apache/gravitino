@@ -161,6 +161,43 @@ public class TestJdbcCatalogCredential {
   }
 
   @Test
+  void testJdbcCatalogPropertiesHidesCredentials() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    Map<String, String> jdbcProps = Maps.newHashMap();
+    jdbcProps.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    jdbcProps.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    jdbcProps.put(JdbcConfig.USERNAME.getKey(), "test-user");
+    jdbcProps.put(JdbcConfig.PASSWORD.getKey(), "test-password");
+
+    CatalogEntity jdbcEntity =
+        CatalogEntity.builder()
+            .withId(5L)
+            .withName("jdbc-catalog-hidden")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(TestableJdbcCatalog.Type.RELATIONAL)
+            .withProvider("jdbc-mysql")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcProps)
+            .build();
+
+    TestableJdbcCatalog jdbcCatalog = new TestableJdbcCatalog();
+    jdbcCatalog.withCatalogConf(jdbcProps).withCatalogEntity(jdbcEntity);
+
+    // GravitinoEnv is not initialized in unit tests, so backfill is disabled by default.
+    Map<String, String> publicProps = jdbcCatalog.properties();
+    Assertions.assertFalse(publicProps.containsKey(JdbcConfig.USERNAME.getKey()));
+    Assertions.assertFalse(publicProps.containsKey(JdbcConfig.PASSWORD.getKey()));
+
+    // propertiesWithCredentialProviders must still see the raw credentials
+    Map<String, String> credProps = jdbcCatalog.propertiesWithCredentialProviders();
+    Assertions.assertEquals(
+        JdbcCredential.JDBC_CREDENTIAL_TYPE,
+        credProps.get(CredentialConstants.CREDENTIAL_PROVIDERS));
+  }
+
+  @Test
   void testJdbcCatalogExplicitCredentialProvidersNotOverridden() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();

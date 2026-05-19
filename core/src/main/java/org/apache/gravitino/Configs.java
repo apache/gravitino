@@ -521,6 +521,18 @@ public class Configs {
                   + " and must not contain '.' or the internal physical separator (\\u0001)")
           .createWithDefault(":");
 
+  public static final ConfigEntry<Boolean> CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES =
+      new ConfigBuilder("gravitino.catalog.credential.backfillToProperties")
+          .doc(
+              "If true, the server exposes hidden catalog credentials (such as jdbc-user and "
+                  + "jdbc-password) in the catalog properties response. Enable only during a "
+                  + "rolling upgrade while old connectors that do not support credential vending "
+                  + "are still in use. Enabling this is a security risk because credentials "
+                  + "become visible to anyone who can read catalog properties.")
+          .version(ConfigConstants.VERSION_0_9_0)
+          .booleanConf()
+          .createWithDefault(false);
+
   public static final ConfigEntry<String> PARTITION_STATS_STORAGE_FACTORY_CLASS =
       new ConfigBuilder("gravitino.stats.partition.storageFactoryClass")
           .doc(
