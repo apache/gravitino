@@ -43,9 +43,8 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     };
   }
 
-  protected String expectedSoftDeleteSetClause() {
-    return " SET deleted_at = CURRENT_TIME_MILLIS(), current_version = current_version + 1,"
-        + " last_version = last_version + 1";
+  protected String expectedDeleteAtClause() {
+    return "deleted_at = CURRENT_TIME_MILLIS()";
   }
 
   protected String expectedDeleteIdpGroupUserRelMetasByLegacyTimelineSql() {
@@ -157,7 +156,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     String normalizedSql = renderScript(script, params);
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
-    Assertions.assertTrue(normalizedSql.contains(expectedSoftDeleteSetClause()));
+    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
     Assertions.assertTrue(normalizedSql.matches(".*user_id IN \\( \\? , \\? \\).*"));
   }
 
@@ -200,7 +199,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
         createProvider().softDeleteGroupUsersByUserId(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
-    Assertions.assertTrue(normalizedSql.contains(expectedSoftDeleteSetClause()));
+    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
     Assertions.assertTrue(normalizedSql.contains("WHERE user_id = #{userId} AND deleted_at = 0"));
   }
 
@@ -210,7 +209,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
         createProvider().softDeleteGroupUsersByGroupId(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
-    Assertions.assertTrue(normalizedSql.contains(expectedSoftDeleteSetClause()));
+    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
     Assertions.assertTrue(normalizedSql.contains("WHERE group_id = #{groupId} AND deleted_at = 0"));
   }
 
@@ -255,7 +254,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
         .withGroupId(groupId)
         .withUserId(userId)
         .withCurrentVersion(1L)
-        .withLastVersion(1L)
+        .withLastVersion(0L)
         .withDeletedAt(0L)
         .build();
   }

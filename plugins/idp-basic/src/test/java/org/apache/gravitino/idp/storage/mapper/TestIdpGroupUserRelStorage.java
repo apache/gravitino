@@ -32,6 +32,7 @@ import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -104,17 +105,12 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
     insertGroup(10L, "dev", 1L, 0L, 0L);
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
     insertUser(2L, "bob", "hash-b", 1L, 0L, 0L);
-    IdpGroupUserRelPO firstRelation = insertRelation(100L, 10L, 1L, 1L, 0L, 0L);
+    insertRelation(100L, 10L, 1L, 1L, 0L, 0L);
     insertRelation(101L, 10L, 2L, 1L, 0L, 0L);
 
-    idpGroupUserRelMapper.softDeleteIdpGroupUsers(10L, List.of(1L));
+    assertEquals(1, idpGroupUserRelMapper.softDeleteIdpGroupUsers(10L, List.of(1L)));
     assertIterableEquals(List.of("bob"), idpGroupUserRelMapper.selectUserNamesByGroupId(10L));
-    assertTrue(
-        queryLongValue("idp_group_user_rel", "deleted_at", "id", firstRelation.getId()) > 0L);
-    assertEquals(
-        2L, queryLongValue("idp_group_user_rel", "current_version", "id", firstRelation.getId()));
-    assertEquals(
-        1L, queryLongValue("idp_group_user_rel", "last_version", "id", firstRelation.getId()));
+    assertEquals(0, idpGroupUserRelMapper.softDeleteIdpGroupUsers(10L, List.of(1L)));
   }
 
   @ParameterizedTest
@@ -125,12 +121,11 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
     insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
     insertUser(2L, "bob", "hash-b", 1L, 0L, 0L);
     insertRelation(100L, 10L, 1L, 1L, 0L, 0L);
-    IdpGroupUserRelPO secondRelation = insertRelation(101L, 10L, 2L, 1L, 0L, 0L);
+    insertRelation(101L, 10L, 2L, 1L, 0L, 0L);
 
-    idpGroupUserRelMapper.softDeleteGroupUsersByUserId(2L);
+    assertEquals(1, idpGroupUserRelMapper.softDeleteGroupUsersByUserId(2L));
     assertIterableEquals(List.of("alice"), idpGroupUserRelMapper.selectUserNamesByGroupId(10L));
-    assertTrue(
-        queryLongValue("idp_group_user_rel", "deleted_at", "id", secondRelation.getId()) > 0L);
+    assertEquals(0, idpGroupUserRelMapper.softDeleteGroupUsersByUserId(2L));
   }
 
   @ParameterizedTest
@@ -139,12 +134,26 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
     init(type);
     insertGroup(20L, "ops", 1L, 0L, 0L);
     insertUser(3L, "carol", "hash-c", 1L, 0L, 0L);
-    IdpGroupUserRelPO thirdRelation = insertRelation(102L, 20L, 3L, 1L, 0L, 0L);
+    insertRelation(102L, 20L, 3L, 1L, 0L, 0L);
 
-    idpGroupUserRelMapper.softDeleteGroupUsersByGroupId(20L);
+    assertEquals(1, idpGroupUserRelMapper.softDeleteGroupUsersByGroupId(20L));
     assertTrue(idpGroupUserRelMapper.selectUserNamesByGroupId(20L).isEmpty());
-    assertTrue(
-        queryLongValue("idp_group_user_rel", "deleted_at", "id", thirdRelation.getId()) > 0L);
+    assertEquals(0, idpGroupUserRelMapper.softDeleteGroupUsersByGroupId(20L));
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testRestart(String type) throws IOException {
+    init(type);
+    insertGroup(10L, "dev", 1L, 0L, 0L);
+    insertUser(1L, "alice", "hash-a", 1L, 0L, 0L);
+    insertRelation(100L, 10L, 1L, 1L, 0L, 0L);
+
+    assertPersistedRelations();
+
+    restartBackend();
+
+    assertPersistedRelations();
   }
 
   @ParameterizedTest
@@ -160,6 +169,17 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
     assertEquals(0, countRows("idp_group_user_rel", "id", 100L));
     assertEquals(1, countRows("idp_group_user_rel", "id", 101L));
     assertEquals(1, countRows("idp_group_user_rel", "id", 102L));
+  }
+
+  private void assertPersistedRelations() {
+    assertTrue(
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .getConfiguration()
+            .hasMapper(IdpGroupUserRelMapper.class));
+
+    assertIterableEquals(List.of("dev"), idpGroupUserRelMapper.selectGroupNamesByUserId(1L));
+    assertIterableEquals(List.of("alice"), idpGroupUserRelMapper.selectUserNamesByGroupId(10L));
   }
 
   private void insertUser(
@@ -205,21 +225,6 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .build();
     idpGroupUserRelMapper.batchInsertIdpGroupUsers(List.of(relationPO));
     return relationPO;
-  }
-
-  private long queryLongValue(String table, String column, String idColumn, long idValue) {
-    try (Connection connection = sharedSession.getConnection()) {
-      String query = "SELECT " + column + " FROM " + table + " WHERE " + idColumn + " = ?";
-      try (PreparedStatement statement = connection.prepareStatement(query)) {
-        statement.setLong(1, idValue);
-        try (ResultSet resultSet = statement.executeQuery()) {
-          assertTrue(resultSet.next());
-          return resultSet.getLong(1);
-        }
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Query " + column + " from " + table + " failed", e);
-    }
   }
 
   private int countRows(String table, String idColumn, long idValue) {

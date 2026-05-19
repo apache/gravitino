@@ -60,18 +60,18 @@ public interface IdpGroupUserRelMapper {
   @UpdateProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
       method = "softDeleteIdpGroupUsers")
-  void softDeleteIdpGroupUsers(
+  Integer softDeleteIdpGroupUsers(
       @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds);
 
   @UpdateProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
       method = "softDeleteGroupUsersByUserId")
-  void softDeleteGroupUsersByUserId(@Param("userId") Long userId);
+  Integer softDeleteGroupUsersByUserId(@Param("userId") Long userId);
 
   @UpdateProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
       method = "softDeleteGroupUsersByGroupId")
-  void softDeleteGroupUsersByGroupId(@Param("groupId") Long groupId);
+  Integer softDeleteGroupUsersByGroupId(@Param("groupId") Long groupId);
 
   @DeleteProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,

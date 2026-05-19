@@ -31,7 +31,7 @@ public class TestIdpGroupUserRelPO {
             .withGroupId(10L)
             .withUserId(20L)
             .withCurrentVersion(1L)
-            .withLastVersion(1L)
+            .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
 
@@ -39,7 +39,7 @@ public class TestIdpGroupUserRelPO {
     Assertions.assertEquals(10L, relPO.getGroupId());
     Assertions.assertEquals(20L, relPO.getUserId());
     Assertions.assertEquals(1L, relPO.getCurrentVersion());
-    Assertions.assertEquals(1L, relPO.getLastVersion());
+    Assertions.assertEquals(0L, relPO.getLastVersion());
     Assertions.assertEquals(0L, relPO.getDeletedAt());
   }
 
@@ -51,7 +51,7 @@ public class TestIdpGroupUserRelPO {
             .withGroupId(10L)
             .withUserId(20L)
             .withCurrentVersion(1L)
-            .withLastVersion(1L)
+            .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
 
@@ -61,7 +61,7 @@ public class TestIdpGroupUserRelPO {
             .withGroupId(10L)
             .withUserId(20L)
             .withCurrentVersion(1L)
-            .withLastVersion(1L)
+            .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
 
@@ -77,7 +77,7 @@ public class TestIdpGroupUserRelPO {
             .withGroupId(10L)
             .withUserId(20L)
             .withCurrentVersion(1L)
-            .withLastVersion(1L)
+            .withLastVersion(0L)
             .withDeletedAt(0L);
 
     IdpGroupUserRelPO firstRelation = builder.build();
