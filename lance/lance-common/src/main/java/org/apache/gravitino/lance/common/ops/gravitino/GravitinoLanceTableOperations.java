@@ -22,7 +22,7 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 import static org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter.CONVERTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_CREATE_EMPTY;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -196,7 +196,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     ImmutableMap<String, String> props =
         ImmutableMap.<String, String>builder()
             .putAll(tableProperties)
-            .put(LANCE_TABLE_CREATE_EMPTY, "true")
+            .put(LANCE_TABLE_DECLARED, "true")
             .put(Table.PROPERTY_EXTERNAL, "true")
             .build();
 
@@ -206,26 +206,6 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     declareTableResponse.setLocation(response.getLocation());
     declareTableResponse.setStorageOptions(response.getStorageOptions());
     return declareTableResponse;
-  }
-
-  @Override
-  @SuppressWarnings("deprecation")
-  public DeclareTableResponse createEmptyTable(
-      String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties) {
-    // Empty table creation only supports CREATE mode (not EXIST_OK or OVERWRITE).
-    ImmutableMap<String, String> props =
-        ImmutableMap.<String, String>builder()
-            .putAll(tableProperties)
-            .put(LANCE_TABLE_CREATE_EMPTY, "true")
-            .put(Table.PROPERTY_EXTERNAL, "true")
-            .build();
-
-    CreateTableResponse response =
-        createTable(tableId, "create", delimiter, tableLocation, props, null);
-    DeclareTableResponse emptyTableResponse = new DeclareTableResponse();
-    emptyTableResponse.setLocation(response.getLocation());
-    emptyTableResponse.setStorageOptions(response.getStorageOptions());
-    return emptyTableResponse;
   }
 
   @Override

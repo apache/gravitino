@@ -59,8 +59,7 @@ public interface LanceTableOperations {
       byte[] arrowStreamBody);
 
   /**
-   * Declare a table without touching storage. This is the preferred API for creating metadata-only
-   * table entries, replacing the deprecated {@link #createEmptyTable} method.
+   * Declare a table without touching storage.
    *
    * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
    * @param delimiter the delimiter used in the namespace
@@ -69,28 +68,6 @@ public interface LanceTableOperations {
    * @return the response of the declare table operation
    */
   DeclareTableResponse declareTable(
-      String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties);
-
-  /**
-   * Create a new table without schema.
-   *
-   * <p>Slated for removal in 1.4.0. Upstream {@code lance-namespace-core} 0.7.5 already removed
-   * this operation from the {@code LanceNamespace} interface, and the <a
-   * href="../../../docs/lance-rest-integration.md">compatibility matrix</a> declares Gravitino
-   * 1.3.0 incompatible with the older clients that still call it (lance-ray &lt; 0.3.0 and
-   * lance-spark &lt; 0.1.0), so the legacy {@code /create-empty} REST endpoint and this method keep
-   * no reachable users. They are kept for one release as a courtesy for any direct HTTP caller and
-   * will be deleted once 1.3.0 has shipped.
-   *
-   * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
-   * @param delimiter the delimiter used in the namespace
-   * @param tableLocation the location where the table data will be stored
-   * @param tableProperties the properties of the table
-   * @return the response of the create table operation
-   * @deprecated Use {@link #declareTable} instead. To be removed in 1.4.0.
-   */
-  @Deprecated
-  DeclareTableResponse createEmptyTable(
       String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties);
 
   /**

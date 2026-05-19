@@ -19,7 +19,6 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
@@ -435,121 +434,6 @@ public class TestLanceNamespaceOperations extends JerseyTest {
             .queryParam("delimiter", delimiter)
             .request(MediaType.APPLICATION_JSON_TYPE)
             .post(Entity.entity(bytes, "application/vnd.apache.arrow.stream"));
-
-    Assertions.assertEquals(
-        Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
-    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
-    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals("Runtime exception", errorResp.getError());
-  }
-
-  @Test
-  void testCreateEmptyTable() {
-    String tableIds = "catalog.scheme.create_empty_table";
-    String delimiter = ".";
-
-    // Test normal
-    DeclareTableResponse createTableResponse = new DeclareTableResponse();
-    createTableResponse.setLocation("/path/to/table");
-    createTableResponse.setStorageOptions(ImmutableMap.of("key", "value"));
-    when(tableOps.createEmptyTable(any(), any(), any(), any())).thenReturn(createTableResponse);
-
-    DeclareTableRequest tableRequest = new DeclareTableRequest();
-    tableRequest.setLocation("/path/to/table");
-
-    Response resp =
-        target(String.format("/v1/table/%s/create-empty", tableIds))
-            .queryParam("delimiter", delimiter)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .post(Entity.entity(tableRequest, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
-    DeclareTableResponse response = resp.readEntity(DeclareTableResponse.class);
-    Assertions.assertEquals(createTableResponse.getLocation(), response.getLocation());
-    Assertions.assertEquals(createTableResponse.getStorageOptions(), response.getStorageOptions());
-
-    Mockito.verify(tableOps)
-        .createEmptyTable(eq(tableIds), eq(delimiter), eq("/path/to/table"), eq(Map.of()));
-
-    // Backward compatibility: request-body properties should still be accepted.
-    Mockito.reset(tableOps);
-    when(tableOps.createEmptyTable(any(), any(), any(), any())).thenReturn(createTableResponse);
-    String bodyWithProperties =
-        "{"
-            + "\"id\":[\"catalog\",\"scheme\",\"create_empty_table\"],"
-            + "\"location\":\"/path/to/table\","
-            + "\"properties\":{\"k1\":\"v1\",\"k2\":2}"
-            + "}";
-    resp =
-        target(String.format("/v1/table/%s/create-empty", tableIds))
-            .queryParam("delimiter", delimiter)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .post(Entity.entity(bodyWithProperties, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    Mockito.verify(tableOps)
-        .createEmptyTable(
-            eq(tableIds),
-            eq(delimiter),
-            eq("/path/to/table"),
-            argThat(
-                (Map<String, String> props) ->
-                    "v1".equals(props.get("k1"))
-                        && "2".equals(props.get("k2"))
-                        && props.size() == 2));
-
-    // Header properties should override body properties on key conflicts.
-    Mockito.reset(tableOps);
-    when(tableOps.createEmptyTable(any(), any(), any(), any())).thenReturn(createTableResponse);
-    String bodyWithOverlappedProperties =
-        "{"
-            + "\"id\":[\"catalog\",\"scheme\",\"create_empty_table\"],"
-            + "\"location\":\"/path/to/table\","
-            + "\"properties\":{\"k1\":\"body\",\"k2\":\"body2\"}"
-            + "}";
-    resp =
-        target(String.format("/v1/table/%s/create-empty", tableIds))
-            .queryParam("delimiter", delimiter)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .header(
-                LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER,
-                "{\"k1\":\"header\",\"k3\":\"v3\"}")
-            .post(Entity.entity(bodyWithOverlappedProperties, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    Mockito.verify(tableOps)
-        .createEmptyTable(
-            eq(tableIds),
-            eq(delimiter),
-            eq("/path/to/table"),
-            argThat(
-                (Map<String, String> props) ->
-                    "header".equals(props.get("k1"))
-                        && "body2".equals(props.get("k2"))
-                        && "v3".equals(props.get("k3"))
-                        && props.size() == 3));
-
-    Mockito.reset(tableOps);
-    // Test illegal argument
-    when(tableOps.createEmptyTable(any(), any(), any(), any()))
-        .thenThrow(new IllegalArgumentException("Illegal argument"));
-
-    resp =
-        target(String.format("/v1/table/%s/create-empty", tableIds))
-            .queryParam("delimiter", delimiter)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .post(Entity.entity(tableRequest, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
-    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
-
-    // Test runtime exception
-    Mockito.reset(tableOps);
-    when(tableOps.createEmptyTable(any(), any(), any(), any()))
-        .thenThrow(new RuntimeException("Runtime exception"));
-    resp =
-        target(String.format("/v1/table/%s/create-empty", tableIds))
-            .queryParam("delimiter", delimiter)
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .post(Entity.entity(tableRequest, MediaType.APPLICATION_JSON_TYPE));
 
     Assertions.assertEquals(
         Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());

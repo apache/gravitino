@@ -133,50 +133,6 @@ public class LanceTableOperations {
     }
   }
 
-  /**
-   * Legacy create-empty endpoint kept for clients that still call it. It only records table
-   * metadata, including its location, and does not touch Lance storage.
-   *
-   * <p>Slated for removal in 1.4.0 — upstream {@code lance-namespace-core} 0.7.5 dropped this
-   * operation, and lance-ray &lt; 0.3.0 / lance-spark &lt; 0.1.0 (the only clients that could still
-   * hit it) are already declared incompatible with Gravitino 1.3.0 in the <a
-   * href="../../../../docs/lance-rest-integration.md">compatibility matrix</a>. Kept for one
-   * release as a courtesy to any direct HTTP caller.
-   */
-  @POST
-  @Path("/create-empty")
-  @Produces("application/json")
-  @Timed(name = "create-empty-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "create-empty-table", absolute = true)
-  @SuppressWarnings("deprecation")
-  public Response createEmptyTable(
-      @PathParam("id") String tableId,
-      @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
-      Map<String, Object> requestBody,
-      @Context HttpHeaders headers) {
-    try {
-      validateCreateEmptyTableRequest(requestBody);
-      String tableLocation =
-          Optional.ofNullable(requestBody)
-              .map(body -> body.get(LANCE_LOCATION))
-              .map(String::valueOf)
-              .orElse(null);
-      Map<String, String> props = extractPropertiesFromBody(requestBody);
-      MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
-      String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
-      Map<String, String> headerProps = SerializationUtils.deserializeProperties(tableProperties);
-      // Keep backward compatibility: accept body properties and let header override on key
-      // conflict.
-      props.putAll(headerProps);
-
-      DeclareTableResponse response =
-          lanceNamespace.asTableOps().createEmptyTable(tableId, delimiter, tableLocation, props);
-      return Response.ok(response).build();
-    } catch (Exception e) {
-      return LanceExceptionMapper.toRESTResponse(tableId, e);
-    }
-  }
-
   @POST
   @Path("/declare")
   @Produces("application/json")
@@ -336,30 +292,9 @@ public class LanceTableOperations {
     }
   }
 
-  @SuppressWarnings({"unused", "deprecation"})
-  private void validateCreateEmptyTableRequest(Map<String, Object> requestBody) {
-    // No specific fields to validate for now
-  }
-
   private void validateDeclareTableRequest(
       @SuppressWarnings("unused") DeclareTableRequest request) {
     // No specific fields to validate for now
-  }
-
-  private static Map<String, String> extractPropertiesFromBody(Map<String, Object> requestBody) {
-    if (requestBody == null) {
-      return Maps.newHashMap();
-    }
-
-    Object propertiesObject = requestBody.get("properties");
-    if (!(propertiesObject instanceof Map<?, ?>)) {
-      return Maps.newHashMap();
-    }
-
-    Map<String, String> properties = Maps.newHashMap();
-    ((Map<?, ?>) propertiesObject)
-        .forEach((key, value) -> properties.put(String.valueOf(key), String.valueOf(value)));
-    return properties;
   }
 
   private void validateRegisterTableRequest(

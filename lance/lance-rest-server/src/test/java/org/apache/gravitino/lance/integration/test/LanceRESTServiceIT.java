@@ -797,13 +797,13 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
     Assertions.assertTrue(exception.getMessage().contains("Table not found"));
     // Try to create a table and then deregister table
-    DeclareTableRequest createEmptyTableRequest = new DeclareTableRequest();
+    DeclareTableRequest declareTableRequest = new DeclareTableRequest();
     String location = tempDir + "/" + "to_be_deregistered_table/";
     ids = List.of(CATALOG_NAME, SCHEMA_NAME, "to_be_deregistered_table");
-    createEmptyTableRequest.setLocation(location);
-    createEmptyTableRequest.setId(ids);
+    declareTableRequest.setLocation(location);
+    declareTableRequest.setId(ids);
     DeclareTableResponse response =
-        Assertions.assertDoesNotThrow(() -> ns.declareTable(createEmptyTableRequest));
+        Assertions.assertDoesNotThrow(() -> ns.declareTable(declareTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
@@ -841,12 +841,12 @@ public class LanceRESTServiceIT extends BaseIT {
     createSchema();
 
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_exists");
-    DeclareTableRequest createEmptyTableRequest = new DeclareTableRequest();
+    DeclareTableRequest declareTableRequest = new DeclareTableRequest();
     String location = tempDir + "/" + "table_exists/";
-    createEmptyTableRequest.setLocation(location);
-    createEmptyTableRequest.setId(ids);
+    declareTableRequest.setLocation(location);
+    declareTableRequest.setId(ids);
     DeclareTableResponse response =
-        Assertions.assertDoesNotThrow(() -> ns.declareTable(createEmptyTableRequest));
+        Assertions.assertDoesNotThrow(() -> ns.declareTable(declareTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
@@ -870,12 +870,12 @@ public class LanceRESTServiceIT extends BaseIT {
     createSchema();
 
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_to_drop");
-    DeclareTableRequest createEmptyTableRequest = new DeclareTableRequest();
+    DeclareTableRequest declareTableRequest = new DeclareTableRequest();
     String location = tempDir + "/" + "table_to_drop/";
-    createEmptyTableRequest.setLocation(location);
-    createEmptyTableRequest.setId(ids);
+    declareTableRequest.setLocation(location);
+    declareTableRequest.setId(ids);
     DeclareTableResponse response =
-        Assertions.assertDoesNotThrow(() -> ns.declareTable(createEmptyTableRequest));
+        Assertions.assertDoesNotThrow(() -> ns.declareTable(declareTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
@@ -920,7 +920,7 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(location, loadTable.getLocation());
     Assertions.assertEquals(
-        "true", loadTable.getMetadata().get(LanceConstants.LANCE_TABLE_CREATE_EMPTY));
+        "true", loadTable.getMetadata().get(LanceConstants.LANCE_TABLE_DECLARED));
     Assertions.assertEquals("true", loadTable.getMetadata().get(Table.PROPERTY_EXTERNAL));
 
     // Try to declare the same table again should fail
