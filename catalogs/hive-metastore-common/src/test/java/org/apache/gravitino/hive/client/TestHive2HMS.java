@@ -50,6 +50,7 @@ import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -133,6 +134,11 @@ public class TestHive2HMS {
       hiveClient.createTable(table);
       List<String> allTables = hiveClient.getAllTables(catalogName, dbName);
       Assertions.assertTrue(allTables.contains(tableName), "Table should be in the list");
+
+      List<String> managedTables =
+          hiveClient.listTablesByType(catalogName, dbName, "*", TableType.MANAGED_TABLE.name());
+      Assertions.assertTrue(
+          managedTables.contains(tableName), "Managed table list should contain the table");
 
       HiveTable loadedTable = hiveClient.getTable(catalogName, dbName, tableName);
       Assertions.assertNotNull(loadedTable, "Loaded table should not be null");
