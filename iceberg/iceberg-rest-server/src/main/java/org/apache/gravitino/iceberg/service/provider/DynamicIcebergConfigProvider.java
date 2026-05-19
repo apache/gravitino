@@ -54,7 +54,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   private String gravitinoMetalake;
   private Optional<String> defaultDynamicCatalogName;
   private Map<String, String> properties;
-  @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
+  private Map<String, IcebergConfig> restServerCatalogConfigs;
 
   private volatile CatalogFetcher catalogFetcher;
 
@@ -70,7 +70,8 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         Optional.ofNullable(
             properties.get(IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME));
     this.properties = properties;
-    this.catalogConfigs = StaticIcebergConfigProvider.initCatalogConfigs(properties);
+    this.restServerCatalogConfigs =
+        IcebergRestServerCatalogConfigParser.parseFromServerProperties(properties);
   }
 
   @Override
@@ -102,10 +103,8 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    IcebergConfig icebergConfig = getIcebergConfigFromCatalogProperties(catalog.properties());
-    Map<String, String> icebergCatalogProperties = new HashMap<>(icebergConfig.getAllConfig());
-    mergeAbsentProperties(icebergCatalogProperties, getCatalogConfig(requestedCatalogName));
-    return Optional.of(new IcebergConfig(icebergCatalogProperties));
+    return Optional.of(
+        mergeWithRestServerCatalogConfig(catalog.properties(), requestedCatalogName));
   }
 
   /**
@@ -164,16 +163,16 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     return new IcebergConfig(properties);
   }
 
-  @VisibleForTesting
-  static void mergeAbsentProperties(
-      Map<String, String> icebergCatalogProperties, Map<String, String> properties) {
-    properties.forEach(icebergCatalogProperties::putIfAbsent);
-  }
-
-  private Map<String, String> getCatalogConfig(String catalogName) {
-    return Optional.ofNullable(catalogConfigs.get(catalogName))
-        .map(IcebergConfig::getAllConfig)
-        .orElseGet(HashMap::new);
+  private IcebergConfig mergeWithRestServerCatalogConfig(
+      Map<String, String> catalogProperties, String restServerCatalogKey) {
+    Map<String, String> merged =
+        new HashMap<>(getIcebergConfigFromCatalogProperties(catalogProperties).getAllConfig());
+    IcebergConfig restServerConfig = restServerCatalogConfigs.get(restServerCatalogKey);
+    if (restServerConfig != null) {
+      IcebergRestServerCatalogConfigParser.mergeAbsentProperties(
+          merged, restServerConfig.getAllConfig());
+    }
+    return new IcebergConfig(merged);
   }
 
   @Override

@@ -21,12 +21,7 @@ package org.apache.gravitino.iceberg.service.provider;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
-import org.apache.gravitino.utils.MapUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This provider use configs to support multiple catalogs.
@@ -39,13 +34,13 @@ import org.slf4j.LoggerFactory;
  * gravitino.iceberg-rest.catalog.hive_proxy.uri = thrift://{host}:{port} ...
  */
 public class StaticIcebergConfigProvider implements IcebergConfigProvider {
-  public static final Logger LOG = LoggerFactory.getLogger(StaticIcebergConfigProvider.class);
 
   @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
 
   @Override
   public void initialize(Map<String, String> properties) {
-    this.catalogConfigs = initCatalogConfigs(properties);
+    this.catalogConfigs =
+        IcebergRestServerCatalogConfigParser.parseFromServerProperties(properties);
   }
 
   @Override
@@ -55,35 +50,4 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
 
   @Override
   public void close() {}
-
-  @VisibleForTesting
-  static Map<String, IcebergConfig> initCatalogConfigs(Map<String, String> properties) {
-    Map<String, IcebergConfig> configs =
-        properties.keySet().stream()
-            .map(StaticIcebergConfigProvider::getCatalogName)
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .distinct()
-            .collect(
-                Collectors.toMap(
-                    catalogName -> catalogName,
-                    catalogName ->
-                        new IcebergConfig(
-                            MapUtils.getPrefixMap(
-                                properties, String.format("catalog.%s.", catalogName)))));
-    configs.put(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, new IcebergConfig(properties));
-    return configs;
-  }
-
-  private static Optional<String> getCatalogName(String catalogConfigKey) {
-    if (!catalogConfigKey.startsWith("catalog.")) {
-      return Optional.empty();
-    }
-    // The catalogConfigKey's format is catalog.<catalog_name>.<param_name>
-    if (catalogConfigKey.split("\\.").length < 3) {
-      LOG.warn("{} format is illegal", catalogConfigKey);
-      return Optional.empty();
-    }
-    return Optional.of(catalogConfigKey.split("\\.")[1]);
-  }
 }
