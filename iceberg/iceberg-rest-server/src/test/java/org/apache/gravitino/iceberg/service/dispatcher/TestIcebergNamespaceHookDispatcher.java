@@ -226,9 +226,7 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedNamespaceOwnsOnlyMissingAncestorsAndLeaf() {
-    // Depth-4 leaf, only A exists. Expect setOwners with [A:B, A:B:C, A:B:C:D] —
-    // missing ancestors (outermost first) + leaf; existing A is not re-owned.
+  public void testCreateNestedNamespaceOwnsOnlyLeaf() {
     Namespace leaf = Namespace.of("A", "B", "C", "D");
     Set<String> existing = ImmutableSet.of("A");
     when(mockDispatcher.namespaceExists(eq(mockContext), any(Namespace.class)))
@@ -251,16 +249,11 @@ public class TestIcebergNamespaceHookDispatcher {
         .setOwners(eq(TEST_METALAKE), captor.capture(), eq(TEST_USER), eq(Owner.Type.USER));
     List<String> names =
         captor.getValue().stream().map(MetadataObject::fullName).collect(Collectors.toList());
-    Assertions.assertEquals(
-        Arrays.asList(TEST_CATALOG + ".A:B", TEST_CATALOG + ".A:B:C", TEST_CATALOG + ".A:B:C:D"),
-        names);
+    Assertions.assertEquals(Arrays.asList(TEST_CATALOG + ".A:B:C:D"), names);
   }
 
   @Test
-  public void testDropNamespaceCascadeDeletesOutermostPhantomAncestor() throws Exception {
-    // Drop A:B:C. Neither A nor A:B exists in Iceberg, so the whole branch is Gravitino-side
-    // phantoms. The hook cascade-deletes the outermost phantom (A) so the future hierarchical
-    // cascade in the entity store can clean up the whole sub-tree in one call.
+  public void testDropNamespaceDeletesTargetAndPhantomAncestors() throws Exception {
     Namespace leaf = Namespace.of("A", "B", "C");
     Namespace parent = Namespace.of("A", "B");
     Namespace grandparent = Namespace.of("A");
@@ -272,16 +265,15 @@ public class TestIcebergNamespaceHookDispatcher {
     verify(mockDispatcher, never()).dropNamespace(mockContext, grandparent);
 
     ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
-    verify(mockEntityStore, org.mockito.Mockito.times(1))
-        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
-    Assertions.assertEquals("A", captor.getValue().name());
+    verify(mockEntityStore, org.mockito.Mockito.times(3))
+        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA));
+    List<String> deletedNames =
+        captor.getAllValues().stream().map(NameIdentifier::name).collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("A:B:C", "A:B", "A"), deletedNames);
   }
 
   @Test
-  public void testDropNamespaceCascadeDeletesTargetWhenAncestorsExist() throws Exception {
-    // Drop A:B:C; A:B still exists in Iceberg. By the child-exists-implies-parent-exists
-    // invariant A is also live, so there is no phantom to cascade-delete from. The hook
-    // cascade-deletes just the target's row.
+  public void testDropNamespaceDeletesTargetWhenAncestorsExist() throws Exception {
     Namespace leaf = Namespace.of("A", "B", "C");
     Namespace parent = Namespace.of("A", "B");
     Namespace grandparent = Namespace.of("A");
@@ -298,7 +290,7 @@ public class TestIcebergNamespaceHookDispatcher {
 
     ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
     verify(mockEntityStore, org.mockito.Mockito.times(1))
-        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
+        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA));
     Assertions.assertEquals("A:B:C", captor.getValue().name());
   }
 }
