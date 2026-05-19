@@ -253,8 +253,32 @@ tasks {
 
     val versions = project.findProperty("lanceRayVersions") as? String
     val keepGoing = project.hasProperty("lanceRayKeepGoing")
-    val pythonExecutable =
-      (project.findProperty("lanceRayPython") as? String)?.takeIf { it.isNotBlank() } ?: "python3"
+    // Bootstrap interpreter resolution (lowest to highest priority):
+    //   1. system `python3` on PATH (final fallback)
+    //   2. miniforge plugin's conda env (set up by `pythonPlugin {}` block
+    //      above), if its `python` exists. This keeps the matrix consistent
+    //      with the python toolchain the rest of the python client uses.
+    //   3. `-PlanceRayPython=/path/to/python` explicit override.
+    //
+    // The matrix script provisions its own per-version venvs from this
+    // interpreter, so all that's required is a Python 3 with the `venv`
+    // module — the choice does not affect what lance-ray sees at runtime.
+    val pythonVersion = project.rootProject.extra["pythonVersion"].toString()
+    val osDir = when {
+      org.gradle.internal.os.OperatingSystem.current().isMacOsX -> "MacOSX"
+      org.gradle.internal.os.OperatingSystem.current().isLinux -> "Linux"
+      else -> null
+    }
+    val condaPython = osDir?.let {
+      file("${project.rootDir}/.gradle/python/$it/Miniforge3/envs/python-$pythonVersion/bin/python")
+    }
+    val explicitPython =
+      (project.findProperty("lanceRayPython") as? String)?.takeIf { it.isNotBlank() }
+    val pythonExecutable = when {
+      explicitPython != null -> explicitPython
+      condaPython != null && condaPython.exists() -> condaPython.absolutePath
+      else -> "python3"
+    }
     val script = projectDir.resolve("scripts/run_lance_ray_matrix.py")
     val gravitinoHome = file("${project.rootDir}/distribution/package")
 
