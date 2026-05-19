@@ -66,9 +66,9 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  void testSelectUserNamesByGroupId() {
+  void testSelectUsernamesByGroupId() {
     String normalizedSql =
-        createProvider().selectUserNamesByGroupId(1L).replaceAll("\\s+", " ").trim();
+        createProvider().selectUsernamesByGroupId(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT u.user_name"));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_group_user_rel r JOIN idp_user_meta u"));
@@ -123,7 +123,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     List<IdpGroupUserRelPO> relations =
         Arrays.asList(newRelation(1L, 10L, 20L), newRelation(2L, 10L, 21L));
 
-    String script = createProvider().batchInsertIdpGroupUsers(relations);
+    String script = createProvider().batchInsertRelations(relations);
     Map<String, Object> params = new HashMap<>();
     params.put("relations", relations);
 
@@ -143,7 +143,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
 
   @Test
   void testSoftDeleteIdpGroupUsers() {
-    String script = createProvider().softDeleteIdpGroupUsers(10L, Arrays.asList(20L, 21L));
+    String script = createProvider().softDeleteRelations(10L, Arrays.asList(20L, 21L));
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
     params.put("userIds", Arrays.asList(20L, 21L));
@@ -157,7 +157,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
 
   @Test
   void testSoftDeleteIdpGroupUsersWithEmptyUserIds() {
-    String script = createProvider().softDeleteIdpGroupUsers(10L, Collections.emptyList());
+    String script = createProvider().softDeleteRelations(10L, Collections.emptyList());
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
     params.put("userIds", Collections.emptyList());
@@ -175,7 +175,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
 
   @Test
   void testSoftDeleteIdpGroupUsersWithNullUserIds() {
-    String script = createProvider().softDeleteIdpGroupUsers(10L, null);
+    String script = createProvider().softDeleteRelations(10L, null);
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
 
@@ -183,23 +183,29 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  void testSoftDeleteGroupUsersByUserId() {
+  void testSoftDeleteRelationsByUsername() {
     String normalizedSql =
-        createProvider().softDeleteGroupUsersByUserId(1L).replaceAll("\\s+", " ").trim();
+        createProvider().softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
+    Assertions.assertTrue(normalizedSql.contains("JOIN idp_user_meta u"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("WHERE user_id = #{userId} AND deleted_at = 0"));
+    Assertions.assertTrue(normalizedSql.contains("WHERE u.user_name = #{username}"));
+    Assertions.assertTrue(normalizedSql.contains("AND r.deleted_at = 0"));
+    Assertions.assertTrue(normalizedSql.contains("AND u.deleted_at = 0"));
   }
 
   @Test
-  void testSoftDeleteGroupUsersByGroupId() {
+  void testSoftDeleteRelationsByGroupName() {
     String normalizedSql =
-        createProvider().softDeleteGroupUsersByGroupId(1L).replaceAll("\\s+", " ").trim();
+        createProvider().softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
+    Assertions.assertTrue(normalizedSql.contains("JOIN idp_group_meta g"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("WHERE group_id = #{groupId} AND deleted_at = 0"));
+    Assertions.assertTrue(normalizedSql.contains("WHERE g.group_name = #{groupName}"));
+    Assertions.assertTrue(normalizedSql.contains("AND r.deleted_at = 0"));
+    Assertions.assertTrue(normalizedSql.contains("AND g.deleted_at = 0"));
   }
 
   @Test

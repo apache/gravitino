@@ -60,8 +60,8 @@ public class IdpGroupUserRelSQLProviderFactory {
     return currentProvider().selectGroupNamesByUserId(userId);
   }
 
-  public static String selectUserNamesByGroupId(@Param("groupId") Long groupId) {
-    return currentProvider().selectUserNamesByGroupId(groupId);
+  public static String selectUsernamesByGroupId(@Param("groupId") Long groupId) {
+    return currentProvider().selectUsernamesByGroupId(groupId);
   }
 
   public static String selectRelatedUserIds(
@@ -69,22 +69,21 @@ public class IdpGroupUserRelSQLProviderFactory {
     return currentProvider().selectRelatedUserIds(groupId, userIds);
   }
 
-  public static String batchInsertIdpGroupUsers(
-      @Param("relations") List<IdpGroupUserRelPO> relations) {
-    return currentProvider().batchInsertIdpGroupUsers(relations);
+  public static String batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations) {
+    return currentProvider().batchInsertRelations(relations);
   }
 
-  public static String softDeleteIdpGroupUsers(
+  public static String softDeleteRelations(
       @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
-    return currentProvider().softDeleteIdpGroupUsers(groupId, userIds);
+    return currentProvider().softDeleteRelations(groupId, userIds);
   }
 
-  public static String softDeleteGroupUsersByUserId(@Param("userId") Long userId) {
-    return currentProvider().softDeleteGroupUsersByUserId(userId);
+  public static String softDeleteRelationsByUsername(@Param("username") String username) {
+    return currentProvider().softDeleteRelationsByUsername(username);
   }
 
-  public static String softDeleteGroupUsersByGroupId(@Param("groupId") Long groupId) {
-    return currentProvider().softDeleteGroupUsersByGroupId(groupId);
+  public static String softDeleteRelationsByGroupName(@Param("groupName") String groupName) {
+    return currentProvider().softDeleteRelationsByGroupName(groupName);
   }
 
   public static String deleteIdpGroupUserRelMetasByLegacyTimeline(

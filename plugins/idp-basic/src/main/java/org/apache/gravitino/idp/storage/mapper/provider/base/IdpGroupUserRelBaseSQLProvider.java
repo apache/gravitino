@@ -41,7 +41,7 @@ public class IdpGroupUserRelBaseSQLProvider {
         + " ORDER BY g.group_name";
   }
 
-  public String selectUserNamesByGroupId(@Param("groupId") Long groupId) {
+  public String selectUsernamesByGroupId(@Param("groupId") Long groupId) {
     return "SELECT u.user_name"
         + " FROM "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
@@ -68,7 +68,7 @@ public class IdpGroupUserRelBaseSQLProvider {
         + "</script>";
   }
 
-  public String batchInsertIdpGroupUsers(@Param("relations") List<IdpGroupUserRelPO> relations) {
+  public String batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations) {
     return "<script>"
         + "INSERT INTO "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
@@ -81,7 +81,7 @@ public class IdpGroupUserRelBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteIdpGroupUsers(
+  public String softDeleteRelations(
       @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
     return "<script>"
         + "UPDATE "
@@ -96,20 +96,30 @@ public class IdpGroupUserRelBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteGroupUsersByUserId(@Param("userId") Long userId) {
+  public String softDeleteRelationsByUsername(@Param("username") String username) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " SET deleted_at = "
+        + " r JOIN "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u ON u.user_id = r.user_id"
+        + " SET r.deleted_at = "
         + currentTimeMillisExpression()
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " WHERE u.user_name = #{username}"
+        + " AND r.deleted_at = 0"
+        + " AND u.deleted_at = 0";
   }
 
-  public String softDeleteGroupUsersByGroupId(@Param("groupId") Long groupId) {
+  public String softDeleteRelationsByGroupName(@Param("groupName") String groupName) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " SET deleted_at = "
+        + " r JOIN "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g ON g.group_id = r.group_id"
+        + " SET r.deleted_at = "
         + currentTimeMillisExpression()
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        + " WHERE g.group_name = #{groupName}"
+        + " AND r.deleted_at = 0"
+        + " AND g.deleted_at = 0";
   }
 
   public String deleteIdpGroupUserRelMetasByLegacyTimeline(

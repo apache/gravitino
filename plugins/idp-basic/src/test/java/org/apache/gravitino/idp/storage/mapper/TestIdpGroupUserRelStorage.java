@@ -78,7 +78,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build());
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(100L)
@@ -103,7 +103,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testSelectUserNamesByGroupId(String type) throws IOException {
+  void testSelectUsernamesByGroupId(String type) throws IOException {
     init(type);
     idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
@@ -131,7 +131,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build());
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(100L)
@@ -151,8 +151,8 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
                 .build()));
 
     assertIterableEquals(
-        List.of("alice", "bob"), idpGroupUserRelMapper.selectUserNamesByGroupId(1L));
-    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUserNamesByGroupId(999L));
+        List.of("alice", "bob"), idpGroupUserRelMapper.selectUsernamesByGroupId(1L));
+    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUsernamesByGroupId(999L));
   }
 
   @ParameterizedTest
@@ -194,7 +194,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build());
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(100L)
@@ -254,7 +254,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build());
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(100L)
@@ -307,7 +307,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build());
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(100L)
@@ -326,16 +326,16 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
                 .withDeletedAt(0L)
                 .build()));
 
-    assertEquals(1, idpGroupUserRelMapper.softDeleteIdpGroupUsers(1L, List.of(1L)));
-    assertIterableEquals(List.of("bob"), idpGroupUserRelMapper.selectUserNamesByGroupId(1L));
-    assertEquals(0, idpGroupUserRelMapper.softDeleteIdpGroupUsers(1L, List.of(1L)));
+    assertEquals(1, idpGroupUserRelMapper.softDeleteRelations(1L, List.of(1L)));
+    assertIterableEquals(List.of("bob"), idpGroupUserRelMapper.selectUsernamesByGroupId(1L));
+    assertEquals(0, idpGroupUserRelMapper.softDeleteRelations(1L, List.of(1L)));
     assertEquals(
         1, idpGroupUserRelMapper.deleteIdpGroupUserRelMetasByLegacyTimeline(Long.MAX_VALUE, 10));
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testSoftDeleteGroupUsersByUserId(String type) throws IOException {
+  void testSoftDeleteRelationsByUsername(String type) throws IOException {
     init(type);
     idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
@@ -363,7 +363,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build());
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(100L)
@@ -382,14 +382,14 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
                 .withDeletedAt(0L)
                 .build()));
 
-    assertEquals(1, idpGroupUserRelMapper.softDeleteGroupUsersByUserId(2L));
-    assertIterableEquals(List.of("alice"), idpGroupUserRelMapper.selectUserNamesByGroupId(1L));
-    assertEquals(0, idpGroupUserRelMapper.softDeleteGroupUsersByUserId(2L));
+    assertEquals(1, idpGroupUserRelMapper.softDeleteRelationsByUsername("bob"));
+    assertIterableEquals(List.of("alice"), idpGroupUserRelMapper.selectUsernamesByGroupId(1L));
+    assertEquals(0, idpGroupUserRelMapper.softDeleteRelationsByUsername("bob"));
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testSoftDeleteGroupUsersByGroupId(String type) throws IOException {
+  void testSoftDeleteRelationsByGroupName(String type) throws IOException {
     init(type);
     idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
@@ -408,7 +408,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build());
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(102L)
@@ -419,9 +419,9 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
                 .withDeletedAt(0L)
                 .build()));
 
-    assertEquals(1, idpGroupUserRelMapper.softDeleteGroupUsersByGroupId(2L));
-    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUserNamesByGroupId(2L));
-    assertEquals(0, idpGroupUserRelMapper.softDeleteGroupUsersByGroupId(2L));
+    assertEquals(1, idpGroupUserRelMapper.softDeleteRelationsByGroupName("ops"));
+    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUsernamesByGroupId(2L));
+    assertEquals(0, idpGroupUserRelMapper.softDeleteRelationsByGroupName("ops"));
   }
 
   @ParameterizedTest
@@ -479,7 +479,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build());
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(100L)
@@ -489,7 +489,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
                 .withLastVersion(0L)
                 .withDeletedAt(10L)
                 .build()));
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(101L)
@@ -499,7 +499,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
                 .withLastVersion(0L)
                 .withDeletedAt(30L)
                 .build()));
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(102L)
@@ -516,9 +516,9 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
     assertEquals(
         0, idpGroupUserRelMapper.deleteIdpGroupUserRelMetasByLegacyTimeline(Long.MAX_VALUE, 10));
     assertIterableEquals(
-        List.of("active-user"), idpGroupUserRelMapper.selectUserNamesByGroupId(3L));
-    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUserNamesByGroupId(1L));
-    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUserNamesByGroupId(2L));
+        List.of("active-user"), idpGroupUserRelMapper.selectUsernamesByGroupId(3L));
+    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUsernamesByGroupId(1L));
+    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUsernamesByGroupId(2L));
   }
 
   @ParameterizedTest
@@ -559,7 +559,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .withLastVersion(0L)
             .withDeletedAt(10L)
             .build());
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(100L)
@@ -569,7 +569,7 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
                 .withLastVersion(2L)
                 .withDeletedAt(0L)
                 .build()));
-    idpGroupUserRelMapper.batchInsertIdpGroupUsers(
+    idpGroupUserRelMapper.batchInsertRelations(
         List.of(
             IdpGroupUserRelPO.builder()
                 .withId(101L)
@@ -595,8 +595,8 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
             .hasMapper(IdpGroupUserRelMapper.class));
 
     assertIterableEquals(List.of("dev"), idpGroupUserRelMapper.selectGroupNamesByUserId(1L));
-    assertIterableEquals(List.of("alice"), idpGroupUserRelMapper.selectUserNamesByGroupId(1L));
+    assertIterableEquals(List.of("alice"), idpGroupUserRelMapper.selectUsernamesByGroupId(1L));
     assertIterableEquals(List.of(), idpGroupUserRelMapper.selectGroupNamesByUserId(2L));
-    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUserNamesByGroupId(2L));
+    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUsernamesByGroupId(2L));
   }
 }

@@ -45,33 +45,28 @@ public interface IdpGroupUserRelMapper {
 
   @SelectProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "selectUserNamesByGroupId")
-  List<String> selectUserNamesByGroupId(@Param("groupId") Long groupId);
+      method = "selectUsernamesByGroupId")
+  List<String> selectUsernamesByGroupId(@Param("groupId") Long groupId);
 
   @SelectProvider(type = IdpGroupUserRelSQLProviderFactory.class, method = "selectRelatedUserIds")
   List<Long> selectRelatedUserIds(
       @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds);
 
-  @InsertProvider(
-      type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "batchInsertIdpGroupUsers")
-  void batchInsertIdpGroupUsers(@Param("relations") List<IdpGroupUserRelPO> relations);
+  @InsertProvider(type = IdpGroupUserRelSQLProviderFactory.class, method = "batchInsertRelations")
+  void batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations);
+
+  @UpdateProvider(type = IdpGroupUserRelSQLProviderFactory.class, method = "softDeleteRelations")
+  Integer softDeleteRelations(@Param("groupId") Long groupId, @Param("userIds") List<Long> userIds);
 
   @UpdateProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "softDeleteIdpGroupUsers")
-  Integer softDeleteIdpGroupUsers(
-      @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds);
+      method = "softDeleteRelationsByUsername")
+  Integer softDeleteRelationsByUsername(@Param("username") String username);
 
   @UpdateProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "softDeleteGroupUsersByUserId")
-  Integer softDeleteGroupUsersByUserId(@Param("userId") Long userId);
-
-  @UpdateProvider(
-      type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "softDeleteGroupUsersByGroupId")
-  Integer softDeleteGroupUsersByGroupId(@Param("groupId") Long groupId);
+      method = "softDeleteRelationsByGroupName")
+  Integer softDeleteRelationsByGroupName(@Param("groupName") String groupName);
 
   @DeleteProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
