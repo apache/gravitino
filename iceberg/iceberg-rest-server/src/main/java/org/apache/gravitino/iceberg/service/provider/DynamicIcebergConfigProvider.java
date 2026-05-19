@@ -175,6 +175,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     Map<String, String> properties = new HashMap<>();
     properties.putAll(MapUtils.getPrefixMap(catalogProperties, CATALOG_BYPASS_PREFIX));
     properties.putAll(catalogProperties);
+
     return new IcebergConfig(properties);
   }
 
