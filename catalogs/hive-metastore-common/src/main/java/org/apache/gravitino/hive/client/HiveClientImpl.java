@@ -81,6 +81,12 @@ public class HiveClientImpl implements HiveClient {
   }
 
   @Override
+  public List<String> listTablesByType(
+      String catalogName, String databaseName, String tablePattern, String tableType) {
+    return shim.listTablesByType(catalogName, databaseName, tablePattern, tableType);
+  }
+
+  @Override
   public List<String> listTableNamesByFilter(
       String catalogName, String databaseName, String filter, short pageSize) {
     return shim.listTableNamesByFilter(catalogName, databaseName, filter, pageSize);

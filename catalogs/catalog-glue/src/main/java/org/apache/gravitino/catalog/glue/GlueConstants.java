@@ -75,6 +75,12 @@ public final class GlueConstants {
    */
   public static final String TABLE_FORMAT = "table-format";
 
+  /**
+   * Table file format (lowercase, e.g. "parquet", "orc", "textfile") used when creating Hive-format
+   * tables via Trino. Maps to input-format/output-format/serde-lib.
+   */
+  public static final String FORMAT = "format";
+
   /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
   public static final String METADATA_LOCATION = "metadata_location";
 
@@ -110,7 +116,7 @@ public final class GlueConstants {
   public static final String LOCATION = "location";
 
   /** InputFormat class name from {@code StorageDescriptor.inputFormat()}. */
-  public static final String INPUT_FORMAT = "input-format";
+  public static final String INPUT_FORMAT_CLASS = "input-format";
 
   /** OutputFormat class name from {@code StorageDescriptor.outputFormat()}. */
   public static final String OUTPUT_FORMAT = "output-format";
