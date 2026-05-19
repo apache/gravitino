@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     UNIQUE KEY `uk_ign_del` (`group_name`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local IdP group metadata';
 
-CREATE TABLE IF NOT EXISTS `idp_group_user_rel` (
+CREATE TABLE IF NOT EXISTS `idp_user_group_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS `idp_group_user_rel` (
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_igiu_del` (`group_id`, `user_id`, `deleted_at`),
-    KEY `idx_iug_gid` (`group_id`),
-    KEY `idx_iug_uid` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local IdP group user relation';
+    UNIQUE KEY `uk_iugu_del` (`group_id`, `user_id`, `deleted_at`),
+    KEY `idx_iugu_gid` (`group_id`),
+    KEY `idx_iugu_uid` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'local IdP user group relation';

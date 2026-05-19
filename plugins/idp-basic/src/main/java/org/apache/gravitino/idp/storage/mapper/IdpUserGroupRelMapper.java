@@ -20,7 +20,7 @@
 package org.apache.gravitino.idp.storage.mapper;
 
 import java.util.List;
-import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
+import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -28,45 +28,45 @@ import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
- * A MyBatis mapper for built-in IdP group-user relation operations.
+ * A MyBatis mapper for built-in IdP user-group relation operations.
  *
- * <p>This interface defines the SQL statements MyBatis executes for the built-in IdP group-user
+ * <p>This interface defines the SQL statements MyBatis executes for the built-in IdP user-group
  * relation store. The SQLs are provided through {@code *Provider} annotations on this mapper
  * interface. See the <a href="https://mybatis.org/mybatis-3/getting-started.html">MyBatis getting
  * started guide</a>.
  */
-public interface IdpGroupUserRelMapper {
-  String IDP_GROUP_USER_REL_TABLE_NAME = "idp_group_user_rel";
+public interface IdpUserGroupRelMapper {
+  String IDP_USER_GROUP_REL_TABLE_NAME = "idp_user_group_rel";
 
   @SelectProvider(
-      type = IdpGroupUserRelSQLProviderFactory.class,
+      type = IdpUserGroupRelSQLProviderFactory.class,
       method = "selectGroupNamesByUsername")
   List<String> selectGroupNamesByUsername(@Param("username") String username);
 
   @SelectProvider(
-      type = IdpGroupUserRelSQLProviderFactory.class,
+      type = IdpUserGroupRelSQLProviderFactory.class,
       method = "selectUsernamesByGroupName")
   List<String> selectUsernamesByGroupName(@Param("groupName") String groupName);
 
-  @InsertProvider(type = IdpGroupUserRelSQLProviderFactory.class, method = "batchInsertRelations")
-  void batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations);
+  @InsertProvider(type = IdpUserGroupRelSQLProviderFactory.class, method = "batchInsertRelations")
+  void batchInsertRelations(@Param("relations") List<IdpUserGroupRelPO> relations);
 
-  @UpdateProvider(type = IdpGroupUserRelSQLProviderFactory.class, method = "softDeleteRelations")
+  @UpdateProvider(type = IdpUserGroupRelSQLProviderFactory.class, method = "softDeleteRelations")
   Integer softDeleteRelations(@Param("groupId") Long groupId, @Param("userIds") List<Long> userIds);
 
   @UpdateProvider(
-      type = IdpGroupUserRelSQLProviderFactory.class,
+      type = IdpUserGroupRelSQLProviderFactory.class,
       method = "softDeleteRelationsByUsername")
   Integer softDeleteRelationsByUsername(@Param("username") String username);
 
   @UpdateProvider(
-      type = IdpGroupUserRelSQLProviderFactory.class,
+      type = IdpUserGroupRelSQLProviderFactory.class,
       method = "softDeleteRelationsByGroupName")
   Integer softDeleteRelationsByGroupName(@Param("groupName") String groupName);
 
   @DeleteProvider(
-      type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "deleteIdpGroupUserRelMetasByLegacyTimeline")
-  Integer deleteIdpGroupUserRelMetasByLegacyTimeline(
+      type = IdpUserGroupRelSQLProviderFactory.class,
+      method = "deleteIdpUserGroupRelMetasByLegacyTimeline")
+  Integer deleteIdpUserGroupRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 }

@@ -24,7 +24,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
+import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.SqlSource;
@@ -33,10 +33,10 @@ import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpGroupUserRelBaseSQLProvider {
+public class TestIdpUserGroupRelBaseSQLProvider {
 
-  protected IdpGroupUserRelBaseSQLProvider createProvider() {
-    return new IdpGroupUserRelBaseSQLProvider() {
+  protected IdpUserGroupRelBaseSQLProvider createProvider() {
+    return new IdpUserGroupRelBaseSQLProvider() {
       @Override
       protected String currentTimeMillisExpression() {
         return "CURRENT_TIME_MILLIS()";
@@ -48,8 +48,8 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     return "deleted_at = CURRENT_TIME_MILLIS()";
   }
 
-  protected String expectedDeleteIdpGroupUserRelMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_group_user_rel WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+  protected String expectedDeleteIdpUserGroupRelMetasByLegacyTimelineSql() {
+    return "DELETE FROM idp_user_group_rel WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
         + " LIMIT #{limit}";
   }
 
@@ -59,7 +59,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
         createProvider().selectGroupNamesByUsername("alice").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT g.group_name"));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta u JOIN idp_group_user_rel r"));
+    Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta u JOIN idp_user_group_rel r"));
     Assertions.assertTrue(normalizedSql.contains("JOIN idp_group_meta g"));
     Assertions.assertTrue(normalizedSql.contains("r.user_id = u.user_id AND r.deleted_at = 0"));
     Assertions.assertTrue(normalizedSql.contains("WHERE u.user_name = #{username}"));
@@ -73,7 +73,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
 
     Assertions.assertTrue(normalizedSql.contains("SELECT u.user_name"));
     Assertions.assertTrue(
-        normalizedSql.contains("FROM idp_group_meta g JOIN idp_group_user_rel r"));
+        normalizedSql.contains("FROM idp_group_meta g JOIN idp_user_group_rel r"));
     Assertions.assertTrue(normalizedSql.contains("JOIN idp_user_meta u"));
     Assertions.assertTrue(normalizedSql.contains("r.group_id = g.group_id AND r.deleted_at = 0"));
     Assertions.assertTrue(normalizedSql.contains("WHERE g.group_name = #{groupName}"));
@@ -81,8 +81,8 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  void testBatchInsertIdpGroupUsers() {
-    List<IdpGroupUserRelPO> relations =
+  void testBatchInsertIdpUserGroups() {
+    List<IdpUserGroupRelPO> relations =
         Arrays.asList(newRelation(1L, 10L, 20L), newRelation(2L, 10L, 21L));
 
     String script = createProvider().batchInsertRelations(relations);
@@ -91,7 +91,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
 
     String normalizedSql = renderScript(script, params);
 
-    Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_group_user_rel"));
+    Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_user_group_rel"));
     Assertions.assertTrue(
         normalizedSql.contains(
             "(id, group_id, user_id, current_version, last_version, deleted_at)"));
@@ -100,11 +100,11 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     Assertions.assertEquals(
         12,
         countOccurrences(normalizedSql, '?'),
-        "Two group-user relations should render twelve placeholders");
+        "Two user-group relations should render twelve placeholders");
   }
 
   @Test
-  void testSoftDeleteIdpGroupUsers() {
+  void testSoftDeleteIdpUserGroups() {
     String script = createProvider().softDeleteRelations(10L, Arrays.asList(20L, 21L));
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
@@ -112,13 +112,13 @@ public class TestIdpGroupUserRelBaseSQLProvider {
 
     String normalizedSql = renderScript(script, params);
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
+    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
     Assertions.assertTrue(normalizedSql.matches(".*user_id IN \\( \\? , \\? \\).*"));
   }
 
   @Test
-  void testSoftDeleteIdpGroupUsersWithEmptyUserIds() {
+  void testSoftDeleteIdpUserGroupsWithEmptyUserIds() {
     String script = createProvider().softDeleteRelations(10L, Collections.emptyList());
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
@@ -130,13 +130,13 @@ public class TestIdpGroupUserRelBaseSQLProvider {
         normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
         "Empty userIds should not generate invalid SQL IN (...) with no values");
     Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
+    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
     Assertions.assertTrue(normalizedSql.matches(".*WHERE group_id = \\? AND deleted_at = 0.*"));
   }
 
   @Test
-  void testSoftDeleteIdpGroupUsersWithNullUserIds() {
+  void testSoftDeleteIdpUserGroupsWithNullUserIds() {
     String script = createProvider().softDeleteRelations(10L, null);
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
@@ -149,7 +149,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     String normalizedSql =
         createProvider().softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
+    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
     Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_user_meta u"));
     Assertions.assertTrue(normalizedSql.contains("u.user_id = r.user_id AND u.deleted_at = 0"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
@@ -162,7 +162,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     String normalizedSql =
         createProvider().softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
+    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
     Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_group_meta g"));
     Assertions.assertTrue(normalizedSql.contains("g.group_id = r.group_id AND g.deleted_at = 0"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
@@ -171,21 +171,21 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  void testDeleteIdpGroupUserRelMetasByLegacyTimeline() {
+  void testDeleteIdpUserGroupRelMetasByLegacyTimeline() {
     String normalizedSql =
         createProvider()
-            .deleteIdpGroupUserRelMetasByLegacyTimeline(1L, 2)
+            .deleteIdpUserGroupRelMetasByLegacyTimeline(1L, 2)
             .replaceAll("\\s+", " ")
             .trim();
 
-    Assertions.assertEquals(expectedDeleteIdpGroupUserRelMetasByLegacyTimelineSql(), normalizedSql);
+    Assertions.assertEquals(expectedDeleteIdpUserGroupRelMetasByLegacyTimelineSql(), normalizedSql);
   }
 
   @Test
   void testCurrentTimeMillisExpression() {
     Assertions.assertEquals(
         "(UNIX_TIMESTAMP() * 1000.0)",
-        new IdpGroupUserRelBaseSQLProvider().currentTimeMillisExpression());
+        new IdpUserGroupRelBaseSQLProvider().currentTimeMillisExpression());
   }
 
   private String renderScript(String script, Map<String, Object> params) {
@@ -205,8 +205,8 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     return count;
   }
 
-  private IdpGroupUserRelPO newRelation(Long id, Long groupId, Long userId) {
-    return IdpGroupUserRelPO.builder()
+  private IdpUserGroupRelPO newRelation(Long id, Long groupId, Long userId) {
+    return IdpUserGroupRelPO.builder()
         .withId(id)
         .withGroupId(groupId)
         .withUserId(userId)

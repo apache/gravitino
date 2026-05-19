@@ -736,7 +736,7 @@ authorize(metalakeName, username, resource, operation)
 │   [1b] Group query (user may belong to groups that also hold roles):
 │   SELECT gm.group_id, gm.updated_at
 │   FROM group_meta gm
-│   JOIN group_user_rel gu ON gm.group_id = gu.group_id AND gu.deleted_at = 0
+│   JOIN user_group_rel gu ON gm.group_id = gu.group_id AND gu.deleted_at = 0
 │   WHERE gu.user_id = ? AND gm.deleted_at = 0
 │
 │   For each group:
@@ -1117,7 +1117,7 @@ void pruneOldEntries(@Param("before") long before);
 <select id="getGroupInfoByUserId" resultType="map">
   SELECT gm.group_id, gm.updated_at
   FROM group_meta gm
-  JOIN group_user_rel gu ON gm.group_id = gu.group_id AND gu.deleted_at = 0
+  JOIN user_group_rel gu ON gm.group_id = gu.group_id AND gu.deleted_at = 0
   WHERE gu.user_id = #{userId} AND gm.deleted_at = 0
 </select>
 

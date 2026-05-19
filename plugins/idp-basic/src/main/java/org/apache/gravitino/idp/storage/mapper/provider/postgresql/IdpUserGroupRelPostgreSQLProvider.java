@@ -19,11 +19,11 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
 
-import org.apache.gravitino.idp.storage.mapper.IdpGroupUserRelMapper;
-import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupUserRelBaseSQLProvider;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
+import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserGroupRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
-public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLProvider {
+public class IdpUserGroupRelPostgreSQLProvider extends IdpUserGroupRelBaseSQLProvider {
 
   @Override
   protected String currentTimeMillisExpression() {
@@ -31,12 +31,12 @@ public class IdpGroupUserRelPostgreSQLProvider extends IdpGroupUserRelBaseSQLPro
   }
 
   @Override
-  public String deleteIdpGroupUserRelMetasByLegacyTimeline(
+  public String deleteIdpUserGroupRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
         + " WHERE id IN (SELECT id FROM "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

@@ -19,10 +19,10 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
-import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupUserRelBaseSQLProvider;
+import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserGroupRelBaseSQLProvider;
 
-/** SQL provider for IdP group-user relation statements on H2 backends. */
-public class IdpGroupUserRelH2Provider extends IdpGroupUserRelBaseSQLProvider {
+/** SQL provider for IdP user-group relation statements on H2 backends. */
+public class IdpUserGroupRelH2Provider extends IdpUserGroupRelBaseSQLProvider {
 
   @Override
   protected String currentTimeMillisExpression() {

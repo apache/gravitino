@@ -39,7 +39,7 @@ public class TestIdpBasicMapperPackageProvider {
     assertTrue(
         mapperClasses.containsAll(
             List.of(
-                IdpUserMetaMapper.class, IdpGroupMetaMapper.class, IdpGroupUserRelMapper.class)));
+                IdpUserMetaMapper.class, IdpGroupMetaMapper.class, IdpUserGroupRelMapper.class)));
   }
 
   @Test

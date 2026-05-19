@@ -21,12 +21,12 @@ package org.apache.gravitino.idp.storage.po;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpGroupUserRelPO {
+public class TestIdpUserGroupRelPO {
 
   @Test
-  public void testIdpGroupUserRelPOBuilder() {
-    IdpGroupUserRelPO relPO =
-        IdpGroupUserRelPO.builder()
+  public void testIdpUserGroupRelPOBuilder() {
+    IdpUserGroupRelPO relPO =
+        IdpUserGroupRelPO.builder()
             .withId(1L)
             .withGroupId(10L)
             .withUserId(20L)
@@ -45,8 +45,8 @@ public class TestIdpGroupUserRelPO {
 
   @Test
   public void testEqualsAndHashCode() {
-    IdpGroupUserRelPO relPO1 =
-        IdpGroupUserRelPO.builder()
+    IdpUserGroupRelPO relPO1 =
+        IdpUserGroupRelPO.builder()
             .withId(1L)
             .withGroupId(10L)
             .withUserId(20L)
@@ -55,8 +55,8 @@ public class TestIdpGroupUserRelPO {
             .withDeletedAt(0L)
             .build();
 
-    IdpGroupUserRelPO relPO2 =
-        IdpGroupUserRelPO.builder()
+    IdpUserGroupRelPO relPO2 =
+        IdpUserGroupRelPO.builder()
             .withId(1L)
             .withGroupId(10L)
             .withUserId(20L)
@@ -72,7 +72,7 @@ public class TestIdpGroupUserRelPO {
   @Test
   public void testBuilderReuseDoesNotMutateBuiltObject() {
     var builder =
-        IdpGroupUserRelPO.builder()
+        IdpUserGroupRelPO.builder()
             .withId(1L)
             .withGroupId(10L)
             .withUserId(20L)
@@ -80,8 +80,8 @@ public class TestIdpGroupUserRelPO {
             .withLastVersion(0L)
             .withDeletedAt(0L);
 
-    IdpGroupUserRelPO firstRelation = builder.build();
-    IdpGroupUserRelPO secondRelation = builder.withUserId(21L).build();
+    IdpUserGroupRelPO firstRelation = builder.build();
+    IdpUserGroupRelPO secondRelation = builder.withUserId(21L).build();
 
     Assertions.assertEquals(20L, firstRelation.getUserId());
     Assertions.assertEquals(21L, secondRelation.getUserId());

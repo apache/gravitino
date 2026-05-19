@@ -16,20 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.idp.storage.po;
 
-package org.apache.gravitino.idp.storage.mapper.provider.h2;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
-
-class TestIdpGroupUserRelH2Provider {
-
-  @Test
-  void testCurrentTimeMillisExpression() {
-    IdpGroupUserRelH2Provider provider = new IdpGroupUserRelH2Provider();
-
-    Assertions.assertEquals(
-        "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())",
-        provider.currentTimeMillisExpression());
-  }
+@Getter
+@EqualsAndHashCode
+@ToString
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder(setterPrefix = "with")
+public class IdpUserGroupRelPO {
+  private Long id;
+  private Long groupId;
+  private Long userId;
+  private Long currentVersion;
+  private Long lastVersion;
+  private Long deletedAt;
 }

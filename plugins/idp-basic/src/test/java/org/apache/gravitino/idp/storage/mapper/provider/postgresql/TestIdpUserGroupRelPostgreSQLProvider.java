@@ -22,11 +22,11 @@ package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpGroupUserRelPostgreSQLProvider {
+public class TestIdpUserGroupRelPostgreSQLProvider {
 
   @Test
   void testCurrentTimeMillisExpression() {
-    IdpGroupUserRelPostgreSQLProvider provider = new IdpGroupUserRelPostgreSQLProvider();
+    IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
 
     Assertions.assertEquals(
         "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)",
@@ -34,12 +34,12 @@ public class TestIdpGroupUserRelPostgreSQLProvider {
   }
 
   @Test
-  void testDeleteIdpGroupUserRelMetasByLegacyTimeline() {
-    IdpGroupUserRelPostgreSQLProvider provider = new IdpGroupUserRelPostgreSQLProvider();
+  void testDeleteIdpUserGroupRelMetasByLegacyTimeline() {
+    IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
 
     Assertions.assertEquals(
-        "DELETE FROM idp_group_user_rel WHERE id IN (SELECT id FROM idp_group_user_rel"
+        "DELETE FROM idp_user_group_rel WHERE id IN (SELECT id FROM idp_user_group_rel"
             + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})",
-        provider.deleteIdpGroupUserRelMetasByLegacyTimeline(1L, 2));
+        provider.deleteIdpUserGroupRelMetasByLegacyTimeline(1L, 2));
   }
 }

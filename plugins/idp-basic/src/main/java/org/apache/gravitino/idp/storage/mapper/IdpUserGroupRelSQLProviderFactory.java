@@ -22,20 +22,20 @@ package org.apache.gravitino.idp.storage.mapper;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupUserRelBaseSQLProvider;
-import org.apache.gravitino.idp.storage.mapper.provider.h2.IdpGroupUserRelH2Provider;
-import org.apache.gravitino.idp.storage.mapper.provider.postgresql.IdpGroupUserRelPostgreSQLProvider;
-import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
+import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserGroupRelBaseSQLProvider;
+import org.apache.gravitino.idp.storage.mapper.provider.h2.IdpUserGroupRelH2Provider;
+import org.apache.gravitino.idp.storage.mapper.provider.postgresql.IdpUserGroupRelPostgreSQLProvider;
+import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.ibatis.annotations.Param;
 
-public class IdpGroupUserRelSQLProviderFactory {
-  private static final IdpGroupUserRelBaseSQLProvider MYSQL_PROVIDER =
-      new IdpGroupUserRelBaseSQLProvider();
-  private static final IdpGroupUserRelBaseSQLProvider H2_PROVIDER = new IdpGroupUserRelH2Provider();
-  private static final IdpGroupUserRelBaseSQLProvider POSTGRESQL_PROVIDER =
-      new IdpGroupUserRelPostgreSQLProvider();
-  private static final Map<JDBCBackendType, IdpGroupUserRelBaseSQLProvider> PROVIDER_MAP =
+public class IdpUserGroupRelSQLProviderFactory {
+  private static final IdpUserGroupRelBaseSQLProvider MYSQL_PROVIDER =
+      new IdpUserGroupRelBaseSQLProvider();
+  private static final IdpUserGroupRelBaseSQLProvider H2_PROVIDER = new IdpUserGroupRelH2Provider();
+  private static final IdpUserGroupRelBaseSQLProvider POSTGRESQL_PROVIDER =
+      new IdpUserGroupRelPostgreSQLProvider();
+  private static final Map<JDBCBackendType, IdpUserGroupRelBaseSQLProvider> PROVIDER_MAP =
       ImmutableMap.of(
           JDBCBackendType.MYSQL,
           MYSQL_PROVIDER,
@@ -44,16 +44,16 @@ public class IdpGroupUserRelSQLProviderFactory {
           JDBCBackendType.POSTGRESQL,
           POSTGRESQL_PROVIDER);
 
-  private IdpGroupUserRelSQLProviderFactory() {}
+  private IdpUserGroupRelSQLProviderFactory() {}
 
-  private static IdpGroupUserRelBaseSQLProvider currentProvider() {
+  private static IdpUserGroupRelBaseSQLProvider currentProvider() {
     return SQLProviderFactoryHelper.currentProvider(
-        PROVIDER_MAP, IdpGroupUserRelSQLProviderFactory.class);
+        PROVIDER_MAP, IdpUserGroupRelSQLProviderFactory.class);
   }
 
-  static IdpGroupUserRelBaseSQLProvider getProvider(String databaseId) {
+  static IdpUserGroupRelBaseSQLProvider getProvider(String databaseId) {
     return SQLProviderFactoryHelper.getProvider(
-        databaseId, PROVIDER_MAP, IdpGroupUserRelSQLProviderFactory.class);
+        databaseId, PROVIDER_MAP, IdpUserGroupRelSQLProviderFactory.class);
   }
 
   public static String selectGroupNamesByUsername(@Param("username") String username) {
@@ -64,7 +64,7 @@ public class IdpGroupUserRelSQLProviderFactory {
     return currentProvider().selectUsernamesByGroupName(groupName);
   }
 
-  public static String batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations) {
+  public static String batchInsertRelations(@Param("relations") List<IdpUserGroupRelPO> relations) {
     return currentProvider().batchInsertRelations(relations);
   }
 
@@ -81,8 +81,8 @@ public class IdpGroupUserRelSQLProviderFactory {
     return currentProvider().softDeleteRelationsByGroupName(groupName);
   }
 
-  public static String deleteIdpGroupUserRelMetasByLegacyTimeline(
+  public static String deleteIdpUserGroupRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return currentProvider().deleteIdpGroupUserRelMetasByLegacyTimeline(legacyTimeline, limit);
+    return currentProvider().deleteIdpUserGroupRelMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }

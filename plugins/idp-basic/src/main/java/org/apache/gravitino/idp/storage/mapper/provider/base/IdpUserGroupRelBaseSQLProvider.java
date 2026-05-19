@@ -21,19 +21,19 @@ package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import java.util.List;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
-import org.apache.gravitino.idp.storage.mapper.IdpGroupUserRelMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
-import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
+import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.apache.ibatis.annotations.Param;
 
-public class IdpGroupUserRelBaseSQLProvider {
+public class IdpUserGroupRelBaseSQLProvider {
 
   public String selectGroupNamesByUsername(@Param("username") String username) {
     return "SELECT g.group_name"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " u JOIN "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
         + " r ON r.user_id = u.user_id AND r.deleted_at = 0"
         + " JOIN "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
@@ -48,7 +48,7 @@ public class IdpGroupUserRelBaseSQLProvider {
         + " FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g JOIN "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
         + " r ON r.group_id = g.group_id AND r.deleted_at = 0"
         + " JOIN "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
@@ -58,10 +58,10 @@ public class IdpGroupUserRelBaseSQLProvider {
         + " ORDER BY u.user_name";
   }
 
-  public String batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations) {
+  public String batchInsertRelations(@Param("relations") List<IdpUserGroupRelPO> relations) {
     return "<script>"
         + "INSERT INTO "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
         + " (id, group_id, user_id, current_version, last_version, deleted_at)"
         + " VALUES "
         + "<foreach item='item' collection='relations' separator=','>"
@@ -75,7 +75,7 @@ public class IdpGroupUserRelBaseSQLProvider {
       @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
     return "<script>"
         + "UPDATE "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
         + " SET deleted_at = "
         + currentTimeMillisExpression()
         + " WHERE group_id = #{groupId} AND deleted_at = 0 "
@@ -88,7 +88,7 @@ public class IdpGroupUserRelBaseSQLProvider {
 
   public String softDeleteRelationsByUsername(@Param("username") String username) {
     return "UPDATE "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
         + " r INNER JOIN "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " u ON u.user_id = r.user_id AND u.deleted_at = 0"
@@ -100,7 +100,7 @@ public class IdpGroupUserRelBaseSQLProvider {
 
   public String softDeleteRelationsByGroupName(@Param("groupName") String groupName) {
     return "UPDATE "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
         + " r INNER JOIN "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
@@ -110,10 +110,10 @@ public class IdpGroupUserRelBaseSQLProvider {
         + " AND r.deleted_at = 0";
   }
 
-  public String deleteIdpGroupUserRelMetasByLegacyTimeline(
+  public String deleteIdpUserGroupRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 
