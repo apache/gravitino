@@ -45,22 +45,9 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
 
   @Override
   public void initialize(Map<String, String> properties) {
-    this.catalogConfigs = initCatalogConfigs(properties);
-  }
-
-  @Override
-  public Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
-    return Optional.ofNullable(catalogConfigs.get(catalogName));
-  }
-
-  @Override
-  public void close() {}
-
-  @VisibleForTesting
-  static Map<String, IcebergConfig> initCatalogConfigs(Map<String, String> properties) {
-    Map<String, IcebergConfig> configs =
+    this.catalogConfigs =
         properties.keySet().stream()
-            .map(StaticIcebergConfigProvider::getCatalogName)
+            .map(this::getCatalogName)
             .filter(Optional::isPresent)
             .map(Optional::get)
             .distinct()
@@ -71,11 +58,19 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
                         new IcebergConfig(
                             MapUtils.getPrefixMap(
                                 properties, String.format("catalog.%s.", catalogName)))));
-    configs.put(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, new IcebergConfig(properties));
-    return configs;
+    this.catalogConfigs.put(
+        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, new IcebergConfig(properties));
   }
 
-  private static Optional<String> getCatalogName(String catalogConfigKey) {
+  @Override
+  public Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
+    return Optional.ofNullable(catalogConfigs.get(catalogName));
+  }
+
+  @Override
+  public void close() {}
+
+  private Optional<String> getCatalogName(String catalogConfigKey) {
     if (!catalogConfigKey.startsWith("catalog.")) {
       return Optional.empty();
     }
@@ -85,5 +80,12 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
       return Optional.empty();
     }
     return Optional.of(catalogConfigKey.split("\\.")[1]);
+  }
+
+  @VisibleForTesting
+  static Map<String, IcebergConfig> initCatalogConfigs(Map<String, String> properties) {
+    StaticIcebergConfigProvider provider = new StaticIcebergConfigProvider();
+    provider.initialize(properties);
+    return provider.catalogConfigs;
   }
 }
