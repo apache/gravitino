@@ -25,6 +25,30 @@ import org.junit.jupiter.api.Test;
 class TestIdpUserGroupRelH2Provider {
 
   @Test
+  void testSoftDeleteRelationsByUsername() {
+    IdpUserGroupRelH2Provider provider = new IdpUserGroupRelH2Provider();
+    String normalizedSql =
+        provider.softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
+
+    Assertions.assertTrue(normalizedSql.startsWith("MERGE INTO idp_user_group_rel r USING"));
+    Assertions.assertTrue(normalizedSql.contains("idp_user_meta u ON r.user_id = u.user_id"));
+    Assertions.assertTrue(normalizedSql.contains("u.user_name = #{username}"));
+    Assertions.assertTrue(normalizedSql.contains("WHEN MATCHED THEN UPDATE SET r.deleted_at ="));
+  }
+
+  @Test
+  void testSoftDeleteRelationsByGroupName() {
+    IdpUserGroupRelH2Provider provider = new IdpUserGroupRelH2Provider();
+    String normalizedSql =
+        provider.softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
+
+    Assertions.assertTrue(normalizedSql.startsWith("MERGE INTO idp_user_group_rel r USING"));
+    Assertions.assertTrue(normalizedSql.contains("idp_group_meta g ON r.group_id = g.group_id"));
+    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
+    Assertions.assertTrue(normalizedSql.contains("WHEN MATCHED THEN UPDATE SET r.deleted_at ="));
+  }
+
+  @Test
   void testCurrentTimeMillisExpression() {
     IdpUserGroupRelH2Provider provider = new IdpUserGroupRelH2Provider();
 

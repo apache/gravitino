@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
 
+import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserGroupRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
@@ -28,6 +30,34 @@ public class IdpUserGroupRelPostgreSQLProvider extends IdpUserGroupRelBaseSQLPro
   @Override
   protected String currentTimeMillisExpression() {
     return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+  }
+
+  @Override
+  public String softDeleteRelationsByUsername(@Param("username") String username) {
+    return "UPDATE "
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
+        + " r SET deleted_at = "
+        + currentTimeMillisExpression()
+        + " FROM "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u WHERE r.user_id = u.user_id"
+        + " AND u.user_name = #{username}"
+        + " AND u.deleted_at = 0"
+        + " AND r.deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteRelationsByGroupName(@Param("groupName") String groupName) {
+    return "UPDATE "
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
+        + " r SET deleted_at = "
+        + currentTimeMillisExpression()
+        + " FROM "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g WHERE r.group_id = g.group_id"
+        + " AND g.group_name = #{groupName}"
+        + " AND g.deleted_at = 0"
+        + " AND r.deleted_at = 0";
   }
 
   @Override

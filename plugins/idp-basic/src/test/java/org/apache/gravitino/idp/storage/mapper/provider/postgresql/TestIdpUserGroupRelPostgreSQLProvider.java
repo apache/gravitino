@@ -34,6 +34,30 @@ public class TestIdpUserGroupRelPostgreSQLProvider {
   }
 
   @Test
+  void testSoftDeleteRelationsByUsername() {
+    IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
+    String normalizedSql =
+        provider.softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
+
+    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
+    Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta u"));
+    Assertions.assertTrue(normalizedSql.contains("r.user_id = u.user_id"));
+    Assertions.assertTrue(normalizedSql.contains("u.user_name = #{username}"));
+  }
+
+  @Test
+  void testSoftDeleteRelationsByGroupName() {
+    IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
+    String normalizedSql =
+        provider.softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
+
+    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
+    Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta g"));
+    Assertions.assertTrue(normalizedSql.contains("r.group_id = g.group_id"));
+    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
+  }
+
+  @Test
   void testDeleteIdpUserGroupRelMetasByLegacyTimeline() {
     IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
 

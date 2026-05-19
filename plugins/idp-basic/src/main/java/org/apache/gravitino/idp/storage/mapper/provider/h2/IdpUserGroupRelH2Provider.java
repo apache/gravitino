@@ -19,7 +19,11 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
+import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserGroupRelBaseSQLProvider;
+import org.apache.ibatis.annotations.Param;
 
 /** SQL provider for IdP user-group relation statements on H2 backends. */
 public class IdpUserGroupRelH2Provider extends IdpUserGroupRelBaseSQLProvider {
@@ -27,5 +31,33 @@ public class IdpUserGroupRelH2Provider extends IdpUserGroupRelBaseSQLProvider {
   @Override
   protected String currentTimeMillisExpression() {
     return "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
+  }
+
+  @Override
+  public String softDeleteRelationsByUsername(@Param("username") String username) {
+    return "MERGE INTO "
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
+        + " r USING "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u ON r.user_id = u.user_id"
+        + " AND u.user_name = #{username}"
+        + " AND u.deleted_at = 0"
+        + " AND r.deleted_at = 0"
+        + " WHEN MATCHED THEN UPDATE SET r.deleted_at = "
+        + currentTimeMillisExpression();
+  }
+
+  @Override
+  public String softDeleteRelationsByGroupName(@Param("groupName") String groupName) {
+    return "MERGE INTO "
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
+        + " r USING "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g ON r.group_id = g.group_id"
+        + " AND g.group_name = #{groupName}"
+        + " AND g.deleted_at = 0"
+        + " AND r.deleted_at = 0"
+        + " WHEN MATCHED THEN UPDATE SET r.deleted_at = "
+        + currentTimeMillisExpression();
   }
 }
