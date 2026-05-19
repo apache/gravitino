@@ -78,7 +78,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   public Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(catalogName), "blank catalogName is illegal");
-    String serverCatalogKey = catalogName;
     if (catalogName.equals(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG)) {
       catalogName =
           defaultDynamicCatalogName.orElseThrow(
@@ -103,7 +102,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    return Optional.of(mergeServerConfig(catalog.properties(), serverCatalogKey));
+    return Optional.of(mergeServerConfig(catalog.properties(), catalogName));
   }
 
   /**
