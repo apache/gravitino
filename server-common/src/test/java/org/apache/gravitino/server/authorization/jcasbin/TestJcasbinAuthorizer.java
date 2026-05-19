@@ -1077,12 +1077,18 @@ public class TestJcasbinAuthorizer {
     RecordingThreadPoolExecutor executor = new RecordingThreadPoolExecutor();
     Field field = JcasbinAuthorizer.class.getDeclaredField("executor");
     field.setAccessible(true);
-    FieldUtils.writeField(field, jcasbinAuthorizer, executor);
+    Executor originalExecutor = (Executor) FieldUtils.readField(field, jcasbinAuthorizer, true);
 
-    jcasbinAuthorizer.close();
+    try {
+      FieldUtils.writeField(field, jcasbinAuthorizer, executor, true);
 
-    assertTrue(executor.shutdownCalled.get());
-    assertTrue(executor.awaitTerminationCalled.get());
+      jcasbinAuthorizer.close();
+
+      assertTrue(executor.shutdownCalled.get());
+      assertTrue(executor.awaitTerminationCalled.get());
+    } finally {
+      FieldUtils.writeField(field, jcasbinAuthorizer, originalExecutor, true);
+    }
   }
 
   @Test
