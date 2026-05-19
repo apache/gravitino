@@ -249,7 +249,7 @@ public class TestDynamicIcebergConfigProvider {
     catalogProperties.put("custom-k2", "custom-v2");
 
     IcebergConfig icebergConfig =
-        ServerCatalogConfigLoader.fromGravitinoCatalogProperties(catalogProperties);
+        DynamicIcebergConfigProvider.fromGravitinoCatalogProperties(catalogProperties);
     Assertions.assertEquals(
         icebergConfig.getIcebergCatalogProperties().get("custom-k1"), "custom-v1");
     Assertions.assertTrue(icebergConfig.getIcebergCatalogProperties().containsKey("custom-k2"));
@@ -266,7 +266,7 @@ public class TestDynamicIcebergConfigProvider {
     properties.put("catalog.jdbc_backend.jdbc.user", "static-user");
 
     Map<String, IcebergConfig> catalogConfigs =
-        ServerCatalogConfigLoader.loadFromServerProperties(properties);
+        StaticIcebergConfigProvider.initCatalogConfigs(properties);
 
     Assertions.assertEquals(
         "default-cache",
@@ -358,7 +358,7 @@ public class TestDynamicIcebergConfigProvider {
     properties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "server-cache");
     properties.put(IcebergConstants.TABLE_METADATA_CACHE_CAPACITY, "128");
 
-    ServerCatalogConfigLoader.mergeAbsentProperties(icebergCatalogProperties, properties);
+    DynamicIcebergConfigProvider.mergeAbsentProperties(icebergCatalogProperties, properties);
 
     Assertions.assertEquals(
         "server-cache", icebergCatalogProperties.get(IcebergConstants.TABLE_METADATA_CACHE_IMPL));
