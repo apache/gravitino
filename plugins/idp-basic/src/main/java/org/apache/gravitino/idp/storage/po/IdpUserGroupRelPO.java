@@ -34,8 +34,8 @@ import lombok.ToString;
 @Builder(setterPrefix = "with")
 public class IdpUserGroupRelPO {
   private Long id;
-  private Long groupId;
   private Long userId;
+  private Long groupId;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;

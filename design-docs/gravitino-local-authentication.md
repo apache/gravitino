@@ -224,14 +224,14 @@ CREATE TABLE IF NOT EXISTS `idp_group_meta` (
 ```sql
 CREATE TABLE IF NOT EXISTS `idp_user_group_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'IdP group id',
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'IdP user id',
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'IdP group id',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'relation audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_iugu_del` (`group_id`, `user_id`, `deleted_at`),
+    UNIQUE KEY `uk_iu_gu_del` (`user_id`, `group_id`, `deleted_at`),
     KEY `idx_uid` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'IdP user group relation';
 ```

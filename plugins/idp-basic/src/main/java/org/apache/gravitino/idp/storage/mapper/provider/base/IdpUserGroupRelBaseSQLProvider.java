@@ -62,10 +62,10 @@ public class IdpUserGroupRelBaseSQLProvider {
     return "<script>"
         + "INSERT INTO "
         + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
-        + " (id, group_id, user_id, current_version, last_version, deleted_at)"
+        + " (id, user_id, group_id, current_version, last_version, deleted_at)"
         + " VALUES "
         + "<foreach item='item' collection='relations' separator=','>"
-        + "(#{item.id}, #{item.groupId}, #{item.userId}, #{item.currentVersion},"
+        + "(#{item.id}, #{item.userId}, #{item.groupId}, #{item.currentVersion},"
         + " #{item.lastVersion}, #{item.deletedAt})"
         + "</foreach>"
         + "</script>";

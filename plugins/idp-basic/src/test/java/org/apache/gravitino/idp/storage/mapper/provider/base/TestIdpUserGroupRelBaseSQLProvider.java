@@ -83,7 +83,7 @@ public class TestIdpUserGroupRelBaseSQLProvider {
   @Test
   void testBatchInsertIdpUserGroups() {
     List<IdpUserGroupRelPO> relations =
-        Arrays.asList(newRelation(1L, 10L, 20L), newRelation(2L, 10L, 21L));
+        Arrays.asList(newRelation(1L, 20L, 10L), newRelation(2L, 21L, 10L));
 
     String script = createProvider().batchInsertRelations(relations);
     Map<String, Object> params = new HashMap<>();
@@ -94,7 +94,7 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_user_group_rel"));
     Assertions.assertTrue(
         normalizedSql.contains(
-            "(id, group_id, user_id, current_version, last_version, deleted_at)"));
+            "(id, user_id, group_id, current_version, last_version, deleted_at)"));
     Assertions.assertTrue(
         normalizedSql.contains("VALUES"), "Batch insert SQL should include VALUES clause");
     Assertions.assertEquals(
@@ -205,11 +205,11 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     return count;
   }
 
-  private IdpUserGroupRelPO newRelation(Long id, Long groupId, Long userId) {
+  private IdpUserGroupRelPO newRelation(Long id, Long userId, Long groupId) {
     return IdpUserGroupRelPO.builder()
         .withId(id)
-        .withGroupId(groupId)
         .withUserId(userId)
+        .withGroupId(groupId)
         .withCurrentVersion(1L)
         .withLastVersion(0L)
         .withDeletedAt(0L)

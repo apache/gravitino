@@ -28,8 +28,8 @@ public class TestIdpUserGroupRelPO {
     IdpUserGroupRelPO relPO =
         IdpUserGroupRelPO.builder()
             .withId(1L)
-            .withGroupId(10L)
             .withUserId(20L)
+            .withGroupId(10L)
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -48,8 +48,8 @@ public class TestIdpUserGroupRelPO {
     IdpUserGroupRelPO relPO1 =
         IdpUserGroupRelPO.builder()
             .withId(1L)
-            .withGroupId(10L)
             .withUserId(20L)
+            .withGroupId(10L)
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -58,8 +58,8 @@ public class TestIdpUserGroupRelPO {
     IdpUserGroupRelPO relPO2 =
         IdpUserGroupRelPO.builder()
             .withId(1L)
-            .withGroupId(10L)
             .withUserId(20L)
+            .withGroupId(10L)
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -74,8 +74,8 @@ public class TestIdpUserGroupRelPO {
     var builder =
         IdpUserGroupRelPO.builder()
             .withId(1L)
-            .withGroupId(10L)
             .withUserId(20L)
+            .withGroupId(10L)
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L);
