@@ -45,6 +45,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
+import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.lance.common.utils.SerializationUtils;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.metrics.MetricNames;
@@ -86,13 +87,19 @@ public class LanceTableOperations {
   public Response describeTable(
       @PathParam("id") String tableId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
+      @QueryParam("check_declared") Boolean checkDeclared,
       DescribeTableRequest request) {
     try {
       validateDescribeTableRequest(request);
+      Optional<Long> version =
+          request == null ? Optional.empty() : Optional.ofNullable(request.getVersion());
+      boolean shouldCheckDeclared =
+          Optional.ofNullable(checkDeclared)
+              .orElse(request != null && Boolean.TRUE.equals(request.getCheckDeclared()));
       DescribeTableResponse response =
           lanceNamespace
               .asTableOps()
-              .describeTable(tableId, delimiter, Optional.ofNullable(request.getVersion()));
+              .describeTable(tableId, delimiter, version, shouldCheckDeclared);
       return Response.ok(response).build();
     } catch (Exception e) {
       return LanceExceptionMapper.toRESTResponse(tableId, e);
@@ -109,6 +116,8 @@ public class LanceTableOperations {
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
       @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
+      @QueryParam("properties") String queryProperties,
+      @QueryParam("storage_options") String queryStorageOptions,
       @Context HttpHeaders headers,
       byte[] arrowStreamBody) {
     try {
@@ -117,6 +126,10 @@ public class LanceTableOperations {
       String tableLocation = headersMap.getFirst(LANCE_TABLE_LOCATION_HEADER);
       String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
       Map<String, String> props = SerializationUtils.deserializeProperties(tableProperties);
+      props.putAll(SerializationUtils.deserializeProperties(queryProperties));
+      props.putAll(
+          LancePropertiesUtils.toTableProperties(
+              SerializationUtils.deserializeProperties(queryStorageOptions)));
       CreateTableResponse response =
           lanceNamespace
               .asTableOps()
@@ -150,6 +163,9 @@ public class LanceTableOperations {
       MultivaluedMap<String, String> headersMap = headers.getRequestHeaders();
       String tableProperties = headersMap.getFirst(LANCE_TABLE_PROPERTIES_PREFIX_HEADER);
       Map<String, String> props = SerializationUtils.deserializeProperties(tableProperties);
+      if (declareTableRequest.getProperties() != null) {
+        props.putAll(declareTableRequest.getProperties());
+      }
 
       DeclareTableResponse response =
           lanceNamespace.asTableOps().declareTable(tableId, delimiter, tableLocation, props);

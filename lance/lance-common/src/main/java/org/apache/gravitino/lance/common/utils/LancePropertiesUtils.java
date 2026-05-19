@@ -68,4 +68,14 @@ public final class LancePropertiesUtils {
     effectiveStorageOptions.putAll(getLanceStorageOptions(tableProperties));
     return effectiveStorageOptions;
   }
+
+  public static Map<String, String> toTableProperties(Map<String, String> storageOptions) {
+    if (storageOptions == null) {
+      return Map.of();
+    }
+
+    return storageOptions.entrySet().stream()
+        .collect(
+            Collectors.toMap(e -> LANCE_STORAGE_OPTIONS_PREFIX + e.getKey(), Map.Entry::getValue));
+  }
 }

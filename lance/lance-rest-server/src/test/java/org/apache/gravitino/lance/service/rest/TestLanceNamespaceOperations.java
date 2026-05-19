@@ -19,6 +19,7 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
@@ -32,8 +33,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -395,6 +398,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
   @Test
   void testCreateTable() {
+    Mockito.reset(tableOps);
     String tableIds = "catalog.scheme.create_table";
     String delimiter = ".";
 
@@ -405,13 +409,27 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     byte[] bytes = new byte[] {0x01, 0x02, 0x03};
     Response resp =
-        target(String.format("/v1/table/%s/create", tableIds))
-            .queryParam("delimiter", delimiter)
+        client()
+            .target(
+                URI.create(
+                    getBaseUri()
+                        + String.format("v1/table/%s/create", tableIds)
+                        + "?delimiter=."
+                        + "&properties=%7B%22custom%22%3A%22value%22%7D"
+                        + "&storage_options=%7B%22region%22%3A%22us-west-2%22%7D"))
             .request(MediaType.APPLICATION_JSON_TYPE)
             .post(Entity.entity(bytes, "application/vnd.apache.arrow.stream"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+    Mockito.verify(tableOps)
+        .createTable(
+            eq(tableIds),
+            eq("create"),
+            eq(delimiter),
+            eq(null),
+            eq(Map.of("custom", "value", "lance.storage.region", "us-west-2")),
+            eq(bytes));
 
     // Test illegal argument
     when(tableOps.createTable(any(), any(), any(), any(), any(), any()))
@@ -607,6 +625,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
   @Test
   void testDescribeTable() {
+    Mockito.reset(tableOps);
     String tableIds = "catalog.scheme.describe_table";
     String delimiter = ".";
 
@@ -614,12 +633,13 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     DescribeTableResponse createTableResponse = new DescribeTableResponse();
     createTableResponse.setLocation("/path/to/describe_table");
     createTableResponse.setMetadata(ImmutableMap.of("key", "value"));
-    when(tableOps.describeTable(any(), any(), any())).thenReturn(createTableResponse);
+    when(tableOps.describeTable(any(), any(), any(), anyBoolean())).thenReturn(createTableResponse);
 
     DescribeTableRequest tableRequest = new DescribeTableRequest();
     Response resp =
         target(String.format("/v1/table/%s/describe", tableIds))
             .queryParam("delimiter", delimiter)
+            .queryParam("check_declared", "true")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .post(Entity.entity(tableRequest, MediaType.APPLICATION_JSON_TYPE));
 
@@ -628,10 +648,12 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     DescribeTableResponse response = resp.readEntity(DescribeTableResponse.class);
     Assertions.assertEquals(createTableResponse.getLocation(), response.getLocation());
     Assertions.assertEquals(createTableResponse.getMetadata(), response.getMetadata());
+    Mockito.verify(tableOps)
+        .describeTable(eq(tableIds), eq(delimiter), eq(Optional.empty()), eq(true));
 
     // Test not found exception
     Mockito.reset(tableOps);
-    when(tableOps.describeTable(any(), any(), any()))
+    when(tableOps.describeTable(any(), any(), any(), anyBoolean()))
         .thenThrow(new TableNotFoundException("Table not found", "", tableIds));
     resp =
         target(String.format("/v1/table/%s/describe", tableIds))
@@ -642,7 +664,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     // Test runtime exception
     Mockito.reset(tableOps);
-    when(tableOps.describeTable(any(), any(), any()))
+    when(tableOps.describeTable(any(), any(), any(), anyBoolean()))
         .thenThrow(new RuntimeException("Runtime exception"));
     resp =
         target(String.format("/v1/table/%s/describe", tableIds))
@@ -916,6 +938,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
   @Test
   void testDeclareTable() {
+    Mockito.reset(tableOps);
     String tableIds = "catalog.scheme.declare_table";
     String delimiter = ".";
 
@@ -927,6 +950,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
 
     DeclareTableRequest tableRequest = new DeclareTableRequest();
     tableRequest.setLocation("/path/to/table");
+    tableRequest.setProperties(Map.of("declared-key", "declared-value"));
 
     Response resp =
         target(String.format("/v1/table/%s/declare", tableIds))
@@ -941,7 +965,11 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     Assertions.assertEquals(declareTableResponse.getStorageOptions(), response.getStorageOptions());
 
     Mockito.verify(tableOps)
-        .declareTable(eq(tableIds), eq(delimiter), eq("/path/to/table"), eq(Map.of()));
+        .declareTable(
+            eq(tableIds),
+            eq(delimiter),
+            eq("/path/to/table"),
+            eq(Map.of("declared-key", "declared-value")));
 
     // Test illegal argument
     Mockito.reset(tableOps);

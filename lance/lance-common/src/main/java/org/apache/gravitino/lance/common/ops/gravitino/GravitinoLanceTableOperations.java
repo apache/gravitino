@@ -99,7 +99,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
   @Override
   public DescribeTableResponse describeTable(
-      String tableId, String delimiter, Optional<Long> version) {
+      String tableId, String delimiter, Optional<Long> version, boolean checkDeclared) {
     if (!version.isEmpty()) {
       throw new UnsupportedOperationException(
           "Describing specific table version is not supported. It should be null to indicate the"
@@ -124,6 +124,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     }
     DescribeTableResponse response = new DescribeTableResponse();
     response.setMetadata(table.properties());
+    response.setProperties(table.properties());
     response.setLocation(table.properties().get(LANCE_LOCATION));
     response.setSchema(toJsonArrowSchema(table.columns()));
     response.setVersion(
@@ -132,6 +133,11 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
             .orElse(null));
     response.setStorageOptions(
         LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), table.properties()));
+    response.setManagedVersioning(false);
+    if (checkDeclared) {
+      response.setIsOnlyDeclared(
+          Boolean.parseBoolean(table.properties().getOrDefault(LANCE_TABLE_DECLARED, "false")));
+    }
     return response;
   }
 
@@ -187,6 +193,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     response.setVersion(
         Optional.ofNullable(properties.get(LANCE_TABLE_VERSION)).map(Long::valueOf).orElse(null));
     response.setLocation(properties.get(LANCE_LOCATION));
+    response.setProperties(properties);
     return response;
   }
 
@@ -205,6 +212,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     DeclareTableResponse declareTableResponse = new DeclareTableResponse();
     declareTableResponse.setLocation(response.getLocation());
     declareTableResponse.setStorageOptions(response.getStorageOptions());
+    declareTableResponse.setProperties(response.getProperties());
+    declareTableResponse.setManagedVersioning(false);
     return declareTableResponse;
   }
 

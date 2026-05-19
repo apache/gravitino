@@ -35,9 +35,11 @@ public interface LanceTableOperations {
    * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
    * @param delimiter the delimiter used in the namespace
    * @param version the version of the table to describe, if null, describe the latest version
+   * @param checkDeclared whether to populate the is_only_declared response field
    * @return the table description
    */
-  DescribeTableResponse describeTable(String tableId, String delimiter, Optional<Long> version);
+  DescribeTableResponse describeTable(
+      String tableId, String delimiter, Optional<Long> version, boolean checkDeclared);
 
   /**
    * Create a new table.
