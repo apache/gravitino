@@ -88,6 +88,4 @@ class GroupDTO(Group):
         def build(self) -> GroupDTO:
             if not self._name:
                 raise ValueError("name cannot be null or empty")
-            if self._audit is None:
-                raise ValueError("audit cannot be null")
             return GroupDTO(self._name, self._roles, self._audit)
