@@ -61,9 +61,6 @@ public class IdpGroupUserRelBaseSQLProvider {
         + " FROM "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " WHERE group_id = #{groupId} AND deleted_at = 0 "
-        + "<if test='userIds != null and userIds.size() == 0'>"
-        + "AND 1 = 0 "
-        + "</if>"
         + "<foreach collection='userIds' item='userId'"
         + " open='AND user_id IN (' separator=',' close=')'>"
         + "#{userId}"
@@ -92,9 +89,6 @@ public class IdpGroupUserRelBaseSQLProvider {
         + " SET deleted_at = "
         + currentTimeMillisExpression()
         + " WHERE group_id = #{groupId} AND deleted_at = 0 "
-        + "<if test='userIds != null and userIds.size() == 0'>"
-        + "AND 1 = 0 "
-        + "</if>"
         + "<foreach collection='userIds' item='userId'"
         + " open='AND user_id IN (' separator=',' close=')'>"
         + "#{userId}"

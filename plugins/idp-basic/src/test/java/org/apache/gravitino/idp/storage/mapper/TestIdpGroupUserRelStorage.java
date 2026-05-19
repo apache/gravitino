@@ -216,7 +216,10 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
     List<Long> relatedUserIds = idpGroupUserRelMapper.selectRelatedUserIds(1L, List.of(2L, 3L, 1L));
     relatedUserIds.sort(Comparator.comparingLong(Long::longValue));
     assertIterableEquals(List.of(1L, 2L), relatedUserIds);
-    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectRelatedUserIds(1L, List.of()));
+    List<Long> relatedUserIdsWithEmptyFilter =
+        idpGroupUserRelMapper.selectRelatedUserIds(1L, List.of());
+    relatedUserIdsWithEmptyFilter.sort(Comparator.comparingLong(Long::longValue));
+    assertIterableEquals(List.of(1L, 2L), relatedUserIdsWithEmptyFilter);
     assertThrows(
         PersistenceException.class, () -> idpGroupUserRelMapper.selectRelatedUserIds(1L, null));
   }

@@ -103,9 +103,10 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     Assertions.assertFalse(
         normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
         "Empty userIds should not generate invalid SQL IN (...) with no values");
-    Assertions.assertTrue(
-        normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"),
-        "Empty userIds should result in an unsatisfiable WHERE clause (e.g., AND 1 = 0)");
+    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
+    Assertions.assertEquals(
+        "SELECT user_id FROM idp_group_user_rel WHERE group_id = ? AND deleted_at = 0",
+        normalizedSql);
   }
 
   @Test
@@ -166,9 +167,10 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     Assertions.assertFalse(
         normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
         "Empty userIds should not generate invalid SQL IN (...) with no values");
-    Assertions.assertTrue(
-        normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"),
-        "Empty userIds should result in an unsatisfiable WHERE clause (e.g., AND 1 = 0)");
+    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
+    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
+    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
+    Assertions.assertTrue(normalizedSql.matches(".*WHERE group_id = \\? AND deleted_at = 0.*"));
   }
 
   @Test
