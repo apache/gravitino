@@ -41,7 +41,9 @@ class TestIdpUserGroupRelH2Provider extends AbstractIdpMetaStorageTest {
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
     Assertions.assertTrue(
         normalizedSql.contains(
-            "r.group_id IN ( SELECT g.group_id FROM idp_group_meta g WHERE g.group_name = ?"));
+            "r.group_id IN (SELECT g.group_id FROM idp_group_meta g WHERE g.group_name = ?"));
+    Assertions.assertTrue(
+        normalizedSql.contains("r.user_id IN (SELECT u.user_id FROM idp_user_meta u"));
     Assertions.assertTrue(normalizedSql.matches(".*u.user_name IN \\( \\? , \\? \\).*"));
   }
 
