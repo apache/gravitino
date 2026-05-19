@@ -138,6 +138,16 @@ public class JcasbinChangePoller implements AutoCloseable {
    * Drains owner-change rows past {@link #ownerPollHighWaterId} and invalidates the affected {@code
    * ownerRelCache} entries. Each row carries {@code metadataObjectId}, so invalidation is a direct
    * key removal — no name resolution needed.
+   *
+   * <p>The {@code synchronized} modifier is defensive. In production this method is only invoked
+   * from the single-threaded scheduler started in {@link #start()}, and {@link
+   * java.util.concurrent.ScheduledExecutorService#scheduleWithFixedDelay} guarantees that
+   * consecutive runs do not overlap. The cursor field {@link #ownerPollHighWaterId} is also {@code
+   * volatile}, and cache invalidations are now atomic at the cache layer via {@link
+   * org.apache.gravitino.cache.GravitinoCache#runInvalidationBatch}. The keyword is kept so that
+   * future callers — additional schedulers, ad-hoc invocations from tests or admin tooling — do not
+   * silently introduce concurrent {@code "select changes → invalidate → advance cursor"} sequences.
+   * Cost is negligible under no contention thanks to biased / elided locking.
    */
   private synchronized void pollOwnerChanges() {
     List<ChangedOwnerInfo> changes =
@@ -173,6 +183,10 @@ public class JcasbinChangePoller implements AutoCloseable {
    * current name on drop, so the cacheKey we build here resolves to the entry a peer node would
    * have populated under that name. If a future change starts emitting the new post-rename name,
    * this invalidation will silently miss and stale entries will only clear via LRU eviction.
+   *
+   * <p>The {@code synchronized} modifier is defensive — see the note on {@link #pollOwnerChanges()}
+   * for the rationale. The single-threaded scheduler already prevents overlapping runs in
+   * production, and the per-batch invalidation atomicity is provided by the cache itself.
    */
   private synchronized void pollEntityChanges() {
     List<EntityChangeRecord> changes =
