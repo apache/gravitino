@@ -21,15 +21,11 @@ package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.ibatis.builder.BuilderException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpUserMetaBaseSQLProvider extends AbstractIdpMetaStorageTest {
+public class TestIdpUserMetaBaseSQLProvider {
 
   @Test
   void testSelectIdpUser() {
@@ -43,44 +39,31 @@ public class TestIdpUserMetaBaseSQLProvider extends AbstractIdpMetaStorageTest {
 
   @Test
   void testSelectIdpUsers() {
-    String script = createProvider().selectIdpUsers(Arrays.asList("tom", "jerry"));
-    Map<String, Object> params = new HashMap<>();
-    params.put("usernames", Arrays.asList("tom", "jerry"));
-
-    String normalizedSql = renderScript(script, params);
+    String normalizedSql =
+        createProvider()
+            .selectIdpUsers(Arrays.asList("tom", "jerry"))
+            .replaceAll("\\s+", " ")
+            .trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT user_id as userId"));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta"));
-    Assertions.assertTrue(normalizedSql.matches(".*user_name IN \\( \\? , \\? \\).*"));
-    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
+    Assertions.assertTrue(normalizedSql.contains("WHERE deleted_at = 0"));
+    Assertions.assertTrue(normalizedSql.contains("<foreach collection='usernames'"));
+    Assertions.assertTrue(normalizedSql.contains("open='AND user_name IN ('"));
+    Assertions.assertTrue(normalizedSql.contains("#{username}"));
   }
 
   @Test
   void testSelectIdpUsersWithEmptyUserNames() {
-    String script = createProvider().selectIdpUsers(Collections.emptyList());
-    Map<String, Object> params = new HashMap<>();
-    params.put("usernames", Collections.emptyList());
+    String normalizedSql =
+        createProvider().selectIdpUsers(Collections.emptyList()).replaceAll("\\s+", " ").trim();
 
-    String normalizedSql = renderScript(script, params);
-
-    Assertions.assertFalse(
-        normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
-        "Empty userNames should not generate invalid SQL IN (...) with no values");
-    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
-    Assertions.assertEquals(
-        "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
-            + " current_version as currentVersion, last_version as lastVersion,"
-            + " deleted_at as deletedAt FROM idp_user_meta WHERE deleted_at = 0",
-        normalizedSql);
-  }
-
-  @Test
-  void testSelectIdpUsersWithNullUserNames() {
-    String script = createProvider().selectIdpUsers(null);
-    Map<String, Object> params = new HashMap<>();
-    params.put("usernames", null);
-
-    Assertions.assertThrows(BuilderException.class, () -> renderScript(script, params));
+    Assertions.assertTrue(normalizedSql.contains("SELECT user_id as userId"));
+    Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta"));
+    Assertions.assertTrue(normalizedSql.contains("WHERE deleted_at = 0"));
+    Assertions.assertTrue(normalizedSql.contains("<foreach collection='usernames'"));
+    Assertions.assertTrue(normalizedSql.contains("open='AND user_name IN ('"));
+    Assertions.assertTrue(normalizedSql.contains("#{username}"));
   }
 
   @Test

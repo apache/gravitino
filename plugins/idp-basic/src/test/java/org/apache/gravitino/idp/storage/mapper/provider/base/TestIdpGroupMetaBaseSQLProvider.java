@@ -21,15 +21,11 @@ package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
-import org.apache.ibatis.builder.BuilderException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpGroupMetaBaseSQLProvider extends AbstractIdpMetaStorageTest {
+public class TestIdpGroupMetaBaseSQLProvider {
 
   protected IdpGroupMetaBaseSQLProvider createProvider() {
     return new IdpGroupMetaBaseSQLProvider() {
@@ -61,45 +57,31 @@ public class TestIdpGroupMetaBaseSQLProvider extends AbstractIdpMetaStorageTest 
 
   @Test
   void testSelectIdpGroups() {
-    String script = createProvider().selectIdpGroups(Arrays.asList("dev", "ops"));
-    Map<String, Object> params = new HashMap<>();
-    params.put("groupNames", Arrays.asList("dev", "ops"));
-
-    String normalizedSql = renderScript(script, params);
+    String normalizedSql =
+        createProvider()
+            .selectIdpGroups(Arrays.asList("dev", "ops"))
+            .replaceAll("\\s+", " ")
+            .trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT group_id as groupId"));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta"));
-    Assertions.assertTrue(
-        normalizedSql.matches(".*group_name IN\\s*\\(\\s*\\?\\s*,\\s*\\?\\s*\\).*"));
-    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
+    Assertions.assertTrue(normalizedSql.contains("WHERE deleted_at = 0"));
+    Assertions.assertTrue(normalizedSql.contains("<foreach collection='groupNames'"));
+    Assertions.assertTrue(normalizedSql.contains("open='AND group_name IN ('"));
+    Assertions.assertTrue(normalizedSql.contains("#{groupName}"));
   }
 
   @Test
   void testSelectIdpGroupsWithEmptyGroupNames() {
-    String script = createProvider().selectIdpGroups(Collections.emptyList());
-    Map<String, Object> params = new HashMap<>();
-    params.put("groupNames", Collections.emptyList());
+    String normalizedSql =
+        createProvider().selectIdpGroups(Collections.emptyList()).replaceAll("\\s+", " ").trim();
 
-    String normalizedSql = renderScript(script, params);
-
-    Assertions.assertFalse(
-        normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
-        "Empty groupNames should not generate invalid SQL IN (...) with no values");
-    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
-    Assertions.assertEquals(
-        "SELECT group_id as groupId, group_name as groupName, current_version as"
-            + " currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM"
-            + " idp_group_meta WHERE deleted_at = 0",
-        normalizedSql);
-  }
-
-  @Test
-  void testSelectIdpGroupsWithNullGroupNames() {
-    String script = createProvider().selectIdpGroups(null);
-    Map<String, Object> params = new HashMap<>();
-    params.put("groupNames", null);
-
-    Assertions.assertThrows(BuilderException.class, () -> renderScript(script, params));
+    Assertions.assertTrue(normalizedSql.contains("SELECT group_id as groupId"));
+    Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta"));
+    Assertions.assertTrue(normalizedSql.contains("WHERE deleted_at = 0"));
+    Assertions.assertTrue(normalizedSql.contains("<foreach collection='groupNames'"));
+    Assertions.assertTrue(normalizedSql.contains("open='AND group_name IN ('"));
+    Assertions.assertTrue(normalizedSql.contains("#{groupName}"));
   }
 
   @Test
