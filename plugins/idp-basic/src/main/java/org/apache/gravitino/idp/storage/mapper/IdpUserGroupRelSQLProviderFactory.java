@@ -69,8 +69,8 @@ public class IdpUserGroupRelSQLProviderFactory {
   }
 
   public static String softDeleteRelations(
-      @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
-    return currentProvider().softDeleteRelations(groupId, userIds);
+      @Param("groupName") String groupName, @Param("usernames") List<String> usernames) {
+    return currentProvider().softDeleteRelations(groupName, usernames);
   }
 
   public static String softDeleteRelationsByUsername(@Param("username") String username) {

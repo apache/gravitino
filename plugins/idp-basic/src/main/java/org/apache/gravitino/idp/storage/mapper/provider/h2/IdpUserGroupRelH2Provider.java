@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
+import java.util.List;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
@@ -31,6 +32,31 @@ public class IdpUserGroupRelH2Provider extends IdpUserGroupRelBaseSQLProvider {
   @Override
   protected String currentTimeMillisExpression() {
     return "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
+  }
+
+  @Override
+  public String softDeleteRelations(
+      @Param("groupName") String groupName, @Param("usernames") List<String> usernames) {
+    return "<script>"
+        + "UPDATE "
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
+        + " r SET deleted_at = "
+        + currentTimeMillisExpression()
+        + " WHERE r.deleted_at = 0"
+        + " AND r.group_id IN (SELECT g.group_id FROM "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g WHERE g.group_name = #{groupName} AND g.deleted_at = 0)"
+        + "<if test='usernames != null and usernames.size() &gt; 0'>"
+        + " AND r.user_id IN (SELECT u.user_id FROM "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u WHERE u.deleted_at = 0"
+        + "<foreach collection='usernames' item='username'"
+        + " open=' AND u.user_name IN (' separator=',' close=')'>"
+        + "#{username}"
+        + "</foreach>"
+        + ")"
+        + "</if>"
+        + "</script>";
   }
 
   @Override

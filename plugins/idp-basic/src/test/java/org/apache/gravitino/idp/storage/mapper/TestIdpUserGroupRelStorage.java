@@ -202,9 +202,9 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
                 .withDeletedAt(0L)
                 .build()));
 
-    assertEquals(1, idpUserGroupRelMapper.softDeleteRelations(1L, List.of(1L)));
+    assertEquals(1, idpUserGroupRelMapper.softDeleteRelations("dev", List.of("alice")));
     assertIterableEquals(List.of("bob"), idpUserGroupRelMapper.selectUsernamesByGroupName("dev"));
-    assertEquals(0, idpUserGroupRelMapper.softDeleteRelations(1L, List.of(1L)));
+    assertEquals(0, idpUserGroupRelMapper.softDeleteRelations("dev", List.of("alice")));
     assertEquals(
         1, idpUserGroupRelMapper.deleteIdpUserGroupRelMetasByLegacyTimeline(Long.MAX_VALUE, 10));
   }

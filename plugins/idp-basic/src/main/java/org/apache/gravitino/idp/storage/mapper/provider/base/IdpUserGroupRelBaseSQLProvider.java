@@ -72,17 +72,26 @@ public class IdpUserGroupRelBaseSQLProvider {
   }
 
   public String softDeleteRelations(
-      @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
+      @Param("groupName") String groupName, @Param("usernames") List<String> usernames) {
     return "<script>"
         + "UPDATE "
         + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
-        + " SET deleted_at = "
+        + " r INNER JOIN "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
+        + " INNER JOIN "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u ON u.user_id = r.user_id AND u.deleted_at = 0"
+        + " SET r.deleted_at = "
         + currentTimeMillisExpression()
-        + " WHERE group_id = #{groupId} AND deleted_at = 0 "
-        + "<foreach collection='userIds' item='userId'"
-        + " open='AND user_id IN (' separator=',' close=')'>"
-        + "#{userId}"
+        + " WHERE g.group_name = #{groupName}"
+        + " AND r.deleted_at = 0"
+        + "<if test='usernames != null and usernames.size() &gt; 0'>"
+        + "<foreach collection='usernames' item='username'"
+        + " open=' AND u.user_name IN (' separator=',' close=')'>"
+        + "#{username}"
         + "</foreach>"
+        + "</if>"
         + "</script>";
   }
 

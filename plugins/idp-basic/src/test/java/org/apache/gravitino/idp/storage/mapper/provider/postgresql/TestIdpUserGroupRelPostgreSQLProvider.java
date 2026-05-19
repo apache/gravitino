@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
 
+import java.util.Arrays;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -31,6 +32,18 @@ public class TestIdpUserGroupRelPostgreSQLProvider {
     Assertions.assertEquals(
         "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)",
         provider.currentTimeMillisExpression());
+  }
+
+  @Test
+  void testSoftDeleteRelations() {
+    IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
+    String normalizedSql =
+        provider.softDeleteRelations("dev", Arrays.asList("alice", "bob")).replaceAll("\\s+", " ");
+
+    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
+    Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta g, idp_user_meta u"));
+    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
+    Assertions.assertTrue(normalizedSql.contains("u.user_name IN (#{username},#{username})"));
   }
 
   @Test

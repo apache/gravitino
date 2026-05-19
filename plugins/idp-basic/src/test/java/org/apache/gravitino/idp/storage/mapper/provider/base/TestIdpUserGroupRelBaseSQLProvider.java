@@ -105,41 +105,45 @@ public class TestIdpUserGroupRelBaseSQLProvider {
 
   @Test
   void testSoftDeleteIdpUserGroups() {
-    String script = createProvider().softDeleteRelations(10L, Arrays.asList(20L, 21L));
+    String script = createProvider().softDeleteRelations("dev", Arrays.asList("alice", "bob"));
     Map<String, Object> params = new HashMap<>();
-    params.put("groupId", 10L);
-    params.put("userIds", Arrays.asList(20L, 21L));
+    params.put("groupName", "dev");
+    params.put("usernames", Arrays.asList("alice", "bob"));
 
     String normalizedSql = renderScript(script, params);
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
+    Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_group_meta g"));
+    Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_user_meta u"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.matches(".*user_id IN \\( \\? , \\? \\).*"));
+    Assertions.assertTrue(normalizedSql.contains("g.group_name = ?"));
+    Assertions.assertTrue(normalizedSql.matches(".*u.user_name IN \\( \\? , \\? \\).*"));
   }
 
   @Test
-  void testSoftDeleteIdpUserGroupsWithEmptyUserIds() {
-    String script = createProvider().softDeleteRelations(10L, Collections.emptyList());
+  void testSoftDeleteIdpUserGroupsWithEmptyUsernames() {
+    String script = createProvider().softDeleteRelations("dev", Collections.emptyList());
     Map<String, Object> params = new HashMap<>();
-    params.put("groupId", 10L);
-    params.put("userIds", Collections.emptyList());
+    params.put("groupName", "dev");
+    params.put("usernames", Collections.emptyList());
 
     String normalizedSql = renderScript(script, params);
 
     Assertions.assertFalse(
         normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
-        "Empty userIds should not generate invalid SQL IN (...) with no values");
+        "Empty usernames should not generate invalid SQL IN (...) with no values");
     Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.matches(".*WHERE group_id = \\? AND deleted_at = 0.*"));
+    Assertions.assertTrue(normalizedSql.contains("g.group_name = ?"));
+    Assertions.assertFalse(normalizedSql.contains("u.user_name IN"));
   }
 
   @Test
-  void testSoftDeleteIdpUserGroupsWithNullUserIds() {
-    String script = createProvider().softDeleteRelations(10L, null);
+  void testSoftDeleteIdpUserGroupsWithNullUsernames() {
+    String script = createProvider().softDeleteRelations("dev", null);
     Map<String, Object> params = new HashMap<>();
-    params.put("groupId", 10L);
+    params.put("groupName", "dev");
 
     Assertions.assertThrows(BuilderException.class, () -> renderScript(script, params));
   }

@@ -19,10 +19,22 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
+import java.util.Arrays;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestIdpUserGroupRelH2Provider {
+
+  @Test
+  void testSoftDeleteRelations() {
+    IdpUserGroupRelH2Provider provider = new IdpUserGroupRelH2Provider();
+    String normalizedSql =
+        provider.softDeleteRelations("dev", Arrays.asList("alice", "bob")).replaceAll("\\s+", " ");
+
+    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
+    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
+    Assertions.assertTrue(normalizedSql.contains("u.user_name IN (#{username},#{username})"));
+  }
 
   @Test
   void testSoftDeleteRelationsByUsername() {
