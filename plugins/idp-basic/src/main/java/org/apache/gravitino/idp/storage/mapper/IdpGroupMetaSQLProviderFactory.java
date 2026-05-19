@@ -37,26 +37,28 @@ public class IdpGroupMetaSQLProviderFactory {
 
   private IdpGroupMetaSQLProviderFactory() {}
 
+  private static IdpGroupMetaBaseSQLProvider currentProvider() {
+    return PROVIDER_MAP.currentProvider();
+  }
+
   public static String selectIdpGroup(@Param("groupName") String groupName) {
-    return PROVIDER_MAP.currentProvider().selectIdpGroup(groupName);
+    return currentProvider().selectIdpGroup(groupName);
   }
 
   public static String selectIdpGroups(@Param("groupNames") List<String> groupNames) {
-    return PROVIDER_MAP.currentProvider().selectIdpGroups(groupNames);
+    return currentProvider().selectIdpGroups(groupNames);
   }
 
   public static String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
-    return PROVIDER_MAP.currentProvider().insertIdpGroup(groupPO);
+    return currentProvider().insertIdpGroup(groupPO);
   }
 
   public static String softDeleteIdpGroup(@Param("groupId") Long groupId) {
-    return PROVIDER_MAP.currentProvider().softDeleteIdpGroup(groupId);
+    return currentProvider().softDeleteIdpGroup(groupId);
   }
 
   public static String deleteIdpGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return PROVIDER_MAP
-        .currentProvider()
-        .deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit);
+    return currentProvider().deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }

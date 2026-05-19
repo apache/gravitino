@@ -37,41 +37,43 @@ public class IdpGroupUserRelSQLProviderFactory {
 
   private IdpGroupUserRelSQLProviderFactory() {}
 
+  private static IdpGroupUserRelBaseSQLProvider currentProvider() {
+    return PROVIDER_MAP.currentProvider();
+  }
+
   public static String selectGroupNamesByUserId(@Param("userId") Long userId) {
-    return PROVIDER_MAP.currentProvider().selectGroupNamesByUserId(userId);
+    return currentProvider().selectGroupNamesByUserId(userId);
   }
 
   public static String selectUserNamesByGroupId(@Param("groupId") Long groupId) {
-    return PROVIDER_MAP.currentProvider().selectUserNamesByGroupId(groupId);
+    return currentProvider().selectUserNamesByGroupId(groupId);
   }
 
   public static String selectRelatedUserIds(
       @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
-    return PROVIDER_MAP.currentProvider().selectRelatedUserIds(groupId, userIds);
+    return currentProvider().selectRelatedUserIds(groupId, userIds);
   }
 
   public static String batchInsertIdpGroupUsers(
       @Param("relations") List<IdpGroupUserRelPO> relations) {
-    return PROVIDER_MAP.currentProvider().batchInsertIdpGroupUsers(relations);
+    return currentProvider().batchInsertIdpGroupUsers(relations);
   }
 
   public static String softDeleteIdpGroupUsers(
       @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
-    return PROVIDER_MAP.currentProvider().softDeleteIdpGroupUsers(groupId, userIds);
+    return currentProvider().softDeleteIdpGroupUsers(groupId, userIds);
   }
 
   public static String softDeleteGroupUsersByUserId(@Param("userId") Long userId) {
-    return PROVIDER_MAP.currentProvider().softDeleteGroupUsersByUserId(userId);
+    return currentProvider().softDeleteGroupUsersByUserId(userId);
   }
 
   public static String softDeleteGroupUsersByGroupId(@Param("groupId") Long groupId) {
-    return PROVIDER_MAP.currentProvider().softDeleteGroupUsersByGroupId(groupId);
+    return currentProvider().softDeleteGroupUsersByGroupId(groupId);
   }
 
   public static String deleteIdpGroupUserRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return PROVIDER_MAP
-        .currentProvider()
-        .deleteIdpGroupUserRelMetasByLegacyTimeline(legacyTimeline, limit);
+    return currentProvider().deleteIdpGroupUserRelMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }

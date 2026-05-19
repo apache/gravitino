@@ -37,29 +37,33 @@ public class IdpUserMetaSQLProviderFactory {
 
   private IdpUserMetaSQLProviderFactory() {}
 
+  private static IdpUserMetaBaseSQLProvider currentProvider() {
+    return PROVIDER_MAP.currentProvider();
+  }
+
   public static String selectIdpUser(@Param("username") String username) {
-    return PROVIDER_MAP.currentProvider().selectIdpUser(username);
+    return currentProvider().selectIdpUser(username);
   }
 
   public static String selectIdpUsers(@Param("usernames") List<String> usernames) {
-    return PROVIDER_MAP.currentProvider().selectIdpUsers(usernames);
+    return currentProvider().selectIdpUsers(usernames);
   }
 
   public static String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
-    return PROVIDER_MAP.currentProvider().insertIdpUser(userPO);
+    return currentProvider().insertIdpUser(userPO);
   }
 
   public static String updateIdpUserPassword(
       @Param("userId") Long userId, @Param("passwordHash") String passwordHash) {
-    return PROVIDER_MAP.currentProvider().updateIdpUserPassword(userId, passwordHash);
+    return currentProvider().updateIdpUserPassword(userId, passwordHash);
   }
 
   public static String softDeleteIdpUser(@Param("userId") Long userId) {
-    return PROVIDER_MAP.currentProvider().softDeleteIdpUser(userId);
+    return currentProvider().softDeleteIdpUser(userId);
   }
 
   public static String deleteIdpUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return PROVIDER_MAP.currentProvider().deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit);
+    return currentProvider().deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }
