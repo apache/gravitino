@@ -20,8 +20,8 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
@@ -75,7 +75,7 @@ public class OwnerEventManager implements OwnerDispatcher {
       List<MetadataObject> metadataObjects,
       String ownerName,
       Owner.Type ownerType) {
-    Objects.requireNonNull(metadataObjects, "metadataObjects must not be null");
+    Preconditions.checkArgument(metadataObjects != null, "metadataObjects must not be null");
     if (metadataObjects.isEmpty()) {
       return;
     }

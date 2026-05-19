@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import lombok.Getter;
@@ -144,7 +143,7 @@ public class OwnerManager implements OwnerDispatcher {
       List<MetadataObject> metadataObjects,
       String ownerName,
       Owner.Type ownerType) {
-    Objects.requireNonNull(metadataObjects, "metadataObjects must not be null");
+    Preconditions.checkArgument(metadataObjects != null, "metadataObjects must not be null");
     if (metadataObjects.isEmpty()) {
       return;
     }

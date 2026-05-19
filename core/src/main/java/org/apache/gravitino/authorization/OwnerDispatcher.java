@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.authorization;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 
@@ -55,7 +55,7 @@ public interface OwnerDispatcher {
       List<MetadataObject> metadataObjects,
       String ownerName,
       Owner.Type ownerType) {
-    Objects.requireNonNull(metadataObjects, "metadataObjects must not be null");
+    Preconditions.checkArgument(metadataObjects != null, "metadataObjects must not be null");
     for (MetadataObject metadataObject : metadataObjects) {
       setOwner(metalake, metadataObject, ownerName, ownerType);
     }
