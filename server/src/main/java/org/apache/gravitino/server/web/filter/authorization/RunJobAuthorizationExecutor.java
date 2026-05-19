@@ -36,6 +36,7 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
   private final AuthorizationExpressionEvaluator authorizationExpressionEvaluator;
   private final Map<String, Object> pathParams;
   private final Optional<String> entityType;
+  private final String expression;
 
   public RunJobAuthorizationExecutor(
       Parameter[] parameters,
@@ -46,6 +47,7 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
       Optional<String> entityType) {
     this.parameters = parameters;
     this.args = args;
+    this.expression = expression;
     this.metadataContext = metadataContext;
     this.authorizationExpressionEvaluator = new AuthorizationExpressionEvaluator(expression);
     this.pathParams = pathParams;
@@ -53,13 +55,13 @@ public class RunJobAuthorizationExecutor implements AuthorizationExecutor {
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute(AuthorizationRequestContext context) throws Exception {
     Object request = extractFromParameters(parameters, args);
     if (request == null) {
       return false;
     }
 
-    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    context.setOriginalAuthorizationExpression(expression);
     Preconditions.checkArgument(
         request instanceof JobRunRequest,
         "Expected JobRunRequest but found %s",

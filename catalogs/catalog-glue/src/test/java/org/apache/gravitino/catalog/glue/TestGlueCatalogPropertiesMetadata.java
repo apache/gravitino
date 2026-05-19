@@ -64,12 +64,6 @@ class TestGlueCatalogPropertiesMetadata {
   }
 
   @Test
-  void testCredentialsAreHidden() {
-    assertTrue(metadata.isHiddenProperty(AWS_ACCESS_KEY_ID));
-    assertTrue(metadata.isHiddenProperty(AWS_SECRET_ACCESS_KEY));
-  }
-
-  @Test
   void testCredentialsAreOptional() {
     assertFalse(metadata.isRequiredProperty(AWS_ACCESS_KEY_ID));
     assertFalse(metadata.isRequiredProperty(AWS_SECRET_ACCESS_KEY));

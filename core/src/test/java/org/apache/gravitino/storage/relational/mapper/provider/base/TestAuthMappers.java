@@ -351,15 +351,16 @@ public class TestAuthMappers {
       throw new RuntimeException("Update failed", e);
     }
 
-    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(50L);
+    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(0L);
     Assertions.assertEquals(1, changed.size());
     Assertions.assertEquals(200L, changed.get(0).getMetadataObjectId());
     Assertions.assertEquals("SCHEMA", changed.get(0).getMetadataObjectType());
     Assertions.assertEquals(100L, changed.get(0).getUpdatedAt());
 
-    // With the same timestamp, the row is returned again for timestamp-only polling.
-    List<ChangedOwnerInfo> sameTimestamp = ownerMetaMapper.selectChangedOwners(100L);
-    Assertions.assertEquals(1, sameTimestamp.size());
+    // Polling after the last seen id should not return the same row again.
+    List<ChangedOwnerInfo> sameTimestamp =
+        ownerMetaMapper.selectChangedOwners(changed.get(0).getId());
+    Assertions.assertTrue(sameTimestamp.isEmpty());
   }
 
   private AuditInfo buildAuditInfo() {

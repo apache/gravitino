@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -68,17 +69,18 @@ final class ClickHouseTableSqlUtils {
 
   static String toPartitionExpression(Transform transform) {
     Preconditions.checkArgument(transform != null, "Partition transform cannot be null");
-    Preconditions.checkArgument(
-        StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_IDENTITY),
-        "Unsupported partition transform: " + transform.name());
-    Preconditions.checkArgument(
-        transform.arguments().length == 1
-            && transform.arguments()[0] instanceof NamedReference
-            && ((NamedReference) transform.arguments()[0]).fieldName().length == 1,
-        "ClickHouse only supports single column identity partitioning");
-
-    String fieldName = ((NamedReference) transform.arguments()[0]).fieldName()[0];
-    return quoteIdentifier(fieldName);
+    String name = transform.name().toLowerCase(Locale.ROOT);
+    return switch (name) {
+      case Transforms.NAME_OF_IDENTITY -> quoteIdentifier(partitionFieldName(transform));
+      case Transforms.NAME_OF_YEAR -> "toYear(%s)"
+          .formatted(quoteIdentifier(partitionFieldName(transform)));
+      case Transforms.NAME_OF_MONTH -> "toYYYYMM(%s)"
+          .formatted(quoteIdentifier(partitionFieldName(transform)));
+      case Transforms.NAME_OF_DAY -> "toDate(%s)"
+          .formatted(quoteIdentifier(partitionFieldName(transform)));
+      default -> throw new IllegalArgumentException(
+          "Unsupported partition transform: " + transform.name());
+    };
   }
 
   static List<String> extractShardingKeyColumns(String shardingKey) {
@@ -235,5 +237,15 @@ final class ClickHouseTableSqlUtils {
 
   private static String quoteIdentifier(String identifier) {
     return String.format("`%s`", identifier);
+  }
+
+  private static String partitionFieldName(Transform transform) {
+    Preconditions.checkArgument(
+        transform.arguments().length == 1
+            && transform.arguments()[0] instanceof NamedReference
+            && ((NamedReference) transform.arguments()[0]).fieldName().length == 1,
+        "ClickHouse partition transform only supports a single column reference");
+
+    return ((NamedReference) transform.arguments()[0]).fieldName()[0];
   }
 }
