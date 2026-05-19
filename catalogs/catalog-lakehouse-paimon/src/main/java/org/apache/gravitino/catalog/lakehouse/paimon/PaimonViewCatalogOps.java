@@ -209,10 +209,6 @@ final class PaimonViewCatalogOps {
 
   private View replaceView(NameIdentifier identifier, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
-    Preconditions.checkArgument(
-        Arrays.stream(changes).noneMatch(change -> change instanceof ViewChange.RenameView),
-        "Rename view change cannot be combined with replace view change");
-
     View existingView = loadView(identifier);
     Map<String, String> finalProperties = new HashMap<>(existingView.properties());
     ViewChange.ReplaceView replaceView = null;
@@ -244,33 +240,14 @@ final class PaimonViewCatalogOps {
             finalProperties);
 
     NameIdentifier sourceIdentifier = paimonIdentifierBuilder.apply(identifier);
-    NameIdentifier targetIdentifier = paimonIdentifierBuilder.apply(identifier);
 
     try {
-      if (sourceIdentifier.equals(targetIdentifier)) {
-        // Paimon does not provide a native replace-view API. To align with Paimon Spark's
-        // CREATE OR REPLACE VIEW behavior, replace on the same identifier is executed as
-        // drop-then-create. This path is intentionally non-atomic: if create fails after drop,
-        // the original view remains dropped and no rollback is attempted.
-        paimonCatalogOps.dropView(sourceIdentifier.toString());
-        paimonCatalogOps.createView(sourceIdentifier.toString(), paimonView);
-      } else {
-        // Cross-identifier replace is also intentionally non-atomic. The target is created first,
-        // then the source is dropped. If source drop fails after target creation, both views may
-        // coexist and no rollback is attempted.
-        paimonCatalogOps.createView(targetIdentifier.toString(), paimonView);
-        try {
-          paimonCatalogOps.dropView(sourceIdentifier.toString());
-        } catch (RuntimeException e) {
-          LOG.warn(
-              "Cross-identifier replace of Paimon view is non-atomic: target view {} was created, "
-                  + "but dropping source view {} failed. Both views may exist until cleanup.",
-              targetIdentifier,
-              sourceIdentifier,
-              e);
-          throw e;
-        }
-      }
+      // Paimon does not provide a native replace-view API. To align with Paimon Spark's
+      // CREATE OR REPLACE VIEW behavior, replace is executed as drop-then-create.
+      // This path is intentionally non-atomic: if create fails after drop,
+      // the original view remains dropped and no rollback is attempted.
+      paimonCatalogOps.dropView(sourceIdentifier.toString());
+      paimonCatalogOps.createView(sourceIdentifier.toString(), paimonView);
       return loadView(identifier);
     } catch (Catalog.ViewNotExistException e) {
       throw new NoSuchViewException(e, NO_SUCH_VIEW_EXCEPTION, identifier);

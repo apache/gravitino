@@ -125,16 +125,12 @@ public final class PaimonViewTestCatalogHelper {
           }
         }
 
-        String updatedQuery =
-            updatedDialects.isEmpty()
-                ? storedView.query()
-                : updatedDialects.values().iterator().next();
         viewStore.put(
             identifier,
             new ViewImpl(
                 identifier,
                 storedView.rowType().getFields(),
-                updatedQuery,
+                storedView.query(),
                 updatedDialects,
                 updatedComment,
                 updatedOptions));

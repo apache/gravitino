@@ -122,6 +122,108 @@ public class TestPaimonViewCatalogOps {
   }
 
   @Test
+  public void testAlterViewReplaceUpdatesBodyAndPreservesProperties() throws Exception {
+    NameIdentifier replaceIdentifier = NameIdentifier.of(Namespace.of(DATABASE), VIEW + "_replace");
+    String originalQuery = "SELECT col_1 FROM source_table";
+
+    paimonViewCatalogOps.createView(
+        replaceIdentifier,
+        "original_view_comment",
+        new Column[] {Column.of("col_1", Types.IntegerType.get(), "col_1")},
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("query").withSql(originalQuery).build(),
+          SQLRepresentation.builder().withDialect("spark").withSql(originalQuery).build()
+        },
+        "paimon",
+        DATABASE,
+        Maps.newHashMap(ImmutableMap.of("keep_key", "keep_value", "remove_key", "remove_value")));
+
+    String replacedQuery = "SELECT col_2, col_3 FROM source_table";
+    String replacedTrinoQuery = "SELECT CAST(col_2 AS BIGINT), col_3 FROM source_table";
+    paimonViewCatalogOps.alterView(
+        replaceIdentifier,
+        ViewChange.setProperty("add_key", "add_value"),
+        ViewChange.removeProperty("remove_key"),
+        ViewChange.replaceView(
+            new Column[] {
+              Column.of("col_2", Types.LongType.get(), "col_2"),
+              Column.of("col_3", Types.StringType.get(), "col_3")
+            },
+            new Representation[] {
+              SQLRepresentation.builder().withDialect("query").withSql(replacedQuery).build(),
+              SQLRepresentation.builder().withDialect("trino").withSql(replacedTrinoQuery).build()
+            },
+            "replaced_catalog",
+            "replaced_schema",
+            "replaced_view_comment"));
+
+    View replacedView = paimonViewCatalogOps.loadView(replaceIdentifier);
+    assertEquals("replaced_view_comment", replacedView.comment());
+    assertEquals(2, replacedView.columns().length);
+    assertEquals("col_2", replacedView.columns()[0].name());
+    assertEquals("col_3", replacedView.columns()[1].name());
+    assertEquals(2, replacedView.representations().length);
+    assertTrue(replacedView.sqlFor("query").isPresent());
+    assertEquals(replacedQuery, replacedView.sqlFor("query").get().sql());
+    assertTrue(replacedView.sqlFor("trino").isPresent());
+    assertEquals(replacedTrinoQuery, replacedView.sqlFor("trino").get().sql());
+    assertTrue(replacedView.sqlFor("spark").isEmpty());
+    assertEquals("replaced_catalog", replacedView.defaultCatalog());
+    assertEquals("replaced_schema", replacedView.defaultSchema());
+    assertEquals("keep_value", replacedView.properties().get("keep_key"));
+    assertFalse(replacedView.properties().containsKey("remove_key"));
+    assertEquals("add_value", replacedView.properties().get("add_key"));
+  }
+
+  @Test
+  public void testListAndDropViewOperations() throws Exception {
+    NameIdentifier firstIdentifier = NameIdentifier.of(Namespace.of(DATABASE), VIEW + "_list_1");
+    NameIdentifier secondIdentifier = NameIdentifier.of(Namespace.of(DATABASE), VIEW + "_list_2");
+    createView(firstIdentifier);
+    createView(secondIdentifier);
+
+    NameIdentifier[] listedViews = paimonViewCatalogOps.listViews(Namespace.of(DATABASE));
+    assertEquals(2, listedViews.length);
+    assertTrue(Arrays.asList(listedViews).contains(firstIdentifier));
+    assertTrue(Arrays.asList(listedViews).contains(secondIdentifier));
+
+    assertTrue(paimonViewCatalogOps.dropView(firstIdentifier));
+    assertFalse(paimonViewCatalogOps.dropView(firstIdentifier));
+    assertThrows(NoSuchViewException.class, () -> paimonViewCatalogOps.loadView(firstIdentifier));
+
+    NameIdentifier[] remainingViews = paimonViewCatalogOps.listViews(Namespace.of(DATABASE));
+    assertEquals(1, remainingViews.length);
+    assertEquals(secondIdentifier, remainingViews[0]);
+  }
+
+  @Test
+  public void testRenameAndReplaceCannotBeCombined() throws Exception {
+    createView(VIEW_IDENTIFIER);
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                paimonViewCatalogOps.alterView(
+                    VIEW_IDENTIFIER,
+                    ViewChange.rename(VIEW + "_renamed"),
+                    ViewChange.replaceView(
+                        new Column[] {Column.of("col_2", Types.IntegerType.get(), "col_2")},
+                        new Representation[] {
+                          SQLRepresentation.builder()
+                              .withDialect("query")
+                              .withSql("SELECT col_2 FROM source_table")
+                              .build()
+                        },
+                        "paimon",
+                        DATABASE,
+                        "replaced_view_comment")));
+
+    assertTrue(exception.getMessage().contains("cannot be performed together"));
+    assertEquals(VIEW, paimonViewCatalogOps.loadView(VIEW_IDENTIFIER).name());
+  }
+
+  @Test
   public void testMultipleRenameChangesAreRejected() throws Exception {
     createView(VIEW_IDENTIFIER);
 

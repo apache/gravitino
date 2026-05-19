@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -204,6 +205,7 @@ public class TestPaimonCatalogOps {
     org.apache.paimon.view.View alteredView = paimonCatalogOps.loadView(VIEW_IDENTIFIER.toString());
     assertEquals("updated_view_comment", alteredView.comment().orElse(null));
     assertEquals("v1", alteredView.options().get("k1"));
+    assertEquals("SELECT col_1 FROM " + TABLE, alteredView.query());
     assertEquals(
         "SELECT col_1 FROM " + TABLE + " WHERE col_1 > 1", alteredView.dialects().get("spark"));
 
@@ -220,6 +222,33 @@ public class TestPaimonCatalogOps {
     assertThrowsExactly(
         Catalog.ViewNotExistException.class,
         () -> paimonCatalogOps.loadView(renamedViewIdentifier.toString()));
+  }
+
+  @Test
+  void testAlterViewExceptionMessageContainsContext() throws Exception {
+    paimonCatalogOps.setCatalog(
+        PaimonViewTestCatalogHelper.createViewSupportedCatalog(paimonCatalogOps.catalog()));
+
+    org.apache.paimon.view.View createdView =
+        new ViewImpl(
+            Identifier.create(DATABASE, VIEW),
+            List.of(new DataField(0, "col_1", DataTypes.INT(), "col_1")),
+            "SELECT col_1 FROM " + TABLE,
+            ImmutableMap.of("spark", "SELECT col_1 FROM " + TABLE),
+            "test_view_comment",
+            Maps.newHashMap());
+    paimonCatalogOps.createView(VIEW_IDENTIFIER.toString(), createdView);
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                paimonCatalogOps.alterView(
+                    VIEW_IDENTIFIER.toString(),
+                    List.of(ViewChange.updateDialect("trino", "SELECT col_1 FROM " + TABLE))));
+
+    assertTrue(exception.getMessage().contains("Cannot alter view " + VIEW_IDENTIFIER + ": "));
+    assertTrue(exception.getCause() instanceof Catalog.DialectNotExistException);
   }
 
   @Test
