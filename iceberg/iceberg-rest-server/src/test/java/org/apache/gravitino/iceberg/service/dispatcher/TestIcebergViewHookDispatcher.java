@@ -78,6 +78,11 @@ public class TestIcebergViewHookDispatcher {
   private IcebergRequestContext mockContext;
   private GravitinoEnv gravitinoEnv;
 
+  private Config previousConfig;
+  private EntityStore previousEntityStore;
+  private ViewDispatcher previousViewDispatcher;
+  private OwnerDispatcher previousOwnerDispatcher;
+
   @BeforeEach
   public void setUp() {
     mockExecutor = mock(IcebergViewOperationDispatcher.class);
@@ -94,6 +99,12 @@ public class TestIcebergViewHookDispatcher {
     try {
       Config mockConfig = mock(Config.class);
       when(mockConfig.get(Configs.SCHEMA_SEPARATOR)).thenReturn(":");
+      previousConfig = (Config) FieldUtils.readField(gravitinoEnv, "config", true);
+      previousEntityStore = (EntityStore) FieldUtils.readField(gravitinoEnv, "entityStore", true);
+      previousViewDispatcher =
+          (ViewDispatcher) FieldUtils.readField(gravitinoEnv, "viewDispatcher", true);
+      previousOwnerDispatcher =
+          (OwnerDispatcher) FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
       FieldUtils.writeField(gravitinoEnv, "config", mockConfig, true);
       FieldUtils.writeField(gravitinoEnv, "entityStore", mockEntityStore, true);
       FieldUtils.writeField(gravitinoEnv, "viewDispatcher", mockViewDispatcher, true);
@@ -108,11 +119,12 @@ public class TestIcebergViewHookDispatcher {
   @AfterEach
   public void tearDown() {
     try {
-      // Clean up GravitinoEnv
-      FieldUtils.writeField(gravitinoEnv, "config", null, true);
-      FieldUtils.writeField(gravitinoEnv, "entityStore", null, true);
-      FieldUtils.writeField(gravitinoEnv, "viewDispatcher", null, true);
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", null, true);
+      // Restore GravitinoEnv to its prior state so this test doesn't leak singleton state
+      // into other tests that share the same JVM.
+      FieldUtils.writeField(gravitinoEnv, "config", previousConfig, true);
+      FieldUtils.writeField(gravitinoEnv, "entityStore", previousEntityStore, true);
+      FieldUtils.writeField(gravitinoEnv, "viewDispatcher", previousViewDispatcher, true);
+      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", previousOwnerDispatcher, true);
     } catch (Exception e) {
       // Ignore cleanup errors
     }
