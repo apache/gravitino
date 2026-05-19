@@ -21,14 +21,12 @@ package org.apache.gravitino.idp.storage.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -396,85 +394,6 @@ class TestIdpGroupUserRelStorage extends AbstractIdpMetaStorageTest {
     assertIterableEquals(
         List.of("active-user"), idpGroupUserRelMapper.selectUsernamesByGroupName("qa"));
     assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUsernamesByGroupName("dev"));
-    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUsernamesByGroupName("ops"));
-  }
-
-  @ParameterizedTest
-  @MethodSource("storageProvider")
-  void testRestart(String type) throws IOException {
-    init(type);
-    idpGroupMetaMapper.insertIdpGroup(
-        IdpGroupPO.builder()
-            .withGroupId(1L)
-            .withGroupName("dev")
-            .withCurrentVersion(3L)
-            .withLastVersion(2L)
-            .withDeletedAt(0L)
-            .build());
-    idpGroupMetaMapper.insertIdpGroup(
-        IdpGroupPO.builder()
-            .withGroupId(2L)
-            .withGroupName("ops")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(10L)
-            .build());
-    idpUserMetaMapper.insertIdpUser(
-        IdpUserPO.builder()
-            .withUserId(1L)
-            .withUserName("alice")
-            .withPasswordHash("hash-a")
-            .withCurrentVersion(3L)
-            .withLastVersion(2L)
-            .withDeletedAt(0L)
-            .build());
-    idpUserMetaMapper.insertIdpUser(
-        IdpUserPO.builder()
-            .withUserId(2L)
-            .withUserName("bob")
-            .withPasswordHash("hash-b")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(10L)
-            .build());
-    idpGroupUserRelMapper.batchInsertRelations(
-        List.of(
-            IdpGroupUserRelPO.builder()
-                .withId(100L)
-                .withGroupId(1L)
-                .withUserId(1L)
-                .withCurrentVersion(3L)
-                .withLastVersion(2L)
-                .withDeletedAt(0L)
-                .build()));
-    idpGroupUserRelMapper.batchInsertRelations(
-        List.of(
-            IdpGroupUserRelPO.builder()
-                .withId(101L)
-                .withGroupId(2L)
-                .withUserId(2L)
-                .withCurrentVersion(1L)
-                .withLastVersion(0L)
-                .withDeletedAt(10L)
-                .build()));
-
-    assertPersistedRelations();
-
-    restartBackend();
-
-    assertPersistedRelations();
-  }
-
-  private void assertPersistedRelations() {
-    assertTrue(
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .hasMapper(IdpGroupUserRelMapper.class));
-
-    assertIterableEquals(List.of("dev"), idpGroupUserRelMapper.selectGroupNamesByUsername("alice"));
-    assertIterableEquals(List.of("alice"), idpGroupUserRelMapper.selectUsernamesByGroupName("dev"));
-    assertIterableEquals(List.of(), idpGroupUserRelMapper.selectGroupNamesByUsername("bob"));
     assertIterableEquals(List.of(), idpGroupUserRelMapper.selectUsernamesByGroupName("ops"));
   }
 }

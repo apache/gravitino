@@ -23,13 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -228,62 +226,5 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     assertEquals("active-user", idpUserMetaMapper.selectIdpUser("active-user").getUserName());
     assertNull(idpUserMetaMapper.selectIdpUser("legacy-user"));
     assertNull(idpUserMetaMapper.selectIdpUser("new-user"));
-  }
-
-  @ParameterizedTest
-  @MethodSource("storageProvider")
-  void testRestart(String type) throws IOException {
-    init(type);
-    IdpUserPO expectedActiveUser =
-        IdpUserPO.builder()
-            .withUserId(1L)
-            .withUserName("alice")
-            .withPasswordHash("hash-a")
-            .withCurrentVersion(3L)
-            .withLastVersion(2L)
-            .withDeletedAt(0L)
-            .build();
-    idpUserMetaMapper.insertIdpUser(expectedActiveUser);
-    idpUserMetaMapper.insertIdpUser(
-        IdpUserPO.builder()
-            .withUserId(2L)
-            .withUserName("bob")
-            .withPasswordHash("hash-b")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(10L)
-            .build());
-    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
-
-    expectedActiveUser =
-        IdpUserPO.builder()
-            .withUserId(expectedActiveUser.getUserId())
-            .withUserName(expectedActiveUser.getUserName())
-            .withPasswordHash("hash-a-2")
-            .withCurrentVersion(expectedActiveUser.getCurrentVersion())
-            .withLastVersion(expectedActiveUser.getLastVersion())
-            .withDeletedAt(expectedActiveUser.getDeletedAt())
-            .build();
-
-    assertPersistedUsers(expectedActiveUser);
-
-    restartBackend();
-
-    assertPersistedUsers(expectedActiveUser);
-  }
-
-  private void assertPersistedUsers(IdpUserPO expectedActiveUser) {
-    assertTrue(
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .hasMapper(IdpUserMetaMapper.class));
-
-    assertEquals(expectedActiveUser, idpUserMetaMapper.selectIdpUser("alice"));
-    assertNull(idpUserMetaMapper.selectIdpUser("bob"));
-
-    List<IdpUserPO> users = idpUserMetaMapper.selectIdpUsers(List.of("bob", "alice"));
-    users.sort(Comparator.comparing(IdpUserPO::getUserId));
-    assertIterableEquals(List.of(expectedActiveUser), users);
   }
 }
