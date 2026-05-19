@@ -406,14 +406,6 @@ class HiveViewCatalogOperations implements ViewCatalog {
 
     SQLRepresentation selected = (SQLRepresentation) firstRepresentation;
     boolean isHiveDialect = Dialects.HIVE.equalsIgnoreCase(selected.dialect());
-    if (!isHiveDialect) {
-      // TODO(design-docs/gravitino-logical-view-management.md): support creating trino/spark HMS
-      // views.
-      throw new UnsupportedOperationException(
-          String.format(
-              "Hive catalog currently supports only '%s' view dialect, but got '%s' for view %s",
-              Dialects.HIVE, selected.dialect(), ident));
-    }
     if (isHiveDialect) {
       Preconditions.checkArgument(
           defaultCatalog == null && defaultSchema == null,
@@ -423,8 +415,14 @@ class HiveViewCatalogOperations implements ViewCatalog {
           defaultCatalog,
           defaultSchema,
           ident);
+      return selected;
     }
-    return selected;
+    // TODO(design-docs/gravitino-logical-view-management.md): support creating trino/spark HMS
+    // views.
+    throw new UnsupportedOperationException(
+        String.format(
+            "Hive catalog currently supports only '%s' view dialect, but got '%s' for view %s",
+            Dialects.HIVE, selected.dialect(), ident));
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
