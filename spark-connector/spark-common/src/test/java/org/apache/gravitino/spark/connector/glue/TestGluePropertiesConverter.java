@@ -132,10 +132,18 @@ public class TestGluePropertiesConverter {
 
   // --- toSparkCatalogProperties tests (single-arg version) ---
 
+  static final String FACTORY_CLASS =
+      "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory";
+
+  // The patched Hive 2.3.9 JARs use hive.imetastoreclient.factory.class (not the standard key).
+  static final String FACTORY_KEY = "hive.imetastoreclient.factory.class";
+
   @Test
-  void testToSparkCatalogPropertiesEmpty() {
+  void testToSparkCatalogPropertiesAlwaysIncludesFactory() {
+    // Factory class is always emitted so HiveTableCatalog connects to Glue instead of Derby.
     Map<String, String> sparkProps = converter.toSparkCatalogProperties(ImmutableMap.of());
-    Assertions.assertTrue(sparkProps.isEmpty());
+    Assertions.assertEquals(FACTORY_CLASS, sparkProps.get(FACTORY_KEY));
+    Assertions.assertEquals(1, sparkProps.size());
   }
 
   @Test
@@ -143,42 +151,42 @@ public class TestGluePropertiesConverter {
     Map<String, String> sparkProps =
         converter.toSparkCatalogProperties(
             ImmutableMap.of(GluePropertiesConverter.AWS_REGION, "us-east-1"));
-    Assertions.assertEquals("us-east-1", sparkProps.get(GluePropertiesConverter.CLIENT_REGION));
-    Assertions.assertEquals(1, sparkProps.size());
+    Assertions.assertEquals(FACTORY_CLASS, sparkProps.get(FACTORY_KEY));
+    Assertions.assertEquals("us-east-1", sparkProps.get("aws.region"));
+    Assertions.assertEquals(2, sparkProps.size());
   }
 
   @Test
-  void testToSparkCatalogPropertiesWithCredentials() {
+  void testToSparkCatalogPropertiesWithCatalogId() {
     Map<String, String> sparkProps =
         converter.toSparkCatalogProperties(
             ImmutableMap.of(
                 GluePropertiesConverter.AWS_REGION, "us-east-1",
-                GluePropertiesConverter.AWS_ACCESS_KEY_ID, "my-access-key",
-                GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, "my-secret-key"));
-    Assertions.assertEquals("us-east-1", sparkProps.get(GluePropertiesConverter.CLIENT_REGION));
-    Assertions.assertEquals(
-        "org.apache.iceberg.aws.static.SessionCredentialsProvider",
-        sparkProps.get(GluePropertiesConverter.CLIENT_CREDENTIALS_PROVIDER));
-    Assertions.assertEquals("my-access-key", sparkProps.get("client.access-key-id"));
-    Assertions.assertEquals("my-secret-key", sparkProps.get("client.secret-key"));
+                GluePropertiesConverter.AWS_GLUE_CATALOG_ID, "123456789012"));
+    Assertions.assertEquals("123456789012", sparkProps.get("aws.glue.catalog.id"));
+    Assertions.assertEquals("us-east-1", sparkProps.get("aws.region"));
   }
 
   @Test
-  void testToSparkCatalogPropertiesWithOnlyAccessKey() {
-    // Only access key without secret key - access key is not propagated (both required),
-    // only the region is passed through to the Spark catalog.
+  void testToSparkCatalogPropertiesWithEndpoint() {
     Map<String, String> sparkProps =
         converter.toSparkCatalogProperties(
             ImmutableMap.of(
-                GluePropertiesConverter.AWS_REGION,
-                "us-east-1",
-                GluePropertiesConverter.AWS_ACCESS_KEY_ID,
-                "only-access-key"));
-    Assertions.assertEquals("us-east-1", sparkProps.get(GluePropertiesConverter.CLIENT_REGION));
-    Assertions.assertNull(sparkProps.get(GluePropertiesConverter.CLIENT_CREDENTIALS_PROVIDER));
+                GluePropertiesConverter.AWS_REGION, "us-east-1",
+                GluePropertiesConverter.AWS_GLUE_ENDPOINT, "http://localhost:4566"));
+    Assertions.assertEquals("http://localhost:4566", sparkProps.get("aws.glue.endpoint"));
+  }
+
+  @Test
+  void testToSparkCatalogPropertiesCredentialsNotMapped() {
+    // Credentials are handled by the AWS SDK credential chain at runtime.
+    Map<String, String> sparkProps =
+        converter.toSparkCatalogProperties(
+            ImmutableMap.of(
+                GluePropertiesConverter.AWS_ACCESS_KEY_ID, "my-access-key",
+                GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, "my-secret-key"));
     Assertions.assertNull(sparkProps.get("client.access-key-id"));
-    // Only client.region is set
-    Assertions.assertEquals(1, sparkProps.size());
+    Assertions.assertNull(sparkProps.get("client.secret-key"));
   }
 
   @Test

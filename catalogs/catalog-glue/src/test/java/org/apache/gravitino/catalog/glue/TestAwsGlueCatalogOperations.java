@@ -99,8 +99,34 @@ class TestAwsGlueCatalogOperations {
   }
 
   @Test
-  void testRenameTableIsUnsupported() {
+  void testRenameTable() {
     String tableName = "rename_test_" + System.currentTimeMillis();
+    String newName = tableName + "_renamed";
+    NameIdentifier ident = NameIdentifier.of(NS.level(0), NS.level(1), TEST_SCHEMA, tableName);
+    NameIdentifier newIdent = NameIdentifier.of(NS.level(0), NS.level(1), TEST_SCHEMA, newName);
+
+    Column col = Column.of("id", Types.IntegerType.get(), "pk");
+    ops.createTable(
+        ident,
+        new Column[] {col},
+        "test table",
+        Map.of(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    try {
+      GlueTable renamed = ops.alterTable(ident, TableChange.rename(newName));
+      org.junit.jupiter.api.Assertions.assertEquals(newName, renamed.name());
+    } finally {
+      ops.dropTable(newIdent);
+    }
+  }
+
+  @Test
+  void testCrossSchemaRenameIsUnsupported() {
+    String tableName = "cross_rename_test_" + System.currentTimeMillis();
     NameIdentifier ident = NameIdentifier.of(NS.level(0), NS.level(1), TEST_SCHEMA, tableName);
 
     Column col = Column.of("id", Types.IntegerType.get(), "pk");
@@ -117,7 +143,7 @@ class TestAwsGlueCatalogOperations {
     try {
       assertThrows(
           UnsupportedOperationException.class,
-          () -> ops.alterTable(ident, TableChange.rename("new_name")));
+          () -> ops.alterTable(ident, TableChange.rename("new_name", "other_schema")));
     } finally {
       ops.dropTable(ident);
     }

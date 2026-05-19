@@ -18,6 +18,7 @@
 #
 [versions]
 awssdk = "2.31.73"
+aws-glue-datacatalog = "3.4.0"
 azure-identity = "1.13.1"
 azure-storage-file-datalake = "12.20.0"
 reactor-netty-http = "1.2.1"
@@ -155,6 +156,7 @@ aws-policy = { group = "software.amazon.awssdk", name = "iam-policy-builder", ve
 aws-s3 = { group = "software.amazon.awssdk", name = "s3", version.ref = "awssdk" }
 aws-sts = { group = "software.amazon.awssdk", name = "sts", version.ref = "awssdk" }
 aws-kms = { group = "software.amazon.awssdk", name = "kms", version.ref = "awssdk" }
+aws-glue-datacatalog-hive3 = { group = "com.amazonaws.glue", name = "aws-glue-datacatalog-hive3-client", version.ref = "aws-glue-datacatalog" }
 azure-identity = { group = "com.azure", name = "azure-identity", version.ref = "azure-identity"}
 azure-storage-file-datalake = { group = "com.azure", name = "azure-storage-file-datalake", version.ref = "azure-storage-file-datalake"}
 reactor-netty-http = {group = "io.projectreactor.netty", name = "reactor-netty-http", version.ref = "reactor-netty-http"}

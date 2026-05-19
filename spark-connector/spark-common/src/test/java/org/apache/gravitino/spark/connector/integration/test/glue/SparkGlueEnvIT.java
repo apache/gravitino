@@ -88,38 +88,17 @@ public abstract class SparkGlueEnvIT extends SparkCommonIT {
       // test environment). Use existing config.
       gravitinoPort = getGravitinoServerPort();
     } else {
-      // Try to start Gravitino via reflection, bypassing the empty @BeforeAll overrides in
-      // SparkEnvIT/SparkUtilIT. If this fails (e.g., no Docker for MiniGravitino), fall back to
-      // assuming Gravitino is externally provided on the default port.
+      // Start the embedded Gravitino server. SparkEnvIT.startIntegrationTest() is an empty
+      // @BeforeAll override that prevents JUnit from auto-invoking BaseIT.startIntegrationTest().
+      // We call startServer() directly (a non-@BeforeAll method) to avoid the virtual-dispatch
+      // problem that would occur with reflection + Method.invoke().
       try {
-        java.lang.reflect.Method baseStartIntegrationTest =
-            org.apache.gravitino.integration.test.util.BaseIT.class.getDeclaredMethod(
-                "startIntegrationTest");
-        baseStartIntegrationTest.setAccessible(true);
-        baseStartIntegrationTest.invoke(this);
-        // serverConfig may still be null even after a successful call (e.g., Gravitino
-        // started externally while reflection succeeded). Guard against NPE here.
-        if (serverConfig != null) {
-          gravitinoPort = getGravitinoServerPort();
-          serverWasStartedByThisClass = true;
-        } else {
-          LOG.warn(
-              "BaseIT.startIntegrationTest() completed but serverConfig is still null. "
-                  + "Assuming externally-provided Gravitino on port {}.",
-              DEFAULT_GRAVITINO_PORT);
-          gravitinoPort = DEFAULT_GRAVITINO_PORT;
-        }
-      } catch (java.lang.reflect.InvocationTargetException e) {
+        startServer();
+        gravitinoPort = getGravitinoServerPort();
+        serverWasStartedByThisClass = true;
+      } catch (Exception e) {
         LOG.warn(
-            "Failed to start Gravitino via BaseIT.startIntegrationTest(), "
-                + "assuming Gravitino is externally provided on port {}. Reason: {}",
-            DEFAULT_GRAVITINO_PORT,
-            e.getCause() != null ? e.getCause().getMessage() : e.getMessage());
-        gravitinoPort = DEFAULT_GRAVITINO_PORT;
-      } catch (ReflectiveOperationException e) {
-        LOG.warn(
-            "Reflection failed to invoke BaseIT.startIntegrationTest(), "
-                + "assuming Gravitino is externally provided on port {}. Reason: {}",
+            "Failed to start embedded Gravitino, assuming externally-provided server on port {}. Reason: {}",
             DEFAULT_GRAVITINO_PORT,
             e.getMessage());
         gravitinoPort = DEFAULT_GRAVITINO_PORT;
@@ -187,13 +166,6 @@ public abstract class SparkGlueEnvIT extends SparkCommonIT {
   protected void initDefaultDatabase() {
     String defaultDbName = getDefaultDatabase();
     String dbLocation = warehouse + "/" + defaultDbName;
-    // Create in spark_catalog (Derby) first so HiveTableCatalog.loadTable() can validate the
-    // schema.
-    // GravitinoGlueCatalog delegates non-Iceberg table operations to HiveTableCatalog (Kyuubi),
-    // which internally calls Derby's SessionCatalog.requireDbExists() during loadTable().
-    sql("SET spark.sql.defaultCatalog=spark_catalog");
-    sql(String.format("CREATE DATABASE IF NOT EXISTS %s LOCATION '%s'", defaultDbName, dbLocation));
-    // Also create in Glue catalog for Gravitino metadata operations.
     sql("SET spark.sql.defaultCatalog=" + getCatalogName());
     sql(String.format("CREATE DATABASE IF NOT EXISTS %s LOCATION '%s'", defaultDbName, dbLocation));
   }
@@ -293,6 +265,15 @@ public abstract class SparkGlueEnvIT extends SparkCommonIT {
         getCatalogConfigs());
   }
 
+  /**
+   * Returns the Glue API endpoint override, or null to use the default AWS endpoint. Subclasses
+   * that use a mock Glue service (e.g., Moto/LocalStack) should override this to return the mock
+   * URL.
+   */
+  protected String getGlueEndpoint() {
+    return null;
+  }
+
   private void initSparkEnv(String gravitinoUri) {
     String awsRegion = getDefaultAwsRegion();
     // Set AWS region as system properties so the AWS SDK's DefaultAwsRegionProviderChain
@@ -304,6 +285,7 @@ public abstract class SparkGlueEnvIT extends SparkCommonIT {
       System.setProperty("aws.region", awsRegion);
     }
 
+    String glueEndpoint = getGlueEndpoint();
     SparkConf sparkConf =
         new SparkConf()
             .set("spark.plugins", GravitinoSparkPlugin.class.getName())
@@ -321,6 +303,14 @@ public abstract class SparkGlueEnvIT extends SparkCommonIT {
             .set(
                 "spark.hadoop.fs.s3a.aws.credentials.provider",
                 "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
+
+    if (awsRegion != null && !awsRegion.isEmpty()) {
+      sparkConf.set("spark.hadoop.aws.region", awsRegion);
+    }
+    if (glueEndpoint != null) {
+      // For mock Glue services (Moto/LocalStack), override the Glue API endpoint.
+      sparkConf.set("spark.hadoop.aws.glue.endpoint", glueEndpoint);
+    }
     // Only set endpoint for custom S3 services (e.g., LocalStack).
     // For real AWS, omit this to use the default AWS endpoint.
     if (s3Endpoint != null) {

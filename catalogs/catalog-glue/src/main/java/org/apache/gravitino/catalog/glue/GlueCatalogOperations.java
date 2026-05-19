@@ -506,7 +506,15 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
-        newName = ((TableChange.RenameTable) change).getNewName();
+        TableChange.RenameTable renameChange = (TableChange.RenameTable) change;
+        renameChange
+            .getNewSchemaName()
+            .ifPresent(
+                newSchema -> {
+                  throw new UnsupportedOperationException(
+                      "Glue does not support cross-schema table rename");
+                });
+        newName = renameChange.getNewName();
       } else if (change instanceof TableChange.UpdateComment) {
         newComment = ((TableChange.UpdateComment) change).getNewComment();
       } else if (change instanceof TableChange.SetProperty) {
@@ -547,8 +555,14 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       applyCatalogId(catalogId, delReq::catalogId);
       try {
         glueClient.deleteTable(delReq.build());
+      } catch (EntityNotFoundException e) {
+        // Old table already gone — rename is complete.
       } catch (GlueException e) {
-        LOG.warn("Failed to delete old Glue table {}.{} after rename: {}", dbName, ident.name(), e);
+        throw new RuntimeException(
+            String.format(
+                "Renamed Glue table %s.%s to %s but failed to delete old entry",
+                dbName, ident.name(), newName),
+            e);
       }
     } else {
       executeUpdateTable(
@@ -736,8 +750,15 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       }
     }
 
-    // Translate format name to input/output/serde class names if not explicitly set
+    // Translate format name to input/output/serde class names if not explicitly set.
+    // Fall back to Spark's "provider" property (set by USING clause) if "format" is absent.
     String format = properties.get(GlueConstants.FORMAT);
+    if (format == null) {
+      String provider = properties.get("provider");
+      if (provider != null) {
+        format = provider.toLowerCase(Locale.ROOT);
+      }
+    }
     String inputFormat = properties.get(GlueConstants.INPUT_FORMAT);
     String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
     String serdeLib = properties.get(GlueConstants.SERDE_LIB);
@@ -750,6 +771,17 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     if (serdeLib == null && format != null) {
       serdeLib = getSerdeClass(format.toLowerCase(Locale.ROOT));
+    }
+
+    // Hive requires non-null StorageDescriptor fields; default to TextFile if still unset.
+    if (inputFormat == null) {
+      inputFormat = HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS;
+    }
+    if (outputFormat == null) {
+      outputFormat = HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS;
+    }
+    if (serdeLib == null) {
+      serdeLib = HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS;
     }
 
     SerDeInfo serDe =
@@ -794,10 +826,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             .sortColumns(glueSortCols)
             .build();
 
+    String tableType = properties.getOrDefault(GlueConstants.TABLE_TYPE, "EXTERNAL_TABLE");
     return TableInput.builder()
         .name(name)
         .description(comment)
-        .tableType(properties.get(GlueConstants.TABLE_TYPE))
+        .tableType(tableType)
         .parameters(tableParams)
         .storageDescriptor(sd)
         .partitionKeys(gluePartCols)

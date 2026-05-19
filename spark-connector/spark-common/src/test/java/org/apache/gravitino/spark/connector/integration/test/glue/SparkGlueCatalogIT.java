@@ -29,6 +29,8 @@ import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfo
 import org.apache.spark.sql.types.DataTypes;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Integration test for GravitinoGlueCatalog in Spark connector.
@@ -37,6 +39,8 @@ import org.junit.jupiter.api.Test;
  * Moto server to mock AWS Glue API, similar to MotoGlueCatalogIT in the server module.
  */
 public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
+
+  private static final Logger LOG = LoggerFactory.getLogger(SparkGlueCatalogIT.class);
 
   private String glueEndpoint;
   private String awsRegion = "us-east-1";
@@ -140,14 +144,18 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
     return awsRegion;
   }
 
+  @Override
+  protected String getGlueEndpoint() {
+    return glueEndpoint;
+  }
+
   protected String getAwsRegion() {
     return awsRegion;
   }
 
   /**
    * Overrides to use CASCADE so that databases with stale tables (e.g., from prior test runs) can
-   * be cleaned up. Glue tables persist across JVM restarts, so Derby may be out of sync with Glue
-   * after a crash, leaving tables behind that block a plain DROP DATABASE.
+   * be cleaned up. Glue tables persist across JVM restarts and may be left behind after a crash.
    */
   @Override
   protected void dropDatabaseIfExists(String database) {
@@ -155,8 +163,51 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
   }
 
   /**
+   * Overrides to always use PARQUET format for Glue. Without an explicit USING clause, Spark may
+   * route CREATE TABLE through the V1 Hive path, bypassing the location-derivation logic in
+   * GravitinoGlueCatalog.createTable and leaving tables without a stored S3 location.
+   */
+  @Override
+  protected void createSimpleTable(String identifier) {
+    sql(getCreateSimpleTableString(identifier) + " USING PARQUET");
+  }
+
+  /**
+   * Overrides to recreate the database with the correct S3 location. The base implementation uses
+   * CREATE DATABASE IF NOT EXISTS with a local HDFS path (/user/hive/db), causing tables to inherit
+   * a local path as their default location. We drop and recreate to ensure the S3 location is
+   * always set correctly, so stale data cleanup via dropTableIfExists works reliably.
+   */
+  @Override
+  protected void createDatabaseIfNotExists(String database, String provider) {
+    String dbLocation = warehouse + "/" + database;
+    dropDatabaseIfExists(database);
+    sql(String.format("CREATE DATABASE %s LOCATION '%s'", database, dbLocation));
+  }
+
+  /**
+   * Overrides to also delete the S3 data directory after dropping the table. Unlike HDFS managed
+   * tables, Glue external tables do not delete S3 data on DROP TABLE. Stale data files cause
+   * duplicate rows on the next create+insert cycle.
+   */
+  @Override
+  protected void dropTableIfExists(String tableName) {
+    String location = null;
+    try {
+      location = getTableInfo(tableName).getTableLocation();
+    } catch (Exception e) {
+      // Table may not exist yet — location stays null, nothing to delete.
+      LOG.debug("Could not get location for table {}: {}", tableName, e.getMessage());
+    }
+    super.dropTableIfExists(tableName);
+    if (location != null) {
+      deleteDirIfExists(location);
+    }
+  }
+
+  /**
    * Overrides base class: use USING PARQUET to ensure the table goes through the Gravitino Glue
-   * catalog (V2 path) instead of the Hive-compatibility V1 path (which would use local Derby).
+   * catalog (V2 path).
    */
   @Test
   @Override
@@ -164,9 +215,15 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
     String tableName = "drop_then_create_write_table";
     dropTableIfExists(tableName);
     sql(getCreateSimpleTableString(tableName) + " USING PARQUET");
-    checkTableReadWrite(getTableInfo(tableName));
+    SparkTableInfo info = getTableInfo(tableName);
+    checkTableReadWrite(info);
 
+    // External tables on S3 do not delete data on DROP TABLE; clean up explicitly.
+    String location = info.getTableLocation();
     dropTableIfExists(tableName);
+    if (location != null) {
+      deleteDirIfExists(location);
+    }
 
     sql(getCreateSimpleTableString(tableName) + " USING PARQUET");
     checkTableReadWrite(getTableInfo(tableName));

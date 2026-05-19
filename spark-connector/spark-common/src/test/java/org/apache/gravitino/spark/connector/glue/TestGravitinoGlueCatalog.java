@@ -129,6 +129,19 @@ public class TestGravitinoGlueCatalog {
     Assertions.assertFalse(GravitinoGlueCatalog.isIcebergTable(mockTable));
   }
 
+  @Test
+  void testIsIcebergTableWithNativeIcebergTableType() {
+    // Tables created directly by Iceberg GlueCatalog use table_type=ICEBERG (no table-format key).
+    Table mockTable = createMockGravitinoTable(ImmutableMap.of("table_type", "ICEBERG"));
+    Assertions.assertTrue(GravitinoGlueCatalog.isIcebergTable(mockTable));
+  }
+
+  @Test
+  void testIsIcebergTableWithNativeIcebergTableTypeLowercase() {
+    Table mockTable = createMockGravitinoTable(ImmutableMap.of("table_type", "iceberg"));
+    Assertions.assertTrue(GravitinoGlueCatalog.isIcebergTable(mockTable));
+  }
+
   // -------------------------------------------------------------------------
   // Test getSparkTypeConverter returns correct type
   // -------------------------------------------------------------------------

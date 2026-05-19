@@ -25,20 +25,26 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
-import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
+import org.apache.gravitino.spark.connector.hive.SparkHiveTable;
+import org.apache.gravitino.spark.connector.hive.SparkHiveTypeConverter;
+import org.apache.gravitino.spark.connector.iceberg.SparkIcebergTable;
 import org.apache.iceberg.spark.SparkCatalog;
+import org.apache.iceberg.spark.source.SparkTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTable;
 import org.apache.kyuubi.spark.connector.hive.HiveTableCatalog;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.analysis.NamespaceAlreadyExistsException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.SupportsNamespaces;
+import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.DataTypes;
@@ -77,6 +83,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   private String catalogName;
   private Map<String, String> catalogProperties;
 
+  /** Creates a new GravitinoGlueCatalog. */
   public GravitinoGlueCatalog() {}
 
   /**
@@ -114,7 +121,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
    * NoSuchTableException.
    */
   @Override
-  public org.apache.spark.sql.connector.catalog.Table createTable(
+  public Table createTable(
       Identifier ident, StructType schema, Transform[] partitions, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
     syncNamespaceToDerby(ident.namespace());
@@ -123,8 +130,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
       icebergCatalog.createTable(ident, schema, partitions, properties);
       try {
         org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
-        org.apache.spark.sql.connector.catalog.Table icebergSparkTable =
-            loadIcebergSparkTable(ident, icebergCatalog);
+        Table icebergSparkTable = loadIcebergSparkTable(ident, icebergCatalog);
         return createSparkTable(
             ident,
             gravitinoTable,
@@ -137,12 +143,29 @@ public class GravitinoGlueCatalog extends BaseCatalog {
         throw new RuntimeException("Failed to load Iceberg table after creation: " + ident, e);
       }
     }
+    // Hive tables require a non-null location in the StorageDescriptor for write operations.
+    // If not explicitly set, derive the default from spark.sql.warehouse.dir.
+    if (!properties.containsKey("location")) {
+      try {
+        SparkSession spark = SparkSession.active();
+        String warehouseDir = spark.conf().get("spark.sql.warehouse.dir", null);
+        if (warehouseDir != null) {
+          String db = ident.namespace()[ident.namespace().length - 1];
+          Map<String, String> withLocation = new HashMap<>(properties);
+          withLocation.put(
+              TableCatalog.PROP_LOCATION, warehouseDir + "/" + db + "/" + ident.name());
+          properties = withLocation;
+        }
+      } catch (Exception e) {
+        LOG.warn("Could not derive default table location", e);
+      }
+    }
     try {
       sparkCatalog.createTable(ident, schema, partitions, properties);
     } catch (TableAlreadyExistsException e) {
       // Already in Derby — OK.
     } catch (Exception e) {
-      LOG.warn("Pre-create in Derby failed for {}: {}", ident, e.getMessage());
+      LOG.warn("Pre-create in Derby failed for {}", ident, e);
     }
     return super.createTable(ident, schema, partitions, properties);
   }
@@ -159,13 +182,11 @@ public class GravitinoGlueCatalog extends BaseCatalog {
    * instance (e.g., tables from a previous test run, or tables loaded after a JVM restart).
    */
   @Override
-  public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident)
-      throws NoSuchTableException {
+  public Table loadTable(Identifier ident) throws NoSuchTableException {
     org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
     if (isIcebergTable(gravitinoTable)) {
       SparkCatalog icebergCatalog = getOrCreateIcebergGlueCatalog();
-      org.apache.spark.sql.connector.catalog.Table icebergSparkTable =
-          loadIcebergSparkTable(ident, icebergCatalog);
+      Table icebergSparkTable = loadIcebergSparkTable(ident, icebergCatalog);
       return createSparkTable(
           ident,
           gravitinoTable,
@@ -182,6 +203,30 @@ public class GravitinoGlueCatalog extends BaseCatalog {
       syncTableToDerby(ident);
     }
     return super.loadTable(ident);
+  }
+
+  /**
+   * Overrides loadTableForWriting (called by Spark's write path) to route Iceberg tables to the
+   * Iceberg GlueCatalog. The base implementation calls loadSparkTable (HiveTableCatalog) which does
+   * not hold Iceberg entries.
+   */
+  @Override
+  protected Table loadTableForWriting(Identifier ident)
+      throws NoSuchTableException, ForbiddenException {
+    org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTableForWriting(ident);
+    if (isIcebergTable(gravitinoTable)) {
+      SparkCatalog icebergCatalog = getOrCreateIcebergGlueCatalog();
+      Table icebergSparkTable = loadIcebergSparkTable(ident, icebergCatalog);
+      return createSparkTable(
+          ident,
+          gravitinoTable,
+          icebergSparkTable,
+          sparkCatalog,
+          getPropertiesConverter(),
+          getSparkTransformConverter(),
+          getSparkTypeConverter());
+    }
+    return super.loadTableForWriting(ident);
   }
 
   /**
@@ -214,10 +259,10 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   }
 
   @Override
-  protected org.apache.spark.sql.connector.catalog.Table createSparkTable(
+  protected Table createSparkTable(
       Identifier identifier,
-      Table gravitinoTable,
-      org.apache.spark.sql.connector.catalog.Table sparkTable,
+      org.apache.gravitino.rel.Table gravitinoTable,
+      Table sparkTable,
       TableCatalog sparkHiveCatalog,
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
@@ -225,19 +270,18 @@ public class GravitinoGlueCatalog extends BaseCatalog {
 
     if (isIcebergTable(gravitinoTable)) {
       SparkCatalog icebergCatalog = getOrCreateIcebergGlueCatalog();
-      org.apache.spark.sql.connector.catalog.Table icebergSparkTable =
-          loadIcebergSparkTable(identifier, icebergCatalog);
-      return new org.apache.gravitino.spark.connector.iceberg.SparkIcebergTable(
+      Table icebergSparkTable = loadIcebergSparkTable(identifier, icebergCatalog);
+      return new SparkIcebergTable(
           identifier,
           gravitinoTable,
-          (org.apache.iceberg.spark.source.SparkTable) icebergSparkTable,
+          (SparkTable) icebergSparkTable,
           icebergCatalog,
           propertiesConverter,
           sparkTransformConverter,
           sparkTypeConverter);
     }
 
-    return new org.apache.gravitino.spark.connector.hive.SparkHiveTable(
+    return new SparkHiveTable(
         identifier,
         gravitinoTable,
         (HiveTable) sparkTable,
@@ -259,7 +303,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
 
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
-    return new org.apache.gravitino.spark.connector.hive.SparkHiveTypeConverter();
+    return new SparkHiveTypeConverter();
   }
 
   private static boolean isIcebergProperties(Map<String, String> properties) {
@@ -274,7 +318,13 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     return GlueConstants.TABLE_FORMAT_ICEBERG.equalsIgnoreCase(tableFormat);
   }
 
-  static boolean isIcebergTable(Table gravitinoTable) {
+  /**
+   * Returns true if the Gravitino table is an Iceberg-format table based on its properties.
+   *
+   * @param gravitinoTable the Gravitino table to inspect
+   * @return true for Iceberg tables, false otherwise
+   */
+  static boolean isIcebergTable(org.apache.gravitino.rel.Table gravitinoTable) {
     Map<String, String> properties = gravitinoTable.properties();
     if (properties == null) {
       return false;
@@ -320,7 +370,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     // Read from the active SparkSession if not explicitly set in catalog properties.
     if (!icebergProperties.containsKey("warehouse")) {
       try {
-        org.apache.spark.sql.SparkSession spark = org.apache.spark.sql.SparkSession.active();
+        SparkSession spark = SparkSession.active();
         String warehouseDir = spark.conf().get("spark.sql.warehouse.dir", null);
         if (warehouseDir != null) {
           icebergProperties.put("warehouse", warehouseDir);
@@ -331,24 +381,22 @@ public class GravitinoGlueCatalog extends BaseCatalog {
       }
     }
 
-    SparkCatalog sparkCatalog = new SparkCatalog();
-    sparkCatalog.initialize(
-        catalogName + "_iceberg", new CaseInsensitiveStringMap(icebergProperties));
-    return sparkCatalog;
+    SparkCatalog catalog = new SparkCatalog();
+    catalog.initialize(catalogName + "_iceberg", new CaseInsensitiveStringMap(icebergProperties));
+    return catalog;
   }
 
   /**
-   * Loads a Spark table from the Iceberg GlueCatalog.
+   * Loads the raw Spark table from the Iceberg GlueCatalog.
    *
    * @param identifier the table identifier
    * @param icebergCatalog the Iceberg SparkCatalog
    * @return the Spark table
    */
-  private org.apache.spark.sql.connector.catalog.Table loadIcebergSparkTable(
-      Identifier identifier, SparkCatalog icebergCatalog) {
+  private Table loadIcebergSparkTable(Identifier identifier, SparkCatalog icebergCatalog) {
     try {
       return icebergCatalog.loadTable(identifier);
-    } catch (org.apache.spark.sql.catalyst.analysis.NoSuchTableException e) {
+    } catch (NoSuchTableException e) {
       throw new RuntimeException(
           String.format(
               "Failed to load Iceberg table: %s",
@@ -381,7 +429,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
    */
   private void syncTableToDerby(Identifier ident) {
     try {
-      Table gravitinoTable = loadGravitinoTable(ident);
+      org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       SparkTypeConverter typeConverter = getSparkTypeConverter();
       SparkTransformConverter transformConverter = getSparkTransformConverter();
 
@@ -415,7 +463,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     } catch (TableAlreadyExistsException e) {
       // Race: another thread created it first — OK.
     } catch (Exception e) {
-      LOG.warn("Failed to sync table {} to Derby: {}", ident, e.getMessage());
+      LOG.warn("Failed to sync table {} to Derby", ident, e);
     }
   }
 

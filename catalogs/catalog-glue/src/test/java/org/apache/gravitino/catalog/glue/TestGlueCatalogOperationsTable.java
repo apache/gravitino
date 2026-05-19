@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -273,6 +274,69 @@ class TestGlueCatalogOperationsTable {
   // -------------------------------------------------------------------------
   // alterTable
   // -------------------------------------------------------------------------
+
+  @Test
+  void testCreateTable_providerMapsToParquetFormat() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
+    Map<String, String> props = Map.of("provider", "parquet");
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+
+    ops.createTable(
+        ident,
+        new Column[0],
+        null,
+        props,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    verify(mockClient).createTable(captor.capture());
+    StorageDescriptor sd = captor.getValue().tableInput().storageDescriptor();
+    assertEquals(HiveStorageConstants.PARQUET_INPUT_FORMAT_CLASS, sd.inputFormat());
+    assertEquals(HiveStorageConstants.PARQUET_OUTPUT_FORMAT_CLASS, sd.outputFormat());
+    assertEquals(HiveStorageConstants.PARQUET_SERDE_CLASS, sd.serdeInfo().serializationLibrary());
+  }
+
+  @Test
+  void testCreateTable_defaultsToTextFileWhenNoFormat() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+
+    ops.createTable(
+        ident,
+        new Column[0],
+        null,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+
+    verify(mockClient).createTable(captor.capture());
+    StorageDescriptor sd = captor.getValue().tableInput().storageDescriptor();
+    assertEquals(HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS, sd.inputFormat());
+    assertEquals(HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS, sd.outputFormat());
+    assertEquals(
+        HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS, sd.serdeInfo().serializationLibrary());
+  }
+
+  @Test
+  void testAlterTable_crossSchemaRenameRejected() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "old");
+    Table glueTable =
+        Table.builder()
+            .name("old")
+            .storageDescriptor(StorageDescriptor.builder().build())
+            .createTime(Instant.now())
+            .build();
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(GetTableResponse.builder().table(glueTable).build());
+
+    TableChange crossSchemaRename = TableChange.rename("new_t", "other_db");
+    assertThrows(
+        UnsupportedOperationException.class, () -> ops.alterTable(ident, crossSchemaRename));
+  }
 
   @Test
   void testAlterTable_renameAndComment() {
