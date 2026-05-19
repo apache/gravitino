@@ -34,12 +34,48 @@ function buildOidcUrl(pathname) {
   return `${window.location.origin}${getOidcAppBasePath()}${pathname}`
 }
 
+function parseLocationFromUrl(rawUrl) {
+  if (!rawUrl) {
+    return null
+  }
+
+  try {
+    const parsed = new URL(rawUrl)
+
+    return {
+      protocol: parsed.protocol,
+      hostname: parsed.hostname
+    }
+  } catch (error) {
+    return null
+  }
+}
+
+function getLocationProtocolAndHostname() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const { protocol, hostname, origin, href } = window.location
+
+  if (protocol && hostname) {
+    return { protocol, hostname }
+  }
+
+  return parseLocationFromUrl(origin) || parseLocationFromUrl(href)
+}
+
 function isOidcSecureOrigin() {
   if (typeof window === 'undefined') {
     return true
   }
 
-  const { protocol, hostname } = window.location
+  const locationInfo = getLocationProtocolAndHostname()
+  if (!locationInfo) {
+    return false
+  }
+
+  const { protocol, hostname } = locationInfo
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
 
   return protocol === 'https:' || isLocalhost

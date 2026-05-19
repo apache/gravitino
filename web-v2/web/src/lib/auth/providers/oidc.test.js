@@ -40,15 +40,39 @@ describe('OidcOAuthProvider', () => {
     hostname: 'localhost'
   }
 
+  const canAssignWindowLocation = () =>
+    originalLocationDescriptor && !originalLocationDescriptor.configurable && originalLocationDescriptor.writable
+
+  const updateWindowLocation = newLocation => {
+    if (canAssignWindowLocation()) {
+      window.location = newLocation
+
+      return
+    }
+
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: newLocation
+    })
+  }
+
   const restoreWindowLocation = () => {
+    if (canAssignWindowLocation()) {
+      window.location = originalLocation
+
+      return
+    }
+
     if (originalLocationDescriptor) {
       Object.defineProperty(window, 'location', originalLocationDescriptor)
-    } else {
-      Object.defineProperty(window, 'location', {
-        configurable: true,
-        value: originalLocation
-      })
+
+      return
     }
+
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: originalLocation
+    })
   }
 
   const setWindowLocation = ({ origin, protocol, hostname }) => {
@@ -72,10 +96,7 @@ describe('OidcOAuthProvider', () => {
       }
     })
 
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: mockedLocation
-    })
+    updateWindowLocation(mockedLocation)
   }
 
   beforeAll(() => {
@@ -258,6 +279,80 @@ describe('OidcOAuthProvider', () => {
       }
 
       await expect(provider.initialize(config)).resolves.toBeUndefined()
+    })
+
+    it('should allow secure origin when protocol and hostname are missing', async () => {
+      const mockedLocation = Object.create(originalLocation)
+
+      Object.defineProperties(mockedLocation, {
+        origin: {
+          configurable: true,
+          enumerable: true,
+          value: 'https://example.com:3000'
+        },
+        href: {
+          configurable: true,
+          enumerable: true,
+          value: 'https://example.com:3000/login'
+        },
+        protocol: {
+          configurable: true,
+          enumerable: true,
+          value: undefined
+        },
+        hostname: {
+          configurable: true,
+          enumerable: true,
+          value: undefined
+        }
+      })
+
+      updateWindowLocation(mockedLocation)
+
+      const config = {
+        'gravitino.authenticator.oauth.authority': 'https://id.example.com/realms/myrealm',
+        'gravitino.authenticator.oauth.clientId': 'postman-client'
+      }
+
+      await expect(provider.initialize(config)).resolves.toBeUndefined()
+    })
+
+    it('should reject insecure origin when protocol and hostname are missing', async () => {
+      const mockedLocation = Object.create(originalLocation)
+
+      Object.defineProperties(mockedLocation, {
+        origin: {
+          configurable: true,
+          enumerable: true,
+          value: 'http://example.com:3000'
+        },
+        href: {
+          configurable: true,
+          enumerable: true,
+          value: 'http://example.com:3000/login'
+        },
+        protocol: {
+          configurable: true,
+          enumerable: true,
+          value: undefined
+        },
+        hostname: {
+          configurable: true,
+          enumerable: true,
+          value: undefined
+        }
+      })
+
+      updateWindowLocation(mockedLocation)
+
+      const config = {
+        'gravitino.authenticator.oauth.authority': 'https://id.example.com/realms/myrealm',
+        'gravitino.authenticator.oauth.clientId': 'postman-client'
+      }
+
+      await expect(provider.initialize(config)).rejects.toThrow(
+        'OIDC login requires the UI to run on HTTPS or localhost. Current origin: http://example.com:3000'
+      )
     })
 
     it('should use default scope when not provided', async () => {
