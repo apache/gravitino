@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from 'vitest'
 import { OidcOAuthProvider } from '@/lib/auth/providers/oidc'
 import { UserManager } from 'oidc-client-ts'
 
@@ -31,6 +31,8 @@ describe('OidcOAuthProvider', () => {
   let provider
   let mockUserManager
   let originalBasePath
+  let originalLocation
+  let originalLocationDescriptor
 
   const DEFAULT_SECURE_LOCATION = {
     origin: 'https://localhost:3000',
@@ -38,17 +40,48 @@ describe('OidcOAuthProvider', () => {
     hostname: 'localhost'
   }
 
+  const restoreWindowLocation = () => {
+    if (originalLocationDescriptor) {
+      Object.defineProperty(window, 'location', originalLocationDescriptor)
+    } else {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: originalLocation
+      })
+    }
+  }
+
   const setWindowLocation = ({ origin, protocol, hostname }) => {
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: {
-        ...window.location,
-        origin,
-        protocol,
-        hostname
+    const mockedLocation = Object.create(originalLocation)
+
+    Object.defineProperties(mockedLocation, {
+      origin: {
+        configurable: true,
+        enumerable: true,
+        value: origin
+      },
+      protocol: {
+        configurable: true,
+        enumerable: true,
+        value: protocol
+      },
+      hostname: {
+        configurable: true,
+        enumerable: true,
+        value: hostname
       }
     })
+
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: mockedLocation
+    })
   }
+
+  beforeAll(() => {
+    originalLocation = window.location
+    originalLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location')
+  })
 
   beforeEach(() => {
     // Reset all mocks
@@ -74,7 +107,11 @@ describe('OidcOAuthProvider', () => {
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_BASE_PATH = originalBasePath
-    setWindowLocation(DEFAULT_SECURE_LOCATION)
+    restoreWindowLocation()
+  })
+
+  afterAll(() => {
+    restoreWindowLocation()
   })
 
   describe('initialization', () => {
@@ -102,6 +139,22 @@ describe('OidcOAuthProvider', () => {
       await expect(provider.initialize(config)).rejects.toThrow(
         'OIDC provider requires both authority and clientId to be configured'
       )
+    })
+
+    it('should reject initialization in non-browser environments', async () => {
+      const originalWindow = global.window
+      delete global.window
+
+      const config = {
+        'gravitino.authenticator.oauth.authority': 'https://test.example.com',
+        'gravitino.authenticator.oauth.clientId': 'test-client'
+      }
+
+      try {
+        await expect(provider.initialize(config)).rejects.toThrow('OIDC provider requires a browser environment')
+      } finally {
+        global.window = originalWindow
+      }
     })
 
     it('should initialize successfully with valid config', async () => {

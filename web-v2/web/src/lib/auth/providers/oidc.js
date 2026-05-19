@@ -56,6 +56,10 @@ export class OidcOAuthProvider extends BaseOAuthProvider {
   async initialize(config) {
     this.config = config
 
+    if (typeof window === 'undefined') {
+      throw new Error('OIDC provider requires a browser environment')
+    }
+
     if (!isOidcSecureOrigin()) {
       throw new Error(
         `OIDC login requires the UI to run on HTTPS or localhost. Current origin: ${window.location.origin}`
