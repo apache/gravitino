@@ -55,7 +55,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   private String gravitinoMetalake;
   private Optional<String> defaultDynamicCatalogName;
   private Map<String, String> properties;
-  private Map<String, IcebergConfig> catalogConfigs;
+  private Map<String, IcebergConfig> serverConfigs;
 
   private volatile CatalogFetcher catalogFetcher;
 
@@ -71,7 +71,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         Optional.ofNullable(
             properties.get(IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME));
     this.properties = properties;
-    this.catalogConfigs = StaticIcebergConfigProvider.initCatalogConfigs(properties);
+    this.serverConfigs = StaticIcebergConfigProvider.initserverConfigs(properties);
   }
 
   @Override
@@ -102,7 +102,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    return Optional.of(mergeWithServerConfig(catalog.properties(), catalogName));
+    return Optional.of(mergeServerConfig(catalog.properties(), catalogName));
   }
 
   /**
@@ -112,11 +112,11 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
    * identified by {@code serverCatalogKey} (for example {@link
    * IcebergConstants#ICEBERG_REST_DEFAULT_CATALOG}).
    */
-  private IcebergConfig mergeWithServerConfig(
-      Map<String, String> catalogProperties, String serverCatalogKey) {
+  private IcebergConfig mergeServerConfig(
+      Map<String, String> catalogProperties, String catalogName) {
     Map<String, String> catalogConfig =
         new HashMap<>(getIcebergConfigFromCatalogProperties(catalogProperties).getAllConfig());
-    IcebergConfig serverConfig = catalogConfigs.get(serverCatalogKey);
+    IcebergConfig serverConfig = serverConfigs.get(catalogName);
     if (serverConfig != null) {
       serverConfig.getAllConfig().forEach(catalogConfig::putIfAbsent);
     }
