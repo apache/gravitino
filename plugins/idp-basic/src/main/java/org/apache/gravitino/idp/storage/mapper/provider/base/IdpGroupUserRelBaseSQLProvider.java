@@ -60,20 +60,14 @@ public class IdpGroupUserRelBaseSQLProvider {
         + "SELECT user_id"
         + " FROM "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " WHERE group_id = #{groupId} "
-        + "<choose>"
-        + "<when test='userIds != null and userIds.size() > 0'>"
-        + "AND user_id IN ("
-        + "<foreach collection='userIds' item='userId' separator=','>"
+        + " WHERE group_id = #{groupId} AND deleted_at = 0 "
+        + "<if test='userIds != null and userIds.size() == 0'>"
+        + "AND 1 = 0 "
+        + "</if>"
+        + "<foreach collection='userIds' item='userId'"
+        + " open='AND user_id IN (' separator=',' close=')'>"
         + "#{userId}"
         + "</foreach>"
-        + ") "
-        + "</when>"
-        + "<otherwise>"
-        + "AND 1 = 0 "
-        + "</otherwise>"
-        + "</choose>"
-        + "AND deleted_at = 0"
         + "</script>";
   }
 
@@ -97,20 +91,14 @@ public class IdpGroupUserRelBaseSQLProvider {
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " SET deleted_at = "
         + currentTimeMillisExpression()
-        + " WHERE group_id = #{groupId} "
-        + "<choose>"
-        + "<when test='userIds != null and userIds.size() > 0'>"
-        + "AND user_id IN ("
-        + "<foreach collection='userIds' item='userId' separator=','>"
+        + " WHERE group_id = #{groupId} AND deleted_at = 0 "
+        + "<if test='userIds != null and userIds.size() == 0'>"
+        + "AND 1 = 0 "
+        + "</if>"
+        + "<foreach collection='userIds' item='userId'"
+        + " open='AND user_id IN (' separator=',' close=')'>"
         + "#{userId}"
         + "</foreach>"
-        + ") "
-        + "</when>"
-        + "<otherwise>"
-        + "AND 1 = 0 "
-        + "</otherwise>"
-        + "</choose>"
-        + "AND deleted_at = 0"
         + "</script>";
   }
 

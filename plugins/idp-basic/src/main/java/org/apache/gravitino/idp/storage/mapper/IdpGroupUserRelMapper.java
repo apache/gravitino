@@ -48,6 +48,10 @@ public interface IdpGroupUserRelMapper {
       method = "selectUserNamesByGroupId")
   List<String> selectUserNamesByGroupId(@Param("groupId") Long groupId);
 
+  /**
+   * Selects related user ids for a group. An empty list returns no related user ids; pass null for
+   * an explicit error.
+   */
   @SelectProvider(type = IdpGroupUserRelSQLProviderFactory.class, method = "selectRelatedUserIds")
   List<Long> selectRelatedUserIds(
       @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds);
@@ -57,6 +61,10 @@ public interface IdpGroupUserRelMapper {
       method = "batchInsertIdpGroupUsers")
   void batchInsertIdpGroupUsers(@Param("relations") List<IdpGroupUserRelPO> relations);
 
+  /**
+   * Soft-deletes group-user relations for users in a group. An empty list affects no rows; pass
+   * null for an explicit error.
+   */
   @UpdateProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
       method = "softDeleteIdpGroupUsers")

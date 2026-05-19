@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
+import org.apache.ibatis.builder.BuilderException;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.SqlSource;
 import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
@@ -113,14 +114,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 1L);
 
-    String normalizedSql = renderScript(script, params);
-
-    Assertions.assertFalse(
-        normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
-        "Null userIds should not generate invalid SQL IN (...) with no values");
-    Assertions.assertTrue(
-        normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"),
-        "Null userIds should result in an unsatisfiable WHERE clause (e.g., AND 1 = 0)");
+    Assertions.assertThrows(BuilderException.class, () -> renderScript(script, params));
   }
 
   @Test
@@ -183,14 +177,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
 
-    String normalizedSql = renderScript(script, params);
-
-    Assertions.assertFalse(
-        normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
-        "Null userIds should not generate invalid SQL IN (...) with no values");
-    Assertions.assertTrue(
-        normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"),
-        "Null userIds should result in an unsatisfiable WHERE clause (e.g., AND 1 = 0)");
+    Assertions.assertThrows(BuilderException.class, () -> renderScript(script, params));
   }
 
   @Test
