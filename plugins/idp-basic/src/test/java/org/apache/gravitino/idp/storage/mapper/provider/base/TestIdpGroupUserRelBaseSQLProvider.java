@@ -59,9 +59,9 @@ public class TestIdpGroupUserRelBaseSQLProvider {
         createProvider().selectGroupNamesByUsername("alice").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT g.group_name"));
-    Assertions.assertTrue(
-        normalizedSql.contains("FROM idp_group_user_rel r JOIN idp_group_meta g"));
-    Assertions.assertTrue(normalizedSql.contains("JOIN idp_user_meta u"));
+    Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta u JOIN idp_group_user_rel r"));
+    Assertions.assertTrue(normalizedSql.contains("JOIN idp_group_meta g"));
+    Assertions.assertTrue(normalizedSql.contains("r.user_id = u.user_id AND r.deleted_at = 0"));
     Assertions.assertTrue(normalizedSql.contains("WHERE u.user_name = #{username}"));
     Assertions.assertTrue(normalizedSql.contains("ORDER BY g.group_name"));
   }
@@ -72,8 +72,10 @@ public class TestIdpGroupUserRelBaseSQLProvider {
         createProvider().selectUsernamesByGroupName("dev").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT u.user_name"));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_group_user_rel r JOIN idp_user_meta u"));
-    Assertions.assertTrue(normalizedSql.contains("JOIN idp_group_meta g"));
+    Assertions.assertTrue(
+        normalizedSql.contains("FROM idp_group_meta g JOIN idp_group_user_rel r"));
+    Assertions.assertTrue(normalizedSql.contains("JOIN idp_user_meta u"));
+    Assertions.assertTrue(normalizedSql.contains("r.group_id = g.group_id AND r.deleted_at = 0"));
     Assertions.assertTrue(normalizedSql.contains("WHERE g.group_name = #{groupName}"));
     Assertions.assertTrue(normalizedSql.contains("ORDER BY u.user_name"));
   }
@@ -148,11 +150,11 @@ public class TestIdpGroupUserRelBaseSQLProvider {
         createProvider().softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
-    Assertions.assertTrue(normalizedSql.contains("JOIN idp_user_meta u"));
+    Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_user_meta u"));
+    Assertions.assertTrue(normalizedSql.contains("u.user_id = r.user_id AND u.deleted_at = 0"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
     Assertions.assertTrue(normalizedSql.contains("WHERE u.user_name = #{username}"));
     Assertions.assertTrue(normalizedSql.contains("AND r.deleted_at = 0"));
-    Assertions.assertTrue(normalizedSql.contains("AND u.deleted_at = 0"));
   }
 
   @Test
@@ -161,11 +163,11 @@ public class TestIdpGroupUserRelBaseSQLProvider {
         createProvider().softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
-    Assertions.assertTrue(normalizedSql.contains("JOIN idp_group_meta g"));
+    Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_group_meta g"));
+    Assertions.assertTrue(normalizedSql.contains("g.group_id = r.group_id AND g.deleted_at = 0"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
     Assertions.assertTrue(normalizedSql.contains("WHERE g.group_name = #{groupName}"));
     Assertions.assertTrue(normalizedSql.contains("AND r.deleted_at = 0"));
-    Assertions.assertTrue(normalizedSql.contains("AND g.deleted_at = 0"));
   }
 
   @Test

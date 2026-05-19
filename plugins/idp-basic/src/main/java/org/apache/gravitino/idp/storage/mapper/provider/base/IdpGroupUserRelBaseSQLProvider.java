@@ -31,16 +31,14 @@ public class IdpGroupUserRelBaseSQLProvider {
   public String selectGroupNamesByUsername(@Param("username") String username) {
     return "SELECT g.group_name"
         + " FROM "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " r JOIN "
-        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
-        + " g ON g.group_id = r.group_id"
-        + " JOIN "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " u ON u.user_id = r.user_id"
+        + " u JOIN "
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + " r ON r.user_id = u.user_id AND r.deleted_at = 0"
+        + " JOIN "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
         + " WHERE u.user_name = #{username}"
-        + " AND r.deleted_at = 0"
-        + " AND g.deleted_at = 0"
         + " AND u.deleted_at = 0"
         + " ORDER BY g.group_name";
   }
@@ -48,16 +46,14 @@ public class IdpGroupUserRelBaseSQLProvider {
   public String selectUsernamesByGroupName(@Param("groupName") String groupName) {
     return "SELECT u.user_name"
         + " FROM "
-        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " r JOIN "
-        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " u ON u.user_id = r.user_id"
-        + " JOIN "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
-        + " g ON g.group_id = r.group_id"
+        + " g JOIN "
+        + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
+        + " r ON r.group_id = g.group_id AND r.deleted_at = 0"
+        + " JOIN "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u ON u.user_id = r.user_id AND u.deleted_at = 0"
         + " WHERE g.group_name = #{groupName}"
-        + " AND r.deleted_at = 0"
-        + " AND u.deleted_at = 0"
         + " AND g.deleted_at = 0"
         + " ORDER BY u.user_name";
   }
@@ -93,27 +89,25 @@ public class IdpGroupUserRelBaseSQLProvider {
   public String softDeleteRelationsByUsername(@Param("username") String username) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " r JOIN "
+        + " r INNER JOIN "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " u ON u.user_id = r.user_id"
+        + " u ON u.user_id = r.user_id AND u.deleted_at = 0"
         + " SET r.deleted_at = "
         + currentTimeMillisExpression()
         + " WHERE u.user_name = #{username}"
-        + " AND r.deleted_at = 0"
-        + " AND u.deleted_at = 0";
+        + " AND r.deleted_at = 0";
   }
 
   public String softDeleteRelationsByGroupName(@Param("groupName") String groupName) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " r JOIN "
+        + " r INNER JOIN "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
-        + " g ON g.group_id = r.group_id"
+        + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
         + " SET r.deleted_at = "
         + currentTimeMillisExpression()
         + " WHERE g.group_name = #{groupName}"
-        + " AND r.deleted_at = 0"
-        + " AND g.deleted_at = 0";
+        + " AND r.deleted_at = 0";
   }
 
   public String deleteIdpGroupUserRelMetasByLegacyTimeline(
