@@ -383,10 +383,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           GlueIcebergTableHelper.loadTable(icebergGlueCatalog, dbName, ident.name(), table);
         } catch (Exception e) {
           LOG.warn(
-              "Failed to load Iceberg metadata for table {}.{}: {}",
+              "Failed to load Iceberg metadata for table {}.{}. "
+                  + "Partitioning and sort order information may be incomplete.",
               dbName,
               ident.name(),
-              e.getMessage());
+              e);
         }
       }
 
@@ -534,7 +535,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
-        // Already handled above; this branch is never reached.
         throw new UnsupportedOperationException("Glue does not support table rename");
       } else if (change instanceof TableChange.UpdateComment) {
         newComment = ((TableChange.UpdateComment) change).getNewComment();
@@ -885,7 +885,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   private static void applyColumnChange(
       List<Column> dataCols, List<Column> partCols, TableChange.ColumnChange change) {
 
-    String fieldName = change.fieldName()[0];
+    String[] fieldNameParts = change.fieldName();
+    Preconditions.checkArgument(
+        fieldNameParts != null && fieldNameParts.length > 0,
+        "Column change field name cannot be empty");
+    String fieldName = fieldNameParts[0];
 
     if (change instanceof TableChange.AddColumn) {
       TableChange.AddColumn add = (TableChange.AddColumn) change;

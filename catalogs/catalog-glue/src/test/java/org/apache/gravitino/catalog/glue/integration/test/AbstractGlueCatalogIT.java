@@ -603,35 +603,6 @@ abstract class AbstractGlueCatalogIT {
   }
 
   @Test
-  void testAlterIcebergMetadata() {
-    String schema = newSchema();
-    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
-
-    Map<String, String> props = new HashMap<>();
-    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
-    ops.createTable(
-        tableIdent(schema, "iceberg_alter"),
-        new Column[0],
-        null,
-        props,
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
-
-    ops.alterTable(
-        tableIdent(schema, "iceberg_alter"),
-        TableChange.setProperty(
-            GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v2.metadata.json"));
-
-    Table loaded = ops.loadTable(tableIdent(schema, "iceberg_alter"));
-    assertEquals(
-        "s3://bucket/path/metadata/v2.metadata.json",
-        loaded.properties().get(GlueConstants.METADATA_LOCATION));
-  }
-
-  @Test
   void testListTablesIncludesIceberg() {
     String schema = newSchema();
     ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());

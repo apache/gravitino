@@ -20,11 +20,15 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.StatisticEntity;
@@ -55,13 +59,22 @@ public class StatisticPO {
     return new Builder();
   }
 
-  public static StatisticEntity fromStatisticPO(StatisticPO statisticPO) {
+  public static StatisticEntity fromStatisticPO(
+      StatisticPO statisticPO, NameIdentifier metadataObjectIdentifier) {
+    Preconditions.checkArgument(
+        metadataObjectIdentifier != null, "`metadataObjectIdentifier` is required");
     try {
       return StatisticEntity.builder(
               StatisticEntity.getStatisticType(
                   MetadataObject.Type.valueOf(statisticPO.metadataObjectType)))
           .withId(statisticPO.getStatisticId())
           .withName(statisticPO.getStatisticName())
+          .withNamespace(
+              Namespace.of(
+                  Stream.concat(
+                          Arrays.stream(metadataObjectIdentifier.namespace().levels()),
+                          Stream.of(metadataObjectIdentifier.name()))
+                      .toArray(String[]::new)))
           .withValue(
               JsonUtils.anyFieldMapper()
                   .readValue(statisticPO.getStatisticValue(), StatisticValue.class))

@@ -16,21 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.po.auth;
+package org.apache.gravitino.storage.relational.po;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
-/** Owner change poller result -- one row per changed owner_meta entry. */
+/** Key for batch soft-deleting owner rows by metadata object. */
 @Getter
-@Setter
-@NoArgsConstructor
 @AllArgsConstructor
-public class ChangedOwnerInfo {
-  private long id;
-  private long metadataObjectId;
-  private String metadataObjectType;
-  private long updatedAt;
+public class OwnerRelForDeletion {
+  private final Long metadataObjectId;
+  private final String metadataObjectType;
 }

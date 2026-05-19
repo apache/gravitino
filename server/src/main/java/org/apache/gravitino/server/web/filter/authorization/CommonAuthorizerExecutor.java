@@ -45,10 +45,9 @@ public class CommonAuthorizerExecutor implements AuthorizationExecutor {
   }
 
   @Override
-  public boolean execute() throws Exception {
-    AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
+  public boolean execute(AuthorizationRequestContext authorizationRequestContext) throws Exception {
     authorizationRequestContext.setOriginalAuthorizationExpression(expression);
     return authorizationExpressionEvaluator.evaluate(
-        metadataContext, pathParams, new AuthorizationRequestContext(), entityType);
+        metadataContext, pathParams, authorizationRequestContext, entityType);
   }
 }
