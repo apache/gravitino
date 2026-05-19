@@ -233,10 +233,7 @@ public class IcebergCatalogWrapperHelper {
   public IcebergTableChange buildIcebergTableChanges(
       NameIdentifier gravitinoNameIdentifier, TableChange... tableChanges) {
 
-    TableIdentifier icebergTableIdentifier =
-        TableIdentifier.of(
-            Namespace.of(gravitinoNameIdentifier.namespace().levels()),
-            gravitinoNameIdentifier.name());
+    TableIdentifier icebergTableIdentifier = buildIcebergTableIdentifier(gravitinoNameIdentifier);
 
     List<ColumnChange> gravitinoColumnChanges = Lists.newArrayList();
     List<TableChange> gravitinoPropertyChanges = Lists.newArrayList();
@@ -305,8 +302,13 @@ public class IcebergCatalogWrapperHelper {
   }
 
   /**
-   * Gravitino only supports tables managed with a single level hierarchy, such as
-   * `{namespace}.{table}`, so we need to perform truncation here.
+   * Builds an Iceberg {@link TableIdentifier} from a Gravitino namespace and table name.
+   *
+   * <p>The last level of the Gravitino namespace is the schema name. When HierarchicalSchema is
+   * enabled, that schema name may encode multiple Iceberg namespace levels joined by the configured
+   * external separator (e.g. {@code "schema:nested"} → Iceberg namespace {@code ("schema",
+   * "nested")}); split it back into a multi-level namespace so the underlying Iceberg catalog
+   * receives the correct identifier.
    *
    * @param namespace The Gravitino name space
    * @param name The table name
@@ -315,19 +317,22 @@ public class IcebergCatalogWrapperHelper {
   public static TableIdentifier buildIcebergTableIdentifier(
       org.apache.gravitino.Namespace namespace, String name) {
     String[] levels = namespace.levels();
-    return TableIdentifier.of(levels[levels.length - 1], name);
+    return TableIdentifier.of(getIcebergNamespace(levels[levels.length - 1]), name);
   }
 
   /**
-   * Gravitino only supports tables managed with a single level hierarchy, such as
-   * `{namespace}.{table}`, so we need to perform truncation here.
+   * Builds an Iceberg {@link TableIdentifier} from a Gravitino {@link NameIdentifier}.
+   *
+   * <p>See {@link #buildIcebergTableIdentifier(org.apache.gravitino.Namespace, String)} for how the
+   * trailing schema name is converted back into a multi-level Iceberg namespace.
    *
    * @param nameIdentifier GravitinoNameIdentifier
    * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
     String[] levels = nameIdentifier.namespace().levels();
-    return TableIdentifier.of(levels[levels.length - 1], nameIdentifier.name());
+    return TableIdentifier.of(
+        getIcebergNamespace(levels[levels.length - 1]), nameIdentifier.name());
   }
 
   @VisibleForTesting
