@@ -36,8 +36,8 @@ public class TestIdpUserGroupRelPO {
             .build();
 
     Assertions.assertEquals(1L, relPO.getId());
-    Assertions.assertEquals(10L, relPO.getGroupId());
     Assertions.assertEquals(20L, relPO.getUserId());
+    Assertions.assertEquals(10L, relPO.getGroupId());
     Assertions.assertEquals(1L, relPO.getCurrentVersion());
     Assertions.assertEquals(0L, relPO.getLastVersion());
     Assertions.assertEquals(0L, relPO.getDeletedAt());

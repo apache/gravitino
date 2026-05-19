@@ -195,7 +195,6 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'username',
     `password_hash` VARCHAR(1024) NOT NULL COMMENT 'hashed password',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'user audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'user deleted at',
@@ -210,7 +209,6 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
 CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'group audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',
@@ -226,13 +224,13 @@ CREATE TABLE IF NOT EXISTS `idp_user_group_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'IdP user id',
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'IdP group id',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'relation audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_iu_gu_del` (`user_id`, `group_id`, `deleted_at`),
-    KEY `idx_uid` (`user_id`)
+    UNIQUE KEY `uk_iuig_del` (`user_id`, `group_id`, `deleted_at`),
+    KEY `idx_iuig_uid` (`user_id`),
+    KEY `idx_iuig_gid` (`group_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'IdP user group relation';
 ```
 

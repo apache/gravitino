@@ -473,10 +473,10 @@ CREATE TABLE IF NOT EXISTS idp_user_group_rel (
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    CONSTRAINT uk_iu_gu_del UNIQUE (user_id, group_id, deleted_at)
+    CONSTRAINT uk_iuig_del UNIQUE (user_id, group_id, deleted_at)
 );
-CREATE INDEX IF NOT EXISTS idp_user_group_rel_idx_group_id ON idp_user_group_rel (group_id);
-CREATE INDEX IF NOT EXISTS idp_user_group_rel_idx_user_id ON idp_user_group_rel (user_id);
+CREATE INDEX IF NOT EXISTS idp_user_group_rel_idx_iuig_uid ON idp_user_group_rel (user_id);
+CREATE INDEX IF NOT EXISTS idp_user_group_rel_idx_iuig_gid ON idp_user_group_rel (group_id);
 COMMENT ON TABLE idp_user_group_rel IS 'local IdP user group relation';
 
 COMMENT ON COLUMN idp_user_group_rel.id IS 'auto increment id';
