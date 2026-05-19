@@ -16,19 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.storage.mapper.provider;
 
-import com.google.common.collect.ImmutableList;
-import java.util.List;
-import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
-import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
+package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
-/** Supplies built-in IdP mapper classes from the idp-basic plugin. */
-public class IdpBasicMapperPackageProvider implements MapperPackageProvider {
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-  @Override
-  public List<Class<?>> getMapperClasses() {
-    return ImmutableList.of(IdpUserMetaMapper.class, IdpGroupMetaMapper.class);
+class TestIdpGroupMetaH2Provider {
+
+  @Test
+  void testCurrentTimeMillisExpression() {
+    IdpGroupMetaH2Provider provider = new IdpGroupMetaH2Provider();
+
+    Assertions.assertEquals(
+        "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())",
+        provider.currentTimeMillisExpression());
   }
 }
