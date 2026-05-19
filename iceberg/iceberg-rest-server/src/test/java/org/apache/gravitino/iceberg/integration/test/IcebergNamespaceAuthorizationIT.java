@@ -32,6 +32,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.iceberg.exceptions.ForbiddenException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,7 +104,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Should fail without proper authorization
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("CREATE DATABASE %s", namespace));
 
     // Grant CREATE_SCHEMA and USE_CATALOG privileges and verify creation succeeds
@@ -146,7 +147,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     revokeUserRoles();
     resetMetalakeAndCatalogOwner();
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class, () -> sql("SHOW DATABASES"));
+        ForbiddenException.class, () -> sql("SHOW DATABASES"));
   }
 
   @Test
@@ -186,7 +187,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Access should fail without proper privileges
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class, () -> sql("USE %s", namespace));
+        ForbiddenException.class, () -> sql("USE %s", namespace));
 
     // Grant schema access and verify success
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
@@ -203,7 +204,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     createNestedNamespaceViaIRC(parentNamespace, "child");
 
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("USE %s", nestedNamespaceInIceberg));
 
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
@@ -219,7 +220,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     createNestedNamespaceViaIRC(parentNamespace, "child");
 
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("USE %s", nestedNamespaceInIceberg));
 
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
@@ -239,7 +240,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
 
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () ->
             sql(
                 "ALTER DATABASE %s SET DBPROPERTIES ('nestedKey'='nestedValue')",
@@ -269,7 +270,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
 
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("DROP DATABASE %s", nestedNamespaceInIceberg));
 
     metalakeClientWithAllPrivilege.setOwner(
@@ -297,7 +298,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Non-owners cannot modify schemas even with USE_CATALOG privilege
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("ALTER DATABASE %s SET DBPROPERTIES ('key'='value')", namespace));
 
     // Schema ownership enables modification
@@ -328,7 +329,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Non-owner cannot delete schema
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("DROP DATABASE %s", namespace));
 
     // Transfer ownership to normal user
@@ -358,7 +359,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Schema access requires proper authorization
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class, () -> sql("USE %s", namespace));
+        ForbiddenException.class, () -> sql("USE %s", namespace));
 
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
     grantUseSchemaRole(namespace);
@@ -409,7 +410,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Registration should fail without destination schema ownership
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () ->
             sql(
                 "CALL rest.system.register_table(table => '%s.%s', metadata_file=> '%s')",
@@ -455,13 +456,13 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Verify operations fail without authorization
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("ALTER DATABASE %s SET DBPROPERTIES ('key1'='value1')", namespace));
 
     // USE_CATALOG alone is insufficient for schema modification
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("ALTER DATABASE %s SET DBPROPERTIES ('key2'='value2')", namespace));
 
     // Schema ownership with USE_CATALOG enables modification
@@ -480,7 +481,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     // Authorization is checked before existence - security best practice
     String nonExistentSchema = "non_existent_schema";
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("USE %s", nonExistentSchema));
 
     // Special characters in schema names should work with authorization
