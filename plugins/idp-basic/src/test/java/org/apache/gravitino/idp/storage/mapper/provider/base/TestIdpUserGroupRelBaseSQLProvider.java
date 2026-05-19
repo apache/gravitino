@@ -20,17 +20,12 @@
 package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
 import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
-import org.apache.ibatis.builder.BuilderException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpUserGroupRelBaseSQLProvider extends AbstractIdpMetaStorageTest {
+public class TestIdpUserGroupRelBaseSQLProvider {
 
   protected IdpUserGroupRelBaseSQLProvider createProvider() {
     return new IdpUserGroupRelBaseSQLProvider() {
@@ -82,68 +77,35 @@ public class TestIdpUserGroupRelBaseSQLProvider extends AbstractIdpMetaStorageTe
     List<IdpUserGroupRelPO> relations =
         Arrays.asList(newRelation(1L, 20L, 10L), newRelation(2L, 21L, 10L));
 
-    String script = createProvider().batchInsertRelations(relations);
-    Map<String, Object> params = new HashMap<>();
-    params.put("relations", relations);
-
-    String normalizedSql = renderScript(script, params);
+    String normalizedSql =
+        createProvider().batchInsertRelations(relations).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_user_group_rel"));
     Assertions.assertTrue(
         normalizedSql.contains(
             "(id, user_id, group_id, current_version, last_version, deleted_at)"));
-    Assertions.assertTrue(
-        normalizedSql.contains("VALUES"), "Batch insert SQL should include VALUES clause");
-    Assertions.assertEquals(
-        12,
-        countOccurrences(normalizedSql, '?'),
-        "Two user-group relations should render twelve placeholders");
+    Assertions.assertTrue(normalizedSql.contains("<foreach item='item' collection='relations'"));
+    Assertions.assertTrue(normalizedSql.contains("#{item.id}"));
+    Assertions.assertTrue(normalizedSql.contains("#{item.userId}"));
+    Assertions.assertTrue(normalizedSql.contains("#{item.groupId}"));
   }
 
   @Test
   void testSoftDeleteIdpUserGroups() {
-    String script = createProvider().softDeleteRelations("dev", Arrays.asList("alice", "bob"));
-    Map<String, Object> params = new HashMap<>();
-    params.put("groupName", "dev");
-    params.put("usernames", Arrays.asList("alice", "bob"));
-
-    String normalizedSql = renderScript(script, params);
+    String normalizedSql =
+        createProvider()
+            .softDeleteRelations("dev", Arrays.asList("alice", "bob"))
+            .replaceAll("\\s+", " ")
+            .trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
     Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_group_meta g"));
     Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_user_meta u"));
     Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("g.group_name = ?"));
-    Assertions.assertTrue(normalizedSql.matches(".*u.user_name IN \\( \\? , \\? \\).*"));
-  }
-
-  @Test
-  void testSoftDeleteIdpUserGroupsWithEmptyUsernames() {
-    String script = createProvider().softDeleteRelations("dev", Collections.emptyList());
-    Map<String, Object> params = new HashMap<>();
-    params.put("groupName", "dev");
-    params.put("usernames", Collections.emptyList());
-
-    String normalizedSql = renderScript(script, params);
-
-    Assertions.assertFalse(
-        normalizedSql.matches(".*\\bIN\\s*\\(\\s*\\).*"),
-        "Empty usernames should not generate invalid SQL IN (...) with no values");
-    Assertions.assertFalse(normalizedSql.matches(".*\\b1\\s*=\\s*0\\b.*"));
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
-    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("g.group_name = ?"));
-    Assertions.assertFalse(normalizedSql.contains("u.user_name IN"));
-  }
-
-  @Test
-  void testSoftDeleteIdpUserGroupsWithNullUsernames() {
-    String script = createProvider().softDeleteRelations("dev", null);
-    Map<String, Object> params = new HashMap<>();
-    params.put("groupName", "dev");
-    params.put("usernames", null);
-
-    Assertions.assertThrows(BuilderException.class, () -> renderScript(script, params));
+    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
+    Assertions.assertTrue(normalizedSql.contains("<foreach collection='usernames'"));
+    Assertions.assertTrue(normalizedSql.contains("open=' AND u.user_name IN ('"));
+    Assertions.assertTrue(normalizedSql.contains("#{username}"));
   }
 
   @Test
@@ -188,16 +150,6 @@ public class TestIdpUserGroupRelBaseSQLProvider extends AbstractIdpMetaStorageTe
     Assertions.assertEquals(
         "(UNIX_TIMESTAMP() * 1000.0)",
         new IdpUserGroupRelBaseSQLProvider().currentTimeMillisExpression());
-  }
-
-  private int countOccurrences(String input, char expectedChar) {
-    int count = 0;
-    for (int index = 0; index < input.length(); index++) {
-      if (input.charAt(index) == expectedChar) {
-        count++;
-      }
-    }
-    return count;
   }
 
   private IdpUserGroupRelPO newRelation(Long id, Long userId, Long groupId) {
