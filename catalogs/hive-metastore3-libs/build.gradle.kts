@@ -29,6 +29,12 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
+  // Force upgrades for outdated transitive dependencies pulled by Hive Metastore
+  constraints {
+    implementation(libs.thrift)
+    implementation(libs.snappy.java)
+  }
+
   implementation(libs.hadoop3.common) {
     exclude(group = "ch.qos.logback")
     exclude(group = "ch.qos.reload4j")

@@ -82,6 +82,14 @@ public interface SchemaMetaMapper {
       method = "insertSchemaMetaOnDuplicateKeyUpdate")
   void insertSchemaMetaOnDuplicateKeyUpdate(@Param("schemaMeta") SchemaPO schemaPO);
 
+  @InsertProvider(type = SchemaMetaSQLProviderFactory.class, method = "batchInsertSchemaMeta")
+  void batchInsertSchemaMeta(@Param("schemaMetas") List<SchemaPO> schemaMetas);
+
+  @InsertProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "batchInsertSchemaMetaOnDuplicateKeyUpdate")
+  void batchInsertSchemaMetaOnDuplicateKeyUpdate(@Param("schemaMetas") List<SchemaPO> schemaMetas);
+
   @UpdateProvider(type = SchemaMetaSQLProviderFactory.class, method = "updateSchemaMeta")
   Integer updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO);

@@ -53,6 +53,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
 import org.lance.Dataset;
+import org.lance.ReadOptions;
 import org.lance.WriteParams;
 import org.lance.index.DistanceType;
 import org.lance.index.IndexOptions;
@@ -78,6 +79,8 @@ public class LanceTableOperations extends ManagedTableOperations {
 
   private final IdGenerator idGenerator;
 
+  private volatile Map<String, String> catalogProperties = Map.of();
+
   public LanceTableOperations(
       EntityStore store, ManagedSchemaOperations schemaOps, IdGenerator idGenerator) {
     this.store = store;
@@ -98,6 +101,16 @@ public class LanceTableOperations extends ManagedTableOperations {
   @Override
   protected IdGenerator idGenerator() {
     return idGenerator;
+  }
+
+  /**
+   * Sets the catalog properties used to resolve Lance storage defaults at runtime.
+   *
+   * @param catalogProperties the catalog properties
+   */
+  public void setCatalogProperties(Map<String, String> catalogProperties) {
+    this.catalogProperties =
+        catalogProperties == null ? Map.of() : ImmutableMap.copyOf(catalogProperties);
   }
 
   @Override
@@ -197,7 +210,9 @@ public class LanceTableOperations extends ManagedTableOperations {
       // Otherwise, we should not delete the dataset.
       if (purged) {
         // Delete the Lance dataset at the location
-        Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+        Dataset.drop(
+            location,
+            LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties()));
         LOG.info("Deleted Lance dataset at location {}", location);
       }
 
@@ -231,7 +246,9 @@ public class LanceTableOperations extends ManagedTableOperations {
         String location = table.properties().get(Table.PROPERTY_LOCATION);
 
         // Delete the Lance dataset at the location
-        Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(table.properties()));
+        Dataset.drop(
+            location,
+            LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties()));
         LOG.info("Deleted Lance dataset at location {}", location);
       }
 
@@ -265,19 +282,20 @@ public class LanceTableOperations extends ManagedTableOperations {
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     }
 
-    // Check whether it's a create empty table operation.
+    // Check whether it's a metadata-only declare table operation.
     boolean createEmpty =
-        Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_CREATE_EMPTY))
+        Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_DECLARED))
             .map(Boolean::parseBoolean)
             .orElse(false);
     if (createEmpty) {
-      // For create empty table, we just create the table metadata in Gravitino without creating
-      // the underlying Lance dataset.
+      // For declare table, we just create the table metadata in Gravitino without creating the
+      // underlying Lance dataset.
       return super.createTable(
           ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
     }
 
-    Map<String, String> storageProps = LancePropertiesUtils.getLanceStorageOptions(properties);
+    Map<String, String> storageProps =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
     try (Dataset ignored =
         Dataset.write()
             .allocator(new RootAllocator())
@@ -308,7 +326,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (TableAlreadyExistsException e) {
       // If the table metadata already exists, but the underlying lance table was just created
       // successfully, we need to clean up the created lance table to avoid orphaned datasets.
-      Dataset.drop(location, LancePropertiesUtils.getLanceStorageOptions(properties));
+      Dataset.drop(location, storageProps);
       throw e;
     } catch (IllegalArgumentException e) {
       if (e.getMessage().contains("Dataset already exists")) {
@@ -344,7 +362,9 @@ public class LanceTableOperations extends ManagedTableOperations {
    */
   long handleLanceTableChange(Table table, TableChange[] changes) {
     String location = table.properties().get(Table.PROPERTY_LOCATION);
-    try (Dataset dataset = openDataset(location)) {
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    try (Dataset dataset = openDataset(location, storageOptions)) {
       for (TableChange change : changes) {
         if (change instanceof TableChange.DeleteColumn deleteColumn) {
           dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
@@ -385,7 +405,15 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   Dataset openDataset(String location) {
-    return Dataset.open().allocator(new RootAllocator()).uri(location).build();
+    return openDataset(location, Map.of());
+  }
+
+  Dataset openDataset(String location, Map<String, String> storageOptions) {
+    return Dataset.open()
+        .allocator(new RootAllocator())
+        .uri(location)
+        .readOptions(new ReadOptions.Builder().setStorageOptions(storageOptions).build())
+        .build();
   }
 
   private IndexParams getIndexParamsByIndexType(IndexType indexType) {

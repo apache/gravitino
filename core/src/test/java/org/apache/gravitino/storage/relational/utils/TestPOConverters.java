@@ -1317,10 +1317,13 @@ public class TestPOConverters {
                             .withCreateTime(FIX_INSTANT)
                             .build()))
             .build();
-    StatisticEntity entity = StatisticPO.fromStatisticPO(statisticPO);
+    NameIdentifier parentTableIdent =
+        NameIdentifier.of("test_metalake", "test_catalog", "test_schema", "test_table");
+    StatisticEntity entity = StatisticPO.fromStatisticPO(statisticPO, parentTableIdent);
     Assertions.assertEquals(1L, entity.id());
     Assertions.assertEquals("test", entity.name());
     Assertions.assertEquals("test", entity.value().value());
+    Assertions.assertEquals(Namespace.fromString(parentTableIdent.toString()), entity.namespace());
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {

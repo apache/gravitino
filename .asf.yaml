@@ -61,6 +61,7 @@ github:
     - geyanggang
     - markhoerth
     - danhuawang
+    - lasdf1234
 
 notifications:
   commits: commits@gravitino.apache.org

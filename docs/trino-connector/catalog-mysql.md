@@ -17,8 +17,11 @@ To connect to MySQL, you need:
 ## Create table
 
 At present, the Apache Gravitino Trino connector only supports basic MySQL table creation statements, which involve fields, null allowances, comments, primary keys, indexes, default values and auto-increment.
+The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
 
-The Gravitino Trino connector does not support `CREATE TABLE AS SELECT`.
+:::note
+`CREATE OR REPLACE TABLE AS SELECT` is not supported. Use `DROP TABLE` followed by `CREATE TABLE AS SELECT` as an alternative.
+:::
 
 ## Alter table
 

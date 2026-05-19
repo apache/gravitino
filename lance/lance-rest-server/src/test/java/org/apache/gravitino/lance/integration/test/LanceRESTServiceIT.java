@@ -93,6 +93,10 @@ public class LanceRESTServiceIT extends BaseIT {
   private static final String CATALOG_NAME = GravitinoITUtils.genRandomName("lance_rest_catalog");
   private static final String SCHEMA_NAME = GravitinoITUtils.genRandomName("lance_rest_schema");
   private static final String DELIMITER = ".";
+  private static final String MINIO_ENDPOINT = "http://127.0.0.1:9000";
+  private static final String MINIO_REGION = "us-east-1";
+  private static final String MINIO_ACCESS_KEY = "minioadmin";
+  private static final String MINIO_SECRET_KEY = "minioadmin";
 
   private GravitinoMetalake metalake;
   private Catalog catalog;
@@ -423,62 +427,6 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-  void testCreateEmptyTable() throws ApiException {
-    catalog = createCatalog(CATALOG_NAME);
-    createSchema();
-
-    DeclareTableRequest request = new DeclareTableRequest();
-    String location = tempDir + "/" + "empty_table/";
-    request.setLocation(location);
-    request.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
-
-    DeclareTableResponse response = ns.declareTable(request);
-    Assertions.assertNotNull(response);
-    Assertions.assertEquals(location, response.getLocation());
-
-    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
-    describeTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "empty_table"));
-
-    DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
-    Assertions.assertNotNull(loadTable);
-    Assertions.assertEquals(location, loadTable.getLocation());
-    Assertions.assertEquals(
-        "true", loadTable.getMetadata().get(LanceConstants.LANCE_TABLE_CREATE_EMPTY));
-    Assertions.assertEquals("true", loadTable.getMetadata().get(Table.PROPERTY_EXTERNAL));
-
-    // Try to create the same table again should fail
-    RuntimeException exception =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> {
-              ns.declareTable(request);
-            });
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":5"));
-
-    // Create an empty table with non-existent location should succeed
-    // since storage is not touched
-    DeclareTableRequest wrongLocationRequest = new DeclareTableRequest();
-    wrongLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "another_table"));
-    String another_location = tempDir + "/" + "another_location/";
-    Assertions.assertFalse(new File(another_location).exists());
-    wrongLocationRequest.setLocation(another_location);
-    response = ns.declareTable(wrongLocationRequest);
-    Assertions.assertNotNull(response);
-    Assertions.assertEquals(another_location, response.getLocation());
-    // Will not touch storage, so the path should not be created.
-    Assertions.assertFalse(new File(another_location).exists());
-
-    // Create another empty table at a new location and verify it succeeds
-    String correctedLocation = tempDir + "/" + "wrong_location_table/";
-    wrongLocationRequest.setLocation(correctedLocation);
-    wrongLocationRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "wrong_location_table"));
-    DeclareTableResponse wrongLocationResponse =
-        Assertions.assertDoesNotThrow(() -> ns.declareTable(wrongLocationRequest));
-    Assertions.assertNotNull(wrongLocationResponse);
-    Assertions.assertEquals(correctedLocation, wrongLocationResponse.getLocation());
-  }
-
-  @Test
   void testCreateTable() throws IOException {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
@@ -660,6 +608,46 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
+  void testCreateTableUsesCatalogStorageOptions() throws IOException {
+    catalog = createCatalog(GravitinoITUtils.genRandomName("lance_rest_catalog"));
+    createSchema();
+
+    String location = tempDir.resolve("catalog_storage_table").toString() + "/";
+    List<String> ids = List.of(catalog.name(), SCHEMA_NAME, "catalog_storage_table");
+    org.apache.arrow.vector.types.pojo.Schema schema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            Arrays.asList(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("value", new ArrowType.Utf8())));
+    byte[] body = ArrowUtils.generateIpcStream(schema);
+
+    CreateTableResponse response =
+        createTable(ids, location, ImmutableMap.of("key1", "v1"), body, /* mode= */ null);
+    Assertions.assertNotNull(response);
+    Assertions.assertEquals(location, response.getLocation());
+    Assertions.assertEquals(MINIO_ENDPOINT, response.getStorageOptions().get("endpoint"));
+    Assertions.assertEquals("true", response.getStorageOptions().get("allow_http"));
+    Assertions.assertEquals(MINIO_ACCESS_KEY, response.getStorageOptions().get("access_key_id"));
+    Assertions.assertEquals(
+        MINIO_SECRET_KEY, response.getStorageOptions().get("secret_access_key"));
+    Assertions.assertEquals(MINIO_REGION, response.getStorageOptions().get("region"));
+
+    DescribeTableRequest describeTableRequest = new DescribeTableRequest();
+    describeTableRequest.setId(ids);
+    DescribeTableResponse loadTable = ns.describeTable(describeTableRequest);
+    Assertions.assertNotNull(loadTable);
+    Assertions.assertEquals(MINIO_ENDPOINT, loadTable.getStorageOptions().get("endpoint"));
+    Assertions.assertEquals("true", loadTable.getStorageOptions().get("allow_http"));
+    Assertions.assertEquals(MINIO_ACCESS_KEY, loadTable.getStorageOptions().get("access_key_id"));
+    Assertions.assertEquals(
+        MINIO_SECRET_KEY, loadTable.getStorageOptions().get("secret_access_key"));
+    Assertions.assertEquals(MINIO_REGION, loadTable.getStorageOptions().get("region"));
+    Assertions.assertFalse(loadTable.getMetadata().containsKey("lance.storage.endpoint"));
+    Assertions.assertFalse(loadTable.getMetadata().containsKey("lance.storage.access_key_id"));
+    Assertions.assertFalse(loadTable.getMetadata().containsKey("lance.storage.secret_access_key"));
+  }
+
+  @Test
   void testAlterColumns() throws Exception {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
@@ -809,13 +797,13 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
     Assertions.assertTrue(exception.getMessage().contains("Table not found"));
     // Try to create a table and then deregister table
-    DeclareTableRequest createEmptyTableRequest = new DeclareTableRequest();
+    DeclareTableRequest declareTableRequest = new DeclareTableRequest();
     String location = tempDir + "/" + "to_be_deregistered_table/";
     ids = List.of(CATALOG_NAME, SCHEMA_NAME, "to_be_deregistered_table");
-    createEmptyTableRequest.setLocation(location);
-    createEmptyTableRequest.setId(ids);
+    declareTableRequest.setLocation(location);
+    declareTableRequest.setId(ids);
     DeclareTableResponse response =
-        Assertions.assertDoesNotThrow(() -> ns.declareTable(createEmptyTableRequest));
+        Assertions.assertDoesNotThrow(() -> ns.declareTable(declareTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
@@ -853,12 +841,12 @@ public class LanceRESTServiceIT extends BaseIT {
     createSchema();
 
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_exists");
-    DeclareTableRequest createEmptyTableRequest = new DeclareTableRequest();
+    DeclareTableRequest declareTableRequest = new DeclareTableRequest();
     String location = tempDir + "/" + "table_exists/";
-    createEmptyTableRequest.setLocation(location);
-    createEmptyTableRequest.setId(ids);
+    declareTableRequest.setLocation(location);
+    declareTableRequest.setId(ids);
     DeclareTableResponse response =
-        Assertions.assertDoesNotThrow(() -> ns.declareTable(createEmptyTableRequest));
+        Assertions.assertDoesNotThrow(() -> ns.declareTable(declareTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
@@ -882,12 +870,12 @@ public class LanceRESTServiceIT extends BaseIT {
     createSchema();
 
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_to_drop");
-    DeclareTableRequest createEmptyTableRequest = new DeclareTableRequest();
+    DeclareTableRequest declareTableRequest = new DeclareTableRequest();
     String location = tempDir + "/" + "table_to_drop/";
-    createEmptyTableRequest.setLocation(location);
-    createEmptyTableRequest.setId(ids);
+    declareTableRequest.setLocation(location);
+    declareTableRequest.setId(ids);
     DeclareTableResponse response =
-        Assertions.assertDoesNotThrow(() -> ns.declareTable(createEmptyTableRequest));
+        Assertions.assertDoesNotThrow(() -> ns.declareTable(declareTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(location, response.getLocation());
 
@@ -932,7 +920,7 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertNotNull(loadTable);
     Assertions.assertEquals(location, loadTable.getLocation());
     Assertions.assertEquals(
-        "true", loadTable.getMetadata().get(LanceConstants.LANCE_TABLE_CREATE_EMPTY));
+        "true", loadTable.getMetadata().get(LanceConstants.LANCE_TABLE_DECLARED));
     Assertions.assertEquals("true", loadTable.getMetadata().get(Table.PROPERTY_EXTERNAL));
 
     // Try to declare the same table again should fail
@@ -1024,12 +1012,22 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) {
+    Map<String, String> catalogProperties =
+        ImmutableMap.<String, String>builder()
+            .putAll(properties)
+            .put("lance.storage.endpoint", MINIO_ENDPOINT)
+            .put("lance.storage.allow_http", "true")
+            .put("lance.storage.access_key_id", MINIO_ACCESS_KEY)
+            .put("lance.storage.secret_access_key", MINIO_SECRET_KEY)
+            .put("lance.storage.region", MINIO_REGION)
+            .build();
+
     return metalake.createCatalog(
         catalogName,
         Catalog.Type.RELATIONAL,
         "lakehouse-generic",
         "catalog for lance rest service tests",
-        properties);
+        catalogProperties);
   }
 
   private void createSchema() {

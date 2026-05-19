@@ -20,6 +20,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from gravitino.api.authorization.owner import Owner
+from gravitino.api.authorization.user import User
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_handle import JobHandle
@@ -369,3 +370,71 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
             UnsupportedOperationException: If the operation is not supported.
         """
         self.get_metalake().set_owner(metadata_object, owner_name, owner_type)
+
+    # User operations
+
+    def add_user(self, user: str) -> User:
+        """Add a user to the metalake.
+
+        Args:
+            user: The name of the user.
+
+        Returns:
+            The added User object.
+
+        Raises:
+            UserAlreadyExistsException: If a user with the same name already exists.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().add_user(user)
+
+    def remove_user(self, user: str) -> bool:
+        """Remove a user from the metalake.
+
+        Args:
+            user: The name of the user.
+
+        Returns:
+            True if the user was removed, False if the user did not exist.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().remove_user(user)
+
+    def get_user(self, user: str) -> User:
+        """Get a user by name from the metalake.
+
+        Args:
+            user: The name of the user.
+
+        Returns:
+            The User object.
+
+        Raises:
+            NoSuchUserException: If the user does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().get_user(user)
+
+    def list_users(self) -> list[User]:
+        """List all users with details under the metalake.
+
+        Returns:
+            A list of User objects.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_users()
+
+    def list_user_names(self) -> list[str]:
+        """List all user names under the metalake.
+
+        Returns:
+            A list of user name strings.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_user_names()

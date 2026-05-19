@@ -252,7 +252,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean isMetalakeUser(String metalake) {
+  public boolean isMetalakeUser(String metalake, AuthorizationRequestContext requestContext) {
     String currentUserName = PrincipalUtils.getCurrentUserName();
     if (StringUtils.isBlank(currentUserName)) {
       return false;

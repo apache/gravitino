@@ -152,7 +152,28 @@ spark.sql("SELECT * FROM sales.orders").show()
 The `LOCATION` clause in the `CREATE TABLE` statement is optional. When omitted, lance-spark automatically determines an appropriate storage location based on catalog properties.
 For detailed information on location resolution logic, refer to the [Lakehouse Generic Catalog documentation](./lakehouse-generic-catalog.md#key-property-location).
 
-For cloud storage backends such as Amazon S3 or MinIO, specify credentials and endpoint configuration in the table properties:
+For Gravitino-managed Lance catalogs, put the storage configuration in the Gravitino catalog properties so Spark does not need to repeat it.
+
+For example, create the Gravitino catalog with catalog-level Lance storage properties:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "name": "lance_catalog",
+  "type": "RELATIONAL",
+  "provider": "lakehouse-generic",
+  "comment": "catalog for Lance tables on MinIO",
+  "properties": {
+    "location": "s3://bucket/tmp",
+    "lance.storage.endpoint": "http://minio:9000",
+    "lance.storage.access_key_id": "ak",
+    "lance.storage.secret_access_key": "sk",
+    "lance.storage.allow_http": "true",
+    "lance.storage.region": "us-east-1"
+  }
+}' http://localhost:8090/api/metalakes/test/catalogs
+```
 
 ```python
 spark.sql("""
@@ -162,15 +183,11 @@ spark.sql("""
     )
     USING lance
     LOCATION 's3://bucket/tmp/sales/orders.lance/'
-    TBLPROPERTIES (
-        'format' = 'lance',
-        'lance.storage.access_key_id' = 'your_access_key',
-        'lance.storage.secret_access_key' = 'your_secret_key',
-        'lance.storage.endpoint' = 'http://minio:9000',
-        'lance.storage.allow_http' = 'true'
-    )
+    TBLPROPERTIES ('format' = 'lance')
 """)
 ```
+
+If you need a per-table override, `lance.storage.*` table properties are still supported and take precedence over catalog defaults.
 
 ## Ray Integration
 
@@ -184,7 +201,8 @@ pip install lance-ray
 
 :::info
 - Ray will be automatically installed if not already present
-- The lance-namespace version must be less than or equal to 0.4.5.
+- For Gravitino 1.3.0, use a `lance-namespace` client compatible with
+  server-side `lance-namespace-core` 0.7.5 or newer.
 - Ensure Ray version compatibility in your environment before deployment
 :::
 

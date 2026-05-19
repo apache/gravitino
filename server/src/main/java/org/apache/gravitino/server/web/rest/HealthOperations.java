@@ -34,7 +34,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
-import javax.servlet.http.HttpServlet;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -48,6 +47,7 @@ import org.apache.gravitino.dto.HealthCheckDTO;
 import org.apache.gravitino.dto.responses.HealthResponse;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.ServerConfig;
+import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
  */
 @Path("/health")
 @Produces(MediaType.APPLICATION_JSON)
-public class HealthOperations extends HttpServlet {
+public class HealthOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(HealthOperations.class);
 
@@ -110,7 +110,7 @@ public class HealthOperations extends HttpServlet {
   @ResponseMetered(name = "health.live", absolute = true)
   public Response live() {
     HealthCheckDTO check = up(CHECK_HTTP_SERVER, Collections.emptyMap());
-    return ok(new HealthResponse(HealthCheckDTO.Status.UP, Collections.singletonList(check)));
+    return Utils.ok(new HealthResponse(HealthCheckDTO.Status.UP, Collections.singletonList(check)));
   }
 
   @GET
@@ -122,7 +122,7 @@ public class HealthOperations extends HttpServlet {
     HealthCheckDTO entityStoreCheck = checkEntityStore();
     HealthCheckDTO.Status overall = entityStoreCheck.getStatus();
     HealthResponse body = new HealthResponse(overall, Collections.singletonList(entityStoreCheck));
-    return overall == HealthCheckDTO.Status.UP ? ok(body) : serviceUnavailable(body);
+    return overall == HealthCheckDTO.Status.UP ? Utils.ok(body) : Utils.serviceUnavailable(body);
   }
 
   @GET
@@ -140,7 +140,7 @@ public class HealthOperations extends HttpServlet {
             : HealthCheckDTO.Status.UP;
 
     HealthResponse body = new HealthResponse(overall, checks);
-    return overall == HealthCheckDTO.Status.UP ? ok(body) : serviceUnavailable(body);
+    return overall == HealthCheckDTO.Status.UP ? Utils.ok(body) : Utils.serviceUnavailable(body);
   }
 
   private HealthCheckDTO checkEntityStore() {
@@ -226,19 +226,5 @@ public class HealthOperations extends HttpServlet {
   private static HealthCheckDTO down(String name, String detailKey, String detailValue) {
     return new HealthCheckDTO(
         name, HealthCheckDTO.Status.DOWN, Collections.singletonMap(detailKey, detailValue));
-  }
-
-  private static Response ok(HealthResponse body) {
-    return Response.status(Response.Status.OK)
-        .entity(body)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
-  }
-
-  private static Response serviceUnavailable(HealthResponse body) {
-    return Response.status(Response.Status.SERVICE_UNAVAILABLE)
-        .entity(body)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
   }
 }
