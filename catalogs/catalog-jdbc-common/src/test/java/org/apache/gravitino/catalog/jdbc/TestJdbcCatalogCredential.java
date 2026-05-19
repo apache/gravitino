@@ -21,6 +21,10 @@ package org.apache.gravitino.catalog.jdbc;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -31,11 +35,17 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /** Tests for JdbcCatalog credential provider functionality. */
 public class TestJdbcCatalogCredential {
+
+  @AfterEach
+  void resetGravitinoEnvConfig() throws IllegalAccessException {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", null, true);
+  }
 
   /** A concrete implementation of JdbcCatalog for testing purposes. */
   private static class TestableJdbcCatalog extends JdbcCatalog {
@@ -195,6 +205,41 @@ public class TestJdbcCatalogCredential {
     Assertions.assertEquals(
         JdbcCredential.JDBC_CREDENTIAL_TYPE,
         credProps.get(CredentialConstants.CREDENTIAL_PROVIDERS));
+  }
+
+  @Test
+  void testJdbcCatalogBackfillCredentialsToProperties() throws IllegalAccessException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    Map<String, String> jdbcProps = Maps.newHashMap();
+    jdbcProps.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    jdbcProps.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    jdbcProps.put(JdbcConfig.USERNAME.getKey(), "test-user");
+    jdbcProps.put(JdbcConfig.PASSWORD.getKey(), "test-password");
+
+    CatalogEntity jdbcEntity =
+        CatalogEntity.builder()
+            .withId(6L)
+            .withName("jdbc-catalog-backfill")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(TestableJdbcCatalog.Type.RELATIONAL)
+            .withProvider("jdbc-mysql")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcProps)
+            .build();
+
+    // Inject server config with backfill enabled
+    Config serverConfig = new Config(false) {};
+    serverConfig.set(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", serverConfig, true);
+
+    TestableJdbcCatalog jdbcCatalog = new TestableJdbcCatalog();
+    jdbcCatalog.withCatalogConf(jdbcProps).withCatalogEntity(jdbcEntity);
+
+    Map<String, String> props = jdbcCatalog.properties();
+    Assertions.assertEquals("test-user", props.get(JdbcConfig.USERNAME.getKey()));
+    Assertions.assertEquals("test-password", props.get(JdbcConfig.PASSWORD.getKey()));
   }
 
   @Test
