@@ -276,14 +276,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .doc("Table metadata cache implementation")
           .version(ConfigConstants.VERSION_1_1_0)
           .stringConf()
-          .create();
+          .createWithDefault("org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache");
 
   public static final ConfigEntry<Integer> TABLE_METADATA_CACHE_CAPACITY =
       new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_CAPACITY)
           .doc("Table metadata cache capacity")
           .version(ConfigConstants.VERSION_1_1_0)
           .intConf()
-          .createWithDefault(200);
+          .createWithDefault(1000);
 
   public static final ConfigEntry<Integer> TABLE_METADATA_CACHE_EXPIRE_MINUTES =
       new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES)
