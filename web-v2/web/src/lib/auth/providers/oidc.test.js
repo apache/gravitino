@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { OidcOAuthProvider } from '@/lib/auth/providers/oidc'
 import { UserManager } from 'oidc-client-ts'
 
@@ -30,10 +30,33 @@ vi.mock('oidc-client-ts', () => ({
 describe('OidcOAuthProvider', () => {
   let provider
   let mockUserManager
+  let originalBasePath
+
+  const DEFAULT_SECURE_LOCATION = {
+    origin: 'https://localhost:3000',
+    protocol: 'https:',
+    hostname: 'localhost'
+  }
+
+  const setWindowLocation = ({ origin, protocol, hostname }) => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        ...window.location,
+        origin,
+        protocol,
+        hostname
+      }
+    })
+  }
 
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks()
+
+    originalBasePath = process.env.NEXT_PUBLIC_BASE_PATH
+    process.env.NEXT_PUBLIC_BASE_PATH = ''
+    setWindowLocation(DEFAULT_SECURE_LOCATION)
 
     // Create mock UserManager
     mockUserManager = {
@@ -47,6 +70,11 @@ describe('OidcOAuthProvider', () => {
     UserManager.mockImplementation(() => mockUserManager)
 
     provider = new OidcOAuthProvider()
+  })
+
+  afterEach(() => {
+    process.env.NEXT_PUBLIC_BASE_PATH = originalBasePath
+    setWindowLocation(DEFAULT_SECURE_LOCATION)
   })
 
   describe('initialization', () => {
@@ -91,14 +119,92 @@ describe('OidcOAuthProvider', () => {
         client_id: 'test-client',
         response_type: 'code',
         scope: 'openid profile',
-        redirect_uri: `${window.location.origin}/ui/oauth/callback`,
-        post_logout_redirect_uri: `${window.location.origin}/ui/oauth/logout`,
-        silent_redirect_uri: `${window.location.origin}/ui/oauth/silent-callback`,
+        redirect_uri: `${window.location.origin}/oauth/callback`,
+        post_logout_redirect_uri: `${window.location.origin}/oauth/logout`,
+        silent_redirect_uri: `${window.location.origin}/oauth/silent-callback`,
         automaticSilentRenew: true,
         silentRequestTimeout: 10000,
         userStore: expect.any(Object)
       })
       expect(UserManager).toHaveBeenCalledWith(provider.oidcConfig)
+    })
+
+    it('should include configured base path in callback urls', async () => {
+      process.env.NEXT_PUBLIC_BASE_PATH = '/ui'
+
+      const config = {
+        'gravitino.authenticator.oauth.authority': 'https://test.example.com',
+        'gravitino.authenticator.oauth.clientId': 'test-client',
+        'gravitino.authenticator.oauth.scope': 'openid profile'
+      }
+
+      await provider.initialize(config)
+
+      expect(provider.oidcConfig.redirect_uri).toBe(`${window.location.origin}/ui/oauth/callback`)
+      expect(provider.oidcConfig.post_logout_redirect_uri).toBe(`${window.location.origin}/ui/oauth/logout`)
+      expect(provider.oidcConfig.silent_redirect_uri).toBe(`${window.location.origin}/ui/oauth/silent-callback`)
+    })
+
+    it('should trim trailing slash for configured base path', async () => {
+      process.env.NEXT_PUBLIC_BASE_PATH = '/ui/'
+
+      const config = {
+        'gravitino.authenticator.oauth.authority': 'https://test.example.com',
+        'gravitino.authenticator.oauth.clientId': 'test-client'
+      }
+
+      await provider.initialize(config)
+
+      expect(provider.oidcConfig.redirect_uri).toBe(`${window.location.origin}/ui/oauth/callback`)
+      expect(provider.oidcConfig.post_logout_redirect_uri).toBe(`${window.location.origin}/ui/oauth/logout`)
+      expect(provider.oidcConfig.silent_redirect_uri).toBe(`${window.location.origin}/ui/oauth/silent-callback`)
+    })
+
+    it('should reject insecure non-localhost origins', async () => {
+      setWindowLocation({
+        origin: 'http://example.com:3000',
+        protocol: 'http:',
+        hostname: 'example.com'
+      })
+
+      const config = {
+        'gravitino.authenticator.oauth.authority': 'https://id.example.com/realms/myrealm',
+        'gravitino.authenticator.oauth.clientId': 'postman-client'
+      }
+
+      await expect(provider.initialize(config)).rejects.toThrow(
+        'OIDC login requires the UI to run on HTTPS or localhost. Current origin: http://example.com:3000'
+      )
+    })
+
+    it('should allow localhost over http', async () => {
+      setWindowLocation({
+        origin: 'http://localhost:3001',
+        protocol: 'http:',
+        hostname: 'localhost'
+      })
+
+      const config = {
+        'gravitino.authenticator.oauth.authority': 'https://id.example.com/realms/myrealm',
+        'gravitino.authenticator.oauth.clientId': 'postman-client'
+      }
+
+      await expect(provider.initialize(config)).resolves.toBeUndefined()
+    })
+
+    it('should allow https for non-localhost origins', async () => {
+      setWindowLocation({
+        origin: 'https://example.com:3000',
+        protocol: 'https:',
+        hostname: 'example.com'
+      })
+
+      const config = {
+        'gravitino.authenticator.oauth.authority': 'https://id.example.com/realms/myrealm',
+        'gravitino.authenticator.oauth.clientId': 'postman-client'
+      }
+
+      await expect(provider.initialize(config)).resolves.toBeUndefined()
     })
 
     it('should use default scope when not provided', async () => {
