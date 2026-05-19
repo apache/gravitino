@@ -123,15 +123,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     return new IcebergConfig(catalogConfig);
   }
 
-  @VisibleForTesting
-  static IcebergConfig getIcebergConfigFromCatalogProperties(
-      Map<String, String> catalogProperties) {
-    Map<String, String> properties = new HashMap<>();
-    properties.putAll(MapUtils.getPrefixMap(catalogProperties, CATALOG_BYPASS_PREFIX));
-    properties.putAll(catalogProperties);
-    return new IcebergConfig(properties);
-  }
-
   /**
    * Lazily creates the CatalogFetcher based on whether running in auxiliary mode. Uses internal
    * interface when in auxiliary mode (embedded in Gravitino server), otherwise uses HTTP interface.
@@ -176,6 +167,15 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   @Override
   public String getMetalakeName() {
     return gravitinoMetalake;
+  }
+
+  @VisibleForTesting
+  static IcebergConfig getIcebergConfigFromCatalogProperties(
+      Map<String, String> catalogProperties) {
+    Map<String, String> properties = new HashMap<>();
+    properties.putAll(MapUtils.getPrefixMap(catalogProperties, CATALOG_BYPASS_PREFIX));
+    properties.putAll(catalogProperties);
+    return new IcebergConfig(properties);
   }
 
   @Override
