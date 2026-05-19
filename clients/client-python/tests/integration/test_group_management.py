@@ -36,24 +36,38 @@ class TestGroupManagement(IntegrationTestEnv):
 
     @classmethod
     def setUpClass(cls):
-        if not (
+        cls._get_gravitino_home()
+        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
+        cls._reset_conf(
+            {"gravitino.authorization.enable": "true"}, conf_path
+        )
+        cls._append_conf(
+            {"gravitino.authorization.enable": "true"}, conf_path
+        )
+        if (
             os.environ.get("START_EXTERNAL_GRAVITINO") is not None
             and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
         ):
-            cls._get_gravitino_home()
-            conf_path = os.path.join(
-                cls.gravitino_home, "conf", "gravitino.conf"
-            )
-            cls._reset_conf(
-                {"gravitino.authorization.enable": "true"}, conf_path
-            )
-            cls._append_conf(
-                {"gravitino.authorization.enable": "true"}, conf_path
-            )
-        super().setUpClass()
+            cls.restart_server()
+        else:
+            super().setUpClass()
         cls._gravitino_admin_client = GravitinoAdminClient(
             uri="http://localhost:8090"
         )
+
+    @classmethod
+    def tearDownClass(cls):
+        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
+        cls._reset_conf(
+            {"gravitino.authorization.enable": "false"}, conf_path
+        )
+        if (
+            os.environ.get("START_EXTERNAL_GRAVITINO") is not None
+            and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
+        ):
+            cls.restart_server()
+        else:
+            super().tearDownClass()
 
     def setUp(self):
         self._gravitino_admin_client.create_metalake(
