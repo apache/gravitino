@@ -458,19 +458,23 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   /**
-   * Builds the logical schema inheritance chain for a SCHEMA MetadataObject. For a schema object
-   * whose parent is {@code catalog} and whose name is {@code "A:B:C"}, this returns MetadataObjects
-   * for parent {@code catalog} with schema names {@code A:B:C}, {@code A:B}, and {@code A} in that
-   * order.
+   * Builds the logical schema inheritance chain for a SCHEMA MetadataObject, ordered from the
+   * outermost ancestor to the schema itself. For a schema object whose parent is {@code catalog}
+   * and whose name is {@code "A:B:C"}, this returns MetadataObjects for parent {@code catalog} with
+   * schema names {@code A}, {@code A:B}, and {@code A:B:C} in that order so that an ancestor-level
+   * privilege grant short-circuits the authorization check before descending into more specific
+   * scopes.
    *
    * <p>For flat (non-HierarchicalSchema) schemas the list contains only the original object.
    */
   private List<MetadataObject> buildSchemaInheritanceChain(MetadataObject schemaObject) {
     String separator = HierarchicalSchemaUtil.schemaSeparator();
 
-    List<MetadataObject> chain = new ArrayList<>();
-    for (String scope : HierarchicalSchemaUtil.allScopes(schemaObject.name(), separator)) {
-      chain.add(MetadataObjects.of(schemaObject.parent(), scope, MetadataObject.Type.SCHEMA));
+    List<String> scopes = HierarchicalSchemaUtil.allScopes(schemaObject.name(), separator);
+    List<MetadataObject> chain = new ArrayList<>(scopes.size());
+    for (int i = scopes.size() - 1; i >= 0; i--) {
+      chain.add(
+          MetadataObjects.of(schemaObject.parent(), scopes.get(i), MetadataObject.Type.SCHEMA));
     }
     return ImmutableList.copyOf(chain);
   }
@@ -516,8 +520,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return false;
       }
       // For SCHEMA objects with hierarchical schema names (for example, parent=catalog and
-      // name="A:B:C"), walk the logical parent chain over the schema name segments so that a
-      // privilege granted on an ancestor schema is inherited by all descendant schemas.
+      // name="A:B:C"), walk the logical parent chain from the outermost ancestor down to the
+      // schema itself so that a privilege granted on an ancestor schema short-circuits the check
+      // before descending into more specific scopes.
       if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
         List<MetadataObject> chain = buildSchemaInheritanceChain(metadataObject);
         for (MetadataObject scopeObject : chain) {

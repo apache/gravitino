@@ -165,23 +165,23 @@ public class OwnerManager implements OwnerDispatcher {
             .collect(Collectors.toList());
 
     OwnerImpl newOwner = new OwnerImpl();
-    try {
-      NameIdentifier ownerIdent;
-      Entity.EntityType ownerEntityType;
-      if (ownerType == Owner.Type.USER) {
-        ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
-        ownerEntityType = Entity.EntityType.USER;
-        newOwner.name = ownerName;
-        newOwner.type = Owner.Type.USER;
-      } else if (ownerType == Owner.Type.GROUP) {
-        ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
-        ownerEntityType = Entity.EntityType.GROUP;
-        newOwner.name = ownerName;
-        newOwner.type = Owner.Type.GROUP;
-      } else {
-        throw new IllegalArgumentException("Unsupported owner type: " + ownerType);
-      }
+    NameIdentifier ownerIdent;
+    Entity.EntityType ownerEntityType;
+    if (ownerType == Owner.Type.USER) {
+      ownerIdent = AuthorizationUtils.ofUser(metalake, ownerName);
+      ownerEntityType = Entity.EntityType.USER;
+      newOwner.name = ownerName;
+      newOwner.type = Owner.Type.USER;
+    } else if (ownerType == Owner.Type.GROUP) {
+      ownerIdent = AuthorizationUtils.ofGroup(metalake, ownerName);
+      ownerEntityType = Entity.EntityType.GROUP;
+      newOwner.name = ownerName;
+      newOwner.type = Owner.Type.GROUP;
+    } else {
+      throw new IllegalArgumentException("Unsupported owner type: " + ownerType);
+    }
 
+    try {
       TreeLockUtils.doWithTreeLock(
           ownerIdent,
           LockType.READ,
@@ -198,15 +198,24 @@ public class OwnerManager implements OwnerDispatcher {
             return null;
           });
 
+      // Owner relations are already persisted; a failure for one plugin notification must not
+      // abort the remaining notifications and leave the batch half-notified.
       for (int i = 0; i < metadataObjects.size(); i++) {
         MetadataObject mo = metadataObjects.get(i);
         Optional<Owner> originOwner = originOwners.get(i);
-        AuthorizationUtils.callAuthorizationPluginForMetadataObject(
-            metalake,
-            mo,
-            authorizationPlugin ->
-                authorizationPlugin.onOwnerSet(mo, originOwner.orElse(null), newOwner));
-        originOwner.ifPresent(owner -> notifyOwnerChange(owner, metalake, mo));
+        try {
+          AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+              metalake,
+              mo,
+              authorizationPlugin ->
+                  authorizationPlugin.onOwnerSet(mo, originOwner.orElse(null), newOwner));
+          originOwner.ifPresent(owner -> notifyOwnerChange(owner, metalake, mo));
+        } catch (RuntimeException re) {
+          LOG.warn(
+              "Failed to notify authorization plugin for metadata object {} during batch setOwners",
+              mo.fullName(),
+              re);
+        }
       }
     } catch (NoSuchEntityException nse) {
       LOG.warn(

@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import lombok.Getter;
@@ -81,23 +82,26 @@ public class OwnerEventManager implements OwnerDispatcher {
     }
     String user = PrincipalUtils.getCurrentUserName();
     OwnerInfo ownerInfo = new OwnerInfo(ownerName, ownerType);
+    List<NameIdentifier> identifiers = new ArrayList<>(metadataObjects.size());
     for (MetadataObject metadataObject : metadataObjects) {
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-      MetadataObject.Type type = metadataObject.type();
-      eventBus.dispatchEvent(new SetOwnerPreEvent(user, identifier, ownerInfo, type));
+      identifiers.add(identifier);
+      eventBus.dispatchEvent(
+          new SetOwnerPreEvent(user, identifier, ownerInfo, metadataObject.type()));
     }
     try {
       ownerDispatcher.setOwners(metalake, metadataObjects, ownerName, ownerType);
-      for (MetadataObject metadataObject : metadataObjects) {
-        NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+      for (int i = 0; i < metadataObjects.size(); i++) {
+        MetadataObject metadataObject = metadataObjects.get(i);
         eventBus.dispatchEvent(
-            new SetOwnerEvent(user, identifier, ownerInfo, metadataObject.type()));
+            new SetOwnerEvent(user, identifiers.get(i), ownerInfo, metadataObject.type()));
       }
     } catch (Exception e) {
-      for (MetadataObject metadataObject : metadataObjects) {
-        NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+      for (int i = 0; i < metadataObjects.size(); i++) {
+        MetadataObject metadataObject = metadataObjects.get(i);
         eventBus.dispatchEvent(
-            new SetOwnerFailureEvent(user, identifier, e, ownerInfo, metadataObject.type()));
+            new SetOwnerFailureEvent(
+                user, identifiers.get(i), e, ownerInfo, metadataObject.type()));
       }
       throw e;
     }
