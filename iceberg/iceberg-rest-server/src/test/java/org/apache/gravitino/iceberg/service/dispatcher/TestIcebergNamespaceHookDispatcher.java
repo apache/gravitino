@@ -226,7 +226,9 @@ public class TestIcebergNamespaceHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedNamespaceOwnsOnlyLeaf() {
+  public void testCreateNestedNamespaceOwnsMissingAncestorsAndLeaf() {
+    // Depth-4 leaf, only A exists. Expect setOwners with [A:B, A:B:C, A:B:C:D] —
+    // missing ancestors (outermost first) + leaf; existing A is not re-owned.
     Namespace leaf = Namespace.of("A", "B", "C", "D");
     Set<String> existing = ImmutableSet.of("A");
     when(mockDispatcher.namespaceExists(eq(mockContext), any(Namespace.class)))
@@ -249,7 +251,9 @@ public class TestIcebergNamespaceHookDispatcher {
         .setOwners(eq(TEST_METALAKE), captor.capture(), eq(TEST_USER), eq(Owner.Type.USER));
     List<String> names =
         captor.getValue().stream().map(MetadataObject::fullName).collect(Collectors.toList());
-    Assertions.assertEquals(Arrays.asList(TEST_CATALOG + ".A:B:C:D"), names);
+    Assertions.assertEquals(
+        Arrays.asList(TEST_CATALOG + ".A:B", TEST_CATALOG + ".A:B:C", TEST_CATALOG + ".A:B:C:D"),
+        names);
   }
 
   @Test
