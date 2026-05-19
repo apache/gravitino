@@ -138,17 +138,38 @@ public class OwnerManager implements OwnerDispatcher {
   private void notifyOwnerChange(
       @Nullable Owner oldOwner, String metalake, MetadataObject metadataObject) {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
-    if (gravitinoAuthorizer != null) {
-      try {
-        Long oldOwnerId = oldOwner == null ? null : getOwnerId(metalake, oldOwner);
-        gravitinoAuthorizer.handleMetadataOwnerChange(
-            metalake,
-            oldOwnerId,
-            MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
-            Entity.EntityType.valueOf(metadataObject.type().name()));
-      } catch (Exception e) {
-        LOG.warn(e.getMessage(), e);
-      }
+    if (gravitinoAuthorizer == null) {
+      return;
+    }
+
+    Long oldOwnerId;
+    try {
+      oldOwnerId = oldOwner == null ? null : getOwnerId(metalake, oldOwner);
+    } catch (IOException e) {
+      LOG.warn(
+          "Failed to resolve previous owner id for {} (metalake={}, oldOwner={}); "
+              + "cache invalidation for this change may be skipped on this node",
+          metadataObject.fullName(),
+          metalake,
+          oldOwner,
+          e);
+      return;
+    }
+
+    try {
+      gravitinoAuthorizer.handleMetadataOwnerChange(
+          metalake,
+          oldOwnerId,
+          MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
+          Entity.EntityType.valueOf(metadataObject.type().name()));
+    } catch (RuntimeException e) {
+      // Best-effort hook: a failing authorizer must not fail the owner-change operation itself.
+      LOG.warn(
+          "Authorizer hook failed for owner change on {} (metalake={}, oldOwnerId={})",
+          metadataObject.fullName(),
+          metalake,
+          oldOwnerId,
+          e);
     }
   }
 

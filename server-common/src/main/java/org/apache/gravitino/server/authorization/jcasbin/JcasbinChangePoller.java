@@ -123,6 +123,9 @@ public class JcasbinChangePoller implements AutoCloseable {
       LOG.debug("Polling for owner changes after id {}", ownerPollHighWaterId);
       pollOwnerChanges();
     } catch (Exception e) {
+      if (handleInterruptIfAny(e, "Owner change poll")) {
+        return;
+      }
       LOG.warn("Owner change poll failed", e);
     }
 
@@ -130,8 +133,33 @@ public class JcasbinChangePoller implements AutoCloseable {
       LOG.debug("Polling for entity changes after id {}", entityPollHighWaterId);
       pollEntityChanges();
     } catch (Exception e) {
+      if (handleInterruptIfAny(e, "Entity change poll")) {
+        return;
+      }
       LOG.warn("Entity change poll failed", e);
     }
+  }
+
+  /**
+   * Restores the interrupt flag and returns true if {@code e} carries (or the current thread has
+   * accumulated) an interruption, so the caller can bail out of this poll cycle quickly during
+   * {@link #close()}-driven {@code shutdownNow()}.
+   */
+  private static boolean handleInterruptIfAny(Throwable e, String context) {
+    Throwable t = e;
+    while (t != null) {
+      if (t instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+        LOG.debug("{} interrupted, stopping poll cycle", context);
+        return true;
+      }
+      t = t.getCause();
+    }
+    if (Thread.currentThread().isInterrupted()) {
+      LOG.debug("{} ran while thread was interrupted, stopping poll cycle", context);
+      return true;
+    }
+    return false;
   }
 
   /**

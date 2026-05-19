@@ -1075,19 +1075,37 @@ public class TestJcasbinAuthorizer {
   @Test
   public void testCloseAwaitsRoleLoadExecutorTermination() throws Exception {
     RecordingThreadPoolExecutor executor = new RecordingThreadPoolExecutor();
-    Field field = JcasbinAuthorizer.class.getDeclaredField("executor");
-    field.setAccessible(true);
-    Executor originalExecutor = (Executor) FieldUtils.readField(field, jcasbinAuthorizer, true);
+
+    Field executorField = JcasbinAuthorizer.class.getDeclaredField("executor");
+    Field changePollerField = JcasbinAuthorizer.class.getDeclaredField("changePoller");
+    Field metadataIdCacheField = JcasbinAuthorizer.class.getDeclaredField("metadataIdCache");
+    Field ownerRelCacheField = JcasbinAuthorizer.class.getDeclaredField("ownerRelCache");
+
+    Executor originalExecutor =
+        (Executor) FieldUtils.readField(executorField, jcasbinAuthorizer, true);
+    Object originalPoller = FieldUtils.readField(changePollerField, jcasbinAuthorizer, true);
+    Object originalMetadataIdCache =
+        FieldUtils.readField(metadataIdCacheField, jcasbinAuthorizer, true);
+    Object originalOwnerRelCache =
+        FieldUtils.readField(ownerRelCacheField, jcasbinAuthorizer, true);
 
     try {
-      FieldUtils.writeField(field, jcasbinAuthorizer, executor, true);
+      FieldUtils.writeField(executorField, jcasbinAuthorizer, executor, true);
+      // Detach shared resources so close() only exercises the executor shutdown branch and does
+      // not leave the shared poller / caches in a closed state for subsequent tests.
+      FieldUtils.writeField(changePollerField, jcasbinAuthorizer, null, true);
+      FieldUtils.writeField(metadataIdCacheField, jcasbinAuthorizer, null, true);
+      FieldUtils.writeField(ownerRelCacheField, jcasbinAuthorizer, null, true);
 
       jcasbinAuthorizer.close();
 
       assertTrue(executor.shutdownCalled.get());
       assertTrue(executor.awaitTerminationCalled.get());
     } finally {
-      FieldUtils.writeField(field, jcasbinAuthorizer, originalExecutor, true);
+      FieldUtils.writeField(executorField, jcasbinAuthorizer, originalExecutor, true);
+      FieldUtils.writeField(changePollerField, jcasbinAuthorizer, originalPoller, true);
+      FieldUtils.writeField(metadataIdCacheField, jcasbinAuthorizer, originalMetadataIdCache, true);
+      FieldUtils.writeField(ownerRelCacheField, jcasbinAuthorizer, originalOwnerRelCache, true);
     }
   }
 
