@@ -105,7 +105,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       ImmutableSet.of(
           GlueConstants.LOCATION,
           GlueConstants.FORMAT,
-          GlueConstants.INPUT_FORMAT,
+          GlueConstants.INPUT_FORMAT_CLASS,
           GlueConstants.OUTPUT_FORMAT,
           GlueConstants.SERDE_LIB,
           GlueConstants.SERDE_NAME);
@@ -686,7 +686,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     // Translate format name to input/output/serde class names if not explicitly set
     String format = properties.get(GlueConstants.FORMAT);
-    String inputFormat = properties.get(GlueConstants.INPUT_FORMAT);
+    String inputFormat = properties.get(GlueConstants.INPUT_FORMAT_CLASS);
     String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
     String serdeLib = properties.get(GlueConstants.SERDE_LIB);
 

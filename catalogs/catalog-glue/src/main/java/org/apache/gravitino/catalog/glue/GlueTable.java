@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.glue;
 
-import static org.apache.gravitino.catalog.glue.GlueConstants.INPUT_FORMAT;
+import static org.apache.gravitino.catalog.glue.GlueConstants.INPUT_FORMAT_CLASS;
 import static org.apache.gravitino.catalog.glue.GlueConstants.LOCATION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.OUTPUT_FORMAT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_LIB;
@@ -181,7 +181,7 @@ public class GlueTable extends BaseTable {
     }
     if (sd != null) {
       putIfNotBlank(properties, LOCATION, sd.location());
-      putIfNotBlank(properties, INPUT_FORMAT, sd.inputFormat());
+      putIfNotBlank(properties, INPUT_FORMAT_CLASS, sd.inputFormat());
       putIfNotBlank(properties, OUTPUT_FORMAT, sd.outputFormat());
       if (sd.serdeInfo() != null) {
         putIfNotBlank(properties, SERDE_LIB, sd.serdeInfo().serializationLibrary());
