@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package org.apache.gravitino.storage.relational.mapper;
+package org.apache.gravitino.idp.storage.mapper;
 
 import java.util.List;
-import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
+import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -31,13 +31,11 @@ import org.apache.ibatis.annotations.UpdateProvider;
  * A MyBatis mapper for built-in IdP group-user relation operations.
  *
  * <p>This interface defines the SQL statements MyBatis executes for the built-in IdP group-user
- * relation store. The SQLs can be provided by XML files or annotations on this mapper interface.
- * See the <a href="https://mybatis.org/mybatis-3/getting-started.html">MyBatis getting started
- * guide</a>.
+ * relation store. The SQLs are provided through {@code *Provider} annotations on this mapper
+ * interface. See the <a href="https://mybatis.org/mybatis-3/getting-started.html">MyBatis getting
+ * started guide</a>.
  */
 public interface IdpGroupUserRelMapper {
-  String IDP_USER_TABLE_NAME = "idp_user_meta";
-  String IDP_GROUP_TABLE_NAME = "idp_group_meta";
   String IDP_GROUP_USER_REL_TABLE_NAME = "idp_group_user_rel";
 
   @SelectProvider(

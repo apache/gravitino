@@ -16,14 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.mapper.provider.base;
+
+package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
+import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.SqlSource;
 import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
@@ -34,19 +35,26 @@ import org.junit.jupiter.api.Test;
 public class TestIdpGroupUserRelBaseSQLProvider {
 
   protected IdpGroupUserRelBaseSQLProvider createProvider() {
-    return new IdpGroupUserRelBaseSQLProvider();
+    return new IdpGroupUserRelBaseSQLProvider() {
+      @Override
+      protected String currentTimeMillisExpression() {
+        return "CURRENT_TIME_MILLIS()";
+      }
+    };
   }
 
-  protected String expectedDeleteAtClause() {
-    return "deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+  protected String expectedSoftDeleteSetClause() {
+    return " SET deleted_at = CURRENT_TIME_MILLIS(), current_version = current_version + 1,"
+        + " last_version = last_version + 1";
   }
 
   protected String expectedDeleteIdpGroupUserRelMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_group_user_rel WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+    return "DELETE FROM idp_group_user_rel WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " LIMIT #{limit}";
   }
 
   @Test
-  public void testSelectGroupNamesByUserId() {
+  void testSelectGroupNamesByUserId() {
     String normalizedSql =
         createProvider().selectGroupNamesByUserId(1L).replaceAll("\\s+", " ").trim();
 
@@ -58,7 +66,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testSelectUserNamesByGroupId() {
+  void testSelectUserNamesByGroupId() {
     String normalizedSql =
         createProvider().selectUserNamesByGroupId(1L).replaceAll("\\s+", " ").trim();
 
@@ -69,7 +77,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testSelectRelatedUserIds() {
+  void testSelectRelatedUserIds() {
     String script = createProvider().selectRelatedUserIds(1L, Arrays.asList(10L, 20L));
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 1L);
@@ -84,7 +92,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testSelectRelatedUserIdsWithEmptyUserIds() {
+  void testSelectRelatedUserIdsWithEmptyUserIds() {
     String script = createProvider().selectRelatedUserIds(1L, Collections.emptyList());
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 1L);
@@ -101,7 +109,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testSelectRelatedUserIdsWithNullUserIds() {
+  void testSelectRelatedUserIdsWithNullUserIds() {
     String script = createProvider().selectRelatedUserIds(1L, null);
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 1L);
@@ -117,7 +125,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testBatchInsertIdpGroupUsers() {
+  void testBatchInsertIdpGroupUsers() {
     List<IdpGroupUserRelPO> relations =
         Arrays.asList(newRelation(1L, 10L, 20L), newRelation(2L, 10L, 21L));
 
@@ -140,7 +148,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteIdpGroupUsers() {
+  void testSoftDeleteIdpGroupUsers() {
     String script = createProvider().softDeleteIdpGroupUsers(10L, Arrays.asList(20L, 21L));
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
@@ -149,14 +157,12 @@ public class TestIdpGroupUserRelBaseSQLProvider {
     String normalizedSql = renderScript(script, params);
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
-    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("current_version = current_version + 1"));
-    Assertions.assertTrue(normalizedSql.contains("last_version = last_version + 1"));
+    Assertions.assertTrue(normalizedSql.contains(expectedSoftDeleteSetClause()));
     Assertions.assertTrue(normalizedSql.matches(".*user_id IN \\( \\? , \\? \\).*"));
   }
 
   @Test
-  public void testSoftDeleteIdpGroupUsersWithEmptyUserIds() {
+  void testSoftDeleteIdpGroupUsersWithEmptyUserIds() {
     String script = createProvider().softDeleteIdpGroupUsers(10L, Collections.emptyList());
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
@@ -173,7 +179,7 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteIdpGroupUsersWithNullUserIds() {
+  void testSoftDeleteIdpGroupUsersWithNullUserIds() {
     String script = createProvider().softDeleteIdpGroupUsers(10L, null);
     Map<String, Object> params = new HashMap<>();
     params.put("groupId", 10L);
@@ -189,27 +195,27 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  public void testSoftDeleteGroupUsersByUserId() {
+  void testSoftDeleteGroupUsersByUserId() {
     String normalizedSql =
         createProvider().softDeleteGroupUsersByUserId(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
-    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
+    Assertions.assertTrue(normalizedSql.contains(expectedSoftDeleteSetClause()));
     Assertions.assertTrue(normalizedSql.contains("WHERE user_id = #{userId} AND deleted_at = 0"));
   }
 
   @Test
-  public void testSoftDeleteGroupUsersByGroupId() {
+  void testSoftDeleteGroupUsersByGroupId() {
     String normalizedSql =
         createProvider().softDeleteGroupUsersByGroupId(1L).replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_user_rel"));
-    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
+    Assertions.assertTrue(normalizedSql.contains(expectedSoftDeleteSetClause()));
     Assertions.assertTrue(normalizedSql.contains("WHERE group_id = #{groupId} AND deleted_at = 0"));
   }
 
   @Test
-  public void testDeleteIdpGroupUserRelMetasByLegacyTimeline() {
+  void testDeleteIdpGroupUserRelMetasByLegacyTimeline() {
     String normalizedSql =
         createProvider()
             .deleteIdpGroupUserRelMetasByLegacyTimeline(1L, 2)
@@ -217,6 +223,13 @@ public class TestIdpGroupUserRelBaseSQLProvider {
             .trim();
 
     Assertions.assertEquals(expectedDeleteIdpGroupUserRelMetasByLegacyTimelineSql(), normalizedSql);
+  }
+
+  @Test
+  void testCurrentTimeMillisExpression() {
+    Assertions.assertEquals(
+        "(UNIX_TIMESTAMP() * 1000.0)",
+        new IdpGroupUserRelBaseSQLProvider().currentTimeMillisExpression());
   }
 
   private String renderScript(String script, Map<String, Object> params) {

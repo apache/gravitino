@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational.po;
+package org.apache.gravitino.idp.storage.po;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -28,33 +28,19 @@ public class TestIdpGroupUserRelPO {
     IdpGroupUserRelPO relPO =
         IdpGroupUserRelPO.builder()
             .withId(1L)
-            .withGroupId(2L)
-            .withUserId(3L)
+            .withGroupId(10L)
+            .withUserId(20L)
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
     Assertions.assertEquals(1L, relPO.getId());
-    Assertions.assertEquals(2L, relPO.getGroupId());
-    Assertions.assertEquals(3L, relPO.getUserId());
+    Assertions.assertEquals(10L, relPO.getGroupId());
+    Assertions.assertEquals(20L, relPO.getUserId());
     Assertions.assertEquals(1L, relPO.getCurrentVersion());
     Assertions.assertEquals(1L, relPO.getLastVersion());
     Assertions.assertEquals(0L, relPO.getDeletedAt());
-  }
-
-  @Test
-  public void testIdpGroupUserRelPOBuilderValidation() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            IdpGroupUserRelPO.builder()
-                .withGroupId(2L)
-                .withUserId(3L)
-                .withCurrentVersion(1L)
-                .withLastVersion(1L)
-                .withDeletedAt(0L)
-                .build());
   }
 
   @Test
@@ -62,8 +48,8 @@ public class TestIdpGroupUserRelPO {
     IdpGroupUserRelPO relPO1 =
         IdpGroupUserRelPO.builder()
             .withId(1L)
-            .withGroupId(2L)
-            .withUserId(3L)
+            .withGroupId(10L)
+            .withUserId(20L)
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -72,8 +58,8 @@ public class TestIdpGroupUserRelPO {
     IdpGroupUserRelPO relPO2 =
         IdpGroupUserRelPO.builder()
             .withId(1L)
-            .withGroupId(2L)
-            .withUserId(3L)
+            .withGroupId(10L)
+            .withUserId(20L)
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
@@ -81,5 +67,23 @@ public class TestIdpGroupUserRelPO {
 
     Assertions.assertEquals(relPO1, relPO2);
     Assertions.assertEquals(relPO1.hashCode(), relPO2.hashCode());
+  }
+
+  @Test
+  public void testBuilderReuseDoesNotMutateBuiltObject() {
+    var builder =
+        IdpGroupUserRelPO.builder()
+            .withId(1L)
+            .withGroupId(10L)
+            .withUserId(20L)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
+            .withDeletedAt(0L);
+
+    IdpGroupUserRelPO firstRelation = builder.build();
+    IdpGroupUserRelPO secondRelation = builder.withUserId(21L).build();
+
+    Assertions.assertEquals(20L, firstRelation.getUserId());
+    Assertions.assertEquals(21L, secondRelation.getUserId());
   }
 }

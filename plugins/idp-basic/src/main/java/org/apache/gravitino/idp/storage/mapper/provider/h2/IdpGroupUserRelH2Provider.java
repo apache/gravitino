@@ -17,15 +17,15 @@
  * under the License.
  */
 
-package org.apache.gravitino.storage.relational.mapper.provider.h2;
+package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
-import org.apache.gravitino.storage.relational.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.mapper.provider.base.TestIdpGroupMetaBaseSQLProvider;
+import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupUserRelBaseSQLProvider;
 
-public class TestIdpGroupMetaH2Provider extends TestIdpGroupMetaBaseSQLProvider {
+/** SQL provider for IdP group-user relation statements on H2 backends. */
+public class IdpGroupUserRelH2Provider extends IdpGroupUserRelBaseSQLProvider {
 
   @Override
-  protected IdpGroupMetaBaseSQLProvider createProvider() {
-    return new IdpGroupMetaH2Provider();
+  protected String currentTimeMillisExpression() {
+    return "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
   }
 }

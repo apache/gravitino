@@ -16,16 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.idp.storage.po;
 
-package org.apache.gravitino.storage.relational.mapper;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 
-import org.apache.gravitino.storage.relational.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.mapper.provider.base.TestIdpGroupMetaBaseSQLProvider;
-
-public class TestIdpGroupMetaMySQLProvider extends TestIdpGroupMetaBaseSQLProvider {
-
-  @Override
-  protected IdpGroupMetaBaseSQLProvider createProvider() {
-    return new IdpGroupMetaSQLProviderFactory.IdpGroupMetaMySQLProvider();
-  }
+@Getter
+@EqualsAndHashCode
+@ToString
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder(setterPrefix = "with")
+public class IdpGroupUserRelPO {
+  private Long id;
+  private Long groupId;
+  private Long userId;
+  private Long currentVersion;
+  private Long lastVersion;
+  private Long deletedAt;
 }

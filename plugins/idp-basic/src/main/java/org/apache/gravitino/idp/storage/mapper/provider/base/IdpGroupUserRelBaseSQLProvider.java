@@ -17,11 +17,13 @@
  * under the License.
  */
 
-package org.apache.gravitino.storage.relational.mapper.provider.base;
+package org.apache.gravitino.idp.storage.mapper.provider.base;
 
 import java.util.List;
-import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
-import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
+import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpGroupUserRelMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
+import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpGroupUserRelBaseSQLProvider {
@@ -31,7 +33,7 @@ public class IdpGroupUserRelBaseSQLProvider {
         + " FROM "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " r JOIN "
-        + IdpGroupUserRelMapper.IDP_GROUP_TABLE_NAME
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g ON g.group_id = r.group_id"
         + " WHERE r.user_id = #{userId}"
         + " AND r.deleted_at = 0"
@@ -44,7 +46,7 @@ public class IdpGroupUserRelBaseSQLProvider {
         + " FROM "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " r JOIN "
-        + IdpGroupUserRelMapper.IDP_USER_TABLE_NAME
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " u ON u.user_id = r.user_id"
         + " WHERE r.group_id = #{groupId}"
         + " AND r.deleted_at = 0"
@@ -93,10 +95,7 @@ public class IdpGroupUserRelBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000,"
-        + " current_version = current_version + 1,"
-        + " last_version = last_version + 1"
+        + softDeleteSetClause()
         + " WHERE group_id = #{groupId} "
         + "<choose>"
         + "<when test='userIds != null and userIds.size() > 0'>"
@@ -117,20 +116,14 @@ public class IdpGroupUserRelBaseSQLProvider {
   public String softDeleteGroupUsersByUserId(@Param("userId") Long userId) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000,"
-        + " current_version = current_version + 1,"
-        + " last_version = last_version + 1"
+        + softDeleteSetClause()
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 
   public String softDeleteGroupUsersByGroupId(@Param("groupId") Long groupId) {
     return "UPDATE "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000,"
-        + " current_version = current_version + 1,"
-        + " last_version = last_version + 1"
+        + softDeleteSetClause()
         + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 
@@ -139,5 +132,16 @@ public class IdpGroupUserRelBaseSQLProvider {
     return "DELETE FROM "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  protected String softDeleteSetClause() {
+    return " SET deleted_at = "
+        + currentTimeMillisExpression()
+        + ", current_version = current_version + 1,"
+        + " last_version = last_version + 1";
+  }
+
+  protected String currentTimeMillisExpression() {
+    return "(UNIX_TIMESTAMP() * 1000.0)";
   }
 }
