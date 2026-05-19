@@ -45,21 +45,7 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
 
   @Override
   public void initialize(Map<String, String> properties) {
-    this.catalogConfigs =
-        properties.keySet().stream()
-            .map(this::getCatalogName)
-            .filter(Optional::isPresent)
-            .map(Optional::get)
-            .distinct()
-            .collect(
-                Collectors.toMap(
-                    catalogName -> catalogName,
-                    catalogName ->
-                        new IcebergConfig(
-                            MapUtils.getPrefixMap(
-                                properties, String.format("catalog.%s.", catalogName)))));
-    this.catalogConfigs.put(
-        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, new IcebergConfig(properties));
+    this.catalogConfigs = initCatalogConfigs(properties);
   }
 
   @Override
@@ -70,7 +56,26 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
   @Override
   public void close() {}
 
-  private Optional<String> getCatalogName(String catalogConfigKey) {
+  @VisibleForTesting
+  static Map<String, IcebergConfig> initCatalogConfigs(Map<String, String> properties) {
+    Map<String, IcebergConfig> configs =
+        properties.keySet().stream()
+            .map(StaticIcebergConfigProvider::getCatalogName)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .distinct()
+            .collect(
+                Collectors.toMap(
+                    catalogName -> catalogName,
+                    catalogName ->
+                        new IcebergConfig(
+                            MapUtils.getPrefixMap(
+                                properties, String.format("catalog.%s.", catalogName)))));
+    configs.put(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, new IcebergConfig(properties));
+    return configs;
+  }
+
+  private static Optional<String> getCatalogName(String catalogConfigKey) {
     if (!catalogConfigKey.startsWith("catalog.")) {
       return Optional.empty();
     }
