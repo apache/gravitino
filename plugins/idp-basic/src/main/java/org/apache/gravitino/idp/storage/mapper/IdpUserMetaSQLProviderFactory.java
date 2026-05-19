@@ -19,65 +19,47 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.List;
-import java.util.Map;
+import org.apache.gravitino.idp.storage.mapper.SQLProviderFactoryHelper.ProviderMap;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserMetaBaseSQLProvider;
 import org.apache.gravitino.idp.storage.mapper.provider.h2.IdpUserMetaH2Provider;
 import org.apache.gravitino.idp.storage.mapper.provider.postgresql.IdpUserMetaPostgreSQLProvider;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpUserMetaSQLProviderFactory {
-  private static final IdpUserMetaBaseSQLProvider MYSQL_PROVIDER = new IdpUserMetaBaseSQLProvider();
-  private static final IdpUserMetaBaseSQLProvider H2_PROVIDER = new IdpUserMetaH2Provider();
-  private static final IdpUserMetaBaseSQLProvider POSTGRESQL_PROVIDER =
-      new IdpUserMetaPostgreSQLProvider();
-  private static final Map<JDBCBackendType, IdpUserMetaBaseSQLProvider> PROVIDER_MAP =
-      ImmutableMap.of(
-          JDBCBackendType.MYSQL,
-          MYSQL_PROVIDER,
-          JDBCBackendType.H2,
-          H2_PROVIDER,
-          JDBCBackendType.POSTGRESQL,
-          POSTGRESQL_PROVIDER);
+  private static final ProviderMap<IdpUserMetaBaseSQLProvider> PROVIDER_MAP =
+      SQLProviderFactoryHelper.providerMap(
+          IdpUserMetaSQLProviderFactory.class,
+          new IdpUserMetaBaseSQLProvider(),
+          new IdpUserMetaH2Provider(),
+          new IdpUserMetaPostgreSQLProvider());
 
   private IdpUserMetaSQLProviderFactory() {}
 
-  private static IdpUserMetaBaseSQLProvider currentProvider() {
-    return SQLProviderFactoryHelper.currentProvider(
-        PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
-  }
-
-  static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
-    return SQLProviderFactoryHelper.getProvider(
-        databaseId, PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
-  }
-
   public static String selectIdpUser(@Param("username") String username) {
-    return currentProvider().selectIdpUser(username);
+    return PROVIDER_MAP.currentProvider().selectIdpUser(username);
   }
 
   public static String selectIdpUsers(@Param("usernames") List<String> usernames) {
-    return currentProvider().selectIdpUsers(usernames);
+    return PROVIDER_MAP.currentProvider().selectIdpUsers(usernames);
   }
 
   public static String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
-    return currentProvider().insertIdpUser(userPO);
+    return PROVIDER_MAP.currentProvider().insertIdpUser(userPO);
   }
 
   public static String updateIdpUserPassword(
       @Param("userId") Long userId, @Param("passwordHash") String passwordHash) {
-    return currentProvider().updateIdpUserPassword(userId, passwordHash);
+    return PROVIDER_MAP.currentProvider().updateIdpUserPassword(userId, passwordHash);
   }
 
   public static String softDeleteIdpUser(@Param("userId") Long userId) {
-    return currentProvider().softDeleteIdpUser(userId);
+    return PROVIDER_MAP.currentProvider().softDeleteIdpUser(userId);
   }
 
   public static String deleteIdpUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return currentProvider().deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit);
+    return PROVIDER_MAP.currentProvider().deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }

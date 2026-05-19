@@ -19,76 +19,59 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.List;
-import java.util.Map;
+import org.apache.gravitino.idp.storage.mapper.SQLProviderFactoryHelper.ProviderMap;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupUserRelBaseSQLProvider;
 import org.apache.gravitino.idp.storage.mapper.provider.h2.IdpGroupUserRelH2Provider;
 import org.apache.gravitino.idp.storage.mapper.provider.postgresql.IdpGroupUserRelPostgreSQLProvider;
 import org.apache.gravitino.idp.storage.po.IdpGroupUserRelPO;
-import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpGroupUserRelSQLProviderFactory {
-  private static final IdpGroupUserRelBaseSQLProvider MYSQL_PROVIDER =
-      new IdpGroupUserRelBaseSQLProvider();
-  private static final IdpGroupUserRelBaseSQLProvider H2_PROVIDER = new IdpGroupUserRelH2Provider();
-  private static final IdpGroupUserRelBaseSQLProvider POSTGRESQL_PROVIDER =
-      new IdpGroupUserRelPostgreSQLProvider();
-  private static final Map<JDBCBackendType, IdpGroupUserRelBaseSQLProvider> PROVIDER_MAP =
-      ImmutableMap.of(
-          JDBCBackendType.MYSQL,
-          MYSQL_PROVIDER,
-          JDBCBackendType.H2,
-          H2_PROVIDER,
-          JDBCBackendType.POSTGRESQL,
-          POSTGRESQL_PROVIDER);
+  private static final ProviderMap<IdpGroupUserRelBaseSQLProvider> PROVIDER_MAP =
+      SQLProviderFactoryHelper.providerMap(
+          IdpGroupUserRelSQLProviderFactory.class,
+          new IdpGroupUserRelBaseSQLProvider(),
+          new IdpGroupUserRelH2Provider(),
+          new IdpGroupUserRelPostgreSQLProvider());
 
   private IdpGroupUserRelSQLProviderFactory() {}
 
-  private static IdpGroupUserRelBaseSQLProvider currentProvider() {
-    return SQLProviderFactoryHelper.currentProvider(
-        PROVIDER_MAP, IdpGroupUserRelSQLProviderFactory.class);
-  }
-
-  static IdpGroupUserRelBaseSQLProvider getProvider(String databaseId) {
-    return SQLProviderFactoryHelper.getProvider(
-        databaseId, PROVIDER_MAP, IdpGroupUserRelSQLProviderFactory.class);
-  }
-
   public static String selectGroupNamesByUserId(@Param("userId") Long userId) {
-    return currentProvider().selectGroupNamesByUserId(userId);
+    return PROVIDER_MAP.currentProvider().selectGroupNamesByUserId(userId);
   }
 
   public static String selectUserNamesByGroupId(@Param("groupId") Long groupId) {
-    return currentProvider().selectUserNamesByGroupId(groupId);
+    return PROVIDER_MAP.currentProvider().selectUserNamesByGroupId(groupId);
   }
 
   public static String selectRelatedUserIds(
       @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
-    return currentProvider().selectRelatedUserIds(groupId, userIds);
+    return PROVIDER_MAP.currentProvider().selectRelatedUserIds(groupId, userIds);
   }
 
   public static String batchInsertIdpGroupUsers(
       @Param("relations") List<IdpGroupUserRelPO> relations) {
-    return currentProvider().batchInsertIdpGroupUsers(relations);
+    return PROVIDER_MAP.currentProvider().batchInsertIdpGroupUsers(relations);
   }
 
   public static String softDeleteIdpGroupUsers(
       @Param("groupId") Long groupId, @Param("userIds") List<Long> userIds) {
-    return currentProvider().softDeleteIdpGroupUsers(groupId, userIds);
+    return PROVIDER_MAP.currentProvider().softDeleteIdpGroupUsers(groupId, userIds);
   }
 
   public static String softDeleteGroupUsersByUserId(@Param("userId") Long userId) {
-    return currentProvider().softDeleteGroupUsersByUserId(userId);
+    return PROVIDER_MAP.currentProvider().softDeleteGroupUsersByUserId(userId);
   }
 
   public static String softDeleteGroupUsersByGroupId(@Param("groupId") Long groupId) {
-    return currentProvider().softDeleteGroupUsersByGroupId(groupId);
+    return PROVIDER_MAP.currentProvider().softDeleteGroupUsersByGroupId(groupId);
   }
 
   public static String deleteIdpGroupUserRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return currentProvider().deleteIdpGroupUserRelMetasByLegacyTimeline(legacyTimeline, limit);
+    return PROVIDER_MAP
+        .currentProvider()
+        .deleteIdpGroupUserRelMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }
