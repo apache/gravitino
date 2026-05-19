@@ -179,6 +179,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     assertFalse(interceptor.isExceptionPropagate(otherException));
   }
 
+  @Test
   public void testExtractNestedSchemaNamespace() throws Exception {
     IcebergMetadataAuthorizationMethodInterceptor interceptor =
         new IcebergMetadataAuthorizationMethodInterceptor();

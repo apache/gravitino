@@ -80,7 +80,7 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
             () -> {
               // Pre-probe so we only claim ownership of truly-new ancestors, never overwriting
               // an existing parent's owner.
-              getMissingAncestors(context, leaf);
+              newlyOwned.addAll(getMissingAncestors(context, leaf));
               return dispatcher.createNamespace(context, createRequest);
             });
     // SchemaMetaService.insertSchema splits the leaf's logical name and auto-creates a
