@@ -54,25 +54,27 @@ public class TestIdpGroupUserRelBaseSQLProvider {
   }
 
   @Test
-  void testSelectGroupNamesByUserId() {
+  void testSelectGroupNamesByUsername() {
     String normalizedSql =
-        createProvider().selectGroupNamesByUserId(1L).replaceAll("\\s+", " ").trim();
+        createProvider().selectGroupNamesByUsername("alice").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT g.group_name"));
     Assertions.assertTrue(
         normalizedSql.contains("FROM idp_group_user_rel r JOIN idp_group_meta g"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE r.user_id = #{userId}"));
+    Assertions.assertTrue(normalizedSql.contains("JOIN idp_user_meta u"));
+    Assertions.assertTrue(normalizedSql.contains("WHERE u.user_name = #{username}"));
     Assertions.assertTrue(normalizedSql.contains("ORDER BY g.group_name"));
   }
 
   @Test
-  void testSelectUsernamesByGroupId() {
+  void testSelectUsernamesByGroupName() {
     String normalizedSql =
-        createProvider().selectUsernamesByGroupId(1L).replaceAll("\\s+", " ").trim();
+        createProvider().selectUsernamesByGroupName("dev").replaceAll("\\s+", " ").trim();
 
     Assertions.assertTrue(normalizedSql.contains("SELECT u.user_name"));
     Assertions.assertTrue(normalizedSql.contains("FROM idp_group_user_rel r JOIN idp_user_meta u"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE r.group_id = #{groupId}"));
+    Assertions.assertTrue(normalizedSql.contains("JOIN idp_group_meta g"));
+    Assertions.assertTrue(normalizedSql.contains("WHERE g.group_name = #{groupName}"));
     Assertions.assertTrue(normalizedSql.contains("ORDER BY u.user_name"));
   }
 

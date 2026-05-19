@@ -40,13 +40,13 @@ public interface IdpGroupUserRelMapper {
 
   @SelectProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "selectGroupNamesByUserId")
-  List<String> selectGroupNamesByUserId(@Param("userId") Long userId);
+      method = "selectGroupNamesByUsername")
+  List<String> selectGroupNamesByUsername(@Param("username") String username);
 
   @SelectProvider(
       type = IdpGroupUserRelSQLProviderFactory.class,
-      method = "selectUsernamesByGroupId")
-  List<String> selectUsernamesByGroupId(@Param("groupId") Long groupId);
+      method = "selectUsernamesByGroupName")
+  List<String> selectUsernamesByGroupName(@Param("groupName") String groupName);
 
   @InsertProvider(type = IdpGroupUserRelSQLProviderFactory.class, method = "batchInsertRelations")
   void batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations);

@@ -28,29 +28,37 @@ import org.apache.ibatis.annotations.Param;
 
 public class IdpGroupUserRelBaseSQLProvider {
 
-  public String selectGroupNamesByUserId(@Param("userId") Long userId) {
+  public String selectGroupNamesByUsername(@Param("username") String username) {
     return "SELECT g.group_name"
         + " FROM "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " r JOIN "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g ON g.group_id = r.group_id"
-        + " WHERE r.user_id = #{userId}"
+        + " JOIN "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u ON u.user_id = r.user_id"
+        + " WHERE u.user_name = #{username}"
         + " AND r.deleted_at = 0"
         + " AND g.deleted_at = 0"
+        + " AND u.deleted_at = 0"
         + " ORDER BY g.group_name";
   }
 
-  public String selectUsernamesByGroupId(@Param("groupId") Long groupId) {
+  public String selectUsernamesByGroupName(@Param("groupName") String groupName) {
     return "SELECT u.user_name"
         + " FROM "
         + IdpGroupUserRelMapper.IDP_GROUP_USER_REL_TABLE_NAME
         + " r JOIN "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " u ON u.user_id = r.user_id"
-        + " WHERE r.group_id = #{groupId}"
+        + " JOIN "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g ON g.group_id = r.group_id"
+        + " WHERE g.group_name = #{groupName}"
         + " AND r.deleted_at = 0"
         + " AND u.deleted_at = 0"
+        + " AND g.deleted_at = 0"
         + " ORDER BY u.user_name";
   }
 

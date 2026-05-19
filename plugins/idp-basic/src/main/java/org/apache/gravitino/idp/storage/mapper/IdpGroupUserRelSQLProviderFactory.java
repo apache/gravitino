@@ -56,12 +56,12 @@ public class IdpGroupUserRelSQLProviderFactory {
         databaseId, PROVIDER_MAP, IdpGroupUserRelSQLProviderFactory.class);
   }
 
-  public static String selectGroupNamesByUserId(@Param("userId") Long userId) {
-    return currentProvider().selectGroupNamesByUserId(userId);
+  public static String selectGroupNamesByUsername(@Param("username") String username) {
+    return currentProvider().selectGroupNamesByUsername(username);
   }
 
-  public static String selectUsernamesByGroupId(@Param("groupId") Long groupId) {
-    return currentProvider().selectUsernamesByGroupId(groupId);
+  public static String selectUsernamesByGroupName(@Param("groupName") String groupName) {
+    return currentProvider().selectUsernamesByGroupName(groupName);
   }
 
   public static String batchInsertRelations(@Param("relations") List<IdpGroupUserRelPO> relations) {
