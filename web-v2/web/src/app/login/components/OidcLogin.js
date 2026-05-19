@@ -77,12 +77,12 @@ function OidcLogin() {
 
   return (
     <Flex vertical align='center' gap={24} className='mt-4'>
-      <OidcLoginButton userManager={userManager} />
+      <OidcLoginButton userManager={userManager} onError={setError} />
     </Flex>
   )
 }
 
-function OidcLoginButton({ userManager }) {
+function OidcLoginButton({ userManager, onError }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   const handleLogin = async () => {
@@ -91,9 +91,11 @@ function OidcLoginButton({ userManager }) {
     }
 
     try {
+      onError(null)
       setIsLoggingIn(true)
       await userManager.signinRedirect()
     } catch (error) {
+      onError(error.message || 'Failed to redirect to the identity provider')
       setIsLoggingIn(false)
     }
   }

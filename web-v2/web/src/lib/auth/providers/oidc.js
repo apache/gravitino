@@ -20,6 +20,31 @@
 import { BaseOAuthProvider } from './base'
 import { UserManager, WebStorageStateStore } from 'oidc-client-ts'
 
+function getOidcAppBasePath() {
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH || ''
+
+  if (!basePath || basePath === '/') {
+    return ''
+  }
+
+  return basePath.replace(/\/$/, '')
+}
+
+function buildOidcUrl(pathname) {
+  return `${window.location.origin}${getOidcAppBasePath()}${pathname}`
+}
+
+function isOidcSecureOrigin() {
+  if (typeof window === 'undefined') {
+    return true
+  }
+
+  const { protocol, hostname } = window.location
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+
+  return protocol === 'https:' || isLocalhost
+}
+
 export class OidcOAuthProvider extends BaseOAuthProvider {
   constructor() {
     super()
@@ -30,6 +55,12 @@ export class OidcOAuthProvider extends BaseOAuthProvider {
 
   async initialize(config) {
     this.config = config
+
+    if (!isOidcSecureOrigin()) {
+      throw new Error(
+        `OIDC login requires the UI to run on HTTPS or localhost. Current origin: ${window.location.origin}`
+      )
+    }
 
     const authority = config['gravitino.authenticator.oauth.authority']
     const clientId = config['gravitino.authenticator.oauth.clientId']
@@ -45,9 +76,9 @@ export class OidcOAuthProvider extends BaseOAuthProvider {
       client_id: clientId,
       response_type: 'code', // Use Authorization Code flow with PKCE
       scope: scope,
-      redirect_uri: `${window.location.origin}/ui/oauth/callback`,
-      post_logout_redirect_uri: `${window.location.origin}/ui/oauth/logout`,
-      silent_redirect_uri: `${window.location.origin}/ui/oauth/silent-callback`,
+      redirect_uri: buildOidcUrl('/oauth/callback'),
+      post_logout_redirect_uri: buildOidcUrl('/oauth/logout'),
+      silent_redirect_uri: buildOidcUrl('/oauth/silent-callback'),
       automaticSilentRenew: true,
       silentRequestTimeout: 10000,
       userStore: new WebStorageStateStore({ store: window.localStorage })
