@@ -55,7 +55,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   private String gravitinoMetalake;
   private Optional<String> defaultDynamicCatalogName;
   private Map<String, String> properties;
-  @VisibleForTesting Map<String, IcebergConfig> catalogConfigs;
+  private Map<String, IcebergConfig> catalogConfigs;
 
   private volatile CatalogFetcher catalogFetcher;
 
@@ -119,7 +119,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         new HashMap<>(fromGravitinoCatalogProperties(catalogProperties).getAllConfig());
     IcebergConfig serverConfig = catalogConfigs.get(serverCatalogKey);
     if (serverConfig != null) {
-      mergeAbsentProperties(merged, serverConfig.getAllConfig());
+      serverConfig.getAllConfig().forEach(merged::putIfAbsent);
     }
     return new IcebergConfig(merged);
   }
@@ -130,11 +130,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     properties.putAll(MapUtils.getPrefixMap(catalogProperties, CATALOG_BYPASS_PREFIX));
     properties.putAll(catalogProperties);
     return new IcebergConfig(properties);
-  }
-
-  @VisibleForTesting
-  static void mergeAbsentProperties(Map<String, String> target, Map<String, String> defaults) {
-    defaults.forEach(target::putIfAbsent);
   }
 
   /**

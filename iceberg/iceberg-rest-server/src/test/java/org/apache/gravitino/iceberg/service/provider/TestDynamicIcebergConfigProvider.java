@@ -349,25 +349,6 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  void testMergeAbsentProperties() {
-    Map<String, String> icebergCatalogProperties = new HashMap<>();
-    icebergCatalogProperties.put(IcebergConstants.TABLE_METADATA_CACHE_CAPACITY, "256");
-    icebergCatalogProperties.put("custom-k2", "custom-v2");
-
-    Map<String, String> properties = new HashMap<>();
-    properties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "server-cache");
-    properties.put(IcebergConstants.TABLE_METADATA_CACHE_CAPACITY, "128");
-
-    DynamicIcebergConfigProvider.mergeAbsentProperties(icebergCatalogProperties, properties);
-
-    Assertions.assertEquals(
-        "server-cache", icebergCatalogProperties.get(IcebergConstants.TABLE_METADATA_CACHE_IMPL));
-    Assertions.assertEquals(
-        "256", icebergCatalogProperties.get(IcebergConstants.TABLE_METADATA_CACHE_CAPACITY));
-    Assertions.assertEquals("custom-v2", icebergCatalogProperties.get("custom-k2"));
-  }
-
-  @Test
   public void testInternalCatalogFetcher() throws IllegalAccessException {
     String metalakeName = "test_metalake";
     String catalogName = "internal_catalog";
