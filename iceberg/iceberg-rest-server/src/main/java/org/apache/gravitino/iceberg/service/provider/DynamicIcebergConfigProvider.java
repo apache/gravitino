@@ -113,16 +113,10 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
    * IcebergConstants#ICEBERG_REST_DEFAULT_CATALOG}).
    */
   private IcebergConfig mergeServerConfig(
-      Map<String, String> catalogProperties, String serverCatalogKey) {
+      Map<String, String> catalogProperties, String catalogName) {
     Map<String, String> catalogConfig =
         new HashMap<>(getIcebergConfigFromCatalogProperties(catalogProperties).getAllConfig());
-    IcebergConfig serverConfig;
-    if (IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG.equals(serverCatalogKey)
-        || defaultDynamicCatalogName.filter(serverCatalogKey::equals).isPresent()) {
-      serverConfig = serverConfigs.get(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
-    } else {
-      serverConfig = serverConfigs.get(serverCatalogKey);
-    }
+    IcebergConfig serverConfig = serverConfigs.get(catalogName);
     if (serverConfig != null) {
       serverConfig.getAllConfig().forEach(catalogConfig::putIfAbsent);
     }
