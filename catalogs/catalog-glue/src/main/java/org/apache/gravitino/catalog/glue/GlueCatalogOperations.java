@@ -127,7 +127,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   /** Optional S3 warehouse prefix. Table location is derived as {@code warehouse/db/table}. */
   @VisibleForTesting String warehouseLocation;
 
-
   /** Iceberg SDK Glue catalog used for creating Iceberg-format tables. */
   @VisibleForTesting org.apache.iceberg.catalog.Catalog icebergGlueCatalog;
 
@@ -838,7 +837,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             + GlueConstants.WAREHOUSE
             + "' on the catalog.");
   }
-
 
   /** Translates a format name (e.g., "parquet", "orc") to the Hive input format class. */
   private static String getInputFormatClass(String format) {
