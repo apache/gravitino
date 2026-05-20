@@ -23,68 +23,63 @@ import java.util.Arrays;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestIdpUserGroupRelH2Provider {
+public class TestIdpUserGroupRelH2Provider {
 
   @Test
   void testSoftDeleteRelations() {
-    IdpUserGroupRelH2Provider provider = new IdpUserGroupRelH2Provider();
     String normalizedSql =
-        provider
+        new IdpUserGroupRelH2Provider()
             .softDeleteRelations("dev", Arrays.asList("alice", "bob"))
             .replaceAll("\\s+", " ")
             .trim();
 
-    Assertions.assertEquals(expectedSoftDeleteRelationsSql(), normalizedSql);
+    Assertions.assertEquals(
+        "<script>UPDATE idp_user_group_rel r SET deleted_at = DATEDIFF('MILLISECOND',"
+            + " TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP()) WHERE r.deleted_at = 0 AND"
+            + " r.group_id IN (SELECT g.group_id FROM idp_group_meta g WHERE g.group_name ="
+            + " #{groupName} AND g.deleted_at = 0) AND r.user_id IN (SELECT u.user_id FROM"
+            + " idp_user_meta u WHERE u.deleted_at = 0<foreach collection='usernames'"
+            + " item='username' open=' AND u.user_name IN (' separator=',' close=')'>#{username}"
+            + "</foreach>)</script>",
+        normalizedSql);
   }
 
   @Test
   void testSoftDeleteRelationsByUsername() {
-    IdpUserGroupRelH2Provider provider = new IdpUserGroupRelH2Provider();
     String normalizedSql =
-        provider.softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
+        new IdpUserGroupRelH2Provider()
+            .softDeleteRelationsByUsername("alice")
+            .replaceAll("\\s+", " ")
+            .trim();
 
-    Assertions.assertEquals(expectedSoftDeleteRelationsByUsernameSql(), normalizedSql);
+    Assertions.assertEquals(
+        "MERGE INTO idp_user_group_rel r USING idp_user_meta u ON r.user_id = u.user_id"
+            + " AND u.user_name = #{username} AND u.deleted_at = 0 AND r.deleted_at = 0 WHEN"
+            + " MATCHED THEN UPDATE SET r.deleted_at = DATEDIFF('MILLISECOND', TIMESTAMP"
+            + " '1970-01-01 00:00:00', CURRENT_TIMESTAMP())",
+        normalizedSql);
   }
 
   @Test
   void testSoftDeleteRelationsByGroupName() {
-    IdpUserGroupRelH2Provider provider = new IdpUserGroupRelH2Provider();
     String normalizedSql =
-        provider.softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
+        new IdpUserGroupRelH2Provider()
+            .softDeleteRelationsByGroupName("dev")
+            .replaceAll("\\s+", " ")
+            .trim();
 
-    Assertions.assertEquals(expectedSoftDeleteRelationsByGroupNameSql(), normalizedSql);
+    Assertions.assertEquals(
+        "MERGE INTO idp_user_group_rel r USING idp_group_meta g ON r.group_id = g.group_id"
+            + " AND g.group_name = #{groupName} AND g.deleted_at = 0 AND r.deleted_at = 0 WHEN"
+            + " MATCHED THEN UPDATE SET r.deleted_at = DATEDIFF('MILLISECOND', TIMESTAMP"
+            + " '1970-01-01 00:00:00', CURRENT_TIMESTAMP())",
+        normalizedSql);
   }
 
   @Test
   void testCurrentTimeMillisExpression() {
-    IdpUserGroupRelH2Provider provider = new IdpUserGroupRelH2Provider();
-
     Assertions.assertEquals(
         "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())",
-        provider.currentTimeMillisExpression());
-  }
-
-  private String expectedSoftDeleteRelationsSql() {
-    return "<script>UPDATE idp_user_group_rel r SET deleted_at = DATEDIFF('MILLISECOND',"
-        + " TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP()) WHERE r.deleted_at = 0 AND"
-        + " r.group_id IN (SELECT g.group_id FROM idp_group_meta g WHERE g.group_name ="
-        + " #{groupName} AND g.deleted_at = 0) AND r.user_id IN (SELECT u.user_id FROM"
-        + " idp_user_meta u WHERE u.deleted_at = 0<foreach collection='usernames'"
-        + " item='username' open=' AND u.user_name IN (' separator=',' close=')'>#{username}"
-        + "</foreach>)</script>";
-  }
-
-  private String expectedSoftDeleteRelationsByUsernameSql() {
-    return "MERGE INTO idp_user_group_rel r USING idp_user_meta u ON r.user_id = u.user_id"
-        + " AND u.user_name = #{username} AND u.deleted_at = 0 AND r.deleted_at = 0 WHEN"
-        + " MATCHED THEN UPDATE SET r.deleted_at = DATEDIFF('MILLISECOND', TIMESTAMP"
-        + " '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
-  }
-
-  private String expectedSoftDeleteRelationsByGroupNameSql() {
-    return "MERGE INTO idp_user_group_rel r USING idp_group_meta g ON r.group_id = g.group_id"
-        + " AND g.group_name = #{groupName} AND g.deleted_at = 0 AND r.deleted_at = 0 WHEN"
-        + " MATCHED THEN UPDATE SET r.deleted_at = DATEDIFF('MILLISECOND', TIMESTAMP"
-        + " '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
+        new IdpUserGroupRelH2Provider().currentTimeMillisExpression());
   }
 }

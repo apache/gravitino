@@ -27,76 +27,65 @@ public class TestIdpUserGroupRelPostgreSQLProvider {
 
   @Test
   void testCurrentTimeMillisExpression() {
-    IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
-
     Assertions.assertEquals(
         "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)",
-        provider.currentTimeMillisExpression());
+        new IdpUserGroupRelPostgreSQLProvider().currentTimeMillisExpression());
   }
 
   @Test
   void testSoftDeleteRelations() {
-    IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
     String normalizedSql =
-        provider
+        new IdpUserGroupRelPostgreSQLProvider()
             .softDeleteRelations("dev", Arrays.asList("alice", "bob"))
             .replaceAll("\\s+", " ")
             .trim();
 
-    Assertions.assertEquals(expectedSoftDeleteRelationsSql(), normalizedSql);
+    Assertions.assertEquals(
+        "<script>UPDATE idp_user_group_rel r SET deleted_at = CAST(EXTRACT(EPOCH FROM"
+            + " CURRENT_TIMESTAMP) * 1000 AS BIGINT) FROM idp_group_meta g, idp_user_meta u WHERE"
+            + " r.group_id = g.group_id AND r.user_id = u.user_id AND g.group_name = #{groupName}"
+            + " AND g.deleted_at = 0 AND u.deleted_at = 0 AND r.deleted_at = 0<foreach"
+            + " collection='usernames' item='username' open=' AND u.user_name IN (' separator=','"
+            + " close=')'>#{username}</foreach></script>",
+        normalizedSql);
   }
 
   @Test
   void testSoftDeleteRelationsByUsername() {
-    IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
     String normalizedSql =
-        provider.softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
+        new IdpUserGroupRelPostgreSQLProvider()
+            .softDeleteRelationsByUsername("alice")
+            .replaceAll("\\s+", " ")
+            .trim();
 
-    Assertions.assertEquals(expectedSoftDeleteRelationsByUsernameSql(), normalizedSql);
+    Assertions.assertEquals(
+        "UPDATE idp_user_group_rel r SET deleted_at = CAST(EXTRACT(EPOCH FROM"
+            + " CURRENT_TIMESTAMP) * 1000 AS BIGINT) FROM idp_user_meta u WHERE r.user_id ="
+            + " u.user_id AND u.user_name = #{username} AND u.deleted_at = 0 AND r.deleted_at = 0",
+        normalizedSql);
   }
 
   @Test
   void testSoftDeleteRelationsByGroupName() {
-    IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
     String normalizedSql =
-        provider.softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
+        new IdpUserGroupRelPostgreSQLProvider()
+            .softDeleteRelationsByGroupName("dev")
+            .replaceAll("\\s+", " ")
+            .trim();
 
-    Assertions.assertEquals(expectedSoftDeleteRelationsByGroupNameSql(), normalizedSql);
+    Assertions.assertEquals(
+        "UPDATE idp_user_group_rel r SET deleted_at = CAST(EXTRACT(EPOCH FROM"
+            + " CURRENT_TIMESTAMP) * 1000 AS BIGINT) FROM idp_group_meta g WHERE r.group_id ="
+            + " g.group_id AND g.group_name = #{groupName} AND g.deleted_at = 0 AND r.deleted_at ="
+            + " 0",
+        normalizedSql);
   }
 
   @Test
   void testDeleteIdpUserGroupRelMetasByLegacyTimeline() {
-    IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
-
     Assertions.assertEquals(
-        expectedDeleteIdpUserGroupRelMetasByLegacyTimelineSql(),
-        provider.deleteIdpUserGroupRelMetasByLegacyTimeline(1L, 2));
-  }
-
-  private String expectedSoftDeleteRelationsSql() {
-    return "<script>UPDATE idp_user_group_rel r SET deleted_at = CAST(EXTRACT(EPOCH FROM"
-        + " CURRENT_TIMESTAMP) * 1000 AS BIGINT) FROM idp_group_meta g, idp_user_meta u WHERE"
-        + " r.group_id = g.group_id AND r.user_id = u.user_id AND g.group_name = #{groupName}"
-        + " AND g.deleted_at = 0 AND u.deleted_at = 0 AND r.deleted_at = 0<foreach"
-        + " collection='usernames' item='username' open=' AND u.user_name IN (' separator=','"
-        + " close=')'>#{username}</foreach></script>";
-  }
-
-  private String expectedSoftDeleteRelationsByUsernameSql() {
-    return "UPDATE idp_user_group_rel r SET deleted_at = CAST(EXTRACT(EPOCH FROM"
-        + " CURRENT_TIMESTAMP) * 1000 AS BIGINT) FROM idp_user_meta u WHERE r.user_id ="
-        + " u.user_id AND u.user_name = #{username} AND u.deleted_at = 0 AND r.deleted_at = 0";
-  }
-
-  private String expectedSoftDeleteRelationsByGroupNameSql() {
-    return "UPDATE idp_user_group_rel r SET deleted_at = CAST(EXTRACT(EPOCH FROM"
-        + " CURRENT_TIMESTAMP) * 1000 AS BIGINT) FROM idp_group_meta g WHERE r.group_id ="
-        + " g.group_id AND g.group_name = #{groupName} AND g.deleted_at = 0 AND r.deleted_at ="
-        + " 0";
-  }
-
-  private String expectedDeleteIdpUserGroupRelMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_user_group_rel WHERE id IN (SELECT id FROM idp_user_group_rel"
-        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+        "DELETE FROM idp_user_group_rel WHERE id IN (SELECT id FROM idp_user_group_rel"
+            + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})",
+        new IdpUserGroupRelPostgreSQLProvider().deleteIdpUserGroupRelMetasByLegacyTimeline(1L, 2));
   }
 }

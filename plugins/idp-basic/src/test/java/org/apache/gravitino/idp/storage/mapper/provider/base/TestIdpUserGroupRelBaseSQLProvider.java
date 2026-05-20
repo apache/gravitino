@@ -27,21 +27,17 @@ import org.junit.jupiter.api.Test;
 
 public class TestIdpUserGroupRelBaseSQLProvider {
 
-  protected IdpUserGroupRelBaseSQLProvider createProvider() {
-    return new IdpUserGroupRelBaseSQLProvider() {
-      @Override
-      protected String currentTimeMillisExpression() {
-        return "CURRENT_TIME_MILLIS()";
-      }
-    };
-  }
-
   @Test
   void testSelectGroupNamesByUsername() {
     String normalizedSql =
         createProvider().selectGroupNamesByUsername("alice").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertEquals(expectedSelectGroupNamesByUsernameSql(), normalizedSql);
+    Assertions.assertEquals(
+        "SELECT g.group_name FROM idp_user_meta u JOIN idp_user_group_rel r ON r.user_id ="
+            + " u.user_id AND r.deleted_at = 0 JOIN idp_group_meta g ON g.group_id = r.group_id"
+            + " AND g.deleted_at = 0 WHERE u.user_name = #{username} AND u.deleted_at = 0 ORDER BY"
+            + " g.group_name",
+        normalizedSql);
   }
 
   @Test
@@ -49,7 +45,12 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     String normalizedSql =
         createProvider().selectUsernamesByGroupName("dev").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertEquals(expectedSelectUsernamesByGroupNameSql(), normalizedSql);
+    Assertions.assertEquals(
+        "SELECT u.user_name FROM idp_group_meta g JOIN idp_user_group_rel r ON r.group_id ="
+            + " g.group_id AND r.deleted_at = 0 JOIN idp_user_meta u ON u.user_id = r.user_id AND"
+            + " u.deleted_at = 0 WHERE g.group_name = #{groupName} AND g.deleted_at = 0 ORDER BY"
+            + " u.user_name",
+        normalizedSql);
   }
 
   @Test
@@ -60,7 +61,12 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     String normalizedSql =
         createProvider().batchInsertRelations(relations).replaceAll("\\s+", " ").trim();
 
-    Assertions.assertEquals(expectedBatchInsertRelationsSql(), normalizedSql);
+    Assertions.assertEquals(
+        "<script>INSERT INTO idp_user_group_rel (id, user_id, group_id, current_version,"
+            + " last_version, deleted_at) VALUES <foreach item='item' collection='relations'"
+            + " separator=','>(#{item.id}, #{item.userId}, #{item.groupId}, #{item.currentVersion},"
+            + " #{item.lastVersion}, #{item.deletedAt})</foreach></script>",
+        normalizedSql);
   }
 
   @Test
@@ -71,7 +77,13 @@ public class TestIdpUserGroupRelBaseSQLProvider {
             .replaceAll("\\s+", " ")
             .trim();
 
-    Assertions.assertEquals(expectedSoftDeleteRelationsSql(), normalizedSql);
+    Assertions.assertEquals(
+        "<script>UPDATE idp_user_group_rel r INNER JOIN idp_group_meta g ON g.group_id ="
+            + " r.group_id AND g.deleted_at = 0 INNER JOIN idp_user_meta u ON u.user_id = r.user_id"
+            + " AND u.deleted_at = 0 SET r.deleted_at = CURRENT_TIME_MILLIS() WHERE g.group_name ="
+            + " #{groupName} AND r.deleted_at = 0<foreach collection='usernames' item='username'"
+            + " open=' AND u.user_name IN (' separator=',' close=')'>#{username}</foreach></script>",
+        normalizedSql);
   }
 
   @Test
@@ -79,7 +91,11 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     String normalizedSql =
         createProvider().softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertEquals(expectedSoftDeleteRelationsByUsernameSql(), normalizedSql);
+    Assertions.assertEquals(
+        "UPDATE idp_user_group_rel r INNER JOIN idp_user_meta u ON u.user_id = r.user_id AND"
+            + " u.deleted_at = 0 SET r.deleted_at = CURRENT_TIME_MILLIS() WHERE u.user_name ="
+            + " #{username} AND r.deleted_at = 0",
+        normalizedSql);
   }
 
   @Test
@@ -87,7 +103,11 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     String normalizedSql =
         createProvider().softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertEquals(expectedSoftDeleteRelationsByGroupNameSql(), normalizedSql);
+    Assertions.assertEquals(
+        "UPDATE idp_user_group_rel r INNER JOIN idp_group_meta g ON g.group_id = r.group_id"
+            + " AND g.deleted_at = 0 SET r.deleted_at = CURRENT_TIME_MILLIS() WHERE g.group_name ="
+            + " #{groupName} AND r.deleted_at = 0",
+        normalizedSql);
   }
 
   @Test
@@ -98,7 +118,10 @@ public class TestIdpUserGroupRelBaseSQLProvider {
             .replaceAll("\\s+", " ")
             .trim();
 
-    Assertions.assertEquals(expectedDeleteIdpUserGroupRelMetasByLegacyTimelineSql(), normalizedSql);
+    Assertions.assertEquals(
+        "DELETE FROM idp_user_group_rel WHERE deleted_at > 0 AND deleted_at <"
+            + " #{legacyTimeline} LIMIT #{limit}",
+        normalizedSql);
   }
 
   @Test
@@ -108,50 +131,13 @@ public class TestIdpUserGroupRelBaseSQLProvider {
         new IdpUserGroupRelBaseSQLProvider().currentTimeMillisExpression());
   }
 
-  private String expectedSelectGroupNamesByUsernameSql() {
-    return "SELECT g.group_name FROM idp_user_meta u JOIN idp_user_group_rel r ON r.user_id ="
-        + " u.user_id AND r.deleted_at = 0 JOIN idp_group_meta g ON g.group_id = r.group_id"
-        + " AND g.deleted_at = 0 WHERE u.user_name = #{username} AND u.deleted_at = 0 ORDER BY"
-        + " g.group_name";
-  }
-
-  private String expectedSelectUsernamesByGroupNameSql() {
-    return "SELECT u.user_name FROM idp_group_meta g JOIN idp_user_group_rel r ON r.group_id ="
-        + " g.group_id AND r.deleted_at = 0 JOIN idp_user_meta u ON u.user_id = r.user_id AND"
-        + " u.deleted_at = 0 WHERE g.group_name = #{groupName} AND g.deleted_at = 0 ORDER BY"
-        + " u.user_name";
-  }
-
-  private String expectedBatchInsertRelationsSql() {
-    return "<script>INSERT INTO idp_user_group_rel (id, user_id, group_id, current_version,"
-        + " last_version, deleted_at) VALUES <foreach item='item' collection='relations'"
-        + " separator=','>(#{item.id}, #{item.userId}, #{item.groupId}, #{item.currentVersion},"
-        + " #{item.lastVersion}, #{item.deletedAt})</foreach></script>";
-  }
-
-  private String expectedSoftDeleteRelationsSql() {
-    return "<script>UPDATE idp_user_group_rel r INNER JOIN idp_group_meta g ON g.group_id ="
-        + " r.group_id AND g.deleted_at = 0 INNER JOIN idp_user_meta u ON u.user_id = r.user_id"
-        + " AND u.deleted_at = 0 SET r.deleted_at = CURRENT_TIME_MILLIS() WHERE g.group_name ="
-        + " #{groupName} AND r.deleted_at = 0<foreach collection='usernames' item='username'"
-        + " open=' AND u.user_name IN (' separator=',' close=')'>#{username}</foreach></script>";
-  }
-
-  private String expectedSoftDeleteRelationsByUsernameSql() {
-    return "UPDATE idp_user_group_rel r INNER JOIN idp_user_meta u ON u.user_id = r.user_id AND"
-        + " u.deleted_at = 0 SET r.deleted_at = CURRENT_TIME_MILLIS() WHERE u.user_name ="
-        + " #{username} AND r.deleted_at = 0";
-  }
-
-  private String expectedSoftDeleteRelationsByGroupNameSql() {
-    return "UPDATE idp_user_group_rel r INNER JOIN idp_group_meta g ON g.group_id = r.group_id"
-        + " AND g.deleted_at = 0 SET r.deleted_at = CURRENT_TIME_MILLIS() WHERE g.group_name ="
-        + " #{groupName} AND r.deleted_at = 0";
-  }
-
-  private String expectedDeleteIdpUserGroupRelMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_user_group_rel WHERE deleted_at > 0 AND deleted_at <"
-        + " #{legacyTimeline} LIMIT #{limit}";
+  private IdpUserGroupRelBaseSQLProvider createProvider() {
+    return new IdpUserGroupRelBaseSQLProvider() {
+      @Override
+      protected String currentTimeMillisExpression() {
+        return "CURRENT_TIME_MILLIS()";
+      }
+    };
   }
 
   private IdpUserGroupRelPO newRelation(Long id, Long userId, Long groupId) {

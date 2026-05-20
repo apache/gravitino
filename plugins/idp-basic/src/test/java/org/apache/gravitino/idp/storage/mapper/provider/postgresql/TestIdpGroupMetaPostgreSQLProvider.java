@@ -26,20 +26,16 @@ public class TestIdpGroupMetaPostgreSQLProvider {
 
   @Test
   void testCurrentTimeMillisExpression() {
-    IdpGroupMetaPostgreSQLProvider provider = new IdpGroupMetaPostgreSQLProvider();
-
     Assertions.assertEquals(
         "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)",
-        provider.currentTimeMillisExpression());
+        new IdpGroupMetaPostgreSQLProvider().currentTimeMillisExpression());
   }
 
   @Test
   void testDeleteIdpGroupMetasByLegacyTimeline() {
-    IdpGroupMetaPostgreSQLProvider provider = new IdpGroupMetaPostgreSQLProvider();
-
     Assertions.assertEquals(
         "DELETE FROM idp_group_meta WHERE group_id IN (SELECT group_id FROM idp_group_meta"
             + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})",
-        provider.deleteIdpGroupMetasByLegacyTimeline(1L, 2));
+        new IdpGroupMetaPostgreSQLProvider().deleteIdpGroupMetasByLegacyTimeline(1L, 2));
   }
 }

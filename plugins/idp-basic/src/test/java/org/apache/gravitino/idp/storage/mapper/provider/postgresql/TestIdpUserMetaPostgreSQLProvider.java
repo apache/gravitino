@@ -26,20 +26,16 @@ public class TestIdpUserMetaPostgreSQLProvider {
 
   @Test
   void testCurrentTimeMillisExpression() {
-    IdpUserMetaPostgreSQLProvider provider = new IdpUserMetaPostgreSQLProvider();
-
     Assertions.assertEquals(
         "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)",
-        provider.currentTimeMillisExpression());
+        new IdpUserMetaPostgreSQLProvider().currentTimeMillisExpression());
   }
 
   @Test
   void testDeleteIdpUserMetasByLegacyTimeline() {
-    IdpUserMetaPostgreSQLProvider provider = new IdpUserMetaPostgreSQLProvider();
-
     Assertions.assertEquals(
         "DELETE FROM idp_user_meta WHERE user_id IN (SELECT user_id FROM idp_user_meta"
             + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})",
-        provider.deleteIdpUserMetasByLegacyTimeline(1L, 2));
+        new IdpUserMetaPostgreSQLProvider().deleteIdpUserMetasByLegacyTimeline(1L, 2));
   }
 }
