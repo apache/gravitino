@@ -20,6 +20,7 @@ package org.apache.gravitino.spark.connector.integration.test.iceberg;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.condition.DisabledIf;
@@ -41,6 +42,8 @@ public abstract class SparkIcebergCatalogRestBackendIT extends SparkIcebergCatal
         IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST);
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, icebergRestServiceUri);
+    // RESTCatalog does not implement SupportsMetadataLocation; disable default metadata cache.
+    catalogProperties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "");
 
     return catalogProperties;
   }

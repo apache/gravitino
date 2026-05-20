@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.flink.table.api.ResultKind;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
@@ -45,6 +46,8 @@ public abstract class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
         IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST);
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, icebergRestServiceUri);
+    // RESTCatalog does not implement SupportsMetadataLocation; disable default metadata cache.
+    catalogProperties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "");
     return catalogProperties;
   }
 

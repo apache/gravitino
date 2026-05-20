@@ -49,6 +49,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergSchemaPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
@@ -232,6 +233,10 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
       catalogProperties.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), WAREHOUSE);
     }
     catalogProperties.put(IcebergConfig.CATALOG_BACKEND_NAME.getKey(), icebergCatalogBackendName);
+    if ("rest".equalsIgnoreCase(TYPE)) {
+      // RESTCatalog does not implement SupportsMetadataLocation; disable default metadata cache.
+      catalogProperties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "");
+    }
 
     Map<String, String> icebergCatalogProperties = Maps.newHashMap();
     icebergCatalogProperties.put(IcebergConfig.CATALOG_URI.getKey(), URIS);
@@ -240,6 +245,9 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     }
     icebergCatalogProperties.put(
         IcebergConfig.CATALOG_BACKEND_NAME.getKey(), icebergCatalogBackendName);
+    if ("rest".equalsIgnoreCase(TYPE)) {
+      icebergCatalogProperties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "");
+    }
 
     icebergCatalog =
         IcebergCatalogUtil.loadCatalogBackend(
