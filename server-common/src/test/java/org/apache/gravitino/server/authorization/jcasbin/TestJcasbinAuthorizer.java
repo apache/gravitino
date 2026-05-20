@@ -646,6 +646,40 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testRecreatedGroupWithSameNameDoesNotReuseOldRoleCache() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    Long oldGroupId = 201L;
+    Long newGroupId = 202L;
+    Long oldGroupRoleId = 203L;
+    RoleEntity oldGroupRole =
+        mockRoleInStore(
+            oldGroupRoleId, "oldGroupRole", ImmutableList.of(getAllowSecurableObject()));
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(
+        oldGroupId,
+        GROUP_NAME,
+        ImmutableList.of(oldGroupRoleId),
+        ImmutableList.of(oldGroupRole.name()));
+
+    assertTrue(doAuthorize(groupPrincipal));
+
+    // The group is deleted and recreated with the same name but a new id. Keep updated_at lower
+    // than the old cache snapshot to verify the group id, not only updated_at, controls reuse.
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
+        .thenReturn(new GroupUpdatedAt(newGroupId, 0L));
+    when(roleMetaMapper.listRolesByGroupId(eq(newGroupId))).thenReturn(ImmutableList.of());
+
+    assertFalse(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  @Test
   public void testRoleSharedByUserAndGroupSurvivesGroupRevocation() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();

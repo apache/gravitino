@@ -833,11 +833,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   /**
-   * Version-validated group-role load, mirroring {@link #loadUserRoles}. Uses {@code
-   * group_meta.updated_at} as the staleness sentinel: if the cached snapshot is at least as fresh
-   * as the DB version, we reuse it; otherwise we reload from {@code role_meta}. In both cases the
-   * resulting role IDs are bound to the user's jcasbin g-rows so that the enforcer sees inherited
-   * privileges. Groups missing from the DB return an empty list.
+   * Version-validated group-role load, mirroring {@link #loadUserRoles}. A cached snapshot is valid
+   * only when it belongs to the current group id and is at least as fresh as {@code
+   * group_meta.updated_at}; the group id check prevents reusing stale roles after a
+   * delete-and-create of the same group name. In both cases the resulting role IDs are bound to the
+   * user's jcasbin g-rows so that the enforcer sees inherited privileges. Groups missing from the
+   * DB return an empty list.
    */
   private List<Long> loadGroupRoles(
       String metalake, String groupname, long userId, AuthorizationRequestContext requestContext) {
@@ -850,10 +851,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     String groupCacheKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupname);
     Optional<CachedGroupRoles> cachedOpt = groupRoleCache.getIfPresent(groupCacheKey);
 
-    if (cachedOpt.isPresent() && cachedOpt.get().getUpdatedAt() >= groupInfo.getUpdatedAt()) {
+    if (cachedOpt.isPresent()) {
       CachedGroupRoles cached = cachedOpt.get();
-      bindUserRoles(userId, cached.getRoleIds());
-      return cached.getRoleIds();
+      if (cached.getGroupId() == groupId && cached.getUpdatedAt() >= groupInfo.getUpdatedAt()) {
+        bindUserRoles(userId, cached.getRoleIds());
+        return cached.getRoleIds();
+      }
     }
 
     List<RolePO> rolePOs =
