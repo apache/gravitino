@@ -232,6 +232,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
 
     if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
+      // We support hierarchical schema, so a schema may have ancestor schemas. The principal is
+      // treated as the owner if it owns the schema itself or any of its ancestor schemas, hence we
+      // walk the whole inheritance chain here.
       for (MetadataObject scopeObject : buildSchemaInheritanceChain(metadataObject)) {
         Optional<Long> metadataId = MetadataIdConverter.getID(scopeObject, metalake);
         if (!metadataId.isPresent()) {
