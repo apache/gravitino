@@ -18,15 +18,10 @@
  */
 package org.apache.gravitino.trino.connector.catalog.jdbc.mysql;
 
-import java.time.Instant;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
-import org.apache.gravitino.Audit;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
-import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.trino.connector.catalog.jdbc.JDBCCatalogPropertyConverter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -37,103 +32,17 @@ public class TestMySQLConnectorAdapter {
 
   private static final String JDBC_URL = "jdbc:mysql://localhost:3306/";
 
-  private static final Audit AUDIT_STUB =
-      new Audit() {
-        @Override
-        public String creator() {
-          return "test";
-        }
-
-        @Override
-        public Instant createTime() {
-          return Instant.EPOCH;
-        }
-
-        @Override
-        public String lastModifier() {
-          return null;
-        }
-
-        @Override
-        public Instant lastModifiedTime() {
-          return null;
-        }
-      };
-
-  private static class PlainCatalogStub implements Catalog {
-    private final Map<String, String> properties;
-
-    PlainCatalogStub(Map<String, String> properties) {
-      this.properties = properties;
-    }
-
-    @Override
-    public String name() {
-      return "test";
-    }
-
-    @Override
-    public Type type() {
-      return Type.RELATIONAL;
-    }
-
-    @Override
-    public String provider() {
-      return "jdbc-mysql";
-    }
-
-    @Override
-    public String comment() {
-      return null;
-    }
-
-    @Override
-    public Map<String, String> properties() {
-      return properties;
-    }
-
-    @Override
-    public Audit auditInfo() {
-      return AUDIT_STUB;
-    }
-  }
-
-  private static class CredentialCatalogStub extends PlainCatalogStub
-      implements SupportsCredentials {
-
-    private final Credential[] credentials;
-
-    CredentialCatalogStub(Map<String, String> properties, Credential... credentials) {
-      super(properties);
-      this.credentials = credentials;
-    }
-
-    @Override
-    public Credential[] getCredentials() {
-      return credentials;
-    }
-  }
-
-  private Map<String, String> baseProperties() {
-    Map<String, String> props = new HashMap<>();
-    props.put("jdbc-url", JDBC_URL);
-    props.put("jdbc-user", "prop-user");
-    props.put("jdbc-password", "prop-password");
-    return props;
+  private GravitinoCatalog catalogWithProps(Map<String, String> props) {
+    return new GravitinoCatalog("metalake", "jdbc-mysql", "test", props, 0L);
   }
 
   @Test
   void testCredentialVendingOverridesProperties() throws Exception {
-    Map<String, String> props = new HashMap<>();
-    props.put("jdbc-url", JDBC_URL);
-    // jdbc-user and jdbc-password are hidden on the server, so absent here
-
-    Catalog catalog =
-        new CredentialCatalogStub(props, new JdbcCredential("vended-user", "vended-password"));
-    GravitinoCatalog gravitinoCatalog = new GravitinoCatalog("metalake", catalog);
+    GravitinoCatalog catalog = catalogWithProps(Collections.singletonMap("jdbc-url", JDBC_URL));
+    Credential[] credentials = {new JdbcCredential("vended-user", "vended-password")};
 
     Map<String, String> config =
-        new MySQLConnectorAdapter().buildInternalConnectorConfig(gravitinoCatalog);
+        new MySQLConnectorAdapter().buildInternalConnectorConfig(catalog, credentials);
 
     Assertions.assertEquals(
         "vended-user", config.get(JDBCCatalogPropertyConverter.JDBC_CONNECTION_USER_KEY));
@@ -142,54 +51,17 @@ public class TestMySQLConnectorAdapter {
   }
 
   @Test
-  void testFallsBackToPropertiesWhenNoJdbcCredential() throws Exception {
-    Catalog catalog = new CredentialCatalogStub(baseProperties() /* no credentials */);
-    GravitinoCatalog gravitinoCatalog = new GravitinoCatalog("metalake", catalog);
+  void testFallsBackToPropertiesWhenNoCredentials() throws Exception {
+    Map<String, String> props =
+        Map.of("jdbc-url", JDBC_URL, "jdbc-user", "prop-user", "jdbc-password", "prop-password");
+    GravitinoCatalog catalog = catalogWithProps(props);
 
     Map<String, String> config =
-        new MySQLConnectorAdapter().buildInternalConnectorConfig(gravitinoCatalog);
+        new MySQLConnectorAdapter().buildInternalConnectorConfig(catalog, new Credential[0]);
 
     Assertions.assertEquals(
         "prop-user", config.get(JDBCCatalogPropertyConverter.JDBC_CONNECTION_USER_KEY));
     Assertions.assertEquals(
         "prop-password", config.get(JDBCCatalogPropertyConverter.JDBC_CONNECTION_PASSWORD_KEY));
-  }
-
-  @Test
-  void testFallsBackToPropertiesWhenCatalogDoesNotSupportCredentials() throws Exception {
-    Catalog catalog = new PlainCatalogStub(baseProperties());
-    GravitinoCatalog gravitinoCatalog = new GravitinoCatalog("metalake", catalog);
-
-    Map<String, String> config =
-        new MySQLConnectorAdapter().buildInternalConnectorConfig(gravitinoCatalog);
-
-    Assertions.assertEquals(
-        "prop-user", config.get(JDBCCatalogPropertyConverter.JDBC_CONNECTION_USER_KEY));
-    Assertions.assertEquals(
-        "prop-password", config.get(JDBCCatalogPropertyConverter.JDBC_CONNECTION_PASSWORD_KEY));
-  }
-
-  @Test
-  void testNullOriginalCatalogFallsBackToProperties() throws Exception {
-    // Simulates a GravitinoCatalog reconstructed from JSON (originalCatalog == null)
-    GravitinoCatalog gravitinoCatalog =
-        new GravitinoCatalog(
-            "metalake", "jdbc-mysql", "test", baseProperties(), System.currentTimeMillis());
-
-    Map<String, String> config =
-        new MySQLConnectorAdapter().buildInternalConnectorConfig(gravitinoCatalog);
-
-    Assertions.assertEquals(
-        "prop-user", config.get(JDBCCatalogPropertyConverter.JDBC_CONNECTION_USER_KEY));
-    Assertions.assertEquals(
-        "prop-password", config.get(JDBCCatalogPropertyConverter.JDBC_CONNECTION_PASSWORD_KEY));
-  }
-
-  @Test
-  void testGetOriginalCatalogIsNullForJsonConstructor() {
-    GravitinoCatalog gravitinoCatalog =
-        new GravitinoCatalog(
-            "metalake", "jdbc-mysql", "test", Collections.singletonMap("jdbc-url", JDBC_URL), 0L);
-    Assertions.assertNull(gravitinoCatalog.getOriginalCatalog());
   }
 }

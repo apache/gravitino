@@ -23,6 +23,7 @@ import static java.util.Collections.emptyList;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 
 /**
@@ -35,6 +36,19 @@ public interface CatalogConnectorAdapter {
    */
   default List<PropertyMetadata<?>> getTableProperties() {
     return emptyList();
+  }
+
+  /**
+   * Builds the internal connector configuration required.
+   *
+   * @param catalog the Gravitino catalog to build configuration for
+   * @param credentials vended credentials for the catalog; may be empty
+   * @return a map of configuration properties for the internal Trino connector
+   * @throws Exception if the configuration cannot be built
+   */
+  default Map<String, String> buildInternalConnectorConfig(
+      GravitinoCatalog catalog, Credential[] credentials) throws Exception {
+    return buildInternalConnectorConfig(catalog);
   }
 
   /**

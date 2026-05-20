@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
@@ -46,11 +47,17 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
   }
 
   @Override
+  public Map<String, String> buildInternalConnectorConfig(
+      GravitinoCatalog catalog, Credential[] credentials) throws Exception {
+    Map<String, String> gravitinoProps = new HashMap<>(catalog.getProperties());
+    JDBCCatalogPropertyConverter.applyJdbcCredential(credentials, gravitinoProps);
+    return catalogConverter.gravitinoToEngineProperties(gravitinoProps);
+  }
+
+  @Override
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
-    Map<String, String> gravitinoProps = new HashMap<>(catalog.getProperties());
-    JDBCCatalogPropertyConverter.applyJdbcCredential(catalog.getOriginalCatalog(), gravitinoProps);
-    return catalogConverter.gravitinoToEngineProperties(gravitinoProps);
+    return buildInternalConnectorConfig(catalog, new Credential[0]);
   }
 
   @Override
