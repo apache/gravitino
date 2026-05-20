@@ -540,7 +540,7 @@ export default function SchemaDetailsPage() {
         <AssociatedTable
           metalake={currentMetalake}
           metadataObjectType={'schema'}
-          metadataObjectFullName={`${catalog}.${store.activatedDetails?.name}`}
+          metadataObjectFullName={`${catalog}.${schema}`}
         />
       ) : tabKey === 'Functions' ? (
         <Functions metalake={currentMetalake} catalog={catalog} schema={schema} />
