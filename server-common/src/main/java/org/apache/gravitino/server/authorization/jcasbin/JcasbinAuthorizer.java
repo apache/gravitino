@@ -31,6 +31,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -146,8 +147,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   // ---- Eventual consistency caches (poller-driven) ----
 
   /**
-   * metadataIdCache: hierarchical key (metalake::catalog::schema::table::TYPE) -> entity id.
-   * Evicted by entity change poller.
+   * Path-based key {@code metalake::catalog::schema::object::TYPE} -> entity id. Evicted by entity
+   * change poller.
    */
   private GravitinoCache<String, Long> metadataIdCache;
 
@@ -179,7 +180,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             .config()
             .get(Configs.GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS);
 
-    long ttlMs = cacheExpirationSecs * 1000L;
+    long ttlMs = TimeUnit.SECONDS.toMillis(cacheExpirationSecs);
 
     // Initialize enforcers before caches that reference them in removal listeners
     allowEnforcer = new SyncedEnforcer(getModel("/jcasbin_model.conf"), new GravitinoAdapter());
@@ -193,6 +194,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     userRoleCache = new CaffeineGravitinoCache<>(ttlMs, roleCacheSize);
     groupRoleCache = new CaffeineGravitinoCache<>(ttlMs, roleCacheSize);
+    // The change poller is the primary HA invalidation path. These write-based TTLs bound the
+    // stale window if a poll cycle misses a change; access-based TTLs could keep hot stale entries
+    // alive indefinitely.
     metadataIdCache = new CaffeineGravitinoCache<>(ttlMs, metadataIdCacheSize);
     ownerRelCache = new CaffeineGravitinoCache<>(ttlMs, ownerCacheSize);
     lookups = new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
@@ -480,20 +484,24 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void handleMetadataOwnerChange(
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
-    Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-    ownerRelCache.invalidate(metadataId);
     // Owner mutations may happen after drop/recreate with the same name. Invalidate the
     // name->id mapping as well to prevent using a stale metadataId from metadataIdCache.
     metadataIdCache.invalidate(JcasbinAuthorizationLookups.buildCacheKey(metalake, metadataObject));
+    try {
+      Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+      ownerRelCache.invalidate(metadataId);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to resolve metadata id for owner cache invalidation: {}", metadataObject, e);
+    }
   }
 
   @Override
-  public void handleEntityStructuralChange(
+  public void handleEntityNameIdMappingChange(
       String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     String cacheKey = JcasbinAuthorizationLookups.buildCacheKey(metalake, metadataObject);
-    if (JcasbinAuthorizationLookups.isNonLeaf(metadataObject.type())) {
-      // Cascade invalidation: metalake::catalog:: prefix removes catalog + all children
+    if (JcasbinAuthorizationLookups.isContainerType(metadataObject.type())) {
+      // Prefix invalidation: metalake::catalog:: removes catalog + all children.
       metadataIdCache.invalidateByPrefix(cacheKey);
     } else {
       metadataIdCache.invalidate(cacheKey);

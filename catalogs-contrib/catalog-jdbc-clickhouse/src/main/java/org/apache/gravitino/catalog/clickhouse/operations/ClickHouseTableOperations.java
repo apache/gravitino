@@ -419,22 +419,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         .orElse(null);
   }
 
-  private String toPartitionExpression(Transform transform) {
-    Preconditions.checkArgument(transform != null, "Partition transform cannot be null");
-    Preconditions.checkArgument(
-        StringUtils.equalsIgnoreCase(transform.name(), Transforms.NAME_OF_IDENTITY),
-        "Unsupported partition transform: " + transform.name());
-    Preconditions.checkArgument(
-        transform.arguments().length == 1
-            && transform.arguments()[0] instanceof NamedReference
-            && ((NamedReference) transform.arguments()[0]).fieldName().length == 1,
-        "ClickHouse only supports single column identity partitioning");
-
-    String fieldName =
-        ((NamedReference) transform.arguments()[0]).fieldName()[0]; // already validated
-    return quoteIdentifier(fieldName);
-  }
-
   private void validateNoAutoIncrementColumns(JdbcColumn[] columns) {
     if (ArrayUtils.isEmpty(columns)) {
       return;

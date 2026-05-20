@@ -349,6 +349,7 @@ public class Configs {
           .doc("The interval in seconds for polling entity and owner changes")
           .version(ConfigConstants.VERSION_1_3_0)
           .longConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_CHANGE_POLL_INTERVAL_SECS);
 
   public static final ConfigEntry<List<String>> SERVICE_ADMINS =

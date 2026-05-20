@@ -20,8 +20,13 @@ package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
+import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -34,14 +39,15 @@ public class TestJcasbinAuthorizationLookups {
   void testBuildCacheKeyMetalake() {
     MetadataObject obj =
         MetadataObjects.of(Collections.singletonList("ml1"), MetadataObject.Type.METALAKE);
-    Assertions.assertEquals("ml1::", JcasbinAuthorizationLookups.buildCacheKey("ml1", obj));
+    Assertions.assertEquals(key("ml1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", obj));
   }
 
   @Test
   void testBuildCacheKeyCatalog() {
     MetadataObject obj =
         MetadataObjects.of(Collections.singletonList("cat1"), MetadataObject.Type.CATALOG);
-    Assertions.assertEquals("ml1::cat1::", JcasbinAuthorizationLookups.buildCacheKey("ml1", obj));
+    Assertions.assertEquals(
+        key("ml1", "cat1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", obj));
   }
 
   @Test
@@ -49,7 +55,7 @@ public class TestJcasbinAuthorizationLookups {
     MetadataObject obj =
         MetadataObjects.of(Arrays.asList("cat1", "sch1"), MetadataObject.Type.SCHEMA);
     Assertions.assertEquals(
-        "ml1::cat1::sch1::", JcasbinAuthorizationLookups.buildCacheKey("ml1", obj));
+        key("ml1", "cat1", "sch1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", obj));
   }
 
   @Test
@@ -57,40 +63,45 @@ public class TestJcasbinAuthorizationLookups {
     MetadataObject table =
         MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.TABLE);
     Assertions.assertEquals(
-        "ml1::cat1::sch1::tbl1::TABLE", JcasbinAuthorizationLookups.buildCacheKey("ml1", table));
+        key("ml1", "cat1", "sch1", "tbl1", "TABLE"),
+        JcasbinAuthorizationLookups.buildCacheKey("ml1", table));
 
     MetadataObject view =
         MetadataObjects.of(Arrays.asList("cat1", "sch1", "v1"), MetadataObject.Type.VIEW);
     Assertions.assertEquals(
-        "ml1::cat1::sch1::v1::VIEW", JcasbinAuthorizationLookups.buildCacheKey("ml1", view));
+        key("ml1", "cat1", "sch1", "v1", "VIEW"),
+        JcasbinAuthorizationLookups.buildCacheKey("ml1", view));
 
     MetadataObject fileset =
         MetadataObjects.of(Arrays.asList("cat1", "sch1", "fs1"), MetadataObject.Type.FILESET);
     Assertions.assertEquals(
-        "ml1::cat1::sch1::fs1::FILESET", JcasbinAuthorizationLookups.buildCacheKey("ml1", fileset));
+        key("ml1", "cat1", "sch1", "fs1", "FILESET"),
+        JcasbinAuthorizationLookups.buildCacheKey("ml1", fileset));
   }
 
-  // ---------- isNonLeaf ----------
+  // ---------- isContainerType ----------
 
   @Test
-  void testIsNonLeafContainerTypes() {
-    Assertions.assertTrue(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.METALAKE));
-    Assertions.assertTrue(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.CATALOG));
-    Assertions.assertTrue(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.SCHEMA));
+  void testIsContainerTypeContainerTypes() {
+    Assertions.assertTrue(
+        JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.SCHEMA));
   }
 
   @Test
-  void testIsNonLeafLeafTypes() {
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.TABLE));
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.VIEW));
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.FILESET));
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isNonLeaf(MetadataObject.Type.TOPIC));
+  void testIsContainerTypeLeafTypes() {
+    Assertions.assertFalse(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.TABLE));
+    Assertions.assertFalse(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.VIEW));
+    Assertions.assertFalse(
+        JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.TOPIC));
   }
 
-  // ---------- Cascade prefix hierarchy ----------
+  // ---------- Prefix invalidation ----------
 
   @Test
-  void testCascadeInvalidationKeyHierarchy() {
+  void testPrefixInvalidationCoversContainerPath() {
     // Dropping a catalog should use a prefix that covers all schemas and tables below it.
     MetadataObject catalog =
         MetadataObjects.of(Collections.singletonList("cat1"), MetadataObject.Type.CATALOG);
@@ -107,5 +118,90 @@ public class TestJcasbinAuthorizationLookups {
     Assertions.assertTrue(schemaKey.startsWith(catalogKey));
     Assertions.assertTrue(tableKey.startsWith(catalogKey));
     Assertions.assertTrue(tableKey.startsWith(schemaKey));
+  }
+
+  @Test
+  void testResolveMetadataIdUsesAtomicSharedCacheAndRequestDedup() {
+    MetadataObject table =
+        MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.TABLE);
+    CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
+    CountingCache<Long, Optional<OwnerInfo>> ownerRelCache = new CountingCache<>(Optional.empty());
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+
+    Assertions.assertEquals(100L, lookups.resolveMetadataId(table, "ml1", requestContext));
+    Assertions.assertEquals(100L, lookups.resolveMetadataId(table, "ml1", requestContext));
+
+    Assertions.assertEquals(1, metadataIdCache.getCount);
+    Assertions.assertEquals(0, metadataIdCache.getIfPresentCount);
+    Assertions.assertEquals(0, metadataIdCache.putCount);
+  }
+
+  @Test
+  void testResolveOwnerIdUsesAtomicSharedCacheAndRequestDedup() {
+    CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
+    CountingCache<Long, Optional<OwnerInfo>> ownerRelCache = new CountingCache<>(Optional.empty());
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+
+    Assertions.assertFalse(
+        lookups.resolveOwnerId(100L, MetadataObject.Type.TABLE, requestContext).isPresent());
+    Assertions.assertFalse(
+        lookups.resolveOwnerId(100L, MetadataObject.Type.TABLE, requestContext).isPresent());
+
+    Assertions.assertEquals(1, ownerRelCache.getCount);
+    Assertions.assertEquals(0, ownerRelCache.getIfPresentCount);
+    Assertions.assertEquals(0, ownerRelCache.putCount);
+  }
+
+  private static String key(String... parts) {
+    return String.join(JcasbinAuthorizationLookups.KEY_SEP, parts);
+  }
+
+  private static class CountingCache<K, V> implements GravitinoCache<K, V> {
+    private final V value;
+    private int getCount;
+    private int getIfPresentCount;
+    private int putCount;
+
+    private CountingCache(V value) {
+      this.value = value;
+    }
+
+    @Override
+    public Optional<V> getIfPresent(K key) {
+      getIfPresentCount++;
+      return Optional.empty();
+    }
+
+    @Override
+    public V get(K key, Function<K, V> loader) {
+      getCount++;
+      return value;
+    }
+
+    @Override
+    public void put(K key, V value) {
+      putCount++;
+    }
+
+    @Override
+    public void invalidate(K key) {}
+
+    @Override
+    public void invalidateAll() {}
+
+    @Override
+    public void invalidateByPrefix(String prefix) {}
+
+    @Override
+    public long size() {
+      return 0;
+    }
+
+    @Override
+    public void close() {}
   }
 }

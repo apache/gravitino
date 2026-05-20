@@ -19,12 +19,15 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -54,8 +57,8 @@ public class JcasbinChangePoller implements AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinChangePoller.class);
 
-  /** Max rows to fetch per poller cycle. */
-  private static final int POLLER_MAX_ROWS = 500;
+  /** Max entity-change rows to fetch per poller cycle. */
+  private static final int ENTITY_CHANGE_POLLER_MAX_ROWS = 500;
 
   private final GravitinoCache<String, Long> metadataIdCache;
   private final GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache;
@@ -74,6 +77,7 @@ public class JcasbinChangePoller implements AutoCloseable {
       GravitinoCache<String, Long> metadataIdCache,
       GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache,
       long pollIntervalSecs) {
+    Preconditions.checkArgument(pollIntervalSecs > 0, "pollIntervalSecs must be positive");
     this.metadataIdCache = metadataIdCache;
     this.ownerRelCache = ownerRelCache;
     this.pollIntervalSecs = pollIntervalSecs;
@@ -93,11 +97,11 @@ public class JcasbinChangePoller implements AutoCloseable {
    */
   public void start() {
     ownerPollHighWaterId =
-        nullToZero(
+        getOrDefault(
             SessionUtils.getWithoutCommit(
                 OwnerMetaMapper.class, OwnerMetaMapper::selectMaxChangeId));
     entityPollHighWaterId =
-        nullToZero(
+        getOrDefault(
             SessionUtils.getWithoutCommit(
                 EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
 
@@ -119,6 +123,9 @@ public class JcasbinChangePoller implements AutoCloseable {
       LOG.debug("Polling for owner changes after id {}", ownerPollHighWaterId);
       pollOwnerChanges();
     } catch (Exception e) {
+      if (handleInterruptIfAny(e, "Owner change poll")) {
+        return;
+      }
       LOG.warn("Owner change poll failed", e);
     }
 
@@ -126,28 +133,72 @@ public class JcasbinChangePoller implements AutoCloseable {
       LOG.debug("Polling for entity changes after id {}", entityPollHighWaterId);
       pollEntityChanges();
     } catch (Exception e) {
+      if (handleInterruptIfAny(e, "Entity change poll")) {
+        return;
+      }
       LOG.warn("Entity change poll failed", e);
     }
+  }
+
+  /**
+   * Restores the interrupt flag and returns true if {@code e} carries (or the current thread has
+   * accumulated) an interruption, so the caller can bail out of this poll cycle quickly during
+   * {@link #close()}-driven {@code shutdownNow()}.
+   */
+  private static boolean handleInterruptIfAny(Throwable e, String context) {
+    Throwable t = e;
+    while (t != null) {
+      if (t instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+        LOG.debug("{} interrupted, stopping poll cycle", context);
+        return true;
+      }
+      t = t.getCause();
+    }
+    if (Thread.currentThread().isInterrupted()) {
+      LOG.debug("{} ran while thread was interrupted, stopping poll cycle", context);
+      return true;
+    }
+    return false;
   }
 
   /**
    * Drains owner-change rows past {@link #ownerPollHighWaterId} and invalidates the affected {@code
    * ownerRelCache} entries. Each row carries {@code metadataObjectId}, so invalidation is a direct
    * key removal — no name resolution needed.
+   *
+   * <p>The {@code synchronized} modifier is defensive. In production this method is only invoked
+   * from the single-threaded scheduler started in {@link #start()}, and {@link
+   * java.util.concurrent.ScheduledExecutorService#scheduleWithFixedDelay} guarantees that
+   * consecutive runs do not overlap. The cursor field {@link #ownerPollHighWaterId} is also {@code
+   * volatile}, and cache invalidations are now atomic at the cache layer via {@link
+   * org.apache.gravitino.cache.GravitinoCache#runInvalidationBatch}. The keyword is kept so that
+   * future callers — additional schedulers, ad-hoc invocations from tests or admin tooling — do not
+   * silently introduce concurrent {@code "select changes → invalidate → advance cursor"} sequences.
+   * Cost is negligible under no contention thanks to biased / elided locking.
    */
-  private void pollOwnerChanges() {
+  private synchronized void pollOwnerChanges() {
     List<ChangedOwnerInfo> changes =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class, m -> m.selectChangedOwners(ownerPollHighWaterId));
-
-    long maxSeenId = ownerPollHighWaterId;
-    for (ChangedOwnerInfo change : changes) {
-      ownerRelCache.invalidate(change.getMetadataObjectId());
-      if (change.getId() > maxSeenId) {
-        maxSeenId = change.getId();
-      }
+    if (changes.isEmpty()) {
+      return;
     }
-    ownerPollHighWaterId = maxSeenId;
+
+    long[] maxSeenId = {ownerPollHighWaterId};
+    // Hold the cache's exclusive invalidation lock for the whole batch so readers never observe
+    // a half-applied state where some of this batch's entries have been evicted and others are
+    // still hot.
+    ownerRelCache.runInvalidationBatch(
+        () -> {
+          for (ChangedOwnerInfo change : changes) {
+            ownerRelCache.invalidate(change.getMetadataObjectId());
+            if (change.getId() > maxSeenId[0]) {
+              maxSeenId[0] = change.getId();
+            }
+          }
+        });
+    ownerPollHighWaterId = maxSeenId[0];
   }
 
   /**
@@ -160,14 +211,20 @@ public class JcasbinChangePoller implements AutoCloseable {
    * current name on drop, so the cacheKey we build here resolves to the entry a peer node would
    * have populated under that name. If a future change starts emitting the new post-rename name,
    * this invalidation will silently miss and stale entries will only clear via LRU eviction.
+   *
+   * <p>The {@code synchronized} modifier is defensive — see the note on {@link #pollOwnerChanges()}
+   * for the rationale. The single-threaded scheduler already prevents overlapping runs in
+   * production, and the per-batch invalidation atomicity is provided by the cache itself.
    */
-  private void pollEntityChanges() {
+  private synchronized void pollEntityChanges() {
     List<EntityChangeRecord> changes =
         SessionUtils.getWithoutCommit(
             EntityChangeLogMapper.class,
-            m -> m.selectEntityChanges(entityPollHighWaterId, POLLER_MAX_ROWS));
+            m -> m.selectEntityChanges(entityPollHighWaterId, ENTITY_CHANGE_POLLER_MAX_ROWS));
 
     long maxSeenId = entityPollHighWaterId;
+    Set<String> containerPrefixes = new LinkedHashSet<>();
+    Set<String> leafKeys = new LinkedHashSet<>();
     for (EntityChangeRecord change : changes) {
       String metalake = change.getMetalakeName();
       String entityType = change.getEntityType();
@@ -187,16 +244,17 @@ public class JcasbinChangePoller implements AutoCloseable {
       MetadataObject mdObj = metadataObjectFromChangeLog(metalake, fullName, mdType);
       String cacheKey = JcasbinAuthorizationLookups.buildCacheKey(metalake, mdObj);
 
-      if (JcasbinAuthorizationLookups.isNonLeaf(mdType)) {
-        metadataIdCache.invalidateByPrefix(cacheKey);
+      if (JcasbinAuthorizationLookups.isContainerType(mdType)) {
+        addCoalescedPrefix(containerPrefixes, cacheKey);
       } else {
-        metadataIdCache.invalidate(cacheKey);
+        leafKeys.add(cacheKey);
       }
 
       if (change.getId() > maxSeenId) {
         maxSeenId = change.getId();
       }
     }
+    invalidateCoalescedKeys(containerPrefixes, leafKeys);
     entityPollHighWaterId = maxSeenId;
   }
 
@@ -227,7 +285,36 @@ public class JcasbinChangePoller implements AutoCloseable {
     return MetadataObjects.of(names, type);
   }
 
-  private static long nullToZero(Long value) {
+  private static long getOrDefault(Long value) {
     return value == null ? 0L : value;
+  }
+
+  private static void addCoalescedPrefix(Set<String> prefixes, String candidate) {
+    for (String prefix : prefixes) {
+      if (candidate.startsWith(prefix)) {
+        return;
+      }
+    }
+    prefixes.removeIf(prefix -> prefix.startsWith(candidate));
+    prefixes.add(candidate);
+  }
+
+  private void invalidateCoalescedKeys(Set<String> prefixes, Set<String> leafKeys) {
+    if (prefixes.isEmpty() && leafKeys.isEmpty()) {
+      return;
+    }
+    // Hold the cache's exclusive invalidation lock for the whole batch so readers never observe
+    // a half-applied state where some prefix/leaf keys have been evicted and others have not.
+    metadataIdCache.runInvalidationBatch(
+        () -> {
+          for (String prefix : prefixes) {
+            metadataIdCache.invalidateByPrefix(prefix);
+          }
+          for (String leafKey : leafKeys) {
+            if (prefixes.stream().noneMatch(leafKey::startsWith)) {
+              metadataIdCache.invalidate(leafKey);
+            }
+          }
+        });
   }
 }

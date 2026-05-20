@@ -23,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -36,12 +38,14 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -65,6 +69,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
@@ -84,6 +89,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.casbin.jcasbin.main.Enforcer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -135,6 +141,8 @@ public class TestJcasbinAuthorizer {
 
   private static OwnerMetaMapper ownerMetaMapper = mock(OwnerMetaMapper.class);
 
+  private static EntityChangeLogMapper entityChangeLogMapper = mock(EntityChangeLogMapper.class);
+
   /**
    * Tracks roles registered via {@link #mockRoleInStore} so {@code
    * roleMetaMapper.batchGetRoleUpdatedAt} can return their versions on demand.
@@ -161,15 +169,22 @@ public class TestJcasbinAuthorizer {
     OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
     ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
+    when(ownerMetaMapper.selectMaxChangeId()).thenReturn(0L);
+    when(ownerMetaMapper.selectChangedOwners(anyLong())).thenReturn(Collections.emptyList());
+    when(entityChangeLogMapper.selectMaxChangeId()).thenReturn(0L);
+    when(entityChangeLogMapper.selectEntityChanges(anyLong(), anyInt()))
+        .thenReturn(Collections.emptyList());
 
-    // Mock SessionUtils.getWithoutCommit to delegate to our mock mappers
+    // The change poller probes entity_change_log + owner_meta on startup and owner lookups go via
+    // SessionUtils; mock SessionUtils to delegate to mapper mocks so tests can stub owner state
+    // without opening a real MyBatis session. Poller-only mapper calls return safe empty defaults.
     sessionUtilsMockedStatic = mockStatic(SessionUtils.class);
     sessionUtilsMockedStatic
         .when(() -> SessionUtils.getWithoutCommit(any(), any()))
         .thenAnswer(
             invocation -> {
               Class<?> mapperClass = invocation.getArgument(0);
-              java.util.function.Function<Object, Object> func = invocation.getArgument(1);
+              Function<Object, Object> func = invocation.getArgument(1);
               if (mapperClass == UserMetaMapper.class) {
                 return func.apply(userMetaMapper);
               } else if (mapperClass == GroupMetaMapper.class) {
@@ -178,6 +193,9 @@ public class TestJcasbinAuthorizer {
                 return func.apply(roleMetaMapper);
               } else if (mapperClass == OwnerMetaMapper.class) {
                 return func.apply(ownerMetaMapper);
+              }
+              if (mapperClass == EntityChangeLogMapper.class) {
+                return func.apply(entityChangeLogMapper);
               }
               return null;
             });
@@ -240,6 +258,7 @@ public class TestJcasbinAuthorizer {
 
   @AfterAll
   public static void stop() {
+    // jcasbinAuthorizer is per-test (see @AfterEach); only static mocks need cleanup here.
     if (principalUtilsMockedStatic != null) {
       principalUtilsMockedStatic.close();
     }
@@ -502,6 +521,26 @@ public class TestJcasbinAuthorizer {
     assertFalse(doAuthorize(noGroupPrincipal));
 
     restoreDefaultPrincipal();
+  }
+
+  @Test
+  public void testGroupRoleSkippedWhenRoleIdsAndNamesMismatch() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    String mismatchGroupName = "mismatchGroup";
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(mismatchGroupName);
+
+    mockNoDirectUserRoles();
+    // Mismatched roleIds (1) and roleNames (2) -- the whole group should be skipped
+    mockGroupWithRoles(
+        mismatchGroupName, ImmutableList.of(101L), ImmutableList.of("roleA", "roleB"));
+
+    // Authorization denied -- the mismatched group is skipped, so no role is loaded
+    assertFalse(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
   }
 
   @Test
@@ -1067,6 +1106,36 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testOwnerChangeBestEffortWhenMetadataIdLookupFails() throws Exception {
+    GravitinoCache<String, Long> metadataIdCache = getMetadataIdCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache = getOwnerRelCache(jcasbinAuthorizer);
+    NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
+    String cacheKey =
+        JcasbinAuthorizationLookups.buildCacheKey(
+            METALAKE, NameIdentifierUtil.toMetadataObject(catalogIdent, Entity.EntityType.CATALOG));
+
+    metadataIdCache.put(cacheKey, CATALOG_ID);
+    ownerRelCache.put(CATALOG_ID, Optional.of(new OwnerInfo(USER_ID, "USER")));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenThrow(new RuntimeException("lookup failed"));
+
+    try {
+      Assertions.assertDoesNotThrow(
+          () ->
+              jcasbinAuthorizer.handleMetadataOwnerChange(
+                  METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG));
+
+      assertFalse(metadataIdCache.getIfPresent(cacheKey).isPresent());
+      assertTrue(ownerRelCache.getIfPresent(CATALOG_ID).isPresent());
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(CATALOG_ID);
+    }
+  }
+
+  @Test
   public void testRoleCacheSynchronousRemovalListenerDeletesPolicy() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
 
@@ -1282,6 +1351,14 @@ public class TestJcasbinAuthorizer {
         .withLastVersion(1L)
         .withDeletedAt(0L)
         .build();
+  }
+
+  @SuppressWarnings("unchecked")
+  private static GravitinoCache<String, Long> getMetadataIdCache(JcasbinAuthorizer authorizer)
+      throws Exception {
+    Field field = JcasbinAuthorizer.class.getDeclaredField("metadataIdCache");
+    field.setAccessible(true);
+    return (GravitinoCache<String, Long>) field.get(authorizer);
   }
 
   private static Enforcer getAllowEnforcer(JcasbinAuthorizer authorizer) throws Exception {

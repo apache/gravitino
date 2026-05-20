@@ -101,8 +101,7 @@ public class HivePropertyMeta implements HasPropertyMeta {
                           .map(name -> ((String) name).toLowerCase(ENGLISH))
                           .collect(toImmutableList()),
               value -> value),
-          integerProperty(
-              HIVE_BUCKET_COUNT_KEY, "The number of buckets for the table", null, false),
+          integerProperty(HIVE_BUCKET_COUNT_KEY, "The number of buckets for the table", 0, false),
           new PropertyMetadata<>(
               HIVE_SORT_ORDER_KEY,
               "Bucket sorting columns",
