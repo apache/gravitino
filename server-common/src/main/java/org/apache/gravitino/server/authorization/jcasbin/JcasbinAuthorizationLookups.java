@@ -74,25 +74,24 @@ public class JcasbinAuthorizationLookups {
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
     String cacheKey = buildCacheKey(metalake, metadataObject);
     try {
-      // Both cache tiers forbid caching null/absent values, so we signal a missing object by
-      // throwing through the loaders and translate it back to Optional.empty() here. This keeps
-      // positive results cached in both tiers while avoiding caching a negative result.
+      // Both cache tiers load atomically and forbid caching null, so a missing object is signalled
+      // by throwing through the loaders and translated back to Optional.empty() here. This caches
+      // only positive results, never a negative one.
       return Optional.of(
           requestContext.computeMetadataIdIfAbsent(
               cacheKey,
-              k ->
-                  metadataIdCache.get(
-                      k,
-                      ignored ->
-                          MetadataIdConverter.getID(metadataObject, metalake)
-                              .orElseThrow(
-                                  () ->
-                                      new NoSuchMetadataObjectException(
-                                          "Metadata object %s does not exist",
-                                          metadataObject.fullName())))));
+              k -> metadataIdCache.get(k, ignored -> loadMetadataId(metadataObject, metalake))));
     } catch (NoSuchMetadataObjectException e) {
       return Optional.empty();
     }
+  }
+
+  private static Long loadMetadataId(MetadataObject metadataObject, String metalake) {
+    return MetadataIdConverter.getID(metadataObject, metalake)
+        .orElseThrow(
+            () ->
+                new NoSuchMetadataObjectException(
+                    "Metadata object %s does not exist", metadataObject.fullName()));
   }
 
   /**
