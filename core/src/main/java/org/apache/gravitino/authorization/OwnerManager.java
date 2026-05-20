@@ -21,6 +21,7 @@ package org.apache.gravitino.authorization;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
@@ -118,7 +119,7 @@ public class OwnerManager implements OwnerDispatcher {
           metadataObject,
           authorizationPlugin ->
               authorizationPlugin.onOwnerSet(metadataObject, originOwner.orElse(null), newOwner));
-      originOwner.ifPresent(owner -> notifyOwnerChange(owner, metalake, metadataObject));
+      notifyOwnerChange(originOwner.orElse(null), metalake, metadataObject);
     } catch (NoSuchEntityException nse) {
       LOG.warn(
           "Metadata object {} or owner {} is not found", metadataObject.fullName(), ownerName, nse);
@@ -134,41 +135,65 @@ public class OwnerManager implements OwnerDispatcher {
     }
   }
 
-  private void notifyOwnerChange(Owner oldOwner, String metalake, MetadataObject metadataObject) {
+  private void notifyOwnerChange(
+      @Nullable Owner oldOwner, String metalake, MetadataObject metadataObject) {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
-    if (gravitinoAuthorizer != null) {
-      try {
-        Long oldOwnerId;
-        if (oldOwner.type() == Owner.Type.USER) {
-          UserEntity userEntity =
-              GravitinoEnv.getInstance()
-                  .entityStore()
-                  .get(
-                      NameIdentifierUtil.ofUser(metalake, oldOwner.name()),
-                      Entity.EntityType.USER,
-                      UserEntity.class);
-          oldOwnerId = userEntity.id();
-        } else if (oldOwner.type() == Owner.Type.GROUP) {
-          GroupEntity groupEntity =
-              GravitinoEnv.getInstance()
-                  .entityStore()
-                  .get(
-                      NameIdentifierUtil.ofGroup(metalake, oldOwner.name()),
-                      Entity.EntityType.GROUP,
-                      GroupEntity.class);
-          oldOwnerId = groupEntity.id();
-        } else {
-          LOG.warn("Unsupported owner type: {}", oldOwner.type());
-          return;
-        }
-        gravitinoAuthorizer.handleMetadataOwnerChange(
-            metalake,
-            oldOwnerId,
-            MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
-            Entity.EntityType.valueOf(metadataObject.type().name()));
-      } catch (IOException e) {
-        LOG.warn(e.getMessage(), e);
-      }
+    if (gravitinoAuthorizer == null) {
+      return;
+    }
+
+    Long oldOwnerId;
+    try {
+      oldOwnerId = oldOwner == null ? null : getOwnerId(metalake, oldOwner);
+    } catch (IOException e) {
+      LOG.warn(
+          "Failed to resolve previous owner id for {} (metalake={}, oldOwner={}); "
+              + "cache invalidation for this change may be skipped on this node",
+          metadataObject.fullName(),
+          metalake,
+          oldOwner,
+          e);
+      return;
+    }
+
+    try {
+      gravitinoAuthorizer.handleMetadataOwnerChange(
+          metalake,
+          oldOwnerId,
+          MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
+          Entity.EntityType.valueOf(metadataObject.type().name()));
+    } catch (RuntimeException e) {
+      // Best-effort hook: a failing authorizer must not fail the owner-change operation itself.
+      LOG.warn(
+          "Authorizer hook failed for owner change on {} (metalake={}, oldOwnerId={})",
+          metadataObject.fullName(),
+          metalake,
+          oldOwnerId,
+          e);
+    }
+  }
+
+  private Long getOwnerId(String metalake, Owner owner) throws IOException {
+    if (owner.type() == Owner.Type.USER) {
+      UserEntity userEntity =
+          GravitinoEnv.getInstance()
+              .entityStore()
+              .get(
+                  NameIdentifierUtil.ofUser(metalake, owner.name()),
+                  Entity.EntityType.USER,
+                  UserEntity.class);
+      return userEntity.id();
+    } else if (owner.type() == Owner.Type.GROUP) {
+      GroupEntity groupEntity =
+          GravitinoEnv.getInstance()
+              .entityStore()
+              .get(
+                  NameIdentifierUtil.ofGroup(metalake, owner.name()),
+                  Entity.EntityType.GROUP,
+                  GroupEntity.class);
+      return groupEntity.id();
+    } else {
+      throw new IllegalArgumentException("Unsupported owner type: " + owner.type());
     }
   }
 

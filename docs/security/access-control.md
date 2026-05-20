@@ -451,6 +451,8 @@ To enable access control in Gravitino, configure the following settings in your 
 | `gravitino.authorization.jcasbin.cacheExpirationSecs`   | The expiration time in seconds for authorization cache entries            | `3600`        | No                                          | 1.1.1         |
 | `gravitino.authorization.jcasbin.roleCacheSize`         | The maximum size of the role cache for authorization                      | `10000`       | No                                          | 1.1.1         |
 | `gravitino.authorization.jcasbin.ownerCacheSize`        | The maximum size of the owner cache for authorization                     | `100000`      | No                                          | 1.1.1         |
+| `gravitino.authorization.jcasbin.metadataIdCacheSize`   | The maximum size of the metadata ID cache for authorization               | `100000`      | No                                          | 1.3.0         |
+| `gravitino.authorization.jcasbin.changePollIntervalSecs` | The interval in seconds for polling entity and owner changes              | `3`           | No                                          | 1.3.0         |
 
 ### Authorization Cache
 
@@ -461,6 +463,10 @@ Gravitino uses Caffeine caches to improve authorization performance by caching r
 - **`roleCacheSize`**: Controls the maximum number of role entries that can be cached. When the cache reaches this size, the least recently used entries are evicted.
 
 - **`ownerCacheSize`**: Controls the maximum number of owner relationship entries that can be cached. This cache maps metadata object IDs to their owner IDs.
+
+- **`metadataIdCacheSize`**: Controls the maximum number of metadata name-to-ID mapping entries that can be cached. This cache maps metadata object names to internal metadata IDs used by JCasbin authorization checks.
+
+- **`changePollIntervalSecs`**: Controls how often a Gravitino server polls persisted entity and owner changes to invalidate local JCasbin authorization caches in multi-node deployments.
 
 :::info
 When role privileges or ownership are changed through the Gravitino API, the corresponding cache entries are automatically invalidated to ensure authorization decisions reflect the latest state.
@@ -488,6 +494,8 @@ gravitino.authorization.serviceAdmins = admin1,admin2
 gravitino.authorization.jcasbin.cacheExpirationSecs = 3600
 gravitino.authorization.jcasbin.roleCacheSize = 10000
 gravitino.authorization.jcasbin.ownerCacheSize = 100000
+gravitino.authorization.jcasbin.metadataIdCacheSize = 100000
+gravitino.authorization.jcasbin.changePollIntervalSecs = 3
 ```
 
 ## Migration Guide

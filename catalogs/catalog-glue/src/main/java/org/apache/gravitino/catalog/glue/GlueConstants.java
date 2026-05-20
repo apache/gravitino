@@ -123,7 +123,7 @@ public final class GlueConstants {
   public static final String LOCATION = "location";
 
   /** InputFormat class name from {@code StorageDescriptor.inputFormat()}. */
-  public static final String INPUT_FORMAT = "input-format";
+  public static final String INPUT_FORMAT_CLASS = "input-format";
 
   /** OutputFormat class name from {@code StorageDescriptor.outputFormat()}. */
   public static final String OUTPUT_FORMAT = "output-format";

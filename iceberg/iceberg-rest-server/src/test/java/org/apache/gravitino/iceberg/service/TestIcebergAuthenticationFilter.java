@@ -25,16 +25,63 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import javax.servlet.ServletRequest;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIcebergAuthenticationFilter {
 
   private static final ObjectMapper MAPPER = IcebergObjectMapper.getInstance();
+
+  /** Exposes the protected {@code isHealthCheckRequest} method for white-box testing. */
+  private static class TestableFilter extends IcebergAuthenticationFilter {
+    boolean isHealth(ServletRequest request) {
+      return isHealthCheckRequest(request);
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/iceberg/health",
+        "/iceberg/health/live",
+        "/iceberg/health/ready",
+        "/health",
+        "/health/live",
+        "/health/ready",
+        "/health.html",
+        "/api/health",
+        "/api/health/live",
+        "/api/health/ready"
+      })
+  public void testHealthPathsBypassAuth(String path) {
+    TestableFilter filter = new TestableFilter();
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getRequestURI()).thenReturn(path);
+    Assertions.assertTrue(filter.isHealth(req), "Expected health bypass for path: " + path);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/iceberg/v1/namespaces",
+        "/iceberg/v1/config",
+        "/iceberg/healthcheck",
+        "/api/metalakes"
+      })
+  public void testNonHealthPathsRequireAuth(String path) {
+    TestableFilter filter = new TestableFilter();
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getRequestURI()).thenReturn(path);
+    Assertions.assertFalse(filter.isHealth(req), "Expected auth required for path: " + path);
+  }
 
   @Test
   public void testUnauthorizedErrorReturnsJson() throws Exception {

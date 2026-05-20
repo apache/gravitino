@@ -106,7 +106,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       ImmutableSet.of(
           GlueConstants.LOCATION,
           GlueConstants.FORMAT,
-          GlueConstants.INPUT_FORMAT,
+          GlueConstants.INPUT_FORMAT_CLASS,
           GlueConstants.OUTPUT_FORMAT,
           GlueConstants.SERDE_LIB,
           GlueConstants.SERDE_NAME);
@@ -126,6 +126,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   /** Optional S3 warehouse prefix. Table location is derived as {@code warehouse/db/table}. */
   @VisibleForTesting String warehouseLocation;
+
 
   /** Iceberg SDK Glue catalog used for creating Iceberg-format tables. */
   @VisibleForTesting org.apache.iceberg.catalog.Catalog icebergGlueCatalog;
@@ -471,6 +472,24 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       }
     }
 
+    if (isIceberg) {
+      boolean registerMode = props.containsKey(GlueConstants.METADATA_LOCATION);
+      if (!registerMode) {
+        // Use Iceberg SDK to create the table (writes metadata.json to S3 and registers in Glue).
+        GlueIcebergTableHelper.createTable(
+            icebergGlueCatalog,
+            dbName,
+            ident.name(),
+            columns,
+            comment,
+            finalProps,
+            partitions,
+            sortOrders);
+        LOG.info("Created Iceberg table {}.{} via Iceberg SDK", dbName, ident.name());
+        return loadTable(ident);
+      }
+    }
+
     TableInput input =
         buildTableInput(
             dbName,
@@ -747,7 +766,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     // Translate format name to input/output/serde class names if not explicitly set.
     // Fall back to "parquet" when no format is specified at all.
     String format = properties.get(GlueConstants.FORMAT);
-    String inputFormat = properties.get(GlueConstants.INPUT_FORMAT);
+    String inputFormat = properties.get(GlueConstants.INPUT_FORMAT_CLASS);
     String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
     String serdeLib = properties.get(GlueConstants.SERDE_LIB);
 
@@ -847,6 +866,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             + GlueConstants.WAREHOUSE
             + "' on the catalog.");
   }
+
 
   /** Translates a format name (e.g., "parquet", "orc") to the Hive input format class. */
   private static String getInputFormatClass(String format) {

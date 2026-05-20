@@ -19,7 +19,9 @@
 package org.apache.gravitino.cache;
 
 import java.io.Closeable;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * A general-purpose cache interface used by the authorization subsystem. Implementations include a
@@ -37,6 +39,26 @@ public interface GravitinoCache<K, V> extends Closeable {
    * @return an Optional containing the cached value, or empty if absent
    */
   Optional<V> getIfPresent(K key);
+
+  /**
+   * Returns the value associated with the key, loading it if necessary. Implementations with real
+   * storage should make the load atomic for the same key, and should serialise concurrent reads
+   * against any {@link #invalidate(Object) invalidate} call so a reader cannot observe a partially
+   * invalidated cache.
+   *
+   * @param key the cache key
+   * @param loader the loader invoked when the key is absent
+   * @return the cached or loaded value
+   */
+  default V get(K key, Function<K, V> loader) {
+    Optional<V> value = getIfPresent(key);
+    if (value.isPresent()) {
+      return value.get();
+    }
+    V loaded = Objects.requireNonNull(loader.apply(key), "Cache loader must not return null");
+    put(key, loaded);
+    return loaded;
+  }
 
   /**
    * Associates the value with the key in the cache.
@@ -58,12 +80,28 @@ public interface GravitinoCache<K, V> extends Closeable {
 
   /**
    * Evicts all entries whose key is a String and starts with the given prefix. Only meaningful when
-   * K = String. Used by metadataIdCache for hierarchical cascade invalidation: dropping a catalog
-   * evicts the catalog entry plus all schema/table/fileset/... entries beneath it.
+   * K = String. Used by metadataIdCache for path-based invalidation: dropping a catalog evicts the
+   * catalog entry plus all schema/table/fileset/... entries under that catalog name path.
    *
    * @param prefix the prefix to match against key strings
    */
   void invalidateByPrefix(String prefix);
+
+  /**
+   * Runs {@code batch} so that all {@link #invalidate}, {@link #invalidateAll}, and {@link
+   * #invalidateByPrefix} calls it makes appear atomic to concurrent readers — i.e. readers see
+   * either the state from before the batch or the state after, never an intermediate half-applied
+   * state.
+   *
+   * <p>Default implementation: just runs the runnable, suitable for caches without real storage
+   * (e.g. {@link NoOpsGravitinoCache}). Storage-backed implementations should hold an exclusive
+   * lock for the duration of the batch.
+   *
+   * @param batch the invalidation sequence to run atomically
+   */
+  default void runInvalidationBatch(Runnable batch) {
+    batch.run();
+  }
 
   /**
    * Returns the approximate number of entries in the cache.

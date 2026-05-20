@@ -109,7 +109,7 @@ final class GlueIcebergTableHelper {
           GlueConstants.LOCATION,
           GlueConstants.TABLE_TYPE,
           GlueConstants.METADATA_LOCATION,
-          GlueConstants.INPUT_FORMAT,
+          GlueConstants.INPUT_FORMAT_CLASS,
           GlueConstants.OUTPUT_FORMAT,
           GlueConstants.SERDE_LIB);
 
