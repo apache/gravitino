@@ -294,19 +294,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Principal principal,
       String metalake,
       AuthorizationRequestContext requestContext) {
-    try {
-      Optional<Long> metadataId =
-          lookups.resolveMetadataId(metadataObject, metalake, requestContext);
-      if (!metadataId.isPresent()) {
-        return false;
-      }
-      Optional<OwnerInfo> owner =
-          lookups.resolveOwnerId(metadataId.get(), metadataObject.type(), requestContext);
-      return ownerMatchesUserOrGroups(owner, principal, metalake);
-    } catch (Exception e) {
-      LOG.debug("Can not get entity id", e);
+    Optional<Long> metadataId = lookups.resolveMetadataId(metadataObject, metalake, requestContext);
+    if (!metadataId.isPresent()) {
       return false;
     }
+    Optional<OwnerInfo> owner =
+        lookups.resolveOwnerId(metadataId.get(), metadataObject.type(), requestContext);
+    return ownerMatchesUserOrGroups(owner, principal, metalake);
   }
 
   @Override
@@ -629,18 +623,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         MetadataObject metadataObject,
         String privilege,
         AuthorizationRequestContext requestContext) {
-      try {
-        Optional<Long> metadataId =
-            lookups.resolveMetadataId(metadataObject, metalake, requestContext);
-        if (!metadataId.isPresent()) {
-          return false;
-        }
-        return authorizeByJcasbin(
-            userId, metalake, metadataObject, metadataId.get(), privilege, requestContext);
-      } catch (Exception e) {
-        LOG.debug("Can not get entity id", e);
+      Optional<Long> metadataId =
+          lookups.resolveMetadataId(metadataObject, metalake, requestContext);
+      if (!metadataId.isPresent()) {
         return false;
       }
+      return authorizeByJcasbin(
+          userId, metalake, metadataObject, metadataId.get(), privilege, requestContext);
     }
 
     private boolean authorizeByJcasbin(
