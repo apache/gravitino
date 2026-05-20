@@ -97,6 +97,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 /** Test of {@link JcasbinAuthorizer} */
 public class TestJcasbinAuthorizer {
@@ -614,6 +615,54 @@ public class TestJcasbinAuthorizer {
     // A principal with no groups should fail
     setCurrentPrincipalWithGroup(null);
     assertFalse(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+
+    restoreDefaultPrincipal();
+  }
+
+  @Test
+  public void testIsSelfRoleReusesCacheAcrossCalls() throws Exception {
+    // Acceptance criterion for #11088: repeated isSelf(ROLE) calls in the same logical request
+    // must not re-issue the role-list DB queries (listRolesByUserId / listRolesByGroupId).
+    // The version-validated userRoleCache / groupRoleCache are process-wide, so the second call
+    // hits cache even though each isSelf creates a fresh AuthorizationRequestContext.
+    //
+    // Use CATALOG_ID so the role id matches the catch-all MetadataIdConverter.getID mock.
+    Long directRoleId = CATALOG_ID;
+    String directRoleName = "selfDedupRole";
+    NameIdentifier roleIdent = NameIdentifierUtil.ofRole(METALAKE, directRoleName);
+
+    // Direct user-role assignment via the version-validated cache path.
+    mockUserRoles(directRoleId, directRoleName);
+
+    // Use a fresh authorizer + principal to ensure the userRoleCache starts cold.
+    setCurrentPrincipalWithGroup(null);
+    Mockito.clearInvocations(roleMetaMapper);
+
+    // 1st call: miss → listRolesByUserId; 2nd call: cache hit → no extra listRolesByUserId.
+    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+
+    Mockito.verify(roleMetaMapper, Mockito.times(1)).listRolesByUserId(eq(USER_ID));
+
+    restoreDefaultPrincipal();
+  }
+
+  @Test
+  public void testIsSelfRoleDoesNotCallListEntitiesByRelation() throws Exception {
+    // #11088: isSelf(ROLE) must not bypass the cache by going straight to
+    // entityStore.relationOperations().listEntitiesByRelation(ROLE_USER_REL, ...).
+    Long directRoleId = CATALOG_ID;
+    String directRoleName = "noBypassRole";
+    NameIdentifier roleIdent = NameIdentifierUtil.ofRole(METALAKE, directRoleName);
+
+    mockUserRoles(directRoleId, directRoleName);
+    setCurrentPrincipalWithGroup(null);
+    Mockito.clearInvocations(supportsRelationOperations);
+
+    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+
+    Mockito.verify(supportsRelationOperations, Mockito.never())
+        .listEntitiesByRelation(any(), any(), any());
 
     restoreDefaultPrincipal();
   }

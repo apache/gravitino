@@ -44,7 +44,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
@@ -360,24 +359,33 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         Long roleId =
             MetadataIdConverter.getID(
                 NameIdentifierUtil.toMetadataObject(nameIdentifier, type), metalake);
-        EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-        NameIdentifier userNameIdentifier =
-            NameIdentifierUtil.ofUser(metalake, PrincipalUtils.getCurrentUserName());
-        List<RoleEntity> entities =
-            entityStore
-                .relationOperations()
-                .listEntitiesByRelation(
-                    SupportsRelationOperations.Type.ROLE_USER_REL,
-                    userNameIdentifier,
-                    Entity.EntityType.USER);
-        // Check direct user-role assignment
-        if (entities.stream().anyMatch(roleEntity -> Objects.equals(roleEntity.id(), roleId))) {
+
+        // Route through the same version-validated caches that authorize() / isOwner() use, so
+        // the role list comes from userRoleCache / groupRoleCache instead of an extra direct
+        // listEntitiesByRelation call against the EntityStore. The role-list DB queries
+        // (listRolesByUserId / listRolesByGroupId) are then deduplicated across repeated
+        // isSelf(ROLE) calls — and shared with authorize() — by the process-wide Caffeine
+        // caches. The fresh per-call AuthorizationRequestContext only scopes the version
+        // probes (getUserUpdatedAt / getGroupUpdatedAt), which are lightweight single-row
+        // SELECTs and are not the queries the issue calls out as redundant.
+        AuthorizationRequestContext ctx = new AuthorizationRequestContext();
+        Optional<UserUpdatedAt> userInfoOpt = loadUserInfo(metalake, currentUserName, ctx);
+        if (!userInfoOpt.isPresent()) {
+          return false;
+        }
+        UserUpdatedAt userInfo = userInfoOpt.get();
+        long userId = userInfo.getUserId();
+
+        // Direct user-role assignments via the version-validated cache.
+        List<Long> directRoleIds = loadUserRoles(metalake, currentUserName, userId, userInfo);
+        if (directRoleIds.contains(roleId)) {
           return true;
         }
-        // Check group-role assignments.
-        for (GroupEntity groupEntity : resolveCurrentUserGroups(metalake, entityStore)) {
-          List<Long> groupRoleIds = groupEntity.roleIds();
-          if (groupRoleIds != null && groupRoleIds.contains(roleId)) {
+
+        // Group-inherited assignments via the same cache path used by loadRolePrivilege.
+        for (String groupname : currentPrincipalGroupNames()) {
+          List<Long> groupRoleIds = loadGroupRoles(metalake, groupname, userId, ctx);
+          if (groupRoleIds.contains(roleId)) {
             return true;
           }
         }
