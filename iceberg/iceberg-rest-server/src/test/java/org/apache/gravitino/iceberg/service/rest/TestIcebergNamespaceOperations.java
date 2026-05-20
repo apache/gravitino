@@ -183,6 +183,12 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     verifyCreateNamespaceSucc(Namespace.of("drop_foo3", "a"));
     verifyDropNamespaceFail(404, Namespace.of("drop_foo3", "b"));
     verifyDropNamespaceSucc(Namespace.of("drop_foo3", "a"));
+
+    // drop non-empty namespace should return 409 Conflict per Iceberg REST spec
+    Namespace nonEmptyNs = Namespace.of("drop_nonempty_foo");
+    verifyCreateNamespaceSucc(nonEmptyNs);
+    verifyRegisterTableSucc("drop_nonempty_table", nonEmptyNs);
+    verifyDropNamespaceFail(409, nonEmptyNs);
   }
 
   @Test
