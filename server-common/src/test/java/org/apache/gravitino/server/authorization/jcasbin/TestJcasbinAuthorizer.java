@@ -1111,7 +1111,7 @@ public class TestJcasbinAuthorizer {
     GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache = getOwnerRelCache(jcasbinAuthorizer);
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
     String cacheKey =
-        JcasbinAuthorizationLookups.buildCacheKey(
+        JcasbinAuthorizationCacheKeys.metadataObjectKey(
             METALAKE, NameIdentifierUtil.toMetadataObject(catalogIdent, Entity.EntityType.CATALOG));
 
     metadataIdCache.put(cacheKey, CATALOG_ID);

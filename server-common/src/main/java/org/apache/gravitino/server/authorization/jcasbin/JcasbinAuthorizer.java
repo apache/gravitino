@@ -110,9 +110,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizer.class);
 
-  /** Key separator for hierarchical cache keys. */
-  static final String KEY_SEP = "::";
-
   /** Jcasbin enforcer is used for metadata authorization. */
   private Enforcer allowEnforcer;
 
@@ -128,14 +125,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   // ---- Version-validated caches (strong consistency) ----
 
   /**
-   * userRoleCache: metalake::userName -> CachedUserRoles. Version-validated per request via
+   * userRoleCache: per-(metalake, userName) -> CachedUserRoles. Version-validated per request via
    * user_meta.updated_at.
    */
   private GravitinoCache<String, CachedUserRoles> userRoleCache;
 
   /**
-   * groupRoleCache: metalake::groupName -> CachedGroupRoles. Version-validated per request via
-   * group_meta.updated_at.
+   * groupRoleCache: per-(metalake, groupName) -> CachedGroupRoles. Version-validated per request
+   * via group_meta.updated_at.
    */
   private GravitinoCache<String, CachedGroupRoles> groupRoleCache;
 
@@ -146,10 +143,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   // ---- Eventual consistency caches (poller-driven) ----
 
-  /**
-   * Path-based key {@code metalake::catalog::schema::object::TYPE} -> entity id. Evicted by entity
-   * change poller.
-   */
+  /** Path-based metadata object key -> entity id. Evicted by entity change poller. */
   private GravitinoCache<String, Long> metadataIdCache;
 
   /** ownerRelCache: metadataObjectId -> Optional(owner). Evicted by owner change poller. */
@@ -486,7 +480,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     // Owner mutations may happen after drop/recreate with the same name. Invalidate the
     // name->id mapping as well to prevent using a stale metadataId from metadataIdCache.
-    metadataIdCache.invalidate(JcasbinAuthorizationLookups.buildCacheKey(metalake, metadataObject));
+    metadataIdCache.invalidate(
+        JcasbinAuthorizationCacheKeys.metadataObjectKey(metalake, metadataObject));
     try {
       Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
       ownerRelCache.invalidate(metadataId);
@@ -499,9 +494,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void handleEntityNameIdMappingChange(
       String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
-    String cacheKey = JcasbinAuthorizationLookups.buildCacheKey(metalake, metadataObject);
-    if (JcasbinAuthorizationLookups.isContainerType(metadataObject.type())) {
-      // Prefix invalidation: metalake::catalog:: removes catalog + all children.
+    String cacheKey = JcasbinAuthorizationCacheKeys.metadataObjectKey(metalake, metadataObject);
+    if (JcasbinAuthorizationCacheKeys.isMetadataContainer(metadataObject.type())) {
+      // Prefix invalidation removes a container and all children under the same name path.
       metadataIdCache.invalidateByPrefix(cacheKey);
     } else {
       metadataIdCache.invalidate(cacheKey);
@@ -598,7 +593,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Optional<UserUpdatedAt> loadUserInfo(
       String metalake, String username, AuthorizationRequestContext requestContext) {
-    String cacheKey = metalake + KEY_SEP + username;
+    String cacheKey = JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username);
     return requestContext.computeUserInfoIfAbsent(
         cacheKey,
         k ->
@@ -685,7 +680,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private List<Long> loadUserRoles(
       String metalake, String username, long userId, UserUpdatedAt userInfo) {
-    String userCacheKey = metalake + KEY_SEP + username;
+    String userCacheKey = JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username);
     Optional<CachedUserRoles> cachedOpt = userRoleCache.getIfPresent(userCacheKey);
 
     if (cachedOpt.isPresent() && cachedOpt.get().getUpdatedAt() >= userInfo.getUpdatedAt()) {
@@ -711,7 +706,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Optional<GroupUpdatedAt> loadGroupInfo(
       String metalake, String groupname, AuthorizationRequestContext requestContext) {
-    String cacheKey = metalake + KEY_SEP + groupname;
+    String cacheKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupname);
     return requestContext.computeGroupInfoIfAbsent(
         cacheKey,
         k ->
@@ -735,7 +730,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
     GroupUpdatedAt groupInfo = groupInfoOpt.get();
     long groupId = groupInfo.getGroupId();
-    String groupCacheKey = metalake + KEY_SEP + groupname;
+    String groupCacheKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupname);
     Optional<CachedGroupRoles> cachedOpt = groupRoleCache.getIfPresent(groupCacheKey);
 
     if (cachedOpt.isPresent() && cachedOpt.get().getUpdatedAt() >= groupInfo.getUpdatedAt()) {
