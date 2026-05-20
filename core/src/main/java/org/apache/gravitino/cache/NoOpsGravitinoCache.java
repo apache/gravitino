@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.cache;
 
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * A no-op implementation of {@link GravitinoCache} that never caches anything. Useful for testing
@@ -32,6 +34,11 @@ public class NoOpsGravitinoCache<K, V> implements GravitinoCache<K, V> {
   @Override
   public Optional<V> getIfPresent(K key) {
     return Optional.empty();
+  }
+
+  @Override
+  public V get(K key, Function<K, V> loader) {
+    return Objects.requireNonNull(loader.apply(key), "Cache loader must not return null");
   }
 
   @Override
