@@ -33,6 +33,7 @@ dependencies {
   constraints {
     implementation(libs.thrift)
     implementation(libs.snappy.java)
+    implementation(libs.commons.beanutils)
   }
 
   implementation(libs.hadoop3.common) {
