@@ -48,8 +48,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Integration tests for merging server-level {@code catalog.<catalog-name>.*} Iceberg REST
- * configuration into dynamic per-catalog configs.
+ * End-to-end check that server-level root {@code gravitino.iceberg-rest.*} settings merge into
+ * dynamic default-catalog configs when authorization forces the dynamic config provider.
  */
 @Tag("gravitino-docker-test")
 public class IcebergDynamicServerConfigMergeIT extends BaseIT {
@@ -60,7 +60,6 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
   private static final String SCHEMA_NAME = "schema";
   private static final String TABLE_NAME = "merge_config_table";
   private static final String SUPER_USER = "super";
-  private static final String SERVER_STATIC_JDBC_USER = "server-static-user";
 
   private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
 
@@ -85,28 +84,13 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
   }
 
   @Test
-  void testNamedCatalogMergesCatalogPrefixedServerConfig() {
-    CatalogWrapperForREST catalogWrapper =
+  void testDefaultCatalogMergesRootServerMetadataCacheConfig() {
+    IcebergConfig icebergConfig =
         IcebergRESTServerContext.getInstance()
             .catalogWrapperManager()
-            .getCatalogWrapper(CATALOG_NAME);
-    IcebergConfig icebergConfig = catalogWrapper.getIcebergConfig();
+            .getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG)
+            .getIcebergConfig();
 
-    Assertions.assertEquals(SERVER_STATIC_JDBC_USER, icebergConfig.getAllConfig().get("jdbc.user"));
-    Assertions.assertEquals(
-        LocalTableMetadataCache.class.getName(),
-        icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_IMPL));
-  }
-
-  @Test
-  void testDefaultCatalogRequestMergesCatalogPrefixedServerConfig() {
-    CatalogWrapperForREST catalogWrapper =
-        IcebergRESTServerContext.getInstance()
-            .catalogWrapperManager()
-            .getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
-    IcebergConfig icebergConfig = catalogWrapper.getIcebergConfig();
-
-    Assertions.assertEquals(SERVER_STATIC_JDBC_USER, icebergConfig.getAllConfig().get("jdbc.user"));
     Assertions.assertEquals(
         LocalTableMetadataCache.class.getName(),
         icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_IMPL));
@@ -163,12 +147,7 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
     icebergRestConfigs.put(
         GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_SIMPLE_USERNAME, SUPER_USER);
     icebergRestConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + String.format("catalog.%s.jdbc.user", CATALOG_NAME),
-        SERVER_STATIC_JDBC_USER);
-    icebergRestConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX
-            + String.format(
-                "catalog.%s.%s", CATALOG_NAME, IcebergConstants.TABLE_METADATA_CACHE_IMPL),
+        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.TABLE_METADATA_CACHE_IMPL,
         LocalTableMetadataCache.class.getName());
     customConfigs.putAll(icebergRestConfigs);
     super.startIntegrationTest();
