@@ -43,8 +43,8 @@ public class IcebergIdentifierUtils {
    * Converts a logical Gravitino schema name to an Iceberg {@link Namespace} using the given
    * external separator.
    *
-   * <p>If the name contains the separator it is split into a multi-level namespace (e.g. {@code
-   * "A:B:C"} with {@code ":"} → {@code Namespace.of("A","B","C")}). Flat names are wrapped in a
+   * <p>The name is split on the separator into a multi-level namespace (e.g. {@code "A:B:C"} with
+   * {@code ":"} → {@code Namespace.of("A","B","C")}). Flat names without the separator become a
    * single-level namespace.
    *
    * @param schemaName the logical schema name using the configured external separator
@@ -52,10 +52,7 @@ public class IcebergIdentifierUtils {
    * @return the corresponding Iceberg multi-level namespace
    */
   public static Namespace getIcebergNamespaceFromSchemaName(String schemaName, String separator) {
-    if (schemaName.contains(separator)) {
-      return Namespace.of(schemaName.split(Pattern.quote(separator), -1));
-    }
-    return Namespace.of(schemaName);
+    return Namespace.of(schemaName.split(Pattern.quote(separator), -1));
   }
 
   /**
