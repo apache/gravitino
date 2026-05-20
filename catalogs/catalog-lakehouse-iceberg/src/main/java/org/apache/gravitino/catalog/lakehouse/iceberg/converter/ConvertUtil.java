@@ -18,9 +18,11 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg.converter;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergColumn;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable;
+import org.apache.gravitino.rel.Column;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.Types;
@@ -38,6 +40,27 @@ public class ConvertUtil {
         toGravitinoStructType(gravitinoTable);
     Type converted =
         ToIcebergTypeVisitor.visit(gravitinoStructType, new ToIcebergType(gravitinoStructType));
+    return new Schema(converted.asNestedType().asStructType().fields());
+  }
+
+  /**
+   * Convert an array of Gravitino columns to an Iceberg Schema.
+   *
+   * @param columns Gravitino columns.
+   * @return Iceberg schema.
+   */
+  public static Schema toIcebergSchema(Column[] columns) {
+    Preconditions.checkArgument(columns != null, "columns must not be null");
+    org.apache.gravitino.rel.types.Types.StructType.Field[] fields =
+        Arrays.stream(columns)
+            .map(
+                col ->
+                    org.apache.gravitino.rel.types.Types.StructType.Field.of(
+                        col.name(), col.dataType(), col.nullable(), col.comment()))
+            .toArray(org.apache.gravitino.rel.types.Types.StructType.Field[]::new);
+    org.apache.gravitino.rel.types.Types.StructType structType =
+        org.apache.gravitino.rel.types.Types.StructType.of(fields);
+    Type converted = ToIcebergTypeVisitor.visit(structType, new ToIcebergType(structType));
     return new Schema(converted.asNestedType().asStructType().fields());
   }
 

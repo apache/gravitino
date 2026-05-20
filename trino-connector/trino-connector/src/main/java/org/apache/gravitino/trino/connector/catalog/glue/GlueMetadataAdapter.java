@@ -18,18 +18,27 @@
  */
 package org.apache.gravitino.trino.connector.catalog.glue;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static io.trino.spi.session.PropertyMetadata.integerProperty;
 import static io.trino.spi.session.PropertyMetadata.stringProperty;
 import static io.trino.spi.type.VarcharType.VARCHAR;
+import static java.util.Locale.ENGLISH;
 
 import com.google.common.collect.ImmutableList;
+import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.session.PropertyMetadata;
 import io.trino.spi.type.ArrayType;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.catalog.property.PropertyConverter;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.trino.connector.catalog.hive.HiveMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.hive.SortingColumn;
+import org.apache.gravitino.trino.connector.catalog.iceberg.ExpressionUtil;
+import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 
 /**
  * Transforming Apache Gravitino Glue metadata to Trino. This adapter handles properties that are
@@ -44,7 +53,7 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
   private static final List<PropertyMetadata<?>> GLUE_TABLE_PROPERTY_META =
       ImmutableList.of(
           stringProperty(
-              LAKEHOUSE_TABLE_TYPE, "The type of table (ICEBERG, HIVE, DELTA)", "ICEBERG", false),
+              LAKEHOUSE_TABLE_TYPE, "The type of table (ICEBERG, HIVE)", null, false),
           new PropertyMetadata<>(
               "partitioned_by",
               "Partition columns",
@@ -71,8 +80,27 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
                           .map(name -> ((String) name).toLowerCase(java.util.Locale.ENGLISH))
                           .collect(ImmutableList.toImmutableList()),
               value -> value),
-          stringProperty("bucket_count", "The number of buckets for the table", null, false),
-          stringProperty("sorted_by", "Bucket sorting columns", null, false),
+          integerProperty("bucket_count", "The number of buckets for the table", null, false),
+          new PropertyMetadata<>(
+              "sorted_by",
+              "Bucket sorting columns",
+              new ArrayType(VARCHAR),
+              List.class,
+              ImmutableList.of(),
+              false,
+              value ->
+                  ((List<?>) value)
+                      .stream()
+                          .map(String.class::cast)
+                          .map(name -> name.toLowerCase(ENGLISH))
+                          .map(SortingColumn::sortingColumnFromString)
+                          .collect(toImmutableList()),
+              value ->
+                  ((List<?>) value)
+                      .stream()
+                          .map(SortingColumn.class::cast)
+                          .map(SortingColumn::sortingColumnToString)
+                          .collect(toImmutableList())),
           stringProperty(
               "format", "The format of the data files (PARQUET, ORC, etc.)", null, false),
           stringProperty("location", "The S3 storage location for the table", null, false));
@@ -113,6 +141,47 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
     return converted.entrySet().stream()
         .filter(e -> e.getValue() != null)
         .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString()));
+  }
+
+  @Override
+  public GravitinoTable createTable(ConnectorTableMetadata tableMetadata) {
+    List<String> partitionExpressions =
+        tableMetadata.getProperties().containsKey("partitioned_by")
+            ? (List<String>) tableMetadata.getProperties().get("partitioned_by")
+            : Collections.emptyList();
+
+    GravitinoTable table = super.createTable(tableMetadata);
+
+    if (!partitionExpressions.isEmpty()) {
+      Transform[] transforms = ExpressionUtil.partitionFiledToExpression(partitionExpressions);
+      table.setPartitioning(transforms);
+    }
+
+    return table;
+  }
+
+  @Override
+  public ConnectorTableMetadata getTableMetadata(GravitinoTable gravitinoTable) {
+    Transform[] originalPartitioning = gravitinoTable.getPartitioning();
+
+    // Clear partitioning before calling super to avoid ClassCastException when transforms
+    // contain BucketTransform or TruncateTransform (not SingleFieldTransform subclasses).
+    gravitinoTable.setPartitioning(new Transform[0]);
+
+    ConnectorTableMetadata metadata = super.getTableMetadata(gravitinoTable);
+
+    // Restore original partitioning
+    gravitinoTable.setPartitioning(originalPartitioning);
+
+    if (originalPartitioning != null && originalPartitioning.length > 0) {
+      Map<String, Object> properties = new HashMap<>(metadata.getProperties());
+      properties.put(
+          "partitioned_by", ExpressionUtil.expressionToPartitionFiled(originalPartitioning));
+      return new ConnectorTableMetadata(
+          metadata.getTable(), metadata.getColumns(), properties, metadata.getComment());
+    }
+
+    return metadata;
   }
 
   /** Returns the table property metadata for Glue catalogs. */

@@ -39,6 +39,7 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
@@ -171,5 +172,50 @@ public class OwnerMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(ownerRelPO)));
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchSetOwner")
+  public void batchSetOwners(
+      List<NameIdentifier> ownedObjects,
+      Entity.EntityType ownedObjectType,
+      NameIdentifier ownerIdent,
+      Entity.EntityType ownerType) {
+    if (CollectionUtils.isEmpty(ownedObjects)) {
+      return;
+    }
+
+    String metalake = NameIdentifierUtil.getMetalake(ownedObjects.get(0));
+    for (NameIdentifier entity : ownedObjects) {
+      Preconditions.checkArgument(
+          Objects.equals(NameIdentifierUtil.getMetalake(entity), metalake),
+          "All owned objects must be in the same metalake");
+    }
+
+    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    Long ownerId = EntityIdService.getEntityId(ownerIdent, ownerType);
+
+    List<OwnerRelForDeletion> deletions = new ArrayList<>(ownedObjects.size());
+    List<OwnerRelPO> ownerRelPOs = new ArrayList<>(ownedObjects.size());
+    for (NameIdentifier entity : ownedObjects) {
+      Long entityId = EntityIdService.getEntityId(entity, ownedObjectType);
+      deletions.add(
+          new OwnerRelForDeletion(
+              entityId,
+              NameIdentifierUtil.toMetadataObject(entity, ownedObjectType).type().name()));
+      ownerRelPOs.add(
+          POConverters.initializeOwnerRelPOsWithVersion(
+              metalakeId, ownerType.name(), ownerId, ownedObjectType.name(), entityId));
+    }
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper -> mapper.batchSoftDeleteOwnerRelByMetadataObjects(deletions)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class, mapper -> mapper.batchInsertOwnerRels(ownerRelPOs)));
   }
 }

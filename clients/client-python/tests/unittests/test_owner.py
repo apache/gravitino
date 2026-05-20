@@ -280,6 +280,18 @@ class TestOwnerDTOSerialization(unittest.TestCase):
         self.assertEqual("bob", owner.name())
         self.assertEqual(Owner.Type.GROUP, owner.type())
 
+    def test_owner_dto_deserialize_lowercase(self):
+        json_str = _json.dumps({"name": "alice", "type": "user"})
+        owner = OwnerDTO.from_json(json_str)
+        self.assertEqual("alice", owner.name())
+        self.assertEqual(Owner.Type.USER, owner.type())
+
+    def test_owner_dto_deserialize_lowercase_group(self):
+        json_str = _json.dumps({"name": "admin_group", "type": "group"})
+        owner = OwnerDTO.from_json(json_str)
+        self.assertEqual("admin_group", owner.name())
+        self.assertEqual(Owner.Type.GROUP, owner.type())
+
     def test_owner_dto_round_trip(self):
         original = OwnerDTO(_name="alice", _type=Owner.Type.USER)
         json_str = original.to_json()

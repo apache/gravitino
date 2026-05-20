@@ -85,6 +85,7 @@ metrics = "4.2.25"
 prometheus = "0.16.0"
 clickhouse = "0.7.1"
 lz4 = "1.8.0"
+snappy-java = "1.1.10.8"
 mysql = "8.0.33"
 postgresql = "42.6.0"
 immutables-value = "2.11.7"
@@ -125,7 +126,7 @@ error-prone = "3.1.0"
 woodstox-core = "5.3.0"
 mail = "1.4.1"
 rome = "1.0"
-jettison = "1.1"
+jettison = "1.5.4"
 thrift = "0.12.0"
 derby = "10.14.2.0"
 datanucleus-core = "4.1.17"
@@ -293,6 +294,7 @@ prometheus-dropwizard = { group = "io.prometheus", name = "simpleclient_dropwiza
 prometheus-servlet = { group = "io.prometheus", name = "simpleclient_servlet", version.ref = "prometheus" }
 clickhouse-driver = { group = "com.clickhouse", name = "clickhouse-jdbc", version.ref = "clickhouse" }
 lz4-java = { group = "org.lz4", name = "lz4-java", version.ref = "lz4" }
+snappy-java = { group = "org.xerial.snappy", name = "snappy-java", version.ref = "snappy-java" }
 mysql-driver = { group = "mysql", name = "mysql-connector-java", version.ref = "mysql" }
 postgresql-driver = { group = "org.postgresql", name = "postgresql", version.ref = "postgresql" }
 minikdc = { group = "org.apache.hadoop", name = "hadoop-minikdc", version.ref = "hadoop-minikdc"}

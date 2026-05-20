@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -244,11 +245,14 @@ class TestGlueCatalogTableOperations {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
     Map<String, String> props =
         Map.of(
-            GlueConstants.LOCATION, "s3://my-bucket/path",
-            GlueConstants.INPUT_FORMAT, "org.apache.hadoop.mapred.TextInputFormat",
+            GlueConstants.LOCATION,
+            "s3://my-bucket/path",
+            GlueConstants.INPUT_FORMAT_CLASS,
+            HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
             GlueConstants.OUTPUT_FORMAT,
-                "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
-            GlueConstants.TABLE_TYPE, "EXTERNAL_TABLE");
+            HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
+            GlueConstants.TABLE_TYPE,
+            "EXTERNAL_TABLE");
 
     ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
 

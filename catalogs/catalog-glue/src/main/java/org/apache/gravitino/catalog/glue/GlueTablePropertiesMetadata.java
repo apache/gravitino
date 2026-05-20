@@ -19,7 +19,7 @@
 package org.apache.gravitino.catalog.glue;
 
 import static org.apache.gravitino.catalog.glue.GlueConstants.FORMAT;
-import static org.apache.gravitino.catalog.glue.GlueConstants.INPUT_FORMAT;
+import static org.apache.gravitino.catalog.glue.GlueConstants.INPUT_FORMAT_CLASS;
 import static org.apache.gravitino.catalog.glue.GlueConstants.METADATA_LOCATION;
 import static org.apache.gravitino.catalog.glue.GlueConstants.OUTPUT_FORMAT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_LIB;
@@ -74,7 +74,7 @@ public class GlueTablePropertiesMetadata extends BasePropertiesMetadata {
                 false,
                 false),
             stringImmutablePropertyEntry(
-                INPUT_FORMAT,
+                INPUT_FORMAT_CLASS,
                 "The input format class for the table.",
                 false,
                 HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS,
