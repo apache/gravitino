@@ -31,6 +31,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
@@ -78,7 +79,12 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   @Override
   public void open() throws CatalogException {
     if (jdbcCatalog == null) {
-      applyJdbcCredential(catalog(), context.getOptions());
+      try {
+        applyJdbcCredential(catalog(), context.getOptions());
+      } catch (NoSuchCatalogException ignored) {
+        // During CREATE CATALOG, open() is called before the catalog is stored in Gravitino.
+        // In this case credentials are already present in the user-provided options.
+      }
       this.jdbcCatalog = (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context);
     }
     super.open();
