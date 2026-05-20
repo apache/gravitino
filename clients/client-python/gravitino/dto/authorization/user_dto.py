@@ -88,4 +88,6 @@ class UserDTO(User):
         def build(self) -> UserDTO:
             if not self._name:
                 raise ValueError("name cannot be null or empty")
+            if self._audit is None:
+                raise ValueError("audit cannot be null")
             return UserDTO(self._name, self._roles, self._audit)
