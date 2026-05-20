@@ -33,6 +33,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import org.apache.gravitino.catalog.lakehouse.paimon.utils.PaimonViewTestCatalogHelper;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -40,6 +41,7 @@ import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.paimon.catalog.Catalog;
+import org.apache.paimon.catalog.Identifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -237,6 +239,51 @@ public class TestPaimonViewCatalogOps {
   }
 
   @Test
+  public void testRenameViewFailsWithTypedExceptionWhenTargetExists() throws Exception {
+    NameIdentifier sourceIdentifier = NameIdentifier.of(Namespace.of(DATABASE), VIEW + "_source");
+    NameIdentifier targetIdentifier = NameIdentifier.of(Namespace.of(DATABASE), VIEW + "_target");
+    createView(sourceIdentifier);
+    createView(targetIdentifier);
+
+    ViewAlreadyExistsException exception =
+        assertThrows(
+            ViewAlreadyExistsException.class,
+            () ->
+                paimonViewCatalogOps.alterView(
+                    sourceIdentifier, ViewChange.rename(targetIdentifier.name())));
+    assertTrue(exception.getMessage().contains(targetIdentifier.name()));
+    assertEquals(sourceIdentifier.name(), paimonViewCatalogOps.loadView(sourceIdentifier).name());
+    assertEquals(targetIdentifier.name(), paimonViewCatalogOps.loadView(targetIdentifier).name());
+  }
+
+  @Test
+  public void testRenameViewReportsLoadFailureAfterSuccessfulRename() throws Exception {
+    NameIdentifier sourceIdentifier =
+        NameIdentifier.of(Namespace.of(DATABASE), VIEW + "_rename_load_source");
+    createView(sourceIdentifier);
+    NameIdentifier renamedIdentifier =
+        NameIdentifier.of(sourceIdentifier.namespace(), VIEW + "_rename_load_target");
+    NameIdentifier paimonRenamedIdentifier = buildPaimonNameIdentifier(renamedIdentifier);
+    paimonCatalogOps.failLoadView(paimonRenamedIdentifier.toString());
+
+    try {
+      IllegalStateException exception =
+          assertThrows(
+              IllegalStateException.class,
+              () ->
+                  paimonViewCatalogOps.alterView(
+                      sourceIdentifier, ViewChange.rename(renamedIdentifier.name())));
+      assertTrue(exception.getMessage().contains(sourceIdentifier.toString()));
+      assertTrue(exception.getMessage().contains(renamedIdentifier.toString()));
+    } finally {
+      paimonCatalogOps.clearFailLoadView();
+    }
+
+    assertThrows(NoSuchViewException.class, () -> paimonViewCatalogOps.loadView(sourceIdentifier));
+    assertEquals(renamedIdentifier.name(), paimonViewCatalogOps.loadView(renamedIdentifier).name());
+  }
+
+  @Test
   public void testCreateViewRequiresQueryRepresentation() {
     String query = "SELECT col_1 FROM source_table";
     Representation[] representations =
@@ -386,6 +433,8 @@ public class TestPaimonViewCatalogOps {
 
   private static class TestablePaimonCatalogOps extends PaimonCatalogOps {
 
+    private String failLoadViewName;
+
     TestablePaimonCatalogOps(PaimonConfig paimonConfig) {
       super(paimonConfig);
     }
@@ -396,6 +445,23 @@ public class TestPaimonViewCatalogOps {
 
     void setCatalog(Catalog catalog) {
       this.catalog = catalog;
+    }
+
+    void failLoadView(String viewName) {
+      this.failLoadViewName = viewName;
+    }
+
+    void clearFailLoadView() {
+      this.failLoadViewName = null;
+    }
+
+    @Override
+    public org.apache.paimon.view.View loadView(String viewName)
+        throws Catalog.ViewNotExistException {
+      if (failLoadViewName != null && failLoadViewName.equals(viewName)) {
+        throw new Catalog.ViewNotExistException(Identifier.fromString(viewName));
+      }
+      return super.loadView(viewName);
     }
   }
 }

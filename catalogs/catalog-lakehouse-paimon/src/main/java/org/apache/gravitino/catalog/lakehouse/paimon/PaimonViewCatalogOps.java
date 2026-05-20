@@ -98,8 +98,6 @@ final class PaimonViewCatalogOps {
     } catch (Catalog.ViewNotExistException e) {
       throw new NoSuchViewException(e, NO_SUCH_VIEW_EXCEPTION, identifier);
     }
-
-    LOG.info("Loaded Paimon view {}.", identifier);
     return PaimonView.fromPaimonView(view);
   }
 
@@ -198,12 +196,20 @@ final class PaimonViewCatalogOps {
     NameIdentifier targetIdentifier = paimonIdentifierBuilder.apply(renamedIdentifier);
     try {
       paimonCatalogOps.renameView(sourceIdentifier.toString(), targetIdentifier.toString());
-      return loadView(renamedIdentifier);
     } catch (Catalog.ViewNotExistException e) {
       throw new NoSuchViewException(e, NO_SUCH_VIEW_EXCEPTION, identifier);
     } catch (Catalog.ViewAlreadyExistException e) {
-      throw new IllegalArgumentException(
-          String.format(VIEW_ALREADY_EXISTS_EXCEPTION, renamedIdentifier), e);
+      throw new ViewAlreadyExistsException(e, VIEW_ALREADY_EXISTS_EXCEPTION, renamedIdentifier);
+    }
+
+    try {
+      return loadView(renamedIdentifier);
+    } catch (NoSuchViewException e) {
+      throw new IllegalStateException(
+          String.format(
+              "Paimon view %s was renamed to %s, but loading the renamed view failed.",
+              identifier, renamedIdentifier),
+          e);
     }
   }
 
@@ -242,9 +248,13 @@ final class PaimonViewCatalogOps {
     NameIdentifier sourceIdentifier = paimonIdentifierBuilder.apply(identifier);
 
     try {
+      LOG.warn(
+          "Replacing Paimon view {} is non-atomic (drop-then-create). If create fails after drop, "
+              + "the original view is permanently lost.",
+          identifier);
       // Paimon does not provide a native replace-view API. To align with Paimon Spark's
       // CREATE OR REPLACE VIEW behavior, replace is executed as drop-then-create.
-      // This path is intentionally non-atomic: if create fails after drop,
+      // WARNING: This path is intentionally non-atomic: if create fails after drop,
       // the original view remains dropped and no rollback is attempted.
       paimonCatalogOps.dropView(sourceIdentifier.toString());
       paimonCatalogOps.createView(sourceIdentifier.toString(), paimonView);
