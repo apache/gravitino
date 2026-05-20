@@ -73,6 +73,7 @@ class TestGlueCatalogTableOperations {
     mockClient = mock(GlueClient.class);
     ops = new GlueCatalogOperations();
     ops.glueClient = mockClient;
+    ops.warehouseLocation = "s3://test-bucket/warehouse";
   }
 
   // -------------------------------------------------------------------------

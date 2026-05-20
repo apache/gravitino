@@ -590,10 +590,16 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private GlueTable alterIcebergTable(
       NameIdentifier ident, String dbName, Table rawGlueTable, TableChange... changes) {
-    // Register-mode tables (created with METADATA_LOCATION) are not backed by the Iceberg SDK
-    // GlueCatalog, so we fall back to the native Glue SDK update path.
-    if (rawGlueTable.hasParameters()
-        && rawGlueTable.parameters().containsKey(GlueConstants.METADATA_LOCATION)) {
+    // Register-mode: has METADATA_LOCATION but was not created via the Gravitino Iceberg SDK
+    // (i.e., TABLE_TYPE_PARAM is absent). Fall back to the native Glue SDK update path.
+    boolean hasMetadataLocation =
+        rawGlueTable.hasParameters()
+            && rawGlueTable.parameters().containsKey(GlueConstants.METADATA_LOCATION);
+    boolean isSdkManaged =
+        rawGlueTable.hasParameters()
+            && GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equals(
+                rawGlueTable.parameters().get(GlueConstants.TABLE_TYPE_PARAM));
+    if (hasMetadataLocation && !isSdkManaged) {
       return alterRegisterModeIcebergTable(ident, dbName, rawGlueTable, changes);
     }
     GlueIcebergTableHelper.alterTable(icebergGlueCatalog, dbName, ident.name(), changes);
