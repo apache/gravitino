@@ -219,7 +219,7 @@ public class LanceRESTServiceIT extends BaseIT {
     RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.describeNamespace(nonExistentCatalogReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
 
     // test describe a non-existent schema namespace
     DescribeNamespaceRequest nonExistentSchemaReq = new DescribeNamespaceRequest();
@@ -228,7 +228,7 @@ public class LanceRESTServiceIT extends BaseIT {
     exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.describeNamespace(nonExistentSchemaReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
   }
 
   @Test
@@ -254,7 +254,7 @@ public class LanceRESTServiceIT extends BaseIT {
     RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.createNamespace(createNamespaceReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":2"));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_ALREADY_EXISTS);
 
     // create catalog again with exist_ok mode should succeed
     createNamespaceReq.setMode("exist_ok");
@@ -296,7 +296,7 @@ public class LanceRESTServiceIT extends BaseIT {
     // create schema again with default mode (create) should fail
     exception =
         Assertions.assertThrows(RuntimeException.class, () -> ns.createNamespace(createSchemaReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":2"));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_ALREADY_EXISTS);
 
     // create schema again with exist_ok mode should succeed
     createSchemaReq.setMode("exist_ok");
@@ -328,7 +328,7 @@ public class LanceRESTServiceIT extends BaseIT {
     dropNamespaceReq.addIdItem("non_existent_catalog");
     RuntimeException exception =
         Assertions.assertThrows(RuntimeException.class, () -> ns.dropNamespace(dropNamespaceReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
 
     // test drop a non-existent namespace (catalog) with SKIP mode should succeed
     dropNamespaceReq.setMode("skip");
@@ -341,7 +341,7 @@ public class LanceRESTServiceIT extends BaseIT {
     dropSchemaReq.addIdItem("non_existent_schema");
     exception =
         Assertions.assertThrows(RuntimeException.class, () -> ns.dropNamespace(dropSchemaReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
 
     // test drop a non-existent namespace (schema) with SKIP mode should succeed
     dropSchemaReq.setMode("skip");
@@ -354,7 +354,7 @@ public class LanceRESTServiceIT extends BaseIT {
     exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.dropNamespace(dropNonEmptyCatalogReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":13"));
+    assertLanceErrorCode(exception, ErrorCode.INVALID_INPUT);
 
     // test drop a non-empty namespace (catalog) with CASCADE behavior should succeed
     dropNonEmptyCatalogReq.setBehavior("cascade");
@@ -382,7 +382,7 @@ public class LanceRESTServiceIT extends BaseIT {
     exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.dropNamespace(dropNonEmptySchemaReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":13"));
+    assertLanceErrorCode(exception, ErrorCode.INVALID_INPUT);
     Assertions.assertTrue(catalog.asSchemas().schemaExists(schema.name()));
 
     // test drop a non-empty namespace (schema) with CASCADE behavior should succeed
@@ -408,7 +408,7 @@ public class LanceRESTServiceIT extends BaseIT {
     RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.namespaceExists(nonExistentCatalogReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
 
     // test existing schema
     NamespaceExistsRequest schemaExistsReq = new NamespaceExistsRequest();
@@ -423,7 +423,7 @@ public class LanceRESTServiceIT extends BaseIT {
     exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.namespaceExists(nonExistentSchemaReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":1"));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
   }
 
   @Test
@@ -794,7 +794,7 @@ public class LanceRESTServiceIT extends BaseIT {
     RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.deregisterTable(deregisterTableRequest));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
+    assertLanceErrorCode(exception, ErrorCode.TABLE_NOT_FOUND);
     Assertions.assertTrue(exception.getMessage().contains("Table not found"));
     // Try to create a table and then deregister table
     DeclareTableRequest declareTableRequest = new DeclareTableRequest();
@@ -823,7 +823,7 @@ public class LanceRESTServiceIT extends BaseIT {
     RuntimeException describeException =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.describeTable(describeTableRequest));
-    Assertions.assertTrue(describeException.getMessage().contains("\"code\":4"));
+    assertLanceErrorCode(describeException, ErrorCode.TABLE_NOT_FOUND);
 
     describeTableRequest.setVersion(1L);
     RuntimeException versionException =
@@ -860,8 +860,8 @@ public class LanceRESTServiceIT extends BaseIT {
     tableExistsReq.setId(nonExistingIds);
     RuntimeException exception =
         Assertions.assertThrows(RuntimeException.class, () -> ns.tableExists(tableExistsReq));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
-    Assertions.assertTrue(exception.getMessage().contains("Not Found"));
+    assertLanceErrorCode(exception, ErrorCode.TABLE_NOT_FOUND);
+    Assertions.assertTrue(exception.getMessage().contains("Table not found"));
   }
 
   @Test
@@ -890,13 +890,13 @@ public class LanceRESTServiceIT extends BaseIT {
     RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> ns.describeTable(describeTableRequest));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
+    assertLanceErrorCode(exception, ErrorCode.TABLE_NOT_FOUND);
 
     // Drop a non-existing table should fail
     dropTableRequest.setId(ids);
     exception =
         Assertions.assertThrows(RuntimeException.class, () -> ns.dropTable(dropTableRequest));
-    Assertions.assertTrue(exception.getMessage().contains("\"code\":4"));
+    assertLanceErrorCode(exception, ErrorCode.TABLE_NOT_FOUND);
   }
 
   @Test
@@ -930,7 +930,7 @@ public class LanceRESTServiceIT extends BaseIT {
             () -> {
               ns.declareTable(request);
             });
-    Assertions.assertTrue(declareException.getMessage().contains("\"code\":5"));
+    assertLanceErrorCode(declareException, ErrorCode.TABLE_ALREADY_EXISTS);
 
     // Declare a table with non-existent location should succeed
     // since storage is not touched
@@ -1000,6 +1000,13 @@ public class LanceRESTServiceIT extends BaseIT {
     }
 
     return new LanceNamespaceException(ErrorCode.INTERNAL, e.getMessage(), e);
+  }
+
+  private static void assertLanceErrorCode(
+      RuntimeException exception, ErrorCode expectedErrorCode) {
+    Assertions.assertInstanceOf(LanceNamespaceException.class, exception);
+    Assertions.assertEquals(
+        expectedErrorCode.getCode(), ((LanceNamespaceException) exception).getCode());
   }
 
   private TableApi createTableApi() {
