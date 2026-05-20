@@ -525,7 +525,7 @@ Gravitino features a pluggable cache system for updating or retrieving table met
 
 | Configuration item                                           | Description                                 | Default value | Required | Since Version |
 |--------------------------------------------------------------|---------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.table-metadata-cache-impl`           | The implement of the cache.                 | (none)        | No       | 1.1.0         |
+| `gravitino.iceberg-rest.table-metadata-cache-impl`           | The implement of the cache.                 | `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` | No       | 1.1.0         |
 | `gravitino.iceberg-rest.table-metadata-cache-capacity`       | The capacity of table metadata cache.       | 1000          | No       | 1.1.0         |
 | `gravitino.iceberg-rest.table-metadata-cache-expire-minutes` | The expire minutes of table metadata cache. | 60            | No       | 1.1.0         |
 
