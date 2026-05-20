@@ -64,11 +64,10 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
-@SuppressWarnings("deprecation")
 public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
 
   private static final Schema DROP_NONEMPTY_TABLE_SCHEMA =
-      new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
+      new Schema(NestedField.required(1, "foo_string", StringType.get()));
 
   private DummyEventListener dummyEventListener;
 
