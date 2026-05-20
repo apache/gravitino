@@ -36,26 +36,12 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     };
   }
 
-  protected String expectedDeleteAtClause() {
-    return "deleted_at = CURRENT_TIME_MILLIS()";
-  }
-
-  protected String expectedDeleteIdpUserGroupRelMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_user_group_rel WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
-        + " LIMIT #{limit}";
-  }
-
   @Test
   void testSelectGroupNamesByUsername() {
     String normalizedSql =
         createProvider().selectGroupNamesByUsername("alice").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("SELECT g.group_name"));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta u JOIN idp_user_group_rel r"));
-    Assertions.assertTrue(normalizedSql.contains("JOIN idp_group_meta g"));
-    Assertions.assertTrue(normalizedSql.contains("r.user_id = u.user_id AND r.deleted_at = 0"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE u.user_name = #{username}"));
-    Assertions.assertTrue(normalizedSql.contains("ORDER BY g.group_name"));
+    Assertions.assertEquals(expectedSelectGroupNamesByUsernameSql(), normalizedSql);
   }
 
   @Test
@@ -63,13 +49,7 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     String normalizedSql =
         createProvider().selectUsernamesByGroupName("dev").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("SELECT u.user_name"));
-    Assertions.assertTrue(
-        normalizedSql.contains("FROM idp_group_meta g JOIN idp_user_group_rel r"));
-    Assertions.assertTrue(normalizedSql.contains("JOIN idp_user_meta u"));
-    Assertions.assertTrue(normalizedSql.contains("r.group_id = g.group_id AND r.deleted_at = 0"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE g.group_name = #{groupName}"));
-    Assertions.assertTrue(normalizedSql.contains("ORDER BY u.user_name"));
+    Assertions.assertEquals(expectedSelectUsernamesByGroupNameSql(), normalizedSql);
   }
 
   @Test
@@ -80,14 +60,7 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     String normalizedSql =
         createProvider().batchInsertRelations(relations).replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_user_group_rel"));
-    Assertions.assertTrue(
-        normalizedSql.contains(
-            "(id, user_id, group_id, current_version, last_version, deleted_at)"));
-    Assertions.assertTrue(normalizedSql.contains("<foreach item='item' collection='relations'"));
-    Assertions.assertTrue(normalizedSql.contains("#{item.id}"));
-    Assertions.assertTrue(normalizedSql.contains("#{item.userId}"));
-    Assertions.assertTrue(normalizedSql.contains("#{item.groupId}"));
+    Assertions.assertEquals(expectedBatchInsertRelationsSql(), normalizedSql);
   }
 
   @Test
@@ -98,14 +71,7 @@ public class TestIdpUserGroupRelBaseSQLProvider {
             .replaceAll("\\s+", " ")
             .trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
-    Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_group_meta g"));
-    Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_user_meta u"));
-    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
-    Assertions.assertTrue(normalizedSql.contains("<foreach collection='usernames'"));
-    Assertions.assertTrue(normalizedSql.contains("open=' AND u.user_name IN ('"));
-    Assertions.assertTrue(normalizedSql.contains("#{username}"));
+    Assertions.assertEquals(expectedSoftDeleteRelationsSql(), normalizedSql);
   }
 
   @Test
@@ -113,12 +79,7 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     String normalizedSql =
         createProvider().softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
-    Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_user_meta u"));
-    Assertions.assertTrue(normalizedSql.contains("u.user_id = r.user_id AND u.deleted_at = 0"));
-    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("WHERE u.user_name = #{username}"));
-    Assertions.assertTrue(normalizedSql.contains("AND r.deleted_at = 0"));
+    Assertions.assertEquals(expectedSoftDeleteRelationsByUsernameSql(), normalizedSql);
   }
 
   @Test
@@ -126,12 +87,7 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     String normalizedSql =
         createProvider().softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel"));
-    Assertions.assertTrue(normalizedSql.contains("INNER JOIN idp_group_meta g"));
-    Assertions.assertTrue(normalizedSql.contains("g.group_id = r.group_id AND g.deleted_at = 0"));
-    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("WHERE g.group_name = #{groupName}"));
-    Assertions.assertTrue(normalizedSql.contains("AND r.deleted_at = 0"));
+    Assertions.assertEquals(expectedSoftDeleteRelationsByGroupNameSql(), normalizedSql);
   }
 
   @Test
@@ -150,6 +106,52 @@ public class TestIdpUserGroupRelBaseSQLProvider {
     Assertions.assertEquals(
         "(UNIX_TIMESTAMP() * 1000.0)",
         new IdpUserGroupRelBaseSQLProvider().currentTimeMillisExpression());
+  }
+
+  private String expectedSelectGroupNamesByUsernameSql() {
+    return "SELECT g.group_name FROM idp_user_meta u JOIN idp_user_group_rel r ON r.user_id ="
+        + " u.user_id AND r.deleted_at = 0 JOIN idp_group_meta g ON g.group_id = r.group_id"
+        + " AND g.deleted_at = 0 WHERE u.user_name = #{username} AND u.deleted_at = 0 ORDER BY"
+        + " g.group_name";
+  }
+
+  private String expectedSelectUsernamesByGroupNameSql() {
+    return "SELECT u.user_name FROM idp_group_meta g JOIN idp_user_group_rel r ON r.group_id ="
+        + " g.group_id AND r.deleted_at = 0 JOIN idp_user_meta u ON u.user_id = r.user_id AND"
+        + " u.deleted_at = 0 WHERE g.group_name = #{groupName} AND g.deleted_at = 0 ORDER BY"
+        + " u.user_name";
+  }
+
+  private String expectedBatchInsertRelationsSql() {
+    return "<script>INSERT INTO idp_user_group_rel (id, user_id, group_id, current_version,"
+        + " last_version, deleted_at) VALUES <foreach item='item' collection='relations'"
+        + " separator=','>(#{item.id}, #{item.userId}, #{item.groupId}, #{item.currentVersion},"
+        + " #{item.lastVersion}, #{item.deletedAt})</foreach></script>";
+  }
+
+  private String expectedSoftDeleteRelationsSql() {
+    return "<script>UPDATE idp_user_group_rel r INNER JOIN idp_group_meta g ON g.group_id ="
+        + " r.group_id AND g.deleted_at = 0 INNER JOIN idp_user_meta u ON u.user_id = r.user_id"
+        + " AND u.deleted_at = 0 SET r.deleted_at = CURRENT_TIME_MILLIS() WHERE g.group_name ="
+        + " #{groupName} AND r.deleted_at = 0<foreach collection='usernames' item='username'"
+        + " open=' AND u.user_name IN (' separator=',' close=')'>#{username}</foreach></script>";
+  }
+
+  private String expectedSoftDeleteRelationsByUsernameSql() {
+    return "UPDATE idp_user_group_rel r INNER JOIN idp_user_meta u ON u.user_id = r.user_id AND"
+        + " u.deleted_at = 0 SET r.deleted_at = CURRENT_TIME_MILLIS() WHERE u.user_name ="
+        + " #{username} AND r.deleted_at = 0";
+  }
+
+  private String expectedSoftDeleteRelationsByGroupNameSql() {
+    return "UPDATE idp_user_group_rel r INNER JOIN idp_group_meta g ON g.group_id = r.group_id"
+        + " AND g.deleted_at = 0 SET r.deleted_at = CURRENT_TIME_MILLIS() WHERE g.group_name ="
+        + " #{groupName} AND r.deleted_at = 0";
+  }
+
+  private String expectedDeleteIdpUserGroupRelMetasByLegacyTimelineSql() {
+    return "DELETE FROM idp_user_group_rel WHERE deleted_at > 0 AND deleted_at <"
+        + " #{legacyTimeline} LIMIT #{limit}";
   }
 
   private IdpUserGroupRelPO newRelation(Long id, Long userId, Long groupId) {

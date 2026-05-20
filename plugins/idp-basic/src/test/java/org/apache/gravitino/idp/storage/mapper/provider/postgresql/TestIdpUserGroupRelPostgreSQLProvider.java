@@ -43,12 +43,7 @@ public class TestIdpUserGroupRelPostgreSQLProvider {
             .replaceAll("\\s+", " ")
             .trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta g, idp_user_meta u"));
-    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
-    Assertions.assertTrue(normalizedSql.contains("<foreach collection='usernames'"));
-    Assertions.assertTrue(normalizedSql.contains("open=' AND u.user_name IN ('"));
-    Assertions.assertTrue(normalizedSql.contains("#{username}"));
+    Assertions.assertEquals(expectedSoftDeleteRelationsSql(), normalizedSql);
   }
 
   @Test
@@ -57,10 +52,7 @@ public class TestIdpUserGroupRelPostgreSQLProvider {
     String normalizedSql =
         provider.softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta u"));
-    Assertions.assertTrue(normalizedSql.contains("r.user_id = u.user_id"));
-    Assertions.assertTrue(normalizedSql.contains("u.user_name = #{username}"));
+    Assertions.assertEquals(expectedSoftDeleteRelationsByUsernameSql(), normalizedSql);
   }
 
   @Test
@@ -69,10 +61,7 @@ public class TestIdpUserGroupRelPostgreSQLProvider {
     String normalizedSql =
         provider.softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta g"));
-    Assertions.assertTrue(normalizedSql.contains("r.group_id = g.group_id"));
-    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
+    Assertions.assertEquals(expectedSoftDeleteRelationsByGroupNameSql(), normalizedSql);
   }
 
   @Test
@@ -80,8 +69,34 @@ public class TestIdpUserGroupRelPostgreSQLProvider {
     IdpUserGroupRelPostgreSQLProvider provider = new IdpUserGroupRelPostgreSQLProvider();
 
     Assertions.assertEquals(
-        "DELETE FROM idp_user_group_rel WHERE id IN (SELECT id FROM idp_user_group_rel"
-            + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})",
+        expectedDeleteIdpUserGroupRelMetasByLegacyTimelineSql(),
         provider.deleteIdpUserGroupRelMetasByLegacyTimeline(1L, 2));
+  }
+
+  private String expectedSoftDeleteRelationsSql() {
+    return "<script>UPDATE idp_user_group_rel r SET deleted_at = CAST(EXTRACT(EPOCH FROM"
+        + " CURRENT_TIMESTAMP) * 1000 AS BIGINT) FROM idp_group_meta g, idp_user_meta u WHERE"
+        + " r.group_id = g.group_id AND r.user_id = u.user_id AND g.group_name = #{groupName}"
+        + " AND g.deleted_at = 0 AND u.deleted_at = 0 AND r.deleted_at = 0<foreach"
+        + " collection='usernames' item='username' open=' AND u.user_name IN (' separator=','"
+        + " close=')'>#{username}</foreach></script>";
+  }
+
+  private String expectedSoftDeleteRelationsByUsernameSql() {
+    return "UPDATE idp_user_group_rel r SET deleted_at = CAST(EXTRACT(EPOCH FROM"
+        + " CURRENT_TIMESTAMP) * 1000 AS BIGINT) FROM idp_user_meta u WHERE r.user_id ="
+        + " u.user_id AND u.user_name = #{username} AND u.deleted_at = 0 AND r.deleted_at = 0";
+  }
+
+  private String expectedSoftDeleteRelationsByGroupNameSql() {
+    return "UPDATE idp_user_group_rel r SET deleted_at = CAST(EXTRACT(EPOCH FROM"
+        + " CURRENT_TIMESTAMP) * 1000 AS BIGINT) FROM idp_group_meta g WHERE r.group_id ="
+        + " g.group_id AND g.group_name = #{groupName} AND g.deleted_at = 0 AND r.deleted_at ="
+        + " 0";
+  }
+
+  private String expectedDeleteIdpUserGroupRelMetasByLegacyTimelineSql() {
+    return "DELETE FROM idp_user_group_rel WHERE id IN (SELECT id FROM idp_user_group_rel"
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
 }

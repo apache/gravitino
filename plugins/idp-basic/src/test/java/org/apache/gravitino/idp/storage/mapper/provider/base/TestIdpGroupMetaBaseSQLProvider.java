@@ -36,23 +36,11 @@ public class TestIdpGroupMetaBaseSQLProvider {
     };
   }
 
-  protected String expectedDeleteAtClause() {
-    return "deleted_at = CURRENT_TIME_MILLIS()";
-  }
-
-  protected String expectedDeleteIdpGroupMetasByLegacyTimelineSql() {
-    return "DELETE FROM idp_group_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
-        + " LIMIT #{limit}";
-  }
-
   @Test
   void testSelectIdpGroup() {
     String normalizedSql = createProvider().selectIdpGroup("group").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("SELECT group_id as groupId"));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta"));
-    Assertions.assertTrue(
-        normalizedSql.contains("WHERE group_name = #{groupName} AND deleted_at = 0"));
+    Assertions.assertEquals(expectedSelectIdpGroupSql(), normalizedSql);
   }
 
   @Test
@@ -63,12 +51,7 @@ public class TestIdpGroupMetaBaseSQLProvider {
             .replaceAll("\\s+", " ")
             .trim();
 
-    Assertions.assertTrue(normalizedSql.contains("SELECT group_id as groupId"));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE deleted_at = 0"));
-    Assertions.assertTrue(normalizedSql.contains("<foreach collection='groupNames'"));
-    Assertions.assertTrue(normalizedSql.contains("open='AND group_name IN ('"));
-    Assertions.assertTrue(normalizedSql.contains("#{groupName}"));
+    Assertions.assertEquals(expectedSelectIdpGroupsSql(), normalizedSql);
   }
 
   @Test
@@ -76,12 +59,7 @@ public class TestIdpGroupMetaBaseSQLProvider {
     String normalizedSql =
         createProvider().selectIdpGroups(Collections.emptyList()).replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("SELECT group_id as groupId"));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_group_meta"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE deleted_at = 0"));
-    Assertions.assertTrue(normalizedSql.contains("<foreach collection='groupNames'"));
-    Assertions.assertTrue(normalizedSql.contains("open='AND group_name IN ('"));
-    Assertions.assertTrue(normalizedSql.contains("#{groupName}"));
+    Assertions.assertEquals(expectedSelectIdpGroupsSql(), normalizedSql);
   }
 
   @Test
@@ -89,23 +67,14 @@ public class TestIdpGroupMetaBaseSQLProvider {
     String normalizedSql =
         createProvider().insertIdpGroup(newGroupPO()).replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_group_meta"));
-    Assertions.assertTrue(
-        normalizedSql.contains(
-            "(group_id, group_name, current_version, last_version, deleted_at)"));
-    Assertions.assertTrue(
-        normalizedSql.contains(
-            "VALUES ( #{groupMeta.groupId}, #{groupMeta.groupName}, #{groupMeta.currentVersion},"
-                + " #{groupMeta.lastVersion}, #{groupMeta.deletedAt} )"));
+    Assertions.assertEquals(expectedInsertIdpGroupSql(), normalizedSql);
   }
 
   @Test
   void testSoftDeleteIdpGroup() {
     String normalizedSql = createProvider().softDeleteIdpGroup(1L).replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_group_meta"));
-    Assertions.assertTrue(normalizedSql.contains(expectedDeleteAtClause()));
-    Assertions.assertTrue(normalizedSql.contains("WHERE group_id = #{groupId} AND deleted_at = 0"));
+    Assertions.assertEquals(expectedSoftDeleteIdpGroupSql(), normalizedSql);
   }
 
   @Test
@@ -121,6 +90,36 @@ public class TestIdpGroupMetaBaseSQLProvider {
     Assertions.assertEquals(
         "(UNIX_TIMESTAMP() * 1000.0)",
         new IdpGroupMetaBaseSQLProvider().currentTimeMillisExpression());
+  }
+
+  private String expectedSelectIdpGroupSql() {
+    return "SELECT group_id as groupId, group_name as groupName, current_version as"
+        + " currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM"
+        + " idp_group_meta WHERE group_name = #{groupName} AND deleted_at = 0";
+  }
+
+  private String expectedSelectIdpGroupsSql() {
+    return "<script>SELECT group_id as groupId, group_name as groupName, current_version as"
+        + " currentVersion, last_version as lastVersion, deleted_at as deletedAt FROM"
+        + " idp_group_meta WHERE deleted_at = 0 <foreach collection='groupNames'"
+        + " item='groupName' open='AND group_name IN (' separator=',' close=')'>#{groupName}"
+        + "</foreach></script>";
+  }
+
+  private String expectedInsertIdpGroupSql() {
+    return "INSERT INTO idp_group_meta (group_id, group_name, current_version, last_version,"
+        + " deleted_at) VALUES ( #{groupMeta.groupId}, #{groupMeta.groupName},"
+        + " #{groupMeta.currentVersion}, #{groupMeta.lastVersion}, #{groupMeta.deletedAt} )";
+  }
+
+  private String expectedSoftDeleteIdpGroupSql() {
+    return "UPDATE idp_group_meta SET deleted_at = CURRENT_TIME_MILLIS() WHERE group_id ="
+        + " #{groupId} AND deleted_at = 0";
+  }
+
+  private String expectedDeleteIdpGroupMetasByLegacyTimelineSql() {
+    return "DELETE FROM idp_group_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " LIMIT #{limit}";
   }
 
   private IdpGroupPO newGroupPO() {

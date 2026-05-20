@@ -31,10 +31,7 @@ public class TestIdpUserMetaBaseSQLProvider {
   void testSelectIdpUser() {
     String normalizedSql = createProvider().selectIdpUser("tom").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("SELECT user_id as userId"));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta"));
-    Assertions.assertTrue(
-        normalizedSql.contains("WHERE user_name = #{username} AND deleted_at = 0"));
+    Assertions.assertEquals(expectedSelectIdpUserSql(), normalizedSql);
   }
 
   @Test
@@ -45,12 +42,7 @@ public class TestIdpUserMetaBaseSQLProvider {
             .replaceAll("\\s+", " ")
             .trim();
 
-    Assertions.assertTrue(normalizedSql.contains("SELECT user_id as userId"));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE deleted_at = 0"));
-    Assertions.assertTrue(normalizedSql.contains("<foreach collection='usernames'"));
-    Assertions.assertTrue(normalizedSql.contains("open='AND user_name IN ('"));
-    Assertions.assertTrue(normalizedSql.contains("#{username}"));
+    Assertions.assertEquals(expectedSelectIdpUsersSql(), normalizedSql);
   }
 
   @Test
@@ -58,12 +50,7 @@ public class TestIdpUserMetaBaseSQLProvider {
     String normalizedSql =
         createProvider().selectIdpUsers(Collections.emptyList()).replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("SELECT user_id as userId"));
-    Assertions.assertTrue(normalizedSql.contains("FROM idp_user_meta"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE deleted_at = 0"));
-    Assertions.assertTrue(normalizedSql.contains("<foreach collection='usernames'"));
-    Assertions.assertTrue(normalizedSql.contains("open='AND user_name IN ('"));
-    Assertions.assertTrue(normalizedSql.contains("#{username}"));
+    Assertions.assertEquals(expectedSelectIdpUsersSql(), normalizedSql);
   }
 
   @Test
@@ -71,15 +58,7 @@ public class TestIdpUserMetaBaseSQLProvider {
     String normalizedSql =
         createProvider().insertIdpUser(newUserPO()).replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("INSERT INTO idp_user_meta"));
-    Assertions.assertTrue(
-        normalizedSql.contains(
-            "(user_id, user_name, password_hash, current_version, last_version, deleted_at)"));
-    Assertions.assertTrue(
-        normalizedSql.contains(
-            "VALUES ( #{userMeta.userId}, #{userMeta.userName}, #{userMeta.passwordHash},"
-                + " #{userMeta.currentVersion}, #{userMeta.lastVersion},"
-                + " #{userMeta.deletedAt} )"));
+    Assertions.assertEquals(expectedInsertIdpUserSql(), normalizedSql);
   }
 
   @Test
@@ -87,19 +66,14 @@ public class TestIdpUserMetaBaseSQLProvider {
     String normalizedSql =
         createProvider().updateIdpUserPassword(1L, "hash").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_meta"));
-    Assertions.assertTrue(normalizedSql.contains("SET password_hash = #{passwordHash}"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE user_id = #{userId}"));
-    Assertions.assertTrue(normalizedSql.contains("AND deleted_at = 0"));
+    Assertions.assertEquals(expectedUpdateIdpUserPasswordSql(), normalizedSql);
   }
 
   @Test
   void testSoftDeleteIdpUser() {
     String normalizedSql = createProvider().softDeleteIdpUser(1L).replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_meta"));
-    Assertions.assertTrue(normalizedSql.contains("CURRENT_TIME_MILLIS()"));
-    Assertions.assertTrue(normalizedSql.contains("WHERE user_id = #{userId} AND deleted_at = 0"));
+    Assertions.assertEquals(expectedSoftDeleteIdpUserSql(), normalizedSql);
   }
 
   @Test
@@ -107,10 +81,7 @@ public class TestIdpUserMetaBaseSQLProvider {
     String normalizedSql =
         createProvider().deleteIdpUserMetasByLegacyTimeline(1L, 2).replaceAll("\\s+", " ").trim();
 
-    Assertions.assertEquals(
-        "DELETE FROM idp_user_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
-            + " LIMIT #{limit}",
-        normalizedSql);
+    Assertions.assertEquals(expectedDeleteIdpUserMetasByLegacyTimelineSql(), normalizedSql);
   }
 
   @Test
@@ -118,6 +89,42 @@ public class TestIdpUserMetaBaseSQLProvider {
     Assertions.assertEquals(
         "(UNIX_TIMESTAMP() * 1000.0)",
         new IdpUserMetaBaseSQLProvider().currentTimeMillisExpression());
+  }
+
+  private String expectedSelectIdpUserSql() {
+    return "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
+        + " current_version as currentVersion, last_version as lastVersion, deleted_at as"
+        + " deletedAt FROM idp_user_meta WHERE user_name = #{username} AND deleted_at = 0";
+  }
+
+  private String expectedSelectIdpUsersSql() {
+    return "<script>SELECT user_id as userId, user_name as userName, password_hash as"
+        + " passwordHash, current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt FROM idp_user_meta WHERE deleted_at = 0 <foreach"
+        + " collection='usernames' item='username' open='AND user_name IN (' separator=','"
+        + " close=')'>#{username}</foreach></script>";
+  }
+
+  private String expectedInsertIdpUserSql() {
+    return "INSERT INTO idp_user_meta (user_id, user_name, password_hash, current_version,"
+        + " last_version, deleted_at) VALUES ( #{userMeta.userId}, #{userMeta.userName},"
+        + " #{userMeta.passwordHash}, #{userMeta.currentVersion}, #{userMeta.lastVersion},"
+        + " #{userMeta.deletedAt} )";
+  }
+
+  private String expectedUpdateIdpUserPasswordSql() {
+    return "UPDATE idp_user_meta SET password_hash = #{passwordHash} WHERE user_id = #{userId}"
+        + " AND deleted_at = 0";
+  }
+
+  private String expectedSoftDeleteIdpUserSql() {
+    return "UPDATE idp_user_meta SET deleted_at = CURRENT_TIME_MILLIS() WHERE user_id ="
+        + " #{userId} AND deleted_at = 0";
+  }
+
+  private String expectedDeleteIdpUserMetasByLegacyTimelineSql() {
+    return "DELETE FROM idp_user_meta WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline}"
+        + " LIMIT #{limit}";
   }
 
   private IdpUserMetaBaseSQLProvider createProvider() {

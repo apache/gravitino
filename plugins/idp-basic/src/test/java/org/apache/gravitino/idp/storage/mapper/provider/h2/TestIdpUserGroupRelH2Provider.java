@@ -34,16 +34,7 @@ class TestIdpUserGroupRelH2Provider {
             .replaceAll("\\s+", " ")
             .trim();
 
-    Assertions.assertTrue(normalizedSql.contains("UPDATE idp_user_group_rel r SET deleted_at ="));
-    Assertions.assertTrue(
-        normalizedSql.contains(
-            "r.group_id IN (SELECT g.group_id FROM idp_group_meta g WHERE g.group_name ="
-                + " #{groupName}"));
-    Assertions.assertTrue(
-        normalizedSql.contains("r.user_id IN (SELECT u.user_id FROM idp_user_meta u"));
-    Assertions.assertTrue(normalizedSql.contains("<foreach collection='usernames'"));
-    Assertions.assertTrue(normalizedSql.contains("open=' AND u.user_name IN ('"));
-    Assertions.assertTrue(normalizedSql.contains("#{username}"));
+    Assertions.assertEquals(expectedSoftDeleteRelationsSql(), normalizedSql);
   }
 
   @Test
@@ -52,10 +43,7 @@ class TestIdpUserGroupRelH2Provider {
     String normalizedSql =
         provider.softDeleteRelationsByUsername("alice").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.startsWith("MERGE INTO idp_user_group_rel r USING"));
-    Assertions.assertTrue(normalizedSql.contains("idp_user_meta u ON r.user_id = u.user_id"));
-    Assertions.assertTrue(normalizedSql.contains("u.user_name = #{username}"));
-    Assertions.assertTrue(normalizedSql.contains("WHEN MATCHED THEN UPDATE SET r.deleted_at ="));
+    Assertions.assertEquals(expectedSoftDeleteRelationsByUsernameSql(), normalizedSql);
   }
 
   @Test
@@ -64,10 +52,7 @@ class TestIdpUserGroupRelH2Provider {
     String normalizedSql =
         provider.softDeleteRelationsByGroupName("dev").replaceAll("\\s+", " ").trim();
 
-    Assertions.assertTrue(normalizedSql.startsWith("MERGE INTO idp_user_group_rel r USING"));
-    Assertions.assertTrue(normalizedSql.contains("idp_group_meta g ON r.group_id = g.group_id"));
-    Assertions.assertTrue(normalizedSql.contains("g.group_name = #{groupName}"));
-    Assertions.assertTrue(normalizedSql.contains("WHEN MATCHED THEN UPDATE SET r.deleted_at ="));
+    Assertions.assertEquals(expectedSoftDeleteRelationsByGroupNameSql(), normalizedSql);
   }
 
   @Test
@@ -77,5 +62,29 @@ class TestIdpUserGroupRelH2Provider {
     Assertions.assertEquals(
         "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())",
         provider.currentTimeMillisExpression());
+  }
+
+  private String expectedSoftDeleteRelationsSql() {
+    return "<script>UPDATE idp_user_group_rel r SET deleted_at = DATEDIFF('MILLISECOND',"
+        + " TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP()) WHERE r.deleted_at = 0 AND"
+        + " r.group_id IN (SELECT g.group_id FROM idp_group_meta g WHERE g.group_name ="
+        + " #{groupName} AND g.deleted_at = 0) AND r.user_id IN (SELECT u.user_id FROM"
+        + " idp_user_meta u WHERE u.deleted_at = 0<foreach collection='usernames'"
+        + " item='username' open=' AND u.user_name IN (' separator=',' close=')'>#{username}"
+        + "</foreach>)</script>";
+  }
+
+  private String expectedSoftDeleteRelationsByUsernameSql() {
+    return "MERGE INTO idp_user_group_rel r USING idp_user_meta u ON r.user_id = u.user_id"
+        + " AND u.user_name = #{username} AND u.deleted_at = 0 AND r.deleted_at = 0 WHEN"
+        + " MATCHED THEN UPDATE SET r.deleted_at = DATEDIFF('MILLISECOND', TIMESTAMP"
+        + " '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
+  }
+
+  private String expectedSoftDeleteRelationsByGroupNameSql() {
+    return "MERGE INTO idp_user_group_rel r USING idp_group_meta g ON r.group_id = g.group_id"
+        + " AND g.group_name = #{groupName} AND g.deleted_at = 0 AND r.deleted_at = 0 WHEN"
+        + " MATCHED THEN UPDATE SET r.deleted_at = DATEDIFF('MILLISECOND', TIMESTAMP"
+        + " '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
   }
 }
