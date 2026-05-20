@@ -35,6 +35,21 @@ import org.junit.jupiter.api.Test;
 
 public class WebUIFilterTest {
   @Test
+  public void testNullRequestUriPassesThroughFilterChain() throws ServletException, IOException {
+    WebUIFilter filter = new WebUIFilter();
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    ServletResponse response = mock(ServletResponse.class);
+    FilterChain chain = mock(FilterChain.class);
+
+    when(request.getRequestURI()).thenReturn(null);
+
+    filter.doFilter(request, response, chain);
+
+    verify(chain).doFilter(request, response);
+    verify(request, never()).getRequestDispatcher(any());
+  }
+
+  @Test
   public void testNestedDirectoryRequestForwardsToIndexHtml() throws ServletException, IOException {
     WebUIFilter filter = new WebUIFilter();
     HttpServletRequest request = mock(HttpServletRequest.class);

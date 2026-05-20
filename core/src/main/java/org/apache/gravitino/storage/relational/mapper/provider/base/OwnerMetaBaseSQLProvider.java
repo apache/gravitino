@@ -31,6 +31,7 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -122,6 +123,35 @@ public class OwnerMetaBaseSQLProvider {
         + " #{ownerRelPO.deletedAt},"
         + " #{ownerRelPO.updatedAt}"
         + ")";
+  }
+
+  public String batchInsertOwnerRels(@Param("ownerRelPOs") List<OwnerRelPO> ownerRelPOs) {
+    return "<script>"
+        + "INSERT INTO "
+        + OWNER_TABLE_NAME
+        + " (metalake_id, metadata_object_id, metadata_object_type, owner_id, owner_type,"
+        + " audit_info, current_version, last_version, deleted_at, updated_at) VALUES "
+        + "<foreach collection='ownerRelPOs' item='po' separator=','>"
+        + "(#{po.metalakeId}, #{po.metadataObjectId}, #{po.metadataObjectType},"
+        + " #{po.ownerId}, #{po.ownerType}, #{po.auditInfo},"
+        + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt}, #{po.updatedAt})"
+        + "</foreach>"
+        + "</script>";
+  }
+
+  public String batchSoftDeleteOwnerRelByMetadataObjects(
+      @Param("deletions") List<OwnerRelForDeletion> deletions) {
+    return "<script>"
+        + "UPDATE "
+        + OWNER_TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE deleted_at = 0 AND ("
+        + "<foreach collection='deletions' item='t' separator=' OR '>"
+        + "(metadata_object_id = #{t.metadataObjectId} AND metadata_object_type = #{t.metadataObjectType})"
+        + "</foreach>"
+        + ")"
+        + "</script>";
   }
 
   public String softDeleteOwnerRelByMetadataObjectIdAndType(
@@ -244,6 +274,9 @@ public class OwnerMetaBaseSQLProvider {
 
   public String deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    // Keep this cutoff comfortably behind the present time. These deleted owner rows are also used
+    // as short-lived cache-invalidation signals; a running server that is delayed by long GC,
+    // network isolation, scheduler stalls, or clock skew must still have time to consume them.
     return "DELETE FROM "
         + OWNER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
@@ -260,13 +293,23 @@ public class OwnerMetaBaseSQLProvider {
         + " ORDER BY updated_at DESC, id DESC LIMIT 1";
   }
 
-  public String selectChangedOwners(@Param("updatedAtFrom") long updatedAtFrom) {
-    return "SELECT metadata_object_id as metadataObjectId,"
+  public String selectChangedOwners(@Param("lastConsumedId") long lastConsumedId) {
+    // Owner changes are broadcast to every server instance because owner caches are local. Each
+    // instance tracks its own last consumed id; re-reading a row is harmless because cache
+    // invalidation is idempotent.
+    return "SELECT id,"
+        + " metadata_object_id as metadataObjectId,"
         + " metadata_object_type as metadataObjectType,"
         + " updated_at as updatedAt"
         + " FROM "
         + OWNER_TABLE_NAME
-        + " WHERE deleted_at = 0 AND updated_at >= #{updatedAtFrom}"
-        + " ORDER BY updated_at, id LIMIT 1000";
+        + " WHERE deleted_at = 0 AND id > #{lastConsumedId}"
+        + " ORDER BY id LIMIT 1000";
+  }
+
+  public String selectMaxChangeId() {
+    // A newly started server has an empty local owner cache. It can start from the current max id
+    // and consume only owner changes that happen after startup.
+    return "SELECT COALESCE(MAX(id), 0) FROM " + OWNER_TABLE_NAME + " WHERE deleted_at = 0";
   }
 }

@@ -661,7 +661,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     verifyCreateNamespaceSucc(ns);
 
     // Then create a table
-    verifyCreateTableSucc(ns, tableName);
+    doCreateTableWithCredentialVending(ns, tableName, "s3://abc");
 
     // Then test getting credentials
     Response response = doGetTableCredentials(ns, tableName);

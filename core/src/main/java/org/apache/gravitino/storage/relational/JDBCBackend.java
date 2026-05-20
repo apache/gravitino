@@ -353,7 +353,7 @@ public class JDBCBackend implements RelationalBackend {
         return (List<E>)
             JobTemplateMetaService.getInstance().batchGetJobTemplateByIdentifier(identifiers);
       case USER:
-        // TODO: Add true batch SQL operations for users, groups, roles, and views
+        // TODO: Add true batch SQL operations for users, roles, and views
         List<E> users = Lists.newArrayList();
         for (NameIdentifier identifier : identifiers) {
           try {
@@ -364,15 +364,7 @@ public class JDBCBackend implements RelationalBackend {
         }
         return users;
       case GROUP:
-        List<E> groups = Lists.newArrayList();
-        for (NameIdentifier identifier : identifiers) {
-          try {
-            groups.add((E) GroupMetaService.getInstance().getGroupByIdentifier(identifier));
-          } catch (NoSuchEntityException e) {
-            LOG.debug("Skipping missing group during batch get: {}", identifier.name());
-          }
-        }
-        return groups;
+        return (List<E>) GroupMetaService.getInstance().batchGetGroupByIdentifier(identifiers);
       case ROLE:
         List<E> roles = Lists.newArrayList();
         for (NameIdentifier identifier : identifiers) {
@@ -750,6 +742,29 @@ public class JDBCBackend implements RelationalBackend {
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
+    }
+  }
+
+  @Override
+  public void batchInsertRelations(
+      Type relType,
+      List<NameIdentifier> srcIdentifiers,
+      Entity.EntityType srcType,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType,
+      boolean override)
+      throws IOException {
+    if (srcIdentifiers == null || srcIdentifiers.isEmpty()) {
+      return;
+    }
+    switch (relType) {
+      case OWNER_REL:
+        OwnerMetaService.getInstance()
+            .batchSetOwners(srcIdentifiers, srcType, dstIdentifier, dstType);
+        break;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support batch insert for the relation type %s", relType));
     }
   }
 

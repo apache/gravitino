@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
@@ -55,17 +56,23 @@ import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
+import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Scan;
 import org.apache.iceberg.ScanTaskParser;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
+import org.apache.iceberg.Transaction;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -90,6 +97,7 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
+  private static final String FORMAT_VERSION = "format-version";
   private final CatalogCredentialManager catalogCredentialManager;
 
   private volatile Map<String, String> catalogConfigToClients;
@@ -99,6 +107,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
+  private static final Schema EMPTY_SCHEMA = new Schema();
 
   private static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
@@ -176,7 +185,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
     if (isRESTCatalog()) {
-      return CatalogHandlers.updateTable(getCatalog(), tableIdentifier, updateTableRequest);
+      return tableUpdateInternal(tableIdentifier, updateTableRequest);
     } else {
       return super.updateTable(tableIdentifier, updateTableRequest);
     }
@@ -255,6 +264,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * <p>For {@link RESTCatalog}, uses {@link RESTCatalog#properties()} so defaults reflect the
    * remote catalog's config response merged with client properties (after REST handshake), not only
    * static Gravitino catalog configuration.
+   *
+   * <p>{@link IcebergConstants#IO_IMPL} is passed through when present (e.g. Iceberg {@link
+   * org.apache.iceberg.io.ResolvingFileIO}), so clients multiplex by URI scheme without server-side
+   * rewriting per table.
    */
   @VisibleForTesting
   static Map<String, String> buildCatalogConfigToClients(IcebergConfig config, Catalog catalog) {
@@ -346,7 +359,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
                 PrincipalUtils.getCurrentUserName(),
                 Collections.emptySet(),
                 ImmutableSet.copyOf(path));
-    Credential credential = catalogCredentialManager.getCredential(context);
+    Credential credential =
+        catalogCredentialManager.getCredentialByPath(tableMetadata.location(), context);
     if (credential == null) {
       throw new ServiceUnavailableException("Couldn't generate credential, %s", context);
     }
@@ -735,6 +749,52 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return LoadTableResponse.builder().withTableMetadata(metadata).addAllConfig(config).build();
   }
 
+  private LoadTableResponse tableUpdateInternal(TableIdentifier ident, UpdateTableRequest request) {
+    if (isCreate(request)) {
+      // this is a hacky way to get TableOperations for an uncommitted table
+      Optional<Integer> formatVersion =
+          request.updates().stream()
+              .filter(update -> update instanceof MetadataUpdate.UpgradeFormatVersion)
+              .map(update -> ((MetadataUpdate.UpgradeFormatVersion) update).formatVersion())
+              .findFirst();
+
+      Schema schema =
+          request.updates().stream()
+              .filter(update -> update instanceof MetadataUpdate.AddSchema)
+              .map(update -> ((MetadataUpdate.AddSchema) update).schema())
+              .findFirst()
+              .orElse(EMPTY_SCHEMA);
+
+      Catalog.TableBuilder tableBuilder = getCatalog().buildTable(ident, schema);
+
+      TableMetadata.Builder changedMetadata =
+          formatVersion.map(TableMetadata::buildFromEmpty).orElse(TableMetadata.buildFromEmpty());
+      request.updates().forEach(update -> update.applyTo(changedMetadata));
+
+      TableMetadata changedTableMeta = changedMetadata.build();
+      tableBuilder.withPartitionSpec(changedTableMeta.spec());
+      tableBuilder.withSortOrder(changedTableMeta.sortOrder());
+      tableBuilder.withLocation(changedTableMeta.location());
+      tableBuilder.withProperty(FORMAT_VERSION, String.valueOf(changedTableMeta.formatVersion()));
+      tableBuilder.withProperties(changedTableMeta.properties());
+
+      Transaction transaction = tableBuilder.createOrReplaceTransaction();
+      if (transaction instanceof BaseTransaction) {
+        BaseTransaction baseTransaction = (BaseTransaction) transaction;
+
+        return LoadTableResponse.builder()
+            .withTableMetadata(create(baseTransaction, request))
+            .build();
+      } else {
+        throw new IllegalStateException(
+            "Cannot wrap catalog that does not produce BaseTransaction");
+      }
+
+    } else {
+      return CatalogHandlers.updateTable(getCatalog(), ident, request);
+    }
+  }
+
   private LoadTableResponse loadTableInternal(TableIdentifier ident) {
     Table table = getCatalog().loadTable(ident);
 
@@ -756,7 +816,104 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     throw new IllegalStateException("Cannot wrap catalog that does not produce BaseTable");
   }
 
+  private static boolean isCreate(UpdateTableRequest request) {
+    boolean isCreate =
+        request.requirements().stream()
+            .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
+
+    if (isCreate) {
+      List<UpdateRequirement> invalidRequirements =
+          request.requirements().stream()
+              .filter(req -> !(req instanceof UpdateRequirement.AssertTableDoesNotExist))
+              .collect(Collectors.toList());
+      Preconditions.checkArgument(
+          invalidRequirements.isEmpty(), "Invalid create requirements: %s", invalidRequirements);
+    }
+
+    return isCreate;
+  }
+
+  private static TableMetadata create(BaseTransaction baseTransaction, UpdateTableRequest request) {
+    // the only valid requirement is that the table will be created
+    TableOperations ops = baseTransaction.underlyingOps();
+    request.requirements().forEach(requirement -> requirement.validate(ops.current()));
+
+    TableMetadata.Builder builder = TableMetadata.buildFrom(baseTransaction.currentMetadata());
+    request
+        .updates()
+        .forEach(
+            update -> {
+              if (shouldApplyMetadataUpdateAfterBuilder(update)) {
+                update.applyTo(builder);
+              }
+            });
+
+    // create transactions do not retry. if the table exists, retrying is not a solution
+    ops.commit(null, builder.build());
+
+    return ops.current();
+  }
+
+  /**
+   * Returns {@code false} for updates already reflected through {@link Catalog.TableBuilder} during
+   * staged create; those must not be applied again on {@link TableMetadata.Builder}.
+   */
+  @VisibleForTesting
+  static boolean shouldApplyMetadataUpdateAfterBuilder(MetadataUpdate update) {
+    if (update instanceof MetadataUpdate.UpgradeFormatVersion) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.AddSchema) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.SetCurrentSchema) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.RemoveSchemas) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.SetLocation) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.SetProperties) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.RemoveProperties) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.AddSortOrder) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.SetDefaultSortOrder) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.AddPartitionSpec) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.SetDefaultPartitionSpec) {
+      return false;
+    }
+
+    if (update instanceof MetadataUpdate.RemovePartitionSpecs) {
+      return false;
+    }
+
+    return true;
+  }
+
   private static Map<String, String> retrieveFileIOProperties(FileIO fileIO) {
-    return fileIO instanceof InMemoryFileIO ? Maps.newHashMap() : fileIO.properties();
+    return fileIO instanceof InMemoryFileIO
+        ? Maps.newHashMap()
+        : new HashMap<>(fileIO.properties());
   }
 }

@@ -147,6 +147,20 @@ public class TestArgon2idPasswordHasher {
     Assertions.assertEquals("Unsupported Argon2id hash parameters", exception.getMessage());
   }
 
+  @Test
+  public void testVerifyRejectsUnexpectedArgon2Version() {
+    String hashedPassword = passwordHasher.hash("test-password");
+    String unsupportedHash =
+        hashedPassword.replace("v=" + Argon2idDefaults.DEFAULT_VERSION, "v=16");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> passwordHasher.verify("test-password", unsupportedHash));
+
+    Assertions.assertEquals("Unsupported Argon2id hash parameters", exception.getMessage());
+  }
+
   private static byte[] decodeBase64(String value) {
     int remainder = value.length() % 4;
     String paddedValue = remainder == 0 ? value : value + "====".substring(0, 4 - remainder);
