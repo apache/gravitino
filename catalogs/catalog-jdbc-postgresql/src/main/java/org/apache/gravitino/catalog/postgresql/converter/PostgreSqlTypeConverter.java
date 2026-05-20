@@ -41,6 +41,8 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   static final String BYTEA = "bytea";
   @VisibleForTesting static final String JDBC_ARRAY_PREFIX = "_";
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
+  @VisibleForTesting static final int DEFAULT_NUMERIC_PRECISION = 38;
+  @VisibleForTesting static final int DEFAULT_NUMERIC_SCALE = 18;
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
@@ -76,7 +78,15 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
             .map(Types.TimestampType::withTimeZone)
             .orElseGet(Types.TimestampType::withTimeZone);
       case NUMERIC:
-        return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
+        Integer columnSize = typeBean.getColumnSize();
+        Integer scale = typeBean.getScale();
+        if (columnSize == null || columnSize == 0) {
+          // PostgreSQL unconstrained NUMERIC has no fixed precision/scale. Gravitino DecimalType
+          // cannot represent that exactly, so use the maximum supported decimal as a compatibility
+          // tradeoff for engines and clients that cannot consume ExternalType.
+          return Types.DecimalType.of(DEFAULT_NUMERIC_PRECISION, DEFAULT_NUMERIC_SCALE);
+        }
+        return Types.DecimalType.of(columnSize, scale == null ? 0 : scale);
       case VARCHAR:
         return typeBean.getColumnSize() == null
             ? Types.StringType.get()

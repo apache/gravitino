@@ -746,6 +746,29 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public void batchInsertRelations(
+      Type relType,
+      List<NameIdentifier> srcIdentifiers,
+      Entity.EntityType srcType,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType,
+      boolean override)
+      throws IOException {
+    if (srcIdentifiers == null || srcIdentifiers.isEmpty()) {
+      return;
+    }
+    switch (relType) {
+      case OWNER_REL:
+        OwnerMetaService.getInstance()
+            .batchSetOwners(srcIdentifiers, srcType, dstIdentifier, dstType);
+        break;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support batch insert for the relation type %s", relType));
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
       Type relType,
       NameIdentifier srcEntityIdent,

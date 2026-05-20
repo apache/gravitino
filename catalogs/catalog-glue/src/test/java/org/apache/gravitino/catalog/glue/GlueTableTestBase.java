@@ -134,7 +134,7 @@ abstract class GlueTableTestBase {
     try {
       GlueTable t = GlueTable.fromGlueTable(glueTable, TYPE_CONVERTER);
       assertNotNull(t.properties().get(GlueConstants.LOCATION));
-      assertNotNull(t.properties().get(GlueConstants.INPUT_FORMAT));
+      assertNotNull(t.properties().get(GlueConstants.INPUT_FORMAT_CLASS));
       assertNotNull(t.properties().get(GlueConstants.OUTPUT_FORMAT));
       assertNotNull(t.properties().get(GlueConstants.SERDE_LIB));
       assertEquals("EXTERNAL_TABLE", t.properties().get(GlueConstants.TABLE_TYPE));
