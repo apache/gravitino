@@ -239,7 +239,7 @@ public class TestJcasbinAuthorizer {
     principalUtilsMockedStatic.when(PrincipalUtils::getCurrentUserName).thenCallRealMethod();
     metadataIdConverterMockedStatic
         .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
-        .thenReturn(CATALOG_ID);
+        .thenReturn(Optional.of(CATALOG_ID));
     when(gravitinoEnv.entityStore()).thenReturn(entityStore);
     when(entityStore.relationOperations()).thenReturn(supportsRelationOperations);
     when(entityStore.get(
@@ -1136,7 +1136,7 @@ public class TestJcasbinAuthorizer {
     } finally {
       metadataIdConverterMockedStatic
           .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
-          .thenReturn(CATALOG_ID);
+          .thenReturn(Optional.of(CATALOG_ID));
     }
   }
 
