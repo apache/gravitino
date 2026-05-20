@@ -89,6 +89,8 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
     // that Gravitino doesn't know about.
     importSchema(catalogName, leaf);
 
+    // getMissingAncestors() only returns the not-yet-existing ancestors; append the leaf so that
+    // every newly-created namespace in this request gets an owner assigned.
     newlyOwned.add(leaf);
     IcebergOwnershipUtils.setSchemaOwners(
         metalake,
@@ -147,6 +149,13 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
           dispatcher.dropNamespace(context, namespace);
 
           // TODO: Use cascade mode deletion
+          // Current behavior: only the leaf namespace is dropped from the Iceberg catalog above.
+          // We walk ancestors outermost-to-leaf and clean up a Gravitino entity only while the
+          // corresponding Iceberg namespace no longer exists, stopping at the first ancestor that
+          // still exists. As a result, ancestor entities are cleaned up only when the underlying
+          // Iceberg catalog also removes the empty parent namespaces on leaf-drop, which is
+          // catalog-implementation-dependent. For catalogs that keep empty parents, operators may
+          // need to drop empty parent namespaces manually.
           String separator = HierarchicalSchemaUtil.schemaSeparator();
           List<Namespace> deleteTargets = Lists.newArrayList(namespace);
           String namespaceName = String.join(separator, namespace.levels());

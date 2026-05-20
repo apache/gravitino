@@ -123,6 +123,26 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   @Test
+  void testCreateSchemaPrivilegeOnChildDoesNotAllowUnrelatedTopLevel() {
+    String parentNamespace = "ns_child_priv_parent";
+    String childNamespaceInGravitino = parentNamespace + ":child";
+    String unrelatedTopLevel = "ns_child_priv_unrelated";
+
+    // Create the parent/child branch as admin so the child schema exists to grant on.
+    createNestedNamespaceViaIRC(parentNamespace, "child");
+
+    // Grant USE_CATALOG plus CREATE_SCHEMA scoped only to the child schema (A:B).
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+    grantCreateSchemaOnSchemaRole(childNamespaceInGravitino);
+
+    // CREATE_SCHEMA on a child schema must not allow creating an unrelated top-level schema: the
+    // top-level path injects no SCHEMA context, so the expression falls back to catalog-level
+    // checks, which the normal user does not satisfy.
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class, () -> sql("CREATE DATABASE %s", unrelatedTopLevel));
+  }
+
+  @Test
   void testListNamespaces() {
     String namespace1 = "ns_list_hidden1";
     String namespace2 = "ns_list_hidden2";
@@ -519,6 +539,20 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     metalakeClientWithAllPrivilege.createRole(
         roleName, new HashMap<>(), ImmutableList.of(catalogObject));
+    metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
+  }
+
+  /** Grants CREATE_SCHEMA privilege to the normal user scoped to the specified schema. */
+  private void grantCreateSchemaOnSchemaRole(String schemaName) {
+    String roleName = "createSchemaOnSchema_" + UUID.randomUUID();
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(GRAVITINO_CATALOG_NAME, ImmutableList.of());
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            catalogObject, schemaName, ImmutableList.of(Privileges.CreateSchema.allow()));
+
+    metalakeClientWithAllPrivilege.createRole(
+        roleName, new HashMap<>(), ImmutableList.of(schemaObject));
     metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
   }
 

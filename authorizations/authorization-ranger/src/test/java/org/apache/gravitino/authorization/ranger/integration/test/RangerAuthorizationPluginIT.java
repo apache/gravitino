@@ -270,7 +270,7 @@ public class RangerAuthorizationPluginIT {
 
     SecurableObject createSchemaOnSchema =
         SecurableObjects.parse(
-            String.format("catalog.schema"),
+            "catalog.schema",
             MetadataObject.Type.SCHEMA,
             Lists.newArrayList(Privileges.CreateSchema.allow()));
     Assertions.assertTrue(

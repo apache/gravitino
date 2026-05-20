@@ -45,6 +45,13 @@ public interface OwnerDispatcher {
    * The default implementation delegates per object so implementations that wrap {@code setOwner}
    * (e.g. for events) apply consistently.
    *
+   * <p>Note: implementations that persist via {@code batchInsertRelations} (such as {@link
+   * OwnerManager}) require all {@code metadataObjects} to share the same {@link MetadataObject.Type}
+   * within a single call, because the batch operation takes a single object type. Such
+   * implementations throw {@link IllegalArgumentException} when mixed types are supplied, so callers
+   * should group objects by type before calling. The default per-object implementation has no such
+   * restriction.
+   *
    * @param metalake the name of the metalake
    * @param metadataObjects the objects to update; must not be null (may be empty)
    * @param ownerName the name of the owner

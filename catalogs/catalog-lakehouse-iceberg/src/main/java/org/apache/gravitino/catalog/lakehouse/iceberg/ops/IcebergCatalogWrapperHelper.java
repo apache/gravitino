@@ -291,9 +291,8 @@ public class IcebergCatalogWrapperHelper {
   }
 
   public static Namespace getIcebergNamespace(String... level) {
-    // A single schema-name string may encode a hierarchical (multi-level) namespace using the
-    // configured external separator (default ":"). Split it back into individual Iceberg
-    // namespace levels so the underlying catalog receives the correct multi-level Namespace.
+    // A lone string is a logical schema name that may still be joined by the separator (e.g.
+    // "A:B:C"), so it must be split; a multi-element array has already been pre-split into levels.
     if (level.length == 1) {
       return IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
           level[0], HierarchicalSchemaUtil.schemaSeparator());

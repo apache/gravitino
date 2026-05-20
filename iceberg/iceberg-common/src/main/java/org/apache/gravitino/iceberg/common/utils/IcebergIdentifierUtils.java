@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.common.utils;
 
+import com.google.common.base.Preconditions;
 import java.util.regex.Pattern;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.iceberg.catalog.Namespace;
@@ -65,14 +66,14 @@ public class IcebergIdentifierUtils {
    *   <li>{@code Namespace.of("A","B","C")} + {@code ":"} → {@code "A:B:C"} (logical)
    * </ul>
    *
-   * @param namespace the Iceberg namespace
+   * @param namespace the Iceberg namespace, which must not be empty
    * @param separator the separator to join levels with
-   * @return the joined schema name, or {@code ""} for an empty namespace
+   * @return the joined schema name
+   * @throws IllegalArgumentException if the namespace is empty
    */
   public static String icebergNamespaceToSchemaName(Namespace namespace, String separator) {
-    if (namespace.isEmpty()) {
-      return "";
-    }
+    Preconditions.checkArgument(
+        !namespace.isEmpty(), "Iceberg namespace must not be empty to build a schema name");
     return String.join(separator, namespace.levels());
   }
 }

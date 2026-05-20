@@ -224,7 +224,7 @@ public class OwnerManager implements OwnerDispatcher {
           nse.getMessage());
       throw new NotFoundException(nse, "Metadata object or owner %s is not found", ownerName);
     } catch (IOException ioe) {
-      LOG.info("Fail to batch set owner {} on {} objects", ownerName, metadataObjects.size(), ioe);
+      LOG.warn("Fail to batch set owner {} on {} objects", ownerName, metadataObjects.size(), ioe);
       throw new RuntimeException(ioe);
     }
   }
