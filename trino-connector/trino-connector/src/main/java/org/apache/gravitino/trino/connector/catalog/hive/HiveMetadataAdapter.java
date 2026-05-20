@@ -49,6 +49,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdap
 import org.apache.gravitino.trino.connector.catalog.hive.SortingColumn.Order;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 
 /** Transforming Apache Gravitino Hive metadata to Trino. */
 public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
@@ -74,7 +75,23 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,
       List<PropertyMetadata<?>> columnProperties) {
-    super(schemaProperties, tableProperties, columnProperties, new HiveDataTypeTransformer());
+    this(schemaProperties, tableProperties, columnProperties, new HiveDataTypeTransformer());
+  }
+
+  /**
+   * Constructs a new HiveMetadataAdapter with a custom data type transformer.
+   *
+   * @param schemaProperties the schema properties metadata
+   * @param tableProperties the table properties metadata
+   * @param columnProperties the column properties metadata
+   * @param dataTypeTransformer the data type transformer to use
+   */
+  public HiveMetadataAdapter(
+      List<PropertyMetadata<?>> schemaProperties,
+      List<PropertyMetadata<?>> tableProperties,
+      List<PropertyMetadata<?>> columnProperties,
+      GeneralDataTypeTransformer dataTypeTransformer) {
+    super(schemaProperties, tableProperties, columnProperties, dataTypeTransformer);
     this.tableConverter = new HiveTablePropertyConverter();
     this.schemaConverter = new HiveSchemaPropertyConverter();
   }

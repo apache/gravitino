@@ -200,11 +200,93 @@ final class GlueIcebergTableHelper {
     mergedProps.putAll(icebergTable.properties());
     table.setProperties(mergedProps);
 
+    // Overwrite Glue's Hive-style column types with the accurate types from the Iceberg schema.
+    // Glue stores Iceberg TIME as "string", REAL as "float", etc., so the Iceberg schema is the
+    // authoritative source for column types on Iceberg tables.
+    Schema icebergSchema = icebergTable.schema();
+    Column[] columns =
+        icebergSchema.columns().stream()
+            .map(
+                field ->
+                    GlueColumn.builder()
+                        .withName(field.name())
+                        .withType(fromIcebergType(field.type()))
+                        .withComment(field.doc())
+                        .withNullable(field.isOptional())
+                        .build())
+            .toArray(Column[]::new);
+    table.setColumns(columns);
+
     if (!icebergTable.spec().fields().isEmpty()) {
       table.setPartitioning(convertPartitionSpec(icebergTable.spec(), icebergTable.schema()));
     }
     if (!icebergTable.sortOrder().fields().isEmpty()) {
       table.setSortOrders(convertIcebergSortOrder(icebergTable.sortOrder(), icebergTable.schema()));
+    }
+  }
+
+  /**
+   * Converts an Iceberg type to the equivalent Gravitino type.
+   *
+   * <p>TIME and TIMESTAMP types are always returned with microsecond (6) precision, matching
+   * Iceberg's internal representation.
+   */
+  static org.apache.gravitino.rel.types.Type fromIcebergType(
+      org.apache.iceberg.types.Type icebergType) {
+    switch (icebergType.typeId()) {
+      case BOOLEAN:
+        return BooleanType.get();
+      case INTEGER:
+        return IntegerType.get();
+      case LONG:
+        return LongType.get();
+      case FLOAT:
+        return FloatType.get();
+      case DOUBLE:
+        return DoubleType.get();
+      case STRING:
+        return StringType.get();
+      case BINARY:
+        return BinaryType.get();
+      case UUID:
+        return UUIDType.get();
+      case DATE:
+        return DateType.get();
+      case TIME:
+        return TimeType.of(6);
+      case TIMESTAMP:
+        Types.TimestampType ts = (Types.TimestampType) icebergType;
+        return ts.shouldAdjustToUTC()
+            ? org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(6)
+            : org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(6);
+      case DECIMAL:
+        Types.DecimalType decimal = (Types.DecimalType) icebergType;
+        return DecimalType.of(decimal.precision(), decimal.scale());
+      case FIXED:
+        Types.FixedType fixed = (Types.FixedType) icebergType;
+        return FixedType.of(fixed.length());
+      case LIST:
+        Types.ListType list = (Types.ListType) icebergType;
+        return org.apache.gravitino.rel.types.Types.ListType.of(
+            fromIcebergType(list.elementType()), list.isElementOptional());
+      case MAP:
+        Types.MapType map = (Types.MapType) icebergType;
+        return org.apache.gravitino.rel.types.Types.MapType.of(
+            fromIcebergType(map.keyType()),
+            fromIcebergType(map.valueType()),
+            map.isValueOptional());
+      case STRUCT:
+        Types.StructType struct = (Types.StructType) icebergType;
+        org.apache.gravitino.rel.types.Types.StructType.Field[] fields =
+            struct.fields().stream()
+                .map(
+                    f ->
+                        org.apache.gravitino.rel.types.Types.StructType.Field.of(
+                            f.name(), fromIcebergType(f.type()), f.isOptional(), f.doc()))
+                .toArray(org.apache.gravitino.rel.types.Types.StructType.Field[]::new);
+        return org.apache.gravitino.rel.types.Types.StructType.of(fields);
+      default:
+        return org.apache.gravitino.rel.types.Types.ExternalType.of(icebergType.typeId().name());
     }
   }
 

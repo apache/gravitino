@@ -52,8 +52,7 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
 
   private static final List<PropertyMetadata<?>> GLUE_TABLE_PROPERTY_META =
       ImmutableList.of(
-          stringProperty(
-              LAKEHOUSE_TABLE_TYPE, "The type of table (ICEBERG, HIVE)", null, false),
+          stringProperty(LAKEHOUSE_TABLE_TYPE, "The type of table (ICEBERG, HIVE)", null, false),
           new PropertyMetadata<>(
               "partitioned_by",
               "Partition columns",
@@ -113,7 +112,11 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
    * @param schemaProperties the schema properties metadata
    */
   public GlueMetadataAdapter(List<PropertyMetadata<?>> schemaProperties) {
-    super(schemaProperties, GLUE_TABLE_PROPERTY_META, ImmutableList.of());
+    super(
+        schemaProperties,
+        GLUE_TABLE_PROPERTY_META,
+        ImmutableList.of(),
+        new GlueDataTypeTransformer());
   }
 
   @Override
