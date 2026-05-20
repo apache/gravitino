@@ -204,7 +204,6 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
               Caffeine.newBuilder()
                   .maximumSize(datasetCacheSize)
                   .scheduler(Scheduler.forScheduledExecutorService(this.scheduler))
-                  .executor(Runnable::run)
                   .removalListener(
                       (RemovalListener<Long, DatasetHolder>)
                           (key, value, cause) -> {
@@ -358,6 +357,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
   public void close() throws IOException {
     if (datasetCache.isPresent()) {
       Cache<Long, DatasetHolder> cache = datasetCache.get();
+      cache.asMap().values().forEach(LancePartitionStatisticStorage::closeDatasetHolder);
       cache.invalidateAll();
       cache.cleanUp();
     }
@@ -623,6 +623,8 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
     private final Dataset dataset;
 
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+
     DatasetHolder(Dataset dataset) {
       this.dataset = dataset;
     }
@@ -637,7 +639,9 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
 
     @Override
     public void close() throws IOException {
-      dataset.close();
+      if (closed.compareAndSet(false, true)) {
+        dataset.close();
+      }
     }
   }
 }

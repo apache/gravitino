@@ -69,13 +69,21 @@ public final class LancePropertiesUtils {
     return effectiveStorageOptions;
   }
 
+  /**
+   * Converts Lance storage options to table properties.
+   *
+   * <p>The input map should use unprefixed Lance storage option keys. The returned map prefixes
+   * each key with {@code lance.storage.}. A {@code null} input returns an empty map.
+   *
+   * @param storageOptions the unprefixed Lance storage options
+   * @return the table properties with Lance storage option prefixes
+   */
   public static Map<String, String> toTableProperties(Map<String, String> storageOptions) {
-    if (storageOptions == null) {
-      return Map.of();
-    }
-
-    return storageOptions.entrySet().stream()
-        .collect(
-            Collectors.toMap(e -> LANCE_STORAGE_OPTIONS_PREFIX + e.getKey(), Map.Entry::getValue));
+    return storageOptions == null
+        ? Map.of()
+        : storageOptions.entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    entry -> LANCE_STORAGE_OPTIONS_PREFIX + entry.getKey(), Map.Entry::getValue));
   }
 }
