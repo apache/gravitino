@@ -21,6 +21,7 @@ package org.apache.gravitino.credential;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.connector.credential.PathContext;
@@ -57,5 +58,43 @@ public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
     PathBasedCredentialContext context = (PathBasedCredentialContext) contexts.get("dummy");
     Assertions.assertEquals(Set.of("path1"), context.getWritePaths());
     Assertions.assertTrue(context.getReadPaths().isEmpty());
+  }
+
+  @Test
+  public void testFilterContextByProviderScheme() {
+    CredentialProvider s3OnlyProvider =
+        new CredentialProvider() {
+          @Override
+          public void initialize(Map<String, String> properties) {}
+
+          @Override
+          public String credentialType() {
+            return "dummy";
+          }
+
+          @Override
+          public Credential getCredential(CredentialContext context) {
+            return null;
+          }
+
+          @Override
+          public void close() {}
+
+          @Override
+          public boolean supportsScheme(String scheme) {
+            return "s3".equalsIgnoreCase(scheme) || "s3a".equalsIgnoreCase(scheme);
+          }
+        };
+
+    PathBasedCredentialContext context =
+        new PathBasedCredentialContext(
+            "user", Set.of("s3://bucket/a", "gs://bucket/b"), Set.of("s3a://bucket/c"));
+
+    Optional<CredentialContext> filtered =
+        CredentialOperationDispatcher.filterContextByProvider(s3OnlyProvider, context);
+    Assertions.assertTrue(filtered.isPresent());
+    PathBasedCredentialContext filteredPathBased = (PathBasedCredentialContext) filtered.get();
+    Assertions.assertEquals(Set.of("s3://bucket/a"), filteredPathBased.getWritePaths());
+    Assertions.assertEquals(Set.of("s3a://bucket/c"), filteredPathBased.getReadPaths());
   }
 }

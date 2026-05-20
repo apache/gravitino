@@ -24,9 +24,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -204,5 +208,92 @@ public class TestSchemaMetaService extends TestJDBCBackend {
 
     topicMetaService.deleteTopic(topic.nameIdentifier());
     schemaMetaService.deleteSchema(schema.nameIdentifier(), false);
+  }
+
+  @TestTemplate
+  public void testInsertHierarchicalSchemaCreatesAncestorsAndLeaf() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String logicalLeaf = "ns_a:ns_b:leaf";
+    SchemaEntity hierarchical =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(logicalLeaf)
+            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
+            .withComment("nested")
+            .withProperties(Collections.emptyMap())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    schemaMetaService.insertSchema(hierarchical, false);
+
+    List<SchemaEntity> schemas =
+        schemaMetaService.listSchemasByNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName));
+    Set<String> logicalNames = schemas.stream().map(SchemaEntity::name).collect(Collectors.toSet());
+
+    Assertions.assertTrue(logicalNames.contains("ns_a"));
+    Assertions.assertTrue(logicalNames.contains("ns_a:ns_b"));
+    Assertions.assertTrue(logicalNames.contains(logicalLeaf));
+
+    SchemaEntity loaded =
+        schemaMetaService.getSchemaByIdentifier(
+            NameIdentifier.of(metalakeName, catalogName, logicalLeaf));
+    Assertions.assertEquals(logicalLeaf, loaded.name());
+    Assertions.assertEquals("nested", loaded.comment());
+  }
+
+  @TestTemplate
+  public void testInsertHierarchicalSecondLeafReusesAncestorsWithoutUpsert() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String leaf1 = "ns_a:ns_b:leaf1";
+    String leaf2 = "ns_a:ns_b:leaf2";
+    String ancestorA = "ns_a";
+    String ancestorAB = "ns_a:ns_b";
+
+    SchemaEntity first =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(leaf1)
+            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
+            .withComment("first")
+            .withProperties(Collections.emptyMap())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    schemaMetaService.insertSchema(first, false);
+
+    long idA =
+        schemaMetaService
+            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorA))
+            .id();
+    long idAB =
+        schemaMetaService
+            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorAB))
+            .id();
+
+    SchemaEntity second =
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(leaf2)
+            .withNamespace(NamespaceUtil.ofSchema(metalakeName, catalogName))
+            .withComment("second")
+            .withProperties(Collections.emptyMap())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    schemaMetaService.insertSchema(second, false);
+
+    Assertions.assertEquals(
+        idA,
+        schemaMetaService
+            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorA))
+            .id());
+    Assertions.assertEquals(
+        idAB,
+        schemaMetaService
+            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorAB))
+            .id());
   }
 }

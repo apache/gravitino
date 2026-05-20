@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -850,6 +851,103 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
 
     Assertions.assertEquals(1, result.size());
     Assertions.assertEquals("catalog_single", result.get(0).name());
+  }
+
+  @TestTemplate
+  public void testBatchGetGroups() throws IOException {
+    String metalakeName = "metalake_for_group_batch";
+    createAndInsertMakeLake(metalakeName);
+
+    // Create a catalog and two roles so we can attach roles to one of the groups
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_for_group_batch",
+            AUDIT_INFO);
+    backend.insert(catalog, false);
+
+    RoleEntity roleA =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofRole(metalakeName),
+            "role_a",
+            AUDIT_INFO,
+            "catalog_for_group_batch");
+    RoleEntity roleB =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofRole(metalakeName),
+            "role_b",
+            AUDIT_INFO,
+            "catalog_for_group_batch");
+    backend.insert(roleA, false);
+    backend.insert(roleB, false);
+
+    // group1: no roles. group2: two roles. group3: no roles.
+    GroupEntity group1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofGroup(metalakeName),
+            "group1",
+            AUDIT_INFO,
+            Lists.newArrayList(),
+            Lists.newArrayList());
+    GroupEntity group2 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofGroup(metalakeName),
+            "group2",
+            AUDIT_INFO,
+            Lists.newArrayList(roleA.name(), roleB.name()),
+            Lists.newArrayList(roleA.id(), roleB.id()));
+    GroupEntity group3 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofGroup(metalakeName),
+            "group3",
+            AUDIT_INFO,
+            Lists.newArrayList(),
+            Lists.newArrayList());
+    backend.insert(group1, false);
+    backend.insert(group2, false);
+    backend.insert(group3, false);
+
+    List<NameIdentifier> identifiers =
+        Lists.newArrayList(
+            group1.nameIdentifier(), group2.nameIdentifier(), group3.nameIdentifier());
+
+    List<GroupEntity> result = backend.batchGet(identifiers, Entity.EntityType.GROUP);
+
+    Assertions.assertEquals(3, result.size());
+    Map<String, GroupEntity> resultMap =
+        result.stream().collect(Collectors.toMap(GroupEntity::name, g -> g));
+
+    GroupEntity retrieved1 = resultMap.get("group1");
+    Assertions.assertNotNull(retrieved1);
+    Assertions.assertEquals(group1.id(), retrieved1.id());
+    Assertions.assertEquals(group1.namespace(), retrieved1.namespace());
+    Assertions.assertTrue(
+        retrieved1.roleIds() == null || retrieved1.roleIds().isEmpty(),
+        "group1 should have no roles");
+
+    GroupEntity retrieved2 = resultMap.get("group2");
+    Assertions.assertNotNull(retrieved2);
+    Assertions.assertEquals(group2.id(), retrieved2.id());
+    Assertions.assertEquals(group2.namespace(), retrieved2.namespace());
+    Assertions.assertNotNull(retrieved2.roleIds());
+    Assertions.assertEquals(2, retrieved2.roleIds().size());
+    Assertions.assertEquals(
+        Sets.newHashSet(roleA.id(), roleB.id()), Sets.newHashSet(retrieved2.roleIds()));
+    Assertions.assertEquals(
+        Sets.newHashSet(roleA.name(), roleB.name()), Sets.newHashSet(retrieved2.roleNames()));
+
+    GroupEntity retrieved3 = resultMap.get("group3");
+    Assertions.assertNotNull(retrieved3);
+    Assertions.assertEquals(group3.id(), retrieved3.id());
+    Assertions.assertTrue(
+        retrieved3.roleIds() == null || retrieved3.roleIds().isEmpty(),
+        "group3 should have no roles");
   }
 
   @TestTemplate
