@@ -447,28 +447,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       finalProps.put(GlueConstants.TABLE_TYPE_PARAM, GlueConstants.ICEBERG_TABLE_TYPE_VALUE);
       // Resolve location from warehouse if not explicitly provided.
       if (!finalProps.containsKey(GlueConstants.LOCATION)) {
-        String resolved = resolveTableLocation(null, dbName, ident.name());
-        if (resolved != null) {
-          finalProps.put(GlueConstants.LOCATION, resolved);
-        }
-      }
-    }
-
-    if (isIceberg) {
-      boolean registerMode = props.containsKey(GlueConstants.METADATA_LOCATION);
-      if (!registerMode) {
-        // Use Iceberg SDK to create the table (writes metadata.json to S3 and registers in Glue).
-        GlueIcebergTableHelper.createTable(
-            icebergGlueCatalog,
-            dbName,
-            ident.name(),
-            columns,
-            comment,
-            finalProps,
-            partitions,
-            sortOrders);
-        LOG.info("Created Iceberg table {}.{} via Iceberg SDK", dbName, ident.name());
-        return loadTable(ident);
+        finalProps.put(GlueConstants.LOCATION, resolveTableLocation(null, dbName, ident.name()));
       }
     }
 
