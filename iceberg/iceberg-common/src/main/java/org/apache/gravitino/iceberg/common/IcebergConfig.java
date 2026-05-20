@@ -33,6 +33,7 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
@@ -276,7 +277,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .doc("Table metadata cache implementation")
           .version(ConfigConstants.VERSION_1_1_0)
           .stringConf()
-          .createWithDefault("org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache");
+          .createWithDefault(LocalTableMetadataCache.class.getName());
 
   public static final ConfigEntry<Integer> TABLE_METADATA_CACHE_CAPACITY =
       new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_CAPACITY)
