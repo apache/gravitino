@@ -66,26 +66,33 @@ public class JcasbinAuthorizationLookups {
   /**
    * Two-tier name→id lookup: the per-request map in {@code requestContext} dedups calls within the
    * same HTTP request; on a miss, the long-lived {@code metadataIdCache} is consulted, and finally
-   * we fall back to a DB query via {@link MetadataIdConverter#getID}.
+   * we fall back to a DB query via {@link MetadataIdConverter#getID}. Returns {@link
+   * Optional#empty()} when the metadata object does not exist so callers can deny authorization; a
+   * missing object is never cached as a negative result.
    */
-  public Long resolveMetadataId(
+  public Optional<Long> resolveMetadataId(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
     String cacheKey = buildCacheKey(metalake, metadataObject);
-    return requestContext.computeMetadataIdIfAbsent(
-        cacheKey,
-        k ->
-            metadataIdCache.get(
-                k,
-                ignored ->
-                    // MetadataIdConverter.getID returns empty for a non-existent object; the cache
-                    // loader contract forbids null, so we throw and let the caller treat the
-                    // missing object as "not authorized" without caching a negative result.
-                    MetadataIdConverter.getID(metadataObject, metalake)
-                        .orElseThrow(
-                            () ->
-                                new NoSuchMetadataObjectException(
-                                    "Metadata object %s does not exist",
-                                    metadataObject.fullName()))));
+    try {
+      // Both cache tiers forbid caching null/absent values, so we signal a missing object by
+      // throwing through the loaders and translate it back to Optional.empty() here. This keeps
+      // positive results cached in both tiers while avoiding caching a negative result.
+      return Optional.of(
+          requestContext.computeMetadataIdIfAbsent(
+              cacheKey,
+              k ->
+                  metadataIdCache.get(
+                      k,
+                      ignored ->
+                          MetadataIdConverter.getID(metadataObject, metalake)
+                              .orElseThrow(
+                                  () ->
+                                      new NoSuchMetadataObjectException(
+                                          "Metadata object %s does not exist",
+                                          metadataObject.fullName())))));
+    } catch (NoSuchMetadataObjectException e) {
+      return Optional.empty();
+    }
   }
 
   /**

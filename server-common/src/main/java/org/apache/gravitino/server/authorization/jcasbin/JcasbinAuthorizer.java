@@ -295,9 +295,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       AuthorizationRequestContext requestContext) {
     try {
-      Long metadataId = lookups.resolveMetadataId(metadataObject, metalake, requestContext);
+      Optional<Long> metadataId =
+          lookups.resolveMetadataId(metadataObject, metalake, requestContext);
+      if (!metadataId.isPresent()) {
+        return false;
+      }
       Optional<OwnerInfo> owner =
-          lookups.resolveOwnerId(metadataId, metadataObject.type(), requestContext);
+          lookups.resolveOwnerId(metadataId.get(), metadataObject.type(), requestContext);
       return ownerMatchesUserOrGroups(owner, principal, metalake);
     } catch (Exception e) {
       LOG.debug("Can not get entity id", e);
@@ -626,9 +630,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         String privilege,
         AuthorizationRequestContext requestContext) {
       try {
-        Long metadataId = lookups.resolveMetadataId(metadataObject, metalake, requestContext);
+        Optional<Long> metadataId =
+            lookups.resolveMetadataId(metadataObject, metalake, requestContext);
+        if (!metadataId.isPresent()) {
+          return false;
+        }
         return authorizeByJcasbin(
-            userId, metalake, metadataObject, metadataId, privilege, requestContext);
+            userId, metalake, metadataObject, metadataId.get(), privilege, requestContext);
       } catch (Exception e) {
         LOG.debug("Can not get entity id", e);
         return false;
@@ -685,7 +693,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             for (RoleEntity role : entities) {
               desiredRoleIds.add(String.valueOf(role.id()));
               addRoleForUserAndLoadPolicies(
-                  userId, metalake, role.id(), role.name(), loadRoleFutures, entityStore);
+                  userId,
+                  metalake,
+                  role.id(),
+                  role.name(),
+                  loadRoleFutures,
+                  entityStore,
+                  requestContext);
             }
 
             // Load roles inherited from the user's groups.
@@ -711,7 +725,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                     roleIds.get(i),
                     roleNames.get(i),
                     loadRoleFutures,
-                    entityStore);
+                    entityStore,
+                    requestContext);
               }
             }
 
@@ -764,7 +779,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       Long roleId,
       String roleName,
       List<CompletableFuture<Void>> loadRoleFutures,
-      EntityStore entityStore) {
+      EntityStore entityStore,
+      AuthorizationRequestContext requestContext) {
     allowEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
     denyEnforcer.addRoleForUser(String.valueOf(userId), String.valueOf(roleId));
     if (loadedRoles.getIfPresent(roleId) != null) {
@@ -785,23 +801,26 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                 executor)
             .thenAcceptAsync(
                 roleEntity -> {
-                  loadPolicyByRoleEntity(roleEntity);
+                  loadPolicyByRoleEntity(roleEntity, requestContext);
                   loadedRoles.put(roleId, true);
                 },
                 executor);
     loadRoleFutures.add(loadRoleFuture);
   }
 
-  private void loadPolicyByRoleEntity(RoleEntity roleEntity) {
+  private void loadPolicyByRoleEntity(
+      RoleEntity roleEntity, AuthorizationRequestContext requestContext) {
     String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
     List<SecurableObject> securableObjects = roleEntity.securableObjects();
 
     for (SecurableObject securableObject : securableObjects) {
+      Optional<Long> metadataId =
+          lookups.resolveMetadataId(securableObject, metalake, requestContext);
+      // A role may still reference a metadata object that has since been dropped; skip it.
+      if (!metadataId.isPresent()) {
+        continue;
+      }
       for (Privilege privilege : securableObject.privileges()) {
-        Optional<Long> metadataId = MetadataIdConverter.getID(securableObject, metalake);
-        if (!metadataId.isPresent()) {
-          continue;
-        }
         Privilege.Condition condition = privilege.condition();
         if (AuthConstants.DENY.equalsIgnoreCase(condition.name())) {
           denyEnforcer.addPolicy(
