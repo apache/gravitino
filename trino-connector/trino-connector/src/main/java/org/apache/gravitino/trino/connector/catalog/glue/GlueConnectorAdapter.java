@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.catalog.HasPropertyMeta;
@@ -70,7 +71,7 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
     }
 
     String endpoint = catalog.getProperty("aws-glue-endpoint", null);
-    if (endpoint != null) {
+    if (StringUtils.isNotBlank(endpoint)) {
       config.put("hive.metastore.glue.endpoint-url", endpoint);
     }
 

@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -123,6 +124,9 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting String defaultTableFormat;
 
+  /** Optional S3 warehouse prefix. Table location is derived as {@code warehouse/db/table}. */
+  @VisibleForTesting String warehouseLocation;
+
   /** Iceberg SDK Glue catalog used for creating Iceberg-format tables. */
   @VisibleForTesting org.apache.iceberg.catalog.Catalog icebergGlueCatalog;
 
@@ -147,6 +151,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
               .map(s -> s.toLowerCase(Locale.ROOT))
               .collect(Collectors.toSet());
     }
+    this.warehouseLocation = config.get(GlueConstants.WAREHOUSE);
     this.icebergGlueCatalog = GlueIcebergTableHelper.createGlueCatalog(config);
   }
 
@@ -439,6 +444,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     if (isIceberg) {
       finalProps = new HashMap<>(props);
       finalProps.put(GlueConstants.TABLE_TYPE_PARAM, GlueConstants.ICEBERG_TABLE_TYPE_VALUE);
+      // Resolve location from warehouse if not explicitly provided.
+      if (!finalProps.containsKey(GlueConstants.LOCATION)) {
+        String resolved = resolveTableLocation(null, dbName, ident.name());
+        if (resolved != null) {
+          finalProps.put(GlueConstants.LOCATION, resolved);
+        }
+      }
     }
 
     if (isIceberg) {
@@ -461,6 +473,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     TableInput input =
         buildTableInput(
+            dbName,
             ident.name(),
             comment,
             columns,
@@ -557,6 +570,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     TableInput input =
         buildTableInput(
+            dbName,
             newName,
             newComment,
             newColumns,
@@ -689,6 +703,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   private TableInput buildTableInput(
+      String dbName,
       String name,
       String comment,
       Column[] columns,
@@ -729,20 +744,22 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       }
     }
 
-    // Translate format name to input/output/serde class names if not explicitly set
+    // Translate format name to input/output/serde class names if not explicitly set.
+    // Fall back to "parquet" when no format is specified at all.
     String format = properties.get(GlueConstants.FORMAT);
     String inputFormat = properties.get(GlueConstants.INPUT_FORMAT);
     String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
     String serdeLib = properties.get(GlueConstants.SERDE_LIB);
 
-    if (inputFormat == null && format != null) {
-      inputFormat = getInputFormatClass(format.toLowerCase(Locale.ROOT));
+    String resolvedFormat = format != null ? format.toLowerCase(Locale.ROOT) : "parquet";
+    if (inputFormat == null) {
+      inputFormat = getInputFormatClass(resolvedFormat);
     }
-    if (outputFormat == null && format != null) {
-      outputFormat = getOutputFormatClass(format.toLowerCase(Locale.ROOT));
+    if (outputFormat == null) {
+      outputFormat = getOutputFormatClass(resolvedFormat);
     }
-    if (serdeLib == null && format != null) {
-      serdeLib = getSerdeClass(format.toLowerCase(Locale.ROOT));
+    if (serdeLib == null) {
+      serdeLib = getSerdeClass(resolvedFormat);
     }
 
     SerDeInfo serDe =
@@ -778,7 +795,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     StorageDescriptor sd =
         StorageDescriptor.builder()
             .columns(glueDataCols)
-            .location(properties.get(GlueConstants.LOCATION))
+            .location(resolveTableLocation(properties.get(GlueConstants.LOCATION), dbName, name))
             .inputFormat(inputFormat)
             .outputFormat(outputFormat)
             .serdeInfo(serDe)
@@ -791,7 +808,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         TableInput.builder()
             .name(name)
             .description(comment)
-            .tableType(properties.get(GlueConstants.TABLE_TYPE))
+            .tableType(
+                properties.getOrDefault(GlueConstants.TABLE_TYPE, GlueConstants.MANAGED_TABLE_TYPE))
             .parameters(tableParams)
             .storageDescriptor(sd);
 
@@ -809,6 +827,25 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         .type(typeConverter.fromGravitino(col.dataType()))
         .comment(col.comment())
         .build();
+  }
+
+  private String resolveTableLocation(String explicitLocation, String dbName, String tableName) {
+    if (explicitLocation != null) {
+      return explicitLocation;
+    }
+    if (StringUtils.isNotBlank(warehouseLocation)) {
+      String base =
+          warehouseLocation.endsWith("/")
+              ? warehouseLocation.substring(0, warehouseLocation.length() - 1)
+              : warehouseLocation;
+      return base + "/" + dbName + "/" + tableName;
+    }
+    throw new IllegalArgumentException(
+        "Table location is required: either set the '"
+            + GlueConstants.LOCATION
+            + "' property or configure '"
+            + GlueConstants.WAREHOUSE
+            + "' on the catalog.");
   }
 
   /** Translates a format name (e.g., "parquet", "orc") to the Hive input format class. */

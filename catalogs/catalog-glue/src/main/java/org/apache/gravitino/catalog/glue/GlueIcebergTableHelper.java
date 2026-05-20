@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
@@ -161,7 +162,7 @@ final class GlueIcebergTableHelper {
     }
 
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
-    if (endpoint != null) {
+    if (StringUtils.isNotBlank(endpoint)) {
       icebergProps.put(GLUE_ENDPOINT, endpoint);
     }
 
