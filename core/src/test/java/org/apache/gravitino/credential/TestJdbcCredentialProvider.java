@@ -46,7 +46,7 @@ public class TestJdbcCredentialProvider {
     Assertions.assertInstanceOf(JdbcCredentialProvider.class, credentialProvider);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Optional<Credential> credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
     Assertions.assertTrue(credential.isPresent());
     Assertions.assertInstanceOf(JdbcCredential.class, credential.get());
@@ -65,7 +65,7 @@ public class TestJdbcCredentialProvider {
         CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Optional<Credential> credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
     Assertions.assertFalse(credential.isPresent());
   }
@@ -110,7 +110,7 @@ public class TestJdbcCredentialProvider {
         CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Optional<Credential> credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
     Assertions.assertFalse(credential.isPresent());
   }
@@ -126,7 +126,7 @@ public class TestJdbcCredentialProvider {
         CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Optional<Credential> credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
     Assertions.assertFalse(credential.isPresent());
   }
@@ -137,7 +137,7 @@ public class TestJdbcCredentialProvider {
         CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, null);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Optional<Credential> credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
     Assertions.assertFalse(credential.isPresent());
   }
@@ -155,7 +155,7 @@ public class TestJdbcCredentialProvider {
         CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Optional<Credential> credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
     Assertions.assertFalse(credential.isPresent());
   }

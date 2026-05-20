@@ -140,6 +140,6 @@ public class CatalogCredentialManager implements Closeable {
     Preconditions.checkState(
         credentialProviders.containsKey(credentialType),
         String.format("Credential %s not found", credentialType));
-    return credentialProviders.get(credentialType).getCredential(context);
+    return credentialProviders.get(credentialType).getCredentialOptional(context);
   }
 }

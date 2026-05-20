@@ -56,7 +56,7 @@ public class S3SecretKeyProvider implements CredentialProvider {
   }
 
   @Override
-  public Optional<Credential> getCredential(CredentialContext context) {
+  public Optional<Credential> getCredentialOptional(CredentialContext context) {
     return Optional.of(new S3SecretKeyCredential(accessKey, secretKey));
   }
 }

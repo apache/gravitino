@@ -60,7 +60,7 @@ public abstract class CredentialProviderDelegator<T extends Credential>
    * @throws RuntimeException if credential generation fails.
    */
   @Override
-  public Optional<Credential> getCredential(CredentialContext context) {
+  public Optional<Credential> getCredentialOptional(CredentialContext context) {
     try {
       return Optional.ofNullable(generator.generate(context));
     } catch (Exception e) {

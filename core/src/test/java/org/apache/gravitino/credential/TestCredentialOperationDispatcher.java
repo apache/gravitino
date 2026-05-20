@@ -79,7 +79,7 @@ public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
           }
 
           @Override
-          public Optional<Credential> getCredential(CredentialContext context) {
+          public Optional<Credential> getCredentialOptional(CredentialContext context) {
             return Optional.empty();
           }
 

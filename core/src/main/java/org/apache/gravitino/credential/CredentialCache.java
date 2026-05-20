@@ -37,7 +37,7 @@ public class CredentialCache<T> implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(CredentialCache.class);
 
   // Calculates the credential expire time in the cache.
-  static class CredentialExpireTimeCalculator<T> implements Expiry<T, Credential> {
+  static class CredentialExpireTimeCalculator<T> implements Expiry<T, Optional<Credential>> {
 
     private double credentialCacheExpireRatio;
 
@@ -47,8 +47,13 @@ public class CredentialCache<T> implements Closeable {
 
     // Set expire time after add a credential in the cache.
     @Override
-    public long expireAfterCreate(T key, Credential credential, long currentTime) {
-      long credentialExpireTime = credential.expireTimeInMs();
+    public long expireAfterCreate(T key, Optional<Credential> credential, long currentTime) {
+      // Do not cache the absence of a credential, expire it immediately.
+      if (!credential.isPresent()) {
+        return 0;
+      }
+
+      long credentialExpireTime = credential.get().expireTimeInMs();
       long timeToExpire = credentialExpireTime - System.currentTimeMillis();
       if (timeToExpire <= 0) {
         return 0;
@@ -60,18 +65,20 @@ public class CredentialCache<T> implements Closeable {
 
     // Not change expire time after update credential, this should not happen.
     @Override
-    public long expireAfterUpdate(T key, Credential value, long currentTime, long currentDuration) {
+    public long expireAfterUpdate(
+        T key, Optional<Credential> value, long currentTime, long currentDuration) {
       return currentDuration;
     }
 
     // Not change expire time after read credential.
     @Override
-    public long expireAfterRead(T key, Credential value, long currentTime, long currentDuration) {
+    public long expireAfterRead(
+        T key, Optional<Credential> value, long currentTime, long currentDuration) {
       return currentDuration;
     }
   }
 
-  private Cache<T, Credential> credentialCache;
+  private Cache<T, Optional<Credential>> credentialCache;
 
   public void initialize(Map<String, String> catalogProperties) {
     CredentialConfig credentialConfig = new CredentialConfig(catalogProperties);
@@ -90,9 +97,9 @@ public class CredentialCache<T> implements Closeable {
 
   public Optional<Credential> getCredential(
       T cacheKey, Function<T, Optional<Credential>> credentialSupplier) {
-    Credential credential =
-        credentialCache.get(cacheKey, key -> credentialSupplier.apply(cacheKey).orElse(null));
-    return Optional.ofNullable(credential);
+    // Store a non-null Optional in the cache so the Caffeine mapping function never returns null,
+    // keeping Cache#get atomic while supporting the "no credential available" case.
+    return credentialCache.get(cacheKey, key -> credentialSupplier.apply(cacheKey));
   }
 
   @Override

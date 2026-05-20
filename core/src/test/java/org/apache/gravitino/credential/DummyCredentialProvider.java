@@ -50,7 +50,7 @@ public class DummyCredentialProvider implements CredentialProvider {
   }
 
   @Override
-  public Optional<Credential> getCredential(CredentialContext context) {
+  public Optional<Credential> getCredentialOptional(CredentialContext context) {
     Preconditions.checkArgument(
         context instanceof PathBasedCredentialContext
             || context instanceof CatalogCredentialContext,
