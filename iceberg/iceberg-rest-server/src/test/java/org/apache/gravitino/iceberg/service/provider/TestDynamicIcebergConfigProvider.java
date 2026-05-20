@@ -265,13 +265,13 @@ public class TestDynamicIcebergConfigProvider {
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
     Mockito.when(mockCatalog.properties())
         .thenReturn(
-            new HashMap<String, String>() {
-              {
-                put(IcebergConstants.CATALOG_BACKEND, "jdbc");
-                put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
-                put(IcebergConstants.URI, "jdbc:sqlite::memory:");
-              }
-            });
+            Map.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "jdbc",
+                IcebergConstants.CATALOG_BACKEND_NAME,
+                catalogName,
+                IcebergConstants.URI,
+                "jdbc:sqlite::memory:"));
 
     Map<String, String> properties = new HashMap<>();
     properties.put(IcebergConstants.GRAVITINO_URI, "http://localhost:8090");
