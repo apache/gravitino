@@ -22,9 +22,9 @@ import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
-import org.apache.gravitino.storage.relational.mapper.IdpUserMetaMapper;
-import org.apache.gravitino.storage.relational.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
+import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.service.IdpUserMetaService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -57,14 +57,8 @@ public class IdpBasicUserMetaProvider implements IdpUserMetaService<IdpUserPO> {
 
   @Override
   public List<String> listGroupNames(String userName) {
-    Optional<IdpUserPO> user = findUser(userName);
-    if (!user.isPresent()) {
-      return Collections.emptyList();
-    }
-
     return SessionUtils.getWithoutCommit(
-        IdpGroupUserRelMapper.class,
-        mapper -> mapper.selectGroupNamesByUserId(user.get().getUserId()));
+        IdpUserGroupRelMapper.class, mapper -> mapper.selectGroupNamesByUsername(userName));
   }
 
   @Override
@@ -77,13 +71,7 @@ public class IdpBasicUserMetaProvider implements IdpUserMetaService<IdpUserPO> {
     Integer updated =
         SessionUtils.doWithCommitAndFetchResult(
             IdpUserMetaMapper.class,
-            mapper ->
-                mapper.updateIdpUserPassword(
-                    userPO.getUserId(),
-                    passwordHash,
-                    userPO.getCurrentVersion(),
-                    nextVersion,
-                    nextVersion));
+            mapper -> mapper.updateIdpUserPassword(userPO.getUserId(), passwordHash));
     Preconditions.checkState(
         updated == 1, "Failed to update password for user %s", userPO.getUserName());
   }
@@ -93,12 +81,11 @@ public class IdpBasicUserMetaProvider implements IdpUserMetaService<IdpUserPO> {
     SessionUtils.doMultipleWithCommit(
         () ->
             SessionUtils.doWithoutCommit(
-                IdpUserMetaMapper.class,
-                mapper -> mapper.softDeleteIdpUser(userPO.getUserId(), deletedAt)),
+                IdpUserMetaMapper.class, mapper -> mapper.softDeleteIdpUser(userPO.getUserId())),
         () ->
             SessionUtils.doWithoutCommit(
-                IdpGroupUserRelMapper.class,
-                mapper -> mapper.softDeleteGroupUsersByUserId(userPO.getUserId(), deletedAt)));
+                IdpUserGroupRelMapper.class,
+                mapper -> mapper.softDeleteRelationsByUsername(userPO.getUserName())));
     return true;
   }
 
@@ -116,9 +103,9 @@ public class IdpBasicUserMetaProvider implements IdpUserMetaService<IdpUserPO> {
         () ->
             userGroupRelDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
-                    IdpGroupUserRelMapper.class,
+                    IdpUserGroupRelMapper.class,
                     mapper ->
-                        mapper.deleteIdpGroupUserRelMetasByLegacyTimeline(legacyTimeline, limit)));
+                        mapper.deleteIdpUserGroupRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return userDeletedCount[0] + userGroupRelDeletedCount[0];
   }

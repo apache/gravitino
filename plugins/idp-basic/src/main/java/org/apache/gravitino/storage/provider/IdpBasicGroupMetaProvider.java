@@ -21,16 +21,20 @@ package org.apache.gravitino.storage.provider;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import org.apache.gravitino.storage.relational.mapper.IdpGroupMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.IdpGroupUserRelMapper;
-import org.apache.gravitino.storage.relational.po.IdpGroupPO;
-import org.apache.gravitino.storage.relational.po.IdpGroupUserRelPO;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
+import org.apache.gravitino.idp.storage.po.IdpGroupPO;
+import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
+import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.service.IdpGroupMetaService;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /** The provider class for group metadata. It provides the basic database operations for group. */
 public class IdpBasicGroupMetaProvider
-    implements IdpGroupMetaService<IdpGroupPO, IdpGroupUserRelPO> {
+    implements IdpGroupMetaService<IdpGroupPO, IdpUserGroupRelPO> {
   private static final IdpBasicGroupMetaProvider INSTANCE = new IdpBasicGroupMetaProvider();
 
   public static IdpBasicGroupMetaProvider getInstance() {
@@ -48,14 +52,8 @@ public class IdpBasicGroupMetaProvider
 
   @Override
   public List<String> listUserNames(String groupName) {
-    Optional<IdpGroupPO> group = findGroup(groupName);
-    if (!group.isPresent()) {
-      return Collections.emptyList();
-    }
-
     return SessionUtils.getWithoutCommit(
-        IdpGroupUserRelMapper.class,
-        mapper -> mapper.selectUserNamesByGroupId(group.get().getGroupId()));
+        IdpUserGroupRelMapper.class, mapper -> mapper.selectUsernamesByGroupName(groupName));
   }
 
   @Override
@@ -69,27 +67,60 @@ public class IdpBasicGroupMetaProvider
         () ->
             SessionUtils.doWithoutCommit(
                 IdpGroupMetaMapper.class,
-                mapper -> mapper.softDeleteIdpGroup(groupPO.getGroupId(), deletedAt)),
+                mapper -> mapper.softDeleteIdpGroup(groupPO.getGroupId())),
         () ->
             SessionUtils.doWithoutCommit(
-                IdpGroupUserRelMapper.class,
-                mapper -> mapper.softDeleteGroupUsersByGroupId(groupPO.getGroupId(), deletedAt)));
+                IdpUserGroupRelMapper.class,
+                mapper -> mapper.softDeleteRelationsByGroupName(groupPO.getGroupName())));
     return true;
   }
 
   @Override
   public List<Long> selectRelatedUserIds(Long groupId, List<Long> userIds) {
+    if (userIds.isEmpty()) {
+      return Collections.emptyList();
+    }
+
     return SessionUtils.getWithoutCommit(
-        IdpGroupUserRelMapper.class, mapper -> mapper.selectRelatedUserIds(groupId, userIds));
+        IdpGroupMetaMapper.class,
+        groupMapper -> {
+          IdpGroupPO group =
+              groupMapper.selectIdpGroups(Collections.emptyList()).stream()
+                  .filter(groupPO -> groupId.equals(groupPO.getGroupId()))
+                  .findFirst()
+                  .orElse(null);
+          if (group == null) {
+            return Collections.emptyList();
+          }
+
+          Set<String> memberUsernames =
+              SessionUtils.getWithoutCommit(
+                      IdpUserGroupRelMapper.class,
+                      relMapper -> relMapper.selectUsernamesByGroupName(group.getGroupName()))
+                  .stream()
+                  .collect(Collectors.toSet());
+          if (memberUsernames.isEmpty()) {
+            return Collections.emptyList();
+          }
+
+          Set<Long> candidateUserIds = Set.copyOf(userIds);
+          return SessionUtils.getWithoutCommit(
+                  IdpUserMetaMapper.class,
+                  userMapper -> userMapper.selectIdpUsers(List.copyOf(memberUsernames)))
+              .stream()
+              .map(IdpUserPO::getUserId)
+              .filter(candidateUserIds::contains)
+              .collect(Collectors.toList());
+        });
   }
 
   @Override
-  public void addUsersToGroup(List<IdpGroupUserRelPO> relations) {
+  public void addUsersToGroup(List<IdpUserGroupRelPO> relations) {
     if (relations.isEmpty()) {
       return;
     }
     SessionUtils.doWithCommit(
-        IdpGroupUserRelMapper.class, mapper -> mapper.batchInsertIdpGroupUsers(relations));
+        IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
   }
 
   @Override
@@ -99,8 +130,34 @@ public class IdpBasicGroupMetaProvider
     }
 
     SessionUtils.doWithCommit(
-        IdpGroupUserRelMapper.class,
-        mapper -> mapper.softDeleteIdpGroupUsers(groupId, userIds, deletedAt));
+        IdpGroupMetaMapper.class,
+        groupMapper -> {
+          IdpGroupPO group =
+              groupMapper.selectIdpGroups(Collections.emptyList()).stream()
+                  .filter(groupPO -> groupId.equals(groupPO.getGroupId()))
+                  .findFirst()
+                  .orElse(null);
+          if (group == null) {
+            return;
+          }
+
+          Set<Long> userIdsToRemove = Set.copyOf(userIds);
+          List<String> usernames =
+              SessionUtils.getWithoutCommit(
+                      IdpUserMetaMapper.class,
+                      userMapper -> userMapper.selectIdpUsers(Collections.emptyList()))
+                  .stream()
+                  .filter(user -> userIdsToRemove.contains(user.getUserId()))
+                  .map(IdpUserPO::getUserName)
+                  .collect(Collectors.toList());
+          if (usernames.isEmpty()) {
+            return;
+          }
+
+          SessionUtils.doWithoutCommit(
+              IdpUserGroupRelMapper.class,
+              relMapper -> relMapper.softDeleteRelations(group.getGroupName(), usernames));
+        });
   }
 
   @Override
@@ -117,9 +174,9 @@ public class IdpBasicGroupMetaProvider
         () ->
             groupUserRelDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
-                    IdpGroupUserRelMapper.class,
+                    IdpUserGroupRelMapper.class,
                     mapper ->
-                        mapper.deleteIdpGroupUserRelMetasByLegacyTimeline(legacyTimeline, limit)));
+                        mapper.deleteIdpUserGroupRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return groupDeletedCount[0] + groupUserRelDeletedCount[0];
   }
