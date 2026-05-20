@@ -178,6 +178,43 @@ public class TestPaimonViewCatalogOps {
   }
 
   @Test
+  public void testReplaceViewCreateFailureAfterDropLeavesViewDropped() throws Exception {
+    NameIdentifier replaceIdentifier =
+        NameIdentifier.of(Namespace.of(DATABASE), VIEW + "_replace_create_failure");
+    createView(replaceIdentifier);
+
+    NameIdentifier paimonReplaceIdentifier = buildPaimonNameIdentifier(replaceIdentifier);
+    paimonCatalogOps.failCreateViewWithDatabaseNotExist(
+        paimonReplaceIdentifier.toString(), DATABASE);
+
+    try {
+      IllegalArgumentException exception =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  paimonViewCatalogOps.alterView(
+                      replaceIdentifier,
+                      ViewChange.replaceView(
+                          new Column[] {Column.of("col_2", Types.IntegerType.get(), "col_2")},
+                          new Representation[] {
+                            SQLRepresentation.builder()
+                                .withDialect("query")
+                                .withSql("SELECT col_2 FROM source_table")
+                                .build()
+                          },
+                          "paimon",
+                          DATABASE,
+                          "replaced_view_comment")));
+
+      assertTrue(exception.getMessage().contains(DATABASE));
+    } finally {
+      paimonCatalogOps.clearFailCreateView();
+    }
+
+    assertThrows(NoSuchViewException.class, () -> paimonViewCatalogOps.loadView(replaceIdentifier));
+  }
+
+  @Test
   public void testListAndDropViewOperations() throws Exception {
     NameIdentifier firstIdentifier = NameIdentifier.of(Namespace.of(DATABASE), VIEW + "_list_1");
     NameIdentifier secondIdentifier = NameIdentifier.of(Namespace.of(DATABASE), VIEW + "_list_2");
@@ -434,6 +471,8 @@ public class TestPaimonViewCatalogOps {
   private static class TestablePaimonCatalogOps extends PaimonCatalogOps {
 
     private String failLoadViewName;
+    private String failCreateViewName;
+    private String failCreateViewDatabaseName;
 
     TestablePaimonCatalogOps(PaimonConfig paimonConfig) {
       super(paimonConfig);
@@ -453,6 +492,26 @@ public class TestPaimonViewCatalogOps {
 
     void clearFailLoadView() {
       this.failLoadViewName = null;
+    }
+
+    void failCreateViewWithDatabaseNotExist(String viewName, String databaseName) {
+      this.failCreateViewName = viewName;
+      this.failCreateViewDatabaseName = databaseName;
+    }
+
+    void clearFailCreateView() {
+      this.failCreateViewName = null;
+      this.failCreateViewDatabaseName = null;
+    }
+
+    @Override
+    public void createView(String viewName, org.apache.paimon.view.View view)
+        throws Catalog.ViewAlreadyExistException, Catalog.DatabaseNotExistException {
+      if (failCreateViewName != null && failCreateViewName.equals(viewName)) {
+        throw new Catalog.DatabaseNotExistException(failCreateViewDatabaseName);
+      }
+
+      super.createView(viewName, view);
     }
 
     @Override

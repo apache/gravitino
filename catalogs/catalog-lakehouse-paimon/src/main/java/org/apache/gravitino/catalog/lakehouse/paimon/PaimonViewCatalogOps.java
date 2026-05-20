@@ -134,7 +134,6 @@ final class PaimonViewCatalogOps {
       throw new ViewAlreadyExistsException(e, VIEW_ALREADY_EXISTS_EXCEPTION, identifier);
     }
 
-    LOG.info("Created Paimon view {}.", identifier);
     return PaimonView.fromPaimonView(paimonView);
   }
 
@@ -180,11 +179,9 @@ final class PaimonViewCatalogOps {
       NameIdentifier viewIdentifier = paimonIdentifierBuilder.apply(identifier);
       paimonCatalogOps.dropView(viewIdentifier.toString());
     } catch (Catalog.ViewNotExistException e) {
-      LOG.warn("Paimon view {} does not exist.", identifier);
       return false;
     }
 
-    LOG.info("Dropped Paimon view {}.", identifier);
     return true;
   }
 
@@ -248,26 +245,34 @@ final class PaimonViewCatalogOps {
     NameIdentifier sourceIdentifier = paimonIdentifierBuilder.apply(identifier);
 
     try {
-      LOG.warn(
-          "Replacing Paimon view {} is non-atomic (drop-then-create). If create fails after drop, "
-              + "the original view is permanently lost.",
-          identifier);
       // Paimon does not provide a native replace-view API. To align with Paimon Spark's
       // CREATE OR REPLACE VIEW behavior, replace is executed as drop-then-create.
-      // WARNING: This path is intentionally non-atomic: if create fails after drop,
-      // the original view remains dropped and no rollback is attempted.
       paimonCatalogOps.dropView(sourceIdentifier.toString());
-      paimonCatalogOps.createView(sourceIdentifier.toString(), paimonView);
-      return loadView(identifier);
     } catch (Catalog.ViewNotExistException e) {
       throw new NoSuchViewException(e, NO_SUCH_VIEW_EXCEPTION, identifier);
+    }
+
+    try {
+      paimonCatalogOps.createView(sourceIdentifier.toString(), paimonView);
     } catch (Catalog.ViewAlreadyExistException e) {
+      LOG.warn(
+          "Replacing Paimon view {} is non-atomic (drop-then-create). "
+              + "Create failed after drop and the original view may be lost.",
+          identifier,
+          e);
       throw new IllegalArgumentException(
           String.format(VIEW_ALREADY_EXISTS_EXCEPTION, identifier), e);
     } catch (Catalog.DatabaseNotExistException e) {
+      LOG.warn(
+          "Replacing Paimon view {} is non-atomic (drop-then-create). "
+              + "Create failed after drop and the original view may be lost.",
+          identifier,
+          e);
       throw new IllegalArgumentException(
           String.format(NO_SUCH_SCHEMA_EXCEPTION, identifier.namespace()), e);
     }
+
+    return loadView(identifier);
   }
 
   private View alterViewWithoutReplace(NameIdentifier identifier, ViewChange... changes)
