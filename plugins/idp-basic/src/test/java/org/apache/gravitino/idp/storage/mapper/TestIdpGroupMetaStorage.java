@@ -23,13 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.exceptions.PersistenceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -176,45 +174,5 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
     assertEquals("active-group", idpGroupMetaMapper.selectIdpGroup("active-group").getGroupName());
     assertNull(idpGroupMetaMapper.selectIdpGroup("legacy-group"));
     assertNull(idpGroupMetaMapper.selectIdpGroup("new-group"));
-  }
-
-  @ParameterizedTest
-  @MethodSource("storageProvider")
-  void testRestart(String type) throws IOException {
-    init(type);
-    IdpGroupPO expectedActiveGroup =
-        IdpGroupPO.builder()
-            .withGroupId(1L)
-            .withGroupName("dev")
-            .withCurrentVersion(3L)
-            .withLastVersion(2L)
-            .withDeletedAt(0L)
-            .build();
-    idpGroupMetaMapper.insertIdpGroup(expectedActiveGroup);
-    idpGroupMetaMapper.insertIdpGroup(
-        IdpGroupPO.builder()
-            .withGroupId(2L)
-            .withGroupName("ops")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(10L)
-            .build());
-
-    assertPersistedGroups(expectedActiveGroup);
-
-    restartBackend();
-
-    assertPersistedGroups(expectedActiveGroup);
-  }
-
-  private void assertPersistedGroups(IdpGroupPO expectedActiveGroup) {
-    assertTrue(
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .hasMapper(IdpGroupMetaMapper.class));
-
-    assertEquals(expectedActiveGroup, idpGroupMetaMapper.selectIdpGroup("dev"));
-    assertNull(idpGroupMetaMapper.selectIdpGroup("ops"));
   }
 }

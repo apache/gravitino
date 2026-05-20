@@ -85,15 +85,6 @@ abstract class AbstractIdpMetaStorageTest {
     initializeMappers();
   }
 
-  protected void restartBackend() throws IOException {
-    closeSession();
-    backend.close();
-    backend = new JDBCBackend();
-    backend.initialize(config);
-    sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-    initializeMappers();
-  }
-
   protected void closeSession() {
     if (sharedSession != null) {
       sharedSession.close();
@@ -101,7 +92,7 @@ abstract class AbstractIdpMetaStorageTest {
     }
   }
 
-  protected abstract void initializeMappers();
+  protected void initializeMappers() {}
 
   private Config createBackendConfig(String type) throws IOException {
     Config backendConfig = new Config(false) {};

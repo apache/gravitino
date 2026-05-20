@@ -35,9 +35,11 @@ public class TestIdpBasicMapperPackageProvider {
     MapperPackageProvider provider = new IdpBasicMapperPackageProvider();
     List<Class<?>> mapperClasses = provider.getMapperClasses();
 
-    assertEquals(2, mapperClasses.size());
+    assertEquals(3, mapperClasses.size());
     assertTrue(
-        mapperClasses.containsAll(List.of(IdpUserMetaMapper.class, IdpGroupMetaMapper.class)));
+        mapperClasses.containsAll(
+            List.of(
+                IdpUserMetaMapper.class, IdpGroupMetaMapper.class, IdpUserGroupRelMapper.class)));
   }
 
   @Test
