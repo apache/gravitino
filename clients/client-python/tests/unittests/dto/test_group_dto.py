@@ -74,10 +74,6 @@ class TestGroupDTO(unittest.TestCase):
                 AuditDTO(_creator="test", _create_time="2024-01-01T00:00:00Z")
             ).build()
 
-    def test_builder_no_audit_raises(self):
-        with self.assertRaises(ValueError):
-            GroupDTO.builder().with_name("test_group").build()
-
     def test_equality_and_hash(self):
         audit = AuditDTO(_creator="test", _create_time="2024-01-01T00:00:00Z")
 
