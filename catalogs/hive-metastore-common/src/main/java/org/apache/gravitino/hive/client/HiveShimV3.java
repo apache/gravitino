@@ -34,6 +34,7 @@ import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.Table;
 
@@ -51,6 +52,7 @@ class HiveShimV3 extends HiveShimV2 {
   private final Method alterTableMethod;
   private final Method dropTableMethod;
   private final Method getAllTablesMethod;
+  private final Method getTablesByTypeMethod;
   private final Method listTableNamesByFilterMethod;
   private final Method listPartitionNamesMethod;
   private final Method listPartitionsMethod;
@@ -110,6 +112,9 @@ class HiveShimV3 extends HiveShimV2 {
               "dropTable", String.class, String.class, String.class, boolean.class, boolean.class);
       this.getAllTablesMethod =
           IMetaStoreClient.class.getMethod("getAllTables", String.class, String.class);
+      this.getTablesByTypeMethod =
+          IMetaStoreClient.class.getMethod(
+              "getTables", String.class, String.class, String.class, TableType.class);
       this.listTableNamesByFilterMethod =
           IMetaStoreClient.class.getMethod(
               "listTableNamesByFilter", String.class, String.class, String.class, int.class);
@@ -240,6 +245,21 @@ class HiveShimV3 extends HiveShimV2 {
             getAllTablesMethod,
             catalogName,
             databaseName);
+  }
+
+  @Override
+  public List<String> listTablesByType(
+      String catalogName, String databaseName, String tablePattern, String tableType) {
+    TableType hiveTableType = TableType.valueOf(tableType);
+    return (List<String>)
+        invoke(
+            ExceptionTarget.schema(databaseName),
+            client,
+            getTablesByTypeMethod,
+            catalogName,
+            databaseName,
+            tablePattern,
+            hiveTableType);
   }
 
   @Override

@@ -29,9 +29,10 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
-  // Force libthrift upgrade from the outdated 0.9.3 pulled by Hive Metastore transitive deps
+  // Force upgrades for outdated transitive dependencies pulled by Hive Metastore
   constraints {
     implementation(libs.thrift)
+    implementation(libs.snappy.java)
   }
 
   implementation(libs.hadoop3.common) {
