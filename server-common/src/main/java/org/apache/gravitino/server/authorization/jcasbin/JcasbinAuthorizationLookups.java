@@ -23,6 +23,7 @@ import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
@@ -65,15 +66,32 @@ public class JcasbinAuthorizationLookups {
   /**
    * Two-tier name→id lookup: the per-request map in {@code requestContext} dedups calls within the
    * same HTTP request; on a miss, the long-lived {@code metadataIdCache} is consulted, and finally
-   * we fall back to a DB query via {@link MetadataIdConverter#getID}.
+   * we fall back to a DB query via {@link MetadataIdConverter#getID}. Returns {@link
+   * Optional#empty()} when the metadata object does not exist so callers can deny authorization; a
+   * missing object is never cached as a negative result.
    */
-  public Long resolveMetadataId(
+  public Optional<Long> resolveMetadataId(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
     String cacheKey = buildCacheKey(metalake, metadataObject);
-    return requestContext.computeMetadataIdIfAbsent(
-        cacheKey,
-        k ->
-            metadataIdCache.get(k, ignored -> MetadataIdConverter.getID(metadataObject, metalake)));
+    try {
+      // Both cache tiers load atomically and forbid caching null, so a missing object is signalled
+      // by throwing through the loaders and translated back to Optional.empty() here. This caches
+      // only positive results, never a negative one.
+      return Optional.of(
+          requestContext.computeMetadataIdIfAbsent(
+              cacheKey,
+              k -> metadataIdCache.get(k, ignored -> loadMetadataId(metadataObject, metalake))));
+    } catch (NoSuchMetadataObjectException e) {
+      return Optional.empty();
+    }
+  }
+
+  private static Long loadMetadataId(MetadataObject metadataObject, String metalake) {
+    return MetadataIdConverter.getID(metadataObject, metalake)
+        .orElseThrow(
+            () ->
+                new NoSuchMetadataObjectException(
+                    "Metadata object %s does not exist", metadataObject.fullName()));
   }
 
   /**

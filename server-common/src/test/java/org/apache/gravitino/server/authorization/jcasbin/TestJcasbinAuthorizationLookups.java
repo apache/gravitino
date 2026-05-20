@@ -130,8 +130,10 @@ public class TestJcasbinAuthorizationLookups {
         new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
     AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
 
-    Assertions.assertEquals(100L, lookups.resolveMetadataId(table, "ml1", requestContext));
-    Assertions.assertEquals(100L, lookups.resolveMetadataId(table, "ml1", requestContext));
+    Assertions.assertEquals(
+        Optional.of(100L), lookups.resolveMetadataId(table, "ml1", requestContext));
+    Assertions.assertEquals(
+        Optional.of(100L), lookups.resolveMetadataId(table, "ml1", requestContext));
 
     Assertions.assertEquals(1, metadataIdCache.getCount);
     Assertions.assertEquals(0, metadataIdCache.getIfPresentCount);
