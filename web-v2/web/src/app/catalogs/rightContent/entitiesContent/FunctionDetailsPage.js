@@ -191,6 +191,7 @@ export default function FunctionDetailsPage() {
   const functionData = store.activatedDetails
   const [activeDefinitionKeys, setActiveDefinitionKeys] = useState([])
   const [activeTab, setActiveTab] = useState('Definitions')
+  const hasFunctionRoleContext = Boolean(currentMetalake && catalog && schema && functionName)
 
   useEffect(() => {
     setActiveDefinitionKeys([])
@@ -293,7 +294,7 @@ export default function FunctionDetailsPage() {
                   onChange={keys => setActiveDefinitionKeys(Array.isArray(keys) ? keys : [keys])}
                 />
               ))}
-            {anthEnable && activeTab === 'Associated Roles' && functionName && (
+            {anthEnable && activeTab === 'Associated Roles' && hasFunctionRoleContext && (
               <AssociatedTable
                 metalake={currentMetalake}
                 metadataObjectType={'function'}
