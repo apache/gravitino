@@ -227,6 +227,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       MetadataObject metadataObject,
       AuthorizationRequestContext requestContext) {
     boolean result = false;
+    // The metadataObject is resolved from an OGNL variable (e.g. SCHEMA, CATALOG) bound from the
+    // request context when the authorization expression is evaluated. It can be null when the
+    // expression references a metadata-object type that is not present for the current request,
+    // so we treat a missing object as "not the owner".
     if (metadataObject == null) {
       return false;
     }
