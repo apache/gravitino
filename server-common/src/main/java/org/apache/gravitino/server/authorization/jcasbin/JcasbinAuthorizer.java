@@ -67,6 +67,7 @@ import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.casbin.jcasbin.main.Enforcer;
@@ -92,7 +93,9 @@ import org.slf4j.LoggerFactory;
  *       {@link #groupRoleCache}, {@link #loadedRoles}. Each cached entry carries the {@code
  *       *_meta.updated_at} value it was loaded against; every read issues a lightweight version
  *       probe and discards the entry if the DB sentinel has advanced. No TTL is relied on for
- *       correctness — {@code expireAfterAccess} only bounds memory.
+ *       correctness — TTL eviction only bounds memory. User/group role snapshots use write-based
+ *       TTLs through {@link CaffeineGravitinoCache}; loaded role policies use access-based TTLs
+ *       through {@link JcasbinLoadedRolesCache}.
  *   <li><b>Eventual-consistency caches</b> — {@link #metadataIdCache} and {@link #ownerRelCache}. A
  *       single background poller ({@link #changePoller}) drains {@code entity_change_log} and
  *       {@code owner_meta} change rows since a high-water-mark cursor and invalidates the affected
@@ -111,9 +114,6 @@ import org.slf4j.LoggerFactory;
 public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizer.class);
-
-  /** Key separator for hierarchical cache keys. */
-  static final String KEY_SEP = "::";
 
   /**
    * {@code subjectType} literal column value returned by {@link
@@ -142,14 +142,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   // ---- Version-validated caches (strong consistency) ----
 
   /**
-   * userRoleCache: metalake::userName -> CachedUserRoles. Version-validated per request via
+   * userRoleCache: per-(metalake, userName) -> CachedUserRoles. Version-validated per request via
    * user_meta.updated_at.
    */
   private GravitinoCache<String, CachedUserRoles> userRoleCache;
 
   /**
-   * groupRoleCache: metalake::groupName -> CachedGroupRoles. Version-validated per request via
-   * group_meta.updated_at.
+   * groupRoleCache: per-(metalake, groupName) -> CachedGroupRoles. Version-validated per request
+   * via group_meta.updated_at.
    */
   private GravitinoCache<String, CachedGroupRoles> groupRoleCache;
 
@@ -160,10 +160,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   // ---- Eventual consistency caches (poller-driven) ----
 
-  /**
-   * Path-based key {@code metalake::catalog::schema::object::TYPE} -> entity id. Evicted by entity
-   * change poller.
-   */
+  /** Path-based metadata object key -> entity id. Evicted by entity change poller. */
   private GravitinoCache<String, Long> metadataIdCache;
 
   /** ownerRelCache: metadataObjectId -> Optional(owner). Evicted by owner change poller. */
@@ -302,22 +299,29 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake,
       MetadataObject metadataObject,
       AuthorizationRequestContext requestContext) {
-    boolean result;
-    try {
-      Long metadataId = lookups.resolveMetadataId(metadataObject, metalake, requestContext);
-      Optional<UserUpdatedAt> userInfoOpt =
-          loadUserInfo(metalake, principal.getName(), requestContext);
-      if (!userInfoOpt.isPresent()) {
-        result = false;
-      } else {
-        Optional<OwnerInfo> owner =
-            lookups.resolveOwnerId(metadataId, metadataObject.type(), requestContext);
-        result = ownerMatchesUserOrGroups(owner, userInfoOpt.get().getUserId(), metalake);
-      }
-    } catch (Exception e) {
-      LOG.debug("Can not get entity id", e);
-      result = false;
+    boolean result = false;
+    // The metadataObject is resolved from an OGNL variable (e.g. SCHEMA, CATALOG) bound from the
+    // request context when the authorization expression is evaluated. It can be null when the
+    // expression references a metadata-object type that is not present for the current request,
+    // so we treat a missing object as "not the owner".
+    if (metadataObject == null) {
+      return false;
     }
+
+    if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
+      // We support hierarchical schema, so a schema may have ancestor schemas. The principal is
+      // treated as the owner if it owns the schema itself or any of its ancestor schemas, hence we
+      // walk the whole inheritance chain here.
+      for (MetadataObject scopeObject : buildSchemaInheritanceChain(metadataObject)) {
+        if (isOwnerOfObject(scopeObject, principal, metalake, requestContext)) {
+          result = true;
+          break;
+        }
+      }
+    } else {
+      result = isOwnerOfObject(metadataObject, principal, metalake, requestContext);
+    }
+
     LOG.debug(
         "Authorization expression: {},privilege {},owner result {}\n,principal {},metalake {},metadata object {}",
         requestContext.getOriginalAuthorizationExpression(),
@@ -327,6 +331,25 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         metalake,
         metadataObject);
     return result;
+  }
+
+  /**
+   * Resolves the owner of a single metadata object via the cache-backed lookups and checks whether
+   * the given principal (directly or through one of its groups) is that owner. A missing object is
+   * treated as "not the owner".
+   */
+  private boolean isOwnerOfObject(
+      MetadataObject metadataObject,
+      Principal principal,
+      String metalake,
+      AuthorizationRequestContext requestContext) {
+    Optional<Long> metadataId = lookups.resolveMetadataId(metadataObject, metalake, requestContext);
+    if (!metadataId.isPresent()) {
+      return false;
+    }
+    Optional<OwnerInfo> owner =
+        lookups.resolveOwnerId(metadataId.get(), metadataObject.type(), requestContext);
+    return ownerMatchesUserOrGroups(owner, principal, metalake, requestContext);
   }
 
   @Override
@@ -356,9 +379,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return Objects.equals(nameIdentifier.name(), currentUserName);
     } else if (Entity.EntityType.ROLE == type) {
       try {
-        Long roleId =
+        Optional<Long> roleId =
             MetadataIdConverter.getID(
                 NameIdentifierUtil.toMetadataObject(nameIdentifier, type), metalake);
+        if (!roleId.isPresent()) {
+          return false;
+        }
+        long resolvedRoleId = roleId.get();
 
         // Route through the same version-validated caches that authorize() / isOwner() use, so
         // the role list comes from userRoleCache / groupRoleCache instead of an extra direct
@@ -378,14 +405,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
         // Direct user-role assignments via the version-validated cache.
         List<Long> directRoleIds = loadUserRoles(metalake, currentUserName, userId, userInfo);
-        if (directRoleIds.contains(roleId)) {
+        if (directRoleIds.contains(resolvedRoleId)) {
           return true;
         }
 
         // Group-inherited assignments via the same cache path used by loadRolePrivilege.
         for (String groupname : currentPrincipalGroupNames()) {
           List<Long> groupRoleIds = loadGroupRoles(metalake, groupname, userId, ctx);
-          if (groupRoleIds.contains(roleId)) {
+          if (groupRoleIds.contains(resolvedRoleId)) {
             return true;
           }
         }
@@ -509,10 +536,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
     // Owner mutations may happen after drop/recreate with the same name. Invalidate the
     // name->id mapping as well to prevent using a stale metadataId from metadataIdCache.
-    metadataIdCache.invalidate(JcasbinAuthorizationLookups.buildCacheKey(metalake, metadataObject));
+    metadataIdCache.invalidate(
+        JcasbinAuthorizationCacheKeys.metadataObjectKey(metalake, metadataObject));
     try {
-      Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
-      ownerRelCache.invalidate(metadataId);
+      MetadataIdConverter.getID(metadataObject, metalake).ifPresent(ownerRelCache::invalidate);
     } catch (RuntimeException e) {
       LOG.warn("Failed to resolve metadata id for owner cache invalidation: {}", metadataObject, e);
     }
@@ -522,9 +549,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void handleEntityNameIdMappingChange(
       String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
-    String cacheKey = JcasbinAuthorizationLookups.buildCacheKey(metalake, metadataObject);
-    if (JcasbinAuthorizationLookups.isContainerType(metadataObject.type())) {
-      // Prefix invalidation: metalake::catalog:: removes catalog + all children.
+    String cacheKey = JcasbinAuthorizationCacheKeys.metadataObjectKey(metalake, metadataObject);
+    if (JcasbinAuthorizationCacheKeys.isMetadataContainer(metadataObject.type())) {
+      // Prefix invalidation removes a container and all children under the same name path.
       metadataIdCache.invalidateByPrefix(cacheKey);
     } else {
       metadataIdCache.invalidate(cacheKey);
@@ -553,6 +580,28 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
   }
 
+  /**
+   * Builds the logical schema inheritance chain for a SCHEMA MetadataObject, ordered from the
+   * outermost ancestor to the schema itself. For a schema object whose parent is {@code catalog}
+   * and whose name is {@code "A:B:C"}, this returns MetadataObjects for parent {@code catalog} with
+   * schema names {@code A}, {@code A:B}, and {@code A:B:C} in that order so that an ancestor-level
+   * privilege grant short-circuits the authorization check before descending into more specific
+   * scopes.
+   *
+   * <p>For flat (non-HierarchicalSchema) schemas the list contains only the original object.
+   */
+  private List<MetadataObject> buildSchemaInheritanceChain(MetadataObject schemaObject) {
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+
+    List<String> scopes = HierarchicalSchemaUtil.allScopes(schemaObject.name(), separator);
+    List<MetadataObject> chain = new ArrayList<>(scopes.size());
+    for (int i = scopes.size() - 1; i >= 0; i--) {
+      chain.add(
+          MetadataObjects.of(schemaObject.parent(), scopes.get(i), MetadataObject.Type.SCHEMA));
+    }
+    return ImmutableList.copyOf(chain);
+  }
+
   // ---------------------------------------------------------------------------
   //  Internal authorizer
   // ---------------------------------------------------------------------------
@@ -571,7 +620,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         MetadataObject metadataObject,
         String privilege,
         AuthorizationRequestContext requestContext) {
-      Long metadataId;
+      return loadPrivilegeAndAuthorize(
+          username, metalake, metadataObject, privilege, requestContext);
+    }
+
+    private boolean loadPrivilegeAndAuthorize(
+        String username,
+        String metalake,
+        MetadataObject metadataObject,
+        String privilege,
+        AuthorizationRequestContext requestContext) {
       long userId;
       UserUpdatedAt userInfo;
       try {
@@ -587,9 +645,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         }
         userInfo = userInfoOpt.get();
         userId = userInfo.getUserId();
-
-        // Step 2: resolve metadata name → id via metadataIdCache (cache hit when warm)
-        metadataId = lookups.resolveMetadataId(metadataObject, metalake, requestContext);
       } catch (Exception e) {
         LOG.debug("Can not get entity id", e);
         return false;
@@ -598,13 +653,63 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       // Steps 1b→3: version-validated role loading — pass userInfo to avoid re-query
       loadRolePrivilege(metalake, username, userId, userInfo, requestContext);
 
-      // Step 4: JCasbin enforce (pure in-memory)
+      // For requests such as CREATE SCHEMA, the metadata object may be null. This method
+      // performs object-scoped authorization, so without a metadata object it cannot evaluate
+      // the request and must deny authorization here.
+      if (metadataObject == null) {
+        return false;
+      }
+      // For SCHEMA objects with hierarchical schema names (for example, parent=catalog and
+      // name="A:B:C"), walk the logical parent chain from the outermost ancestor down to the
+      // schema itself so that a privilege granted on an ancestor schema short-circuits the check
+      // before descending into more specific scopes.
+      if (metadataObject.type() == MetadataObject.Type.SCHEMA) {
+        for (MetadataObject scopeObject : buildSchemaInheritanceChain(metadataObject)) {
+          if (authorizeObject(userId, metalake, scopeObject, privilege, requestContext)) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      return authorizeObject(userId, metalake, metadataObject, privilege, requestContext);
+    }
+
+    /**
+     * Resolves the metadata id for a single object via the cache-backed lookups and delegates to
+     * {@link #authorizeByJcasbin}. A missing object is treated as "not authorized".
+     */
+    private boolean authorizeObject(
+        long userId,
+        String metalake,
+        MetadataObject metadataObject,
+        String privilege,
+        AuthorizationRequestContext requestContext) {
+      Optional<Long> metadataId =
+          lookups.resolveMetadataId(metadataObject, metalake, requestContext);
+      if (!metadataId.isPresent()) {
+        return false;
+      }
+      return authorizeByJcasbin(
+          userId, metalake, metadataObject, metadataId.get(), privilege, requestContext);
+    }
+
+    private boolean authorizeByJcasbin(
+        long userId,
+        String metalake,
+        MetadataObject metadataObject,
+        Long metadataId,
+        String privilege,
+        AuthorizationRequestContext requestContext) {
+      // Step 4: JCasbin enforce (pure in-memory) — except OWNER, which is resolved via the
+      // owner cache rather than g-rows.
       if (AuthConstants.OWNER.equals(privilege)) {
         // Cold-path: resolveOwnerId loads from DB when neither the per-request nor the shared
         // Caffeine cache has the entry, ensuring the first OWNER check doesn't spuriously deny.
         Optional<OwnerInfo> owner =
             lookups.resolveOwnerId(metadataId, metadataObject.type(), requestContext);
-        return ownerMatchesUserOrGroups(owner, userId, metalake);
+        return ownerMatchesUserOrGroups(
+            owner, PrincipalUtils.getCurrentPrincipal(), metalake, requestContext);
       }
       return enforcer.enforce(
           String.valueOf(userId),
@@ -624,7 +729,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Optional<UserUpdatedAt> loadUserInfo(
       String metalake, String username, AuthorizationRequestContext requestContext) {
-    String cacheKey = metalake + KEY_SEP + username;
+    String cacheKey = JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username);
     return requestContext.computeUserInfoIfAbsent(
         cacheKey,
         k ->
@@ -646,7 +751,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    *
    * <p>{@code computeXxxIfAbsent} is used to populate the caches so that an entry already cached
    * from a prior call in the same request is not overwritten — matching {@link #loadUserInfo}'s and
-   * {@link #loadGroupInfo}'s "first wins" dedup semantics.
+   * {@link #loadGroupInfo}'s "first wins" dedup semantics. Key formats must mirror those used by
+   * the single-subject loaders so the per-request caches are actually shared (see {@link
+   * JcasbinAuthorizationCacheKeys#userRoleKey} / {@link
+   * JcasbinAuthorizationCacheKeys#groupRoleKey}).
    */
   private Optional<UserUpdatedAt> prefetchUserAndGroupInfo(
       String metalake,
@@ -669,14 +777,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       }
     }
 
-    String userKey = metalake + KEY_SEP + username;
+    String userKey = JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username);
     final Optional<UserUpdatedAt> userValue = Optional.ofNullable(foundUser);
     Optional<UserUpdatedAt> userOpt =
         requestContext.computeUserInfoIfAbsent(userKey, k -> userValue);
 
     // Negative-cache absent groups too so loadGroupRoles can short-circuit without re-querying.
     for (String groupName : groupNames) {
-      String groupKey = metalake + KEY_SEP + groupName;
+      String groupKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupName);
       final Optional<GroupUpdatedAt> groupValue = Optional.ofNullable(foundGroups.get(groupName));
       requestContext.computeGroupInfoIfAbsent(groupKey, k -> groupValue);
     }
@@ -685,17 +793,23 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   /**
-   * Returns true when the cached owner type and ID match the current user or one of the user's
-   * groups.
+   * Returns true when the cached owner type and ID match the given principal or one of the
+   * principal's groups. The user id is resolved via the version-validated {@link #loadUserInfo}
+   * cache so back-to-back ownership checks in the same request do not re-query {@code user_meta}.
    */
   private boolean ownerMatchesUserOrGroups(
-      Optional<OwnerInfo> owner, long userId, String metalake) {
+      Optional<OwnerInfo> owner,
+      Principal principal,
+      String metalake,
+      AuthorizationRequestContext requestContext) {
     if (!owner.isPresent()) {
       return false;
     }
     OwnerInfo ownerInfo = owner.get();
     if (Entity.EntityType.USER.name().equalsIgnoreCase(ownerInfo.getOwnerType())) {
-      return ownerInfo.getOwnerId() == userId;
+      Optional<UserUpdatedAt> userInfo =
+          loadUserInfo(metalake, principal.getName(), requestContext);
+      return userInfo.isPresent() && userInfo.get().getUserId() == ownerInfo.getOwnerId();
     }
     if (!Entity.EntityType.GROUP.name().equalsIgnoreCase(ownerInfo.getOwnerType())) {
       return false;
@@ -762,7 +876,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private List<Long> loadUserRoles(
       String metalake, String username, long userId, UserUpdatedAt userInfo) {
-    String userCacheKey = metalake + KEY_SEP + username;
+    String userCacheKey = JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username);
     Optional<CachedUserRoles> cachedOpt = userRoleCache.getIfPresent(userCacheKey);
 
     if (cachedOpt.isPresent() && cachedOpt.get().getUpdatedAt() >= userInfo.getUpdatedAt()) {
@@ -788,7 +902,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    */
   private Optional<GroupUpdatedAt> loadGroupInfo(
       String metalake, String groupname, AuthorizationRequestContext requestContext) {
-    String cacheKey = metalake + KEY_SEP + groupname;
+    String cacheKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupname);
     return requestContext.computeGroupInfoIfAbsent(
         cacheKey,
         k ->
@@ -812,7 +926,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
     GroupUpdatedAt groupInfo = groupInfoOpt.get();
     long groupId = groupInfo.getGroupId();
-    String groupCacheKey = metalake + KEY_SEP + groupname;
+    String groupCacheKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupname);
     Optional<CachedGroupRoles> cachedOpt = groupRoleCache.getIfPresent(groupCacheKey);
 
     if (cachedOpt.isPresent() && cachedOpt.get().getUpdatedAt() >= groupInfo.getUpdatedAt()) {
@@ -850,8 +964,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /**
    * Resolves GroupEntity objects for the current principal's groups, skipping any that are stale or
-   * not found in the store. Used by both {@link #isSelf} (ROLE branch) and {@link
-   * #loadRolePrivilege} to discover group-inherited role assignments.
+   * not found in the store. Used by {@link #isSelf} (ROLE branch) and owner checks that need full
+   * group entities instead of only group names.
    */
   private List<GroupEntity> resolveCurrentUserGroups(String metalake, EntityStore entityStore) {
     Principal principal = PrincipalUtils.getCurrentPrincipal();
@@ -887,28 +1001,34 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         continue;
       }
 
-      // Stale or missing — evict old policies and reload
-      if (cachedUpdatedAt.isPresent()) {
-        allowEnforcer.deleteRole(String.valueOf(roleId));
-        denyEnforcer.deleteRole(String.valueOf(roleId));
-      }
-
       // Load full role entity using roleName from the batch query (no extra DB scan)
+      RoleEntity roleEntity;
       try {
         EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-        RoleEntity roleEntity =
+        roleEntity =
             entityStore.get(
                 NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
                 Entity.EntityType.ROLE,
                 RoleEntity.class);
-        loadPolicyByRoleEntity(roleEntity, requestContext);
       } catch (Exception e) {
         LOG.warn("Failed to load role policies for roleId {}", roleId, e);
         continue;
       }
 
+      // Stale or missing: refresh only permission policies. Do not call deleteRole here because it
+      // also removes the current user's freshly bound grouping links.
+      if (cachedUpdatedAt.isPresent()) {
+        clearRolePolicies(roleId);
+      }
+      loadPolicyByRoleEntity(roleEntity, requestContext);
       loadedRoles.put(roleId, dbUpdatedAt);
     }
+  }
+
+  private void clearRolePolicies(long roleId) {
+    String roleIdStr = String.valueOf(roleId);
+    allowEnforcer.removeFilteredPolicy(0, roleIdStr);
+    denyEnforcer.removeFilteredPolicy(0, roleIdStr);
   }
 
   private void bindUserRoles(long userId, List<Long> roleIds) {
@@ -928,14 +1048,19 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     List<SecurableObject> securableObjects = roleEntity.securableObjects();
 
     for (SecurableObject securableObject : securableObjects) {
-      Long securableId = lookups.resolveMetadataId(securableObject, metalake, requestContext);
+      Optional<Long> metadataId =
+          lookups.resolveMetadataId(securableObject, metalake, requestContext);
+      // A role may still reference a metadata object that has since been dropped; skip it.
+      if (!metadataId.isPresent()) {
+        continue;
+      }
       for (Privilege privilege : securableObject.privileges()) {
         Privilege.Condition condition = privilege.condition();
         if (AuthConstants.DENY.equalsIgnoreCase(condition.name())) {
           denyEnforcer.addPolicy(
               String.valueOf(roleEntity.id()),
               securableObject.type().name(),
-              String.valueOf(securableId),
+              String.valueOf(metadataId.get()),
               AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
                   .name()
                   .toUpperCase(Locale.ROOT),
@@ -945,7 +1070,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         allowEnforcer.addPolicy(
             String.valueOf(roleEntity.id()),
             securableObject.type().name(),
-            String.valueOf(securableId),
+            String.valueOf(metadataId.get()),
             AuthorizationUtils.replaceLegacyPrivilegeName(privilege.name())
                 .name()
                 .toUpperCase(Locale.ROOT),

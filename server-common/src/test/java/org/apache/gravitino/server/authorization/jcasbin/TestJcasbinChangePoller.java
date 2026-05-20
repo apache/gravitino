@@ -64,20 +64,21 @@ public class TestJcasbinChangePoller {
         JcasbinChangePoller.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1", MetadataObject.Type.CATALOG);
     Assertions.assertEquals(
-        key("ml1", "cat1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", catalog));
+        key("ml1", "cat1", ""), JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", catalog));
 
     MetadataObject schema =
         JcasbinChangePoller.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1.sch1", MetadataObject.Type.SCHEMA);
     Assertions.assertEquals(
-        key("ml1", "cat1", "sch1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", schema));
+        key("ml1", "cat1", "sch1", ""),
+        JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", schema));
 
     MetadataObject table =
         JcasbinChangePoller.metadataObjectFromChangeLog(
             "ml1", "ml1.cat1.sch1.tbl1", MetadataObject.Type.TABLE);
     Assertions.assertEquals(
         key("ml1", "cat1", "sch1", "tbl1", "TABLE"),
-        JcasbinAuthorizationLookups.buildCacheKey("ml1", table));
+        JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", table));
   }
 
   @Test
@@ -85,7 +86,7 @@ public class TestJcasbinChangePoller {
     MetadataObject metalake =
         JcasbinChangePoller.metadataObjectFromChangeLog("ml1", "ml1", MetadataObject.Type.METALAKE);
     Assertions.assertEquals(
-        key("ml1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", metalake));
+        key("ml1", ""), JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", metalake));
   }
 
   @Test
@@ -139,7 +140,7 @@ public class TestJcasbinChangePoller {
   }
 
   private static String key(String... parts) {
-    return String.join(JcasbinAuthorizationLookups.KEY_SEP, parts);
+    return String.join(JcasbinAuthorizationCacheKeys.SEPARATOR, parts);
   }
 
   private static EntityChangeRecord change(long id, MetadataObject.Type type, String fullName) {

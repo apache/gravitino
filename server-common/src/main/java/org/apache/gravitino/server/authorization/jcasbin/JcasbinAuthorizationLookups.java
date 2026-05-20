@@ -18,11 +18,11 @@
  */
 package org.apache.gravitino.server.authorization.jcasbin;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
@@ -42,9 +42,6 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  */
 public class JcasbinAuthorizationLookups {
 
-  /** Unit Separator for internal path-based cache keys. */
-  static final String KEY_SEP = "\u001F";
-
   private final GravitinoCache<String, Long> metadataIdCache;
   private final GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache;
 
@@ -52,7 +49,7 @@ public class JcasbinAuthorizationLookups {
    * Creates a new lookups facade around the supplied caches. The caches are owned by the caller and
    * remain accessible for invalidation by other components (poller, change hooks).
    *
-   * @param metadataIdCache path-based {@code metalake::catalog::schema::object::TYPE} → entity id
+   * @param metadataIdCache path-based metadata object key → entity id
    * @param ownerRelCache {@code metadataObjectId} → {@link Optional} of {@link OwnerInfo}
    */
   public JcasbinAuthorizationLookups(
@@ -65,15 +62,32 @@ public class JcasbinAuthorizationLookups {
   /**
    * Two-tier name→id lookup: the per-request map in {@code requestContext} dedups calls within the
    * same HTTP request; on a miss, the long-lived {@code metadataIdCache} is consulted, and finally
-   * we fall back to a DB query via {@link MetadataIdConverter#getID}.
+   * we fall back to a DB query via {@link MetadataIdConverter#getID}. Returns {@link
+   * Optional#empty()} when the metadata object does not exist so callers can deny authorization; a
+   * missing object is never cached as a negative result.
    */
-  public Long resolveMetadataId(
+  public Optional<Long> resolveMetadataId(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
-    String cacheKey = buildCacheKey(metalake, metadataObject);
-    return requestContext.computeMetadataIdIfAbsent(
-        cacheKey,
-        k ->
-            metadataIdCache.get(k, ignored -> MetadataIdConverter.getID(metadataObject, metalake)));
+    String cacheKey = JcasbinAuthorizationCacheKeys.metadataObjectKey(metalake, metadataObject);
+    try {
+      // Both cache tiers load atomically and forbid caching null, so a missing object is signalled
+      // by throwing through the loaders and translated back to Optional.empty() here. This caches
+      // only positive results, never a negative one.
+      return Optional.of(
+          requestContext.computeMetadataIdIfAbsent(
+              cacheKey,
+              k -> metadataIdCache.get(k, ignored -> loadMetadataId(metadataObject, metalake))));
+    } catch (NoSuchMetadataObjectException e) {
+      return Optional.empty();
+    }
+  }
+
+  private static Long loadMetadataId(MetadataObject metadataObject, String metalake) {
+    return MetadataIdConverter.getID(metadataObject, metalake)
+        .orElseThrow(
+            () ->
+                new NoSuchMetadataObjectException(
+                    "Metadata object %s does not exist", metadataObject.fullName()));
   }
 
   /**
@@ -97,53 +111,5 @@ public class JcasbinAuthorizationLookups {
                           m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
                   return ownerInfo == null ? Optional.empty() : Optional.of(ownerInfo);
                 }));
-  }
-
-  /** Underlying metadata-id cache; exposed for invalidation by the change hooks and the poller. */
-  public GravitinoCache<String, Long> metadataIdCache() {
-    return metadataIdCache;
-  }
-
-  /** Underlying owner cache; exposed for invalidation by the change hooks and the poller. */
-  public GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache() {
-    return ownerRelCache;
-  }
-
-  /**
-   * Builds a path-based cache key for the metadataIdCache. Container objects end with the internal
-   * separator so a prefix invalidation can remove the container and all entries under the same name
-   * path.
-   *
-   * <p>Examples: {@code metalake<sep>}, {@code metalake<sep>catalog<sep>}, {@code
-   * metalake<sep>catalog<sep>schema<sep>}, {@code
-   * metalake<sep>catalog<sep>schema<sep>table<sep>TABLE}.
-   */
-  @VisibleForTesting
-  public static String buildCacheKey(String metalake, MetadataObject metadataObject) {
-    if (metadataObject.type() == MetadataObject.Type.METALAKE) {
-      return metalake + KEY_SEP;
-    }
-    StringBuilder sb = new StringBuilder(metalake);
-    sb.append(KEY_SEP);
-    // fullName uses '.' as separator, e.g. "catalog1.schema1.table1"
-    String[] parts = metadataObject.fullName().split("\\.");
-    sb.append(String.join(KEY_SEP, parts));
-    if (isContainerType(metadataObject.type())) {
-      // Trailing separator enables prefix-based invalidation.
-      sb.append(KEY_SEP);
-    } else {
-      // Leaf nodes get the type suffix to avoid collisions
-      sb.append(KEY_SEP);
-      sb.append(metadataObject.type().name());
-    }
-    return sb.toString();
-  }
-
-  /** Returns true for entity types that can contain children (metalake, catalog, schema). */
-  @VisibleForTesting
-  public static boolean isContainerType(MetadataObject.Type type) {
-    return type == MetadataObject.Type.METALAKE
-        || type == MetadataObject.Type.CATALOG
-        || type == MetadataObject.Type.SCHEMA;
   }
 }

@@ -64,7 +64,7 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                       + " When omitted the default credential chain is used.",
                   false /* immutable */,
                   null /* defaultValue */,
-                  true /* hidden */))
+                  false /* hidden */))
           .put(
               AWS_SECRET_ACCESS_KEY,
               stringOptionalPropertyEntry(
@@ -73,7 +73,7 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                       + " When omitted the default credential chain is used.",
                   false /* immutable */,
                   null /* defaultValue */,
-                  true /* hidden */))
+                  false /* hidden */))
           .put(
               AWS_GLUE_ENDPOINT,
               stringOptionalPropertyEntry(

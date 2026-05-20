@@ -58,9 +58,6 @@ dependencies {
   implementation(libs.prometheus.servlet)
   implementation(libs.nimbus.jose.jwt)
 
-  testAnnotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
-
   testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
