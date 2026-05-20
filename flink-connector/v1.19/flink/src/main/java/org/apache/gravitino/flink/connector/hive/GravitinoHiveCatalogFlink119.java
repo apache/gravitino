@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
-import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink119;
+import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.hadoop.hive.conf.HiveConf;
 
 /** {@link GravitinoHiveCatalog} implementation for Flink 1.19. */
@@ -50,6 +50,6 @@ public class GravitinoHiveCatalogFlink119 extends GravitinoHiveCatalog {
 
   @Override
   protected CatalogCompat catalogCompat() {
-    return CatalogCompatFlink119.INSTANCE;
+    return DefaultCatalogCompat.INSTANCE;
   }
 }
