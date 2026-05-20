@@ -57,7 +57,7 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
   private static final String GRAVITINO_ICEBERG_REST_PREFIX = "gravitino.iceberg-rest.";
   private static final String METALAKE_NAME = "test_metalake_dynamic_config_merge";
   private static final String CATALOG_NAME = "iceberg";
-  private static final String SCHEMA_NAME = "dynamic_merge_schema";
+  private static final String SCHEMA_NAME = "schema";
   private static final String TABLE_NAME = "merge_config_table";
   private static final String SUPER_USER = "super";
 

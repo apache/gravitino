@@ -106,33 +106,21 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   }
 
   /**
-   * Merges Gravitino catalog properties with server-side defaults.
+   * Merges Gravitino catalog properties with server-side defaults for the given catalog key.
    *
-   * <p>Catalog properties take precedence. Named server keys under {@code catalog.<name>.*} apply
-   * to the matching catalog. Root {@code gravitino.iceberg-rest.*} settings apply only to the
-   * default dynamic catalog (see {@link
-   * IcebergConstants#ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME}).
+   * <p>Catalog properties take precedence; missing keys are filled from the server config entry
+   * identified by {@code serverCatalogKey} (for example {@link
+   * IcebergConstants#ICEBERG_REST_DEFAULT_CATALOG}).
    */
   private IcebergConfig mergeServerConfig(
       Map<String, String> catalogProperties, String catalogName) {
     Map<String, String> catalogConfig =
         new HashMap<>(getIcebergConfigFromCatalogProperties(catalogProperties).getAllConfig());
-    IcebergConfig namedServerConfig = serverConfigs.get(catalogName);
-    if (namedServerConfig != null) {
-      namedServerConfig.getAllConfig().forEach(catalogConfig::putIfAbsent);
-    }
-    if (isDefaultDynamicCatalog(catalogName)) {
-      IcebergConfig rootServerConfig =
-          serverConfigs.get(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
-      if (rootServerConfig != null) {
-        rootServerConfig.getAllConfig().forEach(catalogConfig::putIfAbsent);
-      }
+    IcebergConfig serverConfig = serverConfigs.get(catalogName);
+    if (serverConfig != null) {
+      serverConfig.getAllConfig().forEach(catalogConfig::putIfAbsent);
     }
     return new IcebergConfig(catalogConfig);
-  }
-
-  private boolean isDefaultDynamicCatalog(String catalogName) {
-    return defaultDynamicCatalogName.map(name -> name.equals(catalogName)).orElse(false);
   }
 
   /**
