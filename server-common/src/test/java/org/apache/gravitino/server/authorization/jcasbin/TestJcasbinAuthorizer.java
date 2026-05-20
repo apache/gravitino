@@ -36,6 +36,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -155,6 +156,10 @@ public class TestJcasbinAuthorizer {
    * when the wall clock hasn't advanced.
    */
   private static final AtomicLong groupVersionCounter = new AtomicLong(1L);
+
+  private static final AtomicLong roleVersionCounter = new AtomicLong(1L);
+
+  private static final AtomicLong userVersionCounter = new AtomicLong(1L);
 
   /**
    * Recreated per test in {@link #createAuthorizer()} so each case starts with empty enforcer state
@@ -333,14 +338,14 @@ public class TestJcasbinAuthorizer {
         .thenReturn(allowRole);
 
     // Mock mapper: user has allowRole
-    long now = System.currentTimeMillis();
+    long roleVersion = nextRoleVersion();
     RolePO allowRolePO = buildRolePO(ALLOW_ROLE_ID, "allowRole");
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of(allowRolePO));
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
-        .thenReturn(ImmutableList.of(new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", now)));
+        .thenReturn(ImmutableList.of(new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", roleVersion)));
     // Bump user version to invalidate userRoleCache
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
-        .thenReturn(new UserUpdatedAt(USER_ID, now));
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
 
     assertTrue(doAuthorize(currentPrincipal));
 
@@ -356,11 +361,11 @@ public class TestJcasbinAuthorizer {
         .thenReturn(tempNewRole);
     RolePO tempNewRolePO = buildRolePO(newRoleId, "tempNewRole");
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of(tempNewRolePO));
-    long now2 = now + 1;
+    long roleVersion2 = nextRoleVersion();
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
-        .thenReturn(ImmutableList.of(new RoleUpdatedAt(newRoleId, "tempNewRole", now2)));
+        .thenReturn(ImmutableList.of(new RoleUpdatedAt(newRoleId, "tempNewRole", roleVersion2)));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
-        .thenReturn(new UserUpdatedAt(USER_ID, now2));
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
     // tempNewRole has no privileges; prune step removes stale allowRole g-row, so authz fails.
     assertFalse(doAuthorize(currentPrincipal));
 
@@ -369,11 +374,11 @@ public class TestJcasbinAuthorizer {
 
     // Re-assign allowRole, the authorization will succeed
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of(allowRolePO));
-    long now3 = now2 + 1;
+    long roleVersion3 = nextRoleVersion();
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
-        .thenReturn(ImmutableList.of(new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", now3)));
+        .thenReturn(ImmutableList.of(new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", roleVersion3)));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
-        .thenReturn(new UserUpdatedAt(USER_ID, now3));
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
     assertTrue(doAuthorize(currentPrincipal));
 
     // Test deny
@@ -387,14 +392,14 @@ public class TestJcasbinAuthorizer {
     RolePO denyRolePO = buildRolePO(DENY_ROLE_ID, "denyRole");
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
         .thenReturn(ImmutableList.of(allowRolePO, denyRolePO));
-    long now4 = now3 + 1;
+    long roleVersion4 = nextRoleVersion();
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
         .thenReturn(
             ImmutableList.of(
-                new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", now4),
-                new RoleUpdatedAt(DENY_ROLE_ID, "denyRole", now4)));
+                new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", roleVersion4),
+                new RoleUpdatedAt(DENY_ROLE_ID, "denyRole", roleVersion4)));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
-        .thenReturn(new UserUpdatedAt(USER_ID, now4));
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
     assertFalse(doAuthorize(currentPrincipal));
   }
 
@@ -882,7 +887,7 @@ public class TestJcasbinAuthorizer {
   private static void mockNoDirectUserRoles() throws IOException {
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of());
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
-        .thenReturn(new UserUpdatedAt(USER_ID, System.currentTimeMillis()));
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
   }
 
   /**
@@ -896,7 +901,7 @@ public class TestJcasbinAuthorizer {
     }
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(rolePOs);
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
-        .thenReturn(new UserUpdatedAt(USER_ID, System.currentTimeMillis()));
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
   }
 
   /**
@@ -911,7 +916,7 @@ public class TestJcasbinAuthorizer {
             eq(Entity.EntityType.ROLE),
             eq(RoleEntity.class)))
         .thenReturn(role);
-    mockedRoleVersions.put(roleId, new RoleUpdatedAt(roleId, roleName, System.currentTimeMillis()));
+    mockedRoleVersions.put(roleId, new RoleUpdatedAt(roleId, roleName, nextRoleVersion()));
     return role;
   }
 
@@ -1171,6 +1176,49 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testRoleCacheReplacementDoesNotDeletePolicy() throws Exception {
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    Enforcer denyEnforcer = getDenyEnforcer(jcasbinAuthorizer);
+    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
+
+    Long testRoleId = 301L;
+    String roleIdStr = String.valueOf(testRoleId);
+    loadedRoles.put(testRoleId, 1L);
+
+    allowEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
+    denyEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
+
+    loadedRoles.put(testRoleId, 2L);
+
+    assertTrue(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
+    assertTrue(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
+  }
+
+  @Test
+  public void testClearRolePoliciesPreservesUserRoleBindings() throws Exception {
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    Enforcer denyEnforcer = getDenyEnforcer(jcasbinAuthorizer);
+
+    Long testRoleId = 302L;
+    String roleIdStr = String.valueOf(testRoleId);
+    String userIdStr = String.valueOf(USER_ID);
+    allowEnforcer.addRoleForUser(userIdStr, roleIdStr);
+    denyEnforcer.addRoleForUser(userIdStr, roleIdStr);
+    allowEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
+    denyEnforcer.addPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow");
+
+    Method clearRolePolicies =
+        JcasbinAuthorizer.class.getDeclaredMethod("clearRolePolicies", long.class);
+    clearRolePolicies.setAccessible(true);
+    clearRolePolicies.invoke(jcasbinAuthorizer, testRoleId);
+
+    assertFalse(allowEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
+    assertFalse(denyEnforcer.hasPolicy(roleIdStr, "CATALOG", "999", "USE_CATALOG", "allow"));
+    assertTrue(allowEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
+    assertTrue(denyEnforcer.getRolesForUser(userIdStr).contains(roleIdStr));
+  }
+
+  @Test
   public void testCacheInitialization() throws Exception {
     // Verify that caches are initialized
     GravitinoCache<Long, Long> loadedRolesCache = getLoadedRolesCache(jcasbinAuthorizer);
@@ -1322,22 +1370,29 @@ public class TestJcasbinAuthorizer {
 
   /** Mock mapper to assign zero roles. Bumps user version to invalidate cache. */
   private static void mockUserRoles() {
-    long now = System.currentTimeMillis();
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of());
     when(roleMetaMapper.batchGetRoleUpdatedAt(any())).thenReturn(ImmutableList.of());
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
-        .thenReturn(new UserUpdatedAt(USER_ID, now));
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
   }
 
   /** Mock mapper to assign a single role. Bumps user version to invalidate cache. */
   private static void mockUserRoles(Long roleId, String roleName) {
-    long now = System.currentTimeMillis();
+    long roleVersion = nextRoleVersion();
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
         .thenReturn(ImmutableList.of(buildRolePO(roleId, roleName)));
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
-        .thenReturn(ImmutableList.of(new RoleUpdatedAt(roleId, roleName, now)));
+        .thenReturn(ImmutableList.of(new RoleUpdatedAt(roleId, roleName, roleVersion)));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
-        .thenReturn(new UserUpdatedAt(USER_ID, now));
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
+  }
+
+  private static long nextRoleVersion() {
+    return roleVersionCounter.incrementAndGet();
+  }
+
+  private static long nextUserVersion() {
+    return userVersionCounter.incrementAndGet();
   }
 
   private static RolePO buildRolePO(Long roleId, String roleName) {

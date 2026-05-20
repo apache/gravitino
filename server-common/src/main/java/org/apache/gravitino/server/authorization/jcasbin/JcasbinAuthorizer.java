@@ -55,7 +55,6 @@ import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
@@ -90,7 +89,9 @@ import org.slf4j.LoggerFactory;
  *       {@link #groupRoleCache}, {@link #loadedRoles}. Each cached entry carries the {@code
  *       *_meta.updated_at} value it was loaded against; every read issues a lightweight version
  *       probe and discards the entry if the DB sentinel has advanced. No TTL is relied on for
- *       correctness — {@code expireAfterAccess} only bounds memory.
+ *       correctness — TTL eviction only bounds memory. User/group role snapshots use write-based
+ *       TTLs through {@link CaffeineGravitinoCache}; loaded role policies use access-based TTLs
+ *       through {@link JcasbinLoadedRolesCache}.
  *   <li><b>Eventual-consistency caches</b> — {@link #metadataIdCache} and {@link #ownerRelCache}. A
  *       single background poller ({@link #changePoller}) drains {@code entity_change_log} and
  *       {@code owner_meta} change rows since a high-water-mark cursor and invalidates the affected
@@ -336,9 +337,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return Objects.equals(nameIdentifier.name(), currentUserName);
     } else if (Entity.EntityType.ROLE == type) {
       try {
+        MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
         Long roleId =
-            MetadataIdConverter.getID(
-                NameIdentifierUtil.toMetadataObject(nameIdentifier, type), metalake);
+            lookups.resolveMetadataId(metadataObject, metalake, new AuthorizationRequestContext());
         EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
         NameIdentifier userNameIdentifier =
             NameIdentifierUtil.ofUser(metalake, PrincipalUtils.getCurrentUserName());
@@ -483,7 +484,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     metadataIdCache.invalidate(
         JcasbinAuthorizationCacheKeys.metadataObjectKey(metalake, metadataObject));
     try {
-      Long metadataId = MetadataIdConverter.getID(metadataObject, metalake);
+      Long metadataId = lookups.resolveFreshMetadataId(metadataObject, metalake);
       ownerRelCache.invalidate(metadataId);
     } catch (RuntimeException e) {
       LOG.warn("Failed to resolve metadata id for owner cache invalidation: {}", metadataObject, e);
@@ -768,8 +769,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /**
    * Resolves GroupEntity objects for the current principal's groups, skipping any that are stale or
-   * not found in the store. Used by both {@link #isSelf} (ROLE branch) and {@link
-   * #loadRolePrivilege} to discover group-inherited role assignments.
+   * not found in the store. Used by {@link #isSelf} (ROLE branch) and owner checks that need full
+   * group entities instead of only group names.
    */
   private List<GroupEntity> resolveCurrentUserGroups(String metalake, EntityStore entityStore) {
     Principal principal = PrincipalUtils.getCurrentPrincipal();
@@ -805,28 +806,34 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         continue;
       }
 
-      // Stale or missing — evict old policies and reload
-      if (cachedUpdatedAt.isPresent()) {
-        allowEnforcer.deleteRole(String.valueOf(roleId));
-        denyEnforcer.deleteRole(String.valueOf(roleId));
-      }
-
       // Load full role entity using roleName from the batch query (no extra DB scan)
+      RoleEntity roleEntity;
       try {
         EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-        RoleEntity roleEntity =
+        roleEntity =
             entityStore.get(
                 NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
                 Entity.EntityType.ROLE,
                 RoleEntity.class);
-        loadPolicyByRoleEntity(roleEntity, requestContext);
       } catch (Exception e) {
         LOG.warn("Failed to load role policies for roleId {}", roleId, e);
         continue;
       }
 
+      // Stale or missing: refresh only permission policies. Do not call deleteRole here because it
+      // also removes the current user's freshly bound grouping links.
+      if (cachedUpdatedAt.isPresent()) {
+        clearRolePolicies(roleId);
+      }
+      loadPolicyByRoleEntity(roleEntity, requestContext);
       loadedRoles.put(roleId, dbUpdatedAt);
     }
+  }
+
+  private void clearRolePolicies(long roleId) {
+    String roleIdStr = String.valueOf(roleId);
+    allowEnforcer.removeFilteredPolicy(0, roleIdStr);
+    denyEnforcer.removeFilteredPolicy(0, roleIdStr);
   }
 
   private void bindUserRoles(long userId, List<Long> roleIds) {

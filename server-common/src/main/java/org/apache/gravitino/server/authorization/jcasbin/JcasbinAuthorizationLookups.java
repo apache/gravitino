@@ -73,6 +73,15 @@ public class JcasbinAuthorizationLookups {
   }
 
   /**
+   * Resolves the current metadata id directly from the entity store without populating the shared
+   * metadata-id cache. Use this in invalidation paths that have just removed the name→id mapping
+   * and only need the id to evict related caches.
+   */
+  public Long resolveFreshMetadataId(MetadataObject metadataObject, String metalake) {
+    return MetadataIdConverter.getID(metadataObject, metalake);
+  }
+
+  /**
    * Two-tier owner lookup: request-level dedup first, then the shared {@code ownerRelCache}, and
    * finally a single {@code owner_meta} query. A successful DB fetch populates both tiers so
    * subsequent {@code isOwner} calls — in this request and later ones — hit the cache.

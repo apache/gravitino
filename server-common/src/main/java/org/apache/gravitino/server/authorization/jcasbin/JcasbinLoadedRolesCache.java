@@ -20,6 +20,7 @@ package org.apache.gravitino.server.authorization.jcasbin;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.cache.GravitinoCache;
@@ -45,8 +46,8 @@ class JcasbinLoadedRolesCache implements GravitinoCache<Long, Long> {
             .maximumSize(maxSize)
             .executor(Runnable::run)
             .removalListener(
-                (roleId, value, cause) -> {
-                  if (roleId != null) {
+                (Long roleId, Long value, RemovalCause cause) -> {
+                  if (roleId != null && cause != RemovalCause.REPLACED) {
                     allowEnforcer.deleteRole(String.valueOf(roleId));
                     denyEnforcer.deleteRole(String.valueOf(roleId));
                   }
@@ -76,7 +77,7 @@ class JcasbinLoadedRolesCache implements GravitinoCache<Long, Long> {
 
   @Override
   public void invalidateByPrefix(String prefix) {
-    cache.asMap().keySet().removeIf(k -> k.toString().startsWith(prefix));
+    // Role ids are Long keys, so prefix invalidation is not meaningful for this cache.
   }
 
   @Override
