@@ -20,7 +20,6 @@
 package org.apache.gravitino.abs.credential;
 
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
@@ -56,7 +55,7 @@ public class AzureAccountKeyProvider implements CredentialProvider {
   }
 
   @Override
-  public Optional<Credential> getCredentialOptional(CredentialContext context) {
-    return Optional.of(new AzureAccountKeyCredential(accountName, accountKey));
+  public Credential getCredential(CredentialContext context) {
+    return new AzureAccountKeyCredential(accountName, accountKey);
   }
 }

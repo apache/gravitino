@@ -22,7 +22,6 @@ package org.apache.gravitino.iceberg.service.extension;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import javax.ws.rs.NotSupportedException;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
@@ -67,8 +66,8 @@ public class DummyCredentialProvider implements CredentialProvider {
   }
 
   @Override
-  public Optional<Credential> getCredentialOptional(CredentialContext context) {
-    return Optional.of(new SimpleCredential());
+  public Credential getCredential(CredentialContext context) {
+    return new SimpleCredential();
   }
 
   @Override

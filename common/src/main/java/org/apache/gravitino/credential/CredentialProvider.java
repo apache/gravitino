@@ -71,15 +71,10 @@ public interface CredentialProvider extends Closeable {
    *     a system or resource. {@code null} will be returned if no credential is available.
    */
   @Nullable
-  default Credential getCredential(CredentialContext context) {
-    return getCredentialOptional(context).orElse(null);
-  }
+  Credential getCredential(CredentialContext context);
 
   /**
    * Gets a credential based on the provided context information.
-   *
-   * <p>Implementations should override either this method or {@link
-   * #getCredential(CredentialContext)}; overriding neither will result in infinite recursion.
    *
    * @param context A context object providing necessary information for retrieving credentials.
    * @return An {@link Optional} containing the {@link Credential} with the authentication

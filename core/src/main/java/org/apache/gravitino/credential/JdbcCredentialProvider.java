@@ -20,7 +20,7 @@
 package org.apache.gravitino.credential;
 
 import java.util.Map;
-import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
 /** Generate JDBC user and password credentials to access JDBC backend services. */
@@ -35,7 +35,7 @@ public class JdbcCredentialProvider implements CredentialProvider {
       return;
     }
     // jdbcUser / jdbcPassword will be null when the catalog was not configured with JDBC
-    // credentials. getCredentialOptional() handles this by returning Optional.empty().
+    // credentials. getCredential() handles this by returning null.
     // Note: The property keys "jdbc-user" and "jdbc-password" match the configuration keys
     // used by JDBC-based catalogs (e.g., Iceberg JDBC backend, Paimon JDBC backend).
     this.jdbcUser = properties.get(JdbcCredential.GRAVITINO_JDBC_USER);
@@ -50,11 +50,12 @@ public class JdbcCredentialProvider implements CredentialProvider {
     return JdbcCredential.JDBC_CREDENTIAL_TYPE;
   }
 
+  @Nullable
   @Override
-  public Optional<Credential> getCredentialOptional(CredentialContext context) {
+  public Credential getCredential(CredentialContext context) {
     if (StringUtils.isBlank(jdbcUser) || StringUtils.isBlank(jdbcPassword)) {
-      return Optional.empty();
+      return null;
     }
-    return Optional.of(new JdbcCredential(jdbcUser, jdbcPassword));
+    return new JdbcCredential(jdbcUser, jdbcPassword);
   }
 }

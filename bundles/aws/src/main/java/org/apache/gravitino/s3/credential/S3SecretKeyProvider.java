@@ -20,7 +20,6 @@
 package org.apache.gravitino.s3.credential;
 
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialProvider;
@@ -56,7 +55,7 @@ public class S3SecretKeyProvider implements CredentialProvider {
   }
 
   @Override
-  public Optional<Credential> getCredentialOptional(CredentialContext context) {
-    return Optional.of(new S3SecretKeyCredential(accessKey, secretKey));
+  public Credential getCredential(CredentialContext context) {
+    return new S3SecretKeyCredential(accessKey, secretKey);
   }
 }
