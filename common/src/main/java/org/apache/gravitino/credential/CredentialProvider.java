@@ -69,11 +69,7 @@ public interface CredentialProvider extends Closeable {
    * @param context A context object providing necessary information for retrieving credentials.
    * @return A {@link Credential} object containing the authentication information needed to access
    *     a system or resource. {@code null} will be returned if no credential is available.
-   * @deprecated since 1.3.0, use {@link #getCredentialOptional(CredentialContext)} instead. This
-   *     method is retained for backward compatibility with existing implementations discovered via
-   *     {@link java.util.ServiceLoader}.
    */
-  @Deprecated
   @Nullable
   default Credential getCredential(CredentialContext context) {
     return getCredentialOptional(context).orElse(null);
@@ -82,7 +78,7 @@ public interface CredentialProvider extends Closeable {
   /**
    * Gets a credential based on the provided context information.
    *
-   * <p>Implementations should override either this method or the deprecated {@link
+   * <p>Implementations should override either this method or {@link
    * #getCredential(CredentialContext)}; overriding neither will result in infinite recursion.
    *
    * @param context A context object providing necessary information for retrieving credentials.
