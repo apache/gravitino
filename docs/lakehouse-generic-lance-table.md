@@ -118,6 +118,20 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 
 You may also set additional properties specific to your lakehouse format or custom requirements.
 
+### Schema Refresh
+
+For Lance tables, Gravitino stores table columns in its metadata store. Some Lance writers can also
+update the dataset directly at the Lance location. To keep Gravitino metadata in sync, the Generic
+Lakehouse catalog supports catalog-level schema refresh modes:
+
+| Mode            | Behavior                                                                                                                                     |
+|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `DECLARED_ONLY` | Default. Refreshes schema from the Lance dataset only for metadata-only declared tables or tables whose Gravitino column list is empty.        |
+| `VERSION_CHECK` | Opens the Lance dataset during `loadTable`, compares the dataset version with `lance.version`, and refreshes columns when the version changed. |
+
+Use `VERSION_CHECK` only when tables may be modified directly through the Lance path outside
+Gravitino. It adds a lightweight dataset version check to `loadTable`.
+
 ### Table Operations
 
 Table operations follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for comprehensive documentation.

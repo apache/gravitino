@@ -20,9 +20,11 @@ package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -73,6 +75,11 @@ public class LanceTableOperations extends ManagedTableOperations {
     OVERWRITE
   }
 
+  public enum SchemaRefreshMode {
+    DECLARED_ONLY,
+    VERSION_CHECK
+  }
+
   private final EntityStore store;
 
   private final ManagedSchemaOperations schemaOps;
@@ -111,6 +118,62 @@ public class LanceTableOperations extends ManagedTableOperations {
   public void setCatalogProperties(Map<String, String> catalogProperties) {
     this.catalogProperties =
         catalogProperties == null ? Map.of() : ImmutableMap.copyOf(catalogProperties);
+  }
+
+  @Override
+  public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    Table table = super.loadTable(ident);
+    // Spark staged create can write the actual schema only to the Lance dataset path. Refresh
+    // Gravitino metadata when the stored table is declared-only, empty, or configured to track
+    // Lance dataset versions.
+    boolean declaredOnly = isDeclaredOnly(table);
+    boolean emptySchema = table.columns().length == 0;
+    SchemaRefreshMode refreshMode = schemaRefreshMode();
+    if (!declaredOnly && !emptySchema && refreshMode == SchemaRefreshMode.DECLARED_ONLY) {
+      return table;
+    }
+
+    String location = table.properties().get(Table.PROPERTY_LOCATION);
+    if (StringUtils.isBlank(location)) {
+      return table;
+    }
+
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    Column[] columns;
+    long datasetVersion;
+    try (Dataset dataset = openDataset(location, storageOptions)) {
+      datasetVersion = dataset.version();
+      if (refreshMode == SchemaRefreshMode.VERSION_CHECK
+          && !declaredOnly
+          && !emptySchema
+          && !isDatasetVersionChanged(table, datasetVersion)) {
+        return table;
+      }
+      columns = extractColumns(dataset.getSchema());
+    } catch (Exception e) {
+      LOG.debug(
+          "Failed to load Lance schema from location {} for table {}. Return stored metadata.",
+          location,
+          ident,
+          e);
+      return table;
+    }
+
+    List<TableChange> changes = new ArrayList<>();
+    if (!emptySchema) {
+      for (Column column : table.columns()) {
+        changes.add(TableChange.deleteColumn(new String[] {column.name()}, true));
+      }
+    }
+    addColumnChanges(changes, columns);
+    changes.add(
+        TableChange.setProperty(
+            LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion)));
+    changes.add(TableChange.removeProperty(LanceConstants.LANCE_TABLE_DECLARED));
+    // This is a metadata-only repair. Calling super avoids replaying these column changes against
+    // the Lance dataset that we just read from.
+    return super.alterTable(ident, changes.toArray(new TableChange[0]));
   }
 
   @Override
@@ -348,6 +411,59 @@ public class LanceTableOperations extends ManagedTableOperations {
                         col.name(), col.dataType(), col.nullable()))
             .collect(Collectors.toList());
     return new org.apache.arrow.vector.types.pojo.Schema(fields);
+  }
+
+  private SchemaRefreshMode schemaRefreshMode() {
+    return Optional.ofNullable(catalogProperties.get(LanceConstants.LANCE_SCHEMA_REFRESH_MODE))
+        .map(mode -> mode.trim().replace('-', '_').toUpperCase())
+        .map(SchemaRefreshMode::valueOf)
+        .orElse(SchemaRefreshMode.DECLARED_ONLY);
+  }
+
+  private boolean isDeclaredOnly(Table table) {
+    return Optional.ofNullable(table.properties().get(LanceConstants.LANCE_TABLE_DECLARED))
+        .map(Boolean::parseBoolean)
+        .orElse(false);
+  }
+
+  private boolean isDatasetVersionChanged(Table table, long datasetVersion) {
+    String version = table.properties().get(LanceConstants.LANCE_TABLE_VERSION);
+    if (StringUtils.isBlank(version)) {
+      return true;
+    }
+
+    try {
+      return Long.parseLong(version) != datasetVersion;
+    } catch (NumberFormatException e) {
+      return true;
+    }
+  }
+
+  private void addColumnChanges(List<TableChange> changes, Column[] columns) {
+    for (Column column : columns) {
+      changes.add(
+          TableChange.addColumn(
+              new String[] {column.name()},
+              column.dataType(),
+              column.comment(),
+              null,
+              column.nullable(),
+              column.autoIncrement()));
+    }
+  }
+
+  private Column[] extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {
+    return arrowSchema.getFields().stream()
+        .map(
+            field ->
+                Column.of(
+                    field.getName(),
+                    LanceDataTypeConverter.CONVERTER.toGravitino(field),
+                    null,
+                    field.isNullable(),
+                    false,
+                    DEFAULT_VALUE_NOT_SET))
+        .toArray(Column[]::new);
   }
 
   /**
