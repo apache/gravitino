@@ -19,12 +19,18 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import java.util.Map;
 import java.util.Optional;
 import org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory;
 import org.apache.flink.connector.jdbc.table.JdbcDynamicTableFactory;
 import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
@@ -35,19 +41,22 @@ import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
  */
 public class GravitinoJdbcCatalog extends BaseCatalog {
 
-  private final AbstractCatalog jdbcCatalog;
+  private final CatalogFactory.Context context;
+  private AbstractCatalog jdbcCatalog;
 
   protected GravitinoJdbcCatalog(
       CatalogFactory.Context context,
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
-    this(
-        context,
+    super(
+        context.getName(),
+        context.getOptions(),
         defaultDatabase,
         schemaAndTablePropertiesConverter,
-        partitionConverter,
-        (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context));
+        partitionConverter);
+    this.context = context;
+    this.jdbcCatalog = null;
   }
 
   protected GravitinoJdbcCatalog(
@@ -62,7 +71,17 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
         defaultDatabase,
         schemaAndTablePropertiesConverter,
         partitionConverter);
+    this.context = context;
     this.jdbcCatalog = jdbcCatalog;
+  }
+
+  @Override
+  public void open() throws CatalogException {
+    if (jdbcCatalog == null) {
+      applyJdbcCredential(catalog(), context.getOptions());
+      this.jdbcCatalog = (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context);
+    }
+    super.open();
   }
 
   @Override
@@ -73,5 +92,27 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   @Override
   public Optional<Factory> getFactory() {
     return Optional.of(new JdbcDynamicTableFactory());
+  }
+
+  /**
+   * Overwrites the Flink JDBC user and password in {@code options} with credentials obtained from
+   * the server via credential vending, if available. Falls back to the existing options if the
+   * catalog does not support credential vending or no JDBC credential is returned.
+   *
+   * @param catalog the Gravitino catalog client
+   * @param options the mutable Flink catalog options map to update
+   */
+  static void applyJdbcCredential(Catalog catalog, Map<String, String> options) {
+    if (!(catalog instanceof SupportsCredentials)) {
+      return;
+    }
+    for (Credential credential : ((SupportsCredentials) catalog).getCredentials()) {
+      if (credential instanceof JdbcCredential) {
+        JdbcCredential jdbcCredential = (JdbcCredential) credential;
+        options.put(JdbcPropertiesConstants.FLINK_JDBC_USER, jdbcCredential.jdbcUser());
+        options.put(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD, jdbcCredential.jdbcPassword());
+        return;
+      }
+    }
   }
 }

@@ -44,6 +44,7 @@ public class GravitinoCatalog {
   private final String name;
   private final Map<String, String> properties;
   private final long lastModifiedTime;
+  private final org.apache.gravitino.Catalog originalCatalog;
 
   static {
     objectMapper =
@@ -71,6 +72,7 @@ public class GravitinoCatalog {
             ? catalog.auditInfo().createTime()
             : catalog.auditInfo().lastModifiedTime();
     lastModifiedTime = time.toEpochMilli();
+    this.originalCatalog = catalog;
   }
 
   /**
@@ -95,6 +97,7 @@ public class GravitinoCatalog {
     this.name = name;
     this.properties = properties;
     this.lastModifiedTime = lastModifiedTime;
+    this.originalCatalog = null;
   }
 
   /**
@@ -181,6 +184,16 @@ public class GravitinoCatalog {
   @JsonProperty
   public long getLastModifiedTime() {
     return lastModifiedTime;
+  }
+
+  /**
+   * Returns the original Gravitino {@link Catalog} object. May be {@code null} when this instance
+   * was reconstructed from JSON rather than created from a live catalog.
+   *
+   * @return the original catalog, or {@code null}
+   */
+  public org.apache.gravitino.Catalog getOriginalCatalog() {
+    return originalCatalog;
   }
 
   /**
