@@ -58,7 +58,7 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
         NoSuchCatalogException.class);
   }
 
-  private List<Credential> getCredentials(
+  List<Credential> getCredentials(
       BaseCatalog baseCatalog, NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
     Map<String, CredentialContext> contexts =
         getCredentialContexts(baseCatalog, nameIdentifier, privilege);

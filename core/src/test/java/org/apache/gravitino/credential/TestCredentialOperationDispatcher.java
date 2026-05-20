@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.credential;
 
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -146,19 +145,11 @@ public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
     CredentialOperationDispatcher dispatcher =
         new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator);
 
-    Method method =
-        CredentialOperationDispatcher.class.getDeclaredMethod(
-            "getCredentials", BaseCatalog.class, NameIdentifier.class, CredentialPrivilege.class);
-    method.setAccessible(true);
-
-    @SuppressWarnings("unchecked")
     List<Credential> credentials =
-        (List<Credential>)
-            method.invoke(
-                dispatcher,
-                baseCatalog,
-                NameIdentifier.of(metalake, catalog, "schema", "fileset"),
-                CredentialPrivilege.READ);
+        dispatcher.getCredentials(
+            baseCatalog,
+            NameIdentifier.of(metalake, catalog, "schema", "fileset"),
+            CredentialPrivilege.READ);
 
     Assertions.assertEquals(1, credentials.size());
     Assertions.assertSame(validCredential, credentials.get(0));
