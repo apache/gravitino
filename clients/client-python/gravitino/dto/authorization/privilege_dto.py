@@ -25,24 +25,14 @@ from gravitino.api.metadata_object import MetadataObject
 from gravitino.utils.precondition import Precondition
 
 
-def _encode_privilege_name(privilege: Privilege.Name) -> str:
-    """Encode Privilege.Name to string."""
-    return privilege.name
-
-
-def _decode_privilege_name(privilege_str: str) -> Privilege.Name:
-    """Decode string to Privilege.Name."""
-    return Privilege.Name[privilege_str]
-
-
 @dataclass_json
 @dataclass
 class PrivilegeDTO(Privilege):
     _name: Privilege.Name = field(
         metadata=config(
             field_name="name",
-            encoder=_encode_privilege_name,
-            decoder=_decode_privilege_name,
+            encoder=lambda x: x.name,
+            decoder=lambda x: Privilege.Name[x],
         )
     )
     _condition: Privilege.Condition = field(metadata=config(field_name="condition"))
