@@ -24,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -76,6 +78,7 @@ import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
+import org.apache.gravitino.storage.relational.po.auth.AuthSubjectVersion;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
@@ -203,6 +206,31 @@ public class TestJcasbinAuthorizer {
     // Default mock: getUserInfo returns a valid user
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, 1000L));
+
+    // The hot path uses batchGetUserAndGroupUpdatedAt to fetch user + all group versions in one
+    // UNION query; synthesize its result from the per-subject getUserUpdatedAt /
+    // getGroupUpdatedAt stubs so tests can keep stubbing those at the per-subject granularity.
+    when(userMetaMapper.batchGetUserAndGroupUpdatedAt(anyString(), anyString(), anyList()))
+        .thenAnswer(
+            invocation -> {
+              String mlk = invocation.getArgument(0);
+              String uname = invocation.getArgument(1);
+              List<String> gNames = invocation.getArgument(2);
+              List<AuthSubjectVersion> rows = new ArrayList<>();
+              UserUpdatedAt u = userMetaMapper.getUserUpdatedAt(mlk, uname);
+              if (u != null) {
+                rows.add(new AuthSubjectVersion("USER", u.getUserId(), uname, u.getUpdatedAt()));
+              }
+              if (gNames != null) {
+                for (String gn : gNames) {
+                  GroupUpdatedAt g = groupMetaMapper.getGroupUpdatedAt(mlk, gn);
+                  if (g != null) {
+                    rows.add(new AuthSubjectVersion("GROUP", g.getGroupId(), gn, g.getUpdatedAt()));
+                  }
+                }
+              }
+              return rows;
+            });
 
     // Default: no roles assigned initially
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of());

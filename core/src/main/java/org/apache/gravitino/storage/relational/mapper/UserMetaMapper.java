@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
+import org.apache.gravitino.storage.relational.po.auth.AuthSubjectVersion;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -96,4 +97,23 @@ public interface UserMetaMapper {
   @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "getUserUpdatedAt")
   UserUpdatedAt getUserUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("userName") String userName);
+
+  /**
+   * One-shot UNION probe that returns {@code (id, name, updated_at)} for one user and (optionally)
+   * any number of groups in the same metalake. Used by the authorization hot path to collapse the
+   * per-user + per-group version probes into a single round trip.
+   *
+   * <p>When {@code groupNames} is empty the GROUP side of the UNION is omitted entirely (the SQL
+   * provider returns a user-only SELECT) so callers do not need to special-case that branch.
+   *
+   * @param metalakeName the metalake the user and groups belong to
+   * @param userName the user to probe
+   * @param groupNames the group names to probe; may be empty (never null)
+   * @return one row per matching user/group; missing entities are simply absent
+   */
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "batchGetUserAndGroupUpdatedAt")
+  List<AuthSubjectVersion> batchGetUserAndGroupUpdatedAt(
+      @Param("metalakeName") String metalakeName,
+      @Param("userName") String userName,
+      @Param("groupNames") List<String> groupNames);
 }

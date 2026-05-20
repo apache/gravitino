@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
@@ -105,5 +106,12 @@ public class UserMetaSQLProviderFactory {
   public static String getUserUpdatedAt(
       @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
     return getProvider().getUserUpdatedAt(metalakeName, userName);
+  }
+
+  public static String batchGetUserAndGroupUpdatedAt(
+      @Param("metalakeName") String metalakeName,
+      @Param("userName") String userName,
+      @Param("groupNames") List<String> groupNames) {
+    return getProvider().batchGetUserAndGroupUpdatedAt(metalakeName, userName, groupNames);
   }
 }

@@ -25,9 +25,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -60,6 +62,7 @@ import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.auth.AuthSubjectVersion;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
@@ -112,6 +115,18 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /** Key separator for hierarchical cache keys. */
   static final String KEY_SEP = "::";
+
+  /**
+   * {@code subjectType} literal column value returned by {@link
+   * UserMetaMapper#batchGetUserAndGroupUpdatedAt} for user-meta rows.
+   */
+  private static final String SUBJECT_TYPE_USER = "USER";
+
+  /**
+   * {@code subjectType} literal column value returned by {@link
+   * UserMetaMapper#batchGetUserAndGroupUpdatedAt} for group-meta rows.
+   */
+  private static final String SUBJECT_TYPE_GROUP = "GROUP";
 
   /** Jcasbin enforcer is used for metadata authorization. */
   private Enforcer allowEnforcer;
@@ -552,9 +567,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       long userId;
       UserUpdatedAt userInfo;
       try {
-        // Step 1a: lightweight query — get userId + user.updated_at (version sentinel).
-        //          Per-request dedup: only the first authorize() call for this user hits DB.
-        Optional<UserUpdatedAt> userInfoOpt = loadUserInfo(metalake, username, requestContext);
+        // Step 1a: lightweight UNION query — get userId + user.updated_at AND every group's
+        //          version in one round trip. Subsequent loadUserInfo / loadGroupInfo calls in
+        //          this request hit the per-request cache (0 DB queries).
+        Optional<UserUpdatedAt> userInfoOpt =
+            prefetchUserAndGroupInfo(
+                metalake, username, currentPrincipalGroupNames(), requestContext);
         if (!userInfoOpt.isPresent()) {
           LOG.debug("User {} not found in metalake {}", username, metalake);
           return false;
@@ -605,6 +623,57 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
             Optional.ofNullable(
                 SessionUtils.getWithoutCommit(
                     UserMetaMapper.class, m -> m.getUserUpdatedAt(metalake, username))));
+  }
+
+  /**
+   * Batched version probe that collapses {@link #loadUserInfo} and a per-group {@link
+   * #loadGroupInfo} fan-out into a single UNION query. After this returns, both the per-request
+   * {@code userInfoCache} and {@code groupInfoCache} on {@code requestContext} are primed: every
+   * requested group key is present (mapped to either a {@link GroupUpdatedAt} when the row exists
+   * or {@link Optional#empty()} when the IdP-pushed name is stale).
+   *
+   * <p>Saves {@code N} round trips on the hot path: where the legacy flow paid {@code 1 user_meta +
+   * N group_meta} probes, this pays {@code 1} UNION. {@code N=0} (principal has no groups) degrades
+   * to a plain user-only SELECT via the SQL provider.
+   *
+   * <p>{@code computeXxxIfAbsent} is used to populate the caches so that an entry already cached
+   * from a prior call in the same request is not overwritten — matching {@link #loadUserInfo}'s and
+   * {@link #loadGroupInfo}'s "first wins" dedup semantics.
+   */
+  private Optional<UserUpdatedAt> prefetchUserAndGroupInfo(
+      String metalake,
+      String username,
+      List<String> groupNames,
+      AuthorizationRequestContext requestContext) {
+
+    List<AuthSubjectVersion> rows =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m -> m.batchGetUserAndGroupUpdatedAt(metalake, username, groupNames));
+
+    UserUpdatedAt foundUser = null;
+    Map<String, GroupUpdatedAt> foundGroups = new HashMap<>();
+    for (AuthSubjectVersion row : rows) {
+      if (SUBJECT_TYPE_USER.equals(row.getSubjectType())) {
+        foundUser = new UserUpdatedAt(row.getId(), row.getUpdatedAt());
+      } else if (SUBJECT_TYPE_GROUP.equals(row.getSubjectType())) {
+        foundGroups.put(row.getName(), new GroupUpdatedAt(row.getId(), row.getUpdatedAt()));
+      }
+    }
+
+    String userKey = metalake + KEY_SEP + username;
+    final Optional<UserUpdatedAt> userValue = Optional.ofNullable(foundUser);
+    Optional<UserUpdatedAt> userOpt =
+        requestContext.computeUserInfoIfAbsent(userKey, k -> userValue);
+
+    // Negative-cache absent groups too so loadGroupRoles can short-circuit without re-querying.
+    for (String groupName : groupNames) {
+      String groupKey = metalake + KEY_SEP + groupName;
+      final Optional<GroupUpdatedAt> groupValue = Optional.ofNullable(foundGroups.get(groupName));
+      requestContext.computeGroupInfoIfAbsent(groupKey, k -> groupValue);
+    }
+
+    return userOpt;
   }
 
   /**
