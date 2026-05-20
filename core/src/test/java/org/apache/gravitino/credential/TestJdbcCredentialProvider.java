@@ -143,7 +143,7 @@ public class TestJdbcCredentialProvider {
   }
 
   @Test
-  void testEmptyPasswordReturnsNull() {
+  void testEmptyPasswordReturnsEmptyOptional() {
     Map<String, String> catalogProperties =
         ImmutableMap.of(
             JdbcCredential.GRAVITINO_JDBC_USER,
