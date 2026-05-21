@@ -789,7 +789,8 @@ tasks {
         ":authorizations:copyLibAndConfig",
         ":iceberg:iceberg-rest-server:copyLibAndConfigs",
         ":lance:lance-rest-server:copyLibAndConfigs",
-        ":maintenance:optimizer:copyLibAndConfigs"
+        ":maintenance:optimizer:copyLibAndConfigs",
+        ":plugins:idp-basic:copyLib"
       )
     if (!skipWeb) {
       dependencies.add(":web:web:build")

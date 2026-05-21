@@ -26,12 +26,14 @@ plugins {
 dependencies {
   annotationProcessor(libs.lombok)
 
+  implementation(project(":common"))
   implementation(project(":core"))
 
   implementation(libs.bcprov.jdk18on)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.mybatis)
+  implementation(libs.slf4j.api)
 
   compileOnly(libs.lombok)
 
@@ -50,6 +52,15 @@ dependencies {
   testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+val copyLib by tasks.registering(Copy::class) {
+  group = "gravitino distribution"
+  description = "Copy idp-basic plugin jar into distribution libs classpath"
+  dependsOn(tasks.jar)
+  from(tasks.jar)
+  into("$rootDir/distribution/package/libs")
+  duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
 tasks {
