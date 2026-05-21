@@ -13,7 +13,7 @@ overrides:
   undici: ^6.24.0
   postcss: ^8.5.10
   picomatch: ^4.0.4
-  yaml: ^1.10.3
+  yaml: ^2.4.2
   esbuild: 0.25.0
 
 importers:
@@ -2578,7 +2578,7 @@ packages:
       jiti: '>=1.21.0'
       postcss: ^8.5.10
       tsx: ^4.8.1
-      yaml: ^1.10.3
+      yaml: ^2.4.2
     peerDependenciesMeta:
       jiti:
         optional: true
