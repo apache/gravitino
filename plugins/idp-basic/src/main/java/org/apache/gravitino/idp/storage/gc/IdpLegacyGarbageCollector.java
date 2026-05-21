@@ -34,19 +34,16 @@ import org.apache.gravitino.idp.storage.service.IdpBasicUserMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Periodically hard-deletes legacy built-in IdP metadata without core module hooks. */
 public final class IdpLegacyGarbageCollector implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpLegacyGarbageCollector.class);
 
   private final long storeDeleteAfterTimeMillis;
-  private final IdpBasicUserMetaService userMetaService = new IdpBasicUserMetaService();
-  private final IdpBasicGroupMetaService groupMetaService = new IdpBasicGroupMetaService();
 
   @VisibleForTesting
   final ScheduledExecutorService garbageCollectorPool =
       new ScheduledThreadPoolExecutor(
-          1,
+          2,
           r -> {
             Thread t = new Thread(r, "IdpBasic-Legacy-Garbage-Collector");
             t.setDaemon(true);
@@ -54,72 +51,75 @@ public final class IdpLegacyGarbageCollector implements Closeable {
           },
           new ThreadPoolExecutor.AbortPolicy());
 
-  /**
-   * Creates a collector using the same retention configuration as the relational store GC.
-   *
-   * @param config server configuration
-   */
   public IdpLegacyGarbageCollector(Config config) {
-    this.storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
+    storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
   }
 
-  /** Starts the periodic garbage collection task. */
   public void start() {
     long dateTimelineMinute = storeDeleteAfterTimeMillis / 1000 / 60;
+
+    // We will collect garbage every 10 minutes at least. If the dateTimelineMinute is larger than
+    // 100 minutes, we would collect garbage every dateTimelineMinute/10 minutes.
     long frequency = Math.max(dateTimelineMinute / 10, 10);
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
-    LOG.info("Started built-in IdP legacy metadata garbage collector");
   }
 
   @VisibleForTesting
-  void collectAndClean() {
+  public void collectAndClean() {
     long threadId = Thread.currentThread().getId();
-    LOG.debug("Thread {} start to collect built-in IdP garbage...", threadId);
+    LOG.debug("Thread {} start to collect garbage...", threadId);
 
     try {
+      LOG.debug("Start to collect and delete legacy data by thread {}", threadId);
       long legacyTimeline = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
-      collectLegacyData(
-          "idp_user", legacyTimeline, userMetaService::deleteUserMetasByLegacyTimeline);
-      collectLegacyData(
-          "idp_group", legacyTimeline, groupMetaService::deleteGroupMetasByLegacyTimeline);
-    } catch (Exception e) {
-      LOG.error("Thread {} failed to collect and clean built-in IdP garbage.", threadId, e);
-    } finally {
-      LOG.debug("Thread {} finish to collect built-in IdP garbage.", threadId);
-    }
-  }
-
-  private void collectLegacyData(String entityLabel, long legacyTimeline, LegacyDeletion deletion) {
-    long deletedCount = Long.MAX_VALUE;
-    LOG.debug(
-        "Try to physically delete {} legacy data that has been marked deleted before {}",
-        entityLabel,
-        legacyTimeline);
-    try {
-      while (deletedCount > 0) {
-        deletedCount = deletion.delete(legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      long deletedCount = Long.MAX_VALUE;
+      LOG.debug(
+          "Try to physically delete {} legacy data that has been marked deleted before {}",
+          "idp_user",
+          legacyTimeline);
+      try {
+        while (deletedCount > 0) {
+          deletedCount =
+              IdpBasicUserMetaService.getInstance()
+                  .deleteUserMetasByLegacyTimeline(
+                      legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+        }
+      } catch (RuntimeException e) {
+        LOG.error("Failed to physically delete type of idp_user's legacy data: ", e);
       }
-    } catch (RuntimeException e) {
-      LOG.error("Failed to physically delete {} legacy data: ", entityLabel, e);
+
+      deletedCount = Long.MAX_VALUE;
+      LOG.debug(
+          "Try to physically delete {} legacy data that has been marked deleted before {}",
+          "idp_group",
+          legacyTimeline);
+      try {
+        while (deletedCount > 0) {
+          deletedCount =
+              IdpBasicGroupMetaService.getInstance()
+                  .deleteGroupMetasByLegacyTimeline(
+                      legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+        }
+      } catch (RuntimeException e) {
+        LOG.error("Failed to physically delete type of idp_group's legacy data: ", e);
+      }
+    } catch (Exception e) {
+      LOG.error("Thread {} failed to collect and clean garbage.", threadId, e);
+    } finally {
+      LOG.debug("Thread {} finish to collect garbage.", threadId);
     }
   }
 
   @Override
   public void close() throws IOException {
-    garbageCollectorPool.shutdown();
+    this.garbageCollectorPool.shutdown();
     try {
-      if (!garbageCollectorPool.awaitTermination(5, TimeUnit.SECONDS)) {
-        garbageCollectorPool.shutdownNow();
+      if (!this.garbageCollectorPool.awaitTermination(5, TimeUnit.SECONDS)) {
+        this.garbageCollectorPool.shutdownNow();
       }
     } catch (InterruptedException ex) {
-      garbageCollectorPool.shutdownNow();
+      this.garbageCollectorPool.shutdownNow();
       Thread.currentThread().interrupt();
     }
-    LOG.info("Stopped built-in IdP legacy metadata garbage collector");
-  }
-
-  @FunctionalInterface
-  private interface LegacyDeletion {
-    int delete(long legacyTimeline, int limit);
   }
 }

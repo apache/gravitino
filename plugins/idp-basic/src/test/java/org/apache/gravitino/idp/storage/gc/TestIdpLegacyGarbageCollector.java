@@ -20,31 +20,31 @@ package org.apache.gravitino.idp.storage.gc;
 
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 
+import java.io.IOException;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
-public class TestIdpLegacyGarbageCollector {
+@Tag("gravitino-docker-test")
+class TestIdpLegacyGarbageCollector extends AbstractIdpMetaStorageTest {
 
   @AfterEach
-  public void tearDown() {
-    IdpLegacyGarbageCollectorManager.getInstance().stopForTesting();
+  void tearDown() throws IOException {
+    IdpLegacyGarbageCollectorManager.getInstance().close();
   }
 
-  @Test
-  public void testCollectAndCleanDoesNotThrow() throws Exception {
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testCollectAndClean(String type) throws Exception {
+    init(type);
     Config config = new Config(false) {};
     config.set(STORE_DELETE_AFTER_TIME, 600000L);
 
-    try (IdpLegacyGarbageCollector collector = new IdpLegacyGarbageCollector(config)) {
-      collector.collectAndClean();
-    }
-  }
-
-  @Test
-  public void testManagerStopForTestingWhenNotStarted() {
-    Assertions.assertDoesNotThrow(
-        () -> IdpLegacyGarbageCollectorManager.getInstance().stopForTesting());
+    IdpLegacyGarbageCollector garbageCollector = new IdpLegacyGarbageCollector(config);
+    garbageCollector.collectAndClean();
+    garbageCollector.close();
   }
 }

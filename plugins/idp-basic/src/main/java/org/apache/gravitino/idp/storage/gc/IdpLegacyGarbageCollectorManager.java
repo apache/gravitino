@@ -19,71 +19,48 @@
 package org.apache.gravitino.idp.storage.gc;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Lazily starts the built-in IdP legacy garbage collector when mappers are registered. */
+/** Manages the lifecycle of the built-in IdP legacy garbage collector. */
 public final class IdpLegacyGarbageCollectorManager {
-
   private static final Logger LOG = LoggerFactory.getLogger(IdpLegacyGarbageCollectorManager.class);
   private static final IdpLegacyGarbageCollectorManager INSTANCE =
       new IdpLegacyGarbageCollectorManager();
 
-  private volatile IdpLegacyGarbageCollector garbageCollector;
+  private IdpLegacyGarbageCollector garbageCollector;
 
   private IdpLegacyGarbageCollectorManager() {}
 
-  /**
-   * Returns the singleton manager.
-   *
-   * @return the manager instance
-   */
   public static IdpLegacyGarbageCollectorManager getInstance() {
     return INSTANCE;
   }
 
-  /**
-   * Ensures the built-in IdP garbage collector is started once relational mappers are available.
-   */
   public synchronized void ensureStarted() {
     if (garbageCollector != null) {
       return;
     }
 
     try {
-      IdpLegacyGarbageCollector collector =
-          new IdpLegacyGarbageCollector(GravitinoEnv.getInstance().config());
-      collector.start();
-      Runtime.getRuntime()
-          .addShutdownHook(
-              new Thread(
-                  () -> {
-                    try {
-                      collector.close();
-                    } catch (Exception closeException) {
-                      LOG.warn(
-                          "Failed to stop built-in IdP legacy garbage collector on shutdown",
-                          closeException);
-                    }
-                  },
-                  "idp-legacy-gc-shutdown"));
-      garbageCollector = collector;
+      Config config = GravitinoEnv.getInstance().config();
+      garbageCollector = new IdpLegacyGarbageCollector(config);
+      garbageCollector.start();
     } catch (Exception e) {
       LOG.warn("Failed to start built-in IdP legacy garbage collector", e);
     }
   }
 
-  /** Stops the collector. Intended for unit tests only. */
   @VisibleForTesting
-  public synchronized void stopForTesting() {
+  public synchronized void close() throws IOException {
     if (garbageCollector == null) {
       return;
     }
+
     try {
       garbageCollector.close();
-    } catch (Exception e) {
-      LOG.warn("Failed to stop built-in IdP legacy garbage collector during testing", e);
     } finally {
       garbageCollector = null;
     }

@@ -20,45 +20,44 @@ package org.apache.gravitino.idp.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
-/** Built-in IdP group metadata garbage collection service. */
+/**
+ * The service class for built-in IdP group metadata. It provides the basic database operations for
+ * built-in IdP group.
+ */
 public class IdpBasicGroupMetaService {
+  private static final IdpBasicGroupMetaService INSTANCE = new IdpBasicGroupMetaService();
 
-  /** Creates a new service instance. */
-  public IdpBasicGroupMetaService() {}
+  public static IdpBasicGroupMetaService getInstance() {
+    return INSTANCE;
+  }
+
+  private IdpBasicGroupMetaService() {}
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteIdpGroupMetasByLegacyTimeline")
   public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {
-    AtomicInteger groupDeletedCount = new AtomicInteger();
-    AtomicInteger relDeletedCount = new AtomicInteger();
+    int[] groupDeletedCount = new int[] {0};
+    int[] relDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
-        () -> groupDeletedCount.set(deleteIdpGroupMetas(legacyTimeline, limit)),
-        () -> relDeletedCount.set(deleteIdpUserGroupRelMetas(legacyTimeline, limit)));
+        () ->
+            groupDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    IdpGroupMetaMapper.class,
+                    mapper -> mapper.deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit)),
+        () ->
+            relDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    IdpUserGroupRelMapper.class,
+                    mapper ->
+                        mapper.deleteIdpUserGroupRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
-    return groupDeletedCount.get() + relDeletedCount.get();
-  }
-
-  private int deleteIdpGroupMetas(long legacyTimeline, int limit) {
-    Integer deletedCount =
-        SessionUtils.getWithoutCommit(
-            IdpGroupMetaMapper.class,
-            mapper -> mapper.deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit));
-    return deletedCount == null ? 0 : deletedCount;
-  }
-
-  private int deleteIdpUserGroupRelMetas(long legacyTimeline, int limit) {
-    Integer deletedCount =
-        SessionUtils.getWithoutCommit(
-            IdpUserGroupRelMapper.class,
-            mapper -> mapper.deleteIdpUserGroupRelMetasByLegacyTimeline(legacyTimeline, limit));
-    return deletedCount == null ? 0 : deletedCount;
+    return groupDeletedCount[0] + relDeletedCount[0];
   }
 }
