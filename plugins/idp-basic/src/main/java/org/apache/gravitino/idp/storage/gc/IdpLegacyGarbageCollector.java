@@ -29,8 +29,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.idp.storage.service.IdpBasicGroupMetaService;
-import org.apache.gravitino.idp.storage.service.IdpBasicUserMetaService;
+import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
+import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,7 +80,7 @@ public final class IdpLegacyGarbageCollector implements Closeable {
       try {
         while (deletedCount > 0) {
           deletedCount =
-              IdpBasicUserMetaService.getInstance()
+              IdpUserMetaService.getInstance()
                   .deleteUserMetasByLegacyTimeline(
                       legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         }
@@ -96,7 +96,7 @@ public final class IdpLegacyGarbageCollector implements Closeable {
       try {
         while (deletedCount > 0) {
           deletedCount =
-              IdpBasicGroupMetaService.getInstance()
+              IdpGroupMetaService.getInstance()
                   .deleteGroupMetasByLegacyTimeline(
                       legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         }

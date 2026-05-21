@@ -42,7 +42,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 @Tag("gravitino-docker-test")
-class TestIdpBasicGroupMetaService extends AbstractIdpMetaStorageTest {
+class TestIdpGroupMetaService extends AbstractIdpMetaStorageTest {
   private IdpUserMetaMapper idpUserMetaMapper;
   private IdpGroupMetaMapper idpGroupMetaMapper;
   private IdpUserGroupRelMapper idpUserGroupRelMapper;
@@ -58,7 +58,7 @@ class TestIdpBasicGroupMetaService extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void deleteGroupMetasByLegacyTimeline(String type) throws Exception {
     init(type);
-    IdpBasicGroupMetaService groupMetaService = IdpBasicGroupMetaService.getInstance();
+    IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
 
     insertUsers();
     insertGroups();
