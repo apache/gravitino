@@ -171,9 +171,8 @@ WITH (
 
 ### Trino does not distinguish metadata names that differ only by letter case
 
-Trino does not reliably distinguish metadata names, including catalog, schema, and table names,
-that differ only by letter case. This limitation comes from Trino itself and is not specific to
-Gravitino.
+Trino does not reliably distinguish metadata names that differ only by letter case. This
+limitation comes from Trino itself and is not specific to Gravitino.
 
 For the best compatibility with Trino:
 
