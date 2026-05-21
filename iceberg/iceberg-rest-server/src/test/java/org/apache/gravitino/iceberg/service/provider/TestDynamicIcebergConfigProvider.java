@@ -258,9 +258,46 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  void testNamedDynamicCatalogMergesNamedStaticConfigOnly() {
-    String metalakeName = "test_metalake";
-    String catalogName = "jdbc_backend";
+  void testMergeCatalogPrefixedServerConfig() {
+    String namedCatalog = "jdbc_backend";
+    String otherCatalog = "other_catalog";
+    String gravitinoUri = "jdbc:sqlite::memory:from-gravitino";
+    String serverUri = "jdbc:sqlite::memory:from-server";
+
+    Catalog namedCatalogMock = mockLakehouseIcebergCatalog(namedCatalog, gravitinoUri);
+    Catalog otherCatalogMock = mockLakehouseIcebergCatalog(otherCatalog, "jdbc:sqlite::memory:");
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.GRAVITINO_URI, "http://localhost:8090");
+    properties.put(IcebergConstants.GRAVITINO_METALAKE, "test_metalake");
+    properties.put(IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME, namedCatalog);
+    properties.put("catalog." + namedCatalog + ".jdbc.user", "server-user");
+    properties.put("catalog." + namedCatalog + ".uri", serverUri);
+    properties.put("catalog." + otherCatalog + ".jdbc.user", "other-user");
+    properties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "server-cache");
+
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+    provider.initialize(properties);
+    setMockCatalogFetcher(
+        provider, Map.of(namedCatalog, namedCatalogMock, otherCatalog, otherCatalogMock));
+
+    IcebergConfig namedConfig = provider.getIcebergCatalogConfig(namedCatalog).orElseThrow();
+    Assertions.assertEquals("server-user", namedConfig.getAllConfig().get("jdbc.user"));
+    Assertions.assertEquals(gravitinoUri, namedConfig.get(IcebergConfig.CATALOG_URI));
+    Assertions.assertFalse(
+        namedConfig.getAllConfig().containsKey(IcebergConstants.TABLE_METADATA_CACHE_IMPL));
+
+    IcebergConfig otherConfig = provider.getIcebergCatalogConfig(otherCatalog).orElseThrow();
+    Assertions.assertEquals("other-user", otherConfig.getAllConfig().get("jdbc.user"));
+
+    for (String catalogRequest :
+        List.of(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, namedCatalog)) {
+      IcebergConfig config = provider.getIcebergCatalogConfig(catalogRequest).orElseThrow();
+      Assertions.assertEquals("server-user", config.getAllConfig().get("jdbc.user"));
+    }
+  }
+
+  private static Catalog mockLakehouseIcebergCatalog(String catalogName, String uri) {
     Catalog mockCatalog = Mockito.mock(Catalog.class);
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
     Mockito.when(mockCatalog.properties())
@@ -271,57 +308,8 @@ public class TestDynamicIcebergConfigProvider {
                 IcebergConstants.CATALOG_BACKEND_NAME,
                 catalogName,
                 IcebergConstants.URI,
-                "jdbc:sqlite::memory:"));
-
-    Map<String, String> properties = new HashMap<>();
-    properties.put(IcebergConstants.GRAVITINO_URI, "http://localhost:8090");
-    properties.put(IcebergConstants.GRAVITINO_METALAKE, metalakeName);
-    properties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "default-cache");
-    properties.put("catalog.jdbc_backend.jdbc.user", "static-user");
-
-    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
-    provider.initialize(properties);
-    setMockCatalogFetcher(provider, Map.of(catalogName, mockCatalog));
-
-    IcebergConfig icebergConfig = provider.getIcebergCatalogConfig(catalogName).orElseThrow();
-
-    Assertions.assertEquals("static-user", icebergConfig.getAllConfig().get("jdbc.user"));
-    Assertions.assertFalse(
-        icebergConfig.getAllConfig().containsKey(IcebergConstants.TABLE_METADATA_CACHE_IMPL));
-  }
-
-  @Test
-  void testDefaultCatalogMergesRootServerConfig() {
-    String defaultDynamicCatalogName = "jdbc_backend";
-    Catalog mockCatalog = Mockito.mock(Catalog.class);
-    Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
-    Mockito.when(mockCatalog.properties())
-        .thenReturn(
-            Map.of(
-                IcebergConstants.CATALOG_BACKEND,
-                "jdbc",
-                IcebergConstants.CATALOG_BACKEND_NAME,
-                defaultDynamicCatalogName,
-                IcebergConstants.URI,
-                "jdbc:sqlite::memory:"));
-
-    Map<String, String> properties = new HashMap<>();
-    properties.put(IcebergConstants.GRAVITINO_URI, "http://localhost:8090");
-    properties.put(IcebergConstants.GRAVITINO_METALAKE, "test_metalake");
-    properties.put(
-        IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME, defaultDynamicCatalogName);
-    properties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "default-cache");
-
-    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
-    provider.initialize(properties);
-    setMockCatalogFetcher(provider, Map.of(defaultDynamicCatalogName, mockCatalog));
-
-    for (String catalogRequest :
-        List.of(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG, defaultDynamicCatalogName)) {
-      IcebergConfig icebergConfig = provider.getIcebergCatalogConfig(catalogRequest).orElseThrow();
-      Assertions.assertEquals(
-          "default-cache", icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_IMPL));
-    }
+                uri));
+    return mockCatalog;
   }
 
   @Test

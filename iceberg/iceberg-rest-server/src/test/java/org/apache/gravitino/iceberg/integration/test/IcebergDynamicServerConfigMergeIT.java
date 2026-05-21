@@ -34,9 +34,7 @@ import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
@@ -44,24 +42,24 @@ import org.apache.iceberg.catalog.TableIdentifier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * End-to-end check that server-level root {@code gravitino.iceberg-rest.*} settings merge into
- * dynamic default-catalog configs when authorization forces the dynamic config provider.
+ * Verifies that IRC server-side {@code catalog.<name>.*} settings merge into dynamic catalog
+ * configs. Uses an isolated in-memory JDBC catalog to avoid sharing state with authorization ITs.
  */
-@Tag("gravitino-docker-test")
 public class IcebergDynamicServerConfigMergeIT extends BaseIT {
 
   private static final String GRAVITINO_ICEBERG_REST_PREFIX = "gravitino.iceberg-rest.";
-  private static final String METALAKE_NAME = "test_metalake_dynamic_config_merge";
+  private static final String METALAKE_NAME = "test_metalake_dynamic_server_config_merge";
   private static final String CATALOG_NAME = "iceberg";
-  private static final String SCHEMA_NAME = "schema";
+  private static final String CATALOG_BACKEND_NAME = "dynamic_server_config_merge";
+  private static final String SCHEMA_NAME = "dynamic_server_config_merge_schema";
   private static final String TABLE_NAME = "merge_config_table";
+  private static final String JDBC_URI =
+      "jdbc:sqlite::memory:gravitino_dynamic_server_config_merge";
+  private static final String WAREHOUSE = "file:///tmp/gravitino_dynamic_server_config_merge/";
   private static final String SUPER_USER = "super";
-
-  private static final ContainerSuite CONTAINER_SUITE = ContainerSuite.getInstance();
 
   private GravitinoMetalake metalakeClient;
   private Catalog catalogClient;
@@ -69,7 +67,6 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    CONTAINER_SUITE.startPostgreSQLContainer(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
     startGravitinoServerWithIcebergREST();
     initMetalakeAndCatalog();
   }
@@ -84,7 +81,7 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
   }
 
   @Test
-  void testDefaultCatalogMergesRootServerMetadataCacheConfig() {
+  void testDynamicCatalogMergesCatalogPrefixedServerMetadataCacheConfig() {
     IcebergConfig icebergConfig =
         IcebergRESTServerContext.getInstance()
             .catalogWrapperManager()
@@ -97,15 +94,20 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
   }
 
   @Test
-  void testLoadTableInitializesMergedServerMetadataCache() throws Exception {
-    catalogClient.asSchemas().createSchema(SCHEMA_NAME, "comment", new HashMap<>());
-    catalogClient
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(SCHEMA_NAME, TABLE_NAME),
-            new Column[] {Column.of("id", Types.IntegerType.get(), "id")},
-            "comment",
-            new HashMap<>());
+  void testLoadTableUsesMergedCatalogPrefixedMetadataCache() throws Exception {
+    if (!catalogClient.asSchemas().schemaExists(SCHEMA_NAME)) {
+      catalogClient.asSchemas().createSchema(SCHEMA_NAME, "comment", new HashMap<>());
+    }
+    NameIdentifier tableIdent = NameIdentifier.of(SCHEMA_NAME, TABLE_NAME);
+    if (!catalogClient.asTableCatalog().tableExists(tableIdent)) {
+      catalogClient
+          .asTableCatalog()
+          .createTable(
+              tableIdent,
+              new Column[] {Column.of("id", Types.IntegerType.get(), "id")},
+              "comment",
+              new HashMap<>());
+    }
 
     CatalogWrapperForREST catalogWrapper =
         IcebergRESTServerContext.getInstance()
@@ -135,6 +137,7 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
             Configs.CACHE_ENABLED.getKey(),
             "true"));
 
+    String namedCatalogPrefix = GRAVITINO_ICEBERG_REST_PREFIX + "catalog." + CATALOG_NAME + ".";
     Map<String, String> icebergRestConfigs = new HashMap<>();
     icebergRestConfigs.put(
         GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
@@ -147,7 +150,7 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
     icebergRestConfigs.put(
         GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_SIMPLE_USERNAME, SUPER_USER);
     icebergRestConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.TABLE_METADATA_CACHE_IMPL,
+        namedCatalogPrefix + IcebergConstants.TABLE_METADATA_CACHE_IMPL,
         LocalTableMetadataCache.class.getName());
     customConfigs.putAll(icebergRestConfigs);
     super.startIntegrationTest();
@@ -157,14 +160,13 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
     metalakeClient = client.createMetalake(METALAKE_NAME, "", new HashMap<>());
 
     Map<String, String> catalogProps = new HashMap<>();
-    catalogProps.put(IcebergConstants.URI, getPGUri());
+    catalogProps.put(IcebergConstants.URI, JDBC_URI);
     catalogProps.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
-    catalogProps.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.postgresql.Driver");
-    catalogProps.put(IcebergConstants.GRAVITINO_JDBC_USER, getPGUser());
-    catalogProps.put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, getPGPassword());
-    catalogProps.put("gravitino.bypass.jdbc.schema-version", "v1");
+    catalogProps.put(IcebergConstants.CATALOG_BACKEND_NAME, CATALOG_BACKEND_NAME);
+    catalogProps.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
     catalogProps.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
-    catalogProps.put(IcebergConstants.WAREHOUSE, "file:///tmp/");
+    catalogProps.put("gravitino.bypass.jdbc.schema-version", "v1");
+    catalogProps.put(IcebergConstants.WAREHOUSE, WAREHOUSE);
 
     catalogClient =
         metalakeClient.createCatalog(
@@ -176,19 +178,5 @@ public class IcebergDynamicServerConfigMergeIT extends BaseIT {
     Method method = IcebergCatalogWrapper.class.getDeclaredMethod("getMetadataCache");
     method.setAccessible(true);
     return (TableMetadataCache) method.invoke(wrapper);
-  }
-
-  private String getPGUri() {
-    return CONTAINER_SUITE
-        .getPostgreSQLContainer()
-        .getJdbcUrl(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
-  }
-
-  private String getPGUser() {
-    return CONTAINER_SUITE.getPostgreSQLContainer().getUsername();
-  }
-
-  private String getPGPassword() {
-    return CONTAINER_SUITE.getPostgreSQLContainer().getPassword();
   }
 }
