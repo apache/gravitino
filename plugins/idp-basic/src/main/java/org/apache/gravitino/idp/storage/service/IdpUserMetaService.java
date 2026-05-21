@@ -110,45 +110,34 @@ public class IdpUserMetaService {
   public void insertIdpUser(
       IdpUserPO userPO, List<IdpUserGroupRelPO> relations, boolean overwritten) throws IOException {
     try {
-      IdpUserPO existingUser =
-          overwritten
-              ? SessionUtils.getWithoutCommit(
-                  IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(userPO.getUsername()))
-              : null;
-
-      if (existingUser != null) {
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    IdpUserGroupRelMapper.class,
-                    mapper -> mapper.softDeleteRelationsByUsername(userPO.getUsername())),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    IdpUserMetaMapper.class,
-                    mapper -> mapper.softDeleteIdpUser(existingUser.getUserId())),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO)),
-            () -> insertIdpUserGroupRelations(relations));
-      } else {
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO)),
-            () -> insertIdpUserGroupRelations(relations));
-      }
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  IdpUserMetaMapper.class,
+                  mapper -> {
+                    if (overwritten) {
+                      IdpUserPO existing = mapper.selectIdpUser(userPO.getUsername());
+                      if (existing != null) {
+                        mapper.softDeleteIdpUser(existing.getUserId());
+                      }
+                    }
+                    mapper.insertIdpUser(userPO);
+                  }),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  IdpUserGroupRelMapper.class,
+                  mapper -> {
+                    if (overwritten) {
+                      mapper.softDeleteRelationsByUsername(userPO.getUsername());
+                    }
+                    if (relations != null && !relations.isEmpty()) {
+                      mapper.batchInsertRelations(relations);
+                    }
+                  }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(re, Entity.EntityType.USER, userPO.getUsername());
       throw re;
     }
-  }
-
-  private void insertIdpUserGroupRelations(List<IdpUserGroupRelPO> relations) {
-    if (relations == null || relations.isEmpty()) {
-      return;
-    }
-    SessionUtils.doWithoutCommit(
-        IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
   }
 
   @Monitored(
