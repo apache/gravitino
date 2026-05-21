@@ -18,9 +18,9 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
-import java.util.regex.Pattern;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 public class IcebergCatalogCapability implements Capability {
 
@@ -35,8 +35,16 @@ public class IcebergCatalogCapability implements Capability {
     this.schemaSeparator = schemaSeparator;
   }
 
-  /** Creates a capability with the default external schema separator {@code ":"}. */
-  public IcebergCatalogCapability() {
+  /**
+   * Creates a capability with the default external schema separator {@code ":"}.
+   *
+   * <p>Package-private and intended for tests only: production code constructs this via {@link
+   * IcebergCatalog#newCapability()}, which passes the server-configured separator from {@link
+   * HierarchicalSchemaUtil#schemaSeparator()}. Using this constructor in production would hardcode
+   * {@code ":"} and validate names against the wrong separator if the server is configured
+   * otherwise.
+   */
+  IcebergCatalogCapability() {
     this(":");
   }
 
@@ -70,7 +78,7 @@ public class IcebergCatalogCapability implements Capability {
   }
 
   private CapabilityResult validateSegments(String name, String separator) {
-    String[] segments = name.split(Pattern.quote(separator), -1);
+    String[] segments = HierarchicalSchemaUtil.splitSchemaName(name, separator);
     for (String segment : segments) {
       if (segment.isEmpty()) {
         return CapabilityResult.unsupported(

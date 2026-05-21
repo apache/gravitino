@@ -19,6 +19,7 @@ package org.apache.gravitino.client.integration.test.authorization;
 
 import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableList;
@@ -84,6 +85,10 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     super.startIntegrationTest();
 
     // Create an Iceberg catalog because ':' hierarchical schema names are only supported there.
+    // The Iceberg JDBC catalog is backed by an in-memory SQLite database purely for test
+    // convenience: it is lightweight and needs no extra Docker container, so the IT can exercise
+    // the hierarchical-namespace behavior without a heavyweight metastore. SQLite is NOT a
+    // supported production Iceberg backend.
     Map<String, String> catalogProperties = new HashMap<>();
     catalogProperties.put("catalog-backend", "jdbc");
     catalogProperties.put("warehouse", "/tmp/gravitino-it-nested-schema");
@@ -122,11 +127,11 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     List<String> schemaList = Arrays.asList(schemas);
 
     assertTrue(schemaList.contains(ROOT_A), "Parent 'A' should be auto-created");
-    assertTrue(
-        !schemaList.contains(SCHEMA_AB),
+    assertFalse(
+        schemaList.contains(SCHEMA_AB),
         "Default listSchemas() should not include nested schema A:B");
-    assertTrue(
-        !schemaList.contains(SCHEMA_ABC),
+    assertFalse(
+        schemaList.contains(SCHEMA_ABC),
         "Default listSchemas() should not include nested schema A:B:C");
 
     // Verify nested schemas exist via direct load.
@@ -214,8 +219,8 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     // Nested schemas should NOT appear in the default listing.
     schemaList.forEach(
         name ->
-            assertTrue(
-                !name.contains(":"),
+            assertFalse(
+                name.contains(":"),
                 "Default listSchemas() should return only top-level schemas, got: " + name));
   }
 

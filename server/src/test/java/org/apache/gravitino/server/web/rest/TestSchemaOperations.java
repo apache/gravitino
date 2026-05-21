@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -200,6 +201,20 @@ public class TestSchemaOperations extends BaseOperationsTest {
     Assertions.assertEquals("A:sales", listResp.identifiers()[0].name());
 
     verify(dispatcher).listSchemas(eq(Namespace.of(metalake, catalog, "A")));
+  }
+
+  @Test
+  public void testListSchemasWithMalformedParentSchemaReturnsBadRequest() {
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .queryParam("parentSchema", "A::B")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    // The malformed parentSchema must be rejected before reaching the dispatcher.
+    verify(dispatcher, never()).listSchemas(any());
   }
 
   @Test

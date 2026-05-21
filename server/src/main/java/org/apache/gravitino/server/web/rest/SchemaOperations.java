@@ -57,6 +57,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -99,10 +100,13 @@ public class SchemaOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace schemaNS =
-                StringUtils.isBlank(parentSchema)
-                    ? NamespaceUtil.ofSchema(metalake, catalog)
-                    : Namespace.of(metalake, catalog, parentSchema);
+            Namespace schemaNS;
+            if (StringUtils.isBlank(parentSchema)) {
+              schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
+            } else {
+              validateParentSchema(parentSchema);
+              schemaNS = Namespace.of(metalake, catalog, parentSchema);
+            }
             NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
             idents =
                 MetadataAuthzHelper.filterByExpression(
@@ -257,6 +261,26 @@ public class SchemaOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.DROP, schema, catalog, e);
+    }
+  }
+
+  /**
+   * Validates the {@code parentSchema} query parameter. The value is a logical (possibly
+   * hierarchical) schema name, so it must not contain empty segments (e.g. {@code "A::B"} or {@code
+   * "A:"}) before it is passed to {@link Namespace#of}.
+   *
+   * @param parentSchema the non-blank {@code parentSchema} query parameter
+   * @throws IllegalArgumentException if the value contains an empty segment
+   */
+  private static void validateParentSchema(String parentSchema) {
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    for (String segment : HierarchicalSchemaUtil.splitSchemaName(parentSchema, separator)) {
+      if (segment.isEmpty()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "The parentSchema '%s' contains an empty segment after splitting by '%s'.",
+                parentSchema, separator));
+      }
     }
   }
 }

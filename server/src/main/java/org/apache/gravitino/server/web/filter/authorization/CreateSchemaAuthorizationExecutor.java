@@ -21,7 +21,6 @@ import java.lang.reflect.Parameter;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -44,6 +43,18 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  */
 public class CreateSchemaAuthorizationExecutor extends CommonAuthorizerExecutor {
 
+  /**
+   * Creates an authorization executor for a {@code createSchema} request and, for nested schema
+   * names, injects the parent schema into the metadata context so the standard expression can
+   * evaluate {@code CREATE_SCHEMA} against the already-existing parent.
+   *
+   * @param parameters the parameters of the intercepted method
+   * @param args the arguments passed to the intercepted method
+   * @param expression the authorization expression to evaluate
+   * @param metadataContext the mutable metadata context bound to the authorization expression
+   * @param pathParams the path parameters of the request
+   * @param entityType the optional entity type of the request
+   */
   public CreateSchemaAuthorizationExecutor(
       Parameter[] parameters,
       Object[] args,
@@ -72,7 +83,7 @@ public class CreateSchemaAuthorizationExecutor extends CommonAuthorizerExecutor 
 
     String separator = HierarchicalSchemaUtil.schemaSeparator();
     String schemaName = request.getName();
-    String[] levels = schemaName.split(Pattern.quote(separator), -1);
+    String[] levels = HierarchicalSchemaUtil.splitSchemaName(schemaName, separator);
 
     if (levels.length > 1) {
       String parentPath = String.join(separator, Arrays.copyOf(levels, levels.length - 1));

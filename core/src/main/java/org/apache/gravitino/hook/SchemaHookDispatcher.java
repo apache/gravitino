@@ -121,6 +121,13 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
    * Returns the identifiers of the (already-normalized) ancestor schemas of {@code normalizedIdent}
    * that do not yet exist, ordered outermost-to-innermost. Returns an empty list for a flat (non
    * hierarchical) schema name.
+   *
+   * <p>This issues one {@code schemaExists} probe per missing ancestor while the caller holds the
+   * catalog WRITE lock, so it blocks other schema operations on the catalog for the duration. The
+   * cost is bounded by the schema nesting depth, which is expected to be small (typically 2-3
+   * levels); the innermost-to-outermost short-circuit below means a request that nests under an
+   * existing parent issues only a single probe. If much deeper nesting becomes common this should
+   * be revisited (e.g. a single prefix query instead of per-level probes).
    */
   private List<NameIdentifier> findMissingAncestors(NameIdentifier normalizedIdent) {
     String separator = HierarchicalSchemaUtil.schemaSeparator();
