@@ -43,9 +43,9 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.commons.io)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
