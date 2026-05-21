@@ -50,14 +50,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
-    super(
-        context.getName(),
-        context.getOptions(),
-        defaultDatabase,
-        schemaAndTablePropertiesConverter,
-        partitionConverter);
-    this.context = context;
-    this.jdbcCatalog = null;
+    this(context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter, null);
   }
 
   protected GravitinoJdbcCatalog(

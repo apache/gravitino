@@ -46,19 +46,8 @@ public interface CatalogConnectorAdapter {
    * @return a map of configuration properties for the internal Trino connector
    * @throws Exception if the configuration cannot be built
    */
-  default Map<String, String> buildInternalConnectorConfig(
-      GravitinoCatalog catalog, Credential[] credentials) throws Exception {
-    return buildInternalConnectorConfig(catalog);
-  }
-
-  /**
-   * Builds the internal connector configuration required.
-   *
-   * @param catalog the Gravitino catalog to build configuration for
-   * @return a map of configuration properties for the internal Trino connector
-   * @throws Exception if the configuration cannot be built
-   */
-  Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog) throws Exception;
+  Map<String, String> buildInternalConnectorConfig(
+      GravitinoCatalog catalog, Credential[] credentials) throws Exception;
 
   /**
    * @return Return internal connector name with Trino.

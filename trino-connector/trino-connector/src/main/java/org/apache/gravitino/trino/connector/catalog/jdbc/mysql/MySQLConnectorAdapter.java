@@ -55,12 +55,6 @@ public class MySQLConnectorAdapter implements CatalogConnectorAdapter {
   }
 
   @Override
-  public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
-      throws Exception {
-    return buildInternalConnectorConfig(catalog, new Credential[0]);
-  }
-
-  @Override
   public String internalConnectorName() {
     return CONNECTOR_MYSQL;
   }
