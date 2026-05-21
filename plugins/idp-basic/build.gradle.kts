@@ -87,3 +87,7 @@ tasks {
     environment("GRAVITINO_TEST", "true")
   }
 }
+
+tasks.getByName("generateMetadataFileForMavenJavaPublication") {
+  dependsOn("copyDepends")
+}
