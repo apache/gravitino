@@ -56,12 +56,15 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The GravitinoHiveCatalog class is an implementation of the BaseCatalog class that is used to
  * proxy the HiveCatalog class.
  */
 public class GravitinoHiveCatalog extends BaseCatalog {
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoHiveCatalog.class);
 
   private static final String HIVE_TABLE_TYPE_KEY = "table-type";
   private static final String HIVE_VIRTUAL_VIEW_TYPE = "VIRTUAL_VIEW";
@@ -172,6 +175,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     } catch (NoSuchTableException e) {
       // Fall through to check views.
     } catch (Exception e) {
+      LOG.warn("Failed to load table {} from catalog {}", tablePath, catalogName(), e);
       throw new CatalogException(e);
     }
 

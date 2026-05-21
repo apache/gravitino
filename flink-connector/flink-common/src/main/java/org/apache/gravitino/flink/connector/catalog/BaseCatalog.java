@@ -250,6 +250,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     } catch (NoSuchTableException e) {
       // Fall through to check views.
     } catch (Exception e) {
+      LOG.warn("Failed to load table {} from catalog {}", ident, catalogName(), e);
       throw new CatalogException(e);
     }
 
@@ -277,6 +278,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
           e);
       return false;
     } catch (NoSuchSchemaException e) {
+      LOG.debug(
+          "Schema not found when checking viewExists for {} in catalog {}; returning false",
+          ident,
+          catalogName(),
+          e);
       return false;
     } catch (Exception e) {
       throw new CatalogException(e);
@@ -328,6 +334,14 @@ public abstract class BaseCatalog extends AbstractCatalog {
     if (catalog().asTableCatalog().tableExists(identifier)) {
       throw new TableAlreadyExistException(
           catalogName(), new ObjectPath(tablePath.getDatabaseName(), newTableName));
+    }
+    try {
+      if (catalog().asViewCatalog().viewExists(identifier)) {
+        throw new TableAlreadyExistException(
+            catalogName(), new ObjectPath(tablePath.getDatabaseName(), newTableName));
+      }
+    } catch (UnsupportedOperationException ignored) {
+      // catalog does not support views
     }
 
     CatalogBaseTable existing;
@@ -939,15 +953,18 @@ public abstract class BaseCatalog extends AbstractCatalog {
                         fallback.dialect());
                     return fallback.sql();
                   }
-                  LOG.warn("View {} has no SQL representation; returning empty query", view.name());
-                  return "";
+                  throw new CatalogException(
+                      String.format(
+                          "View '%s' in catalog '%s' has no SQL representation",
+                          view.name(), catalogName()));
                 });
 
     Map<String, String> properties =
         view.properties() != null
             ? Collections.unmodifiableMap(view.properties())
             : Collections.emptyMap();
-    return CatalogView.of(builder.build(), view.comment(), sql, sql, properties);
+    String comment = view.comment() != null ? view.comment() : "";
+    return CatalogView.of(builder.build(), comment, sql, sql, properties);
   }
 
   /**

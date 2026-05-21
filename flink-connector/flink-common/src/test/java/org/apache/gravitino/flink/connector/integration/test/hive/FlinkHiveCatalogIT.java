@@ -910,7 +910,8 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
           Assertions.assertEquals(1, view.representations().length);
           SQLRepresentation rep = (SQLRepresentation) view.representations()[0];
           Assertions.assertTrue(
-              rep.sql().contains("name"), "updated view SQL should reference 'name' column");
+              rep.sql().contains("name") && rep.sql().contains("id"),
+              "updated view SQL should select both id and name columns");
         },
         true);
   }
