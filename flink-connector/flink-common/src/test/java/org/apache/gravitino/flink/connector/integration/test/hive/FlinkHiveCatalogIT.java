@@ -60,6 +60,7 @@ import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.flink.table.catalog.hive.util.Constants;
 import org.apache.flink.types.Row;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.flink.connector.CatalogPropertiesConverter;
@@ -816,8 +817,7 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
 
           // Verify via Gravitino ViewCatalog
           ViewCatalog viewCatalog = catalog.asViewCatalog();
-          NameIdentifier[] gravitinoViews =
-              viewCatalog.listViews(org.apache.gravitino.Namespace.of(schemaName));
+          NameIdentifier[] gravitinoViews = viewCatalog.listViews(Namespace.of(schemaName));
           List<String> gravitinoViewNames =
               Arrays.stream(gravitinoViews).map(NameIdentifier::name).collect(Collectors.toList());
           Assertions.assertTrue(gravitinoViewNames.contains(view1));

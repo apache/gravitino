@@ -182,8 +182,7 @@ public class TestBaseCatalog {
     List<TableChange> tableChanges =
         ImmutableList.of(TableChange.set("k1", "v1"), TableChange.reset("k2"));
 
-    org.apache.flink.table.api.Schema schema =
-        Schema.newBuilder().column("id", DataTypes.INT()).build();
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
 
     ViewChange[] changes =
         BaseCatalog.getGravitinoViewChanges(
@@ -204,8 +203,7 @@ public class TestBaseCatalog {
         ImmutableList.of(
             TableChange.add(Column.physical("id", DataTypes.INT())), TableChange.set("k1", "v1"));
 
-    org.apache.flink.table.api.Schema schema =
-        Schema.newBuilder().column("id", DataTypes.INT()).build();
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
 
     ViewChange[] changes =
         BaseCatalog.getGravitinoViewChanges(
@@ -238,8 +236,7 @@ public class TestBaseCatalog {
 
   @Test
   public void testGetGravitinoViewChangesFullReplace() {
-    org.apache.flink.table.api.Schema schema =
-        Schema.newBuilder().column("id", DataTypes.INT()).build();
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
     CatalogView existing =
         CatalogView.of(schema, "old comment", "SELECT 1", "SELECT 1", Collections.emptyMap());
 
