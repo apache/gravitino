@@ -56,10 +56,10 @@ public class GlueDataTypeTransformer extends HiveDataTypeTransformer {
         // TIMESTAMP WITH TIME ZONE is Iceberg-only; always microseconds.
         return TimestampWithTimeZoneType.TIMESTAMP_TZ_MICROS;
       } else if (timestampType.hasPrecisionSet()) {
-        // Precision is set to 6 for Iceberg tables (via fromIcebergType); use microseconds.
+        // Iceberg tables always carry explicit precision; Hive-loaded timestamps do not.
         return TimestampType.TIMESTAMP_MICROS;
       }
-      // No precision set = loaded from Hive/Glue type string; fall through to TIMESTAMP_MILLIS.
+      // Hive/Glue TIMESTAMP has no precision set; fall through to TIMESTAMP_MILLIS.
     }
     return super.getTrinoType(type);
   }

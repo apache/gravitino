@@ -24,13 +24,17 @@ import static org.apache.gravitino.rel.types.Types.ByteType;
 import static org.apache.gravitino.rel.types.Types.DateType;
 import static org.apache.gravitino.rel.types.Types.DecimalType;
 import static org.apache.gravitino.rel.types.Types.DoubleType;
+import static org.apache.gravitino.rel.types.Types.ExternalType;
 import static org.apache.gravitino.rel.types.Types.FixedCharType;
 import static org.apache.gravitino.rel.types.Types.FixedType;
 import static org.apache.gravitino.rel.types.Types.FloatType;
 import static org.apache.gravitino.rel.types.Types.IntegerType;
+import static org.apache.gravitino.rel.types.Types.ListType;
 import static org.apache.gravitino.rel.types.Types.LongType;
+import static org.apache.gravitino.rel.types.Types.MapType;
 import static org.apache.gravitino.rel.types.Types.ShortType;
 import static org.apache.gravitino.rel.types.Types.StringType;
+import static org.apache.gravitino.rel.types.Types.StructType;
 import static org.apache.gravitino.rel.types.Types.TimeType;
 import static org.apache.gravitino.rel.types.Types.TimestampType;
 import static org.apache.gravitino.rel.types.Types.UUIDType;
@@ -231,8 +235,9 @@ final class GlueIcebergTableHelper {
    * <p>TIME and TIMESTAMP types are always returned with microsecond (6) precision, matching
    * Iceberg's internal representation.
    */
-  static org.apache.gravitino.rel.types.Type fromIcebergType(
-      org.apache.iceberg.types.Type icebergType) {
+  // The parameter uses FQN because org.apache.iceberg.types.Type and
+  // org.apache.gravitino.rel.types.Type share the same simple name.
+  static Type fromIcebergType(org.apache.iceberg.types.Type icebergType) {
     switch (icebergType.typeId()) {
       case BOOLEAN:
         return BooleanType.get();
@@ -257,8 +262,8 @@ final class GlueIcebergTableHelper {
       case TIMESTAMP:
         Types.TimestampType ts = (Types.TimestampType) icebergType;
         return ts.shouldAdjustToUTC()
-            ? org.apache.gravitino.rel.types.Types.TimestampType.withTimeZone(6)
-            : org.apache.gravitino.rel.types.Types.TimestampType.withoutTimeZone(6);
+            ? TimestampType.withTimeZone(6)
+            : TimestampType.withoutTimeZone(6);
       case DECIMAL:
         Types.DecimalType decimal = (Types.DecimalType) icebergType;
         return DecimalType.of(decimal.precision(), decimal.scale());
@@ -267,26 +272,25 @@ final class GlueIcebergTableHelper {
         return FixedType.of(fixed.length());
       case LIST:
         Types.ListType list = (Types.ListType) icebergType;
-        return org.apache.gravitino.rel.types.Types.ListType.of(
-            fromIcebergType(list.elementType()), list.isElementOptional());
+        return ListType.of(fromIcebergType(list.elementType()), list.isElementOptional());
       case MAP:
         Types.MapType map = (Types.MapType) icebergType;
-        return org.apache.gravitino.rel.types.Types.MapType.of(
+        return MapType.of(
             fromIcebergType(map.keyType()),
             fromIcebergType(map.valueType()),
             map.isValueOptional());
       case STRUCT:
         Types.StructType struct = (Types.StructType) icebergType;
-        org.apache.gravitino.rel.types.Types.StructType.Field[] fields =
+        StructType.Field[] fields =
             struct.fields().stream()
                 .map(
                     f ->
-                        org.apache.gravitino.rel.types.Types.StructType.Field.of(
+                        StructType.Field.of(
                             f.name(), fromIcebergType(f.type()), f.isOptional(), f.doc()))
-                .toArray(org.apache.gravitino.rel.types.Types.StructType.Field[]::new);
-        return org.apache.gravitino.rel.types.Types.StructType.of(fields);
+                .toArray(StructType.Field[]::new);
+        return StructType.of(fields);
       default:
-        return org.apache.gravitino.rel.types.Types.ExternalType.of(icebergType.typeId().name());
+        return ExternalType.of(icebergType.typeId().name());
     }
   }
 

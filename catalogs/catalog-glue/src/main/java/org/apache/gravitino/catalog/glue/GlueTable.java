@@ -281,8 +281,8 @@ public class GlueTable extends BaseTable {
   }
 
   /**
-   * Replaces the columns of the table. Package-private: only {@link GlueIcebergTableHelper} should
-   * call this to overwrite Hive-style column types with accurate types from the Iceberg schema.
+   * Replaces the columns with types sourced from the Iceberg schema, which is authoritative for
+   * Iceberg tables. Glue stores some types (e.g. TIME) as "string", so this corrects the loss.
    *
    * @param columns the columns derived from the Iceberg table schema
    */
