@@ -78,7 +78,7 @@ import {
   deleteVersionApi
 } from '@/lib/api/models'
 import { getFunctionsApi, getFunctionDetailsApi } from '@/lib/api/functions'
-import { getViewsApi, getViewDetailsApi } from '@/lib/api/views'
+import { getViewsApi, getViewDetailsApi, deleteViewApi } from '@/lib/api/views'
 
 const remapExpandedAndLoadedNodes = ({ getState, mapNode }) => {
   const expandedNodes = getState().metalakes.expandedNodes.map(mapNode)
@@ -2238,6 +2238,23 @@ export const getViewDetails = createAsyncThunk(
   }
 )
 
+export const deleteView = createAsyncThunk(
+  'appMetalakes/deleteView',
+  async ({ metalake, catalog, schema, view }, { dispatch }) => {
+    await dispatch(setTableLoading(true))
+    const [err, res] = await to(deleteViewApi({ metalake, catalog, schema, view }))
+    await dispatch(setTableLoading(false))
+
+    if (err || !res) {
+      throw new Error(err)
+    }
+
+    await dispatch(fetchViews({ metalake, catalog, schema, init: true }))
+
+    return res
+  }
+)
+
 export const appMetalakesSlice = createSlice({
   name: 'appMetalakes',
   initialState: {
@@ -2969,6 +2986,11 @@ export const appMetalakesSlice = createSlice({
       }
     })
     builder.addCase(getViewDetails.rejected, (state, action) => {
+      if (!action.error.message.includes('CanceledError')) {
+        toast.error(action.error.message)
+      }
+    })
+    builder.addCase(deleteView.rejected, (state, action) => {
       if (!action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }

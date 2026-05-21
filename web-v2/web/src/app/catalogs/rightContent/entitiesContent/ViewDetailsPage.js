@@ -75,8 +75,7 @@ export default function ViewDetailsPage() {
 
   const tabOptions = [
     { label: 'Columns', key: 'Columns' },
-    { label: 'SQL', key: 'SQL' },
-    ...(properties && Object.keys(properties).length > 0 ? [{ label: 'Properties', key: 'Properties' }] : [])
+    { label: 'SQL', key: 'SQL' }
   ]
 
   const onChangeTab = key => {
@@ -236,7 +235,6 @@ export default function ViewDetailsPage() {
           )}
         </div>
       )}
-      {tabKey === 'Properties' && <PropertiesContent properties={properties} />}
     </>
   )
 }

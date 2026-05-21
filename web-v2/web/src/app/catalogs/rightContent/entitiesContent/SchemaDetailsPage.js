@@ -22,7 +22,21 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons'
-import { Breadcrumb, Button, Divider, Flex, Input, Popover, Space, Spin, Table, Tabs, Tooltip, Typography } from 'antd'
+import {
+  Breadcrumb,
+  Button,
+  Divider,
+  Flex,
+  Input,
+  Modal,
+  Popover,
+  Space,
+  Spin,
+  Table,
+  Tabs,
+  Tooltip,
+  Typography
+} from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import useResizeObserver from 'use-resize-observer'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
@@ -41,6 +55,7 @@ import {
   deleteModel,
   deleteTopic,
   deleteTable,
+  deleteView,
   getTableDetails,
   getCurrentEntityOwner
 } from '@/lib/store/metalakes'
@@ -374,7 +389,11 @@ export default function SchemaDetailsPage() {
               )
               break
             case 'relational':
-              await dispatch(deleteTable({ metalake: currentMetalake, catalog, catalogType, schema, table: entity }))
+              if (type === 'view') {
+                await dispatch(deleteView({ metalake: currentMetalake, catalog, schema, view: entity }))
+              } else {
+                await dispatch(deleteTable({ metalake: currentMetalake, catalog, catalogType, schema, table: entity }))
+              }
               break
             case 'model':
               await dispatch(deleteModel({ metalake: currentMetalake, catalog, catalogType, schema, model: entity }))
@@ -472,9 +491,20 @@ export default function SchemaDetailsPage() {
             {name}
           </Link>
         )
+      },
+      {
+        title: 'Actions',
+        dataIndex: 'action',
+        key: 'action',
+        width: 100,
+        render: (_, record) => (
+          <a data-refer={`delete-view-${record.name}`}>
+            <Icons.Trash2Icon className='size-4' onClick={() => showDeleteConfirm(Modal, record, 'view')} />
+          </a>
+        )
       }
     ],
-    [currentMetalake, catalogType, catalog, schema]
+    [currentMetalake, catalogType, catalog, schema, catalogData?.provider]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {

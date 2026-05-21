@@ -27,6 +27,10 @@ const Apis = {
   GET_DETAIL: ({ metalake, catalog, schema, view }) =>
     `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
       catalog
+    )}/schemas/${encodeURIComponent(schema)}/views/${encodeURIComponent(view)}`,
+  DELETE: ({ metalake, catalog, schema, view }) =>
+    `/api/metalakes/${encodeURIComponent(metalake)}/catalogs/${encodeURIComponent(
+      catalog
     )}/schemas/${encodeURIComponent(schema)}/views/${encodeURIComponent(view)}`
 }
 
@@ -39,5 +43,11 @@ export const getViewsApi = params => {
 export const getViewDetailsApi = ({ metalake, catalog, schema, view }) => {
   return defHttp.get({
     url: `${Apis.GET_DETAIL({ metalake, catalog, schema, view })}`
+  })
+}
+
+export const deleteViewApi = ({ metalake, catalog, schema, view }) => {
+  return defHttp.delete({
+    url: `${Apis.DELETE({ metalake, catalog, schema, view })}`
   })
 }
