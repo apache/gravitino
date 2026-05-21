@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.idp.exception.NotFoundException;
@@ -53,8 +52,8 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
             .build();
 
     assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("group1"));
-    runServiceCall(
-        () -> groupMetaService.insertIdpGroup(group1, List.of(userGroupRel(100L, 1L, 1L))));
+    runServiceCall(() -> groupMetaService.insertIdpGroup(group1));
+    idpUserGroupRelMapper.batchInsertRelations(List.of(userGroupRel(100L, 1L, 1L)));
     assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
     assertIterableEquals(List.of("user1"), groupMetaService.listUsernamesByGroupName("group1"));
 
@@ -66,8 +65,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
-    assertThrowsEntityAlreadyExists(
-        () -> groupMetaService.insertIdpGroup(duplicateGroup, Lists.newArrayList()));
+    assertThrowsEntityAlreadyExists(() -> groupMetaService.insertIdpGroup(duplicateGroup));
   }
 
   @ParameterizedTest

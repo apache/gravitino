@@ -22,7 +22,6 @@ import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -38,7 +37,6 @@ import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -54,11 +52,6 @@ class TestIdpLegacyGarbageCollector extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
     idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
     idpUserGroupRelMapper = sharedSession.getMapper(IdpUserGroupRelMapper.class);
-  }
-
-  @AfterEach
-  void tearDown() throws IOException {
-    IdpLegacyGarbageCollector.stop();
   }
 
   @ParameterizedTest
@@ -83,7 +76,6 @@ class TestIdpLegacyGarbageCollector extends AbstractIdpMetaStorageTest {
     closeSession();
     IdpLegacyGarbageCollector garbageCollector = new IdpLegacyGarbageCollector(config);
     garbageCollector.collectAndClean();
-    garbageCollector.close();
     reopenSession();
 
     assertEquals(0, countUsers());

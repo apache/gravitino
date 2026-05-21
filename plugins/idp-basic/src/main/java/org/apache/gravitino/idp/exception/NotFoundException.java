@@ -18,29 +18,25 @@
  */
 package org.apache.gravitino.idp.exception;
 
-/** This exception is thrown when a built-in IdP entity is not found. */
+/** This exception is thrown when a built-in IdP resource is not found. */
 public class NotFoundException extends RuntimeException {
-  /** The not-found message template for the exception. */
-  public static final String NOT_FOUND_MESSAGE = "No such %s entity: %s";
 
   /**
-   * Constructs a new NotFoundException for the given entity type and name.
+   * Constructs a new NotFoundException with the given message.
    *
-   * @param entityType human-readable entity type, for example {@code idp user}
-   * @param entityName entity identifier, for example username or group name
+   * @param message the detail message
    */
-  public NotFoundException(String entityType, String entityName) {
-    super(String.format(NOT_FOUND_MESSAGE, entityType, entityName));
+  public NotFoundException(String message) {
+    super(message);
   }
 
   /**
-   * Constructs a new NotFoundException for the given entity type and name.
+   * Constructs a new NotFoundException with the given message and cause.
    *
    * @param cause the cause of the exception
-   * @param entityType human-readable entity type, for example {@code idp user}
-   * @param entityName entity identifier, for example username or group name
+   * @param message the detail message
    */
-  public NotFoundException(Throwable cause, String entityType, String entityName) {
-    super(String.format(NOT_FOUND_MESSAGE, entityType, entityName), cause);
+  public NotFoundException(Throwable cause, String message) {
+    super(message, cause);
   }
 }

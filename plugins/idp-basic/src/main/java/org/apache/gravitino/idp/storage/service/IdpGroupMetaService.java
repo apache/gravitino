@@ -30,7 +30,6 @@ import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
-import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -54,7 +53,7 @@ public class IdpGroupMetaService {
             IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName));
 
     if (groupPO == null) {
-      throw new NotFoundException("idp group", groupName);
+      throw new NotFoundException("IdP group not found: " + groupName);
     }
     return groupPO;
   }
@@ -114,21 +113,10 @@ public class IdpGroupMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertIdpGroup")
-  public void insertIdpGroup(IdpGroupPO groupPO, List<IdpUserGroupRelPO> relations)
-      throws IOException {
+  public void insertIdpGroup(IdpGroupPO groupPO) throws IOException {
     try {
-      SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  IdpUserGroupRelMapper.class,
-                  mapper -> {
-                    if (relations != null && !relations.isEmpty()) {
-                      mapper.batchInsertRelations(relations);
-                    }
-                  }));
+      SessionUtils.doWithoutCommit(
+          IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(re, Entity.EntityType.GROUP, groupPO.getGroupName());
       throw re;

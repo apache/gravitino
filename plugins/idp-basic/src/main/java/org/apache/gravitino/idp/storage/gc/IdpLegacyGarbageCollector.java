@@ -21,8 +21,6 @@ package org.apache.gravitino.idp.storage.gc;
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -44,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * org.apache.gravitino.idp.storage.mapper.provider.IdpBasicMapperPackageProvider} registers mappers
  * via SPI.
  */
-public final class IdpLegacyGarbageCollector implements Closeable {
+public final class IdpLegacyGarbageCollector {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpLegacyGarbageCollector.class);
 
@@ -80,21 +78,6 @@ public final class IdpLegacyGarbageCollector implements Closeable {
         instance.start();
       } catch (Exception e) {
         LOG.warn("Failed to start built-in IdP legacy garbage collector", e);
-      }
-    }
-  }
-
-  /** Stops the global collector if it was started via {@link #ensureStarted()}. */
-  public static void stop() throws IOException {
-    synchronized (START_LOCK) {
-      if (instance == null) {
-        return;
-      }
-
-      try {
-        instance.close();
-      } finally {
-        instance = null;
       }
     }
   }
@@ -150,19 +133,6 @@ public final class IdpLegacyGarbageCollector implements Closeable {
       LOG.error("Thread {} failed to collect and clean garbage.", threadId, e);
     } finally {
       LOG.debug("Thread {} finish to collect garbage.", threadId);
-    }
-  }
-
-  @Override
-  public void close() throws IOException {
-    this.garbageCollectorPool.shutdown();
-    try {
-      if (!this.garbageCollectorPool.awaitTermination(5, TimeUnit.SECONDS)) {
-        this.garbageCollectorPool.shutdownNow();
-      }
-    } catch (InterruptedException ex) {
-      this.garbageCollectorPool.shutdownNow();
-      Thread.currentThread().interrupt();
     }
   }
 }
