@@ -59,6 +59,7 @@ commons-logging = "1.3.5"
 commons-io = "2.18.0"
 commons-collections4 = "4.4"
 commons-collections3 = "3.2.2"
+commons-beanutils = "1.11.0"
 commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
@@ -240,6 +241,7 @@ commons-io = { group = "commons-io", name = "commons-io", version.ref = "commons
 caffeine = { group = "com.github.ben-manes.caffeine", name = "caffeine", version.ref = "caffeine" }
 commons-collections4 = { group = "org.apache.commons", name = "commons-collections4", version.ref = "commons-collections4" }
 commons-collections3 = { group = "commons-collections", name = "commons-collections", version.ref = "commons-collections3" }
+commons-beanutils = { group = "commons-beanutils", name = "commons-beanutils", version.ref = "commons-beanutils" }
 commons-configuration1 = { group = "commons-configuration", name = "commons-configuration", version.ref = "commons-configuration1" }
 commons-configuration2 = { group = "org.apache.commons", name = "commons-configuration2", version.ref = "commons-configuration2" }
 iceberg-aliyun = { group = "org.apache.iceberg", name = "iceberg-aliyun", version.ref = "iceberg" }
