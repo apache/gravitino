@@ -140,14 +140,8 @@ public final class GlueConstants {
    */
   public static final String SERDE_PARAMETER_PREFIX = "serde.parameter.";
 
-  /**
-   * Glue table type from {@code Table.tableType()}. Common values: {@code EXTERNAL_TABLE}, {@code
-   * MANAGED_TABLE}.
-   */
-  public static final String TABLE_TYPE = "table-type";
-
-  /** Default Glue {@code tableType} used when none is specified at table creation time. */
-  public static final String MANAGED_TABLE_TYPE = "MANAGED_TABLE";
+  /** Glue {@code tableType} value for external tables. */
+  public static final String EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
 
   private GlueConstants() {}
 }

@@ -111,7 +111,6 @@ final class GlueIcebergTableHelper {
   private static final Set<String> EXCLUDED_TABLE_PROPS =
       Set.of(
           GlueConstants.LOCATION,
-          GlueConstants.TABLE_TYPE,
           GlueConstants.METADATA_LOCATION,
           GlueConstants.INPUT_FORMAT_CLASS,
           GlueConstants.OUTPUT_FORMAT,

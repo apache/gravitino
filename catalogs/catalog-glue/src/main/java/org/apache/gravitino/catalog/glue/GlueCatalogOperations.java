@@ -111,9 +111,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           GlueConstants.SERDE_LIB,
           GlueConstants.SERDE_NAME);
 
-  /** Property keys that map to top-level TableInput fields, not to Table.parameters(). */
-  private static final Set<String> TABLE_LEVEL_KEYS = ImmutableSet.of(GlueConstants.TABLE_TYPE);
-
   @VisibleForTesting GlueClient glueClient;
 
   /** Nullable — when null, Glue uses the caller's AWS account ID. */
@@ -735,13 +732,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       if (key.startsWith(GlueConstants.SERDE_PARAMETER_PREFIX)) {
         serdeParams.put(
             key.substring(GlueConstants.SERDE_PARAMETER_PREFIX.length()), entry.getValue());
-      } else if (!SD_TABLE_PROPERTY_KEYS.contains(key) && !TABLE_LEVEL_KEYS.contains(key)) {
+      } else if (!SD_TABLE_PROPERTY_KEYS.contains(key)) {
         tableParams.put(key, entry.getValue());
       }
     }
 
     // Translate format name to input/output/serde class names if not explicitly set.
-    String format = properties.get(GlueConstants.FORMAT);
+    String format = properties.getOrDefault(GlueConstants.FORMAT, StorageFormat.PARQUET.name());
     String inputFormat = properties.get(GlueConstants.INPUT_FORMAT_CLASS);
     String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
     String serdeLib = properties.get(GlueConstants.SERDE_LIB);
@@ -749,10 +746,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     boolean needsFormatClasses =
         !isIceberg && (inputFormat == null || outputFormat == null || serdeLib == null);
     if (needsFormatClasses) {
-      Preconditions.checkArgument(
-          format != null,
-          "Table format is required: set the '%s' property on the table.",
-          GlueConstants.FORMAT);
       StorageFormat sf;
       try {
         sf = StorageFormat.valueOf(format.toUpperCase(Locale.ROOT));
@@ -810,8 +803,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         TableInput.builder()
             .name(name)
             .description(comment)
-            .tableType(
-                properties.getOrDefault(GlueConstants.TABLE_TYPE, GlueConstants.MANAGED_TABLE_TYPE))
+            .tableType(GlueConstants.EXTERNAL_TABLE_TYPE)
             .parameters(tableParams)
             .storageDescriptor(sd);
 

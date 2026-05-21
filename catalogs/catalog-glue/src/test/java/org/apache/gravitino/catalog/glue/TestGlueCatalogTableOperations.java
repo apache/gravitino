@@ -253,9 +253,7 @@ class TestGlueCatalogTableOperations {
             GlueConstants.OUTPUT_FORMAT,
             HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS,
             GlueConstants.SERDE_LIB,
-            HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS,
-            GlueConstants.TABLE_TYPE,
-            "EXTERNAL_TABLE");
+            HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS);
 
     ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
 
@@ -274,7 +272,6 @@ class TestGlueCatalogTableOperations {
     assertEquals("EXTERNAL_TABLE", req.tableInput().tableType());
     assertEquals("s3://my-bucket/path", req.tableInput().storageDescriptor().location());
     assertFalse(req.tableInput().parameters().containsKey(GlueConstants.LOCATION));
-    assertFalse(req.tableInput().parameters().containsKey(GlueConstants.TABLE_TYPE));
   }
 
   // -------------------------------------------------------------------------

@@ -24,7 +24,6 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.OUTPUT_FORMAT;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_LIB;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_NAME;
 import static org.apache.gravitino.catalog.glue.GlueConstants.SERDE_PARAMETER_PREFIX;
-import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_TYPE;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
@@ -176,9 +175,7 @@ public class GlueTable extends BaseTable {
     if (glueTable.hasParameters()) {
       properties.putAll(glueTable.parameters());
     }
-    if (StringUtils.isNotBlank(glueTable.tableType())) {
-      properties.put(TABLE_TYPE, glueTable.tableType());
-    }
+
     if (sd != null) {
       putIfNotBlank(properties, LOCATION, sd.location());
       putIfNotBlank(properties, INPUT_FORMAT_CLASS, sd.inputFormat());
