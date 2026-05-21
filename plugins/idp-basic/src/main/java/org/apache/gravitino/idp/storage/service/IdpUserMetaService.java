@@ -105,29 +105,17 @@ public class IdpUserMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertIdpUser")
-  public void insertIdpUser(
-      IdpUserPO userPO, List<IdpUserGroupRelPO> relations, boolean overwritten) throws IOException {
+  public void insertIdpUser(IdpUserPO userPO, List<IdpUserGroupRelPO> relations)
+      throws IOException {
     try {
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
-                  IdpUserMetaMapper.class,
-                  mapper -> {
-                    if (overwritten) {
-                      IdpUserPO existing = mapper.selectIdpUser(userPO.getUsername());
-                      if (existing != null) {
-                        mapper.softDeleteIdpUser(existing.getUserId());
-                      }
-                    }
-                    mapper.insertIdpUser(userPO);
-                  }),
+                  IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO)),
           () ->
               SessionUtils.doWithoutCommit(
                   IdpUserGroupRelMapper.class,
                   mapper -> {
-                    if (overwritten) {
-                      mapper.softDeleteRelationsByUsername(userPO.getUsername());
-                    }
                     if (relations != null && !relations.isEmpty()) {
                       mapper.batchInsertRelations(relations);
                     }

@@ -28,7 +28,6 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.idp.exception.NotFoundException;
-import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -55,8 +54,7 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
             .build();
 
     assertThrows(NotFoundException.class, () -> userMetaService.getIdpUserByUsername("user1"));
-    runServiceCall(
-        () -> userMetaService.insertIdpUser(user1, List.of(userGroupRel(100L, 1L, 1L)), false));
+    runServiceCall(() -> userMetaService.insertIdpUser(user1, List.of(userGroupRel(100L, 1L, 1L))));
     assertEquals("user1", userMetaService.getIdpUserByUsername("user1").getUsername());
     assertIterableEquals(List.of("group1"), userMetaService.listGroupNamesByUsername("user1"));
 
@@ -70,25 +68,7 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
             .withDeletedAt(0L)
             .build();
     assertThrowsEntityAlreadyExists(
-        () -> userMetaService.insertIdpUser(duplicateUser, Lists.newArrayList(), false));
-
-    IdpUserPO overwriteUser =
-        IdpUserPO.builder()
-            .withUserId(3L)
-            .withUsername("user1")
-            .withPasswordHash("hash-3")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build();
-    List<IdpUserGroupRelPO> overwriteRelations =
-        List.of(userGroupRel(101L, 3L, 1L), userGroupRel(102L, 3L, 2L));
-    runServiceCall(() -> userMetaService.insertIdpUser(overwriteUser, overwriteRelations, true));
-    assertEquals("hash-3", userMetaService.getIdpUserByUsername("user1").getPasswordHash());
-    assertIterableEquals(
-        List.of("group1", "group2"), userMetaService.listGroupNamesByUsername("user1"));
-    assertEquals(2, countUsers());
-    assertEquals(3, countUserGroupRels());
+        () -> userMetaService.insertIdpUser(duplicateUser, Lists.newArrayList()));
   }
 
   @ParameterizedTest

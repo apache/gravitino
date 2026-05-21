@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
-import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -55,7 +54,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("group1"));
     runServiceCall(
-        () -> groupMetaService.insertIdpGroup(group1, List.of(userGroupRel(100L, 1L, 1L)), false));
+        () -> groupMetaService.insertIdpGroup(group1, List.of(userGroupRel(100L, 1L, 1L))));
     assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
     assertIterableEquals(List.of("user1"), groupMetaService.listUsernamesByGroupName("group1"));
 
@@ -68,24 +67,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
             .withDeletedAt(0L)
             .build();
     assertThrowsEntityAlreadyExists(
-        () -> groupMetaService.insertIdpGroup(duplicateGroup, Lists.newArrayList(), false));
-
-    IdpGroupPO overwriteGroup =
-        IdpGroupPO.builder()
-            .withGroupId(2L)
-            .withGroupName("group1")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build();
-    List<IdpUserGroupRelPO> overwriteRelations =
-        List.of(userGroupRel(101L, 2L, 2L), userGroupRel(102L, 3L, 2L));
-    runServiceCall(() -> groupMetaService.insertIdpGroup(overwriteGroup, overwriteRelations, true));
-    assertEquals(2L, groupMetaService.getIdpGroupByName("group1").getGroupId());
-    assertIterableEquals(
-        List.of("user2", "user3"), groupMetaService.listUsernamesByGroupName("group1"));
-    assertEquals(2, countGroups());
-    assertEquals(3, countUserGroupRels());
+        () -> groupMetaService.insertIdpGroup(duplicateGroup, Lists.newArrayList()));
   }
 
   @ParameterizedTest
