@@ -255,7 +255,7 @@ final class PaimonViewCatalogOps {
     try {
       paimonCatalogOps.createView(sourceIdentifier.toString(), paimonView);
     } catch (Catalog.ViewAlreadyExistException e) {
-      LOG.warn(
+      LOG.error(
           "Replacing Paimon view {} is non-atomic (drop-then-create). "
               + "Create failed after drop and the original view may be lost.",
           identifier,
@@ -263,7 +263,7 @@ final class PaimonViewCatalogOps {
       throw new IllegalArgumentException(
           String.format(VIEW_ALREADY_EXISTS_EXCEPTION, identifier), e);
     } catch (Catalog.DatabaseNotExistException e) {
-      LOG.warn(
+      LOG.error(
           "Replacing Paimon view {} is non-atomic (drop-then-create). "
               + "Create failed after drop and the original view may be lost.",
           identifier,
