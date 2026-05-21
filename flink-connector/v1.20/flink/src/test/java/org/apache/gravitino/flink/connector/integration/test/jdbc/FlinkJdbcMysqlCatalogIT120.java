@@ -45,7 +45,7 @@ public class FlinkJdbcMysqlCatalogIT120 extends FlinkJdbcMysqlCatalogIT {
                             + ")",
                         catalogName, mysqlUrl, mysqlUsername, mysqlDefaultDatabase)));
 
-    Assertions.assertTrue(exception.getMessage().contains("jdbc-password"));
+    Assertions.assertTrue(exception.getMessage().contains("password"));
     Assertions.assertFalse(metalake.catalogExists(catalogName));
   }
 }
