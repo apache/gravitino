@@ -1104,6 +1104,7 @@ tasks {
         it.name != "integration-test" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
+        it.parent?.name != "plugins" &&
         it.name != "mcp-server"
       ) {
         from(it.configurations.runtimeClasspath) {

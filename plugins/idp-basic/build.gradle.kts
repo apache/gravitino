@@ -55,30 +55,23 @@ dependencies {
 }
 
 tasks {
-  val copyDepends by registering(Copy::class) {
-    from(configurations.runtimeClasspath)
-    into("build/libs")
-  }
-
-  jar {
-    finalizedBy(copyDepends)
-  }
-
   val copyLibs by registering(Copy::class) {
-    dependsOn("jar", copyDepends)
-    from("build/libs") {
-      exclude("guava-*.jar")
-      exclude("log4j-*.jar")
-      exclude("slf4j-*.jar")
-      exclude("error_prone_annotations-*.jar")
+    dependsOn(jar)
+    from(layout.buildDirectory.dir("libs")) {
+      include("gravitino-idp-basic-*.jar")
+      exclude("*-javadoc.jar", "*-sources.jar")
+    }
+    // Argon2id password hashing; not bundled in the server distribution today.
+    from(configurations.runtimeClasspath) {
+      include("bcprov-jdk18on-*.jar")
     }
     into("$rootDir/distribution/package/libs")
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   }
 
   register("copyLibAndConfigs", Copy::class) {
     group = "gravitino distribution"
-    description = "Copy idp-basic plugin libs into distribution package libs classpath"
+    description = "Copy idp-basic plugin jar into distribution package libs"
     dependsOn(copyLibs)
   }
 
@@ -86,8 +79,4 @@ tasks {
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")
   }
-}
-
-tasks.getByName("generateMetadataFileForMavenJavaPublication") {
-  dependsOn("copyDepends")
 }
