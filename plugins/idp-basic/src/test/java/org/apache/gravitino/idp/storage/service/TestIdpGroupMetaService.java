@@ -37,6 +37,17 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
+  void testGetIdpGroupByName(String type) throws IOException {
+    init(type);
+    insertGroups(1);
+    IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
+
+    assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("missing"));
+    assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
   void testInsertIdpGroup(String type) throws IOException {
     init(type);
     insertUsers(4);
@@ -53,7 +64,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("group1"));
     runServiceCall(() -> groupMetaService.insertIdpGroup(group1));
-    idpUserGroupRelMapper.batchInsertRelations(List.of(userGroupRel(100L, "user1", "group1")));
+    runServiceCall(() -> groupMetaService.addUsersToGroup("group1", List.of("user1")));
     assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
     assertIterableEquals(List.of("user1"), groupMetaService.listUsernamesByGroupName("group1"));
 
@@ -70,7 +81,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testDeleteIdpGroup(String type) throws IOException {
+  void testDeleteIdpGroupCascadesMemberships(String type) throws IOException {
     init(type);
     insertUsers(4);
     insertGroups(4);
@@ -83,6 +94,36 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
     assertEquals(8, countUserGroupRels());
     assertIterableEquals(List.of(), groupMetaService.listUsernamesByGroupName("group1"));
     assertEquals("group2", idpGroupMetaMapper.selectIdpGroup("group2").getGroupName());
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testAddAndRemoveUsersFromGroup(String type) throws IOException {
+    init(type);
+    insertUsers(4);
+    IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
+
+    IdpGroupPO group1 =
+        IdpGroupPO.builder()
+            .withGroupId(1L)
+            .withGroupName("engineering")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    runServiceCall(() -> groupMetaService.insertIdpGroup(group1));
+
+    runServiceCall(
+        () -> groupMetaService.addUsersToGroup("engineering", List.of("user1", "user2")));
+    assertIterableEquals(
+        List.of("user1", "user2"), groupMetaService.listUsernamesByGroupName("engineering"));
+
+    runServiceCall(
+        () ->
+            assertEquals(
+                1, groupMetaService.removeUsersFromGroup("engineering", List.of("user1"))));
+    assertIterableEquals(
+        List.of("user2"), groupMetaService.listUsernamesByGroupName("engineering"));
   }
 
   @ParameterizedTest

@@ -37,10 +37,22 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
+  void testGetIdpUserByUsername(String type) throws IOException {
+    init(type);
+    insertUsers(1);
+    IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
+
+    assertThrows(NotFoundException.class, () -> userMetaService.getIdpUserByUsername("missing"));
+    assertEquals("user1", userMetaService.getIdpUserByUsername("user1").getUsername());
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
   void testInsertIdpUser(String type) throws IOException {
     init(type);
     insertGroups(2);
     IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
+    IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
 
     IdpUserPO user1 =
         IdpUserPO.builder()
@@ -54,7 +66,7 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> userMetaService.getIdpUserByUsername("user1"));
     runServiceCall(() -> userMetaService.insertIdpUser(user1));
-    idpUserGroupRelMapper.batchInsertRelations(List.of(userGroupRel(100L, "user1", "group1")));
+    runServiceCall(() -> groupMetaService.addUsersToGroup("group1", List.of("user1")));
     assertEquals("user1", userMetaService.getIdpUserByUsername("user1").getUsername());
     assertIterableEquals(List.of("group1"), userMetaService.listGroupNamesByUsername("user1"));
 
@@ -68,6 +80,21 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
             .withDeletedAt(0L)
             .build();
     assertThrowsEntityAlreadyExists(() -> userMetaService.insertIdpUser(duplicateUser));
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testUpdateIdpUserPassword(String type) throws IOException {
+    init(type);
+    insertUsers(1);
+    IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
+
+    assertThrows(
+        NotFoundException.class, () -> userMetaService.updateIdpUserPassword("missing", "hash-2"));
+
+    runServiceCall(() -> assertTrue(userMetaService.updateIdpUserPassword("user1", "hash-2")));
+    assertEquals("hash-2", userMetaService.getIdpUserByUsername("user1").getPasswordHash());
+    assertEquals(1L, userMetaService.getIdpUserByUsername("user1").getCurrentVersion());
   }
 
   @ParameterizedTest

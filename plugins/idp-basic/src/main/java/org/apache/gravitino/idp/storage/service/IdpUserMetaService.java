@@ -20,9 +20,7 @@ package org.apache.gravitino.idp.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.idp.exception.NotFoundException;
@@ -46,51 +44,17 @@ public class IdpUserMetaService {
 
   private IdpUserMetaService() {}
 
-  private IdpUserPO getIdpUserPOByUsername(String username) {
-    IdpUserPO userPO =
-        SessionUtils.getWithoutCommit(
-            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
-
-    if (userPO == null) {
-      throw new NotFoundException("IdP user not found: " + username);
-    }
-    return userPO;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getIdpUserIdByUsername")
-  public Long getIdpUserIdByUsername(String username) {
-    return getIdpUserPOByUsername(username).getUserId();
-  }
-
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getIdpUserByUsername")
   public IdpUserPO getIdpUserByUsername(String username) {
-    return getIdpUserPOByUsername(username);
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "listIdpUsersByGroupName")
-  public List<IdpUserPO> listIdpUsersByGroupName(String groupName) {
-    List<String> usernames =
+    IdpUserPO userPO =
         SessionUtils.getWithoutCommit(
-            IdpUserGroupRelMapper.class, mapper -> mapper.selectUsernamesByGroupName(groupName));
-    if (usernames.isEmpty()) {
-      return Collections.emptyList();
+            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
+    if (userPO == null) {
+      throw new NotFoundException("IdP user not found: " + username);
     }
-    return listIdpUsers(usernames);
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "listIdpUsers")
-  public List<IdpUserPO> listIdpUsers(List<String> usernames) {
-    Preconditions.checkNotNull(usernames, "IdP usernames cannot be null");
-    return SessionUtils.getWithoutCommit(
-        IdpUserMetaMapper.class, mapper -> mapper.selectIdpUsers(usernames));
+    return userPO;
   }
 
   @Monitored(
@@ -132,8 +96,9 @@ public class IdpUserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateIdpUserPassword")
   public boolean updateIdpUserPassword(String username, String passwordHash) {
+    getIdpUserByUsername(username);
     Integer updated =
-        SessionUtils.getWithoutCommit(
+        SessionUtils.doWithCommitAndFetchResult(
             IdpUserMetaMapper.class,
             mapper -> mapper.updateIdpUserPassword(username, passwordHash));
     return updated != null && updated > 0;
