@@ -746,7 +746,8 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
     String serdeLib = properties.get(GlueConstants.SERDE_LIB);
 
-    boolean needsFormatClasses = inputFormat == null || outputFormat == null || serdeLib == null;
+    boolean needsFormatClasses =
+        !isIceberg && (inputFormat == null || outputFormat == null || serdeLib == null);
     if (needsFormatClasses) {
       Preconditions.checkArgument(
           format != null,
