@@ -19,7 +19,9 @@
 package org.apache.gravitino.idp.storage.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -52,6 +54,72 @@ class TestIdpGroupMetaService extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
     idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
     idpUserGroupRelMapper = sharedSession.getMapper(IdpUserGroupRelMapper.class);
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void insertIdpGroup(String type) throws Exception {
+    init(type);
+    insertUsers();
+    IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
+
+    IdpGroupPO group =
+        IdpGroupPO.builder()
+            .withGroupId(1L)
+            .withGroupName("admins")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    List<IdpUserGroupRelPO> relations = List.of(userGroupRel(100L, 1L, 1L));
+
+    closeSession();
+    groupMetaService.insertIdpGroup(group, relations, false);
+    reopenSession();
+
+    assertEquals("admins", idpGroupMetaMapper.selectIdpGroup("admins").getGroupName());
+    assertIterableEquals(List.of("user1"), groupMetaService.listUsernamesByGroupName("admins"));
+
+    IdpGroupPO overwriteGroup =
+        IdpGroupPO.builder()
+            .withGroupId(2L)
+            .withGroupName("admins")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    List<IdpUserGroupRelPO> overwriteRelations =
+        List.of(userGroupRel(101L, 2L, 2L), userGroupRel(102L, 3L, 2L));
+
+    closeSession();
+    groupMetaService.insertIdpGroup(overwriteGroup, overwriteRelations, true);
+    reopenSession();
+
+    assertEquals(2L, idpGroupMetaMapper.selectIdpGroup("admins").getGroupId());
+    assertIterableEquals(
+        List.of("user2", "user3"), groupMetaService.listUsernamesByGroupName("admins"));
+    assertEquals(2, countGroups());
+    assertEquals(3, countUserGroupRels());
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void deleteIdpGroup(String type) throws Exception {
+    init(type);
+    insertUsers();
+    insertGroups();
+    insertUserGroupRelations();
+    IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
+
+    closeSession();
+    assertTrue(groupMetaService.deleteIdpGroup("group1"));
+    reopenSession();
+
+    assertNull(idpGroupMetaMapper.selectIdpGroup("group1"));
+    assertEquals(4, countGroups());
+    assertEquals(8, countUserGroupRels());
+    assertIterableEquals(List.of(), groupMetaService.listUsernamesByGroupName("group1"));
+    assertEquals("group2", idpGroupMetaMapper.selectIdpGroup("group2").getGroupName());
   }
 
   @ParameterizedTest

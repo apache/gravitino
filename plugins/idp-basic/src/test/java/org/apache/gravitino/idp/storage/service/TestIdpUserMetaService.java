@@ -19,7 +19,9 @@
 package org.apache.gravitino.idp.storage.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -52,6 +54,74 @@ class TestIdpUserMetaService extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
     idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
     idpUserGroupRelMapper = sharedSession.getMapper(IdpUserGroupRelMapper.class);
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void insertIdpUser(String type) throws Exception {
+    init(type);
+    insertGroups();
+    IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
+
+    IdpUserPO user =
+        IdpUserPO.builder()
+            .withUserId(1L)
+            .withUsername("alice")
+            .withPasswordHash("hash-a")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    List<IdpUserGroupRelPO> relations = List.of(userGroupRel(100L, 1L, 1L));
+
+    closeSession();
+    userMetaService.insertIdpUser(user, relations, false);
+    reopenSession();
+
+    assertEquals(user.getUsername(), idpUserMetaMapper.selectIdpUser("alice").getUsername());
+    assertIterableEquals(List.of("group1"), userMetaService.listGroupNamesByUsername("alice"));
+
+    IdpUserPO overwriteUser =
+        IdpUserPO.builder()
+            .withUserId(2L)
+            .withUsername("alice")
+            .withPasswordHash("hash-b")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    List<IdpUserGroupRelPO> overwriteRelations =
+        List.of(userGroupRel(101L, 2L, 1L), userGroupRel(102L, 2L, 2L));
+
+    closeSession();
+    userMetaService.insertIdpUser(overwriteUser, overwriteRelations, true);
+    reopenSession();
+
+    assertEquals("hash-b", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
+    assertIterableEquals(
+        List.of("group1", "group2"), userMetaService.listGroupNamesByUsername("alice"));
+    assertEquals(2, countUsers());
+    assertEquals(3, countUserGroupRels());
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void deleteIdpUser(String type) throws Exception {
+    init(type);
+    insertGroups();
+    insertUsers();
+    insertUserGroupRelations();
+    IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
+
+    closeSession();
+    assertTrue(userMetaService.deleteIdpUser("user1"));
+    reopenSession();
+
+    assertNull(idpUserMetaMapper.selectIdpUser("user1"));
+    assertEquals(4, countUsers());
+    assertEquals(8, countUserGroupRels());
+    assertIterableEquals(List.of(), userMetaService.listGroupNamesByUsername("user1"));
+    assertEquals("user2", idpUserMetaMapper.selectIdpUser("user2").getUsername());
   }
 
   @ParameterizedTest
