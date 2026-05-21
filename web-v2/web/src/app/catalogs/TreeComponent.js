@@ -305,7 +305,7 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
       case 'view':
         return (
           <span role='img' aria-label='view' className='anticon anticon-frown'>
-            <Icons.iconify icon='mdi:eye-outline' className='my-icon-small' />
+            <Icons.iconify icon='ic:outline-table-view' className='my-icon-small' />
           </span>
         )
       default:

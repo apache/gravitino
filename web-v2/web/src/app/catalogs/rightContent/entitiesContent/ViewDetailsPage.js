@@ -19,12 +19,29 @@
 
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Descriptions, Divider, Flex, Input, Popover, Space, Spin, Table, Tabs, Tag, Tooltip, Typography } from 'antd'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  Descriptions,
+  Divider,
+  Flex,
+  Input,
+  Popover,
+  Space,
+  Segmented,
+  Spin,
+  Table,
+  Tabs,
+  Tag,
+  Tooltip,
+  Typography,
+  message
+} from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import useResizeObserver from 'use-resize-observer'
+import { format } from 'sql-formatter'
+import { highlight } from 'sql-highlight'
 import Icons from '@/components/Icons'
-import { ColumnTypeColorEnum } from '@/config'
+import { ColumnTypeColorEnum, sqlFormatterDialectMap } from '@/config'
 import { useAppSelector } from '@/lib/hooks/useStore'
 import { useSearchParams } from 'next/navigation'
 import { formatToDateTime, isValidDate } from '@/lib/utils/date'
@@ -40,6 +57,8 @@ export default function ViewDetailsPage() {
   const viewData = store.activatedDetails
   const [search, setSearch] = useState('')
   const [tabKey, setTabKey] = useState('Columns')
+  const [activeSqlKey, setActiveSqlKey] = useState(null)
+  const [messageApi, contextHolder] = message.useMessage()
   const { ref, width } = useResizeObserver()
 
   const tableData = viewData?.columns
@@ -70,8 +89,77 @@ export default function ViewDetailsPage() {
 
   const representations = viewData?.representations || []
   const properties = viewData?.properties
+  const defaultCatalog = viewData?.defaultCatalog
+  const defaultSchema = viewData?.defaultSchema
   const createdAt = viewData?.audit?.createTime
   const createdAtText = !createdAt || !isValidDate(createdAt) ? '-' : formatToDateTime(createdAt)
+
+  const formatSql = (sql, dialect) => {
+    if (!sql) {
+      return '-'
+    }
+
+    const normalizedDialect = (dialect || 'sql').toLowerCase()
+    const mappedDialect = sqlFormatterDialectMap[normalizedDialect]
+
+    try {
+      if (mappedDialect) {
+        return format(sql, {
+          language: mappedDialect,
+          keywordCase: 'upper'
+        })
+      }
+
+      return format(sql, { keywordCase: 'upper' })
+    } catch {
+      return sql
+    }
+  }
+
+  const onCopySql = async sql => {
+    try {
+      await navigator.clipboard.writeText(sql)
+      messageApi.success('SQL copied')
+    } catch {
+      messageApi.error('Failed to copy SQL')
+    }
+  }
+
+  const highlightSql = sql => {
+    try {
+      return highlight(sql, { html: true })
+    } catch {
+      return sql
+    }
+  }
+
+  const sqlSegmentItems = useMemo(
+    () =>
+      representations.map((rep, index) => {
+        const formattedSql = formatSql(rep?.sql, rep?.dialect)
+
+        return {
+          key: `sql-${index}-${rep?.dialect || 'unknown'}`,
+          label: rep?.dialect || `dialect-${index + 1}`,
+          formattedSql
+        }
+      }),
+    [representations]
+  )
+
+  useEffect(() => {
+    if (sqlSegmentItems.length === 0) {
+      setActiveSqlKey(null)
+      return
+    }
+
+    if (!sqlSegmentItems.some(item => item.key === activeSqlKey)) {
+      setActiveSqlKey(sqlSegmentItems[0].key)
+    }
+  }, [sqlSegmentItems, activeSqlKey])
+
+  const activeSqlItem =
+    sqlSegmentItems.find(item => item.key === activeSqlKey) || (sqlSegmentItems.length > 0 ? sqlSegmentItems[0] : null)
 
   const tabOptions = [
     { label: 'Columns', key: 'Columns' },
@@ -133,10 +221,11 @@ export default function ViewDetailsPage() {
 
   return (
     <>
+      {contextHolder}
       <Spin spinning={store.activatedDetailsLoading}>
         <Flex className='mb-2' gap='small' align='flex-start' ref={ref}>
           <div className='size-8'>
-            <Icons.iconify icon='mdi:eye-outline' className='my-icon-large' />
+            <Icons.iconify icon='ic:outline-table-view' className='my-icon-large' />
           </div>
           <div className='grow-1 relative bottom-1'>
             <Title level={3} style={{ marginBottom: '0.125rem' }}>
@@ -213,23 +302,46 @@ export default function ViewDetailsPage() {
       )}
       {tabKey === 'SQL' && (
         <div className='mt-2'>
+          {(defaultCatalog || defaultSchema) && (
+            <Descriptions
+              layout='horizontal'
+              column={1}
+              size='small'
+              bordered
+              className='mb-4'
+              labelStyle={{ width: '20%' }}
+            >
+              {defaultCatalog && <Descriptions.Item label='Default Catalog'>{defaultCatalog}</Descriptions.Item>}
+              {defaultSchema && <Descriptions.Item label='Default Schema'>{defaultSchema}</Descriptions.Item>}
+            </Descriptions>
+          )}
           {representations.length > 0 ? (
-            representations.map((rep, index) => (
-              <Descriptions
-                key={`sql-${index}`}
-                layout='horizontal'
-                column={1}
+            <>
+              <Segmented
+                className='mb-3'
                 size='small'
-                bordered
-                className='mb-4'
-                labelStyle={{ width: '20%' }}
-              >
-                <Descriptions.Item label='Dialect'>{rep.dialect || '-'}</Descriptions.Item>
-                <Descriptions.Item label='SQL'>
-                  <pre className='m-0 whitespace-pre-wrap break-all font-mono text-sm'>{rep.sql || '-'}</pre>
-                </Descriptions.Item>
-              </Descriptions>
-            ))
+                options={sqlSegmentItems.map(item => ({ label: item.label, value: item.key }))}
+                value={activeSqlItem?.key}
+                onChange={setActiveSqlKey}
+              />
+              {activeSqlItem && (
+                <div className='relative rounded border border-borderColor p-3'>
+                  <Tooltip title='Copy SQL' placement='top'>
+                    <button
+                      type='button'
+                      className='absolute right-3 top-3 inline-flex cursor-pointer items-center rounded border border-borderColor bg-transparent p-1 text-textSecondary transition-colors hover:text-defaultPrimary'
+                      onClick={() => onCopySql(activeSqlItem.formattedSql)}
+                    >
+                      <Icons.Copy className='size-4' />
+                    </button>
+                  </Tooltip>
+                  <pre
+                    className='m-0 whitespace-pre-wrap break-all font-mono text-sm leading-6'
+                    dangerouslySetInnerHTML={{ __html: highlightSql(activeSqlItem.formattedSql) }}
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <Paragraph type='secondary'>No SQL representations available.</Paragraph>
           )}
