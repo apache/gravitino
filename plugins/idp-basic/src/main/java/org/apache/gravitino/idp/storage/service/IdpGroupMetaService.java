@@ -115,8 +115,7 @@ public class IdpGroupMetaService {
       baseMetricName = "insertIdpGroup")
   public void insertIdpGroup(IdpGroupPO groupPO) throws IOException {
     try {
-      SessionUtils.doWithoutCommit(
-          IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO));
+      SessionUtils.doWithCommit(IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(re, Entity.EntityType.GROUP, groupPO.getGroupName());
       throw re;

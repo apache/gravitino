@@ -106,7 +106,7 @@ public class IdpUserMetaService {
       baseMetricName = "insertIdpUser")
   public void insertIdpUser(IdpUserPO userPO) throws IOException {
     try {
-      SessionUtils.doWithoutCommit(IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO));
+      SessionUtils.doWithCommit(IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(re, Entity.EntityType.USER, userPO.getUsername());
       throw re;
