@@ -52,7 +52,8 @@
 }
 
 .ant-tabs-content-holder {
-  width: 0;
+  min-width: 0;
+  width: 100%;
 }
 
 .ant-steps-item-active {
@@ -157,4 +158,32 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.sql-hl-keyword {
+  @apply font-semibold text-defaultPrimary;
+}
+
+.sql-hl-function {
+  color: #7c3aed;
+}
+
+.sql-hl-string {
+  color: #166534;
+}
+
+.sql-hl-number {
+  color: #1d4ed8;
+}
+
+.sql-hl-identifier {
+  color: inherit;
+}
+
+.sql-hl-special {
+  color: #6b7280;
+}
+
+.sql-hl-bracket {
+  color: #6b7280;
 }
