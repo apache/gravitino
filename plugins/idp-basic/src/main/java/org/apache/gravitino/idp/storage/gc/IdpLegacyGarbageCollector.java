@@ -28,14 +28,28 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Periodically purges soft-deleted built-in IdP rows after {@link
+ * org.apache.gravitino.Configs#STORE_DELETE_AFTER_TIME}.
+ *
+ * <p>Unlike core {@link org.apache.gravitino.storage.relational.RelationalGarbageCollector}, which
+ * is started from {@code RelationalEntityStore}, this plugin has no entity-store lifecycle hook. It
+ * is started once when {@link
+ * org.apache.gravitino.idp.storage.mapper.provider.IdpBasicMapperPackageProvider} registers mappers
+ * via SPI.
+ */
 public final class IdpLegacyGarbageCollector implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpLegacyGarbageCollector.class);
+
+  private static final Object START_LOCK = new Object();
+  private static IdpLegacyGarbageCollector instance;
 
   private final long storeDeleteAfterTimeMillis;
 
@@ -51,6 +65,38 @@ public final class IdpLegacyGarbageCollector implements Closeable {
 
   public IdpLegacyGarbageCollector(Config config) {
     storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
+  }
+
+  /** Starts the global collector if it is not already running. */
+  public static void ensureStarted() {
+    synchronized (START_LOCK) {
+      if (instance != null) {
+        return;
+      }
+
+      try {
+        Config config = GravitinoEnv.getInstance().config();
+        instance = new IdpLegacyGarbageCollector(config);
+        instance.start();
+      } catch (Exception e) {
+        LOG.warn("Failed to start built-in IdP legacy garbage collector", e);
+      }
+    }
+  }
+
+  /** Stops the global collector if it was started via {@link #ensureStarted()}. */
+  public static void stop() throws IOException {
+    synchronized (START_LOCK) {
+      if (instance == null) {
+        return;
+      }
+
+      try {
+        instance.close();
+      } finally {
+        instance = null;
+      }
+    }
   }
 
   public void start() {

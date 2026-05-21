@@ -58,7 +58,7 @@ class TestIdpLegacyGarbageCollector extends AbstractIdpMetaStorageTest {
 
   @AfterEach
   void tearDown() throws IOException {
-    IdpLegacyGarbageCollectorManager.getInstance().close();
+    IdpLegacyGarbageCollector.stop();
   }
 
   @ParameterizedTest

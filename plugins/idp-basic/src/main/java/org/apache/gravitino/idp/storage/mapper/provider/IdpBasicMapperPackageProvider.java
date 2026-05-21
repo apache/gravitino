@@ -20,7 +20,7 @@ package org.apache.gravitino.idp.storage.mapper.provider;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
-import org.apache.gravitino.idp.storage.gc.IdpLegacyGarbageCollectorManager;
+import org.apache.gravitino.idp.storage.gc.IdpLegacyGarbageCollector;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
@@ -31,7 +31,7 @@ public class IdpBasicMapperPackageProvider implements MapperPackageProvider {
 
   @Override
   public List<Class<?>> getMapperClasses() {
-    IdpLegacyGarbageCollectorManager.getInstance().ensureStarted();
+    IdpLegacyGarbageCollector.ensureStarted();
     return ImmutableList.of(
         IdpUserMetaMapper.class, IdpGroupMetaMapper.class, IdpUserGroupRelMapper.class);
   }
