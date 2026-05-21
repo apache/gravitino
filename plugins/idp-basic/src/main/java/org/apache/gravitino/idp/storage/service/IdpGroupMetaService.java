@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.idp.exception.NoSuchEntityException;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
@@ -56,7 +56,7 @@ public class IdpGroupMetaService {
             IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName));
 
     if (groupPO == null) {
-      throw new NoSuchEntityException(IDP_GROUP_ENTITY_TYPE, groupName);
+      throw new NotFoundException(IDP_GROUP_ENTITY_TYPE, groupName);
     }
     return groupPO;
   }

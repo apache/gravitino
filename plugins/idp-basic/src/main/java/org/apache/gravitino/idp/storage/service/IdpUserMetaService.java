@@ -25,7 +25,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.idp.exception.NoSuchEntityException;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
@@ -55,7 +55,7 @@ public class IdpUserMetaService {
             IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
 
     if (userPO == null) {
-      throw new NoSuchEntityException(IDP_USER_ENTITY_TYPE, username);
+      throw new NotFoundException(IDP_USER_ENTITY_TYPE, username);
     }
     return userPO;
   }

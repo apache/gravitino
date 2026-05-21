@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.List;
-import org.apache.gravitino.idp.exception.NoSuchEntityException;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.junit.jupiter.api.Tag;
@@ -53,7 +53,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
             .withDeletedAt(0L)
             .build();
 
-    assertThrows(NoSuchEntityException.class, () -> groupMetaService.getIdpGroupByName("group1"));
+    assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("group1"));
     runServiceCall(
         () -> groupMetaService.insertIdpGroup(group1, List.of(userGroupRel(100L, 1L, 1L)), false));
     assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
