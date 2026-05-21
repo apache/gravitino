@@ -25,9 +25,6 @@ plugins {
 }
 
 dependencies {
-  annotationProcessor(libs.lombok)
-  compileOnly(libs.lombok)
-
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":common")) {

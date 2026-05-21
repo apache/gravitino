@@ -29,6 +29,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -401,6 +402,32 @@ public class TestJcasbinAuthorizer {
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
     assertFalse(doAuthorize(currentPrincipal));
+  }
+
+  @Test
+  public void testUserRoleCacheDoesNotReuseRolesAfterUsernameRecreate() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    RoleEntity allowRole =
+        mockRoleInStore(
+            ALLOW_ROLE_ID,
+            "allowRoleBeforeUserRecreate",
+            ImmutableList.of(getAllowSecurableObject()));
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, 1000L));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(allowRole.id(), allowRole.name())));
+
+    assertTrue(doAuthorize(currentPrincipal));
+
+    long recreatedUserId = USER_ID + 1000L;
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(recreatedUserId, 0L));
+    when(roleMetaMapper.listRolesByUserId(eq(recreatedUserId))).thenReturn(ImmutableList.of());
+
+    assertFalse(doAuthorize(currentPrincipal));
+    verify(roleMetaMapper).listRolesByUserId(eq(recreatedUserId));
   }
 
   @Test

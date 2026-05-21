@@ -19,19 +19,33 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.List;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 
 /**
  * Cached snapshot of a group's role assignments. The {@code updatedAt} timestamp corresponds to the
  * {@code group_meta.updated_at} column and is used as a version sentinel: if the DB value is newer,
  * the cached role list is stale and must be reloaded.
  */
-@Getter
-@AllArgsConstructor
-public class CachedGroupRoles {
+final class CachedGroupRoles {
 
   private final long groupId;
   private final long updatedAt;
   private final List<Long> roleIds;
+
+  CachedGroupRoles(long groupId, long updatedAt, List<Long> roleIds) {
+    this.groupId = groupId;
+    this.updatedAt = updatedAt;
+    this.roleIds = roleIds;
+  }
+
+  long getGroupId() {
+    return groupId;
+  }
+
+  long getUpdatedAt() {
+    return updatedAt;
+  }
+
+  List<Long> getRoleIds() {
+    return roleIds;
+  }
 }

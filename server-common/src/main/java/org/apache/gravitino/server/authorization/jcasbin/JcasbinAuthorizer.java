@@ -800,8 +800,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     String userCacheKey = JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username);
     Optional<CachedUserRoles> cachedOpt = userRoleCache.getIfPresent(userCacheKey);
 
-    if (cachedOpt.isPresent() && cachedOpt.get().getUpdatedAt() >= userInfo.getUpdatedAt()) {
-      // Cache is still valid
+    if (cachedOpt.isPresent()
+        && cachedOpt.get().getUserId() == userId
+        && cachedOpt.get().getUpdatedAt() >= userInfo.getUpdatedAt()) {
+      // Cache is still valid. The user id check prevents reusing roles after deleting and
+      // recreating the same username with a new entity id.
       CachedUserRoles cached = cachedOpt.get();
       bindUserRoles(userId, cached.getRoleIds());
       return cached.getRoleIds();
