@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.dto.requests;
+package org.apache.gravitino.idp.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;

@@ -17,10 +17,11 @@
  * under the License.
  */
 
-package org.apache.gravitino.dto.requests;
+package org.apache.gravitino.idp.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.List;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -29,41 +30,45 @@ import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to reset a built-in IdP user password. */
+/** Represents a request to remove users from a built-in IdP group. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
-public class ResetPasswordRequest implements RESTRequest {
+public class GroupRemoveUsersRequest implements RESTRequest {
 
-  @JsonProperty("password")
-  @ToString.Exclude
-  private final String password;
+  @JsonProperty("users")
+  private final List<String> users;
 
-  /** Default constructor for ResetPasswordRequest. (Used for Jackson deserialization.) */
-  public ResetPasswordRequest() {
+  /** Default constructor for GroupRemoveUsersRequest. (Used for Jackson deserialization.) */
+  public GroupRemoveUsersRequest() {
     this(null);
   }
 
   /**
-   * Creates a new ResetPasswordRequest.
+   * Creates a new GroupRemoveUsersRequest.
    *
-   * @param password The new password of the built-in IdP user.
+   * @param users The user names to remove from the built-in IdP group.
    */
-  public ResetPasswordRequest(String password) {
+  public GroupRemoveUsersRequest(List<String> users) {
     super();
-    this.password = password;
+    this.users = users;
   }
 
   /**
-   * Validates the {@link ResetPasswordRequest} request.
+   * Validates the {@link GroupRemoveUsersRequest} request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(password), "\"password\" field is required and cannot be empty");
+        users != null && !users.isEmpty(), "\"users\" field is required and cannot be empty");
+    users.forEach(
+        user ->
+            Preconditions.checkArgument(
+                StringUtils.isNotBlank(user),
+                "\"users\" field is required and cannot contain empty user names"));
   }
 }

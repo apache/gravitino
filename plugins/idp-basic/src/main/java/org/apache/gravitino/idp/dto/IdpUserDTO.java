@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.dto;
+package org.apache.gravitino.idp.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;

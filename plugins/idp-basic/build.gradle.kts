@@ -38,6 +38,7 @@ dependencies {
 
   compileOnly(libs.lombok)
 
+  testImplementation(project(":common"))
   testImplementation(project(":core"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 

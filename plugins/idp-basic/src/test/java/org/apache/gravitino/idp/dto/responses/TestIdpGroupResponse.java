@@ -17,78 +17,78 @@
  * under the License.
  */
 
-package org.apache.gravitino.dto.responses;
+package org.apache.gravitino.idp.dto.responses;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Arrays;
-import org.apache.gravitino.dto.IdpUserDTO;
+import org.apache.gravitino.idp.dto.IdpGroupDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpUserResponse {
+public class TestIdpGroupResponse {
 
   @Test
-  public void testIdpUserResponseSerDe() throws JsonProcessingException {
-    IdpUserDTO user =
-        IdpUserDTO.builder()
-            .withName("test_user")
-            .withGroups(Arrays.asList("group1", "group2"))
+  public void testIdpGroupResponseSerDe() throws JsonProcessingException {
+    IdpGroupDTO group =
+        IdpGroupDTO.builder()
+            .withName("test_group")
+            .withUsers(Arrays.asList("user1", "user2"))
             .build();
-    IdpUserResponse response = new IdpUserResponse(user);
+    IdpGroupResponse response = new IdpGroupResponse(group);
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
-    IdpUserResponse deserResponse =
-        JsonUtils.objectMapper().readValue(serJson, IdpUserResponse.class);
+    IdpGroupResponse deserResponse =
+        JsonUtils.objectMapper().readValue(serJson, IdpGroupResponse.class);
 
     Assertions.assertEquals(response, deserResponse);
-    Assertions.assertEquals("test_user", deserResponse.getUser().name());
-    Assertions.assertEquals(Arrays.asList("group1", "group2"), deserResponse.getUser().groups());
+    Assertions.assertEquals("test_group", deserResponse.getGroup().name());
+    Assertions.assertEquals(Arrays.asList("user1", "user2"), deserResponse.getGroup().users());
   }
 
   @Test
-  public void testIdpUserResponseValidate() {
-    IdpUserDTO user =
-        IdpUserDTO.builder()
-            .withName("test_user")
-            .withGroups(Arrays.asList("group1", "group2"))
+  public void testIdpGroupResponseValidate() {
+    IdpGroupDTO group =
+        IdpGroupDTO.builder()
+            .withName("test_group")
+            .withUsers(Arrays.asList("user1", "user2"))
             .build();
-    IdpUserResponse response = new IdpUserResponse(user);
+    IdpGroupResponse response = new IdpGroupResponse(group);
     response.validate(); // No exception thrown
   }
 
   @Test
-  public void testIdpUserResponseException() {
-    IdpUserResponse response = new IdpUserResponse();
+  public void testIdpGroupResponseException() {
+    IdpGroupResponse response = new IdpGroupResponse();
     Assertions.assertThrows(IllegalArgumentException.class, response::validate);
   }
 
   @Test
-  public void testIdpUserResponseBlankNameMessage() throws JsonProcessingException {
-    IdpUserResponse response =
+  public void testIdpGroupResponseBlankNameMessage() throws JsonProcessingException {
+    IdpGroupResponse response =
         JsonUtils.objectMapper()
             .readValue(
-                "{\"code\":0,\"user\":{\"name\":\" \",\"groups\":[\"group1\"]}}",
-                IdpUserResponse.class);
+                "{\"code\":0,\"group\":{\"name\":\" \",\"users\":[\"user1\"]}}",
+                IdpGroupResponse.class);
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, response::validate);
 
-    Assertions.assertEquals("user 'name' must not be null or empty", exception.getMessage());
+    Assertions.assertEquals("group 'name' must not be null or empty", exception.getMessage());
   }
 
   @Test
-  public void testIdpUserResponseBlankGroupMessage() throws JsonProcessingException {
-    IdpUserResponse response =
+  public void testIdpGroupResponseBlankUserMessage() throws JsonProcessingException {
+    IdpGroupResponse response =
         JsonUtils.objectMapper()
             .readValue(
-                "{\"code\":0,\"user\":{\"name\":\"test_user\",\"groups\":[\" \"]}}",
-                IdpUserResponse.class);
+                "{\"code\":0,\"group\":{\"name\":\"test_group\",\"users\":[\" \"]}}",
+                IdpGroupResponse.class);
 
     IllegalArgumentException exception =
         Assertions.assertThrows(IllegalArgumentException.class, response::validate);
 
     Assertions.assertEquals(
-        "user 'groups' must not contain null or empty group names", exception.getMessage());
+        "group 'users' must not contain null or empty user names", exception.getMessage());
   }
 }

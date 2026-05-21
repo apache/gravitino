@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.dto.responses;
+package org.apache.gravitino.idp.dto.responses;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
@@ -26,7 +26,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.dto.IdpUserDTO;
+import org.apache.gravitino.dto.responses.BaseResponse;
+import org.apache.gravitino.idp.dto.IdpUserDTO;
 
 /** Represents a response for a built-in IdP user. */
 @Getter
