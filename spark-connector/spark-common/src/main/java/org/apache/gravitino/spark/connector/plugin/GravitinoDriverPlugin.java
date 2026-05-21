@@ -46,6 +46,7 @@ import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.auth.BearerTokenFileProvider;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
@@ -206,6 +207,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
           !UserGroupInformation.isSecurityEnabled(),
           "Spark simple auth mode doesn't support setting kerberos configurations");
       builder.withSimpleAuth(sparkUser);
+    } else if ("bearer-token-file".equalsIgnoreCase(authType)) {
+      String tokenFile =
+          getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_BEARER_TOKEN_FILE);
+      builder.withCustomTokenAuth(new BearerTokenFileProvider(tokenFile));
     } else if (AuthProperties.isOAuth2(authType)) {
       String oAuthUri = getRequiredConfig(sparkConf, GravitinoSparkConfig.GRAVITINO_OAUTH2_URI);
       String credential =

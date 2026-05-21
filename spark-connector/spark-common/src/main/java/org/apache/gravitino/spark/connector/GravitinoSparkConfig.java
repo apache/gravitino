@@ -42,6 +42,8 @@ public class GravitinoSparkConfig {
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_CREDENTIAL;
   public static final String GRAVITINO_OAUTH2_SCOPE =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_OAUTH2_SCOPE;
+  public static final String GRAVITINO_BEARER_TOKEN_FILE =
+      GRAVITINO_PREFIX + "bearer.tokenFile";
   public static final String GRAVITINO_KERBEROS_PRINCIPAL = "spark.kerberos.principal";
   public static final String GRAVITINO_KERBEROS_KEYTAB_FILE_PATH = "spark.kerberos.keytab";
 
