@@ -52,7 +52,7 @@ public interface IdpGroupMetaMapper {
   void insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO);
 
   @UpdateProvider(type = IdpGroupMetaSQLProviderFactory.class, method = "softDeleteIdpGroup")
-  Integer softDeleteIdpGroup(@Param("groupId") Long groupId);
+  Integer softDeleteIdpGroup(@Param("groupName") String groupName);
 
   @DeleteProvider(
       type = IdpGroupMetaSQLProviderFactory.class,

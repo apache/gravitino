@@ -91,11 +91,11 @@ public abstract class AbstractIdpMetaServiceTest extends AbstractIdpMetaStorageT
   }
 
   protected void insertGroups(long count) {
-    for (long groupId = 1L; groupId <= count; groupId++) {
+    for (long index = 1L; index <= count; index++) {
       idpGroupMetaMapper.insertIdpGroup(
           IdpGroupPO.builder()
-              .withGroupId(groupId)
-              .withGroupName("group" + groupId)
+              .withGroupId(index)
+              .withGroupName("group" + index)
               .withCurrentVersion(1L)
               .withLastVersion(0L)
               .withDeletedAt(0L)
@@ -104,12 +104,12 @@ public abstract class AbstractIdpMetaServiceTest extends AbstractIdpMetaStorageT
   }
 
   protected void insertUsers(long count) {
-    for (long userId = 1L; userId <= count; userId++) {
+    for (long index = 1L; index <= count; index++) {
       idpUserMetaMapper.insertIdpUser(
           IdpUserPO.builder()
-              .withUserId(userId)
-              .withUsername("user" + userId)
-              .withPasswordHash("hash-" + userId)
+              .withUserId(index)
+              .withUsername("user" + index)
+              .withPasswordHash("hash-" + index)
               .withCurrentVersion(1L)
               .withLastVersion(0L)
               .withDeletedAt(0L)
@@ -120,34 +120,37 @@ public abstract class AbstractIdpMetaServiceTest extends AbstractIdpMetaStorageT
   protected void insertDefaultUserGroupRelations() {
     idpUserGroupRelMapper.batchInsertRelations(
         List.of(
-            userGroupRel(100L, 1L, 1L),
-            userGroupRel(101L, 2L, 1L),
-            userGroupRel(102L, 3L, 1L),
-            userGroupRel(103L, 4L, 1L),
-            userGroupRel(104L, 1L, 2L),
-            userGroupRel(105L, 2L, 2L),
-            userGroupRel(106L, 3L, 2L),
-            userGroupRel(107L, 4L, 2L)));
+            userGroupRel(100L, "user1", "group1"),
+            userGroupRel(101L, "user2", "group1"),
+            userGroupRel(102L, "user3", "group1"),
+            userGroupRel(103L, "user4", "group1"),
+            userGroupRel(104L, "user1", "group2"),
+            userGroupRel(105L, "user2", "group2"),
+            userGroupRel(106L, "user3", "group2"),
+            userGroupRel(107L, "user4", "group2")));
   }
 
   protected void insertGroupUserGroupRelations() {
     idpUserGroupRelMapper.batchInsertRelations(
         List.of(
-            userGroupRel(100L, 1L, 1L),
-            userGroupRel(101L, 2L, 1L),
-            userGroupRel(102L, 1L, 2L),
-            userGroupRel(103L, 2L, 2L),
-            userGroupRel(104L, 3L, 3L),
-            userGroupRel(105L, 4L, 3L),
-            userGroupRel(106L, 3L, 4L),
-            userGroupRel(107L, 4L, 4L)));
+            userGroupRel(100L, "user1", "group1"),
+            userGroupRel(101L, "user2", "group1"),
+            userGroupRel(102L, "user1", "group2"),
+            userGroupRel(103L, "user2", "group2"),
+            userGroupRel(104L, "user3", "group3"),
+            userGroupRel(105L, "user4", "group3"),
+            userGroupRel(106L, "user3", "group4"),
+            userGroupRel(107L, "user4", "group4")));
   }
 
-  protected IdpUserGroupRelPO userGroupRel(long id, long userId, long groupId) {
+  protected IdpUserGroupRelPO userGroupRel(
+      long relationOrdinal, String username, String groupName) {
+    IdpUserPO user = idpUserMetaMapper.selectIdpUser(username);
+    IdpGroupPO group = idpGroupMetaMapper.selectIdpGroup(groupName);
     return IdpUserGroupRelPO.builder()
-        .withId(id)
-        .withUserId(userId)
-        .withGroupId(groupId)
+        .withId(relationOrdinal)
+        .withUserId(user.getUserId())
+        .withGroupId(group.getGroupId())
         .withCurrentVersion(1L)
         .withLastVersion(0L)
         .withDeletedAt(0L)

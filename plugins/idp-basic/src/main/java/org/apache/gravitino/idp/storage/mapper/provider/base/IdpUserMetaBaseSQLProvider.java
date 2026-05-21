@@ -64,20 +64,20 @@ public class IdpUserMetaBaseSQLProvider {
   }
 
   public String updateIdpUserPassword(
-      @Param("userId") Long userId, @Param("passwordHash") String passwordHash) {
+      @Param("username") String username, @Param("passwordHash") String passwordHash) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET password_hash = #{passwordHash}"
-        + " WHERE user_id = #{userId}"
+        + " WHERE user_name = #{username}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteIdpUser(@Param("userId") Long userId) {
+  public String softDeleteIdpUser(@Param("username") String username) {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET deleted_at = "
         + currentTimeMillisExpression()
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " WHERE user_name = #{username} AND deleted_at = 0";
   }
 
   public String deleteIdpUserMetasByLegacyTimeline(

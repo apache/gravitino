@@ -26,7 +26,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.slf4j.Logger;
@@ -38,16 +37,14 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Unlike core {@link org.apache.gravitino.storage.relational.RelationalGarbageCollector}, which
  * is started from {@code RelationalEntityStore}, this plugin has no entity-store lifecycle hook. It
- * is started once when {@link
- * org.apache.gravitino.idp.storage.mapper.provider.IdpBasicMapperPackageProvider} registers mappers
- * via SPI.
+ * is started once via {@link org.apache.gravitino.idp.storage.IdpStorageBootstrap} when the
+ * idp-basic plugin is loaded.
  */
 public final class IdpLegacyGarbageCollector {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpLegacyGarbageCollector.class);
 
-  private static final Object START_LOCK = new Object();
-  private static IdpLegacyGarbageCollector instance;
+  private static volatile IdpLegacyGarbageCollector instance;
 
   private final long storeDeleteAfterTimeMillis;
 
@@ -65,24 +62,26 @@ public final class IdpLegacyGarbageCollector {
     storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
   }
 
-  /** Starts the global collector if it is not already running. */
-  public static void ensureStarted() {
-    synchronized (START_LOCK) {
+  /**
+   * Starts the scheduled legacy garbage collector. Idempotent; only the first call takes effect.
+   *
+   * @param config Gravitino server configuration
+   */
+  public static void startScheduledCollector(Config config) {
+    if (instance != null) {
+      return;
+    }
+    synchronized (IdpLegacyGarbageCollector.class) {
       if (instance != null) {
         return;
       }
-
-      try {
-        Config config = GravitinoEnv.getInstance().config();
-        instance = new IdpLegacyGarbageCollector(config);
-        instance.start();
-      } catch (Exception e) {
-        LOG.warn("Failed to start built-in IdP legacy garbage collector", e);
-      }
+      IdpLegacyGarbageCollector collector = new IdpLegacyGarbageCollector(config);
+      collector.start();
+      instance = collector;
     }
   }
 
-  public void start() {
+  private void start() {
     long dateTimelineMinute = storeDeleteAfterTimeMillis / 1000 / 60;
 
     // We will collect garbage every 10 minutes at least. If the dateTimelineMinute is larger than
@@ -110,7 +109,7 @@ public final class IdpLegacyGarbageCollector {
                   .deleteUserMetasByLegacyTimeline(
                       legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         }
-      } catch (RuntimeException e) {
+      } catch (Exception e) {
         LOG.error("Failed to physically delete type of idp_user's legacy data: ", e);
       }
 
@@ -126,7 +125,7 @@ public final class IdpLegacyGarbageCollector {
                   .deleteGroupMetasByLegacyTimeline(
                       legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
         }
-      } catch (RuntimeException e) {
+      } catch (Exception e) {
         LOG.error("Failed to physically delete type of idp_group's legacy data: ", e);
       }
     } catch (Exception e) {

@@ -126,8 +126,6 @@ public class IdpGroupMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteIdpGroup")
   public boolean deleteIdpGroup(String groupName) {
-    Long groupId = getIdpGroupIdByName(groupName);
-
     SessionUtils.doMultipleWithCommit(
         () ->
             SessionUtils.doWithoutCommit(
@@ -135,7 +133,7 @@ public class IdpGroupMetaService {
                 mapper -> mapper.softDeleteRelationsByGroupName(groupName)),
         () ->
             SessionUtils.doWithoutCommit(
-                IdpGroupMetaMapper.class, mapper -> mapper.softDeleteIdpGroup(groupId)));
+                IdpGroupMetaMapper.class, mapper -> mapper.softDeleteIdpGroup(groupName)));
     return true;
   }
 

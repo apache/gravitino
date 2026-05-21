@@ -132,9 +132,9 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
             .withDeletedAt(0L)
             .build());
 
-    assertEquals(1, idpGroupMetaMapper.softDeleteIdpGroup(1L));
+    assertEquals(1, idpGroupMetaMapper.softDeleteIdpGroup("dev"));
     assertNull(idpGroupMetaMapper.selectIdpGroup("dev"));
-    assertEquals(0, idpGroupMetaMapper.softDeleteIdpGroup(1L));
+    assertEquals(0, idpGroupMetaMapper.softDeleteIdpGroup("dev"));
     assertEquals(1, idpGroupMetaMapper.deleteIdpGroupMetasByLegacyTimeline(Long.MAX_VALUE, 10));
   }
 

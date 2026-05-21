@@ -138,7 +138,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withDeletedAt(0L)
             .build());
 
-    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
+    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
     assertEquals("hash-a-2", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
     assertEquals(1L, idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
     assertEquals(0L, idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
@@ -158,7 +158,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withDeletedAt(0L)
             .build());
 
-    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
+    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
     assertEquals("hash-a-2", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
     assertEquals(3L, idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
     assertEquals(2L, idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
@@ -178,11 +178,11 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withDeletedAt(0L)
             .build());
 
-    assertEquals(1, idpUserMetaMapper.softDeleteIdpUser(1L));
+    assertEquals(1, idpUserMetaMapper.softDeleteIdpUser("alice"));
     assertNull(idpUserMetaMapper.selectIdpUser("alice"));
     assertIterableEquals(List.of(), idpUserMetaMapper.selectIdpUsers(List.of("alice")));
-    assertEquals(0, idpUserMetaMapper.softDeleteIdpUser(1L));
-    assertEquals(0, idpUserMetaMapper.updateIdpUserPassword(1L, "hash-a-2"));
+    assertEquals(0, idpUserMetaMapper.softDeleteIdpUser("alice"));
+    assertEquals(0, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
     assertEquals(1, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
     assertEquals(0, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
   }

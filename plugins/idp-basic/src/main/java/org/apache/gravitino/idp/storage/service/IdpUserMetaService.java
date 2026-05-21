@@ -117,8 +117,6 @@ public class IdpUserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteIdpUser")
   public boolean deleteIdpUser(String username) {
-    Long userId = getIdpUserIdByUsername(username);
-
     SessionUtils.doMultipleWithCommit(
         () ->
             SessionUtils.doWithoutCommit(
@@ -126,7 +124,7 @@ public class IdpUserMetaService {
                 mapper -> mapper.softDeleteRelationsByUsername(username)),
         () ->
             SessionUtils.doWithoutCommit(
-                IdpUserMetaMapper.class, mapper -> mapper.softDeleteIdpUser(userId)));
+                IdpUserMetaMapper.class, mapper -> mapper.softDeleteIdpUser(username)));
     return true;
   }
 
@@ -134,10 +132,10 @@ public class IdpUserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateIdpUserPassword")
   public boolean updateIdpUserPassword(String username, String passwordHash) {
-    Long userId = getIdpUserIdByUsername(username);
     Integer updated =
         SessionUtils.getWithoutCommit(
-            IdpUserMetaMapper.class, mapper -> mapper.updateIdpUserPassword(userId, passwordHash));
+            IdpUserMetaMapper.class,
+            mapper -> mapper.updateIdpUserPassword(username, passwordHash));
     return updated != null && updated > 0;
   }
 

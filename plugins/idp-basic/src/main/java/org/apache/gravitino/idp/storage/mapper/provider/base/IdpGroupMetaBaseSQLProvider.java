@@ -63,12 +63,12 @@ public class IdpGroupMetaBaseSQLProvider {
         + " )";
   }
 
-  public String softDeleteIdpGroup(@Param("groupId") Long groupId) {
+  public String softDeleteIdpGroup(@Param("groupName") String groupName) {
     return "UPDATE "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " SET deleted_at = "
         + currentTimeMillisExpression()
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        + " WHERE group_name = #{groupName} AND deleted_at = 0";
   }
 
   public String deleteIdpGroupMetasByLegacyTimeline(

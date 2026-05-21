@@ -68,8 +68,8 @@ public class IdpGroupMetaSQLProviderFactory {
     return currentProvider().insertIdpGroup(groupPO);
   }
 
-  public static String softDeleteIdpGroup(@Param("groupId") Long groupId) {
-    return currentProvider().softDeleteIdpGroup(groupId);
+  public static String softDeleteIdpGroup(@Param("groupName") String groupName) {
+    return currentProvider().softDeleteIdpGroup(groupName);
   }
 
   public static String deleteIdpGroupMetasByLegacyTimeline(

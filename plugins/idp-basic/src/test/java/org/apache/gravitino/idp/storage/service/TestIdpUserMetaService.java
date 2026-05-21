@@ -54,7 +54,7 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> userMetaService.getIdpUserByUsername("user1"));
     runServiceCall(() -> userMetaService.insertIdpUser(user1));
-    idpUserGroupRelMapper.batchInsertRelations(List.of(userGroupRel(100L, 1L, 1L)));
+    idpUserGroupRelMapper.batchInsertRelations(List.of(userGroupRel(100L, "user1", "group1")));
     assertEquals("user1", userMetaService.getIdpUserByUsername("user1").getUsername());
     assertIterableEquals(List.of("group1"), userMetaService.listGroupNamesByUsername("user1"));
 
