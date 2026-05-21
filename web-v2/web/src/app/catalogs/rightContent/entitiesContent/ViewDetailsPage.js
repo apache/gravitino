@@ -150,6 +150,7 @@ export default function ViewDetailsPage() {
   useEffect(() => {
     if (sqlSegmentItems.length === 0) {
       setActiveSqlKey(null)
+
       return
     }
 
