@@ -137,8 +137,10 @@ final class GlueIcebergTableHelper {
   /**
    * Creates an Iceberg {@link Catalog} backed by AWS Glue.
    *
-   * @param config Gravitino catalog configuration (region, credentials, endpoint, etc.)
+   * @param config Gravitino catalog configuration (region, credentials, endpoint, etc.). Must
+   *     contain {@code aws-region} and {@code warehouse}.
    * @return an initialized Iceberg Glue catalog
+   * @throws IllegalArgumentException if {@code aws-region} or {@code warehouse} is not configured
    */
   static Catalog createGlueCatalog(Map<String, String> config) {
     String region = config.get(GlueConstants.AWS_REGION);
