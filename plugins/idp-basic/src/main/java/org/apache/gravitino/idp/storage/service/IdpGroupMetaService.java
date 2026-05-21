@@ -130,35 +130,45 @@ public class IdpGroupMetaService {
       IdpGroupPO groupPO, List<IdpUserGroupRelPO> relations, boolean overwritten)
       throws IOException {
     try {
-      SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  IdpGroupMetaMapper.class,
-                  mapper -> {
-                    if (overwritten) {
-                      IdpGroupPO existing = mapper.selectIdpGroup(groupPO.getGroupName());
-                      if (existing != null) {
-                        mapper.softDeleteIdpGroup(existing.getGroupId());
-                      }
-                    }
-                    mapper.insertIdpGroup(groupPO);
-                  }),
-          () -> {
-            if (relations == null || relations.isEmpty()) {
-              return;
-            }
-            if (overwritten) {
-              SessionUtils.doWithoutCommit(
-                  IdpUserGroupRelMapper.class,
-                  mapper -> mapper.softDeleteRelationsByGroupName(groupPO.getGroupName()));
-            }
-            SessionUtils.doWithoutCommit(
-                IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
-          });
+      IdpGroupPO existingGroup =
+          overwritten
+              ? SessionUtils.getWithoutCommit(
+                  IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupPO.getGroupName()))
+              : null;
+
+      if (existingGroup != null) {
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SessionUtils.doWithoutCommit(
+                    IdpUserGroupRelMapper.class,
+                    mapper -> mapper.softDeleteRelationsByGroupName(groupPO.getGroupName())),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    IdpGroupMetaMapper.class,
+                    mapper -> mapper.softDeleteIdpGroup(existingGroup.getGroupId())),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO)),
+            () -> insertIdpGroupRelations(relations));
+      } else {
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SessionUtils.doWithoutCommit(
+                    IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO)),
+            () -> insertIdpGroupRelations(relations));
+      }
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(re, Entity.EntityType.GROUP, groupPO.getGroupName());
       throw re;
     }
+  }
+
+  private void insertIdpGroupRelations(List<IdpUserGroupRelPO> relations) {
+    if (relations == null || relations.isEmpty()) {
+      return;
+    }
+    SessionUtils.doWithoutCommit(
+        IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
   }
 
   @Monitored(
@@ -208,21 +218,14 @@ public class IdpGroupMetaService {
       baseMetricName = "deleteIdpGroupMetasByLegacyTimeline")
   public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] groupDeletedCount = new int[] {0};
-    int[] relDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
         () ->
             groupDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     IdpGroupMetaMapper.class,
-                    mapper -> mapper.deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit)),
-        () ->
-            relDeletedCount[0] =
-                SessionUtils.getWithoutCommit(
-                    IdpUserGroupRelMapper.class,
-                    mapper ->
-                        mapper.deleteIdpUserGroupRelMetasByLegacyTimeline(legacyTimeline, limit)));
+                    mapper -> mapper.deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit)));
 
-    return groupDeletedCount[0] + relDeletedCount[0];
+    return groupDeletedCount[0];
   }
 }

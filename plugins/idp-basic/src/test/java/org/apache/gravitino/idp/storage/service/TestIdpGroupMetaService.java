@@ -90,25 +90,17 @@ class TestIdpGroupMetaService extends AbstractIdpMetaStorageTest {
     deletedCount =
         groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     reopenSession();
-    Assertions.assertEquals(6, deletedCount); // delete 3 group + 3 userGroupRel
+    Assertions.assertEquals(3, deletedCount); // delete 3 groups only
     Assertions.assertEquals(1, countGroups()); // 4 - 3
-    Assertions.assertEquals(5, countUserGroupRels()); // 8 - 3
+    Assertions.assertEquals(8, countUserGroupRels());
 
     closeSession();
     deletedCount =
         groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
     reopenSession();
-    Assertions.assertEquals(4, deletedCount); // delete 1 group + 3 userGroupRel
+    Assertions.assertEquals(1, deletedCount); // delete 1 group
     Assertions.assertEquals(0, countGroups());
-    Assertions.assertEquals(2, countUserGroupRels()); // 5 - 3
-
-    closeSession();
-    deletedCount =
-        groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
-    reopenSession();
-    Assertions.assertEquals(2, deletedCount);
-    Assertions.assertEquals(0, countGroups());
-    Assertions.assertEquals(0, countUserGroupRels());
+    Assertions.assertEquals(8, countUserGroupRels());
 
     closeSession();
     deletedCount =
