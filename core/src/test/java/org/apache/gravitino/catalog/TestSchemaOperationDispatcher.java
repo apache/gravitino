@@ -297,7 +297,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testDropNestedSchemaCleansUpOrphanedAncestors() throws IOException {
+  public void testDropHierarchicalSchemaCleansUpOrphanedAncestors() throws IOException {
     // Clear any spy stubs leaked from other tests sharing the static entityStore.
     reset(entityStore);
     // Only the leaf "orphanA:orphanB:orphanC" is created in the catalog and the store. Names are
@@ -305,7 +305,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier leaf = NameIdentifier.of(metalake, catalog, "orphanA:orphanB:orphanC");
     dispatcher.createSchema(leaf, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
 
-    // Simulate the ancestor entities the relational store auto-creates for a nested name.
+    // Simulate the ancestor entities the relational store auto-creates for a hierarchical name.
     NameIdentifier ancestorAb = NameIdentifier.of(metalake, catalog, "orphanA:orphanB");
     NameIdentifier ancestorA = NameIdentifier.of(metalake, catalog, "orphanA");
     putSchemaEntity(ancestorAb);
@@ -319,7 +319,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testDropNestedSchemaKeepsAncestorsThatStillExist() throws IOException {
+  public void testDropHierarchicalSchemaKeepsAncestorsThatStillExist() throws IOException {
     // Clear any spy stubs leaked from other tests sharing the static entityStore.
     reset(entityStore);
     // Both the parent "keepA:keepB" and the leaf "keepA:keepB:keepC" exist in the catalog and the

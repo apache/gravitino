@@ -49,26 +49,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
 /**
- * Integration tests for nested namespace (hierarchical schema) authorization.
+ * Integration tests for hierarchical schema authorization.
  *
  * <p>Tests cover:
  *
  * <ol>
- *   <li>Admin can create nested schemas; auto-creates parent chain.
- *   <li>Normal user cannot create nested schemas without grants.
+ *   <li>Admin can create hierarchical schemas; auto-creates parent chain.
+ *   <li>Normal user cannot create hierarchical schemas without grants.
  *   <li>Granting {@code create_schema} on a parent schema allows creating direct children.
  *   <li>Granting {@code create_schema} on an ancestor schema inherits down to all descendants.
  *   <li>List schemas returns only top-level schemas by default.
- *   <li>{@code use_schema} on a nested schema allows loading and listing it.
- *   <li>Drop nested schema requires ownership or catalog ownership.
+ *   <li>{@code use_schema} on a hierarchical schema allows loading and listing it.
+ *   <li>Drop hierarchical schema requires ownership or catalog ownership.
  * </ol>
  */
 @Tag("gravitino-docker-test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
+public class HierarchicalSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
 
-  private static final String CATALOG = "nested_catalog";
-  private static final String ROLE = "nested_role";
+  private static final String CATALOG = "hierarchical_catalog";
+  private static final String ROLE = "hierarchical_role";
 
   /** Top-level schemas created by admin at setup. */
   private static final String ROOT_A = "A";
@@ -80,7 +80,7 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    // Enable authorization and configure the nested namespace separator.
+    // Enable authorization and configure the hierarchical schema separator.
     customConfigs.put(Configs.SCHEMA_SEPARATOR.getKey(), ":");
     super.startIntegrationTest();
 
@@ -91,7 +91,7 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     // supported production Iceberg backend.
     Map<String, String> catalogProperties = new HashMap<>();
     catalogProperties.put("catalog-backend", "jdbc");
-    catalogProperties.put("warehouse", "/tmp/gravitino-it-nested-schema");
+    catalogProperties.put("warehouse", "/tmp/gravitino-it-hierarchical-schema");
     catalogProperties.put("uri", "jdbc:sqlite::memory:");
     catalogProperties.put("jdbc-driver", "org.sqlite.JDBC");
     catalogProperties.put("jdbc-initialize", "true");
@@ -111,16 +111,16 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   /**
-   * Admin creates a nested schema {@code A:B:C}. The server automatically ensures the parent chain
-   * {@code A} and {@code A:B} exists. Verify all three schemas are accessible by the admin.
+   * Admin creates a hierarchical schema {@code A:B:C}. The server automatically ensures the parent
+   * chain {@code A} and {@code A:B} exists. Verify all three schemas are accessible by the admin.
    */
   @Test
   @Order(1)
-  public void testAdminCreatesNestedSchemaAutoCreatesParentChain() {
+  public void testAdminCreatesHierarchicalSchemaAutoCreatesParentChain() {
     Catalog catalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
 
     // Creating "A:B:C" should auto-create "A" and "A:B".
-    catalog.asSchemas().createSchema(SCHEMA_ABC, "nested schema", new HashMap<>());
+    catalog.asSchemas().createSchema(SCHEMA_ABC, "hierarchical schema", new HashMap<>());
 
     // Default listing only returns top-level schemas.
     String[] schemas = catalog.asSchemas().listSchemas();
@@ -129,22 +129,23 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     assertTrue(schemaList.contains(ROOT_A), "Parent 'A' should be auto-created");
     assertFalse(
         schemaList.contains(SCHEMA_AB),
-        "Default listSchemas() should not include nested schema A:B");
+        "Default listSchemas() should not include hierarchical schema A:B");
     assertFalse(
         schemaList.contains(SCHEMA_ABC),
-        "Default listSchemas() should not include nested schema A:B:C");
+        "Default listSchemas() should not include hierarchical schema A:B:C");
 
-    // Verify nested schemas exist via direct load.
+    // Verify hierarchical schemas exist via direct load.
     assertEquals(SCHEMA_AB, catalog.asSchemas().loadSchema(SCHEMA_AB).name());
     assertEquals(SCHEMA_ABC, catalog.asSchemas().loadSchema(SCHEMA_ABC).name());
   }
 
   /**
-   * Normal user without {@code create_schema} on the parent schema cannot create a nested schema.
+   * Normal user without {@code create_schema} on the parent schema cannot create a hierarchical
+   * schema.
    */
   @Test
   @Order(2)
-  public void testNormalUserCannotCreateNestedSchemaWithoutGrant() {
+  public void testNormalUserCannotCreateHierarchicalSchemaWithoutGrant() {
     Catalog catalogByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
 
     // Creating "A:B:D" requires create_schema on parent "A:B" (or any ancestor / catalog).
@@ -204,7 +205,7 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
 
   /**
    * By default {@code listSchemas()} returns only top-level schemas (those without the separator).
-   * Nested schemas are accessible through the parent-aware filter.
+   * Hierarchical schemas are accessible through the parent-aware filter.
    */
   @Test
   @Order(5)
@@ -216,7 +217,7 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     List<String> schemaList = Arrays.asList(schemas);
     assertTrue(schemaList.contains(ROOT_A));
 
-    // Nested schemas should NOT appear in the default listing.
+    // Hierarchical schemas should NOT appear in the default listing.
     schemaList.forEach(
         name ->
             assertFalse(
@@ -225,12 +226,12 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   /**
-   * Granting {@code use_schema} on a nested schema allows the normal user to load it, even without
-   * grants on intermediate parent schemas.
+   * Granting {@code use_schema} on a hierarchical schema allows the normal user to load it, even
+   * without grants on intermediate parent schemas.
    */
   @Test
   @Order(6)
-  public void testUseSchemaPrivilegeOnNestedSchema() {
+  public void testUseSchemaPrivilegeOnHierarchicalSchema() {
     GravitinoMetalake metalake = client.loadMetalake(METALAKE);
 
     // Grant use_schema specifically on "A:B:C".
@@ -247,12 +248,12 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
   }
 
   /**
-   * Dropping a nested schema requires ownership or catalog ownership. Normal user without ownership
-   * cannot drop; after becoming owner, they can.
+   * Dropping a hierarchical schema requires ownership or catalog ownership. Normal user without
+   * ownership cannot drop; after becoming owner, they can.
    */
   @Test
   @Order(7)
-  public void testDropNestedSchemaRequiresOwnership() {
+  public void testDropHierarchicalSchemaRequiresOwnership() {
     GravitinoMetalake metalake = client.loadMetalake(METALAKE);
     Catalog catalogByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
 
@@ -298,5 +299,31 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
 
     Catalog catalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
     assertEquals("A:F", catalog.asSchemas().loadSchema("A:F").name());
+  }
+
+  /**
+   * Listing with an explicit {@code parentSchema} returns the direct children of that parent,
+   * exposing the hierarchical schemas that the default top-level listing hides. Uses a
+   * self-contained {@code P:Q} subtree so the assertions do not depend on schemas created or
+   * dropped by earlier ordered tests.
+   */
+  @Test
+  @Order(9)
+  public void testListSchemasUnderParentReturnsChildren() {
+    Catalog catalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG);
+
+    catalog.asSchemas().createSchema("P:Q:R", "child R", new HashMap<>());
+    catalog.asSchemas().createSchema("P:Q:S", "child S", new HashMap<>());
+
+    // Children are not visible in the default top-level listing.
+    List<String> topLevel = Arrays.asList(catalog.asSchemas().listSchemas());
+    assertTrue(topLevel.contains("P"), "Auto-created parent 'P' should be a top-level schema");
+    assertFalse(topLevel.contains("P:Q"), "Default listSchemas() should not include 'P:Q'");
+    assertFalse(topLevel.contains("P:Q:R"), "Default listSchemas() should not include 'P:Q:R'");
+
+    // Listing under "P:Q" returns its direct children as logical hierarchical names.
+    List<String> children = Arrays.asList(catalog.asSchemas().listSchemas("P:Q"));
+    assertTrue(children.contains("P:Q:R"), "listSchemas(\"P:Q\") should include P:Q:R");
+    assertTrue(children.contains("P:Q:S"), "listSchemas(\"P:Q\") should include P:Q:S");
   }
 }

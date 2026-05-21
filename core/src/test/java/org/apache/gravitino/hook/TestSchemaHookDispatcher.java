@@ -160,9 +160,9 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedSchemaOwnsNewAncestors() throws Exception {
-    // A capability that permits hierarchical (":"-separated) schema names so the nested name is
-    // not rejected during normalization.
+  public void testCreateHierarchicalSchemaOwnsNewAncestors() throws Exception {
+    // A capability that permits hierarchical (":"-separated) schema names so the hierarchical name
+    // is not rejected during normalization.
     when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
@@ -182,7 +182,7 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedSchemaKeepsExistingAncestorOwner() throws Exception {
+  public void testCreateHierarchicalSchemaKeepsExistingAncestorOwner() throws Exception {
     when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");

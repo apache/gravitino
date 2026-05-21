@@ -191,6 +191,45 @@ public class TestRelationalCatalog extends TestBase {
   }
 
   @Test
+  public void testListSchemasUnderParent() throws JsonProcessingException {
+    Namespace schemaNs = Namespace.of(metalakeName, catalogName);
+    String schemaPath = withSlash(RelationalCatalog.formatSchemaRequestPath(schemaNs));
+
+    // A non-blank parentSchema must be forwarded as the "parentSchema" query parameter.
+    NameIdentifier child = NameIdentifier.of(schemaNs, "a:b:c");
+    EntityListResponse resp = new EntityListResponse(new NameIdentifier[] {child});
+    buildMockResource(
+        Method.GET, schemaPath, ImmutableMap.of("parentSchema", "a:b"), null, resp, SC_OK);
+    String[] schemas = catalog.asSchemas().listSchemas("a:b");
+    Assertions.assertEquals(1, schemas.length);
+    Assertions.assertEquals("a:b:c", schemas[0]);
+
+    // A blank parentSchema falls back to listing top-level schemas (no query parameter sent).
+    NameIdentifier topLevel = NameIdentifier.of(schemaNs, "a");
+    EntityListResponse topResp = new EntityListResponse(new NameIdentifier[] {topLevel});
+    buildMockResource(Method.GET, schemaPath, null, topResp, SC_OK);
+    String[] topSchemas = catalog.asSchemas().listSchemas("");
+    Assertions.assertEquals(1, topSchemas.length);
+    Assertions.assertEquals("a", topSchemas[0]);
+
+    // Test throw NoSuchSchemaException when the parent schema does not exist.
+    ErrorResponse errorResp =
+        ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
+    buildMockResource(
+        Method.GET,
+        schemaPath,
+        ImmutableMap.of("parentSchema", "missing"),
+        null,
+        errorResp,
+        SC_NOT_FOUND);
+    SupportsSchemas supportsSchemas = catalog.asSchemas();
+    Throwable ex =
+        Assertions.assertThrows(
+            NoSuchSchemaException.class, () -> supportsSchemas.listSchemas("missing"));
+    Assertions.assertTrue(ex.getMessage().contains("schema not found"));
+  }
+
+  @Test
   public void testCreateSchema() throws JsonProcessingException {
     String schemaName = "schema1";
     String schemaPath =

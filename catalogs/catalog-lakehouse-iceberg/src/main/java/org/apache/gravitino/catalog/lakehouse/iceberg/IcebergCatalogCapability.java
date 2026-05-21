@@ -35,19 +35,6 @@ public class IcebergCatalogCapability implements Capability {
     this.schemaSeparator = schemaSeparator;
   }
 
-  /**
-   * Creates a capability with the default external schema separator {@code ":"}.
-   *
-   * <p>Package-private and intended for tests only: production code constructs this via {@link
-   * IcebergCatalog#newCapability()}, which passes the server-configured separator from {@link
-   * HierarchicalSchemaUtil#schemaSeparator()}. Using this constructor in production would hardcode
-   * {@code ":"} and validate names against the wrong separator if the server is configured
-   * otherwise.
-   */
-  IcebergCatalogCapability() {
-    this(":");
-  }
-
   @Override
   public CapabilityResult columnDefaultValue() {
     // Iceberg column default value is WIP, see

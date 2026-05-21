@@ -72,12 +72,12 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
         CapabilityHelpers.applyCapabilities(
             ident, Capability.Scope.SCHEMA, GravitinoEnv.getInstance().catalogManager());
 
-    // Serialize probe -> create -> owner-assignment on the catalog so concurrent nested creates
-    // cannot both claim a shared, newly-created ancestor (which would let the later create
-    // overwrite the first creator's ownership). We lock the catalog node -- the same node the
-    // inner SchemaOperationDispatcher.createSchema write-locks -- so the nested acquisition is
-    // reentrant; a deeper (branch-scoped) lock would hold the catalog node in READ mode and
-    // deadlock against that inner WRITE acquisition.
+    // Serialize probe -> create -> owner-assignment on the catalog so concurrent hierarchical
+    // creates cannot both claim a shared, newly-created ancestor (which would let the later create
+    // overwrite the first creator's ownership). We lock the catalog node -- the same node the inner
+    // SchemaOperationDispatcher.createSchema write-locks -- so the acquisition is reentrant; a
+    // deeper (branch-scoped) lock would hold the catalog node in READ mode and deadlock against
+    // that inner WRITE acquisition.
     NameIdentifier catalogIdent =
         NameIdentifierUtil.ofCatalog(
             normalizedIdent.namespace().level(0), normalizedIdent.namespace().level(1));
@@ -85,9 +85,9 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
         catalogIdent,
         LockType.WRITE,
         () -> {
-          // For a nested schema name (e.g. "A:B:C") the store auto-creates a row for each missing
-          // ancestor ("A", "A:B"). Probe BEFORE the create which ancestors are new, so ownership
-          // is assigned only to schemas this request actually creates and a pre-existing
+          // For a hierarchical schema name (e.g. "A:B:C") the store auto-creates a row for each
+          // missing ancestor ("A", "A:B"). Probe BEFORE the create which ancestors are new, so
+          // ownership is assigned only to schemas this request actually creates and a pre-existing
           // ancestor's owner is never overwritten.
           List<NameIdentifier> newAncestors = findMissingAncestors(normalizedIdent);
 

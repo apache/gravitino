@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -143,10 +144,31 @@ abstract class BaseSchemaCatalog extends CatalogDTO
    */
   @Override
   public String[] listSchemas() throws NoSuchCatalogException {
+    return listSchemas(null);
+  }
+
+  /**
+   * List the schemas directly under the given parent schema. When {@code parentSchema} is null or
+   * blank, the top-level schemas of the catalog are returned, matching {@link #listSchemas()}.
+   *
+   * @param parentSchema The parent (possibly hierarchical) schema name whose direct children are
+   *     listed, e.g. {@code "a"} or {@code "a:b"}.
+   * @return A list of schema names directly under the given parent schema.
+   * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
+   * @throws NoSuchSchemaException if the parent schema does not exist.
+   */
+  @Override
+  public String[] listSchemas(String parentSchema)
+      throws NoSuchCatalogException, NoSuchSchemaException {
+    Map<String, String> queryParams =
+        StringUtils.isBlank(parentSchema)
+            ? Collections.emptyMap()
+            : Collections.singletonMap("parentSchema", parentSchema);
 
     EntityListResponse resp =
         restClient.get(
             formatSchemaRequestPath(schemaNamespace()),
+            queryParams,
             EntityListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());

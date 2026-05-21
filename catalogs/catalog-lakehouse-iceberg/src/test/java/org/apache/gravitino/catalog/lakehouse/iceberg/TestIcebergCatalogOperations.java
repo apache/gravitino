@@ -62,10 +62,10 @@ public class TestIcebergCatalogOperations {
     catalogOperations.icebergCatalogWrapper = mockWrapper;
 
     org.apache.iceberg.catalog.Namespace flatNs = org.apache.iceberg.catalog.Namespace.of("mydb");
-    org.apache.iceberg.catalog.Namespace nestedNs =
+    org.apache.iceberg.catalog.Namespace hierarchicalNs =
         org.apache.iceberg.catalog.Namespace.of("A", "B", "C");
     ListNamespacesResponse mockResponse =
-        ListNamespacesResponse.builder().addAll(Arrays.asList(flatNs, nestedNs)).build();
+        ListNamespacesResponse.builder().addAll(Arrays.asList(flatNs, hierarchicalNs)).build();
     when(mockWrapper.listNamespace(any())).thenReturn(mockResponse);
 
     NameIdentifier[] result = catalogOperations.listSchemas(Namespace.of(METALAKE, CATALOG));
