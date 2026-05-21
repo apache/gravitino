@@ -155,10 +155,9 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
     org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
     Map<String, String> properties = gravitinoCatalog.properties();
     Assertions.assertEquals(mysqlUrl, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_URL));
-    Assertions.assertEquals(
-        mysqlUsername, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
-    Assertions.assertEquals(
-        mysqlPassword, properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
+    // jdbc-user and jdbc-password are hidden properties and not returned by catalog.properties()
+    Assertions.assertFalse(properties.containsKey(JdbcPropertiesConstants.GRAVITINO_JDBC_USER));
+    Assertions.assertFalse(properties.containsKey(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD));
     Assertions.assertEquals(mysqlDefaultDatabase, properties.get(FLINK_BYPASS_DEFAULT_DATABASE));
     Assertions.assertEquals(
         "com.mysql.jdbc.Driver", properties.get(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER));
