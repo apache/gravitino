@@ -36,6 +36,11 @@ public class WebUIFilter implements Filter {
 
     HttpServletRequest httpRequest = (HttpServletRequest) request;
     String path = httpRequest.getRequestURI();
+    if (path == null) {
+      chain.doFilter(request, response);
+      return;
+    }
+
     String lastPathSegment = path.substring(path.lastIndexOf("/") + 1);
 
     if (path.equals("/") || path.equals("/ui") || path.equals("/ui/")) {

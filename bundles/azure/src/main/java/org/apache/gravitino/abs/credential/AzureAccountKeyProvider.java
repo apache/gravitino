@@ -42,6 +42,14 @@ public class AzureAccountKeyProvider implements CredentialProvider {
   public void close() {}
 
   @Override
+  public boolean supportsScheme(String scheme) {
+    return "abfs".equalsIgnoreCase(scheme)
+        || "abfss".equalsIgnoreCase(scheme)
+        || "wasb".equalsIgnoreCase(scheme)
+        || "wasbs".equalsIgnoreCase(scheme);
+  }
+
+  @Override
   public String credentialType() {
     return AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE;
   }

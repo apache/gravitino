@@ -168,7 +168,7 @@ Local authentication requires three new tables:
 
 1. `idp_user_meta` — IdP user records
 2. `idp_group_meta` — IdP group records
-3. `idp_group_user_rel` — user/group membership mapping
+3. `idp_user_group_rel` — user/group membership mapping
 
 These tables follow Gravitino's existing metadata table conventions:
 
@@ -179,7 +179,7 @@ These tables follow Gravitino's existing metadata table conventions:
 Soft-deleted rows in `idp_user_meta` and `idp_group_meta` should be cleaned asynchronously by
 Gravitino's GC thread, following the same lifecycle management pattern used by other metadata
 tables. When a local user or local group is physically removed by the GC thread, the implementation
-should also clean the corresponding soft-deleted rows in `idp_group_user_rel` to avoid leaving
+should also clean the corresponding soft-deleted rows in `idp_user_group_rel` to avoid leaving
 orphaned membership records.
 
 Unlike Gravitino's existing `user_meta` and `group_meta` tables, `idp_user_meta` and
@@ -195,7 +195,6 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'username',
     `password_hash` VARCHAR(1024) NOT NULL COMMENT 'hashed password',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'user audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'user deleted at',
@@ -210,7 +209,6 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
 CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'group audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'group deleted at',
@@ -219,21 +217,21 @@ CREATE TABLE IF NOT EXISTS `idp_group_meta` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'IdP group metadata';
 ```
 
-### 5.3 `idp_group_user_rel`
+### 5.3 `idp_user_group_rel`
 
 ```sql
-CREATE TABLE IF NOT EXISTS `idp_group_user_rel` (
+CREATE TABLE IF NOT EXISTS `idp_user_group_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
-    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'IdP group id',
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'IdP user id',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'relation audit info',
+    `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'IdP group id',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_gi_ui_del` (`group_id`, `user_id`, `deleted_at`),
-    KEY `idx_uid` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'IdP group user relation';
+    UNIQUE KEY `uk_iuig_del` (`user_id`, `group_id`, `deleted_at`),
+    KEY `idx_iuig_uid` (`user_id`),
+    KEY `idx_iuig_gid` (`group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'IdP user group relation';
 ```
 
 ### 5.4 Relationship Model
@@ -242,7 +240,7 @@ The logical entity relationship is straightforward:
 
 ```text
 idp_user_meta
-    └──< idp_group_user_rel >── idp_group_meta
+    └──< idp_user_group_rel >── idp_group_meta
 ```
 
 For integration with Gravitino's existing access control model, the local authentication tables are also
@@ -269,7 +267,7 @@ idp_user_meta --(user_name, logical mapping)--> user_meta[*]
 idp_group_meta --(group_name, logical mapping)--> group_meta[*]
 
 idp_user_meta
-    └──< idp_group_user_rel >── idp_group_meta
+    └──< idp_user_group_rel >── idp_group_meta
 ```
 
 This supports direct username lookup for authentication, group resolution for authorization, and a
@@ -380,7 +378,7 @@ The password verification flow is:
 The local user's groups are resolved by:
 
 1. Query `idp_user_meta` by username and `deleted_at = 0` to get `user_id`.
-2. Query `idp_group_user_rel` by `user_id` to get all active `group_id` values.
+2. Query `idp_user_group_rel` by `user_id` to get all active `group_id` values.
 3. Query `idp_group_meta` by those `group_id` values to load the full group set.
 
 This keeps the model aligned with Gravitino's existing authorization architecture, where user-group
@@ -479,7 +477,7 @@ At a high level:
 5. **Get group**: read the local group information and its current user memberships.
 6. **Add group**: create a new local group.
 7. **Remove group**: soft-delete the group record.
-8. **Add user to group**: create a row in `idp_group_user_rel`.
+8. **Add user to group**: create a row in `idp_user_group_rel`.
 9. **Remove user from group**: soft-delete the corresponding relation row.
 
 ### 9.1 HTTP Interface Design
@@ -743,10 +741,10 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 |---|---|---|---|
 | 1 | Authenticator module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `plugins:idp-basic` | Add the new module and make the server load it when `gravitino.authenticators=basic`. |
 | 2 | Password hashing support | `PasswordHasher`, `Argon2idPasswordHasher`, related tests | Use Argon2id as the only supported password hashing algorithm and store PHC-style hash strings. |
-| 3 | IdP metadata schema | JDBC schema files, mapper definitions, store layer | Create `idp_user_meta`, `idp_group_meta`, and `idp_group_user_rel` with soft-delete support. |
+| 3 | IdP metadata schema | JDBC schema files, mapper definitions, store layer | Create `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel` with soft-delete support. |
 | 4 | Service admin initialization | startup initialization logic, validation logic | Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD`, initialize missing configured service admins during startup, and fail startup when required credentials are absent. |
 | 5 | Basic authentication flow | `BasicAuthenticator`, auth manager, filter integration | Verify Basic credentials against `idp_user_meta` and resolve the authenticated principal. |
-| 6 | Group resolution | store layer, auth manager | Load the user's active groups from `idp_group_user_rel` and `idp_group_meta` for later authorization. |
+| 6 | Group resolution | store layer, auth manager | Load the user's active groups from `idp_user_group_rel` and `idp_group_meta` for later authorization. |
 | 7 | Local IdP management APIs | REST resources, DTOs, request/response classes | Implement user CRUD, group CRUD, and group membership management under `/api/idp`. |
 | 8 | Tests and documentation | unit tests, integration tests, design and user docs | Cover initialization flow, authentication, metadata persistence, REST APIs, and doc/config alignment. |
 
@@ -756,7 +754,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 |---|---|
 | Module wiring | The design, module name, and server wiring all consistently use `plugins:idp-basic`, while the authenticator mode remains `basic`. |
 | Configuration | All examples use `gravitino.authenticators=basic`, and no obsolete configuration keys remain in the document. |
-| Schema design | The document consistently uses `idp_user_meta`, `idp_group_meta`, and `idp_group_user_rel`, and the soft-delete lifecycle is clearly described. |
+| Schema design | The document consistently uses `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel`, and the soft-delete lifecycle is clearly described. |
 | Security constraints | The document states that passwords are never stored in plaintext, Basic authentication should be used only over HTTPS, and initialization must enforce password policy. |
 | Initialization flow | The document explains how configured service admins are initialized during startup, when `GRAVITINO_INITIAL_ADMIN_PASSWORD` is required, and that only hashed passwords are written. |
 | Authentication flow | The Basic authentication flow is described end-to-end, including username/password parsing, user lookup, hash verification, and group resolution. |

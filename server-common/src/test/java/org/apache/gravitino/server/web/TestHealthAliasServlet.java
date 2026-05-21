@@ -51,6 +51,26 @@ public class TestHealthAliasServlet {
     verify(dispatcher).forward(req, resp);
   }
 
+  @ParameterizedTest
+  @CsvSource({
+    "/health,        /iceberg/health",
+    "/health.html,   /iceberg/health",
+    "/health/live,   /iceberg/health/live",
+    "/health/ready,  /iceberg/health/ready"
+  })
+  public void testDoGetForwardsWithCustomPrefix(String incoming, String expected) throws Exception {
+    HealthAliasServlet servlet = new HealthAliasServlet("/iceberg");
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    RequestDispatcher dispatcher = mock(RequestDispatcher.class);
+    when(req.getRequestURI()).thenReturn(incoming.strip());
+    when(req.getRequestDispatcher(expected.strip())).thenReturn(dispatcher);
+
+    servlet.doGet(req, resp);
+
+    verify(dispatcher).forward(req, resp);
+  }
+
   @Test
   public void testDoGetReturns503WhenDispatcherIsNull() throws Exception {
     HealthAliasServlet servlet = new HealthAliasServlet();
