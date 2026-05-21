@@ -22,7 +22,6 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.trino.spi.session.PropertyMetadata.integerProperty;
 import static io.trino.spi.session.PropertyMetadata.stringProperty;
 import static io.trino.spi.type.VarcharType.VARCHAR;
-import static java.util.Locale.ENGLISH;
 
 import com.google.common.collect.ImmutableList;
 import io.trino.spi.connector.ConnectorTableMetadata;
@@ -31,11 +30,13 @@ import io.trino.spi.type.ArrayType;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.trino.connector.catalog.hive.HiveMetadataAdapter;
+import org.apache.gravitino.trino.connector.catalog.hive.HivePropertyMeta;
 import org.apache.gravitino.trino.connector.catalog.hive.SortingColumn;
 import org.apache.gravitino.trino.connector.catalog.iceberg.ExpressionUtil;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
@@ -54,7 +55,7 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
       ImmutableList.of(
           stringProperty(LAKEHOUSE_TABLE_TYPE, "The type of table (ICEBERG, HIVE)", null, false),
           new PropertyMetadata<>(
-              "partitioned_by",
+              HivePropertyMeta.HIVE_PARTITION_KEY,
               "Partition columns",
               new ArrayType(VARCHAR),
               List.class,
@@ -63,11 +64,11 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
               value ->
                   ((List<?>) value)
                       .stream()
-                          .map(name -> ((String) name).toLowerCase(java.util.Locale.ENGLISH))
+                          .map(name -> ((String) name).toLowerCase(Locale.ROOT))
                           .collect(ImmutableList.toImmutableList()),
               value -> value),
           new PropertyMetadata<>(
-              "bucketed_by",
+              HivePropertyMeta.HIVE_BUCKET_KEY,
               "Bucketing columns",
               new ArrayType(VARCHAR),
               List.class,
@@ -76,12 +77,16 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
               value ->
                   ((List<?>) value)
                       .stream()
-                          .map(name -> ((String) name).toLowerCase(java.util.Locale.ENGLISH))
+                          .map(name -> ((String) name).toLowerCase(Locale.ROOT))
                           .collect(ImmutableList.toImmutableList()),
               value -> value),
-          integerProperty("bucket_count", "The number of buckets for the table", null, false),
+          integerProperty(
+              HivePropertyMeta.HIVE_BUCKET_COUNT_KEY,
+              "The number of buckets for the table",
+              null,
+              false),
           new PropertyMetadata<>(
-              "sorted_by",
+              HivePropertyMeta.HIVE_SORT_ORDER_KEY,
               "Bucket sorting columns",
               new ArrayType(VARCHAR),
               List.class,
@@ -91,7 +96,7 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
                   ((List<?>) value)
                       .stream()
                           .map(String.class::cast)
-                          .map(name -> name.toLowerCase(ENGLISH))
+                          .map(name -> name.toLowerCase(Locale.ROOT))
                           .map(SortingColumn::sortingColumnFromString)
                           .collect(toImmutableList()),
               value ->
@@ -148,9 +153,10 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
 
   @Override
   public GravitinoTable createTable(ConnectorTableMetadata tableMetadata) {
+    @SuppressWarnings("unchecked")
     List<String> partitionExpressions =
-        tableMetadata.getProperties().containsKey("partitioned_by")
-            ? (List<String>) tableMetadata.getProperties().get("partitioned_by")
+        tableMetadata.getProperties().containsKey(HivePropertyMeta.HIVE_PARTITION_KEY)
+            ? (List<String>) tableMetadata.getProperties().get(HivePropertyMeta.HIVE_PARTITION_KEY)
             : Collections.emptyList();
 
     GravitinoTable table = super.createTable(tableMetadata);
@@ -179,7 +185,8 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
     if (originalPartitioning != null && originalPartitioning.length > 0) {
       Map<String, Object> properties = new HashMap<>(metadata.getProperties());
       properties.put(
-          "partitioned_by", ExpressionUtil.expressionToPartitionFiled(originalPartitioning));
+          HivePropertyMeta.HIVE_PARTITION_KEY,
+          ExpressionUtil.expressionToPartitionFiled(originalPartitioning));
       return new ConnectorTableMetadata(
           metadata.getTable(), metadata.getColumns(), properties, metadata.getComment());
     }

@@ -144,10 +144,14 @@ final class GlueIcebergTableHelper {
     String region = config.get(GlueConstants.AWS_REGION);
     Preconditions.checkArgument(region != null, "AWS region is required for Iceberg Glue catalog");
 
+    String warehouse = config.get(GlueConstants.WAREHOUSE);
+    Preconditions.checkArgument(
+        warehouse != null,
+        "Warehouse is required for Iceberg Glue catalog; configure '%s' on the catalog.",
+        GlueConstants.WAREHOUSE);
+
     Map<String, String> icebergProps = new HashMap<>();
-    // Warehouse is required by Iceberg catalog initialization but is not used when each table
-    // provides an explicit location.
-    icebergProps.put(IcebergConstants.WAREHOUSE, "/tmp/gravitino-glue-iceberg");
+    icebergProps.put(IcebergConstants.WAREHOUSE, warehouse);
     icebergProps.put(CATALOG_IMPL, GLUE_CATALOG);
     icebergProps.put(IcebergConstants.AWS_S3_REGION, region);
 
@@ -486,7 +490,7 @@ final class GlueIcebergTableHelper {
     return spec.fields().stream()
         .map(
             field -> {
-              String colName = schema.findColumnName(field.sourceId());
+              String colName = requireColumnName(schema, field.sourceId());
               String transformStr = field.transform().toString().toLowerCase(Locale.ROOT);
               if (transformStr.startsWith("identity")) {
                 return Transforms.identity(colName);
@@ -521,7 +525,7 @@ final class GlueIcebergTableHelper {
     return iceSortOrder.fields().stream()
         .map(
             field -> {
-              String colName = schema.findColumnName(field.sourceId());
+              String colName = requireColumnName(schema, field.sourceId());
               SortDirection direction =
                   field.direction() == org.apache.iceberg.SortDirection.ASC
                       ? SortDirection.ASCENDING
@@ -781,6 +785,15 @@ final class GlueIcebergTableHelper {
    *
    * <p>Iceberg does not expose transform parameters through a typed API, so string parsing is used.
    */
+  private static String requireColumnName(Schema schema, int sourceId) {
+    String colName = schema.findColumnName(sourceId);
+    Preconditions.checkState(
+        colName != null,
+        "No column found for Iceberg field ID %s; schema may be out of sync",
+        sourceId);
+    return colName;
+  }
+
   private static int extractTransformParam(String transformStr) {
     String param = TRANSFORM_PARAM_PATTERN.matcher(transformStr).replaceAll("$1");
     if (param.equals(transformStr)) {

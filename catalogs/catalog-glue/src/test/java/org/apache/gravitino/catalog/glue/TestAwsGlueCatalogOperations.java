@@ -119,7 +119,7 @@ class TestAwsGlueCatalogOperations {
         ident,
         new Column[] {col},
         "test table",
-        Map.of(),
+        Map.of(GlueConstants.FORMAT, "parquet"),
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         SortOrders.NONE,

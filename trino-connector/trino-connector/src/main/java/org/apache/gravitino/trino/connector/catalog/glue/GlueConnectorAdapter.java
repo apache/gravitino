@@ -37,6 +37,24 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 public class GlueConnectorAdapter implements CatalogConnectorAdapter {
 
   private static final String CONNECTOR_LAKEHOUSE = "lakehouse";
+
+  // Gravitino catalog property keys for AWS Glue
+  private static final String PROP_AWS_REGION = "aws-region";
+  private static final String PROP_AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
+  private static final String PROP_AWS_ACCESS_KEY_ID = "aws-access-key-id";
+  private static final String PROP_AWS_SECRET_ACCESS_KEY = "aws-secret-access-key";
+  private static final String PROP_AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
+
+  // Trino Hive connector configuration keys for Glue
+  private static final String HIVE_METASTORE = "hive.metastore";
+  private static final String HIVE_METASTORE_GLUE_REGION = "hive.metastore.glue.region";
+  private static final String HIVE_METASTORE_GLUE_CATALOG_ID = "hive.metastore.glue.catalogid";
+  private static final String HIVE_METASTORE_GLUE_ACCESS_KEY = "hive.metastore.glue.aws-access-key";
+  private static final String HIVE_METASTORE_GLUE_SECRET_KEY = "hive.metastore.glue.aws-secret-key";
+  private static final String HIVE_METASTORE_GLUE_ENDPOINT = "hive.metastore.glue.endpoint-url";
+  private static final String HIVE_S3_ACCESS_KEY = "hive.s3.aws-access-key";
+  private static final String HIVE_S3_SECRET_KEY = "hive.s3.aws-secret-key";
+
   private final HasPropertyMeta propertyMetadata;
 
   /** Constructs a new GlueConnectorAdapter. */
@@ -48,31 +66,31 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, String> config = new HashMap<>();
-    config.put("hive.metastore", "glue");
-    config.put("hive.metastore.glue.region", catalog.getRequiredProperty("aws-region"));
+    config.put(HIVE_METASTORE, "glue");
+    config.put(HIVE_METASTORE_GLUE_REGION, catalog.getRequiredProperty(PROP_AWS_REGION));
     config.put("hive.security", "allow-all");
     config.put("fs.hadoop.enabled", "true");
     config.put("hive.non-managed-table-writes-enabled", "true");
 
-    String catalogId = catalog.getProperty("aws-glue-catalog-id", null);
+    String catalogId = catalog.getProperty(PROP_AWS_GLUE_CATALOG_ID, null);
     if (catalogId != null) {
-      config.put("hive.metastore.glue.catalogid", catalogId);
+      config.put(HIVE_METASTORE_GLUE_CATALOG_ID, catalogId);
     }
 
-    String accessKey = catalog.getProperty("aws-access-key-id", null);
-    String secretKey = catalog.getProperty("aws-secret-access-key", null);
+    String accessKey = catalog.getProperty(PROP_AWS_ACCESS_KEY_ID, null);
+    String secretKey = catalog.getProperty(PROP_AWS_SECRET_ACCESS_KEY, null);
     if (accessKey != null && secretKey != null) {
       // Glue metastore credentials
-      config.put("hive.metastore.glue.aws-access-key", accessKey);
-      config.put("hive.metastore.glue.aws-secret-key", secretKey);
+      config.put(HIVE_METASTORE_GLUE_ACCESS_KEY, accessKey);
+      config.put(HIVE_METASTORE_GLUE_SECRET_KEY, secretKey);
       // S3 credentials for data access
-      config.put("hive.s3.aws-access-key", accessKey);
-      config.put("hive.s3.aws-secret-key", secretKey);
+      config.put(HIVE_S3_ACCESS_KEY, accessKey);
+      config.put(HIVE_S3_SECRET_KEY, secretKey);
     }
 
-    String endpoint = catalog.getProperty("aws-glue-endpoint", null);
+    String endpoint = catalog.getProperty(PROP_AWS_GLUE_ENDPOINT, null);
     if (StringUtils.isNotBlank(endpoint)) {
-      config.put("hive.metastore.glue.endpoint-url", endpoint);
+      config.put(HIVE_METASTORE_GLUE_ENDPOINT, endpoint);
     }
 
     return config;
