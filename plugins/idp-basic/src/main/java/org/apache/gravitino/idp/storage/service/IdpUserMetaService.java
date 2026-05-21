@@ -101,13 +101,6 @@ public class IdpUserMetaService {
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "listAllIdpUsers")
-  public List<IdpUserPO> listAllIdpUsers() {
-    return listIdpUsers(Collections.emptyList());
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listGroupNamesByUsername")
   public List<String> listGroupNamesByUsername(String username) {
     return SessionUtils.getWithoutCommit(
