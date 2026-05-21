@@ -32,17 +32,47 @@ public class FlinkHiveCatalogIT120 extends FlinkHiveCatalogIT {
     tableEnv.useCatalog(DEFAULT_CATALOG);
 
     String catalogName = "gravitino_hive_sql2";
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            tableEnv.executeSql(
-                String.format(
-                    "create catalog %s with ("
-                        + "'type'='gravitino-hive', "
-                        + "'hive-conf-dir'='%s'"
-                        + ")",
-                    catalogName, getSharedHiveConfDir())));
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableEnv.executeSql(
+                    String.format(
+                        "create catalog %s with ("
+                            + "'type'='gravitino-hive', "
+                            + "'hive-conf-dir'='%s'"
+                            + ")",
+                        catalogName, getSharedHiveConfDir())));
 
+    Assertions.assertTrue(containsMessage(exception, "metastore.uris"), collectMessages(exception));
     Assertions.assertFalse(metalake.catalogExists(catalogName));
+  }
+
+  private static boolean containsMessage(Throwable throwable, String expectedMessage) {
+    Throwable current = throwable;
+    while (current != null) {
+      String message = current.getMessage();
+      if (message != null && message.contains(expectedMessage)) {
+        return true;
+      }
+      current = current.getCause();
+    }
+
+    return false;
+  }
+
+  private static String collectMessages(Throwable throwable) {
+    StringBuilder messages = new StringBuilder();
+    Throwable current = throwable;
+    while (current != null) {
+      messages
+          .append(current.getClass().getName())
+          .append(": ")
+          .append(current.getMessage())
+          .append('\n');
+      current = current.getCause();
+    }
+
+    return messages.toString();
   }
 }
