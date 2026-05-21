@@ -24,8 +24,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
@@ -180,25 +178,6 @@ public class IdpUserMetaService {
         SessionUtils.getWithoutCommit(
             IdpUserMetaMapper.class, mapper -> mapper.updateIdpUserPassword(userId, passwordHash));
     return updated != null && updated > 0;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "updateIdpUser")
-  public IdpUserPO updateIdpUser(String username, Function<IdpUserPO, IdpUserPO> updater)
-      throws IOException {
-    IdpUserPO oldUserPO = getIdpUserPOByUsername(username);
-    IdpUserPO newUserPO = updater.apply(oldUserPO);
-    Preconditions.checkArgument(
-        Objects.equals(oldUserPO.getUserId(), newUserPO.getUserId()),
-        "The updated IdP user id: %s should be the same as before: %s",
-        newUserPO.getUserId(),
-        oldUserPO.getUserId());
-
-    if (!Objects.equals(oldUserPO.getPasswordHash(), newUserPO.getPasswordHash())) {
-      updateIdpUserPassword(username, newUserPO.getPasswordHash());
-    }
-    return getIdpUserPOByUsername(username);
   }
 
   @Monitored(

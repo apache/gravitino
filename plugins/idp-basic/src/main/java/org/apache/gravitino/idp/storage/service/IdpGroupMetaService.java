@@ -24,8 +24,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -179,20 +177,6 @@ public class IdpGroupMetaService {
             SessionUtils.doWithoutCommit(
                 IdpGroupMetaMapper.class, mapper -> mapper.softDeleteIdpGroup(groupId)));
     return true;
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "updateIdpGroup")
-  public IdpGroupPO updateIdpGroup(String groupName, Function<IdpGroupPO, IdpGroupPO> updater) {
-    IdpGroupPO oldGroupPO = getIdpGroupPOByName(groupName);
-    IdpGroupPO newGroupPO = updater.apply(oldGroupPO);
-    Preconditions.checkArgument(
-        Objects.equals(oldGroupPO.getGroupId(), newGroupPO.getGroupId()),
-        "The updated IdP group id: %s should be the same as before: %s",
-        newGroupPO.getGroupId(),
-        oldGroupPO.getGroupId());
-    return oldGroupPO;
   }
 
   @Monitored(
