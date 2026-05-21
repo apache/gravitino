@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -144,27 +145,28 @@ abstract class BaseSchemaCatalog extends CatalogDTO
    */
   @Override
   public String[] listSchemas() throws NoSuchCatalogException {
-    return listSchemas(null);
+    return doListSchemas(Collections.emptyMap());
   }
 
   /**
-   * List the schemas directly under the given parent schema. When {@code parentSchema} is null or
-   * blank, the top-level schemas of the catalog are returned, matching {@link #listSchemas()}.
+   * List the schemas directly under the given parent schema.
    *
    * @param parentSchema The parent (possibly hierarchical) schema name whose direct children are
-   *     listed, e.g. {@code "a"} or {@code "a:b"}.
+   *     listed, e.g. {@code "a"} or {@code "a:b"}. Must not be null or blank.
    * @return A list of schema names directly under the given parent schema.
+   * @throws IllegalArgumentException if {@code parentSchema} is null or blank.
    * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
    * @throws NoSuchSchemaException if the parent schema does not exist.
    */
   @Override
   public String[] listSchemas(String parentSchema)
       throws NoSuchCatalogException, NoSuchSchemaException {
-    Map<String, String> queryParams =
-        StringUtils.isBlank(parentSchema)
-            ? Collections.emptyMap()
-            : Collections.singletonMap("parentSchema", parentSchema);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(parentSchema), "parentSchema must not be null or blank");
+    return doListSchemas(Collections.singletonMap("parentSchema", parentSchema));
+  }
 
+  private String[] doListSchemas(Map<String, String> queryParams) {
     EntityListResponse resp =
         restClient.get(
             formatSchemaRequestPath(schemaNamespace()),

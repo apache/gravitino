@@ -204,13 +204,11 @@ public class TestRelationalCatalog extends TestBase {
     Assertions.assertEquals(1, schemas.length);
     Assertions.assertEquals("a:b:c", schemas[0]);
 
-    // A blank parentSchema falls back to listing top-level schemas (no query parameter sent).
-    NameIdentifier topLevel = NameIdentifier.of(schemaNs, "a");
-    EntityListResponse topResp = new EntityListResponse(new NameIdentifier[] {topLevel});
-    buildMockResource(Method.GET, schemaPath, null, topResp, SC_OK);
-    String[] topSchemas = catalog.asSchemas().listSchemas("");
-    Assertions.assertEquals(1, topSchemas.length);
-    Assertions.assertEquals("a", topSchemas[0]);
+    // A null or blank parentSchema is rejected before any request is sent.
+    SupportsSchemas schemas2 = catalog.asSchemas();
+    Assertions.assertThrows(IllegalArgumentException.class, () -> schemas2.listSchemas(null));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> schemas2.listSchemas(""));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> schemas2.listSchemas("  "));
 
     // Test throw NoSuchSchemaException when the parent schema does not exist.
     ErrorResponse errorResp =

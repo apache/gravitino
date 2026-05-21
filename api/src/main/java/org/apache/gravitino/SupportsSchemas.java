@@ -58,6 +58,7 @@ public interface SupportsSchemas {
    * @param parentSchema The parent (possibly hierarchical) schema name whose direct children are
    *     listed, e.g. {@code "a"} or {@code "a:b"}. Must not be null or blank.
    * @return An array of schema names directly under the given parent schema.
+   * @throws IllegalArgumentException If {@code parentSchema} is null or blank.
    * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws NoSuchSchemaException If the parent schema does not exist.
    */
