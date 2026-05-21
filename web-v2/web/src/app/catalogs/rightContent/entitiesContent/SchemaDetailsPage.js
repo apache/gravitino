@@ -499,7 +499,9 @@ export default function SchemaDetailsPage() {
         width: 100,
         render: (_, record) => (
           <a data-refer={`delete-view-${record.name}`}>
-            <Icons.Trash2Icon className='size-4' onClick={() => showDeleteConfirm(Modal, record, 'view')} />
+            <Tooltip title='Delete'>
+              <Icons.Trash2Icon className='size-4' onClick={() => showDeleteConfirm(Modal, record, 'view')} />
+            </Tooltip>
           </a>
         )
       }
