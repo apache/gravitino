@@ -30,6 +30,7 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogPropertiesUtil;
 import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.CatalogView;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
@@ -47,6 +48,7 @@ import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -60,6 +62,9 @@ import org.apache.hadoop.hive.conf.HiveConf;
  * proxy the HiveCatalog class.
  */
 public class GravitinoHiveCatalog extends BaseCatalog {
+
+  private static final String HIVE_TABLE_TYPE_KEY = "table-type";
+  private static final String HIVE_VIRTUAL_VIEW_TYPE = "VIRTUAL_VIEW";
 
   private HiveCatalog hiveCatalog;
 
@@ -94,11 +99,22 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     return hiveCatalog;
   }
 
+  /** {@inheritDoc} Returns {@link Dialects#HIVE} for Hive catalog views. */
+  @Override
+  protected String preferredDialect() {
+    return Dialects.HIVE;
+  }
+
   @Override
   public void createTable(ObjectPath tablePath, CatalogBaseTable table, boolean ignoreIfExists)
       throws TableAlreadyExistException, DatabaseNotExistException, CatalogException {
     Preconditions.checkArgument(
         table instanceof ResolvedCatalogBaseTable, "table should be resolved");
+
+    if (table instanceof CatalogView) {
+      super.createTable(tablePath, table, ignoreIfExists);
+      return;
+    }
 
     if (!FlinkGenericTableUtil.isGenericTableWhenCreate(table.getOptions())) {
       super.createTable(tablePath, table, ignoreIfExists);
@@ -145,20 +161,30 @@ public class GravitinoHiveCatalog extends BaseCatalog {
           catalog()
               .asTableCatalog()
               .loadTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
+      if (HIVE_VIRTUAL_VIEW_TYPE.equalsIgnoreCase(table.properties().get(HIVE_TABLE_TYPE_KEY))) {
+        // Hive HMS stores VIRTUAL_VIEW entries as table entries also returned by loadTable.
+        return loadViewOrThrow(tablePath);
+      }
       if (FlinkGenericTableUtil.isGenericTableWhenLoad(table.properties())) {
         return toFlinkGenericTable(table);
       }
       return super.toFlinkTable(table, tablePath);
     } catch (NoSuchTableException e) {
-      throw new TableNotExistException(catalogName(), tablePath, e);
+      // Fall through to check views.
     } catch (Exception e) {
       throw new CatalogException(e);
     }
+
+    return loadViewOrThrow(tablePath);
   }
 
   @Override
   public void alterTable(ObjectPath tablePath, CatalogBaseTable newTable, boolean ignoreIfNotExists)
       throws TableNotExistException, CatalogException {
+    if (newTable instanceof CatalogView) {
+      super.alterTable(tablePath, newTable, ignoreIfNotExists);
+      return;
+    }
     Table table = loadGravitinoTable(tablePath, ignoreIfNotExists);
     if (table == null) {
       return;
@@ -170,9 +196,7 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     if (!(newTable instanceof ResolvedCatalogTable)) {
       throw new CatalogException("Generic table must be a resolved catalog table");
     }
-    // For generic tables, we re-serialize the entire table schema and partition keys into
-    // flink.* properties, so the individual tableChanges are not needed. The newTable
-    // parameter contains the final state after applying all changes.
+    // For generic tables, re-serialize the entire schema into flink.* properties.
     applyGenericTableAlter(tablePath, table, (ResolvedCatalogTable) newTable);
   }
 
@@ -183,6 +207,10 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       java.util.List<org.apache.flink.table.catalog.TableChange> tableChanges,
       boolean ignoreIfNotExists)
       throws TableNotExistException, CatalogException {
+    if (newTable instanceof CatalogView) {
+      super.alterTable(tablePath, newTable, tableChanges, ignoreIfNotExists);
+      return;
+    }
     Table table = loadGravitinoTable(tablePath, ignoreIfNotExists);
     if (table == null) {
       return;
