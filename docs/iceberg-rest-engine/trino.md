@@ -187,11 +187,12 @@ FROM <catalog>.<namespace>.<table>;
 
 ## Known issues
 
-### Trino does not distinguish metadata names that differ only by letter case
+### Trino identifiers are not treated as case sensitive
 
-Trino does not reliably distinguish metadata names that differ only by letter case. See
-[Trino identifier documentation](https://trino.io/docs/current/language/reserved.html#language-identifiers).
-This limitation comes from Trino itself and is not specific to Gravitino.
+Trino identifiers are not treated as case sensitive. As a result, metadata names that differ
+only by letter case cannot be distinguished. See [Trino identifier
+documentation](https://trino.io/docs/current/language/reserved.html#language-identifiers). This
+limitation comes from Trino itself and is not specific to Gravitino.
 
 For the best compatibility with Trino:
 
