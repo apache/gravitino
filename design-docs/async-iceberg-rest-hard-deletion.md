@@ -17,7 +17,7 @@
   under the License.
 -->
 
-# Design: Pluggable Asynchronous Hard Deletion for the Gravitino Iceberg REST Server
+# Design: Asynchronous Hard Deletion for the Gravitino Iceberg REST Server
 
 | Field    | Value                                                   |
 | -------- | ------------------------------------------------------- |
@@ -48,152 +48,97 @@ For production tables this fails in three ways:
 - Concurrent purges saturate the Jetty pool.
 - Mid-purge failures leak files with no retry or audit trail.
 
-We want to return quickly, finish deletion reliably in the background,
-survive restarts, and let operators plug in alternative strategies
-(object-store batch APIs, external job systems, audit-only) without
-modifying Gravitino.
+We want the drop to return quickly, finish file deletion reliably in the
+background, survive restarts, and run safely across multiple server
+replicas — while keeping the synchronous path available as a rollback.
 
 *Not in scope:* `RelationalGarbageCollector`, which deletes tombstoned
 **rows** from Gravitino's relational backend. Different IO surface,
 different failure model — kept separate.
 
+---
+
 ## 2. Goals
 
-1. `DELETE … ?purgeRequested=true` returns at typical request latency
-   (target p99 < 500 ms) regardless of table size, when an async purger
-   is configured.
-2. File-deletion strategy is **pluggable** behind an `IcebergPurger` SPI.
-3. The default async implementation deletes every file the synchronous
-   purge would have deleted, retries transient failures, and survives
-   restarts.
-4. No change to the Iceberg REST wire protocol.
-5. Authorization runs on the **request thread**, never deferred.
+1. **Fast response**: `DELETE … ?purgeRequested=true` returns at typical
+   request latency (target p99 < 500 ms, and < 5 s even for the largest
+   tables) regardless of table size.
+2. **Operational simplicity**: Ship a single async deletion path with the
+   smallest possible bug surface; retain the synchronous path behind a
+   feature flag purely for rollback, not as a parallel product surface.
+3. **Reliable deletion**: The async path deletes every file the
+   synchronous purge would have deleted, retries transient failures, and
+   survives restarts and replica failover.
+4. **Wire compatibility**: No change to the Iceberg REST wire protocol.
+5. **Request-thread authorization**: Authorization runs on the request
+   thread, never deferred.
+6. **Uniform object coverage**: Tables, views, and namespace (schema)
+   drops all flow through the same async cleanup mechanism (PRD §2.2).
+
+---
 
 ## 3. Non-Goals
 
-- Changing Gravitino-native soft-delete semantics.
-- User-initiated cancellation of in-flight purges (v1).
-- Async `dropNamespace` / `dropView` (they don't delete data today).
+1. **Native soft-delete semantics (R2)**: This design only delivers async
+   *hard* deletion (R1). Full soft-delete / undrop semantics are a
+   follow-up requirement; §5.7 records the seam they build on so R2 stays
+   a small extension rather than a separate V2 mechanism.
+2. **Purge cancellation (v1)**: User-initiated cancellation of in-flight
+   purges is out of scope for v1; it needs a control API and lifecycle
+   states we can add later without breaking the design.
+3. **Third-party deletion plugins**: We ship one async implementation. A
+   pluggable extension point is explicitly *not* built now — see §4 for
+   why, and the conditions under which we would revisit it.
 
-## 4. Overview
+---
 
-```
-                           IcebergPurger (SPI)
-                                 ▲
-        ┌────────────────────────┼────────────────────────────┐
-        │                        │                            │
-SynchronousIceberg-       JdbcAsyncIceberg-          (third-party plugins:
-   Purger                    Purger                   Kafka, S3 Batch,
-(legacy parity)          (default async)              audit-only, …)
-```
+## 4. Solution Investigations
 
-`IcebergTableOperationExecutor.dropTable` no longer knows how purge is
-implemented — it calls `purger.purgeTable(request)` and the configured
-plugin decides whether the work is synchronous, queued in a DB,
-dispatched externally, or skipped.
+The earlier draft proposed a pluggable `IcebergPurger` SPI. Review
+feedback (PR #11152) pushed back: the PRD does not ask for an SPI, no
+second implementation is in flight, and the competitive frame against
+Polaris is "simpler design with smaller bug surface." We re-evaluated and
+chose a single async implementation with a synchronous rollback flag.
 
-The default plugin (`JdbcAsyncIcebergPurger`) persists a job row, returns
-immediately, and drains the queue from a background worker pool.
+| Approach | Pros | Cons | Decision |
+|----------|------|------|----------|
+| Synchronous only (status quo) | Simplest; strongest "deleted means gone" guarantee | Exceeds HTTP timeouts, saturates Jetty, no retry/audit on large tables | **Rejected** — the problem we are solving |
+| Pluggable `IcebergPurger` SPI (factory + classpath loading + context) | Extensible to object-store batch / audit-only without code changes | Real added surface (SPI, discovery factory, context) with **no** second implementation in flight; widens the bug surface against the PRD's "smaller surface" goal | **Rejected** — revisit only when a second implementation has a real customer behind it |
+| Reuse `RelationalGarbageCollector` | Proven worker/scheduling pattern already in the codebase | Different IO surface (object store vs. JDBC) and failure model (best-effort per-file vs. transactional rows) | **Rejected** — share patterns, not code |
+| External job system only (Quartz / Temporal) | Mature scheduling, retries, observability | Heavy operational burden imposed on every operator | **Rejected** — disproportionate for one deletion workload |
+| Enumerate files at enqueue time | Worker needs no metadata re-read | Enumeration is slow on large tables (defeats the latency goal) and bloats job rows | **Rejected** — store `metadata_location`, re-read at run time |
+| **Single async purger (JDBC job table + worker pool) with a synchronous fallback flag** | Smallest bug surface; reliable, restart-safe, cluster-safe via `SKIP LOCKED`; one code path to test | No built-in extension point — a second strategy would need a follow-up refactor | **Chosen** |
 
-## 5. The `IcebergPurger` SPI
+---
 
-### 5.1 Interface
+## 5. Proposal
 
-Mirrors `IcebergConfigProvider`
-(`iceberg-rest-server/.../service/provider/IcebergConfigProvider.java`)
-for consistency.
-
-```java
-package org.apache.gravitino.iceberg.service.purge;
-
-public interface IcebergPurger extends Closeable {
-
-  /** Initialize the purger. Properties are stripped of the
-   *  {@code gravitino.iceberg-rest.purger.} prefix. */
-  void initialize(Map<String, String> properties, IcebergPurgerContext context);
-
-  /** Called on the REST request thread, after authorization and after the
-   *  catalog entry has been removed. The implementation either performs
-   *  the file deletion inline or accepts responsibility for completing it
-   *  later. Throwing surfaces as a 5xx. */
-  void purgeTable(IcebergPurgeRequest request);
-
-  String name();
-}
-```
-
-```java
-public final class IcebergPurgeRequest {
-  String metalakeName, catalogName, requestUser, requestId, fileIoImpl;
-  TableIdentifier tableIdentifier;
-  TableMetadata tableMetadata;            // loaded by the server
-  Map<String, String> fileIoProperties;
-  long requestTimestampMs;
-}
-
-public interface IcebergPurgerContext {
-  FileIO newFileIo(String impl, Map<String, String> properties);
-  Optional<RelationalBackend> relationalBackend();
-  EventListenerManager eventListenerManager();
-  String serverIdentity();   // host:pid
-}
-```
-
-The server loads `TableMetadata` once and hands it to the plugin so
-every implementation sees a consistent snapshot regardless of when it
-acts. `fileIoProperties` is captured at request time so deferred work
-can reconstruct `FileIO` even if the catalog is later reconfigured.
-
-### 5.2 Discovery
-
-Modeled on `IcebergConfigProviderFactory`:
-
-```java
-private static final Map<String, String> BUILTINS = ImmutableMap.of(
-    "synchronous", SynchronousIcebergPurger.class.getCanonicalName(),
-    "jdbc-async",  JdbcAsyncIcebergPurger.class.getCanonicalName());
-
-public static IcebergPurger create(Map<String, String> props,
-                                   IcebergPurgerContext ctx) {
-  String selector = new IcebergConfig(props).get(IcebergConfig.ICEBERG_REST_PURGER);
-  String className = BUILTINS.getOrDefault(selector, selector);
-  IcebergPurger purger = (IcebergPurger)
-      Class.forName(className).getDeclaredConstructor().newInstance();
-  purger.initialize(stripPrefix(props, "gravitino.iceberg-rest.purger."), ctx);
-  return purger;
-}
-```
-
-Built in `RESTService.serviceInit` right after the `IcebergConfigProvider`.
-
-### 5.3 Built-in providers
-
-**`SynchronousIcebergPurger`** — wraps `CatalogUtil.dropTableData(io, meta)`.
-Today's behavior, repackaged. Phase-1 default; remains the documented
-fallback after the default flips.
-
-**`JdbcAsyncIcebergPurger`** — persists an `iceberg_purge_job` row and
-returns. A worker pool leases jobs via `SELECT … FOR UPDATE SKIP LOCKED`,
-walks the metadata, deletes files, and retries with exponential backoff
-up to `max_attempts`. Becomes the default once stable. Detailed in §6.
-
-### 5.4 Third-party plugins
-
-Drop a jar with a class implementing `IcebergPurger` (no-arg constructor)
-onto the classpath and set:
+### 5.1 Overview
 
 ```
-gravitino.iceberg-rest.purger = com.example.S3BatchIcebergPurger
-gravitino.iceberg-rest.purger.s3-batch.account-id = 123456789012
+  DELETE …?purgeRequested=true
+            │
+            ▼
+  IcebergTableOperationExecutor.dropTable
+            │  async-purge.enabled ?
+      ┌─────┴───────────────┐
+      │ true (default 1.3)  │ false (rollback)
+      ▼                     ▼
+ persist iceberg_purge_job   CatalogUtil.dropTableData
+ row, return 204             (synchronous, on request thread)
+      │
+      ▼
+ worker pool (any replica)
+   leases job via FOR UPDATE SKIP LOCKED
+   → rebuild snapshot graph from metadata_location
+   → delete every reachable file, retry w/ backoff
+   → SUCCEEDED | DEAD_LETTER
 ```
 
-Expected uses: emit Kafka events for downstream cleanup, create S3 Batch
-Operations jobs from the manifest list, or record intent in an audit
-system without deleting.
+There is one async deletion path. The synchronous path is retained only
+as a feature-flag rollback (`async-purge.enabled = false`).
 
-## 6. Default implementation: `JdbcAsyncIcebergPurger`
-
-### 6.1 Request-path interaction
+### 5.2 Request-path interaction
 
 ```java
 public void dropTable(IcebergRequestContext ctx, TableIdentifier id,
@@ -201,24 +146,32 @@ public void dropTable(IcebergRequestContext ctx, TableIdentifier id,
   IcebergCatalogWrapper w = catalogWrapperManager.getCatalogWrapper(ctx.catalogName());
   if (!purgeRequested) { w.dropTable(id); return; }
 
+  if (!asyncPurgeEnabled) {                 // rollback path
+    w.purgeTable(id);                       // synchronous, today's behavior
+    return;
+  }
+
   TableMetadata metadata = w.loadTableMetadata(id);
-  w.dropTable(id);          // metadata-only drop in the catalog
-  purger.purgeTable(
-      IcebergPurgeRequest.builder()
+  w.dropTable(id);                          // metadata-only drop in the catalog
+  purgeJobStore.enqueue(
+      IcebergPurgeJob.builder()
           .catalogName(ctx.catalogName())
           .tableIdentifier(id)
-          .tableMetadata(metadata)
+          .metadataLocation(metadata.metadataFileLocation())
           .fileIoImpl(w.fileIoImpl())
           .fileIoProperties(w.fileIoProperties())
-          .requestUser(ctx.userPrincipal())
+          .createdBy(ctx.userPrincipal())
           .build());
 }
 ```
 
-Order matters: load metadata → drop catalog entry → call the purger. A
-purge job exists only for a table that is already gone from the catalog.
+Order matters on the async path: load metadata location → drop catalog
+entry → enqueue the job. A purge job exists only for a table that is
+already gone from the catalog. `fileIoProperties` is captured at enqueue
+time so the worker can reconstruct `FileIO` even if the catalog is later
+reconfigured.
 
-### 6.2 Schema — `iceberg_purge_job`
+### 5.3 Schema — `iceberg_purge_job`
 
 ```sql
 CREATE TABLE IF NOT EXISTS `iceberg_purge_job` (
@@ -226,7 +179,8 @@ CREATE TABLE IF NOT EXISTS `iceberg_purge_job` (
   `metalake_name`     VARCHAR(128)  NOT NULL,
   `catalog_name`      VARCHAR(128)  NOT NULL,
   `namespace`         VARCHAR(512)  NOT NULL,
-  `table_name`        VARCHAR(256)  NOT NULL,
+  `object_name`       VARCHAR(256)  NOT NULL,
+  `object_type`       VARCHAR(16)   NOT NULL COMMENT 'TABLE|VIEW',
   `metadata_location` VARCHAR(1024) NOT NULL,
   `file_io_impl`      VARCHAR(256)  NOT NULL,
   `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON',
@@ -251,7 +205,7 @@ rebuilds the snapshot graph deterministically when the worker runs.
 
 Migration: `upgrade-1.2.0-to-1.3.0-mysql.sql` (and H2 / PostgreSQL).
 
-### 6.3 Worker pool
+### 5.4 Worker pool
 
 A `ScheduledThreadPoolExecutor` modeled on `RelationalGarbageCollector`.
 Each tick:
@@ -284,7 +238,7 @@ Tasks.foreach(collectAllReachableFiles(meta))
 A separate task renews the lease every `leaseTimeout / 3`. If the host
 dies, the lease expires and another replica reclaims the job.
 
-### 6.4 Failure model
+### 5.5 Failure model
 
 Per-file failures are logged but do not fail the whole job — the
 synchronous purge has the same "best effort" stance. A job fails only if
@@ -300,122 +254,183 @@ the **metadata phase** fails.
 `NotFoundException` from `deleteFile` counts as success. Backoff:
 `min(maxBackoff, base * 2^attempts)` with jitter.
 
-## 7. Events
+### 5.6 Views and namespace (schema) drops
+
+The same async mechanism covers all object types (PRD §2.2):
+
+- **Views** carry no data files — the worker cleanup just removes the
+  view's `metadata.json`. The job row uses `object_type = 'VIEW'`.
+- **Namespace (schema) drops** cascade: the server enqueues an
+  independent purge job for each contained table and view. Failures and
+  retries are tracked per object, so a re-run never re-deletes an
+  already-cleaned object, and one object's failure does not block the
+  others.
+
+### 5.7 Recovery and the soft-delete (R2) seam
+
+Because the job stores `metadata_location` and the underlying data /
+metadata files are not touched until the worker runs, a table dropped by
+mistake can be recovered *before its files are deleted* by re-registering
+it at the stored location:
+
+```
+POST /v1/{prefix}/namespaces/{ns}/register
+{ "name": "<table>", "metadata-location": "<stored metadata_location>" }
+```
+
+Once the worker deletes the files the table is unrecoverable — which is
+the intended semantics of *hard* delete. Soft delete (R2) layers on top
+by deferring file deletion for a retention window (delaying
+`next_attempt_at`) on the **same** job row, executor, and scheduler, so
+register-table recovery succeeds throughout the window. This keeps R2 a
+small extension on R1 rather than a separate V2 mechanism.
+
+### 5.8 Events
 
 Existing `IcebergDropTableEvent` continues to fire on the REST thread
 with the *requested* purge flag, preserving today's listener contract.
-Plugins emit, via `IcebergPurgerContext.eventListenerManager()`:
+The async purger additionally emits, via the event listener manager:
 
-- `IcebergPurgeStartedEvent` — work begins on a request.
+- `IcebergPurgeStartedEvent` — work begins on a job.
 - `IcebergPurgeCompletedEvent` — files deleted, with elapsed time.
 - `IcebergPurgeFailedEvent` — dead-lettered job.
 
-Third-party purgers are expected to fire the same events.
+### 5.9 Configuration
 
-## 8. Configuration
+| Key                                                  | Default   | Description                                                                              |
+| ---------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------- |
+| `gravitino.iceberg-rest.async-purge.enabled`         | `true`    | When `true`, `purgeRequested=true` deletes files asynchronously. Set `false` to roll back to synchronous deletion on the request thread. |
+| `gravitino.iceberg-rest.async-purge.worker-threads`           | `4`       | Worker pool size per server. |
+| `gravitino.iceberg-rest.async-purge.delete-threads-per-job`   | `8`       | Parallelism of file deletes within a single job. |
+| `gravitino.iceberg-rest.async-purge.poll-interval-ms`         | `5000`    | Worker poll interval. |
+| `gravitino.iceberg-rest.async-purge.batch-size`               | `16`      | Jobs leased per tick. |
+| `gravitino.iceberg-rest.async-purge.lease-timeout-ms`         | `300000`  | Lease duration before a job is reclaimable. |
+| `gravitino.iceberg-rest.async-purge.max-attempts`             | `5`       | Attempts before `DEAD_LETTER`. |
+| `gravitino.iceberg-rest.async-purge.backoff-base-ms`          | `30000`   | Exponential backoff base. |
+| `gravitino.iceberg-rest.async-purge.backoff-max-ms`           | `3600000` | Exponential backoff ceiling. |
+| `gravitino.iceberg-rest.async-purge.completed-retention-hours`| `168`     | How long `SUCCEEDED` rows are retained before pruning. |
 
-### 8.1 SPI selection
-
-| Key                              | Default       | Description                                                                                          |
-| -------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------- |
-| `gravitino.iceberg-rest.purger`  | `synchronous` (initially) → `jdbc-async` (after phase 3) | Short alias or FQCN of an `IcebergPurger` implementation. |
-
-### 8.2 `jdbc-async` tunables
-
-| Key                                                           | Default   |
-| ------------------------------------------------------------- | --------- |
-| `…purger.jdbc-async.worker-threads`                           | `4`       |
-| `…purger.jdbc-async.delete-threads-per-job`                   | `8`       |
-| `…purger.jdbc-async.poll-interval-ms`                         | `5000`    |
-| `…purger.jdbc-async.batch-size`                               | `16`      |
-| `…purger.jdbc-async.lease-timeout-ms`                         | `300000`  |
-| `…purger.jdbc-async.max-attempts`                             | `5`       |
-| `…purger.jdbc-async.backoff-base-ms`                          | `30000`   |
-| `…purger.jdbc-async.backoff-max-ms`                           | `3600000` |
-| `…purger.jdbc-async.completed-retention-hours`                | `168`     |
-
-`synchronous` has no tunables.
-
-## 9. Wire compatibility
+### 5.10 Backward compatibility (wire)
 
 The Iceberg REST spec does not require file deletion to be complete
 before the response. With this design:
 
 - The catalog entry is removed before `204`, so `HEAD` returns `404`,
-  `LIST` no longer includes the table, and `CREATE` at the same
-  identifier succeeds immediately.
+  `LIST` no longer includes the table, and **`CREATE` at the same
+  identifier currently succeeds immediately** (today's drop semantics).
+  Whether this should instead be blocked until cleanup completes is an
+  open design question — see §8.1.
 - Object-store files may linger until the worker drains. Documented in
   release notes.
 
 Operators needing strict synchronous deletion set
-`gravitino.iceberg-rest.purger = synchronous`.
+`gravitino.iceberg-rest.async-purge.enabled = false`.
 
-## 10. Security
+### 5.11 Security
 
 - `@AuthorizationExpression` on `dropTable` runs on the request thread,
   unchanged.
-- Plugins use FileIO credentials snapshotted at request time. Plugins
-  that defer past credential lifetime (STS tokens, …) must refresh or
-  require static credentials — a documented plugin responsibility.
+- The worker uses FileIO credentials snapshotted at enqueue time.
+  Credentials that expire before the worker runs (STS tokens, …) need
+  the refresh strategy under discussion in §8.2.
 - `iceberg_purge_job` may contain credentials in `file_io_props`; the
   existing Gravitino DB encryption / access controls apply.
 
-## 11. Rollout
+### 5.12 User process
 
-1. SPI + `SynchronousIcebergPurger` (parity with today). Default
-   `synchronous`. No behavior change.
-2. Land `JdbcAsyncIcebergPurger` + schema migration behind opt-in.
-3. Flip default to `jdbc-async`. `synchronous` stays as fallback.
-4. Document the SPI as a public extension point.
+End-to-end flow with async purge enabled (the 1.3 default):
 
-## 12. Testing
+1. Operator runs with `gravitino.iceberg-rest.async-purge.enabled = true`
+   (the default). No client-side change is required.
+2. A client issues
+   `DELETE /v1/{prefix}/namespaces/{ns}/tables/{t}?purgeRequested=true`.
+3. The server runs authorization on the request thread, loads the table
+   metadata location, drops the catalog entry, and persists an
+   `iceberg_purge_job` row.
+4. The server responds `204 No Content` within typical request latency
+   (target p99 < 500 ms, < 5 s for the largest tables). The table is
+   immediately absent from `LIST` and `HEAD` returns `404`.
+5. In the background, a worker on any replica leases the job, rebuilds
+   the snapshot graph from `metadata_location`, and deletes every
+   reachable file, retrying transient failures with exponential backoff.
+6. On success the job is marked `SUCCEEDED`; on terminal failure it lands
+   in `DEAD_LETTER` for operator inspection. Listeners observe
+   `IcebergPurge{Started,Completed,Failed}Event` throughout.
+7. *(Recovery)* If the drop was a mistake, the table can be re-registered
+   at the stored metadata location any time before the worker deletes the
+   files (§5.7).
+
+---
+
+## 6. Task Breakdown
+
+Ordered so dependencies come first. Each item maps to one GitHub issue/PR.
+Async purge ships **as the default in 1.3** (PR #11152, confirmed); the
+synchronous path remains only as a rollback flag.
+
+### Phase 1 (1.3): Async purge core
+- [ ] Add the `iceberg_purge_job` schema and migrations (MySQL, H2, PostgreSQL)
+- [ ] Implement `IcebergPurgeJobStore` enqueue path (persist job, return)
+- [ ] Implement the worker pool: leasing via `FOR UPDATE SKIP LOCKED`, lease renewal, file deletion, retry/backoff state machine
+- [ ] Add the `async-purge.enabled` feature flag and wire both paths into `IcebergTableOperationExecutor.dropTable` (async default, synchronous rollback)
+- [ ] Add purge events: `IcebergPurgeStartedEvent`, `IcebergPurgeCompletedEvent`, `IcebergPurgeFailedEvent`
+- [ ] Extend coverage to views (`object_type='VIEW'`, metadata-only cleanup) and namespace-drop cascade (one job per contained object)
+- [ ] Add register-table recovery support / documentation (§5.7)
+
+### Phase 1 (1.3): Testing
+- [ ] Unit tests: enqueue, state machine, worker leasing/renewal/contention (H2)
+- [ ] Docker integration tests: latency, restart-resume (`kill -9` mid-purge), two-replica no-duplicate-deletes
+- [ ] Scale & concurrency tests (PRD §4 / R3) — see §7
+
+### Phase 1 (1.3): Documentation
+- [ ] Update user-facing documentation in `docs/` (async semantics, config, rollback flag, release notes)
+
+---
+
+## 7. Testing
 
 - Unit (`./gradlew :iceberg:iceberg-rest-server:test -PskipITs`):
-  - `TestIcebergPurgerFactory` — alias / FQCN resolution.
-  - `TestSynchronousIcebergPurger` — delegates to `CatalogUtil.dropTableData`.
-  - `TestJdbcAsyncIcebergPurgerStateMachine` — PENDING → RUNNING →
-    SUCCEEDED; failure → retry → DEAD_LETTER.
-  - `TestJdbcAsyncIcebergPurgerWorker` — leasing, renewal, contention
-    (H2 backend).
-  - `TestIcebergTableOperationExecutorPluggable` — `dropTable` invokes
-    `purger.purgeTable` exactly once; thrown errors surface as 5xx.
+  - `TestIcebergPurgeJobStore` — enqueue and row contents.
+  - `TestIcebergPurgeStateMachine` — PENDING → RUNNING → SUCCEEDED;
+    failure → retry → DEAD_LETTER.
+  - `TestIcebergPurgeWorker` — leasing, renewal, contention (H2 backend).
+  - `TestIcebergTableOperationExecutorAsyncPurge` — async default enqueues
+    exactly one job; `async-purge.enabled=false` falls back to synchronous
+    purge; thrown errors surface as 5xx.
 - Integration (`gravitino-docker-test`):
-  - Default plugin: drop a table; REST returns < 500 ms; worker
-    eventually clears every file.
+  - Drop a table; REST returns < 500 ms; worker eventually clears every file.
   - Restart REST mid-purge (kill -9); purge resumes.
   - Two replicas on one DB; no duplicate deletions or orphans.
-  - `synchronous`: existing `IcebergRESTServiceIT` reruns unchanged.
+  - Rollback flag: existing `IcebergRESTServiceIT` reruns unchanged with
+    `async-purge.enabled=false`.
+- Scale & concurrency (PRD §4 / R3):
+  - Locust scenarios under `gravitino-test/cloud/scale-test/`.
+  - High-file-count fixtures: medium (~50K files), large (~500K files).
+  - Concurrent-drop tier.
+  - Cucumber features for drop / soft-delete / cleanup / cleanup-failure.
+  - Timing assertion: drop returns within 5 s regardless of table size.
+  - Direct GCS/S3 listing asserts the storage prefix is empty after cleanup.
 
-## 13. Alternatives
+---
 
-**Hard-code "JDBC async."** Earlier draft. Bakes one operational model
-into every deployment. The SPI form is strictly more general for the
-same core complexity.
+## 8. Open questions
 
-**ServiceLoader instead of FQCN config.** The codebase precedent
-(`IcebergConfigProviderFactory`) uses FQCN with aliases. We follow that.
-
-**Reuse `RelationalGarbageCollector`.** Different IO surface (object
-store vs JDBC), different failure model. Share patterns, not code.
-
-**External job system (Quartz / Temporal) as the only path.** Heavy
-operational burden. Operators who want one write a plugin.
-
-**Enumerate files at enqueue time.** Defeats the latency goal; bloats
-rows.
-
-## 14. Open questions
-
-1. **Multi-server coordination on H2** — fall back to advisory locks or
-   conditional updates? Need a decision before implementation.
-2. **Credential refresh in `jdbc-async`** — refresh from the catalog at
+1. **Name reuse after drop** — should `CREATE` at the same identifier be
+   blocked (e.g. tombstone row → `409`) until cleanup completes? PRD §2.2
+   argues an attacker could otherwise read the original table's data via a
+   same-name/same-location recreate. Current design keeps today's drop
+   semantics (recreate allowed immediately); changing this alters drop
+   behavior. **Pending decision with @jerryshao.**
+2. **Credential refresh** — refresh FileIO credentials from the catalog at
    lease-renewal time, or require static credentials for catalogs that
-   opt into async purge?
-3. **Admin visibility** — expose an in-flight-jobs read endpoint? If
-   yes, on the SPI (`IcebergPurger#describeInFlight()`) or only on the
-   default plugin?
-4. **SPI stability** — mark `@Evolving` until at least one third-party
-   plugin is in production?
-5. **Namespace / view purge on the SPI in v1** — adding
-   `purgeNamespace` / `purgeView` as default-no-op methods now avoids a
-   binary break later.
+   opt into async purge? Leaning toward refresh so long-retention soft
+   delete (R2) keeps working; cost/complexity trade-off still open.
+3. **Multi-server coordination on H2** — fall back to advisory locks or
+   conditional updates where `SKIP LOCKED` is unavailable? Needs a
+   decision before implementation.
+4. **Job row vs. catalog row** — if name-reuse (Q1) is resolved by keeping
+   a tombstone on the catalog's table row, could the lease/retry fields
+   live on that row instead of a separate `iceberg_purge_job` table
+   (smaller migration)? Note Gravitino has no `iceberg_tables` table; this
+   would apply to the JDBC catalog's backing table, so scope/portability
+   across catalog types needs confirmation.
