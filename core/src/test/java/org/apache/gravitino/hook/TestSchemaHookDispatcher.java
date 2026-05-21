@@ -18,34 +18,45 @@
  */
 package org.apache.gravitino.hook;
 
+import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
+import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
+import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.lock.LockManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestSchemaHookDispatcher {
 
@@ -58,6 +69,7 @@ public class TestSchemaHookDispatcher {
   // state into the GravitinoEnv singleton across tests.
   private OwnerDispatcher savedOwnerDispatcher;
   private CatalogManager savedCatalogManager;
+  private LockManager savedLockManager;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -74,8 +86,13 @@ public class TestSchemaHookDispatcher {
     // initialized. Read the field directly via reflection to capture the current value safely.
     savedCatalogManager =
         (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    savedLockManager =
+        (LockManager) FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
+    // createSchema now acquires a catalog-level tree lock, so wire up a real LockManager.
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "lockManager", new LockManager(newLockConfig()), true);
     hookDispatcher = new SchemaHookDispatcher(mockDispatcher);
   }
 
@@ -84,6 +101,15 @@ public class TestSchemaHookDispatcher {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", savedLockManager, true);
+  }
+
+  private static Config newLockConfig() {
+    Config config = mock(Config.class);
+    doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
+    doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
+    return config;
   }
 
   @Test
@@ -134,7 +160,7 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedSchemaAssignsOwnerToNewAncestorsAndLeaf() throws Exception {
+  public void testCreateNestedSchemaOwnsNewAncestors() throws Exception {
     // A capability that permits hierarchical (":"-separated) schema names so the nested name is
     // not rejected during normalization.
     when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
@@ -156,7 +182,7 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
-  public void testCreateNestedSchemaDoesNotOverwriteExistingAncestorOwner() throws Exception {
+  public void testCreateNestedSchemaKeepsExistingAncestorOwner() throws Exception {
     when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
@@ -175,6 +201,31 @@ public class TestSchemaHookDispatcher {
         Arrays.asList("A:B", "A:B:C"),
         ownedNames,
         "Pre-existing ancestor 'A' must keep its owner; only newly-created schemas are claimed");
+  }
+
+  @Test
+  public void testDropSchemaRemovesPrivileges() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
+    when(mockDispatcher.dropSchema(eq(ident), eq(false))).thenReturn(true);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(
+              () ->
+                  AuthorizationUtils.getMetadataObjectLocation(
+                      any(NameIdentifier.class), any(Entity.EntityType.class)))
+          .thenReturn(ImmutableList.of("/test"));
+
+      boolean dropped = hookDispatcher.dropSchema(ident, false);
+
+      Assertions.assertTrue(dropped, "Drop result must be propagated from the inner dispatcher");
+      verify(mockDispatcher).dropSchema(eq(ident), eq(false));
+      // Privileges for the dropped schema must be removed.
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  eq(ident), eq(Entity.EntityType.SCHEMA), eq(ImmutableList.of("/test"))));
+    }
   }
 
   @SuppressWarnings("unchecked")

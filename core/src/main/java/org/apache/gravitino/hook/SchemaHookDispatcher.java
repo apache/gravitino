@@ -19,6 +19,7 @@
 package org.apache.gravitino.hook;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
@@ -38,6 +39,8 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -69,39 +72,49 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
         CapabilityHelpers.applyCapabilities(
             ident, Capability.Scope.SCHEMA, GravitinoEnv.getInstance().catalogManager());
 
-    // For a nested schema name (e.g. "A:B:C") the store auto-creates a row for each missing
-    // ancestor ("A", "A:B"). Probe BEFORE the create which ancestors are new, so ownership is
-    // assigned only to schemas this request actually creates and a pre-existing ancestor's owner
-    // is never overwritten.
-    List<NameIdentifier> newAncestors = findMissingAncestors(normalizedIdent);
+    // Serialize probe -> create -> owner-assignment on the catalog so concurrent nested creates
+    // cannot both claim a shared, newly-created ancestor (which would let the later create
+    // overwrite the first creator's ownership). We lock the catalog node -- the same node the
+    // inner SchemaOperationDispatcher.createSchema write-locks -- so the nested acquisition is
+    // reentrant; a deeper (branch-scoped) lock would hold the catalog node in READ mode and
+    // deadlock against that inner WRITE acquisition.
+    NameIdentifier catalogIdent =
+        NameIdentifierUtil.ofCatalog(
+            normalizedIdent.namespace().level(0), normalizedIdent.namespace().level(1));
+    return TreeLockUtils.doWithTreeLock(
+        catalogIdent,
+        LockType.WRITE,
+        () -> {
+          // For a nested schema name (e.g. "A:B:C") the store auto-creates a row for each missing
+          // ancestor ("A", "A:B"). Probe BEFORE the create which ancestors are new, so ownership
+          // is assigned only to schemas this request actually creates and a pre-existing
+          // ancestor's owner is never overwritten.
+          List<NameIdentifier> newAncestors = findMissingAncestors(normalizedIdent);
 
-    Schema schema = dispatcher.createSchema(ident, comment, properties);
+          Schema schema = dispatcher.createSchema(ident, comment, properties);
 
-    // Set the creator as the owner of the new schema and of any ancestors it created. This mirrors
-    // IcebergNamespaceHookDispatcher.createNamespace so ownership-based authorization -- which
-    // treats ownership of an ancestor schema as ownership of the whole subtree -- behaves the same
-    // on the Gravitino and Iceberg REST surfaces. Unlike the Iceberg path we do not wrap this in a
-    // tree lock: the inner SchemaOperationDispatcher.createSchema already holds a catalog-level
-    // WRITE lock, so a branch-scoped lock here would invert lock ordering and risk deadlock. The
-    // only residual race -- two concurrent creates of sibling nested schemas both claiming a
-    // shared, newly-created ancestor -- resolves to last-writer-wins between two legitimate
-    // creators, which is acceptable.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-    if (ownerManager != null) {
-      List<MetadataObject> ownedObjects = new ArrayList<>(newAncestors.size() + 1);
-      for (NameIdentifier ancestor : newAncestors) {
-        ownedObjects.add(NameIdentifierUtil.toMetadataObject(ancestor, Entity.EntityType.SCHEMA));
-      }
-      ownedObjects.add(
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA));
-      // All objects are SCHEMA-typed, so the batch path (which requires a single type) is valid.
-      ownerManager.setOwners(
-          normalizedIdent.namespace().level(0),
-          ownedObjects,
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
-    }
-    return schema;
+          // Set the creator as the owner of the new schema and of any ancestors it created. This
+          // mirrors IcebergNamespaceHookDispatcher.createNamespace so ownership-based
+          // authorization -- which treats ownership of an ancestor schema as ownership of the
+          // whole subtree -- behaves the same on the Gravitino and Iceberg REST surfaces.
+          OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+          if (ownerManager != null) {
+            List<MetadataObject> ownedObjects = new ArrayList<>(newAncestors.size() + 1);
+            for (NameIdentifier ancestor : newAncestors) {
+              ownedObjects.add(
+                  NameIdentifierUtil.toMetadataObject(ancestor, Entity.EntityType.SCHEMA));
+            }
+            ownedObjects.add(
+                NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA));
+            // All objects are SCHEMA-typed, so the batch path (single object type) is valid.
+            ownerManager.setOwners(
+                normalizedIdent.namespace().level(0),
+                ownedObjects,
+                PrincipalUtils.getCurrentUserName(),
+                Owner.Type.USER);
+          }
+          return schema;
+        });
   }
 
   /**
@@ -118,12 +131,20 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
     }
     String metalake = normalizedIdent.namespace().level(0);
     String catalog = normalizedIdent.namespace().level(1);
-    for (String ancestorName : HierarchicalSchemaUtil.getAncestorNames(schemaName, separator)) {
-      NameIdentifier ancestorIdent = NameIdentifierUtil.ofSchema(metalake, catalog, ancestorName);
-      if (!dispatcher.schemaExists(ancestorIdent)) {
-        missing.add(ancestorIdent);
+    List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(schemaName, separator);
+    // Walk innermost-to-outermost: in the hierarchical schema model the existence of an inner
+    // ancestor implies all of its outer ancestors exist, so we can stop probing at the first
+    // ancestor that already exists.
+    for (int i = ancestorNames.size() - 1; i >= 0; i--) {
+      NameIdentifier ancestorIdent =
+          NameIdentifierUtil.ofSchema(metalake, catalog, ancestorNames.get(i));
+      if (dispatcher.schemaExists(ancestorIdent)) {
+        break;
       }
+      missing.add(ancestorIdent);
     }
+    // Reverse to outermost-to-innermost, the order ownership assignment consumes.
+    Collections.reverse(missing);
     return missing;
   }
 
