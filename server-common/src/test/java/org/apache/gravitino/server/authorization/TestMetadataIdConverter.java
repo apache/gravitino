@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
@@ -151,46 +152,46 @@ public class TestMetadataIdConverter {
                       eq(ident8), eq(null), eq(mockCatalogManager)))
           .thenReturn(ident8);
 
-      Long metalakeConvertedId =
+      Optional<Long> metalakeConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(ImmutableList.of("metalake"), MetadataObject.Type.METALAKE),
               "metalake");
-      Long catalogConvertedId =
+      Optional<Long> catalogConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(ImmutableList.of("catalog"), MetadataObject.Type.CATALOG),
               "metalake");
-      Long schemaConvertedId =
+      Optional<Long> schemaConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(ImmutableList.of("catalog", "schema"), MetadataObject.Type.SCHEMA),
               "metalake");
-      Long tableConvertedId =
+      Optional<Long> tableConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "table"), MetadataObject.Type.TABLE),
               "metalake");
-      Long modelConvertedId =
+      Optional<Long> modelConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "model"), MetadataObject.Type.MODEL),
               "metalake");
-      Long filesetConvertedId =
+      Optional<Long> filesetConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "fileset"), MetadataObject.Type.FILESET),
               "metalake");
-      Long topicConvertedId =
+      Optional<Long> topicConvertedId =
           MetadataIdConverter.getID(
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "topic"), MetadataObject.Type.TOPIC),
               "metalake");
 
-      Assertions.assertEquals(1L, metalakeConvertedId);
-      Assertions.assertEquals(2L, catalogConvertedId);
-      Assertions.assertEquals(3L, schemaConvertedId);
-      Assertions.assertEquals(4L, tableConvertedId);
-      Assertions.assertEquals(5L, modelConvertedId);
-      Assertions.assertEquals(6L, filesetConvertedId);
-      Assertions.assertEquals(7L, topicConvertedId);
+      Assertions.assertEquals(Optional.of(1L), metalakeConvertedId);
+      Assertions.assertEquals(Optional.of(2L), catalogConvertedId);
+      Assertions.assertEquals(Optional.of(3L), schemaConvertedId);
+      Assertions.assertEquals(Optional.of(4L), tableConvertedId);
+      Assertions.assertEquals(Optional.of(5L), modelConvertedId);
+      Assertions.assertEquals(Optional.of(6L), filesetConvertedId);
+      Assertions.assertEquals(Optional.of(7L), topicConvertedId);
     } finally {
       FieldUtils.writeDeclaredField(
           GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);

@@ -35,8 +35,7 @@ public class JdbcCredentialProvider implements CredentialProvider {
       return;
     }
     // jdbcUser / jdbcPassword will be null when the catalog was not configured with JDBC
-    // credentials.
-    // getCredential() handles this by returning null (no credential available).
+    // credentials. getCredential() handles this by returning null.
     // Note: The property keys "jdbc-user" and "jdbc-password" match the configuration keys
     // used by JDBC-based catalogs (e.g., Iceberg JDBC backend, Paimon JDBC backend).
     this.jdbcUser = properties.get(JdbcCredential.GRAVITINO_JDBC_USER);
