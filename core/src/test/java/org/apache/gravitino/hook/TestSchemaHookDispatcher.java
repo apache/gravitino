@@ -19,13 +19,17 @@
 package org.apache.gravitino.hook;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -90,7 +94,7 @@ public class TestSchemaHookDispatcher {
 
     doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
-        .setOwner(any(), any(), any(), any());
+        .setOwners(any(), anyList(), any(), any());
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -103,7 +107,7 @@ public class TestSchemaHookDispatcher {
   @Test
   public void testCreateSchemaSetsOwnerWithNormalizedIdentifier() throws Exception {
     // Use a case-insensitive capability so the schema name is normalized to lower case before
-    // setOwner is called, mirroring what NormalizeDispatcher would do for the manager.
+    // setOwners is called, mirroring what NormalizeDispatcher would do for the manager.
     when(mockCatalogWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "MY_SCHEMA");
@@ -112,28 +116,90 @@ public class TestSchemaHookDispatcher {
 
     hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
-    ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
-    verify(mockOwnerDispatcher)
-        .setOwner(eq("test_metalake"), captor.capture(), any(), eq(Owner.Type.USER));
+    List<MetadataObject> owned = captureOwnedObjects();
+    Assertions.assertEquals(1, owned.size(), "A flat schema only assigns ownership to the leaf");
     Assertions.assertEquals(
         "my_schema",
-        captor.getValue().name(),
-        "Schema name passed to setOwner must be lowercased by Capability.Scope.SCHEMA"
+        owned.get(0).name(),
+        "Schema name passed to setOwners must be lowercased by Capability.Scope.SCHEMA"
             + " normalization");
     // Schema's namespace is [metalake, catalog]; NameIdentifierUtil.toMetadataObject uses
     // level(1) as parent. Catalog is not subject to per-scope name normalization here, so
     // parent is just the catalog name -- there is no schema component to normalize.
     Assertions.assertEquals(
         "test_catalog",
-        captor.getValue().parent(),
+        owned.get(0).parent(),
         "Schema parent must be the catalog name (level(1) of the namespace); SCHEMA's namespace"
             + " has no schema component to normalize");
+  }
+
+  @Test
+  public void testCreateNestedSchemaAssignsOwnerToNewAncestorsAndLeaf() throws Exception {
+    // A capability that permits hierarchical (":"-separated) schema names so the nested name is
+    // not rejected during normalization.
+    when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
+
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
+    Schema mockSchema = mock(Schema.class);
+    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    // No ancestor exists yet, so creating "A:B:C" auto-creates "A" and "A:B".
+    when(mockDispatcher.schemaExists(any())).thenReturn(false);
+
+    hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
+
+    List<String> ownedNames =
+        captureOwnedObjects().stream().map(MetadataObject::name).collect(Collectors.toList());
+    Assertions.assertEquals(
+        Arrays.asList("A", "A:B", "A:B:C"),
+        ownedNames,
+        "Creator must own every newly-created ancestor plus the leaf, outermost-to-innermost");
+  }
+
+  @Test
+  public void testCreateNestedSchemaDoesNotOverwriteExistingAncestorOwner() throws Exception {
+    when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
+
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
+    Schema mockSchema = mock(Schema.class);
+    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    // "A" already exists (and has its own owner); only "A:B" and the leaf are newly created.
+    NameIdentifier existingA = NameIdentifier.of("test_metalake", "test_catalog", "A");
+    when(mockDispatcher.schemaExists(any())).thenReturn(false);
+    when(mockDispatcher.schemaExists(eq(existingA))).thenReturn(true);
+
+    hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
+
+    List<String> ownedNames =
+        captureOwnedObjects().stream().map(MetadataObject::name).collect(Collectors.toList());
+    Assertions.assertEquals(
+        Arrays.asList("A:B", "A:B:C"),
+        ownedNames,
+        "Pre-existing ancestor 'A' must keep its owner; only newly-created schemas are claimed");
+  }
+
+  @SuppressWarnings("unchecked")
+  private List<MetadataObject> captureOwnedObjects() {
+    ArgumentCaptor<List<MetadataObject>> captor = ArgumentCaptor.forClass(List.class);
+    verify(mockOwnerDispatcher)
+        .setOwners(eq("test_metalake"), captor.capture(), any(), eq(Owner.Type.USER));
+    return captor.getValue();
   }
 
   private static class CaseInsensitiveCapability implements Capability {
     @Override
     public CapabilityResult caseSensitiveOnName(Scope scope) {
       return CapabilityResult.unsupported("case-insensitive");
+    }
+  }
+
+  /** Accepts hierarchical SCHEMA names so normalization does not reject ":"-separated names. */
+  private static class HierarchicalCapability implements Capability {
+    @Override
+    public CapabilityResult specificationOnName(Scope scope, String name) {
+      if (scope == Scope.SCHEMA) {
+        return CapabilityResult.SUPPORTED;
+      }
+      return Capability.super.specificationOnName(scope, name);
     }
   }
 }

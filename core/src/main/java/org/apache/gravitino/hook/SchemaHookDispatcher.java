@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -36,6 +38,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -59,24 +62,69 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    // The inner NormalizeDispatcher case-folds the schema name based on catalog capabilities, so
+    // the entity is stored under the normalized identifier. Normalize here too so ownership is
+    // attached to the identifiers the manager sees and ancestor probing matches stored names.
+    NameIdentifier normalizedIdent =
+        CapabilityHelpers.applyCapabilities(
+            ident, Capability.Scope.SCHEMA, GravitinoEnv.getInstance().catalogManager());
+
+    // For a nested schema name (e.g. "A:B:C") the store auto-creates a row for each missing
+    // ancestor ("A", "A:B"). Probe BEFORE the create which ancestors are new, so ownership is
+    // assigned only to schemas this request actually creates and a pre-existing ancestor's owner
+    // is never overwritten.
+    List<NameIdentifier> newAncestors = findMissingAncestors(normalizedIdent);
+
     Schema schema = dispatcher.createSchema(ident, comment, properties);
 
-    // Set the creator as the owner of the schema.
+    // Set the creator as the owner of the new schema and of any ancestors it created. This mirrors
+    // IcebergNamespaceHookDispatcher.createNamespace so ownership-based authorization -- which
+    // treats ownership of an ancestor schema as ownership of the whole subtree -- behaves the same
+    // on the Gravitino and Iceberg REST surfaces. Unlike the Iceberg path we do not wrap this in a
+    // tree lock: the inner SchemaOperationDispatcher.createSchema already holds a catalog-level
+    // WRITE lock, so a branch-scoped lock here would invert lock ordering and risk deadlock. The
+    // only residual race -- two concurrent creates of sibling nested schemas both claiming a
+    // shared, newly-created ancestor -- resolves to last-writer-wins between two legitimate
+    // creators, which is acceptable.
     OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
     if (ownerManager != null) {
-      // The inner NormalizeDispatcher case-folds the schema name based on catalog capabilities,
-      // so the entity is stored under the normalized identifier. Apply the same normalization
-      // here so the owner is attached to the same identifier the manager sees.
-      NameIdentifier normalizedIdent =
-          CapabilityHelpers.applyCapabilities(
-              ident, Capability.Scope.SCHEMA, GravitinoEnv.getInstance().catalogManager());
-      ownerManager.setOwner(
+      List<MetadataObject> ownedObjects = new ArrayList<>(newAncestors.size() + 1);
+      for (NameIdentifier ancestor : newAncestors) {
+        ownedObjects.add(NameIdentifierUtil.toMetadataObject(ancestor, Entity.EntityType.SCHEMA));
+      }
+      ownedObjects.add(
+          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA));
+      // All objects are SCHEMA-typed, so the batch path (which requires a single type) is valid.
+      ownerManager.setOwners(
           normalizedIdent.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA),
+          ownedObjects,
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }
     return schema;
+  }
+
+  /**
+   * Returns the identifiers of the (already-normalized) ancestor schemas of {@code normalizedIdent}
+   * that do not yet exist, ordered outermost-to-innermost. Returns an empty list for a flat (non
+   * hierarchical) schema name.
+   */
+  private List<NameIdentifier> findMissingAncestors(NameIdentifier normalizedIdent) {
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    String schemaName = normalizedIdent.name();
+    List<NameIdentifier> missing = new ArrayList<>();
+    if (!schemaName.contains(separator)) {
+      return missing;
+    }
+    String metalake = normalizedIdent.namespace().level(0);
+    String catalog = normalizedIdent.namespace().level(1);
+    for (String ancestorName : HierarchicalSchemaUtil.getAncestorNames(schemaName, separator)) {
+      NameIdentifier ancestorIdent = NameIdentifierUtil.ofSchema(metalake, catalog, ancestorName);
+      if (!dispatcher.schemaExists(ancestorIdent)) {
+        missing.add(ancestorIdent);
+      }
+    }
+    return missing;
   }
 
   @Override

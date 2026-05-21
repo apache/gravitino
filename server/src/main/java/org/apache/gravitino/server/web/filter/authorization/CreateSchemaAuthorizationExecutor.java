@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
@@ -56,7 +57,9 @@ public class CreateSchemaAuthorizationExecutor extends CommonAuthorizerExecutor 
 
   private void injectParentSchema(Parameter[] parameters, Object[] args) {
     SchemaCreateRequest request = extractRequest(parameters, args);
-    if (request == null) {
+    // Skip injection when the name is missing/blank; let SchemaCreateRequest.validate() surface the
+    // intended 400 instead of throwing during authorization interception (returned as a 500).
+    if (request == null || StringUtils.isBlank(request.getName())) {
       return;
     }
 

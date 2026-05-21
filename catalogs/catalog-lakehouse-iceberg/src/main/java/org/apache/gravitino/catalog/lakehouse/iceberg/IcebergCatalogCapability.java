@@ -55,7 +55,8 @@ public class IcebergCatalogCapability implements Capability {
    * <ul>
    *   <li>Regular flat schema names matching the default name pattern.
    *   <li>Logical hierarchical schema names using the configured external separator (e.g. {@code
-   *       "A:B:C"} with separator {@code ":"}), validated to have no empty segments.
+   *       "A:B:C"} with separator {@code ":"}). Each segment must be non-empty and individually
+   *       satisfy the default SCHEMA name rules (reserved words and name pattern).
    * </ul>
    *
    * <p>For all other scopes, the default validation rules apply.
@@ -68,7 +69,7 @@ public class IcebergCatalogCapability implements Capability {
     return Capability.super.specificationOnName(scope, name);
   }
 
-  private static CapabilityResult validateSegments(String name, String separator) {
+  private CapabilityResult validateSegments(String name, String separator) {
     String[] segments = name.split(Pattern.quote(separator), -1);
     for (String segment : segments) {
       if (segment.isEmpty()) {
@@ -76,6 +77,13 @@ public class IcebergCatalogCapability implements Capability {
             String.format(
                 "The SCHEMA name '%s' contains an empty segment after splitting by '%s'.",
                 name, separator));
+      }
+      CapabilityResult segmentResult = Capability.super.specificationOnName(Scope.SCHEMA, segment);
+      if (!segmentResult.supported()) {
+        return CapabilityResult.unsupported(
+            String.format(
+                "The SCHEMA name '%s' contains an illegal segment '%s': %s",
+                name, segment, segmentResult.unsupportedMessage()));
       }
     }
     return CapabilityResult.SUPPORTED;

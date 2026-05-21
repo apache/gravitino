@@ -31,6 +31,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
@@ -236,7 +237,7 @@ public class NestedSchemaAuthorizationIT extends BaseRestApiAuthorizationIT {
     Catalog catalogByNormalUser = normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG);
 
     // Normal user can now load "A:B:C".
-    org.apache.gravitino.Schema loaded = catalogByNormalUser.asSchemas().loadSchema(SCHEMA_ABC);
+    Schema loaded = catalogByNormalUser.asSchemas().loadSchema(SCHEMA_ABC);
     assertEquals(SCHEMA_ABC, loaded.name());
   }
 
