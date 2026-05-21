@@ -32,6 +32,7 @@ import org.apache.gravitino.hive.converter.HiveDatabaseConverter;
 import org.apache.gravitino.hive.converter.HiveTableConverter;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.Database;
 
 class HiveShimV2 extends HiveShim {
@@ -110,6 +111,16 @@ class HiveShimV2 extends HiveShim {
   public List<String> getAllTables(String catalogName, String databaseName) {
     try {
       return client.getAllTables(databaseName);
+    } catch (Exception e) {
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(databaseName));
+    }
+  }
+
+  @Override
+  public List<String> listTablesByType(
+      String catalogName, String databaseName, String tablePattern, String tableType) {
+    try {
+      return client.getTables(databaseName, tablePattern, TableType.valueOf(tableType));
     } catch (Exception e) {
       throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.schema(databaseName));
     }

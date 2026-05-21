@@ -28,6 +28,7 @@ from gravitino.api.rel.expressions.sorts.sort_direction import SortDirection
 from gravitino.api.rel.expressions.transforms.transforms import Transforms
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partitions import Partitions
+from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.client.generic_column import GenericColumn
 from gravitino.client.relational_table import RelationalTable
@@ -341,6 +342,27 @@ class TestRelationalTable(unittest.TestCase):
             )
         )
         expected_methods = ["list_tags", "list_tags_info", "get_tag", "associate_tags"]
+
+        self.assertTrue(
+            all(
+                callable(getattr(relational_table, method, None))
+                for method in expected_methods
+            )
+        )
+
+    def test_extends_supports_statistics_class(self) -> None:
+        table_dto = TableDTO.from_json(TestRelationalTable.TABLE_DTO_JSON_STRING)
+        namespace = Namespace.of("metalake_demo", "test_catalog", "test_schema")
+        rest_client = HTTPClient("http://localhost:8090")
+        relational_table = RelationalTable(namespace, table_dto, rest_client)
+
+        self.assertTrue(
+            issubclass(
+                RelationalTable,
+                SupportsStatistics,
+            )
+        )
+        expected_methods = ["list_statistics", "update_statistics", "drop_statistics"]
 
         self.assertTrue(
             all(

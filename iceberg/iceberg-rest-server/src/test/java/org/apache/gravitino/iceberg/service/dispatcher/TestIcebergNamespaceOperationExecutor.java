@@ -24,6 +24,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -33,6 +35,8 @@ import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
+import org.apache.iceberg.rest.responses.GetNamespaceResponse;
+import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -133,5 +137,111 @@ public class TestIcebergNamespaceOperationExecutor {
 
     String actualOwner = requestCaptor.getValue().properties().get(IcebergConstants.OWNER);
     Assertions.assertEquals(clientProvidedOwner, actualOwner);
+  }
+
+  @Test
+  public void testCreateMultiLevelNamespacePassesCorrectNamespace() {
+    String authenticatedUser = "user@example.com";
+    Namespace multiLevelNs = Namespace.of("team", "sales");
+
+    CreateNamespaceRequest originalRequest =
+        CreateNamespaceRequest.builder().withNamespace(multiLevelNs).build();
+
+    when(mockContext.userName()).thenReturn(authenticatedUser);
+    CreateNamespaceResponse mockResponse = mock(CreateNamespaceResponse.class);
+    when(mockCatalogWrapper.createNamespace(any())).thenReturn(mockResponse);
+
+    executor.createNamespace(mockContext, originalRequest);
+
+    ArgumentCaptor<CreateNamespaceRequest> requestCaptor =
+        ArgumentCaptor.forClass(CreateNamespaceRequest.class);
+    verify(mockCatalogWrapper).createNamespace(requestCaptor.capture());
+
+    CreateNamespaceRequest capturedRequest = requestCaptor.getValue();
+    Assertions.assertEquals(multiLevelNs, capturedRequest.namespace());
+    Assertions.assertEquals(
+        authenticatedUser, capturedRequest.properties().get(IcebergConstants.OWNER));
+  }
+
+  @Test
+  public void testLoadNamespaceDelegatesToCatalogWrapper() {
+    Namespace ns = Namespace.of("A", "B");
+    GetNamespaceResponse mockResponse = mock(GetNamespaceResponse.class);
+    when(mockCatalogWrapper.loadNamespace(ns)).thenReturn(mockResponse);
+
+    GetNamespaceResponse result = executor.loadNamespace(mockContext, ns);
+
+    verify(mockCatalogWrapper).loadNamespace(ns);
+    Assertions.assertEquals(mockResponse, result);
+  }
+
+  @Test
+  public void testDropNestedNamespacePassesCorrectLevels() {
+    Namespace nestedNs = Namespace.of("A", "B", "C");
+
+    executor.dropNamespace(mockContext, nestedNs);
+
+    verify(mockCatalogWrapper).dropNamespace(nestedNs);
+  }
+
+  @Test
+  public void testDropFlatNamespaceDelegatesToCatalogWrapper() {
+    Namespace ns = Namespace.of("mydb");
+
+    executor.dropNamespace(mockContext, ns);
+
+    verify(mockCatalogWrapper).dropNamespace(ns);
+  }
+
+  @Test
+  public void testListNamespacesWithParentDelegatesToCatalogWrapper() {
+    Namespace parent = Namespace.of("A", "B");
+    Namespace child = Namespace.of("A", "B", "C");
+    ListNamespacesResponse mockResponse =
+        ListNamespacesResponse.builder().addAll(Collections.singletonList(child)).build();
+    when(mockCatalogWrapper.listNamespace(parent)).thenReturn(mockResponse);
+
+    ListNamespacesResponse result = executor.listNamespaces(mockContext, parent);
+
+    verify(mockCatalogWrapper).listNamespace(parent);
+    Assertions.assertEquals(mockResponse, result);
+    Assertions.assertEquals(Arrays.asList(child), result.namespaces());
+  }
+
+  @Test
+  public void testListNamespacesAtRootLevelDelegatesToCatalogWrapper() {
+    Namespace root = Namespace.empty();
+    Namespace ns1 = Namespace.of("A");
+    Namespace ns2 = Namespace.of("B");
+    ListNamespacesResponse mockResponse =
+        ListNamespacesResponse.builder().addAll(Arrays.asList(ns1, ns2)).build();
+    when(mockCatalogWrapper.listNamespace(root)).thenReturn(mockResponse);
+
+    ListNamespacesResponse result = executor.listNamespaces(mockContext, root);
+
+    verify(mockCatalogWrapper).listNamespace(root);
+    Assertions.assertEquals(2, result.namespaces().size());
+  }
+
+  @Test
+  public void testNamespaceExistsDelegatesToCatalogWrapper() {
+    Namespace nestedNs = Namespace.of("A", "B");
+    when(mockCatalogWrapper.namespaceExists(nestedNs)).thenReturn(true);
+
+    boolean exists = executor.namespaceExists(mockContext, nestedNs);
+
+    verify(mockCatalogWrapper).namespaceExists(nestedNs);
+    Assertions.assertTrue(exists);
+  }
+
+  @Test
+  public void testNamespaceNotExistsDelegatesToCatalogWrapper() {
+    Namespace ns = Namespace.of("nonexistent");
+    when(mockCatalogWrapper.namespaceExists(ns)).thenReturn(false);
+
+    boolean exists = executor.namespaceExists(mockContext, ns);
+
+    verify(mockCatalogWrapper).namespaceExists(ns);
+    Assertions.assertFalse(exists);
   }
 }

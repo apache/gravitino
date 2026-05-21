@@ -33,13 +33,16 @@ import static org.apache.gravitino.rel.expressions.transforms.Transforms.identit
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.hive.StorageFormat;
 import org.apache.gravitino.hive.HiveColumn;
 import org.apache.gravitino.hive.HivePartition;
@@ -84,6 +87,9 @@ public class HiveTableConverter {
       // Hive2 doesn't have getCatName method, catalogName will be null
     }
 
+    String viewOriginalText =
+        StringUtils.defaultString(table.getViewOriginalText(), table.getViewExpandedText());
+
     HiveTable hiveTable =
         HiveTable.builder()
             .withName(table.getTableName())
@@ -96,6 +102,7 @@ public class HiveTableConverter {
             .withPartitioning(partitioning)
             .withCatalogName(catalogName)
             .withDatabaseName(table.getDbName())
+            .withViewOriginalText(viewOriginalText)
             .build();
     return hiveTable;
   }
@@ -105,6 +112,11 @@ public class HiveTableConverter {
     Map<String, String> properties = Maps.newHashMap(table.getParameters());
 
     Optional.ofNullable(table.getTableType()).ifPresent(t -> properties.put(TABLE_TYPE, t));
+
+    // VIRTUAL_VIEW tables may have a minimal or absent StorageDescriptor — skip SD fields.
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(table.getTableType())) {
+      return properties;
+    }
 
     StorageDescriptor sd = table.getSd();
     properties.put(LOCATION, sd.getLocation());
@@ -135,13 +147,29 @@ public class HiveTableConverter {
         hiveTable.properties().getOrDefault(TABLE_TYPE, String.valueOf(TableType.MANAGED_TABLE));
     table.setTableType(tableType.toUpperCase());
 
-    List<FieldSchema> partitionFields =
-        hiveTable.partitionFieldNames().stream()
-            .map(fieldName -> buildPartitionKeyField(fieldName, hiveTable))
-            .collect(Collectors.toList());
-    table.setSd(buildStorageDescriptor(hiveTable, partitionFields));
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(tableType)) {
+      // Views require a minimal StorageDescriptor (HMS validates its presence), while the output
+      // schema is stored in sd.cols.
+      StorageDescriptor sd = new StorageDescriptor();
+      sd.setCols(buildStorageDescriptor(hiveTable, Collections.emptyList()).getCols());
+      sd.setSerdeInfo(new SerDeInfo());
+      table.setSd(sd);
+      table.setPartitionKeys(new ArrayList<>());
+      String viewOriginalText = hiveTable.viewOriginalText();
+      if (viewOriginalText != null) {
+        table.setViewOriginalText(viewOriginalText);
+        table.setViewExpandedText(viewOriginalText);
+      }
+    } else {
+      List<FieldSchema> partitionFields =
+          hiveTable.partitionFieldNames().stream()
+              .map(fieldName -> buildPartitionKeyField(fieldName, hiveTable))
+              .collect(Collectors.toList());
+      table.setSd(buildStorageDescriptor(hiveTable, partitionFields));
+      table.setPartitionKeys(partitionFields);
+    }
+
     table.setParameters(buildTableParameters(hiveTable));
-    table.setPartitionKeys(partitionFields);
 
     // Set AuditInfo to Hive's Table object. Hive's Table doesn't support setting last modifier
     // and last modified time, so we only set creator and create time.
@@ -282,7 +310,7 @@ public class HiveTableConverter {
   public static Distribution getDistribution(org.apache.hadoop.hive.metastore.api.Table table) {
     StorageDescriptor sd = table.getSd();
     Distribution distribution = Distributions.NONE;
-    if (sd.getBucketCols() != null && !sd.getBucketCols().isEmpty()) {
+    if (sd != null && sd.getBucketCols() != null && !sd.getBucketCols().isEmpty()) {
       // Hive table use hash strategy as bucketing strategy
       distribution =
           Distributions.hash(
@@ -295,7 +323,7 @@ public class HiveTableConverter {
   public static SortOrder[] getSortOrders(org.apache.hadoop.hive.metastore.api.Table table) {
     SortOrder[] sortOrders = SortOrders.NONE;
     StorageDescriptor sd = table.getSd();
-    if (sd.getSortCols() != null && !sd.getSortCols().isEmpty()) {
+    if (sd != null && sd.getSortCols() != null && !sd.getSortCols().isEmpty()) {
       sortOrders =
           sd.getSortCols().stream()
               .map(
@@ -309,26 +337,30 @@ public class HiveTableConverter {
   }
 
   public static Transform[] getPartitioning(org.apache.hadoop.hive.metastore.api.Table table) {
-    return table.getPartitionKeys().stream()
-        .map(p -> identity(p.getName()))
-        .toArray(Transform[]::new);
+    List<FieldSchema> partitionKeys =
+        table.getPartitionKeys() == null ? Collections.emptyList() : table.getPartitionKeys();
+    return partitionKeys.stream().map(p -> identity(p.getName())).toArray(Transform[]::new);
   }
 
   public static Column[] getColumns(org.apache.hadoop.hive.metastore.api.Table table) {
     StorageDescriptor sd = table.getSd();
+    List<FieldSchema> storageColumns =
+        sd == null || sd.getCols() == null ? Collections.emptyList() : sd.getCols();
+    List<FieldSchema> partitionKeys =
+        table.getPartitionKeys() == null ? Collections.emptyList() : table.getPartitionKeys();
     // Collect column names from sd.getCols() to check for duplicates
     Set<String> columnNames =
-        sd.getCols().stream().map(FieldSchema::getName).collect(Collectors.toSet());
+        storageColumns.stream().map(FieldSchema::getName).collect(Collectors.toSet());
 
     return Stream.concat(
-            sd.getCols().stream()
+            storageColumns.stream()
                 .map(
                     f ->
                         buildColumn(
                             f.getName(),
                             HiveDataTypeConverter.CONVERTER.toGravitino(f.getType()),
                             f.getComment())),
-            table.getPartitionKeys().stream()
+            partitionKeys.stream()
                 // Filter out partition keys that already exist in sd.getCols()
                 .filter(p -> !columnNames.contains(p.getName()))
                 .map(

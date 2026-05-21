@@ -17,29 +17,24 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
+package org.apache.gravitino.trino.connector.catalog.hive;
 
+import io.trino.spi.session.PropertyMetadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpUserMetaPostgreSQLProvider {
+public class TestHivePropertyMeta {
 
   @Test
-  void testCurrentTimeMillisExpression() {
-    IdpUserMetaPostgreSQLProvider provider = new IdpUserMetaPostgreSQLProvider();
+  public void testBucketCountDefaultValue() {
+    PropertyMetadata<?> bucketCountProperty =
+        new HivePropertyMeta()
+            .getTablePropertyMetadata().stream()
+                .filter(
+                    property -> property.getName().equals(HivePropertyMeta.HIVE_BUCKET_COUNT_KEY))
+                .findFirst()
+                .orElseThrow();
 
-    Assertions.assertEquals(
-        "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)",
-        provider.currentTimeMillisExpression());
-  }
-
-  @Test
-  void testDeleteIdpUserMetasByLegacyTimeline() {
-    IdpUserMetaPostgreSQLProvider provider = new IdpUserMetaPostgreSQLProvider();
-
-    Assertions.assertEquals(
-        "DELETE FROM idp_user_meta WHERE user_id IN (SELECT user_id FROM idp_user_meta"
-            + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})",
-        provider.deleteIdpUserMetasByLegacyTimeline(1L, 2));
+    Assertions.assertEquals(0, bucketCountProperty.getDefaultValue());
   }
 }

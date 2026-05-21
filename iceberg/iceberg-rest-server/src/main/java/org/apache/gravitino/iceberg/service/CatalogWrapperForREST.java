@@ -359,12 +359,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
                 PrincipalUtils.getCurrentUserName(),
                 Collections.emptySet(),
                 ImmutableSet.copyOf(path));
-    Credential credential =
-        catalogCredentialManager.getCredentialByPath(tableMetadata.location(), context);
-    if (credential == null) {
-      throw new ServiceUnavailableException("Couldn't generate credential, %s", context);
-    }
-    return credential;
+    return catalogCredentialManager
+        .getCredentialByPath(tableMetadata.location(), context)
+        .orElseThrow(
+            () -> new ServiceUnavailableException("Couldn't generate credential, %s", context));
   }
 
   @VisibleForTesting
