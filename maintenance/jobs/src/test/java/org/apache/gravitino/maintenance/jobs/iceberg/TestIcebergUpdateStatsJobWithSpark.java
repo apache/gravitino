@@ -44,7 +44,6 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -822,7 +821,7 @@ public class TestIcebergUpdateStatsJobWithSpark {
     properties.put("catalog-backend", "REST");
     properties.put("uri", ICEBERG_REST_URI);
     // RESTCatalog does not implement SupportsMetadataLocation; disable default metadata cache.
-    properties.put(IcebergConstants.TABLE_METADATA_CACHE_IMPL, "");
+    properties.put("table-metadata-cache-impl", "");
 
     metalake.createCatalog(
         SPARK_CATALOG_NAME,
