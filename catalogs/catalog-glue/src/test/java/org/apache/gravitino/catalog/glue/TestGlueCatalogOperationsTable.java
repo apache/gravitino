@@ -246,7 +246,7 @@ class TestGlueCatalogOperationsTable {
     Map<String, String> props =
         Map.of(
             GlueConstants.LOCATION, "s3://my-bucket/path",
-            GlueConstants.INPUT_FORMAT, "org.apache.hadoop.mapred.TextInputFormat",
+            GlueConstants.INPUT_FORMAT_CLASS, "org.apache.hadoop.mapred.TextInputFormat",
             GlueConstants.OUTPUT_FORMAT,
                 "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
             GlueConstants.TABLE_TYPE, "EXTERNAL_TABLE");
@@ -299,7 +299,7 @@ class TestGlueCatalogOperationsTable {
   }
 
   @Test
-  void testCreateTable_defaultsToTextFileWhenNoFormat() {
+  void testCreateTable_defaultsToParquetFormat() {
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "mytable");
     ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
 
@@ -315,10 +315,9 @@ class TestGlueCatalogOperationsTable {
 
     verify(mockClient).createTable(captor.capture());
     StorageDescriptor sd = captor.getValue().tableInput().storageDescriptor();
-    assertEquals(HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS, sd.inputFormat());
-    assertEquals(HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS, sd.outputFormat());
-    assertEquals(
-        HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS, sd.serdeInfo().serializationLibrary());
+    assertEquals(HiveStorageConstants.PARQUET_INPUT_FORMAT_CLASS, sd.inputFormat());
+    assertEquals(HiveStorageConstants.PARQUET_OUTPUT_FORMAT_CLASS, sd.outputFormat());
+    assertEquals(HiveStorageConstants.PARQUET_SERDE_CLASS, sd.serdeInfo().serializationLibrary());
   }
 
   @Test

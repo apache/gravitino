@@ -148,10 +148,13 @@ public abstract class SparkUtilIT extends BaseIT {
     Identifier identifier;
     TableCatalog tableCatalog;
     if (parts.length == 1) {
-      // Short table name: use current catalog + current database
+      // Short table name: use current catalog + current V2 namespace.
+      // catalog().currentDatabase() returns the V1 Hive session catalog database and is NOT
+      // updated when USE <db> is issued against a V2 catalog (e.g. Glue) in Spark 3.3.
+      // catalogManager.currentNamespace() reflects the V2 namespace correctly.
       CatalogPlugin currentCatalog = catalogManager.currentCatalog();
-      String currentDb = getSparkSession().catalog().currentDatabase();
-      identifier = Identifier.of(new String[] {currentDb}, parts[0]);
+      String[] currentNamespace = catalogManager.currentNamespace();
+      identifier = Identifier.of(currentNamespace, parts[0]);
       tableCatalog = (TableCatalog) currentCatalog;
     } else if (parts.length == 2) {
       // Partially qualified: db.table

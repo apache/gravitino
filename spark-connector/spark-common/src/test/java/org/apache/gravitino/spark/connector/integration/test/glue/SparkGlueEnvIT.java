@@ -158,16 +158,23 @@ public abstract class SparkGlueEnvIT extends SparkCommonIT {
   /**
    * Shadows parent's HDFS-based database initialization. The parent {@link
    * org.apache.gravitino.spark.connector.integration.test.SparkCommonIT} creates a database with an
-   * HDFS location ('/user/hive/{db}') which is wrong for Glue. This implementation creates the
-   * database with the correct S3 location.
+   * HDFS location ('/user/hive/{db}') which is wrong for Glue. This implementation drops and
+   * recreates the database with the correct S3 location to remove any stale tables left by prior
+   * test runs (e.g., when multiple Spark versions share the same Glue catalog).
    *
-   * <p>Called explicitly from {@link #startUp()}, not via JUnit lifecycle inheritance.
+   * <p>Called explicitly from {@link #startUp()}, not via JUnit lifecycle inheritance. JUnit 5
+   * treats this protected method as hiding the package-private {@code @BeforeAll
+   * initDefaultDatabase()} from {@code SparkCommonIT}, so the parent's drop-and-recreate logic
+   * would not run — this override must perform the same cleanup itself.
    */
   protected void initDefaultDatabase() {
     String defaultDbName = getDefaultDatabase();
     String dbLocation = warehouse + "/" + defaultDbName;
     sql("SET spark.sql.defaultCatalog=" + getCatalogName());
-    sql(String.format("CREATE DATABASE IF NOT EXISTS %s LOCATION '%s'", defaultDbName, dbLocation));
+    sql("DROP DATABASE IF EXISTS " + defaultDbName + " CASCADE");
+    deleteDirIfExists(dbLocation);
+    sql(String.format("CREATE DATABASE %s LOCATION '%s'", defaultDbName, dbLocation));
+    sql("USE " + defaultDbName);
   }
 
   /**

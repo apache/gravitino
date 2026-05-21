@@ -621,10 +621,12 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private GlueTable alterIcebergTable(
       NameIdentifier ident, String dbName, Table rawGlueTable, TableChange... changes) {
-    // Register-mode tables (created with METADATA_LOCATION) are not backed by the Iceberg SDK
-    // GlueCatalog, so we fall back to the native Glue SDK update path.
-    if (rawGlueTable.hasParameters()
-        && rawGlueTable.parameters().containsKey(GlueConstants.METADATA_LOCATION)) {
+    // When the Iceberg GlueCatalog is available, use it for all Iceberg schema changes.
+    // Tables created via the Iceberg SDK have metadata_location set by Iceberg itself; tables
+    // explicitly registered by the user also have metadata_location. Both can be altered via the
+    // Iceberg SDK when icebergGlueCatalog is initialized.
+    // Fall back to the register-mode (property-only) path only when icebergGlueCatalog is absent.
+    if (icebergGlueCatalog == null) {
       return alterRegisterModeIcebergTable(ident, dbName, rawGlueTable, changes);
     }
     GlueIcebergTableHelper.alterTable(icebergGlueCatalog, dbName, ident.name(), changes);
@@ -878,12 +880,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
               : warehouseLocation;
       return base + "/" + dbName + "/" + tableName;
     }
-    throw new IllegalArgumentException(
-        "Table location is required: either set the '"
-            + GlueConstants.LOCATION
-            + "' property or configure '"
-            + GlueConstants.WAREHOUSE
-            + "' on the catalog.");
+    return null;
   }
 
   /** Translates a format name (e.g., "parquet", "orc") to the Hive input format class. */
