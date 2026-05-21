@@ -120,7 +120,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaStorageTest {
       idpUserMetaMapper.insertIdpUser(
           IdpUserPO.builder()
               .withUserId(userId)
-              .withUserName("user" + userId)
+              .withUsername("user" + userId)
               .withPasswordHash("hash-" + userId)
               .withCurrentVersion(1L)
               .withLastVersion(0L)

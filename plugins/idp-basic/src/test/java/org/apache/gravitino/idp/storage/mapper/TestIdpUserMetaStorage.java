@@ -49,7 +49,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     IdpUserPO firstUser =
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash-a")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -68,7 +68,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     IdpUserPO firstUser =
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash-a")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -77,7 +77,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     IdpUserPO secondUser =
         IdpUserPO.builder()
             .withUserId(2L)
-            .withUserName("bob")
+            .withUsername("bob")
             .withPasswordHash("hash-b")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -102,7 +102,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     IdpUserPO activeUser =
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash-a")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -112,7 +112,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(2L)
-            .withUserName("bob")
+            .withUsername("bob")
             .withPasswordHash("hash-b")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -131,7 +131,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash-a")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -151,7 +151,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash-a")
             .withCurrentVersion(3L)
             .withLastVersion(2L)
@@ -171,7 +171,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash-a")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -194,7 +194,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("legacy-user")
+            .withUsername("legacy-user")
             .withPasswordHash("hash")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -203,7 +203,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(2L)
-            .withUserName("new-user")
+            .withUsername("new-user")
             .withPasswordHash("hash")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -212,7 +212,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(3L)
-            .withUserName("active-user")
+            .withUsername("active-user")
             .withPasswordHash("hash")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -223,7 +223,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     assertEquals(0, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(20L, 10));
     assertEquals(1, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(40L, 10));
     assertEquals(0, idpUserMetaMapper.deleteIdpUserMetasByLegacyTimeline(Long.MAX_VALUE, 10));
-    assertEquals("active-user", idpUserMetaMapper.selectIdpUser("active-user").getUserName());
+    assertEquals("active-user", idpUserMetaMapper.selectIdpUser("active-user").getUsername());
     assertNull(idpUserMetaMapper.selectIdpUser("legacy-user"));
     assertNull(idpUserMetaMapper.selectIdpUser("new-user"));
   }

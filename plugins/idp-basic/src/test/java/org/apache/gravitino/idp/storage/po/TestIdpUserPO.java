@@ -28,7 +28,7 @@ public class TestIdpUserPO {
     IdpUserPO userPO =
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
@@ -36,7 +36,7 @@ public class TestIdpUserPO {
             .build();
 
     Assertions.assertEquals(1L, userPO.getUserId());
-    Assertions.assertEquals("alice", userPO.getUserName());
+    Assertions.assertEquals("alice", userPO.getUsername());
     Assertions.assertEquals("hash", userPO.getPasswordHash());
     Assertions.assertEquals(1L, userPO.getCurrentVersion());
     Assertions.assertEquals(1L, userPO.getLastVersion());
@@ -48,14 +48,14 @@ public class TestIdpUserPO {
     IdpUserPO userPO =
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
     Assertions.assertEquals(1L, userPO.getUserId());
-    Assertions.assertEquals("alice", userPO.getUserName());
+    Assertions.assertEquals("alice", userPO.getUsername());
     Assertions.assertNull(userPO.getPasswordHash());
   }
 
@@ -64,7 +64,7 @@ public class TestIdpUserPO {
     IdpUserPO userPO1 =
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
@@ -74,7 +74,7 @@ public class TestIdpUserPO {
     IdpUserPO userPO2 =
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
@@ -90,16 +90,16 @@ public class TestIdpUserPO {
     var builder =
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash")
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L);
 
     IdpUserPO firstUser = builder.build();
-    IdpUserPO secondUser = builder.withUserName("bob").build();
+    IdpUserPO secondUser = builder.withUsername("bob").build();
 
-    Assertions.assertEquals("alice", firstUser.getUserName());
-    Assertions.assertEquals("bob", secondUser.getUserName());
+    Assertions.assertEquals("alice", firstUser.getUsername());
+    Assertions.assertEquals("bob", secondUser.getUsername());
   }
 }

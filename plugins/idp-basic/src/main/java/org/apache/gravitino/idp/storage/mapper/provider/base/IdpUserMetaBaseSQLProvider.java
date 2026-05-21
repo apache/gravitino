@@ -26,7 +26,7 @@ import org.apache.ibatis.annotations.Param;
 
 public class IdpUserMetaBaseSQLProvider {
   public String selectIdpUser(@Param("username") String username) {
-    return "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
+    return "SELECT user_id as userId, user_name as username, password_hash as passwordHash,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
@@ -36,7 +36,7 @@ public class IdpUserMetaBaseSQLProvider {
 
   public String selectIdpUsers(@Param("usernames") List<String> usernames) {
     return "<script>"
-        + "SELECT user_id as userId, user_name as userName, password_hash as passwordHash,"
+        + "SELECT user_id as userId, user_name as username, password_hash as passwordHash,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
@@ -55,7 +55,7 @@ public class IdpUserMetaBaseSQLProvider {
         + " (user_id, user_name, password_hash, current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{userMeta.userId},"
-        + " #{userMeta.userName},"
+        + " #{userMeta.username},"
         + " #{userMeta.passwordHash},"
         + " #{userMeta.currentVersion},"
         + " #{userMeta.lastVersion},"

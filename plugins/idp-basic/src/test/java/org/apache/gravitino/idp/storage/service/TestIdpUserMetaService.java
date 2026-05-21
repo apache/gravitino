@@ -68,10 +68,10 @@ class TestIdpUserMetaService extends AbstractIdpMetaStorageTest {
     int deletedCount =
         userMetaService.deleteUserMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 4);
     Assertions.assertEquals(0, deletedCount);
-    assertEquals("user1", idpUserMetaMapper.selectIdpUser("user1").getUserName());
-    assertEquals("user2", idpUserMetaMapper.selectIdpUser("user2").getUserName());
-    assertEquals("user3", idpUserMetaMapper.selectIdpUser("user3").getUserName());
-    assertEquals("user4", idpUserMetaMapper.selectIdpUser("user4").getUserName());
+    assertEquals("user1", idpUserMetaMapper.selectIdpUser("user1").getUsername());
+    assertEquals("user2", idpUserMetaMapper.selectIdpUser("user2").getUsername());
+    assertEquals("user3", idpUserMetaMapper.selectIdpUser("user3").getUsername());
+    assertEquals("user4", idpUserMetaMapper.selectIdpUser("user4").getUsername());
     assertEquals(4, countUsers());
     assertEquals(8, countUserGroupRels());
 
@@ -141,7 +141,7 @@ class TestIdpUserMetaService extends AbstractIdpMetaStorageTest {
       idpUserMetaMapper.insertIdpUser(
           IdpUserPO.builder()
               .withUserId(userId)
-              .withUserName("user" + userId)
+              .withUsername("user" + userId)
               .withPasswordHash("hash-" + userId)
               .withCurrentVersion(1L)
               .withLastVersion(0L)

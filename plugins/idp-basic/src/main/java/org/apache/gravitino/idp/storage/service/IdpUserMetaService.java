@@ -123,7 +123,7 @@ public class IdpUserMetaService {
       IdpUserPO existingUser =
           overwritten
               ? SessionUtils.getWithoutCommit(
-                  IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(userPO.getUserName()))
+                  IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(userPO.getUsername()))
               : null;
 
       if (existingUser != null) {
@@ -131,7 +131,7 @@ public class IdpUserMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     IdpUserGroupRelMapper.class,
-                    mapper -> mapper.softDeleteRelationsByUsername(userPO.getUserName())),
+                    mapper -> mapper.softDeleteRelationsByUsername(userPO.getUsername())),
             () ->
                 SessionUtils.doWithoutCommit(
                     IdpUserMetaMapper.class,
@@ -148,7 +148,7 @@ public class IdpUserMetaService {
             () -> insertIdpUserGroupRelations(relations));
       }
     } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(re, Entity.EntityType.USER, userPO.getUserName());
+      ExceptionUtils.checkSQLException(re, Entity.EntityType.USER, userPO.getUsername());
       throw re;
     }
   }
