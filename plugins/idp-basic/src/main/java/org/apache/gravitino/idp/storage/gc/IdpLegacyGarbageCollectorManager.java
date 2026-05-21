@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.idp.storage.gc;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
@@ -53,7 +52,6 @@ public final class IdpLegacyGarbageCollectorManager {
     }
   }
 
-  @VisibleForTesting
   public synchronized void close() throws IOException {
     if (garbageCollector == null) {
       return;

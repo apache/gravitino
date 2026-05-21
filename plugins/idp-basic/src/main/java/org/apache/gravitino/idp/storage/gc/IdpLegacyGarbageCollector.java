@@ -21,7 +21,6 @@ package org.apache.gravitino.idp.storage.gc;
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -40,8 +39,7 @@ public final class IdpLegacyGarbageCollector implements Closeable {
 
   private final long storeDeleteAfterTimeMillis;
 
-  @VisibleForTesting
-  final ScheduledExecutorService garbageCollectorPool =
+  private final ScheduledExecutorService garbageCollectorPool =
       new ScheduledThreadPoolExecutor(
           2,
           r -> {
@@ -64,7 +62,6 @@ public final class IdpLegacyGarbageCollector implements Closeable {
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
 
-  @VisibleForTesting
   public void collectAndClean() {
     long threadId = Thread.currentThread().getId();
     LOG.debug("Thread {} start to collect garbage...", threadId);
