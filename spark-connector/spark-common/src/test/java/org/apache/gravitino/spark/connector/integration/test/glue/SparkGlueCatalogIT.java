@@ -423,23 +423,6 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
   }
 
   /**
-   * Overrides base: ensures the table is cleaned up before creation to handle stale state from
-   * prior test runs (Glue tables persist across JVM restarts unlike in-memory Derby).
-   */
-  @Test
-  void testDropTable() {
-    String tableName = "drop_table";
-    dropTableIfExists(tableName);
-    createSimpleTable(tableName);
-    Assertions.assertTrue(tableExists(tableName));
-
-    dropTableIfExists(tableName);
-    Assertions.assertFalse(tableExists(tableName));
-
-    Assertions.assertThrows(Exception.class, () -> sql("DROP TABLE not_exists"));
-  }
-
-  /**
    * Overrides base: skips S3 directory verification when no explicit LOCATION was given. Glue does
    * not store the auto-assigned warehouse location in table properties, so we cannot reconstruct
    * the exact S3 path. Data read/write correctness is already validated by {@link
@@ -451,28 +434,6 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
       return;
     }
     super.checkPartitionDirExists(table);
-  }
-
-  // -------------------------------------------------------------------------
-  // Override unsupported operation tests (Glue doesn't support these)
-  // -------------------------------------------------------------------------
-
-  /** Glue doesn't support DROP COLUMNS, so skip this test. */
-  @Test
-  void testAlterTableAddAndDeleteColumn() {
-    // Glue doesn't support DROP COLUMNS — skip
-  }
-
-  /** Glue doesn't support CHANGE COLUMN, so skip this test. */
-  @Test
-  void testAlterTableUpdateColumnType() {
-    // Glue doesn't support ALTER TABLE CHANGE COLUMN — skip
-  }
-
-  /** Glue doesn't support RENAME COLUMN, so skip this test. */
-  @Test
-  void testAlterTableRenameColumn() {
-    // Glue doesn't support RENAME COLUMN — skip
   }
 
   // -------------------------------------------------------------------------
@@ -516,7 +477,6 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
   @Test
   void testListTables() {
     String tableName = "t_list";
-    dropTableIfExists(tableName);
     Set<String> tableNames = listTableNames();
     Assertions.assertFalse(tableNames.contains(tableName));
     createSimpleTable(tableName);
@@ -579,11 +539,10 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
    * tables from a nonexistent database.
    */
   @Test
+  @Override
   protected void testListTable() {
     String table1 = "list1";
     String table2 = "list2";
-    dropTableIfExists(table1);
-    dropTableIfExists(table2);
     createSimpleTable(table1);
     createSimpleTable(table2);
     Set<String> tables = listTableNames();

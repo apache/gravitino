@@ -472,6 +472,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsSchemaEvolution")
   void testAlterTableAddAndDeleteColumn() {
     String tableName = "test_column";
     dropTableIfExists(tableName);
@@ -491,6 +492,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsSchemaEvolution")
   void testAlterTableUpdateColumnType() {
     String tableName = "test_column_type";
     dropTableIfExists(tableName);
@@ -508,6 +510,7 @@ public abstract class SparkCommonIT extends SparkEnvIT {
   }
 
   @Test
+  @EnabledIf("supportsSchemaEvolution")
   void testAlterTableRenameColumn() {
     String tableName = "test_rename_column";
     dropTableIfExists(tableName);
