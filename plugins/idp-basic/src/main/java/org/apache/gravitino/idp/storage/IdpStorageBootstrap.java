@@ -30,8 +30,8 @@ import org.slf4j.LoggerFactory;
  * entity-store lifecycle.
  *
  * <p>Invoked from {@link
- * org.apache.gravitino.idp.storage.mapper.provider.IdpBasicMapperPackageProvider} when the plugin
- * is loaded via {@link
+ * org.apache.gravitino.idp.storage.mapper.provider.IdpBasicMapperPackageProvider#getMapperClasses()}
+ * when relational storage registers mapper packages via {@link
  * org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider} SPI.
  */
 public final class IdpStorageBootstrap {

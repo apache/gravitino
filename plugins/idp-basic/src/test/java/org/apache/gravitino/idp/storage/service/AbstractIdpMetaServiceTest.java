@@ -164,7 +164,9 @@ public abstract class AbstractIdpMetaServiceTest extends AbstractIdpMetaStorageT
   }
 
   protected void softDeleteAllGroups() throws SQLException {
-    executeUpdate("UPDATE idp_group_meta SET deleted_at = 1 WHERE deleted_at = 0");
+    executeUpdate(
+        "UPDATE idp_group_meta SET deleted_at = 1 WHERE deleted_at = 0",
+        "UPDATE idp_user_group_rel SET deleted_at = 1 WHERE deleted_at = 0");
   }
 
   protected int countUsers() {

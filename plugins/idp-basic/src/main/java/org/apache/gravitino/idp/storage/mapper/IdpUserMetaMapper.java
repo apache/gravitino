@@ -41,12 +41,8 @@ public interface IdpUserMetaMapper {
   @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUser")
   IdpUserPO selectIdpUser(@Param("username") String username);
 
-  /**
-   * Selects active users by name. An empty list returns all active users; pass null for an explicit
-   * error.
-   */
-  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUsers")
-  List<IdpUserPO> selectIdpUsers(@Param("usernames") List<String> usernames);
+  @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUsersByUsernames")
+  List<IdpUserPO> selectIdpUsersByUsernames(@Param("usernames") List<String> usernames);
 
   @InsertProvider(type = IdpUserMetaSQLProviderFactory.class, method = "insertIdpUser")
   void insertIdpUser(@Param("userMeta") IdpUserPO userPO);

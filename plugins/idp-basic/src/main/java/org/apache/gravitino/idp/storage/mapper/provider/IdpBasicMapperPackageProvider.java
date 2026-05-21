@@ -29,12 +29,9 @@ import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProv
 /** Supplies built-in IdP mapper classes from the idp-basic plugin. */
 public class IdpBasicMapperPackageProvider implements MapperPackageProvider {
 
-  static {
-    IdpStorageBootstrap.initializeOnce();
-  }
-
   @Override
   public List<Class<?>> getMapperClasses() {
+    IdpStorageBootstrap.initializeOnce();
     return ImmutableList.of(
         IdpUserMetaMapper.class, IdpGroupMetaMapper.class, IdpUserGroupRelMapper.class);
   }

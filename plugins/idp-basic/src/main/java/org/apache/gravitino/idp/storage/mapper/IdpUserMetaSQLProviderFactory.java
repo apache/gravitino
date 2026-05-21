@@ -59,8 +59,8 @@ public class IdpUserMetaSQLProviderFactory {
     return currentProvider().selectIdpUser(username);
   }
 
-  public static String selectIdpUsers(@Param("usernames") List<String> usernames) {
-    return currentProvider().selectIdpUsers(usernames);
+  public static String selectIdpUsersByUsernames(@Param("usernames") List<String> usernames) {
+    return currentProvider().selectIdpUsersByUsernames(usernames);
   }
 
   public static String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {

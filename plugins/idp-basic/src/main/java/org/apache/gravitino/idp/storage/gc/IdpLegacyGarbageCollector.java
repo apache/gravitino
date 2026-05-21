@@ -37,8 +37,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Unlike core {@link org.apache.gravitino.storage.relational.RelationalGarbageCollector}, which
  * is started from {@code RelationalEntityStore}, this plugin has no entity-store lifecycle hook. It
- * is started once via {@link org.apache.gravitino.idp.storage.IdpStorageBootstrap} when the
- * idp-basic plugin is loaded.
+ * is started once via {@link org.apache.gravitino.idp.storage.IdpStorageBootstrap} when IdP mappers
+ * are registered through {@link
+ * org.apache.gravitino.idp.storage.mapper.provider.IdpBasicMapperPackageProvider}.
  */
 public final class IdpLegacyGarbageCollector {
 

@@ -20,15 +20,10 @@
 package org.apache.gravitino.idp.storage.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
-import java.util.Comparator;
-import java.util.List;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
-import org.apache.ibatis.exceptions.PersistenceException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -62,38 +57,6 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testSelectIdpGroups(String type) throws IOException {
-    init(type);
-    IdpGroupPO firstGroup =
-        IdpGroupPO.builder()
-            .withGroupId(1L)
-            .withGroupName("dev")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build();
-    IdpGroupPO secondGroup =
-        IdpGroupPO.builder()
-            .withGroupId(2L)
-            .withGroupName("ops")
-            .withCurrentVersion(1L)
-            .withLastVersion(0L)
-            .withDeletedAt(0L)
-            .build();
-    idpGroupMetaMapper.insertIdpGroup(firstGroup);
-    idpGroupMetaMapper.insertIdpGroup(secondGroup);
-
-    List<IdpGroupPO> groups = idpGroupMetaMapper.selectIdpGroups(List.of("ops", "dev"));
-    groups.sort(Comparator.comparing(IdpGroupPO::getGroupId));
-    assertIterableEquals(List.of(firstGroup, secondGroup), groups);
-    List<IdpGroupPO> groupsWithEmptyFilter = idpGroupMetaMapper.selectIdpGroups(List.of());
-    groupsWithEmptyFilter.sort(Comparator.comparing(IdpGroupPO::getGroupId));
-    assertIterableEquals(List.of(firstGroup, secondGroup), groupsWithEmptyFilter);
-    assertThrows(PersistenceException.class, () -> idpGroupMetaMapper.selectIdpGroups(null));
-  }
-
-  @ParameterizedTest
-  @MethodSource("storageProvider")
   void testSelectIdpGroupIgnoresDeletedGroups(String type) throws IOException {
     init(type);
     IdpGroupPO activeGroup =
@@ -114,8 +77,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
             .withDeletedAt(10L)
             .build());
 
-    assertIterableEquals(
-        List.of(activeGroup), idpGroupMetaMapper.selectIdpGroups(List.of("dev", "ops")));
+    assertEquals(activeGroup, idpGroupMetaMapper.selectIdpGroup("dev"));
     assertNull(idpGroupMetaMapper.selectIdpGroup("ops"));
   }
 

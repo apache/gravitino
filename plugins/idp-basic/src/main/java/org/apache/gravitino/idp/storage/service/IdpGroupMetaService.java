@@ -24,13 +24,13 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
-import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -106,28 +106,40 @@ public class IdpGroupMetaService {
       return;
     }
 
-    IdpGroupPO group = getIdpGroupByName(groupName);
     List<IdpUserGroupRelPO> relations = new ArrayList<>(usernames.size());
-    for (String username : usernames) {
-      IdpUserPO user = IdpUserMetaService.getInstance().getIdpUserByUsername(username);
-      relations.add(
-          IdpUserGroupRelPO.builder()
-              .withId(RandomIdGenerator.INSTANCE.nextId())
-              .withUserId(user.getUserId())
-              .withGroupId(group.getGroupId())
-              .withCurrentVersion(1L)
-              .withLastVersion(0L)
-              .withDeletedAt(0L)
-              .build());
-    }
-
     try {
-      SessionUtils.doWithCommit(
-          IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            IdpGroupPO group =
+                SessionUtils.getWithoutCommit(
+                    IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName));
+            if (group == null) {
+              throw new NotFoundException("IdP group not found: " + groupName);
+            }
+            Map<String, Long> userIds =
+                IdpUserMetaService.getInstance().resolveUserIdsByUsernames(usernames);
+            for (String username : usernames) {
+              relations.add(newUserGroupRelation(group.getGroupId(), userIds.get(username)));
+            }
+          },
+          () ->
+              SessionUtils.doWithoutCommit(
+                  IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations)));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(re, Entity.EntityType.GROUP, groupName);
       throw re;
     }
+  }
+
+  private static IdpUserGroupRelPO newUserGroupRelation(long groupId, long userId) {
+    return IdpUserGroupRelPO.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withUserId(userId)
+        .withGroupId(groupId)
+        .withCurrentVersion(1L)
+        .withLastVersion(0L)
+        .withDeletedAt(0L)
+        .build();
   }
 
   @Monitored(
@@ -135,7 +147,6 @@ public class IdpGroupMetaService {
       baseMetricName = "removeUsersFromGroup")
   public int removeUsersFromGroup(String groupName, List<String> usernames) {
     Preconditions.checkNotNull(usernames, "IdP usernames cannot be null");
-    getIdpGroupByName(groupName);
     Integer deleted =
         SessionUtils.doWithCommitAndFetchResult(
             IdpUserGroupRelMapper.class,
@@ -148,14 +159,21 @@ public class IdpGroupMetaService {
       baseMetricName = "deleteIdpGroupMetasByLegacyTimeline")
   public int deleteGroupMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] groupDeletedCount = new int[] {0};
+    int[] relDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
         () ->
             groupDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     IdpGroupMetaMapper.class,
-                    mapper -> mapper.deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit)));
+                    mapper -> mapper.deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit)),
+        () ->
+            relDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    IdpUserGroupRelMapper.class,
+                    mapper ->
+                        mapper.deleteIdpUserGroupRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
-    return groupDeletedCount[0];
+    return groupDeletedCount[0] + relDeletedCount[0];
   }
 }

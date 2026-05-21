@@ -128,6 +128,30 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
+  void testAddUsersToGroupThrowsWhenUserMissing(String type) throws IOException {
+    init(type);
+    insertUsers(1);
+    IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
+    runServiceCall(
+        () ->
+            groupMetaService.insertIdpGroup(
+                IdpGroupPO.builder()
+                    .withGroupId(1L)
+                    .withGroupName("engineering")
+                    .withCurrentVersion(1L)
+                    .withLastVersion(0L)
+                    .withDeletedAt(0L)
+                    .build()));
+
+    assertThrows(
+        NotFoundException.class,
+        () ->
+            runServiceCall(
+                () -> groupMetaService.addUsersToGroup("engineering", List.of("missing-user"))));
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
   void testDeleteGroupMetasByLegacyTimeline(String type) throws Exception {
     init(type);
     insertUsers(4);
@@ -146,15 +170,20 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
     assertEquals(4, countGroups());
     assertEquals(8, countUserGroupRels());
 
-    assertEquals(3, groupMetaService.deleteGroupMetasByLegacyTimeline(LEGACY_TIMELINE, 3));
+    assertEquals(6, groupMetaService.deleteGroupMetasByLegacyTimeline(LEGACY_TIMELINE, 3));
     refreshSession();
     assertEquals(1, countGroups());
-    assertEquals(8, countUserGroupRels());
+    assertEquals(5, countUserGroupRels());
 
-    assertEquals(1, groupMetaService.deleteGroupMetasByLegacyTimeline(LEGACY_TIMELINE, 3));
+    assertEquals(4, groupMetaService.deleteGroupMetasByLegacyTimeline(LEGACY_TIMELINE, 3));
     refreshSession();
     assertEquals(0, countGroups());
-    assertEquals(8, countUserGroupRels());
+    assertEquals(2, countUserGroupRels());
+
+    assertEquals(2, groupMetaService.deleteGroupMetasByLegacyTimeline(LEGACY_TIMELINE, 3));
+    refreshSession();
+    assertEquals(0, countGroups());
+    assertEquals(0, countUserGroupRels());
 
     assertEquals(0, groupMetaService.deleteGroupMetasByLegacyTimeline(LEGACY_TIMELINE, 3));
   }

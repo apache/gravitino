@@ -21,7 +21,9 @@ package org.apache.gravitino.idp.storage.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
@@ -55,6 +57,29 @@ public class IdpUserMetaService {
       throw new NotFoundException("IdP user not found: " + username);
     }
     return userPO;
+  }
+
+  /**
+   * Resolves active user ids for the given usernames in one query. Throws if any username is
+   * missing.
+   *
+   * @param usernames usernames to resolve
+   * @return username to user id map
+   */
+  Map<String, Long> resolveUserIdsByUsernames(List<String> usernames) {
+    List<IdpUserPO> users =
+        SessionUtils.getWithoutCommit(
+            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUsersByUsernames(usernames));
+    Map<String, Long> userIds = new HashMap<>(users.size());
+    for (IdpUserPO user : users) {
+      userIds.put(user.getUsername(), user.getUserId());
+    }
+    for (String username : usernames) {
+      if (!userIds.containsKey(username)) {
+        throw new NotFoundException("IdP user not found: " + username);
+      }
+    }
+    return userIds;
   }
 
   @Monitored(
@@ -96,12 +121,15 @@ public class IdpUserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateIdpUserPassword")
   public boolean updateIdpUserPassword(String username, String passwordHash) {
-    getIdpUserByUsername(username);
-    Integer updated =
-        SessionUtils.doWithCommitAndFetchResult(
-            IdpUserMetaMapper.class,
-            mapper -> mapper.updateIdpUserPassword(username, passwordHash));
-    return updated != null && updated > 0;
+    return SessionUtils.doWithCommitAndFetchResult(
+        IdpUserMetaMapper.class,
+        mapper -> {
+          if (mapper.selectIdpUser(username) == null) {
+            throw new NotFoundException("IdP user not found: " + username);
+          }
+          Integer updated = mapper.updateIdpUserPassword(username, passwordHash);
+          return updated != null && updated > 0;
+        });
   }
 
   @Monitored(
