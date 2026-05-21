@@ -182,6 +182,8 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
   protected void createDatabaseIfNotExists(String database, String provider) {
     String dbLocation = warehouse + "/" + database;
     dropDatabaseIfExists(database);
+    // Delete S3 data directory so stale data files from prior runs don't cause duplicate rows.
+    deleteDirIfExists(dbLocation);
     sql(String.format("CREATE DATABASE %s LOCATION '%s'", database, dbLocation));
   }
 

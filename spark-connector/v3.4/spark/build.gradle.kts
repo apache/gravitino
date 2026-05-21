@@ -135,6 +135,9 @@ dependencies {
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
   testImplementation(libs.hadoop3.aws)
+  // hadoop-aws declares hadoop-client-api as provided; add it explicitly so S3AFileSystem can load
+  // org.apache.hadoop.fs.impl.prefetch.PrefetchingStatistics (added in 3.3.5) at runtime.
+  testImplementation(libs.hadoop3.client.api)
   // Iceberg's GlueCatalog references several AWS SDK modules at runtime; must be on test classpath
   testImplementation(libs.aws.glue)
   testImplementation(libs.aws.sts)
