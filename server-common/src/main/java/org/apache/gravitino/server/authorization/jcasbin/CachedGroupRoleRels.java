@@ -21,17 +21,17 @@ package org.apache.gravitino.server.authorization.jcasbin;
 import java.util.List;
 
 /**
- * Cached snapshot of a group's role assignments. The {@code updatedAt} timestamp corresponds to the
+ * Cached snapshot of a group's role relations. The {@code updatedAt} timestamp corresponds to the
  * {@code group_meta.updated_at} column and is used as a version sentinel: if the DB value is newer,
- * the cached role list is stale and must be reloaded.
+ * the cached role relation list is stale and must be reloaded.
  */
-final class CachedGroupRoles {
+final class CachedGroupRoleRels {
 
   private final long groupId;
   private final long updatedAt;
   private final List<Long> roleIds;
 
-  CachedGroupRoles(long groupId, long updatedAt, List<Long> roleIds) {
+  CachedGroupRoleRels(long groupId, long updatedAt, List<Long> roleIds) {
     this.groupId = groupId;
     this.updatedAt = updatedAt;
     this.roleIds = roleIds;
