@@ -21,100 +21,83 @@ package org.apache.gravitino.idp.storage.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.time.Instant;
+import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.util.List;
-import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
-import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
-import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
-import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
+import org.apache.gravitino.idp.exception.NoSuchEntityException;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
-import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
-import org.apache.ibatis.session.SqlSession;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 @Tag("gravitino-docker-test")
-class TestIdpGroupMetaService extends AbstractIdpMetaStorageTest {
-  private IdpUserMetaMapper idpUserMetaMapper;
-  private IdpGroupMetaMapper idpGroupMetaMapper;
-  private IdpUserGroupRelMapper idpUserGroupRelMapper;
-
-  @Override
-  protected void initializeMappers() {
-    idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
-    idpGroupMetaMapper = sharedSession.getMapper(IdpGroupMetaMapper.class);
-    idpUserGroupRelMapper = sharedSession.getMapper(IdpUserGroupRelMapper.class);
-  }
+class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void insertIdpGroup(String type) throws Exception {
+  void testInsertIdpGroup(String type) throws IOException {
     init(type);
-    insertUsers();
+    insertUsers(4);
     IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
 
-    IdpGroupPO group =
+    IdpGroupPO group1 =
         IdpGroupPO.builder()
             .withGroupId(1L)
-            .withGroupName("admins")
+            .withGroupName("group1")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
-    List<IdpUserGroupRelPO> relations = List.of(userGroupRel(100L, 1L, 1L));
 
-    closeSession();
-    groupMetaService.insertIdpGroup(group, relations, false);
-    reopenSession();
+    assertThrows(NoSuchEntityException.class, () -> groupMetaService.getIdpGroupByName("group1"));
+    runServiceCall(
+        () -> groupMetaService.insertIdpGroup(group1, List.of(userGroupRel(100L, 1L, 1L)), false));
+    assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
+    assertIterableEquals(List.of("user1"), groupMetaService.listUsernamesByGroupName("group1"));
 
-    assertEquals("admins", idpGroupMetaMapper.selectIdpGroup("admins").getGroupName());
-    assertIterableEquals(List.of("user1"), groupMetaService.listUsernamesByGroupName("admins"));
+    IdpGroupPO duplicateGroup =
+        IdpGroupPO.builder()
+            .withGroupId(2L)
+            .withGroupName("group1")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    assertThrowsEntityAlreadyExists(
+        () -> groupMetaService.insertIdpGroup(duplicateGroup, Lists.newArrayList(), false));
 
     IdpGroupPO overwriteGroup =
         IdpGroupPO.builder()
             .withGroupId(2L)
-            .withGroupName("admins")
+            .withGroupName("group1")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
     List<IdpUserGroupRelPO> overwriteRelations =
         List.of(userGroupRel(101L, 2L, 2L), userGroupRel(102L, 3L, 2L));
-
-    closeSession();
-    groupMetaService.insertIdpGroup(overwriteGroup, overwriteRelations, true);
-    reopenSession();
-
-    assertEquals(2L, idpGroupMetaMapper.selectIdpGroup("admins").getGroupId());
+    runServiceCall(() -> groupMetaService.insertIdpGroup(overwriteGroup, overwriteRelations, true));
+    assertEquals(2L, groupMetaService.getIdpGroupByName("group1").getGroupId());
     assertIterableEquals(
-        List.of("user2", "user3"), groupMetaService.listUsernamesByGroupName("admins"));
+        List.of("user2", "user3"), groupMetaService.listUsernamesByGroupName("group1"));
     assertEquals(2, countGroups());
     assertEquals(3, countUserGroupRels());
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void deleteIdpGroup(String type) throws Exception {
+  void testDeleteIdpGroup(String type) throws IOException {
     init(type);
-    insertUsers();
-    insertGroups();
-    insertUserGroupRelations();
+    insertUsers(4);
+    insertGroups(4);
+    insertGroupUserGroupRelations();
     IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
 
-    closeSession();
-    assertTrue(groupMetaService.deleteIdpGroup("group1"));
-    reopenSession();
-
+    runServiceCall(() -> assertTrue(groupMetaService.deleteIdpGroup("group1")));
     assertNull(idpGroupMetaMapper.selectIdpGroup("group1"));
     assertEquals(4, countGroups());
     assertEquals(8, countUserGroupRels());
@@ -124,155 +107,34 @@ class TestIdpGroupMetaService extends AbstractIdpMetaStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void deleteGroupMetasByLegacyTimeline(String type) throws Exception {
+  void testDeleteGroupMetasByLegacyTimeline(String type) throws Exception {
     init(type);
+    insertUsers(4);
+    insertGroups(4);
+    insertGroupUserGroupRelations();
     IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
 
-    insertUsers();
-    insertGroups();
-    insertUserGroupRelations();
-
-    // hard delete before soft delete
-    int deletedCount =
-        groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 4);
-    Assertions.assertEquals(0, deletedCount);
+    assertEquals(0, groupMetaService.deleteGroupMetasByLegacyTimeline(LEGACY_TIMELINE, 4));
     assertEquals("group1", idpGroupMetaMapper.selectIdpGroup("group1").getGroupName());
-    assertEquals("group2", idpGroupMetaMapper.selectIdpGroup("group2").getGroupName());
-    assertEquals("group3", idpGroupMetaMapper.selectIdpGroup("group3").getGroupName());
-    assertEquals("group4", idpGroupMetaMapper.selectIdpGroup("group4").getGroupName());
     assertEquals(4, countGroups());
     assertEquals(8, countUserGroupRels());
 
-    // soft delete groups and their relations
-    markGroupsAndRelationsSoftDeleted();
-    reopenSession();
+    softDeleteAllGroups();
+    refreshSession();
     assertNull(idpGroupMetaMapper.selectIdpGroup("group1"));
-    assertNull(idpGroupMetaMapper.selectIdpGroup("group2"));
-    assertNull(idpGroupMetaMapper.selectIdpGroup("group3"));
-    assertNull(idpGroupMetaMapper.selectIdpGroup("group4"));
     assertEquals(4, countGroups());
     assertEquals(8, countUserGroupRels());
 
-    // hard delete after soft delete
-    closeSession();
-    deletedCount =
-        groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
-    reopenSession();
-    Assertions.assertEquals(3, deletedCount); // delete 3 groups only
-    Assertions.assertEquals(1, countGroups()); // 4 - 3
-    Assertions.assertEquals(8, countUserGroupRels());
+    assertEquals(3, groupMetaService.deleteGroupMetasByLegacyTimeline(LEGACY_TIMELINE, 3));
+    refreshSession();
+    assertEquals(1, countGroups());
+    assertEquals(8, countUserGroupRels());
 
-    closeSession();
-    deletedCount =
-        groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
-    reopenSession();
-    Assertions.assertEquals(1, deletedCount); // delete 1 group
-    Assertions.assertEquals(0, countGroups());
-    Assertions.assertEquals(8, countUserGroupRels());
+    assertEquals(1, groupMetaService.deleteGroupMetasByLegacyTimeline(LEGACY_TIMELINE, 3));
+    refreshSession();
+    assertEquals(0, countGroups());
+    assertEquals(8, countUserGroupRels());
 
-    closeSession();
-    deletedCount =
-        groupMetaService.deleteGroupMetasByLegacyTimeline(Instant.now().toEpochMilli() + 1000, 3);
-    reopenSession();
-    Assertions.assertEquals(0, deletedCount); // no more to delete
-  }
-
-  private void reopenSession() {
-    closeSession();
-    sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-    initializeMappers();
-  }
-
-  private void insertUsers() {
-    for (long userId = 1L; userId <= 4L; userId++) {
-      idpUserMetaMapper.insertIdpUser(
-          IdpUserPO.builder()
-              .withUserId(userId)
-              .withUsername("user" + userId)
-              .withPasswordHash("hash-" + userId)
-              .withCurrentVersion(1L)
-              .withLastVersion(0L)
-              .withDeletedAt(0L)
-              .build());
-    }
-  }
-
-  private void insertGroups() {
-    for (long groupId = 1L; groupId <= 4L; groupId++) {
-      idpGroupMetaMapper.insertIdpGroup(
-          IdpGroupPO.builder()
-              .withGroupId(groupId)
-              .withGroupName("group" + groupId)
-              .withCurrentVersion(1L)
-              .withLastVersion(0L)
-              .withDeletedAt(0L)
-              .build());
-    }
-  }
-
-  private void insertUserGroupRelations() {
-    idpUserGroupRelMapper.batchInsertRelations(
-        List.of(
-            userGroupRel(100L, 1L, 1L),
-            userGroupRel(101L, 2L, 1L),
-            userGroupRel(102L, 1L, 2L),
-            userGroupRel(103L, 2L, 2L),
-            userGroupRel(104L, 3L, 3L),
-            userGroupRel(105L, 4L, 3L),
-            userGroupRel(106L, 3L, 4L),
-            userGroupRel(107L, 4L, 4L)));
-  }
-
-  private IdpUserGroupRelPO userGroupRel(long id, long userId, long groupId) {
-    return IdpUserGroupRelPO.builder()
-        .withId(id)
-        .withUserId(userId)
-        .withGroupId(groupId)
-        .withCurrentVersion(1L)
-        .withLastVersion(0L)
-        .withDeletedAt(0L)
-        .build();
-  }
-
-  private void markGroupsAndRelationsSoftDeleted() throws SQLException {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement()) {
-      statement.execute("UPDATE idp_group_meta SET deleted_at = 1 WHERE deleted_at = 0");
-      statement.execute("UPDATE idp_user_group_rel SET deleted_at = 1 WHERE deleted_at = 0");
-    }
-  }
-
-  private Integer countGroups() {
-    int count = 0;
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement();
-        ResultSet rs = statement.executeQuery("SELECT count(*) FROM idp_group_meta")) {
-      while (rs.next()) {
-        count = rs.getInt(1);
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("SQL execution failed", e);
-    }
-    return count;
-  }
-
-  private Integer countUserGroupRels() {
-    int count = 0;
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement();
-        ResultSet rs = statement.executeQuery("SELECT count(*) FROM idp_user_group_rel")) {
-      while (rs.next()) {
-        count = rs.getInt(1);
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("SQL execution failed", e);
-    }
-    return count;
+    assertEquals(0, groupMetaService.deleteGroupMetasByLegacyTimeline(LEGACY_TIMELINE, 3));
   }
 }
