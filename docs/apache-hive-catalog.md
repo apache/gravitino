@@ -44,10 +44,32 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 | `default.catalog`                        | The default catalog name for the Hive3 metastore backend; this configuration is ignored when using a Hive2 metastore.                                                                                                                               | hive          | No                           | 1.1.0         |
 
 :::note
-For `list-all-tables=false`, the Hive catalog will filter out:
-- Iceberg tables by table property `table_type=ICEBERG`
-- Paimon tables by table property `table_type=PAIMON`
-- Hudi tables by table property `provider=hudi`
+When `list-all-tables=false`, the Hive catalog removes the following on a best-effort basis:
+- Iceberg tables (table property `table_type=ICEBERG`)
+- Paimon tables (table property `table_type=PAIMON`)
+- Hudi tables (table property `provider=hudi`), together with their `_ro` and `_rt` siblings
+
+**Known limitation.** Filtering is performed server-side via the Hive Metastore, which only
+supports exact-key lookups on dot-free property keys. Hudi tables registered directly by Spark
+(e.g. via `saveAsTable`) typically only set `spark.sql.sources.provider=hudi` without also
+setting `provider=hudi`, so they cannot be filtered out and will appear in the listing.
+
+**Workaround.** Add a dot-free `provider=hudi` property to such tables so the server-side
+filter can match them. Either after creation:
+
+```sql
+ALTER TABLE <db>.<table> SET TBLPROPERTIES ('provider'='hudi');
+```
+
+or at write time via Hudi's Hive sync option:
+
+```scala
+df.write.format("hudi")
+  .option("hoodie.datasource.hive_sync.table_properties", "provider=hudi")
+  .saveAsTable("<db>.<table>")
+```
+
+The corresponding `_ro` / `_rt` siblings are removed automatically based on the base table name.
 :::
 
 When you use the Gravitino with Trino. You can pass the Trino Hive connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.

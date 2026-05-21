@@ -399,26 +399,7 @@ public class HiveCatalogOperations
       allTables.removeAll(views);
 
       if (!listAllTables) {
-        // The reason for using the listTableNamesByFilter function is that the
-        // getTableObjectiesByName function has poor performance. Currently, we focus on the
-        // Iceberg, Paimon and Hudi table. In the future, if necessary, we will need to filter out
-        // other tables.
-        String icebergAndPaimonFilter = getIcebergAndPaimonFilter();
-        List<String> icebergAndPaimonTables =
-            clientPool.run(
-                c ->
-                    c.listTableNamesByFilter(
-                        catalogName, schemaIdent.name(), icebergAndPaimonFilter, MAX_TABLES));
-        allTables.removeAll(icebergAndPaimonTables);
-
-        // filter out the Hudi tables
-        String hudiFilter = String.format("%sprovider like \"hudi\"", HIVE_FILTER_FIELD_PARAMS);
-        List<String> hudiTables =
-            clientPool.run(
-                c ->
-                    c.listTableNamesByFilter(
-                        catalogName, schemaIdent.name(), hudiFilter, MAX_TABLES));
-        removeHudiTables(allTables, hudiTables);
+        filterOutNonHiveTables(schemaIdent.name(), allTables);
       }
 
       return allTables.stream()
@@ -430,19 +411,53 @@ public class HiveCatalogOperations
     }
   }
 
-  private static String getIcebergAndPaimonFilter() {
+  /**
+   * Best-effort removal of non-Hive tables (Iceberg, Paimon, Hudi) from {@code allTables} using the
+   * HMS server-side {@code listTableNamesByFilter} API. This API only supports exact-key lookups on
+   * dot-free parameter keys, so tables whose only marker is a dotted key (e.g. Spark-managed Hudi
+   * tables exposing only {@code spark.sql.sources.provider=hudi}) cannot be filtered out here; see
+   * the {@code list-all-tables} catalog property for the documented limitation. We prefer this over
+   * {@code getTableObjectsByName} which materializes every Table and is slow on databases with many
+   * tables.
+   */
+  private void filterOutNonHiveTables(String database, List<String> allTables)
+      throws InterruptedException {
+    List<String> icebergAndPaimonTables =
+        clientPool.run(
+            c ->
+                c.listTableNamesByFilter(
+                    catalogName, database, buildIcebergAndPaimonFilter(), MAX_TABLES));
+    allTables.removeAll(icebergAndPaimonTables);
+
+    // HoodieHiveSyncTool sets `provider=hudi` only on the base table; derived `_ro` / `_rt`
+    // tables carry only dotted keys, so we strip them by exact name match against the base list.
+    List<String> hudiBaseTables =
+        clientPool.run(
+            c ->
+                c.listTableNamesByFilter(
+                    catalogName, database, buildHudiBaseTableFilter(), MAX_TABLES));
+    removeHudiDerivedTables(allTables, hudiBaseTables);
+  }
+
+  private static String buildIcebergAndPaimonFilter() {
     String icebergFilter = String.format("%stable_type like \"ICEBERG\"", HIVE_FILTER_FIELD_PARAMS);
     String paimonFilter = String.format("%stable_type like \"PAIMON\"", HIVE_FILTER_FIELD_PARAMS);
     return String.format("%s or %s", icebergFilter, paimonFilter);
   }
 
-  private void removeHudiTables(List<String> allTables, List<String> hudiTables) {
-    for (String hudiTable : hudiTables) {
+  private static String buildHudiBaseTableFilter() {
+    return String.format("%sprovider like \"hudi\"", HIVE_FILTER_FIELD_PARAMS);
+  }
+
+  /**
+   * Removes Hudi base tables together with their derived read-optimized ({@code _ro}) and real-time
+   * ({@code _rt}) tables. Exact name match is used because {@code startsWith} would incorrectly
+   * drop unrelated tables such as {@code <base>_root}.
+   */
+  private void removeHudiDerivedTables(List<String> allTables, List<String> hudiBaseTables) {
+    for (String hudiBase : hudiBaseTables) {
       allTables.removeIf(
-          t ->
-              t.equals(hudiTable)
-                  || t.startsWith(hudiTable + "_ro")
-                  || t.startsWith(hudiTable + "_rt"));
+          t -> t.equals(hudiBase) || t.equals(hudiBase + "_ro") || t.equals(hudiBase + "_rt"));
     }
   }
 
