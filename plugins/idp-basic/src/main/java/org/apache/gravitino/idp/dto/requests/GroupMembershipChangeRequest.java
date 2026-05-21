@@ -21,54 +21,62 @@ package org.apache.gravitino.idp.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.List;
-import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import lombok.extern.jackson.Jacksonized;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to remove users from a built-in IdP group. */
+/** Represents a request to change built-in IdP group membership. */
 @Getter
 @EqualsAndHashCode
 @ToString
-@Builder
-@Jacksonized
-public class GroupRemoveUsersRequest implements RESTRequest {
+public class GroupMembershipChangeRequest implements RESTRequest {
 
-  @JsonProperty("users")
-  private final List<String> users;
+  @JsonProperty("additions")
+  private final String[] additions;
 
-  /** Default constructor for GroupRemoveUsersRequest. (Used for Jackson deserialization.) */
-  public GroupRemoveUsersRequest() {
-    this(null);
-  }
+  @JsonProperty("removals")
+  private final String[] removals;
 
   /**
-   * Creates a new GroupRemoveUsersRequest.
+   * Creates a new GroupMembershipChangeRequest.
    *
-   * @param users The user names to remove from the built-in IdP group.
+   * @param additions The user names to add to the built-in IdP group.
+   * @param removals The user names to remove from the built-in IdP group.
    */
-  public GroupRemoveUsersRequest(List<String> users) {
-    super();
-    this.users = users;
+  public GroupMembershipChangeRequest(String[] additions, String[] removals) {
+    this.additions = additions;
+    this.removals = removals;
+  }
+
+  /** Default constructor for GroupMembershipChangeRequest. (Used for Jackson deserialization.) */
+  public GroupMembershipChangeRequest() {
+    this(null, null);
   }
 
   /**
-   * Validates the {@link GroupRemoveUsersRequest} request.
+   * Validates the {@link GroupMembershipChangeRequest} request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        users != null && !users.isEmpty(), "\"users\" field is required and cannot be empty");
-    users.forEach(
-        user ->
-            Preconditions.checkArgument(
-                StringUtils.isNotBlank(user),
-                "\"users\" field is required and cannot contain empty user names"));
+        additions != null || removals != null, "additions and removals cannot both be null");
+
+    if (additions != null) {
+      for (String user : additions) {
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(user), "additions must not contain null or empty user names");
+      }
+    }
+
+    if (removals != null) {
+      for (String user : removals) {
+        Preconditions.checkArgument(
+            StringUtils.isNotBlank(user), "removals must not contain null or empty user names");
+      }
+    }
   }
 }
