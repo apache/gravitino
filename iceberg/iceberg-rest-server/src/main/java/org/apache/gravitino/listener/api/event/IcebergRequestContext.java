@@ -58,11 +58,19 @@ public class IcebergRequestContext {
   public IcebergRequestContext(
       HttpServletRequest httpRequest, String catalogName, boolean requestCredentialVending) {
     this.httpServletRequest = httpRequest;
-    this.remoteHostName = httpRequest.getRemoteHost();
+    this.remoteHostName = resolveClientAddress(httpRequest);
     this.httpHeaders = IcebergRESTUtils.getHttpHeaders(httpRequest);
     this.catalogName = catalogName;
     this.userName = PrincipalUtils.getCurrentUserName();
     this.requestCredentialVending = requestCredentialVending;
+  }
+
+  private static String resolveClientAddress(HttpServletRequest request) {
+    String xff = request.getHeader("X-Forwarded-For");
+    if (xff != null && !xff.isEmpty()) {
+      return xff.split(",")[0].trim();
+    }
+    return request.getRemoteHost();
   }
 
   /**
