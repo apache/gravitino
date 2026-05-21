@@ -39,8 +39,6 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * user.
  */
 public class IdpUserMetaService {
-  private static final String IDP_USER_ENTITY_TYPE = "idp user";
-
   private static final IdpUserMetaService INSTANCE = new IdpUserMetaService();
 
   public static IdpUserMetaService getInstance() {
@@ -55,7 +53,7 @@ public class IdpUserMetaService {
             IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
 
     if (userPO == null) {
-      throw new NotFoundException(IDP_USER_ENTITY_TYPE, username);
+      throw new NotFoundException("idp user", username);
     }
     return userPO;
   }

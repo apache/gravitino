@@ -40,8 +40,6 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * group.
  */
 public class IdpGroupMetaService {
-  private static final String IDP_GROUP_ENTITY_TYPE = "idp group";
-
   private static final IdpGroupMetaService INSTANCE = new IdpGroupMetaService();
 
   public static IdpGroupMetaService getInstance() {
@@ -56,7 +54,7 @@ public class IdpGroupMetaService {
             IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName));
 
     if (groupPO == null) {
-      throw new NotFoundException(IDP_GROUP_ENTITY_TYPE, groupName);
+      throw new NotFoundException("idp group", groupName);
     }
     return groupPO;
   }
