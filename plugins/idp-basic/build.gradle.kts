@@ -52,8 +52,6 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
 
-  testAnnotationProcessor(libs.lombok)
-  testCompileOnly(libs.lombok)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
