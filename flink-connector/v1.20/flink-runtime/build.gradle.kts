@@ -29,7 +29,7 @@ repositories {
   mavenCentral()
 }
 
-val flinkVersion: String = libs.versions.flink20.get()
+val flinkVersion: String = libs.versions.flink120.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 val scalaVersion: String = "2.12"
 val artifactName = "gravitino-${project.name}_$scalaVersion"

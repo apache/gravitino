@@ -31,10 +31,10 @@ repositories {
 val commonProject = project(":flink-connector:flink-common")
 val commonSourceSets = commonProject.extensions.getByType<SourceSetContainer>()
 val commonTestOutput = commonSourceSets.named("test").get().output
-val flinkVersion: String = libs.versions.flink19.get()
+val flinkVersion: String = libs.versions.flink119.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4flink19.get()
-val paimonVersion: String = libs.versions.paimon4flink19.get()
+val icebergVersion: String = libs.versions.iceberg4flink119.get()
+val paimonVersion: String = libs.versions.paimon4flink119.get()
 val scalaVersion: String = "2.12"
 val artifactName = "${rootProject.name}-flink-${flinkMajorVersion}_$scalaVersion"
 
@@ -47,7 +47,7 @@ dependencies {
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
   compileOnly("org.apache.paimon:paimon-flink-$flinkMajorVersion:$paimonVersion")
-  compileOnly(libs.flinkjdbc19)
+  compileOnly(libs.flinkjdbc119)
   compileOnly(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
@@ -58,15 +58,18 @@ dependencies {
     exclude("org.apache.logging.log4j")
   }
   testImplementation(project(":clients:client-java"))
-  testImplementation(project(":core"))
   testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(project(":flink-connector:flink-common", "testArtifacts"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":flink-connector:flink-common", "testArtifacts"))
   testImplementation(libs.awaitility)
+  testImplementation(libs.flinkjdbc119)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.metrics.core)
+  testImplementation(libs.minikdc)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
@@ -74,9 +77,6 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.junit.jupiter)
   testImplementation(libs.testcontainers.mysql)
-  testImplementation(libs.metrics.core)
-  testImplementation(libs.flinkjdbc19)
-  testImplementation(libs.minikdc)
 
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
