@@ -112,6 +112,21 @@ public final class HierarchicalSchemaUtil {
   }
 
   /**
+   * Splits a (possibly hierarchical) schema name into its segments using the external separator.
+   * Trailing empty segments are preserved (split limit {@code -1}) so callers can detect malformed
+   * names that contain empty segments (e.g. {@code "A::B"} or {@code "A:"}).
+   *
+   * <p>Example: {@code "A:B:C"} with separator {@code ":"} → {@code ["A", "B", "C"]}
+   *
+   * @param name the schema name to split
+   * @param separator the external separator
+   * @return the segments of the schema name
+   */
+  public static String[] splitSchemaName(String name, String separator) {
+    return name.split(Pattern.quote(separator), -1);
+  }
+
+  /**
    * Returns all ancestor schema names of the given schema name, ordered from outermost to innermost
    * (but excluding the name itself). Returns an empty list for top-level (non-HierarchicalSchema)
    * schemas.
@@ -125,7 +140,7 @@ public final class HierarchicalSchemaUtil {
   public static List<String> getAncestorNames(String schemaName, String separator) {
     Preconditions.checkArgument(StringUtils.isNotBlank(schemaName), "schemaName must not be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(separator), "separator must not be blank");
-    String[] parts = schemaName.split(Pattern.quote(separator), -1);
+    String[] parts = splitSchemaName(schemaName, separator);
     List<String> ancestors = new ArrayList<>();
     for (int i = 1; i < parts.length; i++) {
       ancestors.add(String.join(separator, Arrays.copyOf(parts, i)));
