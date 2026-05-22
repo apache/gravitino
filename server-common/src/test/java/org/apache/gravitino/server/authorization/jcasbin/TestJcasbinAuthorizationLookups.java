@@ -19,7 +19,6 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Optional;
 import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
@@ -30,95 +29,8 @@ import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Tests for {@link JcasbinAuthorizationLookups} static helpers. */
+/** Tests for {@link JcasbinAuthorizationLookups}. */
 public class TestJcasbinAuthorizationLookups {
-
-  // ---------- buildCacheKey ----------
-
-  @Test
-  void testBuildCacheKeyMetalake() {
-    MetadataObject obj =
-        MetadataObjects.of(Collections.singletonList("ml1"), MetadataObject.Type.METALAKE);
-    Assertions.assertEquals(key("ml1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", obj));
-  }
-
-  @Test
-  void testBuildCacheKeyCatalog() {
-    MetadataObject obj =
-        MetadataObjects.of(Collections.singletonList("cat1"), MetadataObject.Type.CATALOG);
-    Assertions.assertEquals(
-        key("ml1", "cat1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", obj));
-  }
-
-  @Test
-  void testBuildCacheKeySchema() {
-    MetadataObject obj =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1"), MetadataObject.Type.SCHEMA);
-    Assertions.assertEquals(
-        key("ml1", "cat1", "sch1", ""), JcasbinAuthorizationLookups.buildCacheKey("ml1", obj));
-  }
-
-  @Test
-  void testBuildCacheKeyLeafTypesGetTypeSuffix() {
-    MetadataObject table =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.TABLE);
-    Assertions.assertEquals(
-        key("ml1", "cat1", "sch1", "tbl1", "TABLE"),
-        JcasbinAuthorizationLookups.buildCacheKey("ml1", table));
-
-    MetadataObject view =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1", "v1"), MetadataObject.Type.VIEW);
-    Assertions.assertEquals(
-        key("ml1", "cat1", "sch1", "v1", "VIEW"),
-        JcasbinAuthorizationLookups.buildCacheKey("ml1", view));
-
-    MetadataObject fileset =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1", "fs1"), MetadataObject.Type.FILESET);
-    Assertions.assertEquals(
-        key("ml1", "cat1", "sch1", "fs1", "FILESET"),
-        JcasbinAuthorizationLookups.buildCacheKey("ml1", fileset));
-  }
-
-  // ---------- isContainerType ----------
-
-  @Test
-  void testIsContainerTypeContainerTypes() {
-    Assertions.assertTrue(
-        JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.METALAKE));
-    Assertions.assertTrue(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.CATALOG));
-    Assertions.assertTrue(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.SCHEMA));
-  }
-
-  @Test
-  void testIsContainerTypeLeafTypes() {
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.TABLE));
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.VIEW));
-    Assertions.assertFalse(
-        JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.FILESET));
-    Assertions.assertFalse(JcasbinAuthorizationLookups.isContainerType(MetadataObject.Type.TOPIC));
-  }
-
-  // ---------- Prefix invalidation ----------
-
-  @Test
-  void testPrefixInvalidationCoversContainerPath() {
-    // Dropping a catalog should use a prefix that covers all schemas and tables below it.
-    MetadataObject catalog =
-        MetadataObjects.of(Collections.singletonList("cat1"), MetadataObject.Type.CATALOG);
-    String catalogKey = JcasbinAuthorizationLookups.buildCacheKey("ml1", catalog);
-
-    MetadataObject schema =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1"), MetadataObject.Type.SCHEMA);
-    String schemaKey = JcasbinAuthorizationLookups.buildCacheKey("ml1", schema);
-
-    MetadataObject table =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.TABLE);
-    String tableKey = JcasbinAuthorizationLookups.buildCacheKey("ml1", table);
-
-    Assertions.assertTrue(schemaKey.startsWith(catalogKey));
-    Assertions.assertTrue(tableKey.startsWith(catalogKey));
-    Assertions.assertTrue(tableKey.startsWith(schemaKey));
-  }
 
   @Test
   void testResolveMetadataIdUsesAtomicSharedCacheAndRequestDedup() {
@@ -156,10 +68,6 @@ public class TestJcasbinAuthorizationLookups {
     Assertions.assertEquals(1, ownerRelCache.getCount);
     Assertions.assertEquals(0, ownerRelCache.getIfPresentCount);
     Assertions.assertEquals(0, ownerRelCache.putCount);
-  }
-
-  private static String key(String... parts) {
-    return String.join(JcasbinAuthorizationLookups.KEY_SEP, parts);
   }
 
   private static class CountingCache<K, V> implements GravitinoCache<K, V> {

@@ -44,6 +44,7 @@ import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
@@ -143,6 +144,14 @@ public class TestPaimonCatalog {
                 "paimon",
                 "comment",
                 ImmutableMap.of()));
+  }
+
+  @Test
+  void testAsViewCatalog() {
+    PaimonCatalog paimonCatalog = newPaimonCatalog("catalog_view");
+    ViewCatalog viewCatalog = paimonCatalog.asViewCatalog();
+    Assertions.assertNotNull(viewCatalog);
+    Assertions.assertSame(paimonCatalog.ops(), viewCatalog);
   }
 
   @Test
@@ -402,5 +411,25 @@ public class TestPaimonCatalog {
     // Should keep explicit credential providers, not override
     String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
     Assertions.assertEquals("custom-provider", credentialProviders);
+  }
+
+  private PaimonCatalog newPaimonCatalog(String catalogName) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName(catalogName)
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Map<String, String> conf = Maps.newHashMap();
+    conf.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, "filesystem");
+    conf.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, tempDir + File.separator + catalogName);
+    return new PaimonCatalog().withCatalogConf(conf).withCatalogEntity(entity);
   }
 }

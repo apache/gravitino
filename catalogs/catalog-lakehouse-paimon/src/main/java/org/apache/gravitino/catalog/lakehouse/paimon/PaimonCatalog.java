@@ -31,6 +31,7 @@ import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.rel.ViewCatalog;
 
 /**
  * Implementation of {@link Catalog} that represents an Apache Paimon catalog in Apache Gravitino.
@@ -63,6 +64,11 @@ public class PaimonCatalog extends BaseCatalog<PaimonCatalog> {
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     return new PaimonCatalogOperations();
+  }
+
+  @Override
+  public ViewCatalog asViewCatalog() {
+    return (ViewCatalog) ops();
   }
 
   @Override
