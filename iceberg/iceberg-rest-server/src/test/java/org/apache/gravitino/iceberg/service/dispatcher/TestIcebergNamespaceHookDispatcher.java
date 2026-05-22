@@ -268,12 +268,12 @@ public class TestIcebergNamespaceHookDispatcher {
     verify(mockDispatcher, never()).dropNamespace(mockContext, parent);
     verify(mockDispatcher, never()).dropNamespace(mockContext, grandparent);
 
+    // The leaf and both phantom ancestors are stale, so a single cascade delete of the outermost
+    // empty ancestor (A) removes the whole stale chain in one batched operation.
     ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
-    verify(mockEntityStore, org.mockito.Mockito.times(3))
-        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA));
-    List<String> deletedNames =
-        captor.getAllValues().stream().map(NameIdentifier::name).collect(Collectors.toList());
-    Assertions.assertEquals(Arrays.asList("A:B:C", "A:B", "A"), deletedNames);
+    verify(mockEntityStore, org.mockito.Mockito.times(1))
+        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
+    Assertions.assertEquals("A", captor.getValue().name());
   }
 
   @Test
@@ -292,9 +292,10 @@ public class TestIcebergNamespaceHookDispatcher {
     verify(mockDispatcher).namespaceExists(mockContext, parent);
     verify(mockDispatcher, never()).namespaceExists(mockContext, grandparent);
 
+    // The parent still exists, so only the leaf is stale; it is cascade-deleted on its own.
     ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
     verify(mockEntityStore, org.mockito.Mockito.times(1))
-        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA));
+        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
     Assertions.assertEquals("A:B:C", captor.getValue().name());
   }
 }

@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -148,16 +147,22 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         () -> {
           dispatcher.dropNamespace(context, namespace);
 
-          // TODO: Use cascade mode deletion
-          // Current behavior: only the leaf namespace is dropped from the Iceberg catalog above.
-          // We walk ancestors outermost-to-leaf and clean up a Gravitino entity only while the
-          // corresponding Iceberg namespace no longer exists, stopping at the first ancestor that
-          // still exists. As a result, ancestor entities are cleaned up only when the underlying
-          // Iceberg catalog also removes the empty parent namespaces on leaf-drop, which is
-          // catalog-implementation-dependent. For catalogs that keep empty parents, operators may
-          // need to drop empty parent namespaces manually.
+          // Only the leaf namespace is dropped from the Iceberg catalog above. Walk its
+          // ancestors outermost-to-leaf to find the outermost ancestor whose Iceberg namespace
+          // no longer exists, stopping at the first ancestor that still exists. Everything from
+          // that outermost empty namespace down to the leaf is now stale in Gravitino.
+          //
+          // An inner Iceberg namespace cannot exist unless all of its outer ancestors do, so an
+          // ancestor missing from the catalog implies none of its descendants exist there
+          // either. A single cascade delete of the outermost empty namespace therefore removes
+          // it and every descendant Gravitino entity (the leaf plus the intermediate ancestors)
+          // in one batched operation, rather than issuing one delete per target.
+          //
+          // Ancestor entities are still only cleaned up when the underlying Iceberg catalog
+          // removes the empty parents on leaf-drop, which is catalog-implementation-dependent.
+          // For catalogs that keep empty parents, operators may need to drop them manually.
           String separator = HierarchicalSchemaUtil.schemaSeparator();
-          List<Namespace> deleteTargets = Lists.newArrayList(namespace);
+          Namespace outermostStale = namespace;
           String namespaceName = String.join(separator, namespace.levels());
           List<String> ancestorNames =
               HierarchicalSchemaUtil.getAncestorNames(namespaceName, separator);
@@ -166,22 +171,21 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
             if (dispatcher.namespaceExists(context, ancestor)) {
               break;
             }
-            deleteTargets.add(ancestor);
+            outermostStale = ancestor;
           }
 
           EntityStore store = GravitinoEnv.getInstance().entityStore();
           if (store != null) {
-            for (Namespace target : deleteTargets) {
-              try {
-                store.delete(
-                    IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
-                        metalake, catalogName, target, separator),
-                    Entity.EntityType.SCHEMA);
-              } catch (NoSuchEntityException ignore) {
-                // Already gone.
-              } catch (IOException ioe) {
-                throw new RuntimeException("io exception when deleting schema entity", ioe);
-              }
+            try {
+              store.delete(
+                  IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+                      metalake, catalogName, outermostStale, separator),
+                  Entity.EntityType.SCHEMA,
+                  true);
+            } catch (NoSuchEntityException ignore) {
+              // Already gone.
+            } catch (IOException ioe) {
+              throw new RuntimeException("io exception when deleting schema entity", ioe);
             }
           }
           return null;
