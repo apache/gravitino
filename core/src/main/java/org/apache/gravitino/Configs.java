@@ -529,7 +529,7 @@ public class Configs {
                   + "rolling upgrade while old connectors that do not support credential vending "
                   + "are still in use. Enabling this is a security risk because credentials "
                   + "become visible to anyone who can read catalog properties.")
-          .version(ConfigConstants.VERSION_0_9_0)
+          .version(ConfigConstants.VERSION_1_3_0)
           .booleanConf()
           .createWithDefault(false);
 

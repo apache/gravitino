@@ -144,9 +144,7 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   @Override
   public Map<String, String> properties() {
     Map<String, String> props = super.properties();
-    Config serverConfig = GravitinoEnv.getInstance().config();
-    if (serverConfig == null
-        || !serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES)) {
+    if (!shouldBackfillCredential()) {
       return props;
     }
     // Backfill hidden credentials for backward compatibility with connectors that do not support
@@ -162,6 +160,12 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
       result.put(JdbcConfig.PASSWORD.getKey(), password);
     }
     return result;
+  }
+
+  private boolean shouldBackfillCredential() {
+    Config serverConfig = GravitinoEnv.getInstance().config();
+    return serverConfig != null
+        && serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES);
   }
 
   private Map<String, String> applyDefaultCredentialProviders(Map<String, String> properties) {
