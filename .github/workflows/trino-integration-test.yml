@@ -81,6 +81,10 @@ jobs:
             -x :flink-connector:flink-common:build \
             -x :flink-connector:flink-1.18:build \
             -x :flink-connector:flink-runtime-1.18:build \
+            -x :flink-connector:flink-1.19:build \
+            -x :flink-connector:flink-runtime-1.19:build \
+            -x :flink-connector:flink-1.20:build \
+            -x :flink-connector:flink-runtime-1.20:build \
             -x :spark-connector:spark-common:build \
             -x :spark-connector:spark-3.3:build -x :spark-connector:spark-3.4:build -x :spark-connector:spark-3.5:build \
             -x :spark-connector:spark-runtime-3.3:build -x :spark-connector:spark-runtime-3.4:build -x :spark-connector:spark-runtime-3.5:build \
