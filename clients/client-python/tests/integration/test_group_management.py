@@ -51,20 +51,17 @@ class TestGroupManagement(IntegrationTestEnv):
             cls.restart_server()
         else:
             super().setUpClass()
-        cls._gravitino_admin_client = GravitinoAdminClient(
-            uri="http://localhost:8090"
-        )
+        cls._gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
 
     @classmethod
     def tearDownClass(cls):
         conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        cls._reset_conf(
-            {
-                "gravitino.authorization.enable": "false",
-                "gravitino.authorization.serviceAdmins": "",
-            },
-            conf_path,
-        )
+        reset_confs = {
+            "gravitino.authorization.enable": "false",
+            "gravitino.authorization.serviceAdmins": "anonymous",
+        }
+        cls._reset_conf(reset_confs, conf_path)
+        cls._append_conf(reset_confs, conf_path)
         if (
             os.environ.get("START_EXTERNAL_GRAVITINO") is not None
             and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
