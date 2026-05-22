@@ -820,8 +820,6 @@ public class TestIcebergUpdateStatsJobWithSpark {
     Map<String, String> properties = new HashMap<>();
     properties.put("catalog-backend", "REST");
     properties.put("uri", ICEBERG_REST_URI);
-    // RESTCatalog does not implement SupportsMetadataLocation; disable default metadata cache.
-    properties.put("table-metadata-cache-impl", "");
 
     metalake.createCatalog(
         SPARK_CATALOG_NAME,
