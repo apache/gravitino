@@ -45,22 +45,12 @@ public class IdpUserMetaSQLProviderFactory {
 
   private IdpUserMetaSQLProviderFactory() {}
 
-  private static IdpUserMetaBaseSQLProvider currentProvider() {
-    return SQLProviderFactoryHelper.currentProvider(
-        PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
-  }
-
-  static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
-    return SQLProviderFactoryHelper.getProvider(
-        databaseId, PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
-  }
-
   public static String selectIdpUser(@Param("username") String username) {
     return currentProvider().selectIdpUser(username);
   }
 
-  public static String selectIdpUsers(@Param("usernames") List<String> usernames) {
-    return currentProvider().selectIdpUsers(usernames);
+  public static String selectIdpUsersByUsernames(@Param("usernames") List<String> usernames) {
+    return currentProvider().selectIdpUsersByUsernames(usernames);
   }
 
   public static String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
@@ -68,16 +58,26 @@ public class IdpUserMetaSQLProviderFactory {
   }
 
   public static String updateIdpUserPassword(
-      @Param("userId") Long userId, @Param("passwordHash") String passwordHash) {
-    return currentProvider().updateIdpUserPassword(userId, passwordHash);
+      @Param("username") String username, @Param("passwordHash") String passwordHash) {
+    return currentProvider().updateIdpUserPassword(username, passwordHash);
   }
 
-  public static String softDeleteIdpUser(@Param("userId") Long userId) {
-    return currentProvider().softDeleteIdpUser(userId);
+  public static String softDeleteIdpUser(@Param("username") String username) {
+    return currentProvider().softDeleteIdpUser(username);
   }
 
   public static String deleteIdpUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return currentProvider().deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
+    return SQLProviderFactoryHelper.getProvider(
+        databaseId, PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
+  }
+
+  private static IdpUserMetaBaseSQLProvider currentProvider() {
+    return SQLProviderFactoryHelper.currentProvider(
+        PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
   }
 }
