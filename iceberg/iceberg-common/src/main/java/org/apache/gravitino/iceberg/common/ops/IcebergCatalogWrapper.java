@@ -459,7 +459,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
     if (!(catalog instanceof SupportsMetadataLocation)) {
       LOG.warn(
-          "Catalog '{}' does not support the table metadata cache because the catalog impl does not "
+          "Catalog '{}' does not support the table metadata cache, because the catalog impl does not "
               + "support get metadata location. The cache is disabled. Set '{}' to an empty string "
               + "(\"\") in the configuration before the next restart.",
           catalog.name(),
