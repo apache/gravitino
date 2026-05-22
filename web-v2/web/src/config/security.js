@@ -47,6 +47,10 @@ export const privilegeTypes = [
     value: 'model'
   },
   {
+    label: 'Function',
+    value: 'function'
+  },
+  {
     label: 'Tag',
     value: 'tag'
   },
@@ -121,6 +125,14 @@ export const privilegeOptions = [
       { label: 'Register Model', value: 'register_model' },
       { label: 'Link Model Version', value: 'link_model_version' },
       { label: 'Use Model', value: 'use_model' }
+    ]
+  },
+  {
+    label: 'Function privileges',
+    options: [
+      { label: 'Register Function', value: 'register_function' },
+      { label: 'Execute Function', value: 'execute_function' },
+      { label: 'Modify Function', value: 'modify_function' }
     ]
   },
   {

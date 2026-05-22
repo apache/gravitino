@@ -21,6 +21,7 @@ package org.apache.gravitino.credential;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -45,11 +46,11 @@ public class TestJdbcCredentialProvider {
     Assertions.assertInstanceOf(JdbcCredentialProvider.class, credentialProvider);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Credential credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
-    Assertions.assertNotNull(credential);
-    Assertions.assertInstanceOf(JdbcCredential.class, credential);
-    JdbcCredential jdbcCredential = (JdbcCredential) credential;
+    Assertions.assertTrue(credential.isPresent());
+    Assertions.assertInstanceOf(JdbcCredential.class, credential.get());
+    JdbcCredential jdbcCredential = (JdbcCredential) credential.get();
 
     Assertions.assertEquals(jdbcUser, jdbcCredential.jdbcUser());
     Assertions.assertEquals(jdbcPassword, jdbcCredential.jdbcPassword());
@@ -64,9 +65,9 @@ public class TestJdbcCredentialProvider {
         CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Credential credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
-    Assertions.assertNull(credential);
+    Assertions.assertFalse(credential.isPresent());
   }
 
   @Test
@@ -109,9 +110,9 @@ public class TestJdbcCredentialProvider {
         CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Credential credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
-    Assertions.assertNull(credential);
+    Assertions.assertFalse(credential.isPresent());
   }
 
   @Test
@@ -125,9 +126,9 @@ public class TestJdbcCredentialProvider {
         CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Credential credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
-    Assertions.assertNull(credential);
+    Assertions.assertFalse(credential.isPresent());
   }
 
   @Test
@@ -136,13 +137,13 @@ public class TestJdbcCredentialProvider {
         CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, null);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Credential credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
-    Assertions.assertNull(credential);
+    Assertions.assertFalse(credential.isPresent());
   }
 
   @Test
-  void testEmptyPasswordReturnsNull() {
+  void testEmptyPasswordReturnsEmptyOptional() {
     Map<String, String> catalogProperties =
         ImmutableMap.of(
             JdbcCredential.GRAVITINO_JDBC_USER,
@@ -154,9 +155,9 @@ public class TestJdbcCredentialProvider {
         CredentialProviderFactory.create(JdbcCredential.JDBC_CREDENTIAL_TYPE, catalogProperties);
 
     CatalogCredentialContext context = new CatalogCredentialContext("test-user");
-    Credential credential = credentialProvider.getCredential(context);
+    Optional<Credential> credential = credentialProvider.getCredentialOptional(context);
 
-    Assertions.assertNull(credential);
+    Assertions.assertFalse(credential.isPresent());
   }
 
   @Test

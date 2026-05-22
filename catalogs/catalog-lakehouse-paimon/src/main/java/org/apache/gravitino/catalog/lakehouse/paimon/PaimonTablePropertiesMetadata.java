@@ -61,7 +61,11 @@ public class PaimonTablePropertiesMetadata extends BasePropertiesMetadata {
             stringImmutablePropertyEntry(
                 ROWKIND_FIELD, "The table rowkind field", false, null, false, false),
             stringReservedPropertyEntry(PRIMARY_KEY, "The table primary key", false),
-            stringReservedPropertyEntry(PARTITION, "The table partition", false));
+            stringReservedPropertyEntry(PARTITION, "The table partition", false),
+            stringReservedPropertyEntry(
+                PaimonView.DEFAULT_CATALOG_PROPERTY, "The view default catalog", true),
+            stringReservedPropertyEntry(
+                PaimonView.DEFAULT_SCHEMA_PROPERTY, "The view default schema", true));
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }
 

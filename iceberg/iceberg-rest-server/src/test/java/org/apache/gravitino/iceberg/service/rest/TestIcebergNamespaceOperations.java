@@ -48,10 +48,14 @@ import org.apache.gravitino.listener.api.event.IcebergRegisterTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespacePreEvent;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.types.Types.NestedField;
+import org.apache.iceberg.types.Types.StringType;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
@@ -62,6 +66,9 @@ import org.mockito.Mockito;
 
 public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
 
+  private static final Schema DROP_NONEMPTY_TABLE_SCHEMA =
+      new Schema(NestedField.required(1, "foo_string", StringType.get()));
+
   private DummyEventListener dummyEventListener;
 
   @Override
@@ -70,6 +77,7 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     ResourceConfig resourceConfig =
         IcebergRestTestUtil.getIcebergResourceConfig(
             MockIcebergNamespaceOperations.class, true, Arrays.asList(dummyEventListener));
+    resourceConfig.register(MockIcebergTableOperations.class);
 
     // register a mock HttpServletRequest with user info
     resourceConfig.register(
@@ -183,6 +191,31 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     verifyCreateNamespaceSucc(Namespace.of("drop_foo3", "a"));
     verifyDropNamespaceFail(404, Namespace.of("drop_foo3", "b"));
     verifyDropNamespaceSucc(Namespace.of("drop_foo3", "a"));
+
+    // drop non-empty namespace should return 409 Conflict per Iceberg REST spec
+    Namespace nonEmptyNs = Namespace.of("drop_nonempty_foo");
+    verifyCreateNamespaceSucc(nonEmptyNs);
+    verifyCreateTableSucc(nonEmptyNs, "drop_nonempty_table");
+    verifyDropNamespaceFail(409, nonEmptyNs);
+    verifyDropTableSucc(nonEmptyNs, "drop_nonempty_table");
+    verifyDropNamespaceSucc(nonEmptyNs);
+  }
+
+  private void verifyCreateTableSucc(Namespace ns, String tableName) {
+    CreateTableRequest createTableRequest =
+        CreateTableRequest.builder()
+            .withName(tableName)
+            .withSchema(DROP_NONEMPTY_TABLE_SCHEMA)
+            .build();
+    Response response =
+        getTableClientBuilder(ns, Optional.empty())
+            .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+  }
+
+  private void verifyDropTableSucc(Namespace ns, String tableName) {
+    Response response = getTableClientBuilder(ns, Optional.of(tableName)).delete();
+    Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), response.getStatus());
   }
 
   @Test

@@ -19,11 +19,17 @@
 
 package org.apache.gravitino.flink.connector.integration.test.iceberg;
 
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.flink.table.api.ResultKind;
+import org.apache.flink.table.api.TableResult;
 import org.apache.flink.types.Row;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalog;
+import org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.iceberg.IcebergPropertiesConstants;
 import org.apache.gravitino.flink.connector.integration.test.utils.TestUtils;
 import org.junit.jupiter.api.Assertions;
@@ -46,6 +52,66 @@ public abstract class FlinkIcebergRestCatalogIT extends FlinkIcebergCatalogIT {
     catalogProperties.put(
         IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI, icebergRestServiceUri);
     return catalogProperties;
+  }
+
+  @Override
+  @Test
+  public void testCreateGravitinoIcebergUsingSQL() {
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    int numCatalogs = tableEnv.listCatalogs().length;
+
+    String catalogName = "gravitino_iceberg_using_sql";
+    tableEnv.executeSql(
+        String.format(
+            "create catalog %s with ("
+                + "'type'='%s', "
+                + "'catalog-backend'='%s',"
+                + "'uri'='%s'"
+                + ")",
+            catalogName,
+            GravitinoIcebergCatalogFactoryOptions.IDENTIFIER,
+            getCatalogBackend(),
+            getUri()));
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+
+    Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
+    Map<String, String> properties = gravitinoCatalog.properties();
+    Assertions.assertEquals(
+        getUri(), properties.get(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI));
+    Assertions.assertFalse(
+        properties.containsKey(IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE));
+
+    Optional<org.apache.flink.table.catalog.Catalog> catalog = tableEnv.getCatalog(catalogName);
+    Assertions.assertTrue(catalog.isPresent());
+    Assertions.assertInstanceOf(GravitinoIcebergCatalog.class, catalog.get());
+
+    String[] catalogs = tableEnv.listCatalogs();
+    Assertions.assertEquals(numCatalogs + 1, catalogs.length, "Should create a new catalog");
+    Assertions.assertTrue(
+        Arrays.asList(catalogs).contains(catalogName), "Should create the correct catalog.");
+
+    TableResult result = tableEnv.executeSql("show catalogs");
+    Assertions.assertEquals(
+        numCatalogs + 1, Lists.newArrayList(result.collect()).size(), "Should have 2 catalogs");
+
+    Assertions.assertEquals(
+        DEFAULT_CATALOG,
+        tableEnv.getCurrentCatalog(),
+        "Current catalog should be default_catalog in flink");
+
+    tableEnv.useCatalog(catalogName);
+    Assertions.assertEquals(
+        catalogName,
+        tableEnv.getCurrentCatalog(),
+        "Current catalog should be the one that is created just now.");
+
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    tableEnv.executeSql("drop catalog " + catalogName);
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
+
+    Optional<org.apache.flink.table.catalog.Catalog> droppedCatalog =
+        tableEnv.getCatalog(catalogName);
+    Assertions.assertFalse(droppedCatalog.isPresent(), "Catalog should be dropped");
   }
 
   @Override

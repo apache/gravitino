@@ -19,15 +19,11 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
@@ -38,7 +34,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigConstants;
-import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
@@ -48,7 +43,7 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 
-abstract class AbstractIdpMetaStorageTest {
+public abstract class AbstractIdpMetaStorageTest {
   private static final String H2_BACKEND = "h2";
   private static final String MYSQL_BACKEND = "mysql";
   private static final String POSTGRESQL_BACKEND = "postgresql";
@@ -56,13 +51,12 @@ abstract class AbstractIdpMetaStorageTest {
   private static final TestDatabaseName POSTGRESQL_TEST_DATABASE = TestDatabaseName.PG_JDBC_BACKEND;
 
   protected JDBCBackend backend;
-  protected SqlSession sharedSession;
-  protected IdpUserMetaMapper idpUserMetaMapper;
+  public SqlSession sharedSession;
 
   private Config config;
   private Path h2Path;
 
-  static Stream<String> storageProvider() {
+  public static Stream<String> storageProvider() {
     return Stream.of(H2_BACKEND, MYSQL_BACKEND, POSTGRESQL_BACKEND);
   }
 
@@ -83,75 +77,12 @@ abstract class AbstractIdpMetaStorageTest {
     }
   }
 
-  protected void init(String type) throws IOException {
+  public void init(String type) throws IOException {
     config = createBackendConfig(type);
     backend = new JDBCBackend();
     backend.initialize(config);
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-    idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
-  }
-
-  protected void restartBackend() throws IOException {
-    closeSession();
-    backend.close();
-    backend = new JDBCBackend();
-    backend.initialize(config);
-    sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-    idpUserMetaMapper = sharedSession.getMapper(IdpUserMetaMapper.class);
-  }
-
-  protected IdpUserPO insertUser(
-      long userId,
-      String userName,
-      String passwordHash,
-      long currentVersion,
-      long lastVersion,
-      long deletedAt) {
-    IdpUserPO userPO =
-        IdpUserPO.builder()
-            .withUserId(userId)
-            .withUserName(userName)
-            .withPasswordHash(passwordHash)
-            .withCurrentVersion(currentVersion)
-            .withLastVersion(lastVersion)
-            .withDeletedAt(deletedAt)
-            .build();
-    idpUserMetaMapper.insertIdpUser(userPO);
-    return userPO;
-  }
-
-  protected long queryLongValue(String table, String column, String idColumn, long idValue) {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        PreparedStatement statement =
-            connection.prepareStatement(
-                "SELECT " + column + " FROM " + table + " WHERE " + idColumn + " = ?")) {
-      statement.setLong(1, idValue);
-      try (ResultSet resultSet = statement.executeQuery()) {
-        assertTrue(resultSet.next());
-        return resultSet.getLong(1);
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Query " + column + " from " + table + " failed", e);
-    }
-  }
-
-  protected int countRows(String table, String idColumn, long idValue) {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        PreparedStatement statement =
-            connection.prepareStatement(
-                "SELECT COUNT(1) FROM " + table + " WHERE " + idColumn + " = ?")) {
-      statement.setLong(1, idValue);
-      try (ResultSet resultSet = statement.executeQuery()) {
-        assertTrue(resultSet.next());
-        return resultSet.getInt(1);
-      }
-    } catch (SQLException e) {
-      throw new RuntimeException("Count rows from " + table + " failed", e);
-    }
+    initializeMappers();
   }
 
   protected void closeSession() {
@@ -160,6 +91,8 @@ abstract class AbstractIdpMetaStorageTest {
       sharedSession = null;
     }
   }
+
+  protected void initializeMappers() {}
 
   private Config createBackendConfig(String type) throws IOException {
     Config backendConfig = new Config(false) {};
