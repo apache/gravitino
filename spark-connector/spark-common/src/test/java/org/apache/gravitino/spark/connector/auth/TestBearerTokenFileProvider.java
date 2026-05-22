@@ -30,8 +30,7 @@ public class TestBearerTokenFileProvider {
   @Test
   void testReadRawTokenFromFile() throws Exception {
     Path tokenFile = Files.createTempFile("gravitino-token", ".txt");
-    Files.write(tokenFile, "token-value
-".getBytes(StandardCharsets.UTF_8));
+    Files.write(tokenFile, "token-value\n".getBytes(StandardCharsets.UTF_8));
 
     try (BearerTokenFileProvider provider = new BearerTokenFileProvider(tokenFile.toString())) {
       Assertions.assertEquals(
@@ -44,8 +43,7 @@ public class TestBearerTokenFileProvider {
   @Test
   void testStripBearerPrefixFromFile() throws Exception {
     Path tokenFile = Files.createTempFile("gravitino-token", ".txt");
-    Files.write(tokenFile, "Bearer token-value
-".getBytes(StandardCharsets.UTF_8));
+    Files.write(tokenFile, "Bearer token-value\n".getBytes(StandardCharsets.UTF_8));
 
     try (BearerTokenFileProvider provider = new BearerTokenFileProvider(tokenFile.toString())) {
       Assertions.assertEquals(
@@ -58,8 +56,7 @@ public class TestBearerTokenFileProvider {
   @Test
   void testRejectBlankTokenFile() throws Exception {
     Path tokenFile = Files.createTempFile("gravitino-token", ".txt");
-    Files.write(tokenFile, " 
-".getBytes(StandardCharsets.UTF_8));
+    Files.write(tokenFile, " \n".getBytes(StandardCharsets.UTF_8));
 
     try (BearerTokenFileProvider provider = new BearerTokenFileProvider(tokenFile.toString())) {
       Assertions.assertThrows(IllegalStateException.class, provider::getTokenData);
