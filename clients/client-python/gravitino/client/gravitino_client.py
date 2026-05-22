@@ -21,6 +21,9 @@ from typing import Dict, List, Optional
 
 from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
+from gravitino.api.authorization.privileges import Privilege
+from gravitino.api.authorization.role import Role
+from gravitino.api.authorization.securable_objects import SecurableObject
 from gravitino.api.authorization.user import User
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
@@ -507,3 +510,177 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().list_group_names()
+
+    # Role operations
+
+    def create_role(
+        self,
+        role_name: str,
+        properties: Optional[Dict[str, str]] = None,
+        securable_objects: Optional[List[SecurableObject]] = None,
+    ) -> Role:
+        """Create a new role under the metalake.
+
+        Args:
+            role_name: The name of the role.
+            properties: The properties of the role.
+            securable_objects: The securable objects of the role.
+
+        Returns:
+            The created Role object.
+
+        Raises:
+            RoleAlreadyExistsException: If a role with the same name already exists.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().create_role(role_name, properties, securable_objects)
+
+    def get_role(self, role_name: str) -> Role:
+        """Get a role by name from the metalake.
+
+        Args:
+            role_name: The name of the role.
+
+        Returns:
+            The Role object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().get_role(role_name)
+
+    def delete_role(self, role_name: str) -> bool:
+        """Delete a role from the metalake.
+
+        Args:
+            role_name: The name of the role.
+
+        Returns:
+            True if the role was deleted, False otherwise.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().delete_role(role_name)
+
+    def list_role_names(self) -> list[str]:
+        """List all role names under the metalake.
+
+        Returns:
+            A list of role name strings.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_role_names()
+
+    def grant_roles_to_user(self, role_names: List[str], user_name: str) -> User:
+        """Grant roles to a user.
+
+        Args:
+            role_names: The names of the roles to grant.
+            user_name: The name of the user.
+
+        Returns:
+            The updated User object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchUserException: If the user does not exist.
+        """
+        return self.get_metalake().grant_roles_to_user(role_names, user_name)
+
+    def revoke_roles_from_user(self, role_names: List[str], user_name: str) -> User:
+        """Revoke roles from a user.
+
+        Args:
+            role_names: The names of the roles to revoke.
+            user_name: The name of the user.
+
+        Returns:
+            The updated User object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchUserException: If the user does not exist.
+        """
+        return self.get_metalake().revoke_roles_from_user(role_names, user_name)
+
+    def grant_roles_to_group(self, role_names: List[str], group_name: str) -> Group:
+        """Grant roles to a group.
+
+        Args:
+            role_names: The names of the roles to grant.
+            group_name: The name of the group.
+
+        Returns:
+            The updated Group object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchGroupException: If the group does not exist.
+        """
+        return self.get_metalake().grant_roles_to_group(role_names, group_name)
+
+    def revoke_roles_from_group(self, role_names: List[str], group_name: str) -> Group:
+        """Revoke roles from a group.
+
+        Args:
+            role_names: The names of the roles to revoke.
+            group_name: The name of the group.
+
+        Returns:
+            The updated Group object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchGroupException: If the group does not exist.
+        """
+        return self.get_metalake().revoke_roles_from_group(role_names, group_name)
+
+    def grant_privileges_to_role(
+        self,
+        role_name: str,
+        securable_object: SecurableObject,
+        privileges: List[Privilege],
+    ) -> Role:
+        """Grant privileges to a role on a securable object.
+
+        Args:
+            role_name: The name of the role.
+            securable_object: The securable object.
+            privileges: The privileges to grant.
+
+        Returns:
+            The updated Role object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+        """
+        return self.get_metalake().grant_privileges_to_role(
+            role_name, securable_object, privileges
+        )
+
+    def revoke_privileges_from_role(
+        self,
+        role_name: str,
+        securable_object: SecurableObject,
+        privileges: List[Privilege],
+    ) -> Role:
+        """Revoke privileges from a role on a securable object.
+
+        Args:
+            role_name: The name of the role.
+            securable_object: The securable object.
+            privileges: The privileges to revoke.
+
+        Returns:
+            The updated Role object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+        """
+        return self.get_metalake().revoke_privileges_from_role(
+            role_name, securable_object, privileges
+        )

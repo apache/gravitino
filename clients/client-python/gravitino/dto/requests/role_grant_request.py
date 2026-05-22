@@ -15,7 +15,31 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from gravitino.dto.authorization.owner_dto import OwnerDTO
-from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
-from gravitino.dto.authorization.role_dto import RoleDTO
-from gravitino.dto.authorization.securable_object_dto import SecurableObjectDTO
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import List
+
+from dataclasses_json import config, dataclass_json
+
+from gravitino.rest.rest_message import RESTRequest
+from gravitino.utils.precondition import Precondition
+
+
+@dataclass_json
+@dataclass
+class RoleGrantRequest(RESTRequest):
+    """Represents a request to grant roles."""
+
+    _role_names: List[str] = field(
+        default_factory=list, metadata=config(field_name="roleNames")
+    )
+
+    def __init__(self, role_names: List[str]):
+        self._role_names = role_names
+
+    def validate(self) -> None:
+        Precondition.check_argument(
+            self._role_names is not None and len(self._role_names) > 0,
+            "roleNames cannot be null or empty",
+        )
