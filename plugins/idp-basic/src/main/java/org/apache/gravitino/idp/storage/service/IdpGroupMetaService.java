@@ -49,10 +49,7 @@ public class IdpGroupMetaService {
 
   private IdpGroupMetaService() {}
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getIdpGroupByName")
-  public IdpGroupPO getIdpGroupByName(String groupName) {
+  private IdpGroupPO getIdpGroupPOByName(String groupName) {
     IdpGroupPO groupPO =
         SessionUtils.getWithoutCommit(
             IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName));
@@ -60,6 +57,13 @@ public class IdpGroupMetaService {
       throw new NotFoundException("IdP group not found: " + groupName);
     }
     return groupPO;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getIdpGroupByName")
+  public IdpGroupPO getIdpGroupByName(String groupName) {
+    return getIdpGroupPOByName(groupName);
   }
 
   @Monitored(
@@ -106,25 +110,17 @@ public class IdpGroupMetaService {
       return;
     }
 
+    IdpGroupPO group = getIdpGroupPOByName(groupName);
+    Map<String, Long> userIds =
+        IdpUserMetaService.getInstance().resolveUserIdsByUsernames(usernames);
     List<IdpUserGroupRelPO> relations = new ArrayList<>(usernames.size());
+    for (String username : usernames) {
+      relations.add(newUserGroupRelation(group.getGroupId(), userIds.get(username)));
+    }
+
     try {
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            IdpGroupPO group =
-                SessionUtils.getWithoutCommit(
-                    IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName));
-            if (group == null) {
-              throw new NotFoundException("IdP group not found: " + groupName);
-            }
-            Map<String, Long> userIds =
-                IdpUserMetaService.getInstance().resolveUserIdsByUsernames(usernames);
-            for (String username : usernames) {
-              relations.add(newUserGroupRelation(group.getGroupId(), userIds.get(username)));
-            }
-          },
-          () ->
-              SessionUtils.doWithoutCommit(
-                  IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations)));
+      SessionUtils.doWithCommit(
+          IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(re, Entity.EntityType.GROUP, groupName);
       throw re;
@@ -147,6 +143,11 @@ public class IdpGroupMetaService {
       baseMetricName = "removeUsersFromGroup")
   public int removeUsersFromGroup(String groupName, List<String> usernames) {
     Preconditions.checkNotNull(usernames, "IdP usernames cannot be null");
+    if (usernames.isEmpty()) {
+      return 0;
+    }
+
+    getIdpGroupPOByName(groupName);
     Integer deleted =
         SessionUtils.doWithCommitAndFetchResult(
             IdpUserGroupRelMapper.class,

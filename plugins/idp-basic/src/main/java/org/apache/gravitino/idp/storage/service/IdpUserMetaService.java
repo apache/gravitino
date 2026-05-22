@@ -46,10 +46,7 @@ public class IdpUserMetaService {
 
   private IdpUserMetaService() {}
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "getIdpUserByUsername")
-  public IdpUserPO getIdpUserByUsername(String username) {
+  private IdpUserPO getIdpUserPOByUsername(String username) {
     IdpUserPO userPO =
         SessionUtils.getWithoutCommit(
             IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
@@ -57,6 +54,13 @@ public class IdpUserMetaService {
       throw new NotFoundException("IdP user not found: " + username);
     }
     return userPO;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getIdpUserByUsername")
+  public IdpUserPO getIdpUserByUsername(String username) {
+    return getIdpUserPOByUsername(username);
   }
 
   /**
@@ -121,15 +125,12 @@ public class IdpUserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateIdpUserPassword")
   public boolean updateIdpUserPassword(String username, String passwordHash) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        IdpUserMetaMapper.class,
-        mapper -> {
-          if (mapper.selectIdpUser(username) == null) {
-            throw new NotFoundException("IdP user not found: " + username);
-          }
-          Integer updated = mapper.updateIdpUserPassword(username, passwordHash);
-          return updated != null && updated > 0;
-        });
+    getIdpUserPOByUsername(username);
+    Integer updated =
+        SessionUtils.doWithCommitAndFetchResult(
+            IdpUserMetaMapper.class,
+            mapper -> mapper.updateIdpUserPassword(username, passwordHash));
+    return updated != null && updated > 0;
   }
 
   @Monitored(
