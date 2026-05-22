@@ -85,15 +85,16 @@ public class HierarchicalSchemaAuthorizationIT extends BaseRestApiAuthorizationI
     super.startIntegrationTest();
 
     // Create an Iceberg catalog because ':' hierarchical schema names are only supported there.
-    // The Iceberg JDBC catalog is backed by an in-memory SQLite database purely for test
-    // convenience: it is lightweight and needs no extra Docker container, so the IT can exercise
-    // the hierarchical-namespace behavior without a heavyweight metastore. SQLite is NOT a
-    // supported production Iceberg backend.
+    // The Iceberg JDBC catalog is backed by an in-memory H2 database purely for test convenience:
+    // it is lightweight and needs no extra Docker container, so the IT can exercise the
+    // hierarchical-namespace behavior without a heavyweight metastore. H2 is NOT a supported
+    // production Iceberg backend.
     Map<String, String> catalogProperties = new HashMap<>();
     catalogProperties.put("catalog-backend", "jdbc");
     catalogProperties.put("warehouse", "/tmp/gravitino-it-hierarchical-schema");
-    catalogProperties.put("uri", "jdbc:sqlite::memory:");
-    catalogProperties.put("jdbc-driver", "org.sqlite.JDBC");
+    catalogProperties.put(
+        "uri", "jdbc:h2:mem:gravitino-it-hierarchical-schema;DB_CLOSE_DELAY=-1;MODE=MYSQL");
+    catalogProperties.put("jdbc-driver", "org.h2.Driver");
     catalogProperties.put("jdbc-initialize", "true");
     client
         .loadMetalake(METALAKE)

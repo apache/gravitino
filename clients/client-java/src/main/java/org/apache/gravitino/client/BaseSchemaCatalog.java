@@ -166,19 +166,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO
     return doListSchemas(Collections.singletonMap("parentSchema", parentSchema));
   }
 
-  private String[] doListSchemas(Map<String, String> queryParams) {
-    EntityListResponse resp =
-        restClient.get(
-            formatSchemaRequestPath(schemaNamespace()),
-            queryParams,
-            EntityListResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.schemaErrorHandler());
-    resp.validate();
-
-    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
-  }
-
   /**
    * Create a new schema with specified identifier, comment and metadata.
    *
@@ -394,5 +381,18 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   @Override
   public boolean dropFunction(NameIdentifier ident) {
     return functionOperations.dropFunction(ident);
+  }
+
+  private String[] doListSchemas(Map<String, String> queryParams) {
+    EntityListResponse resp =
+        restClient.get(
+            formatSchemaRequestPath(schemaNamespace()),
+            queryParams,
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.schemaErrorHandler());
+    resp.validate();
+
+    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 }

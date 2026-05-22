@@ -349,12 +349,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   }
 
   /**
-   * Reconciles auto-created ancestor entities after a hierarchical schema leaf is dropped. When the
-   * leaf (e.g. {@code A:B:C}) is removed, the underlying catalog may also remove the now-empty
-   * parent namespaces. This mirrors {@code IcebergNamespaceHookDispatcher.dropNamespace}: walk the
-   * ancestors innermost-to-outermost and delete the orphaned Gravitino entity for each ancestor
-   * that no longer exists in the catalog, stopping at the first ancestor that still exists (its
-   * existence implies all of its outer ancestors exist). For a flat schema name this is a no-op.
+   * Reconciles auto-created ancestor entities after a hierarchical schema leaf is dropped. This
+   * mirrors {@code IcebergNamespaceHookDispatcher.dropNamespace}: walk the ancestors
+   * innermost-to-outermost and delete the orphaned Gravitino entity for each ancestor that no
+   * longer exists in the catalog, stopping at the first ancestor that still exists (its existence
+   * implies all of its outer ancestors exist). For a flat schema name this is a no-op.
    *
    * @param catalogIdent the identifier of the catalog the schema belongs to
    * @param ident the identifier of the dropped (leaf) schema
