@@ -30,7 +30,6 @@ import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
-import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
@@ -102,10 +101,13 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    * @param options the mutable Flink catalog options map to update
    */
   static void applyJdbcCredential(Catalog catalog, Map<String, String> options) {
-    if (!(catalog instanceof SupportsCredentials)) {
+    Credential[] credentials;
+    try {
+      credentials = catalog.supportsCredentials().getCredentials();
+    } catch (UnsupportedOperationException e) {
       return;
     }
-    for (Credential credential : ((SupportsCredentials) catalog).getCredentials()) {
+    for (Credential credential : credentials) {
       if (credential instanceof JdbcCredential) {
         JdbcCredential jdbcCredential = (JdbcCredential) credential;
         options.put(JdbcPropertiesConstants.FLINK_JDBC_USER, jdbcCredential.jdbcUser());

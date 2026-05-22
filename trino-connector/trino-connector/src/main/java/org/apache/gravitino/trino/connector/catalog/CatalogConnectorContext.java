@@ -27,7 +27,6 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.Credential;
-import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoConnector;
 import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
@@ -259,10 +258,12 @@ public class CatalogConnectorContext {
       Preconditions.checkArgument(context != null, "context must not be null");
       Preconditions.checkArgument(config != null, "config must not be null");
       Catalog liveCatalog = metalake.loadCatalog(catalog.getName());
-      Credential[] credentials =
-          liveCatalog instanceof SupportsCredentials
-              ? ((SupportsCredentials) liveCatalog).getCredentials()
-              : new Credential[0];
+      Credential[] credentials;
+      try {
+        credentials = liveCatalog.supportsCredentials().getCredentials();
+      } catch (UnsupportedOperationException e) {
+        credentials = new Credential[0];
+      }
       Map<String, String> connectorConfig =
           connectorAdapter.buildInternalConnectorConfig(catalog, credentials);
       String internalConnectorName = connectorAdapter.internalConnectorName();

@@ -25,7 +25,6 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
-import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -57,15 +56,17 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    * Overwrites the Spark JDBC user and password in {@code sparkProperties} with credentials
    * obtained from the server via credential vending, if available.
    *
-   * @param catalog the Gravitino catalog client; must implement {@link SupportsCredentials} for
-   *     credential vending to take effect
+   * @param catalog the Gravitino catalog client
    * @param sparkProperties the mutable Spark properties map to update
    */
   static void applyJdbcCredential(Catalog catalog, Map<String, String> sparkProperties) {
-    if (!(catalog instanceof SupportsCredentials)) {
+    Credential[] credentials;
+    try {
+      credentials = catalog.supportsCredentials().getCredentials();
+    } catch (UnsupportedOperationException e) {
       return;
     }
-    for (Credential credential : ((SupportsCredentials) catalog).getCredentials()) {
+    for (Credential credential : credentials) {
       if (credential instanceof JdbcCredential) {
         JdbcCredential jdbcCredential = (JdbcCredential) credential;
         sparkProperties.put(JdbcPropertiesConstants.SPARK_JDBC_USER, jdbcCredential.jdbcUser());
