@@ -20,11 +20,13 @@ package org.apache.gravitino.iceberg.integration.test;
 
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
+import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.integration.test.util.IcebergRESTServerManager;
@@ -33,8 +35,11 @@ import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.memory.MemoryCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -196,4 +201,30 @@ public class IcebergCacheIT {
     method.setAccessible(true);
     return (TableMetadataCache) method.invoke(wrapper);
   }
+
+  /** Custom catalog that does not support metadata location for cache IT. */
+  public static class CustomNoSupportLocationCatalog implements Catalog {
+
+    @Override
+    public List<TableIdentifier> listTables(Namespace namespace) {
+      return List.of();
+    }
+
+    @Override
+    public boolean dropTable(TableIdentifier identifier, boolean purge) {
+      return false;
+    }
+
+    @Override
+    public void renameTable(TableIdentifier from, TableIdentifier to) {}
+
+    @Override
+    public Table loadTable(TableIdentifier identifier) {
+      return null;
+    }
+  }
+
+  /** Custom catalog that supports metadata location for cache IT. */
+  public static class CustomSupportLocationCatalog extends MemoryCatalogWithMetadataLocationSupport
+      implements SupportsMetadataLocation {}
 }

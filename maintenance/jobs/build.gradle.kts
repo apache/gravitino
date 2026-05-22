@@ -54,7 +54,6 @@ dependencies {
 
   testImplementation(project(":api"))
   testImplementation(project(":common"))
-  testImplementation(project(":catalogs:catalog-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.hadoop3.common) {
