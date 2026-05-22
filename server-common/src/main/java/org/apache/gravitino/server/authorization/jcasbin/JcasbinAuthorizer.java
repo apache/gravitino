@@ -1069,6 +1069,24 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               RoleMetaMapper.class, m -> m.batchGetRoleUpdatedAt(uniqueRoleIds));
     }
 
+    // Detect roles that were deleted in the DB. Any roleId we asked about but did not get a
+    // version back for has been hard-deleted (or marked deleted at the storage layer); the
+    // corresponding p-rows in {@link #allowEnforcer} / {@link #denyEnforcer} would otherwise
+    // continue granting privileges to anyone whose userRoleCache snapshot still includes the
+    // role id (e.g. when role_meta is deleted without bumping user_meta.updated_at). Clearing
+    // the policies and evicting {@link #loadedRoles} ensures that even a stale grouping row
+    // grants nothing; the grouping row itself is pruned on the next userRoleCache reload.
+    Set<Long> existingRoleIds = new HashSet<>(roleVersions.size());
+    for (RoleUpdatedAt rv : roleVersions) {
+      existingRoleIds.add(rv.getRoleId());
+    }
+    for (Long roleId : uniqueRoleIds) {
+      if (!existingRoleIds.contains(roleId)) {
+        clearRolePolicies(roleId);
+        loadedRoles.invalidate(roleId);
+      }
+    }
+
     List<RoleUpdatedAt> staleRoleVersions = new ArrayList<>();
     for (RoleUpdatedAt rv : roleVersions) {
       Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(rv.getRoleId());

@@ -527,6 +527,79 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testVersionCheckEvictsPoliciesOfRolesMissingFromDb() throws Exception {
+    // Regression test for the cross-instance role-delete invalidation gap. The
+    // happy path is already handled by the fat-JOIN inside prefetchUserAndGroupInfo,
+    // which excludes soft-/hard-deleted roles via "role_meta.deleted_at = 0" and
+    // re-primes userRoleCache before the next loadUserRoles call. This test covers
+    // the defence-in-depth tier: if versionCheckAndLoadRoles is ever invoked with
+    // a roleId whose version probe row is missing (e.g. cache window race, future
+    // code path bypassing the fat-JOIN), the fix must still clear that role's
+    // p-rows from both enforcers and evict its loadedRoles entry so that any
+    // residual user → deleted-role g-row grants nothing on subsequent enforce()s.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    // 1. Authorize once via the normal flow to populate loadedRoles + enforcer p-rows
+    //    for allowRole.
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    long userVersion = nextUserVersion();
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, userVersion));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(ALLOW_ROLE_ID, allowRole.name())));
+    assertTrue(doAuthorize(currentPrincipal));
+
+    // Sanity: loadedRoles now has an entry for ALLOW_ROLE_ID and the allowEnforcer
+    // contains a p-row whose subject (column 0) equals the role id.
+    Assertions.assertTrue(
+        getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent(),
+        "loadedRoles must be primed before the test");
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    Assertions.assertFalse(
+        allowEnforcer.getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID)).isEmpty(),
+        "allowEnforcer must hold p-rows for allowRole before the test");
+
+    // 2. Simulate the bug-trigger: batchGetRoleUpdatedAt returns NO row for the role
+    //    (i.e. the role row is gone from role_meta), even though something is still
+    //    asking us to version-check it.
+    when(roleMetaMapper.batchGetRoleUpdatedAt(any())).thenReturn(ImmutableList.of());
+
+    // Invoke versionCheckAndLoadRoles directly with the "deleted" role id and a
+    // fresh AuthorizationRequestContext that has NO prefetched role versions, so
+    // the method falls through to the batch probe and observes the empty result.
+    AuthorizationRequestContext freshCtx = new AuthorizationRequestContext();
+    invokeVersionCheckAndLoadRoles(
+        jcasbinAuthorizer, METALAKE, ImmutableList.of(ALLOW_ROLE_ID), freshCtx);
+
+    // 3. The fix must have cleared the role's p-rows and evicted loadedRoles.
+    Assertions.assertTrue(
+        allowEnforcer.getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID)).isEmpty(),
+        "allowEnforcer p-rows for the deleted role must be cleared");
+    Assertions.assertFalse(
+        getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent(),
+        "loadedRoles entry for the deleted role must be evicted");
+  }
+
+  /** Reflectively invoke the private versionCheckAndLoadRoles. */
+  private static void invokeVersionCheckAndLoadRoles(
+      JcasbinAuthorizer authorizer,
+      String metalake,
+      List<Long> roleIds,
+      AuthorizationRequestContext requestContext)
+      throws Exception {
+    java.lang.reflect.Method m =
+        JcasbinAuthorizer.class.getDeclaredMethod(
+            "versionCheckAndLoadRoles",
+            String.class,
+            List.class,
+            AuthorizationRequestContext.class);
+    m.setAccessible(true);
+    m.invoke(authorizer, metalake, roleIds, requestContext);
+  }
+
+  @Test
   public void testAuthorizeByOwner() throws Exception {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     // No owner set — should fail
