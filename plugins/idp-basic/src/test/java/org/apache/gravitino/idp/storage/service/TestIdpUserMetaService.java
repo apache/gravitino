@@ -19,6 +19,7 @@
 package org.apache.gravitino.idp.storage.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -95,6 +96,8 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
     runServiceCall(() -> assertTrue(userMetaService.updateIdpUserPassword("user1", "hash-2")));
     assertEquals("hash-2", userMetaService.getIdpUserByUsername("user1").getPasswordHash());
     assertEquals(1L, userMetaService.getIdpUserByUsername("user1").getCurrentVersion());
+
+    runServiceCall(() -> assertFalse(userMetaService.updateIdpUserPassword("user1", "hash-2")));
   }
 
   @ParameterizedTest

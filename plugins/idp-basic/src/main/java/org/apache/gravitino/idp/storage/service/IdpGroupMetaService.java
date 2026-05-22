@@ -136,8 +136,7 @@ public class IdpGroupMetaService {
 
     getIdpGroupPOByName(groupName);
     return SessionUtils.doWithCommitAndFetchResult(
-        IdpUserGroupRelMapper.class,
-        mapper -> mapper.softDeleteRelations(groupName, usernames));
+        IdpUserGroupRelMapper.class, mapper -> mapper.softDeleteRelations(groupName, usernames));
   }
 
   @Monitored(

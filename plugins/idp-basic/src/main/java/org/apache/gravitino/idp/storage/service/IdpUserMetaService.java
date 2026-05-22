@@ -113,6 +113,14 @@ public class IdpUserMetaService {
     return true;
   }
 
+  /**
+   * Updates the password hash for an active user, following the core relational meta update flow:
+   * load the current row, commit the update, and use the affected row count as the success signal.
+   *
+   * @param username username of the user
+   * @param passwordHash new password hash to store
+   * @return {@code true} if the user exists and the password hash was updated
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateIdpUserPassword")

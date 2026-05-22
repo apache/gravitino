@@ -93,7 +93,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
   @MethodSource("storageProvider")
   void testUpdateIdpUserPassword(String type) throws IOException {
     init(type);
-    idpUserMetaMapper.insertIdpUser(
+    IdpUserPO oldUserPO =
         IdpUserPO.builder()
             .withUserId(1L)
             .withUsername("alice")
@@ -101,8 +101,8 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
-            .build());
-
+            .build();
+    idpUserMetaMapper.insertIdpUser(oldUserPO);
     assertEquals(1, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
     assertEquals("hash-a-2", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
     assertEquals(1L, idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
@@ -127,13 +127,14 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     assertEquals("hash-a-2", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
     assertEquals(3L, idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
     assertEquals(2L, idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
+    assertEquals(0, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
   void testSoftDeleteIdpUser(String type) throws IOException {
     init(type);
-    idpUserMetaMapper.insertIdpUser(
+    IdpUserPO oldUserPO =
         IdpUserPO.builder()
             .withUserId(1L)
             .withUsername("alice")
@@ -141,7 +142,8 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
-            .build());
+            .build();
+    idpUserMetaMapper.insertIdpUser(oldUserPO);
 
     assertEquals(1, idpUserMetaMapper.softDeleteIdpUser("alice"));
     assertNull(idpUserMetaMapper.selectIdpUser("alice"));
