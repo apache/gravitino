@@ -706,15 +706,6 @@ schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas()
 </TabItem>
 </Tabs>
 
-### Hierarchical schema
-
-Catalogs that support hierarchical (multi-level) schemas let a schema be nested under another
-schema, using the separator configured by `gravitino.schema.separator` (default `:`, see
-[Gravitino server configuration](./gravitino-server-config.md#schema-configuration)). Currently
-only the Iceberg catalog supports this; see
-[Hierarchical schema](./lakehouse-iceberg-catalog.md#hierarchical-schema) in the Iceberg catalog
-documentation for details and examples.
-
 ## Table operations
 
 :::tip
