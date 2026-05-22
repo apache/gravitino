@@ -37,20 +37,10 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 public class IdpUserMetaService {
   private static final IdpUserMetaService INSTANCE = new IdpUserMetaService();
 
-  public static IdpUserMetaService getInstance() {
-    return INSTANCE;
-  }
-
   private IdpUserMetaService() {}
 
-  private IdpUserPO getIdpUserPOByUsername(String username) {
-    IdpUserPO userPO =
-        SessionUtils.getWithoutCommit(
-            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
-    if (userPO == null) {
-      throw new NotFoundException("IdP user not found: " + username);
-    }
-    return userPO;
+  public static IdpUserMetaService getInstance() {
+    return INSTANCE;
   }
 
   @Monitored(
@@ -58,29 +48,6 @@ public class IdpUserMetaService {
       baseMetricName = "getIdpUserByUsername")
   public IdpUserPO getIdpUserByUsername(String username) {
     return getIdpUserPOByUsername(username);
-  }
-
-  /**
-   * Resolves active user ids for the given usernames in one query. Throws if any username is
-   * missing.
-   *
-   * @param usernames usernames to resolve
-   * @return username to user id map
-   */
-  Map<String, Long> resolveUserIdsByUsernames(List<String> usernames) {
-    List<IdpUserPO> users =
-        SessionUtils.getWithoutCommit(
-            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUsersByUsernames(usernames));
-    Map<String, Long> userIds = new HashMap<>(users.size());
-    for (IdpUserPO user : users) {
-      userIds.put(user.getUsername(), user.getUserId());
-    }
-    for (String username : usernames) {
-      if (!userIds.containsKey(username)) {
-        throw new NotFoundException("IdP user not found: " + username);
-      }
-    }
-    return userIds;
   }
 
   @Monitored(
@@ -125,7 +92,6 @@ public class IdpUserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateIdpUserPassword")
   public boolean updateIdpUserPassword(String username, String passwordHash) {
-    getIdpUserPOByUsername(username);
     Integer updated =
         SessionUtils.doWithCommitAndFetchResult(
             IdpUserMetaMapper.class,
@@ -154,5 +120,38 @@ public class IdpUserMetaService {
                         mapper.deleteIdpUserGroupRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return userDeletedCount[0] + relDeletedCount[0];
+  }
+
+  /**
+   * Resolves active user ids for the given usernames in one query. Throws if any username is
+   * missing.
+   *
+   * @param usernames usernames to resolve
+   * @return username to user id map
+   */
+  Map<String, Long> resolveUserIdsByUsernames(List<String> usernames) {
+    List<IdpUserPO> users =
+        SessionUtils.getWithoutCommit(
+            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUsersByUsernames(usernames));
+    Map<String, Long> userIds = new HashMap<>(users.size());
+    for (IdpUserPO user : users) {
+      userIds.put(user.getUsername(), user.getUserId());
+    }
+    for (String username : usernames) {
+      if (!userIds.containsKey(username)) {
+        throw new NotFoundException("IdP user not found: " + username);
+      }
+    }
+    return userIds;
+  }
+
+  private IdpUserPO getIdpUserPOByUsername(String username) {
+    IdpUserPO userPO =
+        SessionUtils.getWithoutCommit(
+            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
+    if (userPO == null) {
+      throw new NotFoundException("IdP user not found: " + username);
+    }
+    return userPO;
   }
 }

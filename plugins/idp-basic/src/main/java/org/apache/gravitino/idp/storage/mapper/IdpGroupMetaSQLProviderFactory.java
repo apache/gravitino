@@ -45,16 +45,6 @@ public class IdpGroupMetaSQLProviderFactory {
 
   private IdpGroupMetaSQLProviderFactory() {}
 
-  private static IdpGroupMetaBaseSQLProvider currentProvider() {
-    return SQLProviderFactoryHelper.currentProvider(
-        PROVIDER_MAP, IdpGroupMetaSQLProviderFactory.class);
-  }
-
-  static IdpGroupMetaBaseSQLProvider getProvider(String databaseId) {
-    return SQLProviderFactoryHelper.getProvider(
-        databaseId, PROVIDER_MAP, IdpGroupMetaSQLProviderFactory.class);
-  }
-
   public static String selectIdpGroup(@Param("groupName") String groupName) {
     return currentProvider().selectIdpGroup(groupName);
   }
@@ -70,5 +60,15 @@ public class IdpGroupMetaSQLProviderFactory {
   public static String deleteIdpGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return currentProvider().deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  static IdpGroupMetaBaseSQLProvider getProvider(String databaseId) {
+    return SQLProviderFactoryHelper.getProvider(
+        databaseId, PROVIDER_MAP, IdpGroupMetaSQLProviderFactory.class);
+  }
+
+  private static IdpGroupMetaBaseSQLProvider currentProvider() {
+    return SQLProviderFactoryHelper.currentProvider(
+        PROVIDER_MAP, IdpGroupMetaSQLProviderFactory.class);
   }
 }

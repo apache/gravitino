@@ -36,10 +36,9 @@ import org.slf4j.LoggerFactory;
  * org.apache.gravitino.Configs#STORE_DELETE_AFTER_TIME}.
  *
  * <p>Unlike core {@link org.apache.gravitino.storage.relational.RelationalGarbageCollector}, which
- * is started from {@code RelationalEntityStore}, this plugin has no entity-store lifecycle hook. It
- * is started once via {@link org.apache.gravitino.idp.storage.IdpStorageBootstrap} when IdP mappers
- * are registered through {@link
- * org.apache.gravitino.idp.storage.mapper.provider.IdpBasicMapperPackageProvider}.
+ * is started from {@code RelationalEntityStore}, this plugin has no entity-store lifecycle hook.
+ * {@link org.apache.gravitino.idp.storage.IdpStorageBootstrap} can start it once server wiring is
+ * added; mapper registration alone does not start the collector.
  */
 public final class IdpLegacyGarbageCollector {
 
@@ -58,10 +57,6 @@ public final class IdpLegacyGarbageCollector {
             return t;
           },
           new ThreadPoolExecutor.AbortPolicy());
-
-  public IdpLegacyGarbageCollector(Config config) {
-    storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
-  }
 
   /**
    * Starts the scheduled legacy garbage collector. Idempotent; only the first call takes effect.
@@ -82,13 +77,8 @@ public final class IdpLegacyGarbageCollector {
     }
   }
 
-  private void start() {
-    long dateTimelineMinute = storeDeleteAfterTimeMillis / 1000 / 60;
-
-    // We will collect garbage every 10 minutes at least. If the dateTimelineMinute is larger than
-    // 100 minutes, we would collect garbage every dateTimelineMinute/10 minutes.
-    long frequency = Math.max(dateTimelineMinute / 10, 10);
-    garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
+  public IdpLegacyGarbageCollector(Config config) {
+    storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
   }
 
   public void collectAndClean() {
@@ -134,5 +124,14 @@ public final class IdpLegacyGarbageCollector {
     } finally {
       LOG.debug("Thread {} finish to collect garbage.", threadId);
     }
+  }
+
+  private void start() {
+    long dateTimelineMinute = storeDeleteAfterTimeMillis / 1000 / 60;
+
+    // We will collect garbage every 10 minutes at least. If the dateTimelineMinute is larger than
+    // 100 minutes, we would collect garbage every dateTimelineMinute/10 minutes.
+    long frequency = Math.max(dateTimelineMinute / 10, 10);
+    garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
 }

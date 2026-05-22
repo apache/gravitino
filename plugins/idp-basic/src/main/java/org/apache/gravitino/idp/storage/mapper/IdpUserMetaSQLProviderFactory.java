@@ -45,16 +45,6 @@ public class IdpUserMetaSQLProviderFactory {
 
   private IdpUserMetaSQLProviderFactory() {}
 
-  private static IdpUserMetaBaseSQLProvider currentProvider() {
-    return SQLProviderFactoryHelper.currentProvider(
-        PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
-  }
-
-  static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
-    return SQLProviderFactoryHelper.getProvider(
-        databaseId, PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
-  }
-
   public static String selectIdpUser(@Param("username") String username) {
     return currentProvider().selectIdpUser(username);
   }
@@ -79,5 +69,15 @@ public class IdpUserMetaSQLProviderFactory {
   public static String deleteIdpUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return currentProvider().deleteIdpUserMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  static IdpUserMetaBaseSQLProvider getProvider(String databaseId) {
+    return SQLProviderFactoryHelper.getProvider(
+        databaseId, PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
+  }
+
+  private static IdpUserMetaBaseSQLProvider currentProvider() {
+    return SQLProviderFactoryHelper.currentProvider(
+        PROVIDER_MAP, IdpUserMetaSQLProviderFactory.class);
   }
 }

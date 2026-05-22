@@ -20,7 +20,6 @@ package org.apache.gravitino.idp.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -40,20 +39,10 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 public class IdpGroupMetaService {
   private static final IdpGroupMetaService INSTANCE = new IdpGroupMetaService();
 
-  public static IdpGroupMetaService getInstance() {
-    return INSTANCE;
-  }
-
   private IdpGroupMetaService() {}
 
-  private IdpGroupPO getIdpGroupPOByName(String groupName) {
-    IdpGroupPO groupPO =
-        SessionUtils.getWithoutCommit(
-            IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName));
-    if (groupPO == null) {
-      throw new NotFoundException("IdP group not found: " + groupName);
-    }
-    return groupPO;
+  public static IdpGroupMetaService getInstance() {
+    return INSTANCE;
   }
 
   @Monitored(
@@ -97,11 +86,6 @@ public class IdpGroupMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "addUsersToGroup")
   public void addUsersToGroup(String groupName, List<String> usernames) {
-    Preconditions.checkNotNull(usernames, "IdP usernames cannot be null");
-    if (usernames.isEmpty()) {
-      return;
-    }
-
     IdpGroupPO group = getIdpGroupPOByName(groupName);
     Map<String, Long> userIds =
         IdpUserMetaService.getInstance().resolveUserIdsByUsernames(usernames);
@@ -114,27 +98,10 @@ public class IdpGroupMetaService {
         IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
   }
 
-  private static IdpUserGroupRelPO newUserGroupRelation(long groupId, long userId) {
-    return IdpUserGroupRelPO.builder()
-        .withId(RandomIdGenerator.INSTANCE.nextId())
-        .withUserId(userId)
-        .withGroupId(groupId)
-        .withCurrentVersion(1L)
-        .withLastVersion(0L)
-        .withDeletedAt(0L)
-        .build();
-  }
-
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "removeUsersFromGroup")
   public int removeUsersFromGroup(String groupName, List<String> usernames) {
-    Preconditions.checkNotNull(usernames, "IdP usernames cannot be null");
-    if (usernames.isEmpty()) {
-      return 0;
-    }
-
-    getIdpGroupPOByName(groupName);
     return SessionUtils.doWithCommitAndFetchResult(
         IdpUserGroupRelMapper.class, mapper -> mapper.softDeleteRelations(groupName, usernames));
   }
@@ -160,5 +127,26 @@ public class IdpGroupMetaService {
                         mapper.deleteIdpUserGroupRelMetasByLegacyTimeline(legacyTimeline, limit)));
 
     return groupDeletedCount[0] + relDeletedCount[0];
+  }
+
+  private static IdpUserGroupRelPO newUserGroupRelation(long groupId, long userId) {
+    return IdpUserGroupRelPO.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withUserId(userId)
+        .withGroupId(groupId)
+        .withCurrentVersion(1L)
+        .withLastVersion(0L)
+        .withDeletedAt(0L)
+        .build();
+  }
+
+  private IdpGroupPO getIdpGroupPOByName(String groupName) {
+    IdpGroupPO groupPO =
+        SessionUtils.getWithoutCommit(
+            IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName));
+    if (groupPO == null) {
+      throw new NotFoundException("IdP group not found: " + groupName);
+    }
+    return groupPO;
   }
 }

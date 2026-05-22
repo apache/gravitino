@@ -29,10 +29,9 @@ import org.slf4j.LoggerFactory;
  * One-time initialization for built-in IdP storage components that are not wired through core
  * entity-store lifecycle.
  *
- * <p>Invoked from {@link
- * org.apache.gravitino.idp.storage.mapper.provider.IdpBasicMapperPackageProvider#getMapperClasses()}
- * when relational storage registers mapper packages via {@link
- * org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider} SPI.
+ * <p>Not invoked from {@link
+ * org.apache.gravitino.idp.storage.mapper.provider.IdpBasicMapperPackageProvider} in the current
+ * PR; a future change can wire this through server/plugin lifecycle.
  */
 public final class IdpStorageBootstrap {
 
