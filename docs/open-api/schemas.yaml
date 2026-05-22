@@ -162,8 +162,9 @@ components:
         support hierarchical (multi-level) schemas, such as an Iceberg catalog accessed through the
         Gravitino REST server with a configured schema separator (`gravitino.schema.separator`,
         default `:`). For example, when the schemas `a`, `a:b` and `a:b:c` exist, listing with
-        `parentSchema=a:b` returns `[a:b:c]`. When omitted, all schemas under the catalog are
-        returned.
+        `parentSchema=a:b` returns `[a:b:c]`. When omitted, only the top-level schemas under the
+        catalog are returned (the direct children of the catalog root, e.g. `a`), not the nested
+        ones.
       required: false
       schema:
         type: string
