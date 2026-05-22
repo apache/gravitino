@@ -121,7 +121,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting String defaultTableFormat;
 
-  /** Optional S3 warehouse prefix. Table location is derived as {@code warehouse/db/table}. */
+  /** Warehouse storage path. Table location is derived as {@code warehouse/db/table}. */
   @VisibleForTesting String warehouseLocation;
 
   /** Iceberg SDK Glue catalog used for creating Iceberg-format tables. */
