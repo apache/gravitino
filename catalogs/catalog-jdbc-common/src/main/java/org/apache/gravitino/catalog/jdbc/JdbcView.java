@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.jdbc;
 import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
 import lombok.ToString;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
@@ -47,16 +48,19 @@ public class JdbcView implements View {
     return name;
   }
 
+  @Nullable
   @Override
   public String comment() {
     return comment;
   }
 
+  @Nullable
   @Override
   public String defaultCatalog() {
     return defaultCatalog;
   }
 
+  @Nullable
   @Override
   public String defaultSchema() {
     return defaultSchema;
@@ -95,46 +99,99 @@ public class JdbcView implements View {
       view = new JdbcView();
     }
 
+    /**
+     * Sets the name of the view.
+     *
+     * @param name The view name.
+     * @return This builder instance.
+     */
     public Builder withName(String name) {
       view.name = name;
       return this;
     }
 
+    /**
+     * Sets the comment for the view.
+     *
+     * @param comment The comment, or {@code null} if not set.
+     * @return This builder instance.
+     */
     public Builder withComment(String comment) {
       view.comment = comment;
       return this;
     }
 
+    /**
+     * Sets the default catalog used to resolve unqualified identifiers in the view definition.
+     *
+     * @param defaultCatalog The default catalog, or {@code null} if not applicable.
+     * @return This builder instance.
+     */
     public Builder withDefaultCatalog(String defaultCatalog) {
       view.defaultCatalog = defaultCatalog;
       return this;
     }
 
+    /**
+     * Sets the default schema used to resolve unqualified identifiers in the view definition.
+     *
+     * @param defaultSchema The default schema, or {@code null} if not applicable.
+     * @return This builder instance.
+     */
     public Builder withDefaultSchema(String defaultSchema) {
       view.defaultSchema = defaultSchema;
       return this;
     }
 
+    /**
+     * Sets the output columns of the view.
+     *
+     * @param columns The view output columns.
+     * @return This builder instance.
+     */
     public Builder withColumns(Column[] columns) {
       view.columns = columns;
       return this;
     }
 
+    /**
+     * Sets the SQL representations of the view.
+     *
+     * @param representations The view representations.
+     * @return This builder instance.
+     */
     public Builder withRepresentations(Representation[] representations) {
       view.representations = representations;
       return this;
     }
 
+    /**
+     * Sets the properties of the view.
+     *
+     * @param properties The properties map, or {@code null} to use an empty map.
+     * @return This builder instance.
+     */
     public Builder withProperties(Map<String, String> properties) {
       view.properties = properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
       return this;
     }
 
+    /**
+     * Sets the audit information for the view.
+     *
+     * @param auditInfo The audit information.
+     * @return This builder instance.
+     */
     public Builder withAuditInfo(AuditInfo auditInfo) {
       view.auditInfo = auditInfo;
       return this;
     }
 
+    /**
+     * Builds and returns the {@link JdbcView} instance.
+     *
+     * @return The constructed {@link JdbcView}.
+     */
     public JdbcView build() {
       return view;
     }

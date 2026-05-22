@@ -22,6 +22,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.rel.Dialects;
@@ -31,6 +32,9 @@ public class MysqlViewOperations extends JdbcViewOperations {
 
   private static final String BACK_QUOTE = "`";
   private static final String SHOW_CREATE_VIEW = "SHOW CREATE VIEW ";
+  private static final String SHOW_CREATE_VIEW_COLUMN = "Create View";
+  private static final Pattern WITH_CHECK_OPTION_PATTERN =
+      Pattern.compile("(?i)\\s+WITH\\s+(?:CASCADED|LOCAL\\s+)?CHECK\\s+OPTION\\s*$");
 
   @Override
   protected String getSqlDialect() {
@@ -51,12 +55,13 @@ public class MysqlViewOperations extends JdbcViewOperations {
       if (!resultSet.next()) {
         throw new NoSuchViewException("View %s does not exist in %s.", viewName, databaseName);
       }
-      String createView = resultSet.getString(2);
+      String createView = resultSet.getString(SHOW_CREATE_VIEW_COLUMN);
       if (StringUtils.isBlank(createView)) {
         throw new NoSuchViewException(
             "View definition for %s in %s is empty.", viewName, databaseName);
       }
-      return extractSelectBodyFromCreateView(createView);
+      String selectBody = extractSelectBodyFromCreateView(createView);
+      return WITH_CHECK_OPTION_PATTERN.matcher(selectBody).replaceAll("");
     }
   }
 }

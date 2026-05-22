@@ -111,7 +111,7 @@ public abstract class JdbcViewOperations implements ViewOperation {
       return JdbcView.builder()
           .withName(viewName)
           .withComment(comment)
-          .withDefaultCatalog(databaseName)
+          .withDefaultCatalog(null)
           .withDefaultSchema(databaseName)
           .withColumns(columns)
           .withRepresentations(new Representation[] {representation})
@@ -179,12 +179,29 @@ public abstract class JdbcViewOperations implements ViewOperation {
     return Objects.equals(views.getString("TABLE_CAT"), databaseName);
   }
 
+  /**
+   * Returns a {@link ResultSet} of all views in the current catalog/schema via {@link
+   * DatabaseMetaData#getTables}.
+   *
+   * @param connection The JDBC connection.
+   * @return A result set of view metadata rows.
+   * @throws SQLException If a database access error occurs.
+   */
   protected ResultSet getViews(Connection connection) throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
     return metaData.getTables(
         connection.getCatalog(), connection.getSchema(), null, JdbcConnectorUtils.getViewTypes());
   }
 
+  /**
+   * Returns a {@link ResultSet} for a single named view via {@link DatabaseMetaData#getTables}.
+   *
+   * @param connection The JDBC connection.
+   * @param databaseName The database or schema name (used only for error context).
+   * @param viewName The view name to look up.
+   * @return A result set of view metadata rows matching the given name.
+   * @throws SQLException If a database access error occurs.
+   */
   protected ResultSet getView(Connection connection, String databaseName, String viewName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
