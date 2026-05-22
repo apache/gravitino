@@ -41,8 +41,12 @@ class TestUser(IntegrationTestEnv):
     def setUpClass(cls):
         cls._get_gravitino_home()
         conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        cls._reset_conf({"gravitino.authorization.enable": "true"}, conf_path)
-        cls._append_conf({"gravitino.authorization.enable": "true"}, conf_path)
+        auth_confs = {
+            "gravitino.authorization.enable": "true",
+            "gravitino.authorization.serviceAdmins": "anonymous",
+        }
+        cls._reset_conf(auth_confs, conf_path)
+        cls._append_conf(auth_confs, conf_path)
         if (
             os.environ.get("START_EXTERNAL_GRAVITINO") is not None
             and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
@@ -55,7 +59,12 @@ class TestUser(IntegrationTestEnv):
     @classmethod
     def tearDownClass(cls):
         conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        cls._reset_conf({"gravitino.authorization.enable": "false"}, conf_path)
+        reset_confs = {
+            "gravitino.authorization.enable": "false",
+            "gravitino.authorization.serviceAdmins": "anonymous",
+        }
+        cls._reset_conf(reset_confs, conf_path)
+        cls._append_conf(reset_confs, conf_path)
         if (
             os.environ.get("START_EXTERNAL_GRAVITINO") is not None
             and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
