@@ -515,7 +515,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
               + "To resolve: Remove all catalogs managing this view, then recreate one catalog to ensure single-catalog management.");
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
-      throw new RuntimeException("Fail to import the view entity to the store.", e);
+      throw new RuntimeException("Failed to import the view entity to the store", e);
     }
 
     return EntityCombinedView.of(catalogView, viewEntity)
