@@ -35,35 +35,56 @@ import org.apache.ibatis.annotations.Param;
 
 public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
   @Override
+  protected String currentTimestampMillisExpression() {
+    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+  }
+
+  @Override
   public String softDeleteOwnerRelByMetadataObjectIdAndType(
       Long metadataObjectId, String metadataObjectType) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE metadata_object_id = #{metadataObjectId} AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteOwnerRelByOwnerIdAndType(Long ownerId, String ownerType) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE owner_id = #{ownerId} AND owner_type = #{ownerType} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteOwnerRelByMetalakeId(Long metalakeId) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteOwnerRelByCatalogId(Long catalogId) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " ot SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " ot SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE ot.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
@@ -109,9 +130,13 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
 
   @Override
   public String softDeleteOwnerRelBySchemaId(Long schemaId) {
+    String now = currentTimestampMillisExpression();
     return "UPDATE "
         + OWNER_TABLE_NAME
-        + " ot SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " ot SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE ot.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
@@ -153,10 +178,14 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
   @Override
   public String batchSoftDeleteOwnerRelByMetadataObjects(
       @Param("deletions") List<OwnerRelForDeletion> deletions) {
+    String now = currentTimestampMillisExpression();
     return "<script>"
         + "UPDATE "
         + OWNER_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
         + " WHERE deleted_at = 0 AND ("
         + "<foreach collection='deletions' item='t' separator=' OR '>"
         + "(metadata_object_id = #{t.metadataObjectId} AND metadata_object_type = #{t.metadataObjectType})"

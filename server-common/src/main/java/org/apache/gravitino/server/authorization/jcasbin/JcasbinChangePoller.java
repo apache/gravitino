@@ -65,7 +65,9 @@ public class JcasbinChangePoller implements AutoCloseable {
   private final long pollIntervalSecs;
 
   private ScheduledExecutorService scheduler;
-  private volatile long ownerPollHighWaterId = 0;
+  private volatile long ownerPollHighWaterUpdatedAt = 0;
+  private volatile long ownerPollHighWaterUpdatedAtId = 0;
+  private volatile long ownerPollHighWaterInsertId = 0;
   private volatile long entityPollHighWaterId = 0;
 
   /**
@@ -87,16 +89,19 @@ public class JcasbinChangePoller implements AutoCloseable {
    * Initializes the high-water cursors to the current DB tail (so startup does not scan historical
    * changes) and schedules periodic polling.
    *
-   * <p>Known trade-off: an id-based high-water mark can miss rows whose id is allocated before the
-   * cursor snapshot but whose commit lands after it. Concretely, if writer A holds {@code id=N-1}
-   * uncommitted while writer B commits {@code id=N}, {@code selectMaxChangeId()} returns N and the
-   * next poll queries {@code id > N} — A's row is never consumed. In that case the affected cache
-   * entry stays stale until either (a) a request-side path catches it on the next request, or (b)
-   * TTL eviction. Acceptable for the eventual-consistency caches targeted here; revisit if we ever
-   * route strong-consistency data through this poller.
+   * <p>The owner poller tracks inserts by id and updates by {@code (updated_at, id)} because owner
+   * deletion paths soft-delete existing {@code owner_meta} rows. Those updates keep the same id but
+   * advance {@code updated_at}; an id-only cursor would miss them on peer nodes.
    */
   public void start() {
-    ownerPollHighWaterId =
+    ChangedOwnerInfo maxOwnerChange =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class, OwnerMetaMapper::selectMaxChangedOwner);
+    if (maxOwnerChange != null) {
+      ownerPollHighWaterUpdatedAt = maxOwnerChange.getUpdatedAt();
+      ownerPollHighWaterUpdatedAtId = maxOwnerChange.getId();
+    }
+    ownerPollHighWaterInsertId =
         getOrDefault(
             SessionUtils.getWithoutCommit(
                 OwnerMetaMapper.class, OwnerMetaMapper::selectMaxChangeId));
@@ -120,7 +125,11 @@ public class JcasbinChangePoller implements AutoCloseable {
   @VisibleForTesting
   void pollChanges() {
     try {
-      LOG.debug("Polling for owner changes after id {}", ownerPollHighWaterId);
+      LOG.debug(
+          "Polling for owner changes after updated_at {}, updated_at_id {}, insert_id {}",
+          ownerPollHighWaterUpdatedAt,
+          ownerPollHighWaterUpdatedAtId,
+          ownerPollHighWaterInsertId);
       pollOwnerChanges();
     } catch (Exception e) {
       if (handleInterruptIfAny(e, "Owner change poll")) {
@@ -163,15 +172,16 @@ public class JcasbinChangePoller implements AutoCloseable {
   }
 
   /**
-   * Drains owner-change rows past {@link #ownerPollHighWaterId} and invalidates the affected {@code
-   * ownerRelCache} entries. Each row carries {@code metadataObjectId}, so invalidation is a direct
-   * key removal — no name resolution needed.
+   * Drains owner-change rows past {@link #ownerPollHighWaterUpdatedAt}/{@link
+   * #ownerPollHighWaterUpdatedAtId} and {@link #ownerPollHighWaterInsertId}, then invalidates the
+   * affected {@code ownerRelCache} entries. Each row carries {@code metadataObjectId}, so
+   * invalidation is a direct key removal — no name resolution needed.
    *
    * <p>The {@code synchronized} modifier is defensive. In production this method is only invoked
    * from the single-threaded scheduler started in {@link #start()}, and {@link
    * java.util.concurrent.ScheduledExecutorService#scheduleWithFixedDelay} guarantees that
-   * consecutive runs do not overlap. The cursor field {@link #ownerPollHighWaterId} is also {@code
-   * volatile}, and cache invalidations are now atomic at the cache layer via {@link
+   * consecutive runs do not overlap. The cursor fields are also {@code volatile}, and cache
+   * invalidations are now atomic at the cache layer via {@link
    * org.apache.gravitino.cache.GravitinoCache#runInvalidationBatch}. The keyword is kept so that
    * future callers — additional schedulers, ad-hoc invocations from tests or admin tooling — do not
    * silently introduce concurrent {@code "select changes → invalidate → advance cursor"} sequences.
@@ -180,12 +190,19 @@ public class JcasbinChangePoller implements AutoCloseable {
   private synchronized void pollOwnerChanges() {
     List<ChangedOwnerInfo> changes =
         SessionUtils.getWithoutCommit(
-            OwnerMetaMapper.class, m -> m.selectChangedOwners(ownerPollHighWaterId));
+            OwnerMetaMapper.class,
+            m ->
+                m.selectChangedOwners(
+                    ownerPollHighWaterUpdatedAt,
+                    ownerPollHighWaterUpdatedAtId,
+                    ownerPollHighWaterInsertId));
     if (changes.isEmpty()) {
       return;
     }
 
-    long[] maxSeenId = {ownerPollHighWaterId};
+    long[] maxSeenUpdatedAt = {ownerPollHighWaterUpdatedAt};
+    long[] maxSeenUpdatedAtId = {ownerPollHighWaterUpdatedAtId};
+    long[] maxSeenInsertId = {ownerPollHighWaterInsertId};
     // Hold the cache's exclusive invalidation lock for the whole batch so readers never observe
     // a half-applied state where some of this batch's entries have been evicted and others are
     // still hot.
@@ -193,12 +210,20 @@ public class JcasbinChangePoller implements AutoCloseable {
         () -> {
           for (ChangedOwnerInfo change : changes) {
             ownerRelCache.invalidate(change.getMetadataObjectId());
-            if (change.getId() > maxSeenId[0]) {
-              maxSeenId[0] = change.getId();
+            if (change.getUpdatedAt() > maxSeenUpdatedAt[0]
+                || (change.getUpdatedAt() == maxSeenUpdatedAt[0]
+                    && change.getId() > maxSeenUpdatedAtId[0])) {
+              maxSeenUpdatedAt[0] = change.getUpdatedAt();
+              maxSeenUpdatedAtId[0] = change.getId();
+            }
+            if (change.getId() > maxSeenInsertId[0]) {
+              maxSeenInsertId[0] = change.getId();
             }
           }
         });
-    ownerPollHighWaterId = maxSeenId[0];
+    ownerPollHighWaterUpdatedAt = maxSeenUpdatedAt[0];
+    ownerPollHighWaterUpdatedAtId = maxSeenUpdatedAtId[0];
+    ownerPollHighWaterInsertId = maxSeenInsertId[0];
   }
 
   /**

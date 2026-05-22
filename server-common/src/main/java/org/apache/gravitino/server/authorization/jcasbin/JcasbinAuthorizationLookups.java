@@ -94,8 +94,10 @@ public class JcasbinAuthorizationLookups {
 
   /**
    * Two-tier owner lookup: request-level dedup first, then the shared {@code ownerRelCache}, and
-   * finally a single {@code owner_meta} query. A successful DB fetch populates both tiers so
-   * subsequent {@code isOwner} calls — in this request and later ones — hit the cache.
+   * finally a single {@code owner_meta} query. Positive DB fetches populate both tiers so
+   * subsequent {@code isOwner} calls — in this request and later ones — hit the shared cache.
+   * Missing owners are cached only for the current request; otherwise a missed invalidation could
+   * keep a cross-request negative owner result stale until TTL expiry.
    */
   public Optional<OwnerInfo> resolveOwnerId(
       Long metadataId,
@@ -103,15 +105,23 @@ public class JcasbinAuthorizationLookups {
       AuthorizationRequestContext requestContext) {
     return requestContext.computeOwnerIfAbsent(
         metadataId,
-        id ->
-            ownerRelCache.get(
-                id,
-                ignored -> {
-                  OwnerInfo ownerInfo =
-                      SessionUtils.getWithoutCommit(
-                          OwnerMetaMapper.class,
-                          m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
-                  return ownerInfo == null ? Optional.empty() : Optional.of(ownerInfo);
-                }));
+        id -> {
+          Optional<Optional<OwnerInfo>> cachedOwner = ownerRelCache.getIfPresent(id);
+          if (cachedOwner.isPresent()) {
+            return cachedOwner.get();
+          }
+
+          OwnerInfo ownerInfo =
+              SessionUtils.getWithoutCommit(
+                  OwnerMetaMapper.class,
+                  m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
+          if (ownerInfo == null) {
+            return Optional.empty();
+          }
+
+          Optional<OwnerInfo> owner = Optional.of(ownerInfo);
+          ownerRelCache.put(id, owner);
+          return owner;
+        });
   }
 }

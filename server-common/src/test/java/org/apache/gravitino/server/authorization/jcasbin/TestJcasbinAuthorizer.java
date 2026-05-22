@@ -175,8 +175,10 @@ public class TestJcasbinAuthorizer {
     OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
     ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
+    when(ownerMetaMapper.selectMaxChangedOwner()).thenReturn(null);
     when(ownerMetaMapper.selectMaxChangeId()).thenReturn(0L);
-    when(ownerMetaMapper.selectChangedOwners(anyLong())).thenReturn(Collections.emptyList());
+    when(ownerMetaMapper.selectChangedOwners(anyLong(), anyLong(), anyLong()))
+        .thenReturn(Collections.emptyList());
     when(entityChangeLogMapper.selectMaxChangeId()).thenReturn(0L);
     when(entityChangeLogMapper.selectEntityChanges(anyLong(), anyInt()))
         .thenReturn(Collections.emptyList());

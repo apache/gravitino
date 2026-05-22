@@ -116,7 +116,13 @@ public interface OwnerMetaMapper {
       @Param("metadataObjectType") String metadataObjectType);
 
   @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectChangedOwners")
-  List<ChangedOwnerInfo> selectChangedOwners(@Param("lastConsumedId") long lastConsumedId);
+  List<ChangedOwnerInfo> selectChangedOwners(
+      @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
+      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId,
+      @Param("lastConsumedInsertId") long lastConsumedInsertId);
+
+  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectMaxChangedOwner")
+  ChangedOwnerInfo selectMaxChangedOwner();
 
   @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectMaxChangeId")
   Long selectMaxChangeId();
