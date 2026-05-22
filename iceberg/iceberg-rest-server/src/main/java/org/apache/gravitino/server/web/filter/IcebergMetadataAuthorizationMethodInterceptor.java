@@ -26,6 +26,7 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -159,7 +160,12 @@ public class IcebergMetadataAuthorizationMethodInterceptor
       return false;
     }
 
-    IcebergCatalogWrapper catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
+    IcebergCatalogWrapper catalogWrapper;
+    try {
+      catalogWrapper = wrapperManager.getCatalogWrapper(catalogId.name());
+    } catch (NoSuchCatalogException e) {
+      return false;
+    }
     // When IRC2 is another Gravitino server, IRC1 acts as a proxy and does not perform
     // authorization. IRC2 handles authorization.
     return catalogWrapper.isRESTCatalog();
