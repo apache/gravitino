@@ -14,19 +14,25 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-
 from __future__ import annotations
 
-from gravitino.api.authorization.group import Group
-from gravitino.api.authorization.privileges import Privileges
-from gravitino.api.authorization.role import Role
-from gravitino.api.authorization.securable_objects import SecurableObjects
-from gravitino.api.authorization.user import User
+import json as _json
+import unittest
 
-__all__ = [
-    "Group",
-    "Role",
-    "SecurableObjects",
-    "Privileges",
-    "User",
-]
+from gravitino.dto.requests.group_add_request import GroupAddRequest
+
+
+class TestGroupAddRequest(unittest.TestCase):
+    def test_group_add_request_serde(self) -> None:
+        group_add_request = GroupAddRequest(_name="group1")
+        ser_json = _json.dumps(group_add_request.to_dict())
+        deser_dict = _json.loads(ser_json)
+
+        self.assertEqual("group1", deser_dict["name"])
+
+    def test_group_add_request_validate(self) -> None:
+        group_add_request = GroupAddRequest(_name="group1")
+        group_add_request.validate()
+
+        with self.assertRaises(ValueError):
+            GroupAddRequest(_name="").validate()
