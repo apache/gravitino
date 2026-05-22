@@ -170,28 +170,8 @@ public class GlueMetadataAdapter extends HiveMetadataAdapter {
   }
 
   @Override
-  public ConnectorTableMetadata getTableMetadata(GravitinoTable gravitinoTable) {
-    Transform[] originalPartitioning = gravitinoTable.getPartitioning();
-
-    // Clear partitioning before calling super to avoid ClassCastException when transforms
-    // contain BucketTransform or TruncateTransform (not SingleFieldTransform subclasses).
-    gravitinoTable.setPartitioning(new Transform[0]);
-
-    ConnectorTableMetadata metadata = super.getTableMetadata(gravitinoTable);
-
-    // Restore original partitioning
-    gravitinoTable.setPartitioning(originalPartitioning);
-
-    if (originalPartitioning != null && originalPartitioning.length > 0) {
-      Map<String, Object> properties = new HashMap<>(metadata.getProperties());
-      properties.put(
-          HivePropertyMeta.HIVE_PARTITION_KEY,
-          ExpressionUtil.expressionToPartitionFiled(originalPartitioning));
-      return new ConnectorTableMetadata(
-          metadata.getTable(), metadata.getColumns(), properties, metadata.getComment());
-    }
-
-    return metadata;
+  protected List<String> toTrinoPartitionKeys(Transform[] partitioning) {
+    return ExpressionUtil.expressionToPartitionFiled(partitioning);
   }
 
   /** Returns the table property metadata for Glue catalogs. */

@@ -211,18 +211,9 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
     Map<String, Object> properties = toTrinoTableProperties(gravitinoTable.getProperties());
 
     if (ArrayUtils.isNotEmpty(gravitinoTable.getPartitioning())) {
-      // Only support simple partition now like partition by a, b, c.
-      // Format like partition like partition by year(a), b, c is NOT supported now.
       properties.put(
           HivePropertyMeta.HIVE_PARTITION_KEY,
-          gravitinoTable.getPartitioning().length > 0
-              ? Arrays.stream(gravitinoTable.getPartitioning())
-                  .map(
-                      ts ->
-                          ((Transform.SingleFieldTransform) ts)
-                              .fieldName()[0].toLowerCase(Locale.ENGLISH))
-                  .collect(Collectors.toList())
-              : Collections.emptyList());
+          toTrinoPartitionKeys(gravitinoTable.getPartitioning()));
     }
 
     if (gravitinoTable.getDistribution() != null
@@ -265,5 +256,17 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
         columnMetadataList,
         properties,
         Optional.ofNullable(gravitinoTable.getComment()));
+  }
+
+  /**
+   * Converts Gravitino partition transforms to Trino partition key names. Subclasses may override
+   * this to support transform types beyond {@link Transform.SingleFieldTransform}.
+   */
+  protected List<String> toTrinoPartitionKeys(Transform[] partitioning) {
+    // Only support simple partition now like partition by a, b, c.
+    // Format like partition by year(a), b, c is NOT supported now.
+    return Arrays.stream(partitioning)
+        .map(ts -> ((Transform.SingleFieldTransform) ts).fieldName()[0].toLowerCase(Locale.ENGLISH))
+        .collect(Collectors.toList());
   }
 }

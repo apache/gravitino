@@ -66,8 +66,12 @@ public class GlueConnectorAdapter implements CatalogConnectorAdapter {
   public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog)
       throws Exception {
     Map<String, String> config = new HashMap<>();
+
+    // Glue-specific metastore configuration.
     config.put(HIVE_METASTORE, "glue");
     config.put(HIVE_METASTORE_GLUE_REGION, catalog.getRequiredProperty(PROP_AWS_REGION));
+
+    // Passed through to the underlying Trino Hive/Iceberg connector.
     config.put("hive.security", "allow-all");
     config.put("fs.hadoop.enabled", "true");
     config.put("hive.non-managed-table-writes-enabled", "true");

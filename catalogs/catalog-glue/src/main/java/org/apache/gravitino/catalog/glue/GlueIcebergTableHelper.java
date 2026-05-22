@@ -240,6 +240,9 @@ final class GlueIcebergTableHelper {
    * <p>TIME and TIMESTAMP types are always returned with microsecond (6) precision, matching
    * Iceberg's internal representation.
    */
+  // TODO: the Iceberg-to-Gravitino conversions in this class (type mapping, partition spec,
+  // sort order, etc.) duplicate logic in catalog-lakehouse-iceberg. Consider extracting them
+  // to a shared layer (e.g. catalog-common) so both catalogs can reuse the code.
   // The parameter uses FQN because org.apache.iceberg.types.Type and
   // org.apache.gravitino.rel.types.Type share the same simple name.
   static Type fromIcebergType(org.apache.iceberg.types.Type icebergType) {
