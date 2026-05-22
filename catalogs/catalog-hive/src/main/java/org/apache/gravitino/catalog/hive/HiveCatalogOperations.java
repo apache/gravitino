@@ -411,12 +411,16 @@ public class HiveCatalogOperations
     }
   }
 
-  /*
-   * Best-effort removal of non-Hive tables (Iceberg, Paimon, Hudi) from allTables via HMS
-   * server-side listTableNamesByFilter. HMS only supports exact lookups on dot-free property keys,
-   * so Spark-managed Hudi tables that only expose spark.sql.sources.provider=hudi cannot be filtered
-   * here. We keep this strategy because getTableObjectsByName materializes every table and is slow
-   * on large databases.
+  /**
+   * Best-effort removal of non-Hive tables (Iceberg, Paimon, Hudi) from {@code allTables} via HMS
+   * server-side {@code listTableNamesByFilter}. HMS only supports exact lookups on dot-free
+   * property keys, so Spark-managed Hudi tables that only expose {@code
+   * spark.sql.sources.provider=hudi} cannot be filtered here. We keep this strategy because {@code
+   * getTableObjectsByName} materializes every table and is slow on large databases.
+   *
+   * @param database the database name
+   * @param allTables all table names fetched from HMS before non-Hive filtering
+   * @throws InterruptedException if the HMS client call is interrupted
    */
   private void filterOutNonHiveTables(String database, List<String> allTables)
       throws InterruptedException {
