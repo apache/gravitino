@@ -23,22 +23,22 @@ import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Tests for the cached role snapshot classes used by the version-validated role caches. */
+/** Tests for the cached role relation snapshot classes used by the version-validated caches. */
 public class TestJcasbinAuthorizerCacheHelpers {
 
   @Test
-  void testCachedUserRoles() {
+  void testCachedUserRoleRels() {
     List<Long> roleIds = Arrays.asList(10L, 20L, 30L);
-    CachedUserRoles cur = new CachedUserRoles(1L, 1000L, roleIds);
+    CachedUserRoleRels cur = new CachedUserRoleRels(1L, 1000L, roleIds);
     Assertions.assertEquals(1L, cur.getUserId());
     Assertions.assertEquals(1000L, cur.getUpdatedAt());
     Assertions.assertEquals(roleIds, cur.getRoleIds());
   }
 
   @Test
-  void testCachedGroupRoles() {
+  void testCachedGroupRoleRels() {
     List<Long> roleIds = Arrays.asList(100L, 200L);
-    CachedGroupRoles cgr = new CachedGroupRoles(5L, 2000L, roleIds);
+    CachedGroupRoleRels cgr = new CachedGroupRoleRels(5L, 2000L, roleIds);
     Assertions.assertEquals(5L, cgr.getGroupId());
     Assertions.assertEquals(2000L, cgr.getUpdatedAt());
     Assertions.assertEquals(roleIds, cgr.getRoleIds());

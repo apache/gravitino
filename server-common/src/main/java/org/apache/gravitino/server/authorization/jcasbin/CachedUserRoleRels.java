@@ -19,19 +19,33 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.List;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 
 /**
- * Cached snapshot of a user's direct role assignments. The {@code updatedAt} timestamp corresponds
- * to the {@code user_meta.updated_at} column and is used as a version sentinel: if the DB value is
- * newer, the cached role list is stale and must be reloaded.
+ * Cached snapshot of a user's direct role relations. The {@code updatedAt} timestamp corresponds to
+ * the {@code user_meta.updated_at} column and is used as a version sentinel: if the DB value is
+ * newer, the cached role relation list is stale and must be reloaded.
  */
-@Getter
-@AllArgsConstructor
-public class CachedUserRoles {
+final class CachedUserRoleRels {
 
   private final long userId;
   private final long updatedAt;
   private final List<Long> roleIds;
+
+  CachedUserRoleRels(long userId, long updatedAt, List<Long> roleIds) {
+    this.userId = userId;
+    this.updatedAt = updatedAt;
+    this.roleIds = roleIds;
+  }
+
+  long getUserId() {
+    return userId;
+  }
+
+  long getUpdatedAt() {
+    return updatedAt;
+  }
+
+  List<Long> getRoleIds() {
+    return roleIds;
+  }
 }

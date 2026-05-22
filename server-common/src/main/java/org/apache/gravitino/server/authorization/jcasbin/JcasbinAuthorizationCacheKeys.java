@@ -18,53 +18,108 @@
  */
 package org.apache.gravitino.server.authorization.jcasbin;
 
-import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.gravitino.MetadataObject;
 
 /** Cache key factory for JCasbin authorization caches. */
 final class JcasbinAuthorizationCacheKeys {
 
-  /** Unit Separator for internal cache keys. */
-  static final String SEPARATOR = "\u001F";
+  private static final String KEY_SEPARATOR = "\u001F";
+
+  static final String USER_ROLE_REL = "USER_ROLE_REL";
+  static final String GROUP_ROLE_REL = "GROUP_ROLE_REL";
 
   private JcasbinAuthorizationCacheKeys() {}
 
-  /**
-   * Builds a path-based key for the metadata id cache.
-   *
-   * <p>Container objects end with the internal separator so prefix invalidation can remove both the
-   * container and entries under the same name path. Leaf objects include the type suffix to avoid
-   * collisions between objects that share the same name path.
-   */
-  static String metadataObjectKey(String metalake, MetadataObject metadataObject) {
-    if (metadataObject.type() == MetadataObject.Type.METALAKE) {
-      return metalake + SEPARATOR;
+  static String metadataIdCacheKey(String metalake, MetadataObject metadataObject) {
+    List<String> parts = new ArrayList<>();
+    parts.add(metalake);
+
+    String[] names = metadataObject.fullName().split("\\.");
+    switch (metadataObject.type()) {
+      case METALAKE:
+        parts.add(MetadataObject.Type.METALAKE.name());
+        break;
+      case CATALOG:
+        parts.add(MetadataObject.Type.CATALOG.name());
+        parts.add(names[0]);
+        break;
+      case SCHEMA:
+        appendCatalogAndSchemas(parts, names);
+        break;
+      case TABLE:
+        appendCatalogSchemasAndLeaf(parts, names, MetadataObject.Type.TABLE);
+        break;
+      case COLUMN:
+        appendCatalogAndSchemas(parts, names, names.length - 2);
+        parts.add(MetadataObject.Type.TABLE.name());
+        parts.add(names[names.length - 2]);
+        parts.add(MetadataObject.Type.COLUMN.name());
+        parts.add(names[names.length - 1]);
+        break;
+      case VIEW:
+      case TOPIC:
+      case FILESET:
+      case MODEL:
+      case FUNCTION:
+        appendCatalogSchemasAndLeaf(parts, names, metadataObject.type());
+        break;
+      default:
+        parts.add(metadataObject.type().name());
+        parts.add(metadataObject.fullName());
+        break;
     }
 
-    StringBuilder sb = new StringBuilder(metalake);
-    sb.append(SEPARATOR);
-    sb.append(String.join(SEPARATOR, metadataObject.fullName().split("\\.")));
-    if (isMetadataContainer(metadataObject.type())) {
-      sb.append(SEPARATOR);
-    } else {
-      sb.append(SEPARATOR);
-      sb.append(metadataObject.type().name());
+    String key = String.join(KEY_SEPARATOR, parts);
+    if (hasNestedMetadataObjects(metadataObject.type())) {
+      key += KEY_SEPARATOR;
     }
-    return sb.toString();
+    return key;
   }
 
   static String userRoleKey(String metalake, String username) {
-    return "USER" + SEPARATOR + metalake + SEPARATOR + username;
+    return String.join(KEY_SEPARATOR, metalake, USER_ROLE_REL, username);
   }
 
   static String groupRoleKey(String metalake, String groupname) {
-    return "GROUP" + SEPARATOR + metalake + SEPARATOR + groupname;
+    return String.join(KEY_SEPARATOR, metalake, GROUP_ROLE_REL, groupname);
   }
 
-  @VisibleForTesting
-  static boolean isMetadataContainer(MetadataObject.Type type) {
+  static boolean hasNestedMetadataObjects(MetadataObject.Type type) {
     return type == MetadataObject.Type.METALAKE
         || type == MetadataObject.Type.CATALOG
-        || type == MetadataObject.Type.SCHEMA;
+        || type == MetadataObject.Type.SCHEMA
+        || type == MetadataObject.Type.TABLE;
+  }
+
+  static String joinKeyParts(String... parts) {
+    return String.join(KEY_SEPARATOR, parts);
+  }
+
+  private static void appendCatalogAndSchemas(List<String> parts, String[] names) {
+    parts.add(MetadataObject.Type.CATALOG.name());
+    parts.add(names[0]);
+    for (int i = 1; i < names.length; i++) {
+      parts.add(MetadataObject.Type.SCHEMA.name());
+      parts.add(names[i]);
+    }
+  }
+
+  private static void appendCatalogSchemasAndLeaf(
+      List<String> parts, String[] names, MetadataObject.Type leafType) {
+    appendCatalogAndSchemas(parts, names, names.length - 1);
+    parts.add(leafType.name());
+    parts.add(names[names.length - 1]);
+  }
+
+  private static void appendCatalogAndSchemas(
+      List<String> parts, String[] names, int exclusiveEnd) {
+    parts.add(MetadataObject.Type.CATALOG.name());
+    parts.add(names[0]);
+    for (int i = 1; i < exclusiveEnd; i++) {
+      parts.add(MetadataObject.Type.SCHEMA.name());
+      parts.add(names[i]);
+    }
   }
 }

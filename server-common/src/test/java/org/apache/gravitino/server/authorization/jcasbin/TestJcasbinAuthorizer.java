@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -178,8 +179,10 @@ public class TestJcasbinAuthorizer {
     OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
     ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
+    when(ownerMetaMapper.selectMaxChangedOwner()).thenReturn(null);
     when(ownerMetaMapper.selectMaxChangeId()).thenReturn(0L);
-    when(ownerMetaMapper.selectChangedOwners(anyLong())).thenReturn(Collections.emptyList());
+    when(ownerMetaMapper.selectChangedOwners(anyLong(), anyLong(), anyLong()))
+        .thenReturn(Collections.emptyList());
     when(entityChangeLogMapper.selectMaxChangeId()).thenReturn(0L);
     when(entityChangeLogMapper.selectEntityChanges(anyLong(), anyInt()))
         .thenReturn(Collections.emptyList());
@@ -498,6 +501,32 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testUserRoleCacheDoesNotReuseRolesAfterUsernameRecreate() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    RoleEntity allowRole =
+        mockRoleInStore(
+            ALLOW_ROLE_ID,
+            "allowRoleBeforeUserRecreate",
+            ImmutableList.of(getAllowSecurableObject()));
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, 1000L));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(allowRole.id(), allowRole.name())));
+
+    assertTrue(doAuthorize(currentPrincipal));
+
+    long recreatedUserId = USER_ID + 1000L;
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(recreatedUserId, 0L));
+    when(roleMetaMapper.listRolesByUserId(eq(recreatedUserId))).thenReturn(ImmutableList.of());
+
+    assertFalse(doAuthorize(currentPrincipal));
+    verify(roleMetaMapper).listRolesByUserId(eq(recreatedUserId));
+  }
+
+  @Test
   public void testAuthorizeByOwner() throws Exception {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     // No owner set — should fail
@@ -781,6 +810,40 @@ public class TestJcasbinAuthorizer {
     jcasbinAuthorizer.handleRolePrivilegeChange(groupRoleId);
 
     // Authorization should now be denied -- the role was removed from the group
+    assertFalse(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  @Test
+  public void testRecreatedGroupWithSameNameDoesNotReuseOldRoleCache() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    Long oldGroupId = 201L;
+    Long newGroupId = 202L;
+    Long oldGroupRoleId = 203L;
+    RoleEntity oldGroupRole =
+        mockRoleInStore(
+            oldGroupRoleId, "oldGroupRole", ImmutableList.of(getAllowSecurableObject()));
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(
+        oldGroupId,
+        GROUP_NAME,
+        ImmutableList.of(oldGroupRoleId),
+        ImmutableList.of(oldGroupRole.name()));
+
+    assertTrue(doAuthorize(groupPrincipal));
+
+    // The group is deleted and recreated with the same name but a new id. Keep updated_at lower
+    // than the old cache snapshot to verify the group id, not only updated_at, controls reuse.
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
+        .thenReturn(new GroupUpdatedAt(newGroupId, 0L));
+    when(roleMetaMapper.listRolesByGroupId(eq(newGroupId))).thenReturn(ImmutableList.of());
+
     assertFalse(doAuthorize(groupPrincipal));
 
     restoreDefaultPrincipal();
@@ -1258,7 +1321,7 @@ public class TestJcasbinAuthorizer {
     GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache = getOwnerRelCache(jcasbinAuthorizer);
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(METALAKE, "testCatalog");
     String cacheKey =
-        JcasbinAuthorizationCacheKeys.metadataObjectKey(
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey(
             METALAKE, NameIdentifierUtil.toMetadataObject(catalogIdent, Entity.EntityType.CATALOG));
 
     metadataIdCache.put(cacheKey, CATALOG_ID);

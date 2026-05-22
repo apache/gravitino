@@ -29,114 +29,89 @@ import org.junit.jupiter.api.Test;
 public class TestJcasbinAuthorizationCacheKeys {
 
   @Test
-  void testMetadataObjectKeyMetalake() {
-    MetadataObject obj =
+  void testMetadataIdCacheKey() {
+    MetadataObject metalake =
         MetadataObjects.of(Collections.singletonList("ml1"), MetadataObject.Type.METALAKE);
     Assertions.assertEquals(
-        key("ml1", ""), JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", obj));
-  }
+        key("ml1", "METALAKE", ""),
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
 
-  @Test
-  void testMetadataObjectKeyCatalog() {
-    MetadataObject obj =
+    MetadataObject catalog =
         MetadataObjects.of(Collections.singletonList("cat1"), MetadataObject.Type.CATALOG);
-    Assertions.assertEquals(
-        key("ml1", "cat1", ""), JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", obj));
-  }
+    String catalogKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", catalog);
+    Assertions.assertEquals(key("ml1", "CATALOG", "cat1", ""), catalogKey);
 
-  @Test
-  void testMetadataObjectKeySchema() {
-    MetadataObject obj =
+    MetadataObject schema =
         MetadataObjects.of(Arrays.asList("cat1", "sch1"), MetadataObject.Type.SCHEMA);
-    Assertions.assertEquals(
-        key("ml1", "cat1", "sch1", ""),
-        JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", obj));
-  }
+    String schemaKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", schema);
+    Assertions.assertEquals(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", ""), schemaKey);
 
-  @Test
-  void testMetadataObjectKeyLeafTypesGetTypeSuffix() {
     MetadataObject table =
         MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.TABLE);
+    String tableKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", table);
     Assertions.assertEquals(
-        key("ml1", "cat1", "sch1", "tbl1", "TABLE"),
-        JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", table));
+        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", ""), tableKey);
+
+    MetadataObject column =
+        MetadataObjects.of(
+            Arrays.asList("cat1", "sch1", "tbl1", "col1"), MetadataObject.Type.COLUMN);
+    String columnKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", column);
+    Assertions.assertEquals(
+        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "COLUMN", "col1"),
+        columnKey);
 
     MetadataObject view =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1", "v1"), MetadataObject.Type.VIEW);
+        MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.VIEW);
+    String viewKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", view);
     Assertions.assertEquals(
-        key("ml1", "cat1", "sch1", "v1", "VIEW"),
-        JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", view));
+        key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "VIEW", "tbl1"), viewKey);
 
-    MetadataObject fileset =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1", "fs1"), MetadataObject.Type.FILESET);
-    Assertions.assertEquals(
-        key("ml1", "cat1", "sch1", "fs1", "FILESET"),
-        JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", fileset));
+    Assertions.assertTrue(schemaKey.startsWith(catalogKey));
+    Assertions.assertTrue(tableKey.startsWith(schemaKey));
+    Assertions.assertTrue(columnKey.startsWith(tableKey));
+    Assertions.assertFalse(viewKey.startsWith(tableKey));
+  }
+
+  @Test
+  void testHasNestedMetadataObjects() {
+    Assertions.assertTrue(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.CATALOG));
+    Assertions.assertTrue(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.SCHEMA));
+    Assertions.assertTrue(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.TABLE));
+
+    Assertions.assertFalse(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.VIEW));
+    Assertions.assertFalse(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.FILESET));
+    Assertions.assertFalse(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.TOPIC));
+    Assertions.assertFalse(
+        JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(MetadataObject.Type.COLUMN));
   }
 
   @Test
   void testPrincipalRoleKeysAreTyped() {
     Assertions.assertEquals(
-        key("USER", "ml1", "alice"), JcasbinAuthorizationCacheKeys.userRoleKey("ml1", "alice"));
+        key("ml1", JcasbinAuthorizationCacheKeys.USER_ROLE_REL, "alice"),
+        JcasbinAuthorizationCacheKeys.userRoleKey("ml1", "alice"));
     Assertions.assertEquals(
-        key("GROUP", "ml1", "admins"), JcasbinAuthorizationCacheKeys.groupRoleKey("ml1", "admins"));
+        key("ml1", JcasbinAuthorizationCacheKeys.GROUP_ROLE_REL, "admins"),
+        JcasbinAuthorizationCacheKeys.groupRoleKey("ml1", "admins"));
   }
 
   @Test
-  void testPrincipalRoleKeysAreDistinctFromMetadataKeys() {
-    MetadataObject metalake =
-        MetadataObjects.of(Collections.singletonList("ml1"), MetadataObject.Type.METALAKE);
-    String metalakeKey = JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", metalake);
+  void testPrincipalRoleKeysAreDistinct() {
     String userKey = JcasbinAuthorizationCacheKeys.userRoleKey("ml1", "alice");
     String groupKey = JcasbinAuthorizationCacheKeys.groupRoleKey("ml1", "alice");
 
-    Assertions.assertNotEquals(metalakeKey, userKey);
-    Assertions.assertNotEquals(metalakeKey, groupKey);
     Assertions.assertNotEquals(userKey, groupKey);
   }
 
-  @Test
-  void testIsMetadataContainerContainerTypes() {
-    Assertions.assertTrue(
-        JcasbinAuthorizationCacheKeys.isMetadataContainer(MetadataObject.Type.METALAKE));
-    Assertions.assertTrue(
-        JcasbinAuthorizationCacheKeys.isMetadataContainer(MetadataObject.Type.CATALOG));
-    Assertions.assertTrue(
-        JcasbinAuthorizationCacheKeys.isMetadataContainer(MetadataObject.Type.SCHEMA));
-  }
-
-  @Test
-  void testIsMetadataContainerLeafTypes() {
-    Assertions.assertFalse(
-        JcasbinAuthorizationCacheKeys.isMetadataContainer(MetadataObject.Type.TABLE));
-    Assertions.assertFalse(
-        JcasbinAuthorizationCacheKeys.isMetadataContainer(MetadataObject.Type.VIEW));
-    Assertions.assertFalse(
-        JcasbinAuthorizationCacheKeys.isMetadataContainer(MetadataObject.Type.FILESET));
-    Assertions.assertFalse(
-        JcasbinAuthorizationCacheKeys.isMetadataContainer(MetadataObject.Type.TOPIC));
-  }
-
-  @Test
-  void testPrefixInvalidationCoversContainerPath() {
-    MetadataObject catalog =
-        MetadataObjects.of(Collections.singletonList("cat1"), MetadataObject.Type.CATALOG);
-    String catalogKey = JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", catalog);
-
-    MetadataObject schema =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1"), MetadataObject.Type.SCHEMA);
-    String schemaKey = JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", schema);
-
-    MetadataObject table =
-        MetadataObjects.of(Arrays.asList("cat1", "sch1", "tbl1"), MetadataObject.Type.TABLE);
-    String tableKey = JcasbinAuthorizationCacheKeys.metadataObjectKey("ml1", table);
-
-    Assertions.assertTrue(schemaKey.startsWith(catalogKey));
-    Assertions.assertTrue(tableKey.startsWith(catalogKey));
-    Assertions.assertTrue(tableKey.startsWith(schemaKey));
-  }
-
   private static String key(String... parts) {
-    return String.join(JcasbinAuthorizationCacheKeys.SEPARATOR, parts);
+    return JcasbinAuthorizationCacheKeys.joinKeyParts(parts);
   }
 }

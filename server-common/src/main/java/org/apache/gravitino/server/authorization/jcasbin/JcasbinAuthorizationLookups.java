@@ -63,12 +63,14 @@ public class JcasbinAuthorizationLookups {
    * Two-tier name→id lookup: the per-request map in {@code requestContext} dedups calls within the
    * same HTTP request; on a miss, the long-lived {@code metadataIdCache} is consulted, and finally
    * we fall back to a DB query via {@link MetadataIdConverter#getID}. Returns {@link
-   * Optional#empty()} when the metadata object does not exist so callers can deny authorization; a
-   * missing object is never cached as a negative result.
+   * Optional#empty()} when the metadata object does not exist so callers can deny authorization.
+   * Missing metadata objects are never cached as negative results: a later create for the same name
+   * can be observed without waiting for cache eviction. Existing objects are invalidated by local
+   * name-id mapping hooks and by the change-log poller on peer nodes.
    */
   public Optional<Long> resolveMetadataId(
       MetadataObject metadataObject, String metalake, AuthorizationRequestContext requestContext) {
-    String cacheKey = JcasbinAuthorizationCacheKeys.metadataObjectKey(metalake, metadataObject);
+    String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject);
     try {
       // Both cache tiers load atomically and forbid caching null, so a missing object is signalled
       // by throwing through the loaders and translated back to Optional.empty() here. This caches
@@ -92,8 +94,10 @@ public class JcasbinAuthorizationLookups {
 
   /**
    * Two-tier owner lookup: request-level dedup first, then the shared {@code ownerRelCache}, and
-   * finally a single {@code owner_meta} query. A successful DB fetch populates both tiers so
-   * subsequent {@code isOwner} calls — in this request and later ones — hit the cache.
+   * finally a single {@code owner_meta} query. Positive DB fetches populate both tiers so
+   * subsequent {@code isOwner} calls — in this request and later ones — hit the shared cache.
+   * Missing owners are cached only for the current request; otherwise a missed invalidation could
+   * keep a cross-request negative owner result stale until TTL expiry.
    */
   public Optional<OwnerInfo> resolveOwnerId(
       Long metadataId,
@@ -101,15 +105,23 @@ public class JcasbinAuthorizationLookups {
       AuthorizationRequestContext requestContext) {
     return requestContext.computeOwnerIfAbsent(
         metadataId,
-        id ->
-            ownerRelCache.get(
-                id,
-                ignored -> {
-                  OwnerInfo ownerInfo =
-                      SessionUtils.getWithoutCommit(
-                          OwnerMetaMapper.class,
-                          m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
-                  return ownerInfo == null ? Optional.empty() : Optional.of(ownerInfo);
-                }));
+        id -> {
+          Optional<Optional<OwnerInfo>> cachedOwner = ownerRelCache.getIfPresent(id);
+          if (cachedOwner.isPresent()) {
+            return cachedOwner.get();
+          }
+
+          OwnerInfo ownerInfo =
+              SessionUtils.getWithoutCommit(
+                  OwnerMetaMapper.class,
+                  m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
+          if (ownerInfo == null) {
+            return Optional.empty();
+          }
+
+          Optional<OwnerInfo> owner = Optional.of(ownerInfo);
+          ownerRelCache.put(id, owner);
+          return owner;
+        });
   }
 }

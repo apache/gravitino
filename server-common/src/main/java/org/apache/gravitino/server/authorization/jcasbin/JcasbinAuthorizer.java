@@ -143,16 +143,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   // ---- Version-validated caches (strong consistency) ----
 
   /**
-   * userRoleCache: per-(metalake, userName) -> CachedUserRoles. Version-validated per request via
-   * user_meta.updated_at.
+   * userRoleCache: per-(metalake, userName) -> CachedUserRoleRels. Version-validated per request
+   * via user_meta.updated_at.
    */
-  private GravitinoCache<String, CachedUserRoles> userRoleCache;
+  private GravitinoCache<String, CachedUserRoleRels> userRoleCache;
 
   /**
-   * groupRoleCache: per-(metalake, groupName) -> CachedGroupRoles. Version-validated per request
+   * groupRoleCache: per-(metalake, groupName) -> CachedGroupRoleRels. Version-validated per request
    * via group_meta.updated_at.
    */
-  private GravitinoCache<String, CachedGroupRoles> groupRoleCache;
+  private GravitinoCache<String, CachedGroupRoleRels> groupRoleCache;
 
   /**
    * loadedRoles: roleId -> updated_at. If the DB updated_at is newer, evict and reload policies.
@@ -538,7 +538,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     // Owner mutations may happen after drop/recreate with the same name. Invalidate the
     // name->id mapping as well to prevent using a stale metadataId from metadataIdCache.
     metadataIdCache.invalidate(
-        JcasbinAuthorizationCacheKeys.metadataObjectKey(metalake, metadataObject));
+        JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject));
     try {
       MetadataIdConverter.getID(metadataObject, metalake).ifPresent(ownerRelCache::invalidate);
     } catch (RuntimeException e) {
@@ -550,9 +550,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   public void handleEntityNameIdMappingChange(
       String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
-    String cacheKey = JcasbinAuthorizationCacheKeys.metadataObjectKey(metalake, metadataObject);
-    if (JcasbinAuthorizationCacheKeys.isMetadataContainer(metadataObject.type())) {
-      // Prefix invalidation removes a container and all children under the same name path.
+    String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject);
+    if (JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(metadataObject.type())) {
+      // Prefix invalidation removes the object and all nested objects under the same name path.
       metadataIdCache.invalidateByPrefix(cacheKey);
     } else {
       metadataIdCache.invalidate(cacheKey);
@@ -827,7 +827,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           if (foundUser != null) {
             userRoleCache.put(
                 JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username),
-                new CachedUserRoles(
+                new CachedUserRoleRels(
                     foundUser.getUserId(), userUpdatedAtForRoles, new ArrayList<>(userRoleIds)));
           }
 
@@ -839,7 +839,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
                 groupRoleIdsByGroupId.getOrDefault(ginfo.getGroupId(), new LinkedHashSet<>());
             groupRoleCache.put(
                 JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, gname),
-                new CachedGroupRoles(
+                new CachedGroupRoleRels(
                     ginfo.getGroupId(), ginfo.getUpdatedAt(), new ArrayList<>(ridSet)));
           }
 
@@ -935,11 +935,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private List<Long> loadUserRoles(
       String metalake, String username, long userId, UserUpdatedAt userInfo) {
     String userCacheKey = JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username);
-    Optional<CachedUserRoles> cachedOpt = userRoleCache.getIfPresent(userCacheKey);
+    Optional<CachedUserRoleRels> cachedOpt = userRoleCache.getIfPresent(userCacheKey);
 
-    if (cachedOpt.isPresent() && cachedOpt.get().getUpdatedAt() >= userInfo.getUpdatedAt()) {
-      // Cache is still valid
-      CachedUserRoles cached = cachedOpt.get();
+    if (cachedOpt.isPresent()
+        && cachedOpt.get().getUserId() == userId
+        && cachedOpt.get().getUpdatedAt() >= userInfo.getUpdatedAt()) {
+      // Cache is still valid. The user id check prevents reusing roles after deleting and
+      // recreating the same username with a new entity id.
+      CachedUserRoleRels cached = cachedOpt.get();
       bindUserRoles(userId, cached.getRoleIds());
       return cached.getRoleIds();
     }
@@ -949,7 +952,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         SessionUtils.getWithoutCommit(RoleMetaMapper.class, m -> m.listRolesByUserId(userId));
     List<Long> roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
 
-    userRoleCache.put(userCacheKey, new CachedUserRoles(userId, userInfo.getUpdatedAt(), roleIds));
+    userRoleCache.put(
+        userCacheKey, new CachedUserRoleRels(userId, userInfo.getUpdatedAt(), roleIds));
     bindUserRoles(userId, roleIds);
     return roleIds;
   }
@@ -970,11 +974,12 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   /**
-   * Version-validated group-role load, mirroring {@link #loadUserRoles}. Uses {@code
-   * group_meta.updated_at} as the staleness sentinel: if the cached snapshot is at least as fresh
-   * as the DB version, we reuse it; otherwise we reload from {@code role_meta}. In both cases the
-   * resulting role IDs are bound to the user's jcasbin g-rows so that the enforcer sees inherited
-   * privileges. Groups missing from the DB return an empty list.
+   * Version-validated group-role load, mirroring {@link #loadUserRoles}. A cached snapshot is valid
+   * only when it belongs to the current group id and is at least as fresh as {@code
+   * group_meta.updated_at}; the group id check prevents reusing stale roles after a
+   * delete-and-create of the same group name. In both cases the resulting role IDs are bound to the
+   * user's jcasbin g-rows so that the enforcer sees inherited privileges. Groups missing from the
+   * DB return an empty list.
    */
   private List<Long> loadGroupRoles(
       String metalake, String groupname, long userId, AuthorizationRequestContext requestContext) {
@@ -985,12 +990,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     GroupUpdatedAt groupInfo = groupInfoOpt.get();
     long groupId = groupInfo.getGroupId();
     String groupCacheKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupname);
-    Optional<CachedGroupRoles> cachedOpt = groupRoleCache.getIfPresent(groupCacheKey);
+    Optional<CachedGroupRoleRels> cachedOpt = groupRoleCache.getIfPresent(groupCacheKey);
 
-    if (cachedOpt.isPresent() && cachedOpt.get().getUpdatedAt() >= groupInfo.getUpdatedAt()) {
-      CachedGroupRoles cached = cachedOpt.get();
-      bindUserRoles(userId, cached.getRoleIds());
-      return cached.getRoleIds();
+    if (cachedOpt.isPresent()) {
+      CachedGroupRoleRels cached = cachedOpt.get();
+      if (cached.getGroupId() == groupId && cached.getUpdatedAt() >= groupInfo.getUpdatedAt()) {
+        bindUserRoles(userId, cached.getRoleIds());
+        return cached.getRoleIds();
+      }
     }
 
     List<RolePO> rolePOs =
@@ -998,7 +1005,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     List<Long> roleIds = rolePOs.stream().map(RolePO::getRoleId).collect(Collectors.toList());
 
     groupRoleCache.put(
-        groupCacheKey, new CachedGroupRoles(groupId, groupInfo.getUpdatedAt(), roleIds));
+        groupCacheKey, new CachedGroupRoleRels(groupId, groupInfo.getUpdatedAt(), roleIds));
     bindUserRoles(userId, roleIds);
     return roleIds;
   }
@@ -1062,38 +1069,64 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
               RoleMetaMapper.class, m -> m.batchGetRoleUpdatedAt(uniqueRoleIds));
     }
 
+    List<RoleUpdatedAt> staleRoleVersions = new ArrayList<>();
     for (RoleUpdatedAt rv : roleVersions) {
-      long roleId = rv.getRoleId();
-      long dbUpdatedAt = rv.getUpdatedAt();
-      Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(roleId);
+      Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(rv.getRoleId());
 
-      if (cachedUpdatedAt.isPresent() && cachedUpdatedAt.get() >= dbUpdatedAt) {
+      if (cachedUpdatedAt.isPresent() && cachedUpdatedAt.get() >= rv.getUpdatedAt()) {
         // Role policies are still current
         continue;
       }
+      staleRoleVersions.add(rv);
+    }
 
-      // Load full role entity using roleName from the batch query (no extra DB scan).
-      RoleEntity roleEntity;
-      try {
-        EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
-        roleEntity =
-            entityStore.get(
-                NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
-                Entity.EntityType.ROLE,
-                RoleEntity.class);
-      } catch (Exception e) {
-        LOG.warn("Failed to load role policies for roleId {}", roleId, e);
-        continue;
+    if (staleRoleVersions.isEmpty()) {
+      return;
+    }
+
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    List<NameIdentifier> roleIdents =
+        staleRoleVersions.stream()
+            .map(rv -> NameIdentifierUtil.ofRole(metalake, rv.getRoleName()))
+            .collect(Collectors.toList());
+    List<RoleEntity> roleEntities;
+    try {
+      roleEntities = entityStore.batchGet(roleIdents, Entity.EntityType.ROLE, RoleEntity.class);
+    } catch (Exception e) {
+      LOG.warn("Failed to batch load stale role policies for roleIds {}", staleRoleVersions, e);
+      roleEntities = new ArrayList<>();
+    }
+    if (roleEntities == null) {
+      roleEntities = new ArrayList<>();
+    }
+    if (roleEntities.isEmpty()) {
+      for (RoleUpdatedAt rv : staleRoleVersions) {
+        try {
+          roleEntities.add(
+              entityStore.get(
+                  NameIdentifierUtil.ofRole(metalake, rv.getRoleName()),
+                  Entity.EntityType.ROLE,
+                  RoleEntity.class));
+        } catch (Exception e) {
+          LOG.warn("Failed to load role policies for roleId {}", rv.getRoleId(), e);
+        }
       }
+    }
 
-      // Defensive: a NoSuchEntityException surfaces above, but an EntityStore implementation
-      // returning a null roleEntity (e.g. partially-stubbed tests) would NPE the downstream
-      // loadPolicyByRoleEntity. Skip silently; the role's g-row binding stays but no policies
-      // load, which is the same outcome as a role with an empty securableObjects list.
+    Map<Long, RoleUpdatedAt> staleRoleVersionById =
+        staleRoleVersions.stream().collect(Collectors.toMap(RoleUpdatedAt::getRoleId, rv -> rv));
+    for (RoleEntity roleEntity : roleEntities) {
       if (roleEntity == null) {
-        LOG.warn("entityStore.get returned null for roleId {} ({})", roleId, rv.getRoleName());
+        LOG.warn("entityStore.batchGet returned null role entity");
         continue;
       }
+      RoleUpdatedAt rv = staleRoleVersionById.get(roleEntity.id());
+      if (rv == null) {
+        continue;
+      }
+      long roleId = rv.getRoleId();
+      long dbUpdatedAt = rv.getUpdatedAt();
+      Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(roleId);
 
       // Stale or missing: refresh only permission policies. Do not call deleteRole here because it
       // also removes the current user's freshly bound grouping links.
