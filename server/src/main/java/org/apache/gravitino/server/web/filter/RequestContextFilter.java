@@ -27,6 +27,7 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.utils.RequestContext;
 
 /**
@@ -34,8 +35,10 @@ import org.apache.gravitino.utils.RequestContext;
  * {@link RequestContext} so that audit event constructors can read it on the same thread.
  *
  * <p>When a reverse proxy is in use, the real client IP is taken from the first entry of the {@code
- * X-Forwarded-For} header (RFC 7239 §7.1). If the header is absent, {@link
- * HttpServletRequest#getRemoteAddr()} is used instead.
+ * X-Forwarded-For} header (a de-facto standard header set by reverse proxies; note that it is
+ * trusted unconditionally — deployments where the server is reachable directly, without a trusted
+ * reverse proxy, should be aware that clients can spoof this header). If the header is absent,
+ * {@link HttpServletRequest#getRemoteAddr()} is used instead.
  *
  * <p>The stored value is always cleared in a {@code finally} block to prevent thread-pool leaks.
  */
@@ -63,9 +66,9 @@ public class RequestContextFilter implements Filter {
   public void destroy() {}
 
   private String resolveClientAddress(HttpServletRequest request) {
-    String xff = request.getHeader(X_FORWARDED_FOR);
-    if (xff != null && !xff.isEmpty()) {
-      return xff.split(",")[0].trim();
+    String xForwardedFor = request.getHeader(X_FORWARDED_FOR);
+    if (StringUtils.isNotBlank(xForwardedFor)) {
+      return xForwardedFor.split(",")[0].trim();
     }
     return request.getRemoteAddr();
   }

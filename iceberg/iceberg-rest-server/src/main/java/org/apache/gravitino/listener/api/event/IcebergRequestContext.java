@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -66,9 +67,12 @@ public class IcebergRequestContext {
   }
 
   private static String resolveClientAddress(HttpServletRequest request) {
-    String xff = request.getHeader("X-Forwarded-For");
-    if (xff != null && !xff.isEmpty()) {
-      return xff.split(",")[0].trim();
+    // X-Forwarded-For is trusted unconditionally; callers in environments where the server is
+    // reachable directly (not only via a trusted proxy) should be aware that this header can be
+    // spoofed by clients.
+    String xForwardedFor = request.getHeader("X-Forwarded-For");
+    if (StringUtils.isNotBlank(xForwardedFor)) {
+      return xForwardedFor.split(",")[0].trim();
     }
     return request.getRemoteHost();
   }

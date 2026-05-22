@@ -89,10 +89,12 @@ appender.audit_file.strategy.type = DefaultRolloverStrategy
 appender.audit_file.strategy.delete.type = Delete
 appender.audit_file.strategy.delete.basePath = ${basePath}
 appender.audit_file.strategy.delete.maxDepth = 10
-appender.audit_file.strategy.delete.ifLastModified.type = IfLastModified
-
+appender.audit_file.strategy.delete.ifAll.type = IfAll
+appender.audit_file.strategy.delete.ifAll.ifFileName.type = IfFileName
+appender.audit_file.strategy.delete.ifAll.ifFileName.regex = gravitino_audit.*\.log\.gz
 # Delete all audit log files older than 30 days
-appender.audit_file.strategy.delete.ifLastModified.age = 30d
+appender.audit_file.strategy.delete.ifAll.ifLastModified.type = IfLastModified
+appender.audit_file.strategy.delete.ifAll.ifLastModified.age = 30d
 
 logger.audit.name = gravitino.audit
 logger.audit.level = info

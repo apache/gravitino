@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.audit.v2.SimpleFormatterV2;
 import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LogEvent;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.appender.AbstractAppender;
@@ -64,9 +65,7 @@ public class TestFileAuditWriter {
   @BeforeEach
   public void setup() {
     loggerContext =
-        (LoggerContext)
-            org.apache.logging.log4j.LogManager.getContext(
-                FileAuditWriter.class.getClassLoader(), false);
+        (LoggerContext) LogManager.getContext(FileAuditWriter.class.getClassLoader(), false);
     Configuration config = loggerContext.getConfiguration();
 
     auditCapture = new CaptureAppender("auditCapture");
@@ -96,6 +95,10 @@ public class TestFileAuditWriter {
     AbstractConfiguration config = (AbstractConfiguration) loggerContext.getConfiguration();
     config.removeLogger(FileAuditWriter.AUDIT_LOGGER_NAME);
     config.removeLogger(FileAuditWriter.class.getName());
+    auditCapture.stop();
+    warnCapture.stop();
+    config.removeAppender(auditCapture.getName());
+    config.removeAppender(warnCapture.getName());
     loggerContext.updateLoggers();
   }
 
