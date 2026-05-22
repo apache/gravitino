@@ -114,4 +114,11 @@ public class UserMetaSQLProviderFactory {
       @Param("groupNames") List<String> groupNames) {
     return getProvider().batchGetUserAndGroupUpdatedAt(metalakeName, userName, groupNames);
   }
+
+  public static String batchGetAuthSubjectsForUser(
+      @Param("metalakeName") String metalakeName,
+      @Param("userName") String userName,
+      @Param("groupNames") List<String> groupNames) {
+    return getProvider().batchGetAuthSubjectsForUser(metalakeName, userName, groupNames);
+  }
 }

@@ -24,10 +24,21 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * One row of the batched user + group version probe. The {@code subjectType} literal column
- * (carrying {@code "USER"} or {@code "GROUP"}) lets the caller split a single UNION result back
- * into the per-subject {@code UserUpdatedAt} / {@code GroupUpdatedAt} snapshots used by the cache
- * layer.
+ * One row of the batched auth-subject probe. The {@code subjectType} literal column distinguishes
+ * the row's kind:
+ *
+ * <ul>
+ *   <li>{@code "USER"}: {@code id} = {@code user_id}, {@code name} = {@code user_name}, {@code
+ *       updatedAt} = {@code user_meta.updated_at}, {@code parentId} = {@code null}.
+ *   <li>{@code "GROUP"}: {@code id} = {@code group_id}, {@code name} = {@code group_name}, {@code
+ *       updatedAt} = {@code group_meta.updated_at}, {@code parentId} = {@code null}.
+ *   <li>{@code "USER_ROLE"}: {@code id} = {@code role_id}, {@code name} = {@code role_name}, {@code
+ *       updatedAt} = {@code role_meta.updated_at}, {@code parentId} = the owning {@code user_id}
+ *       (lets the caller bucket multiple direct roles by their user).
+ *   <li>{@code "GROUP_ROLE"}: {@code id} = {@code role_id}, {@code name} = {@code role_name},
+ *       {@code updatedAt} = {@code role_meta.updated_at}, {@code parentId} = the owning {@code
+ *       group_id} (lets the caller bucket inherited roles per group).
+ * </ul>
  */
 @Getter
 @Setter
@@ -35,15 +46,21 @@ import lombok.Setter;
 @AllArgsConstructor
 public class AuthSubjectVersion {
 
-  /** {@code "USER"} or {@code "GROUP"}. */
+  /** {@code "USER"}, {@code "GROUP"}, {@code "USER_ROLE"}, or {@code "GROUP_ROLE"}. */
   private String subjectType;
 
-  /** {@code user_id} or {@code group_id}. */
+  /** {@code user_id}, {@code group_id}, or {@code role_id}. */
   private long id;
 
-  /** {@code user_name} or {@code group_name}; used to match the row back to the requested key. */
+  /** {@code user_name}, {@code group_name}, or {@code role_name}. */
   private String name;
 
   /** {@code updated_at} value used as the cache staleness sentinel. */
   private long updatedAt;
+
+  /**
+   * Owning subject id for role rows: {@code user_id} for {@code USER_ROLE} and {@code group_id} for
+   * {@code GROUP_ROLE}; {@code null} for {@code USER} / {@code GROUP} rows.
+   */
+  private Long parentId;
 }

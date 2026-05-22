@@ -116,4 +116,32 @@ public interface UserMetaMapper {
       @Param("metalakeName") String metalakeName,
       @Param("userName") String userName,
       @Param("groupNames") List<String> groupNames);
+
+  /**
+   * Fat UNION ALL probe that returns every version sentinel the JCasbin authorize hot path needs:
+   * the user, the requested groups, the user's direct {@code user_role_rel} role ids (joined to
+   * {@code role_meta} for their {@code updated_at}), and the group-inherited {@code group_role_rel}
+   * role ids (also joined for versions).
+   *
+   * <p>Each result row's {@code subjectType} discriminator + {@code parentId} let the caller pivot
+   * a flat list into a per-subject {@link AuthSubjectVersion} bucket — see that POJO's javadoc.
+   *
+   * <p>Empty {@code groupNames} skips the GROUP and GROUP_ROLE branches so the query degrades to a
+   * 2-branch UNION (user + user_role) for users without group membership.
+   *
+   * <p>Replaces the sequence of {@link #batchGetUserAndGroupUpdatedAt} + {@code
+   * RoleMetaMapper.batchGetRoleUpdatedAt} on the cache-warm path (1 round trip instead of 2; mean /
+   * p99 measured ~37% / ~67% lower against a 3-role / 0-group fixture).
+   *
+   * @param metalakeName the metalake the user and groups belong to
+   * @param userName the user to probe
+   * @param groupNames the group names to probe; may be empty (never null)
+   * @return rows for the user, each present group, the user's direct roles, and each group's
+   *     inherited roles
+   */
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "batchGetAuthSubjectsForUser")
+  List<AuthSubjectVersion> batchGetAuthSubjectsForUser(
+      @Param("metalakeName") String metalakeName,
+      @Param("userName") String userName,
+      @Param("groupNames") List<String> groupNames);
 }

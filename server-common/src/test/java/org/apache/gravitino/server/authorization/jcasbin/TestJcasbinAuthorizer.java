@@ -225,13 +225,78 @@ public class TestJcasbinAuthorizer {
               List<AuthSubjectVersion> rows = new ArrayList<>();
               UserUpdatedAt u = userMetaMapper.getUserUpdatedAt(mlk, uname);
               if (u != null) {
-                rows.add(new AuthSubjectVersion("USER", u.getUserId(), uname, u.getUpdatedAt()));
+                rows.add(
+                    new AuthSubjectVersion("USER", u.getUserId(), uname, u.getUpdatedAt(), null));
               }
               if (gNames != null) {
                 for (String gn : gNames) {
                   GroupUpdatedAt g = groupMetaMapper.getGroupUpdatedAt(mlk, gn);
                   if (g != null) {
-                    rows.add(new AuthSubjectVersion("GROUP", g.getGroupId(), gn, g.getUpdatedAt()));
+                    rows.add(
+                        new AuthSubjectVersion(
+                            "GROUP", g.getGroupId(), gn, g.getUpdatedAt(), null));
+                  }
+                }
+              }
+              return rows;
+            });
+
+    // Fat-JOIN variant used by the cache-warm path: assemble user + groups + direct user roles
+    // + group-inherited roles + role versions from the existing per-subject mocks. Lets tests
+    // continue stubbing at the per-subject granularity.
+    when(userMetaMapper.batchGetAuthSubjectsForUser(anyString(), anyString(), anyList()))
+        .thenAnswer(
+            invocation -> {
+              String mlk = invocation.getArgument(0);
+              String uname = invocation.getArgument(1);
+              List<String> gNames = invocation.getArgument(2);
+              List<AuthSubjectVersion> rows = new ArrayList<>();
+              UserUpdatedAt u = userMetaMapper.getUserUpdatedAt(mlk, uname);
+              // Always include role rows for every roleId returned by listRolesByUserId /
+              // listRolesByGroupId; production SQL is an INNER JOIN onto role_meta so any role
+              // in user_role_rel/group_role_rel is necessarily in role_meta. updated_at falls
+              // back to 0 when mockedRoleVersions has no entry (matches "role exists but version
+              // is unknown to this test"); downstream policy load relies on the entityStore.get
+              // stub set up per-test.
+              if (u != null) {
+                rows.add(
+                    new AuthSubjectVersion("USER", u.getUserId(), uname, u.getUpdatedAt(), null));
+                List<RolePO> directRoles = roleMetaMapper.listRolesByUserId(u.getUserId());
+                if (directRoles != null) {
+                  for (RolePO rp : directRoles) {
+                    RoleUpdatedAt rv = mockedRoleVersions.get(rp.getRoleId());
+                    long roleUpdatedAt = rv != null ? rv.getUpdatedAt() : 0L;
+                    rows.add(
+                        new AuthSubjectVersion(
+                            "USER_ROLE",
+                            rp.getRoleId(),
+                            rp.getRoleName(),
+                            roleUpdatedAt,
+                            u.getUserId()));
+                  }
+                }
+              }
+              if (gNames != null) {
+                for (String gn : gNames) {
+                  GroupUpdatedAt g = groupMetaMapper.getGroupUpdatedAt(mlk, gn);
+                  if (g != null) {
+                    rows.add(
+                        new AuthSubjectVersion(
+                            "GROUP", g.getGroupId(), gn, g.getUpdatedAt(), null));
+                    List<RolePO> groupRoles = roleMetaMapper.listRolesByGroupId(g.getGroupId());
+                    if (groupRoles != null) {
+                      for (RolePO rp : groupRoles) {
+                        RoleUpdatedAt rv = mockedRoleVersions.get(rp.getRoleId());
+                        long roleUpdatedAt = rv != null ? rv.getUpdatedAt() : 0L;
+                        rows.add(
+                            new AuthSubjectVersion(
+                                "GROUP_ROLE",
+                                rp.getRoleId(),
+                                rp.getRoleName(),
+                                roleUpdatedAt,
+                                g.getGroupId()));
+                      }
+                    }
                   }
                 }
               }
@@ -1460,6 +1525,10 @@ public class TestJcasbinAuthorizer {
         .thenReturn(ImmutableList.of(buildRolePO(roleId, roleName)));
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
         .thenReturn(ImmutableList.of(new RoleUpdatedAt(roleId, roleName, roleVersion)));
+    // Also register the role in mockedRoleVersions so the fat-JOIN test stub for
+    // batchGetAuthSubjectsForUser surfaces it; otherwise prefetch's role-version map would
+    // miss this role and downstream loadPolicyByRoleEntity would never run.
+    mockedRoleVersions.put(roleId, new RoleUpdatedAt(roleId, roleName, roleVersion));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
   }

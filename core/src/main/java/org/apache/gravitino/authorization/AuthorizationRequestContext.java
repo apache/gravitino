@@ -32,6 +32,7 @@ import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
+import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 
 /**
@@ -73,6 +74,18 @@ public class AuthorizationRequestContext {
 
   /** Per-request metadataId→owner cache. Deduplicates isOwner within a single request. */
   private final Map<Long, Optional<OwnerInfo>> ownerCache = new ConcurrentHashMap<>();
+
+  /**
+   * Per-request roleId → {@link RoleUpdatedAt} map populated by the fat-JOIN prefetch on the
+   * authorize hot path. When present, the role-policy version probe can skip its dedicated {@code
+   * batchGetRoleUpdatedAt} round trip and use this map as the source of truth for {@code
+   * loadedRoles} cache staleness checks (the {@code roleName} on each entry is what subsequent
+   * {@code entityStore.get(NameIdentifier.ofRole(...))} reloads keys off of).
+   *
+   * <p>{@code null} means "prefetch did not run / did not populate role versions" — callers must
+   * fall back to the legacy per-call DB probe.
+   */
+  private volatile Map<Long, RoleUpdatedAt> prefetchedRoleVersions;
 
   private volatile String originalAuthorizationExpression;
 
@@ -183,6 +196,26 @@ public class AuthorizationRequestContext {
 
   public void setOriginalAuthorizationExpression(String originalAuthorizationExpression) {
     this.originalAuthorizationExpression = originalAuthorizationExpression;
+  }
+
+  /**
+   * Returns the per-request roleId → {@link RoleUpdatedAt} map populated by the fat-JOIN prefetch,
+   * or {@code null} if no prefetch has been seeded for this request.
+   *
+   * @return the prefetched role-version map or {@code null}
+   */
+  public Map<Long, RoleUpdatedAt> getPrefetchedRoleVersions() {
+    return prefetchedRoleVersions;
+  }
+
+  /**
+   * Sets the per-request prefetched role-versions map; called once by the authorize hot path after
+   * the fat-JOIN prefetch.
+   *
+   * @param prefetchedRoleVersions roleId → {@link RoleUpdatedAt}; immutable view recommended
+   */
+  public void setPrefetchedRoleVersions(Map<Long, RoleUpdatedAt> prefetchedRoleVersions) {
+    this.prefetchedRoleVersions = prefetchedRoleVersions;
   }
 
   /**

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import static org.apache.gravitino.storage.relational.mapper.GroupMetaMapper.GROUP_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.GroupMetaMapper.GROUP_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
@@ -249,5 +250,88 @@ public class UserMetaBaseSQLProvider {
         + " <foreach item='g' collection='groupNames' open='(' separator=',' close=')'>#{g}</foreach>"
         + " AND gm.deleted_at = 0"
         + "</script>";
+  }
+
+  public String batchGetAuthSubjectsForUser(
+      @Param("metalakeName") String metalakeName,
+      @Param("userName") String userName,
+      @Param("groupNames") List<String> groupNames) {
+    // USER row.
+    String userBranch =
+        "SELECT 'USER' AS subjectType, um.user_id AS id, um.user_name AS name,"
+            + " um.updated_at AS updatedAt, CAST(NULL AS SIGNED) AS parentId"
+            + " FROM "
+            + USER_TABLE_NAME
+            + " um"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm ON um.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
+            + " WHERE mm.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
+            + " AND um.deleted_at = 0";
+
+    // USER_ROLE rows: direct user-role bindings with each role's updated_at.
+    String userRoleBranch =
+        " UNION ALL "
+            + "SELECT 'USER_ROLE' AS subjectType, rm.role_id AS id, rm.role_name AS name,"
+            + " rm.updated_at AS updatedAt, ur.user_id AS parentId"
+            + " FROM "
+            + USER_TABLE_NAME
+            + " um"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm3 ON um.metalake_id = mm3.metalake_id AND mm3.deleted_at = 0"
+            + " JOIN "
+            + USER_ROLE_RELATION_TABLE_NAME
+            + " ur ON ur.user_id = um.user_id AND ur.deleted_at = 0"
+            + " JOIN "
+            + ROLE_TABLE_NAME
+            + " rm ON rm.role_id = ur.role_id AND rm.deleted_at = 0"
+            + " WHERE mm3.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
+            + " AND um.deleted_at = 0";
+
+    if (groupNames == null || groupNames.isEmpty()) {
+      // No groups -> 2-branch UNION (user + direct user roles).
+      return "<script>" + userBranch + userRoleBranch + "</script>";
+    }
+
+    // GROUP rows.
+    String groupBranch =
+        " UNION ALL "
+            + "SELECT 'GROUP' AS subjectType, gm.group_id AS id, gm.group_name AS name,"
+            + " gm.updated_at AS updatedAt, CAST(NULL AS SIGNED) AS parentId"
+            + " FROM "
+            + GROUP_TABLE_NAME
+            + " gm"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm2 ON gm.metalake_id = mm2.metalake_id AND mm2.deleted_at = 0"
+            + " WHERE mm2.metalake_name = #{metalakeName}"
+            + " AND gm.group_name IN"
+            + " <foreach item='g' collection='groupNames' open='(' separator=',' close=')'>#{g}</foreach>"
+            + " AND gm.deleted_at = 0";
+
+    // GROUP_ROLE rows: group-inherited bindings with each role's updated_at.
+    String groupRoleBranch =
+        " UNION ALL "
+            + "SELECT 'GROUP_ROLE' AS subjectType, rm.role_id AS id, rm.role_name AS name,"
+            + " rm.updated_at AS updatedAt, gr.group_id AS parentId"
+            + " FROM "
+            + GROUP_TABLE_NAME
+            + " gm"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm4 ON gm.metalake_id = mm4.metalake_id AND mm4.deleted_at = 0"
+            + " JOIN "
+            + GROUP_ROLE_RELATION_TABLE_NAME
+            + " gr ON gr.group_id = gm.group_id AND gr.deleted_at = 0"
+            + " JOIN "
+            + ROLE_TABLE_NAME
+            + " rm ON rm.role_id = gr.role_id AND rm.deleted_at = 0"
+            + " WHERE mm4.metalake_name = #{metalakeName}"
+            + " AND gm.group_name IN"
+            + " <foreach item='g2' collection='groupNames' open='(' separator=',' close=')'>#{g2}</foreach>"
+            + " AND gm.deleted_at = 0";
+
+    return "<script>" + userBranch + userRoleBranch + groupBranch + groupRoleBranch + "</script>";
   }
 }
