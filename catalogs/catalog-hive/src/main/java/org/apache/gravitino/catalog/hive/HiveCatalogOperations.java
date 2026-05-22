@@ -411,14 +411,12 @@ public class HiveCatalogOperations
     }
   }
 
-  /**
-   * Best-effort removal of non-Hive tables (Iceberg, Paimon, Hudi) from {@code allTables} using the
-   * HMS server-side {@code listTableNamesByFilter} API. This API only supports exact-key lookups on
-   * dot-free parameter keys, so tables whose only marker is a dotted key (e.g. Spark-managed Hudi
-   * tables exposing only {@code spark.sql.sources.provider=hudi}) cannot be filtered out here; see
-   * the {@code list-all-tables} catalog property for the documented limitation. We prefer this over
-   * {@code getTableObjectsByName} which materializes every Table and is slow on databases with many
-   * tables.
+  /*
+   * Best-effort removal of non-Hive tables (Iceberg, Paimon, Hudi) from allTables via HMS
+   * server-side listTableNamesByFilter. HMS only supports exact lookups on dot-free property keys,
+   * so Spark-managed Hudi tables that only expose spark.sql.sources.provider=hudi cannot be filtered
+   * here. We keep this strategy because getTableObjectsByName materializes every table and is slow
+   * on large databases.
    */
   private void filterOutNonHiveTables(String database, List<String> allTables)
       throws InterruptedException {
@@ -455,10 +453,13 @@ public class HiveCatalogOperations
    * drop unrelated tables such as {@code <base>_root}.
    */
   private void removeHudiDerivedTables(List<String> allTables, List<String> hudiBaseTables) {
+    Set<String> hudiTablesToRemove = new HashSet<>();
     for (String hudiBase : hudiBaseTables) {
-      allTables.removeIf(
-          t -> t.equals(hudiBase) || t.equals(hudiBase + "_ro") || t.equals(hudiBase + "_rt"));
+      hudiTablesToRemove.add(hudiBase);
+      hudiTablesToRemove.add(hudiBase + "_ro");
+      hudiTablesToRemove.add(hudiBase + "_rt");
     }
+    allTables.removeIf(hudiTablesToRemove::contains);
   }
 
   /**
