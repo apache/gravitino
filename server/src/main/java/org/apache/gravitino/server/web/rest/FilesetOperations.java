@@ -144,6 +144,12 @@ public class FilesetOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       FilesetCreateRequest request) {
+    if (request == null) {
+      LOG.warn("Received create fileset request with null request body");
+      return ExceptionHandlers.handleFilesetException(
+          OperationType.CREATE, "", schema, new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received create fileset request: {}.{}.{}.{}",
         metalake,

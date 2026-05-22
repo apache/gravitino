@@ -911,6 +911,23 @@ public class TestTableOperations extends BaseOperationsTest {
     Assertions.assertArrayEquals(tableDTO.index(), updatedTable.index());
   }
 
+  @Test
+  public void testCreateTableWithNullRequestBody() {
+    Response resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(null, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+
+    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(errorResponse.getMessage().contains("Request body cannot be null"));
+  }
+
   private static String tablePath(String metalake, String catalog, String schema) {
     return new StringBuilder()
         .append("/metalakes/")

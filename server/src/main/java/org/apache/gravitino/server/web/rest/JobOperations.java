@@ -150,6 +150,12 @@ public class JobOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       JobTemplateRegisterRequest request) {
+    if (request == null) {
+      LOG.warn("Received register job template request with null request body");
+      return ExceptionHandlers.handleJobTemplateException(
+          OperationType.REGISTER, "", metalake, new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received request to register job template {} in metalake: {}",
         request.getJobTemplate().name(),
@@ -356,6 +362,12 @@ public class JobOperations {
           String metalake,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.RUN_JOB)
           JobRunRequest request) {
+    if (request == null) {
+      LOG.warn("Received run job request with null request body");
+      return ExceptionHandlers.handleJobException(
+          OperationType.RUN, "", metalake, new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received request to run job {} in metalake: {}", request.getJobTemplateName(), metalake);
 
