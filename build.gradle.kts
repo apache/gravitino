@@ -446,9 +446,6 @@ subprojects {
   apply(plugin = "net.ltgt.errorprone")
   dependencies {
     errorprone("com.google.errorprone:error_prone_core:2.10.0")
-    constraints {
-      implementation("org.yaml:snakeyaml:2.0")
-    }
   }
 
   tasks.withType<JavaCompile>().configureEach {
