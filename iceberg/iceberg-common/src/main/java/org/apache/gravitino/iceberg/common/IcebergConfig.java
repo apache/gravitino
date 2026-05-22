@@ -274,7 +274,9 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<String> TABLE_METADATA_CACHE_IMPL =
       new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_IMPL)
-          .doc("Table metadata cache implementation")
+          .doc(
+              "Table metadata cache implementation. Set to empty string(\"\") if catalog-backend "
+                  + "is rest catalog, or custom catalog without the SupportsMetadataLocation interface.")
           .version(ConfigConstants.VERSION_1_1_0)
           .stringConf()
           .createWithDefault(LocalTableMetadataCache.class.getName());

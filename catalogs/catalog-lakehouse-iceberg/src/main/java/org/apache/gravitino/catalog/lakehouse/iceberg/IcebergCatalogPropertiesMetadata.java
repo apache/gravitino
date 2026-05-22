@@ -126,7 +126,9 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_IMPL,
-                "Table metadata cache implementation",
+                "Table metadata cache implementation. Set to empty string(\"\") if "
+                    + "catalog-backend is rest catalog, or custom catalog without the "
+                    + "SupportsMetadataLocation interface.",
                 false /* immutable */,
                 LocalTableMetadataCache.class.getName() /* defaultValue */,
                 false /* hidden */),
