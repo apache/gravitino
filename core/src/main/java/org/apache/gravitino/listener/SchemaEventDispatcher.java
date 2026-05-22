@@ -75,7 +75,9 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
     eventBus.dispatchEvent(new ListSchemaPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listSchemas(namespace);
-      eventBus.dispatchEvent(new ListSchemaEvent(PrincipalUtils.getCurrentUserName(), namespace));
+      eventBus.dispatchEvent(
+          new ListSchemaEvent(
+              PrincipalUtils.getCurrentUserName(), namespace, nameIdentifiers.length));
       return nameIdentifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(

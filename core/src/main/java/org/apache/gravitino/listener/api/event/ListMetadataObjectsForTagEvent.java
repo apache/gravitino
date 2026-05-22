@@ -24,16 +24,42 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event that is triggered upon successfully listing metadata objects for a tag. */
 @DeveloperApi
-public final class ListMetadataObjectsForTagEvent extends TagEvent {
+public final class ListMetadataObjectsForTagEvent extends TagEvent implements ListEvent {
+
+  private final int metadataObjectCount;
+
   /**
    * Constructs an instance of {@code ListMetadataObjectsForTagEvent}.
    *
    * @param user The username of the individual who initiated the metadata objects listing.
    * @param metalake The metalake from which metadata objects were listed.
    * @param tagName The name of the tag for which metadata objects were listed.
+   * @param metadataObjectCount The number of metadata objects returned by the list operation.
    */
-  public ListMetadataObjectsForTagEvent(String user, String metalake, String tagName) {
+  public ListMetadataObjectsForTagEvent(
+      String user, String metalake, String tagName, int metadataObjectCount) {
     super(user, NameIdentifierUtil.ofTag(metalake, tagName));
+    this.metadataObjectCount = metadataObjectCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListMetadataObjectsForTagEvent} without a result count.
+   *
+   * @param user The username of the individual who initiated the metadata objects listing.
+   * @param metalake The metalake from which metadata objects were listed.
+   * @param tagName The name of the tag for which metadata objects were listed.
+   * @deprecated Use {@link #ListMetadataObjectsForTagEvent(String, String, String, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListMetadataObjectsForTagEvent(String user, String metalake, String tagName) {
+    this(user, metalake, tagName, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return metadataObjectCount;
   }
 
   /**

@@ -37,6 +37,9 @@ import org.apache.gravitino.listener.api.event.IcebergCreateNamespacePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropNamespacePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergListNamespacesEvent;
+import org.apache.gravitino.listener.api.event.IcebergListNamespacesFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergListNamespacesPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergLoadNamespacePreEvent;
@@ -45,6 +48,7 @@ import org.apache.gravitino.listener.api.event.IcebergNamespaceExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespacePreEvent;
@@ -258,7 +262,14 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
   void testListNamespace(String prefix) {
     setUrlPathWithPrefix(prefix);
     dropAllExistingNamespace();
+
+    dummyEventListener.clearEvent();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList());
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergListNamespacesPreEvent);
+    Event emptyListEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(emptyListEvent instanceof IcebergListNamespacesEvent);
+    Assertions.assertEquals(0, ((IcebergListNamespacesEvent) emptyListEvent).resultCount());
 
     doCreateNamespace(Namespace.of("list_foo1"));
     doCreateNamespace(Namespace.of("list_foo2"));
@@ -267,16 +278,39 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     doCreateNamespace(Namespace.of("list_foo3", "a", "z"));
     doCreateNamespace(Namespace.of("list_foo3", "a", "y"));
 
+    dummyEventListener.clearEvent();
     verifyListNamespaceSucc(Optional.empty(), Arrays.asList("list_foo1", "list_foo2", "list_foo3"));
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergListNamespacesPreEvent);
+    Event listEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(listEvent instanceof IcebergListNamespacesEvent);
+    Assertions.assertEquals(3, ((IcebergListNamespacesEvent) listEvent).resultCount());
+
     verifyListNamespaceSucc(
         Optional.of(Namespace.of("list_foo3")), Arrays.asList("list_foo3.a", "list_foo3.b"));
     verifyListNamespaceSucc(
         Optional.of(Namespace.of("list_foo3", "a")),
         Arrays.asList("list_foo3.a.y", "list_foo3.a.z"));
 
+    dummyEventListener.clearEvent();
     verifyListNamespaceFail(Optional.of(Namespace.of("list_fooxx")), 404);
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergListNamespacesPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergListNamespacesFailureEvent);
+
     verifyListNamespaceFail(Optional.of(Namespace.of("list_foo3", "c")), 404);
     verifyListNamespaceFail(Optional.of(Namespace.of("list_foo3", "a", "x")), 404);
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testIcebergListNamespacesEventDeprecatedConstructorReturnsNegativeCount() {
+    IcebergListNamespacesEvent event =
+        new IcebergListNamespacesEvent(
+            Mockito.mock(IcebergRequestContext.class),
+            org.apache.gravitino.NameIdentifier.of("metalake", "catalog"));
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test

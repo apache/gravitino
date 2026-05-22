@@ -56,6 +56,7 @@ import org.apache.gravitino.listener.api.event.IcebergPlanTableScanPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRenameTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergTableExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateTableEvent;
@@ -90,6 +91,7 @@ import org.apache.iceberg.util.JsonUtil;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.Mockito;
@@ -295,7 +297,9 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     dummyEventListener.clearEvent();
     verifyListTableSucc(namespace, ImmutableSet.of("list_foo1", "list_foo2"));
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergListTablePreEvent);
-    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergListTableEvent);
+    Event listTablePostEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(listTablePostEvent instanceof IcebergListTableEvent);
+    Assertions.assertEquals(2, ((IcebergListTableEvent) listTablePostEvent).resultCount());
   }
 
   @ParameterizedTest
@@ -1045,5 +1049,15 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         defaultTableResponse.tableMetadata().snapshots().size(),
         allTableResponse.tableMetadata().snapshots().size(),
         "Default load and snapshots=all should return the same number of snapshots");
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testIcebergListTableEventDeprecatedConstructorReturnsNegativeCount() {
+    IcebergListTableEvent event =
+        new IcebergListTableEvent(
+            Mockito.mock(IcebergRequestContext.class),
+            org.apache.gravitino.NameIdentifier.of("metalake", "catalog", "schema"));
+    Assertions.assertEquals(-1, event.resultCount());
   }
 }

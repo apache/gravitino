@@ -22,12 +22,14 @@ package org.apache.gravitino.audit.v2;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.audit.AuditLog;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 
@@ -101,7 +103,16 @@ public class SimpleAuditLogV2 implements AuditLog {
   @Override
   public String toString() {
     Map<String, String> info = customInfo();
-    String customInfoStr = info != null && !info.isEmpty() ? info.toString() : "";
+    String customInfoStr;
+    if (event instanceof ListEvent) {
+      int count = ((ListEvent) event).resultCount();
+      Map<String, String> merged = new LinkedHashMap<>();
+      if (count >= 0) merged.put("count", String.valueOf(count));
+      if (info != null) merged.putAll(info);
+      customInfoStr = merged.isEmpty() ? "" : merged.toString();
+    } else {
+      customInfoStr = info != null && !info.isEmpty() ? info.toString() : "";
+    }
     return String.format(
         "[%s]\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
         TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(timestamp())),

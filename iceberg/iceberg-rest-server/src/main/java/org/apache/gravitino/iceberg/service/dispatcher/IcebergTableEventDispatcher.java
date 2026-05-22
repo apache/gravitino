@@ -198,7 +198,9 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
       eventBus.dispatchEvent(new IcebergListTableFailureEvent(context, gravitinoNameIdentifier, e));
       throw e;
     }
-    eventBus.dispatchEvent(new IcebergListTableEvent(context, gravitinoNameIdentifier));
+    eventBus.dispatchEvent(
+        new IcebergListTableEvent(
+            context, gravitinoNameIdentifier, listTablesResponse.identifiers().size()));
     return listTablesResponse;
   }
 

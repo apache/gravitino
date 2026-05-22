@@ -341,7 +341,7 @@ public class TestFunctionEvent {
         .thenReturn(function);
     when(dispatcher.getFunction(any(NameIdentifier.class))).thenReturn(function);
     when(dispatcher.dropFunction(any(NameIdentifier.class))).thenReturn(true);
-    when(dispatcher.listFunctions(any(Namespace.class))).thenReturn(null);
+    when(dispatcher.listFunctions(any(Namespace.class))).thenReturn(new NameIdentifier[0]);
     when(dispatcher.listFunctionInfos(any(Namespace.class))).thenReturn(new Function[] {function});
     when(dispatcher.alterFunction(any(NameIdentifier.class), any(FunctionChange.class)))
         .thenReturn(function);

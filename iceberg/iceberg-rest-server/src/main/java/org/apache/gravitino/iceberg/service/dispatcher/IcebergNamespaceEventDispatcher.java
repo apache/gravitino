@@ -199,7 +199,8 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
       throw e;
     }
 
-    eventBus.dispatchEvent(new IcebergListNamespacesEvent(context, nameIdentifier));
+    eventBus.dispatchEvent(
+        new IcebergListNamespacesEvent(context, nameIdentifier, listResponse.namespaces().size()));
     return listResponse;
   }
 

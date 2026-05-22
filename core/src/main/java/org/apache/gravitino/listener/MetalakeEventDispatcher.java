@@ -79,7 +79,8 @@ public class MetalakeEventDispatcher implements MetalakeDispatcher {
     eventBus.dispatchEvent(new ListMetalakePreEvent(PrincipalUtils.getCurrentUserName()));
     try {
       Metalake[] metalakes = dispatcher.listMetalakes();
-      eventBus.dispatchEvent(new ListMetalakeEvent(PrincipalUtils.getCurrentUserName()));
+      eventBus.dispatchEvent(
+          new ListMetalakeEvent(PrincipalUtils.getCurrentUserName(), metalakes.length));
       return metalakes;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListMetalakeFailureEvent(PrincipalUtils.getCurrentUserName(), e));

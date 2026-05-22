@@ -22,7 +22,7 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.NameIdentifier;
 
 /** Represents an event that is generated after a model version listing operation. */
-public class ListModelVersionsEvent extends ModelEvent {
+public class ListModelVersionsEvent extends ModelEvent implements ListEvent {
   private final int[] versions;
 
   /**
@@ -46,6 +46,12 @@ public class ListModelVersionsEvent extends ModelEvent {
    */
   public int[] versions() {
     return versions;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return versions.length;
   }
 
   /**
