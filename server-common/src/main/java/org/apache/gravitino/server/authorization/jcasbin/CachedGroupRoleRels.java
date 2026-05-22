@@ -16,20 +16,36 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.server.authorization.jcasbin;
 
-package org.apache.gravitino.idp.storage.mapper.provider.h2;
+import java.util.List;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+/**
+ * Cached snapshot of a group's role relations. The {@code updatedAt} timestamp corresponds to the
+ * {@code group_meta.updated_at} column and is used as a version sentinel: if the DB value is newer,
+ * the cached role relation list is stale and must be reloaded.
+ */
+final class CachedGroupRoleRels {
 
-class TestIdpGroupMetaH2Provider {
+  private final long groupId;
+  private final long updatedAt;
+  private final List<Long> roleIds;
 
-  @Test
-  void testCurrentTimeMillisExpression() {
-    IdpGroupMetaH2Provider provider = new IdpGroupMetaH2Provider();
+  CachedGroupRoleRels(long groupId, long updatedAt, List<Long> roleIds) {
+    this.groupId = groupId;
+    this.updatedAt = updatedAt;
+    this.roleIds = roleIds;
+  }
 
-    Assertions.assertEquals(
-        "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())",
-        provider.currentTimeMillisExpression());
+  long getGroupId() {
+    return groupId;
+  }
+
+  long getUpdatedAt() {
+    return updatedAt;
+  }
+
+  List<Long> getRoleIds() {
+    return roleIds;
   }
 }

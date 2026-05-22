@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.authorization;
 
+import com.google.common.base.Preconditions;
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
 
@@ -35,6 +37,36 @@ public interface OwnerDispatcher {
    */
   void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType);
+
+  /**
+   * Sets the same owner on multiple metadata objects in iteration order. Semantics match repeated
+   * {@link #setOwner} calls; relational {@link org.apache.gravitino.EntityStore} implementations
+   * may persist using {@link org.apache.gravitino.SupportsRelationOperations#batchInsertRelations}.
+   * The default implementation delegates per object so implementations that wrap {@code setOwner}
+   * (e.g. for events) apply consistently.
+   *
+   * <p>Note: implementations that persist via {@code batchInsertRelations} (such as {@link
+   * OwnerManager}) require all {@code metadataObjects} to share the same {@link
+   * MetadataObject.Type} within a single call, because the batch operation takes a single object
+   * type. Such implementations throw {@link IllegalArgumentException} when mixed types are
+   * supplied, so callers should group objects by type before calling. The default per-object
+   * implementation has no such restriction.
+   *
+   * @param metalake the name of the metalake
+   * @param metadataObjects the objects to update; must not be null (may be empty)
+   * @param ownerName the name of the owner
+   * @param ownerType the type of the owner (e.g., USER, GROUP)
+   */
+  default void setOwners(
+      String metalake,
+      List<MetadataObject> metadataObjects,
+      String ownerName,
+      Owner.Type ownerType) {
+    Preconditions.checkArgument(metadataObjects != null, "metadataObjects must not be null");
+    for (MetadataObject metadataObject : metadataObjects) {
+      setOwner(metalake, metadataObject, ownerName, ownerType);
+    }
+  }
 
   /**
    * Retrieves the owner of a metadata object.

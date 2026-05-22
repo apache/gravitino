@@ -10,8 +10,10 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 This page introduces how to manage relational metadata by Apache Gravitino, relational metadata refers
-to relational catalog, schema, table and partitions. Through Gravitino, you can create, edit, and
+to relational catalog, schema, table, partitions, and views. Through Gravitino, you can create, edit, and
 delete relational metadata via unified REST APIs or Java client.
+
+For dedicated view examples and APIs, see [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md).
 
 In this document, Gravitino uses Apache Hive catalog as an example to show how to manage
 relational metadata by Gravitino. Other relational catalogs are similar to Hive catalog,
@@ -1229,3 +1231,8 @@ NameIdentifier[] identifiers =
 
 </TabItem>
 </Tabs>
+
+## View operations
+
+View metadata is documented separately in [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md),
+including create, load, alter, drop, and list examples for the REST API and Java client.
