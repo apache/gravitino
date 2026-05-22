@@ -139,7 +139,7 @@ public class IdpUserMetaService {
     }
     for (String username : usernames) {
       if (!userIds.containsKey(username)) {
-        throw new NotFoundException(String.format("IdP user not found: %s", username));
+        throw new NotFoundException("IdP user not found: %s", username);
       }
     }
     return userIds;
@@ -150,7 +150,7 @@ public class IdpUserMetaService {
         SessionUtils.getWithoutCommit(
             IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
     if (userPO == null) {
-      throw new NotFoundException(String.format("IdP user not found: %s", username));
+      throw new NotFoundException("IdP user not found: %s", username);
     }
     return userPO;
   }

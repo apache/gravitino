@@ -145,7 +145,7 @@ public class IdpGroupMetaService {
         SessionUtils.getWithoutCommit(
             IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName));
     if (groupPO == null) {
-      throw new NotFoundException(String.format("IdP group not found: %s", groupName));
+      throw new NotFoundException("IdP group not found: %s", groupName);
     }
     return groupPO;
   }

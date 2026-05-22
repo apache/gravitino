@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.idp.exception;
 
+import com.google.errorprone.annotations.FormatMethod;
+import com.google.errorprone.annotations.FormatString;
+
 /** This exception is thrown when a built-in IdP resource is not found. */
 public class NotFoundException extends RuntimeException {
 
@@ -25,9 +28,11 @@ public class NotFoundException extends RuntimeException {
    * Constructs a new NotFoundException with the given message.
    *
    * @param message the detail message
+   * @param args the arguments to the message
    */
-  public NotFoundException(String message) {
-    super(message);
+  @FormatMethod
+  public NotFoundException(@FormatString String message, Object... args) {
+    super(String.format(message, args));
   }
 
   /**
@@ -35,8 +40,10 @@ public class NotFoundException extends RuntimeException {
    *
    * @param cause the cause of the exception
    * @param message the detail message
+   * @param args the arguments to the message
    */
-  public NotFoundException(Throwable cause, String message) {
-    super(message, cause);
+  @FormatMethod
+  public NotFoundException(Throwable cause, @FormatString String message, Object... args) {
+    super(String.format(message, args), cause);
   }
 }
