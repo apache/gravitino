@@ -718,8 +718,9 @@ For example, with the default separator the name `a:b:c` denotes a schema `c` ne
 which in turn is nested under `a`. The separator is only used at the API boundary; Gravitino stores
 the name internally using a physical separator that never collides with user input.
 
-To create a nested schema, its parent schema must already exist. Creating `a:b:c` requires `a` and
-`a:b` to exist first. The following example creates a schema `c` under the existing parent `a:b`:
+To create a nested schema, just supply its full hierarchical name. Any missing ancestor schemas are
+created automatically, so creating `a:b:c` also creates `a` and `a:b` if they don't already exist.
+The following example creates the schema `a:b:c`:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -741,7 +742,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 Catalog catalog = gravitinoClient.loadCatalog("iceberg_catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
-// `a` and `a:b` must already exist
+// missing ancestors `a` and `a:b` are created automatically
 Schema schema = supportsSchemas.createSchema("a:b:c", "a nested schema", Collections.emptyMap());
 ```
 
@@ -751,7 +752,7 @@ Schema schema = supportsSchemas.createSchema("a:b:c", "a nested schema", Collect
 ```python
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
 catalog: Catalog = gravitino_client.load_catalog(name="iceberg_catalog")
-# `a` and `a:b` must already exist
+# missing ancestors `a` and `a:b` are created automatically
 catalog.as_schemas().create_schema(name="a:b:c", comment="a nested schema", properties={})
 ```
 
