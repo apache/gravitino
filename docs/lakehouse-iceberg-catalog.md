@@ -235,6 +235,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 ### Schema capabilities
 
 - doesn't support cascade drop schema.
+- supports hierarchical (multi-level) schemas, mapping each level to an Iceberg namespace level. See [Hierarchical schema](./manage-relational-metadata-using-gravitino.md#hierarchical-schema).
 
 ### Schema properties
 

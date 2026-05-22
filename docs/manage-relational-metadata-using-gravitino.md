@@ -706,6 +706,93 @@ schema_list: List[NameIdentifier] = catalog.as_schemas().list_schemas()
 </TabItem>
 </Tabs>
 
+### Hierarchical schema
+
+Some catalogs support a hierarchical (multi-level) schema, where a schema can be nested under
+another schema. Currently only the [Iceberg catalog](./lakehouse-iceberg-catalog.md) supports
+hierarchical schemas, mapping each level to an Iceberg multi-level namespace.
+
+A hierarchical schema name is a path whose levels are joined by the configured separator
+`gravitino.schema.separator` (default `:`, see [Gravitino server configuration](./gravitino-server-config.md#schema-configuration)).
+For example, with the default separator the name `a:b:c` denotes a schema `c` nested under `a:b`,
+which in turn is nested under `a`. The separator is only used at the API boundary; Gravitino stores
+the name internally using a physical separator that never collides with user input.
+
+To create a nested schema, its parent schema must already exist. Creating `a:b:c` requires `a` and
+`a:b` to exist first. The following example creates a schema `c` under the existing parent `a:b`:
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "a:b:c",
+  "comment": "a nested schema",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/iceberg_catalog/schemas
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+// Assuming you have just created an Iceberg catalog named `iceberg_catalog`
+Catalog catalog = gravitinoClient.loadCatalog("iceberg_catalog");
+
+SupportsSchemas supportsSchemas = catalog.asSchemas();
+// `a` and `a:b` must already exist
+Schema schema = supportsSchemas.createSchema("a:b:c", "a nested schema", Collections.emptyMap());
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(name="iceberg_catalog")
+# `a` and `a:b` must already exist
+catalog.as_schemas().create_schema(name="a:b:c", comment="a nested schema", properties={})
+```
+
+</TabItem>
+</Tabs>
+
+To list the schemas directly under a parent schema, pass the parent schema name. Over REST this is
+the optional `parentSchema` query parameter; in the clients it is an argument to the list-schemas
+method. Given the schemas `a`, `a:b` and `a:b:c`, listing the children of `a:b` returns `[a:b:c]`.
+When the parent is omitted, all schemas under the catalog are returned.
+
+<Tabs groupId="language" queryString>
+<TabItem value="shell" label="Shell">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" \
+"http://localhost:8090/api/metalakes/metalake/catalogs/iceberg_catalog/schemas?parentSchema=a:b"
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Catalog catalog = gravitinoClient.loadCatalog("iceberg_catalog");
+SupportsSchemas supportsSchemas = catalog.asSchemas();
+String[] children = supportsSchemas.listSchemas("a:b");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
+catalog: Catalog = gravitino_client.load_catalog(name="iceberg_catalog")
+children: List[str] = catalog.as_schemas().list_schemas(parent_schema="a:b")
+```
+
+</TabItem>
+</Tabs>
+
 ## Table operations
 
 :::tip

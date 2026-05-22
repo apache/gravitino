@@ -146,6 +146,12 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 | `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache; default 3600000ms(1h).                                                                                                                     | `3600000`     | No       | 0.1.0         |
 | `gravitino.catalog.classloader.isolated`     | Whether to use an isolated classloader for catalog. If `true`, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`. | `true`        | No       | 0.1.0         |
 
+### Schema configuration
+
+| Configuration item          | Description                                                                                                                                                                                                                                                                                                                                                                          | Default value | Required | Since version |
+|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.schema.separator` | The separator used to represent a hierarchical (multi-level) schema in schema names at the API boundary, e.g. `:` for `A:B:C`. It only takes effect for catalogs that support hierarchical schemas (currently the Iceberg catalog). The value must not be blank and must not contain `.` or the internal physical separator (ASCII-1, `\u0001`). See [Hierarchical schema](./manage-relational-metadata-using-gravitino.md#hierarchical-schema). | `:`           | No       | 1.3.0         |
+
 ### Auxiliary service configuration
 
 | Configuration item            | Description                                                                                                                    | Default value | Since Version |
