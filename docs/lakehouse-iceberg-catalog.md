@@ -256,7 +256,7 @@ For example, with the default separator the name `a:b:c` denotes a schema `c` ne
 which in turn is nested under `a`. The separator is only used at the API boundary; Gravitino stores
 the name internally using a physical separator that never collides with user input.
 
-To create a nested schema, just supply its full hierarchical name. Any missing ancestor schemas are
+To create a hierarchical schema, just supply its full hierarchical name. Any missing ancestor schemas are
 created automatically, so creating `a:b:c` also creates `a` and `a:b` if they don't already exist.
 The following example creates the schema `a:b:c`:
 
@@ -267,7 +267,7 @@ The following example creates the schema `a:b:c`:
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
   "name": "a:b:c",
-  "comment": "a nested schema",
+  "comment": "a hierarchical schema",
   "properties": {}
 }' http://localhost:8090/api/metalakes/metalake/catalogs/iceberg_catalog/schemas
 ```
@@ -281,7 +281,7 @@ Catalog catalog = gravitinoClient.loadCatalog("iceberg_catalog");
 
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 // missing ancestors `a` and `a:b` are created automatically
-Schema schema = supportsSchemas.createSchema("a:b:c", "a nested schema", Collections.emptyMap());
+Schema schema = supportsSchemas.createSchema("a:b:c", "a hierarchical schema", Collections.emptyMap());
 ```
 
 </TabItem>
@@ -291,7 +291,7 @@ Schema schema = supportsSchemas.createSchema("a:b:c", "a nested schema", Collect
 gravitino_client: GravitinoClient = GravitinoClient(uri="http://127.0.0.1:8090", metalake_name="metalake")
 catalog: Catalog = gravitino_client.load_catalog(name="iceberg_catalog")
 # missing ancestors `a` and `a:b` are created automatically
-catalog.as_schemas().create_schema(name="a:b:c", comment="a nested schema", properties={})
+catalog.as_schemas().create_schema(name="a:b:c", comment="a hierarchical schema", properties={})
 ```
 
 </TabItem>
