@@ -238,7 +238,7 @@ public class TestGravitinoCache {
   void testCaffeineInvalidateByPrefix() {
     CaffeineGravitinoCache<String, Long> cache = new CaffeineGravitinoCache<>(60_000L, 1000L);
     try {
-      // Simulate hierarchical keys: metalake::catalog::schema::
+      // Simulate name-path keys: metalake::catalog::schema::
       cache.put("lake1::cat1::", 1L);
       cache.put("lake1::cat1::s1::", 2L);
       cache.put("lake1::cat1::s1::t1::TABLE", 3L);
