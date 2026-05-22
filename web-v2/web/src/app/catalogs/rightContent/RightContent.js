@@ -62,6 +62,11 @@ const FunctionDetailsPage = dynamic(() => import('./entitiesContent/FunctionDeta
   ssr: false
 })
 
+const ViewDetailsPage = dynamic(() => import('./entitiesContent/ViewDetailsPage'), {
+  loading: () => <Loading height={'200px'} />,
+  ssr: false
+})
+
 const RightContent = () => {
   const searchParams = useSearchParams()
 
@@ -70,9 +75,11 @@ const RightContent = () => {
   const catalog = searchParams.get('catalog')
   const schema = searchParams.get('schema')
   const functionName = searchParams.get('function')
+  const viewName = searchParams.get('view')
 
   const entity =
     functionName ||
+    viewName ||
     searchParams.get('table') ||
     searchParams.get('fileset') ||
     searchParams.get('topic') ||
@@ -91,6 +98,9 @@ const RightContent = () => {
     } else {
       if (functionName) {
         return <FunctionDetailsPage />
+      }
+      if (viewName) {
+        return <ViewDetailsPage />
       }
       switch (catalogType) {
         case 'relational':

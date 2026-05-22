@@ -185,6 +185,20 @@ FROM <catalog>.<namespace>.<table>;
 | Supported engines        | Trino, Spark, Flink, Daft   | Any Iceberg-compatible engine |
 | Credential vending       | Varies                      | Yes (S3, GCS, OSS, ADLS)      |
 
+## Known issues
+
+### Trino identifiers are not treated as case sensitive
+
+Trino identifiers are not treated as case sensitive. As a result, metadata names that differ
+only by letter case cannot be distinguished. See [Trino identifier
+documentation](https://trino.io/docs/current/language/reserved.html#language-identifiers). This
+limitation comes from Trino itself and is not specific to Gravitino.
+
+For the best compatibility with Trino:
+
+- Use lowercase metadata names.
+- Avoid creating objects whose names differ only by letter case.
+
 ## Related
 
 - [Iceberg REST catalog service](../iceberg-rest-service.md)
