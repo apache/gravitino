@@ -16,30 +16,31 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.server.authorization.jcasbin;
 
-package org.apache.gravitino.idp.storage.mapper.provider.postgresql;
-
+import java.util.Arrays;
+import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpUserMetaPostgreSQLProvider {
+/** Tests for the cached role relation snapshot classes used by the version-validated caches. */
+public class TestJcasbinAuthorizerCacheHelpers {
 
   @Test
-  void testCurrentTimeMillisExpression() {
-    IdpUserMetaPostgreSQLProvider provider = new IdpUserMetaPostgreSQLProvider();
-
-    Assertions.assertEquals(
-        "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)",
-        provider.currentTimeMillisExpression());
+  void testCachedUserRoleRels() {
+    List<Long> roleIds = Arrays.asList(10L, 20L, 30L);
+    CachedUserRoleRels cur = new CachedUserRoleRels(1L, 1000L, roleIds);
+    Assertions.assertEquals(1L, cur.getUserId());
+    Assertions.assertEquals(1000L, cur.getUpdatedAt());
+    Assertions.assertEquals(roleIds, cur.getRoleIds());
   }
 
   @Test
-  void testDeleteIdpUserMetasByLegacyTimeline() {
-    IdpUserMetaPostgreSQLProvider provider = new IdpUserMetaPostgreSQLProvider();
-
-    Assertions.assertEquals(
-        "DELETE FROM idp_user_meta WHERE user_id IN (SELECT user_id FROM idp_user_meta"
-            + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})",
-        provider.deleteIdpUserMetasByLegacyTimeline(1L, 2));
+  void testCachedGroupRoleRels() {
+    List<Long> roleIds = Arrays.asList(100L, 200L);
+    CachedGroupRoleRels cgr = new CachedGroupRoleRels(5L, 2000L, roleIds);
+    Assertions.assertEquals(5L, cgr.getGroupId());
+    Assertions.assertEquals(2000L, cgr.getUpdatedAt());
+    Assertions.assertEquals(roleIds, cgr.getRoleIds());
   }
 }

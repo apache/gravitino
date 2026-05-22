@@ -44,7 +44,13 @@ class TestUserDTO(unittest.TestCase):
         self.assertEqual(deser_dict["audit"]["creator"], "admin")
 
     def test_user_dto_without_roles(self):
-        user_dto = UserDTO.builder().with_name("test_user_no_roles").build()
+        audit = AuditDTO(
+            _creator="admin",
+            _create_time="2024-01-01T00:00:00Z",
+        )
+        user_dto = (
+            UserDTO.builder().with_name("test_user_no_roles").with_audit(audit).build()
+        )
 
         ser_json = _json.dumps(user_dto.to_dict()).encode("utf-8")
         deser_dict = _json.loads(ser_json)
@@ -52,19 +58,28 @@ class TestUserDTO(unittest.TestCase):
         self.assertEqual(deser_dict["roles"], [])
 
     def test_user_dto_methods(self):
+        audit = AuditDTO(
+            _creator="admin",
+            _create_time="2024-01-01T00:00:00Z",
+        )
         user_dto = (
             UserDTO.builder()
             .with_name("method_user")
             .with_roles(["admin_role"])
+            .with_audit(audit)
             .build()
         )
         self.assertEqual(user_dto.name(), "method_user")
         self.assertEqual(user_dto.roles(), ["admin_role"])
-        self.assertIsNone(user_dto.audit_info())
+        self.assertIsNotNone(user_dto.audit_info())
 
     def test_builder_empty_name_raises(self):
         with self.assertRaises(ValueError):
             UserDTO.builder().build()
+
+    def test_builder_null_audit_raises(self):
+        with self.assertRaises(ValueError):
+            UserDTO.builder().with_name("test_user").build()
 
     def test_equality_and_hash(self):
         audit = AuditDTO(_creator="test", _create_time="2024-01-01T00:00:00Z")
@@ -96,11 +111,31 @@ class TestUserDTO(unittest.TestCase):
         self.assertNotEqual(user1, user3)
 
     def test_roles_returns_list_type(self):
-        user_dto = UserDTO.builder().with_name("test").with_roles(["r1"]).build()
+        audit = AuditDTO(
+            _creator="admin",
+            _create_time="2024-01-01T00:00:00Z",
+        )
+        user_dto = (
+            UserDTO.builder()
+            .with_name("test")
+            .with_roles(["r1"])
+            .with_audit(audit)
+            .build()
+        )
         self.assertIsInstance(user_dto.roles(), list)
 
     def test_roles_immutability(self):
-        user_dto = UserDTO.builder().with_name("test").with_roles(["r1", "r2"]).build()
+        audit = AuditDTO(
+            _creator="admin",
+            _create_time="2024-01-01T00:00:00Z",
+        )
+        user_dto = (
+            UserDTO.builder()
+            .with_name("test")
+            .with_roles(["r1", "r2"])
+            .with_audit(audit)
+            .build()
+        )
         roles = user_dto.roles()
         roles.append("r3")
         self.assertEqual(["r1", "r2"], user_dto.roles())

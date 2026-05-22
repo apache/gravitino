@@ -321,6 +321,46 @@ Please refer the following configuration If you are using Spark to access Iceber
 --conf spark.sql.catalog.rest.oauth2-server-uri=http://localhost:8177/oauth2/token
 ```
 
+##### OAuth 2.0 token refresh for Iceberg REST clients
+
+OAuth 2.0 token refresh challenges may arise in certain query engines when accessing the Gravitino Iceberg REST Catalog (IRC).
+These are often linked to identity providers without full token exchange support, or to authentication models in which child sessions inherit the expiration policies of their parent sessions.
+
+The following Apache Iceberg change is relevant to this behavior:
+
+| Version         | Change                                                                                                                                                                                 |
+|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Iceberg 1.11.0+ | Supports disabling token exchange, renewing tokens with client credentials, and ensuring that child `AuthSession` instances use their own expiration instead of inheriting the parent session expiration. |
+
+###### Apache Iceberg OAuth 2.0 configuration
+
+**Spark**
+
+Set the following catalog property to disable token exchange:
+
+```text
+spark.sql.catalog.${catalog_name}.token-exchange-enabled=false
+```
+
+**Flink**
+
+Set the following catalog property to disable token exchange:
+
+```sql
+  'token-exchange-enable' = 'false'
+```
+
+**Trino**
+
+Use Trino 479 or later, and set the following properties in the catalog configuration:
+
+```properties
+iceberg.rest-catalog.session=NONE
+iceberg.rest-catalog.oauth2.token-exchange-enabled=false
+```
+
+You can omit `iceberg.rest-catalog.session=NONE` because `NONE` is the default value.
+
 #### HTTPS
 
 Please refer to [HTTPS Configuration](./security/how-to-use-https/#apache-iceberg-rest-services-configuration) for how to enable HTTPS for Gravitino Iceberg REST server.

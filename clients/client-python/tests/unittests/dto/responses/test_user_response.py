@@ -20,6 +20,7 @@ from __future__ import annotations
 import json as _json
 import unittest
 
+from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.authorization.user_dto import UserDTO
 from gravitino.dto.responses.user_response import (
     UserListResponse,
@@ -30,7 +31,11 @@ from gravitino.dto.responses.user_response import (
 
 class TestUserResponses(unittest.TestCase):
     def test_user_response(self):
-        user_dto = UserDTO.builder().with_name("user1").build()
+        audit = AuditDTO(
+            _creator="admin",
+            _create_time="2024-01-01T00:00:00Z",
+        )
+        user_dto = UserDTO.builder().with_name("user1").with_audit(audit).build()
         resp = UserResponse(0, user_dto)
 
         resp.validate()
@@ -62,8 +67,18 @@ class TestUserResponses(unittest.TestCase):
         self.assertListEqual(names, deser_dict["names"])
 
     def test_user_list_response(self):
-        user1 = UserDTO.builder().with_name("user1").with_roles(["r1"]).build()
-        user2 = UserDTO.builder().with_name("user2").build()
+        audit = AuditDTO(
+            _creator="admin",
+            _create_time="2024-01-01T00:00:00Z",
+        )
+        user1 = (
+            UserDTO.builder()
+            .with_name("user1")
+            .with_roles(["r1"])
+            .with_audit(audit)
+            .build()
+        )
+        user2 = UserDTO.builder().with_name("user2").with_audit(audit).build()
 
         resp = UserListResponse(0, [user1, user2])
 
