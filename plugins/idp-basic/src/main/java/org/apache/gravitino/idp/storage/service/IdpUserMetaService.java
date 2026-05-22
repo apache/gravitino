@@ -122,7 +122,7 @@ public class IdpUserMetaService {
         SessionUtils.doWithCommitAndFetchResult(
             IdpUserMetaMapper.class,
             mapper -> mapper.updateIdpUserPassword(username, passwordHash));
-    return updated != null && updated > 0;
+    return updated > 0;
   }
 
   @Monitored(
