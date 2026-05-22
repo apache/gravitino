@@ -31,6 +31,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Implementation of an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
@@ -71,7 +72,7 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
 
   @Override
   public Capability newCapability() {
-    return new IcebergCatalogCapability();
+    return new IcebergCatalogCapability(HierarchicalSchemaUtil.schemaSeparator());
   }
 
   @Override

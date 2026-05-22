@@ -302,6 +302,12 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
             <Icons.iconify icon='material-symbols:function' className='my-icon-small' />
           </span>
         )
+      case 'view':
+        return (
+          <span role='img' aria-label='view' className='anticon anticon-frown'>
+            <Icons.iconify icon='ic:outline-table-view' className='my-icon-small' />
+          </span>
+        )
       default:
         return <></>
     }
@@ -323,11 +329,12 @@ export const TreeComponent = forwardRef(function TreeComponent(props, ref) {
       const catalogType = searchParams.get('catalogType')
       const schema = searchParams.get('schema')
       const table = searchParams.get('table')
+      const view = searchParams.get('view')
       const fileset = searchParams.get('fileset')
       const topic = searchParams.get('topic')
       const model = searchParams.get('model')
       const func = searchParams.get('function')
-      const entity = table || fileset || topic || model || func
+      const entity = table || view || fileset || topic || model || func
 
       if (!metalake) {
         dispatch(setExpanded([]))
