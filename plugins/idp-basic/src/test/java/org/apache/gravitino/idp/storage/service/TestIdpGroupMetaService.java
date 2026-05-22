@@ -76,7 +76,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
-    assertThrowsEntityAlreadyExists(() -> groupMetaService.insertIdpGroup(duplicateGroup));
+    assertThrowsRuntimeException(() -> groupMetaService.insertIdpGroup(duplicateGroup));
   }
 
   @ParameterizedTest

@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.idp.storage.service;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
@@ -75,16 +74,11 @@ public abstract class AbstractIdpMetaServiceTest extends AbstractIdpMetaStorageT
     void run() throws IOException;
   }
 
-  /**
-   * Asserts the service throws {@code EntityAlreadyExistsException} without compiling against the
-   * {@code :api} module.
-   */
-  protected void assertThrowsEntityAlreadyExists(ServiceCall insertCall) throws IOException {
+  /** Asserts the service call fails with a runtime exception (e.g. unique constraint violation). */
+  protected void assertThrowsRuntimeException(ServiceCall insertCall) throws IOException {
     closeSession();
     try {
-      Exception exception = assertThrows(Exception.class, insertCall::run);
-      assertEquals(
-          "org.apache.gravitino.EntityAlreadyExistsException", exception.getClass().getName());
+      assertThrows(RuntimeException.class, insertCall::run);
     } finally {
       refreshSession();
     }

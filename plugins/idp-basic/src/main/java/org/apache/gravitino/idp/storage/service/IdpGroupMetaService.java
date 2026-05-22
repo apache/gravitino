@@ -21,11 +21,9 @@ package org.apache.gravitino.idp.storage.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
@@ -33,7 +31,6 @@ import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /**
@@ -77,13 +74,8 @@ public class IdpGroupMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertIdpGroup")
-  public void insertIdpGroup(IdpGroupPO groupPO) throws IOException {
-    try {
-      SessionUtils.doWithCommit(IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO));
-    } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(re, Entity.EntityType.GROUP, groupPO.getGroupName());
-      throw re;
-    }
+  public void insertIdpGroup(IdpGroupPO groupPO) {
+    SessionUtils.doWithCommit(IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO));
   }
 
   @Monitored(
@@ -104,7 +96,7 @@ public class IdpGroupMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "addUsersToGroup")
-  public void addUsersToGroup(String groupName, List<String> usernames) throws IOException {
+  public void addUsersToGroup(String groupName, List<String> usernames) {
     Preconditions.checkNotNull(usernames, "IdP usernames cannot be null");
     if (usernames.isEmpty()) {
       return;
@@ -118,13 +110,8 @@ public class IdpGroupMetaService {
       relations.add(newUserGroupRelation(group.getGroupId(), userIds.get(username)));
     }
 
-    try {
-      SessionUtils.doWithCommit(
-          IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
-    } catch (RuntimeException re) {
-      ExceptionUtils.checkSQLException(re, Entity.EntityType.GROUP, groupName);
-      throw re;
-    }
+    SessionUtils.doWithCommit(
+        IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
   }
 
   private static IdpUserGroupRelPO newUserGroupRelation(long groupId, long userId) {

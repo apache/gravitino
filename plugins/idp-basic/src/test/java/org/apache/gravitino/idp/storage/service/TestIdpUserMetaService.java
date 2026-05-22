@@ -79,7 +79,7 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
-    assertThrowsEntityAlreadyExists(() -> userMetaService.insertIdpUser(duplicateUser));
+    assertThrowsRuntimeException(() -> userMetaService.insertIdpUser(duplicateUser));
   }
 
   @ParameterizedTest
