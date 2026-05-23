@@ -31,7 +31,7 @@ Doesn't support distribution and sort orders.
 - `TIME TRAVEL QUERY`
 - `DESCRIBE TABLE`
 
-#### Not Supported Operations
+#### Unsupported Operations
 
 - View operations.
 - Metadata tables, like:

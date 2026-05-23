@@ -5,7 +5,7 @@ keyword: table maintenance, optimizer, statistics, metrics, monitor
 license: This software is licensed under the Apache License version 2.
 ---
 
-## What Is This Service
+## Overview
 
 The Table Maintenance Service (Optimizer) automates table maintenance by connecting:
 
