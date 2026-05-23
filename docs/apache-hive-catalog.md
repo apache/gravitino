@@ -8,15 +8,15 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Apache Gravitino offers the capability to utilize [Apache Hive](https://hive.apache.org) as a catalog for metadata management.
+Apache Gravitino can use [Apache Hive](https://hive.apache.org) as a catalog for metadata management.
 
 ### Requirements and Limitations
 
-* The Hive catalog requires a Hive Metastore Service (HMS), or a compatible implementation of the HMS, such as AWS Glue.
-* Gravitino must have network access to the Hive metastore service using the Thrift protocol.
+* The Hive catalog requires a Hive Metastore Service (HMS), or a compatible implementation such as AWS Glue.
+* Gravitino must have network access to the Hive metastore over the Thrift protocol.
 
 :::note
-The Hive catalog supports HMS versions 2.x and 3.x. it can automatically detect the HMS version.
+The Hive catalog supports HMS versions 2.x and 3.x, and automatically detects which version is in use.
 :::
 
 ## Catalog
@@ -33,13 +33,13 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 |------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------|---------------|
 | `metastore.uris`                         | The Hive metastore service URIs, separate multiple addresses with commas. Such as `thrift://127.0.0.1:9083`                                                                                                                                         | (none)        | Yes                          | 0.2.0         |
 | `client.pool-size`                       | The maximum number of Hive metastore clients in the pool for Gravitino.                                                                                                                                                                             | 1             | No                           | 0.2.0         |
-| `gravitino.bypass.`                      | Property name with this prefix passed down to the underlying HMS client for use. Such as `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls                                   | (none)        | No                           | 0.2.0         |
+| `gravitino.bypass.`                      | Properties with this prefix are passed down to the underlying HMS client. For example, `gravitino.bypass.hive.metastore.failure.retries = 3` configures the HMS client to retry failed Thrift calls three times.                                    | (none)        | No                           | 0.2.0         |
 | `client.pool-cache.eviction-interval-ms` | The cache pool eviction interval.                                                                                                                                                                                                                   | 300000        | No                           | 0.4.0         |
 | `impersonation-enable`                   | Enable user impersonation for Hive catalog.                                                                                                                                                                                                         | false         | No                           | 0.4.0         |
-| `kerberos.principal`                     | The Kerberos principal for the catalog. You should configure `gravitino.bypass.hadoop.security.authentication`, `gravitino.bypass.hive.metastore.kerberos.principal` and `gravitino.bypass.hive.metastore.sasl.enabled`if you want to use Kerberos. | (none)        | required if you use kerberos | 0.4.0         |
-| `kerberos.keytab-uri`                    | The uri of key tab for the catalog. Now supported protocols are `https`, `http`, `ftp`, `file`.                                                                                                                                                     | (none)        | required if you use kerberos | 0.4.0         |
-| `kerberos.check-interval-sec`            | The interval to check validness of the principal                                                                                                                                                                                                    | 60            | No                           | 0.4.0         |
-| `kerberos.keytab-fetch-timeout-sec`      | The timeout to fetch key tab                                                                                                                                                                                                                        | 60            | No                           | 0.4.0         |
+| `kerberos.principal`                     | The Kerberos principal for the catalog. To use Kerberos, also configure `gravitino.bypass.hadoop.security.authentication`, `gravitino.bypass.hive.metastore.kerberos.principal`, and `gravitino.bypass.hive.metastore.sasl.enabled`.                | (none)        | Required if you use Kerberos | 0.4.0         |
+| `kerberos.keytab-uri`                    | The URI of the keytab for the catalog. Supported protocols are `https`, `http`, `ftp`, and `file`.                                                                                                                                                  | (none)        | Required if you use Kerberos | 0.4.0         |
+| `kerberos.check-interval-sec`            | Interval, in seconds, at which the catalog re-checks that the principal is still valid.                                                                                                                                                             | 60            | No                           | 0.4.0         |
+| `kerberos.keytab-fetch-timeout-sec`      | Timeout, in seconds, for fetching the keytab.                                                                                                                                                                                                       | 60            | No                           | 0.4.0         |
 | `list-all-tables`                        | Whether to list all tables in a database, including non-Hive tables such as Iceberg, Paimon, and Hudi. When false, non-Hive tables are filtered out on a best-effort basis; see the note below for known limitations.                            | false         | No                           | 0.5.1         |
 | `default.catalog`                        | The default catalog name for the Hive3 metastore backend; this configuration is ignored when using a Hive2 metastore.                                                                                                                               | hive          | No                           | 1.1.0         |
 
@@ -72,11 +72,11 @@ df.write.format("hudi")
 The corresponding `_ro` / `_rt` siblings are removed automatically based on the base table name.
 :::
 
-When using Gravitino with Trino, pass the Trino Hive connector configuration using the `trino.bypass.` prefix. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
+When you use Gravitino with Trino, pass Trino Hive connector configuration through the `trino.bypass.` prefix. For example, set `trino.bypass.hive.config.resources` to forward `hive.config.resources` to the Gravitino Hive catalog at Trino runtime.
 
-When using Gravitino with Spark, pass the Spark Hive connector configuration using the `spark.bypass.` prefix. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
+When you use Gravitino with Spark, pass Spark Hive connector configuration through the `spark.bypass.` prefix. For example, set `spark.bypass.hive.exec.dynamic.partition.mode` to forward `hive.exec.dynamic.partition.mode` to the Spark Hive connector at Spark runtime.
 
-When using Gravitino authorization for Hive with Apache Ranger, see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#configure-the-ranger-hadoop-sql-plugin)
+When you authorize the Hive catalog with Apache Ranger, see the [authorization with Ranger properties](security/authorization-pushdown.md#configure-the-ranger-hadoop-sql-plugin).
 
 ### Catalog Operations
 
@@ -99,19 +99,19 @@ The following table lists predefined schema properties for the Hive database. Ad
 
 ### Schema Operations
 
-see [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations).
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
 ### Table Capabilities
 
 - The Hive catalog supports creating, updating, and deleting tables in the HMS.
-- Doesn't support column default value.
+- The Hive catalog does not support column default values.
 
 ### Table Partitioning
 
-The Hive catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables). Users can create partitioned tables in the Hive catalog with the specific partitioning attribute.
-Although Gravitino supports several partitioning strategies, Apache Hive inherently only supports a single partitioning strategy (partitioned by column). Therefore, the Hive catalog only supports `Identity` partitioning.
+The Hive catalog supports [partitioned tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-PartitionedTables). To create one, set a partitioning attribute on the table definition.
+Although Gravitino supports several partitioning strategies, Apache Hive natively supports only one (partitioned by column). The Hive catalog therefore supports only `Identity` partitioning.
 
 :::caution
 The `fieldName` specified in the partitioning attribute must be the name of a column defined in the table.
@@ -119,8 +119,8 @@ The `fieldName` specified in the partitioning attribute must be the name of a co
 
 ### Table Sort Orders and Distributions
 
-The Hive catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). Users can create bucketed sorted tables in the Hive catalog with specific `distribution` and `sortOrders` attributes.
-Although Gravitino supports several distribution strategies, Apache Hive inherently only supports a single distribution strategy (clustered by column). Therefore the Hive catalog only supports `Hash` distribution.
+The Hive catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). To create one, set the `distribution` and `sortOrders` attributes on the table definition.
+Although Gravitino supports several distribution strategies, Apache Hive natively supports only one (clustered by column). The Hive catalog therefore supports only `Hash` distribution.
 
 :::caution
 The `fieldName` specified in the `distribution` and `sortOrders` attribute must be the name of a column defined in the table.
@@ -155,14 +155,14 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `uniontype`                 | `union`             | 0.2.0         |
 
 :::info
-1. Since 0.6.0-incubating, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.
-2. Since version 1.0.0, using the `struct` data type with field comments will throw an error, as it does not work for Hive tables (see [HIVE-26593](https://issues.apache.org/jira/browse/HIVE-26593)).
+1. Since 0.6.0-incubating, data types other than those listed above are mapped to the Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)**, which represents an unresolvable data type from the Hive catalog.
+2. Since version 1.0.0, using the `struct` data type with field comments throws an error, because Hive does not honor field comments on struct columns (see [HIVE-26593](https://issues.apache.org/jira/browse/HIVE-26593)).
 :::
 
 ### Table Properties
 
 Table properties supply or set metadata for the underlying Hive tables.
-The following table lists predefined table properties for a Hive table. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive database.
+The following table lists predefined table properties for a Hive table. Additionally, you can define your own key-value pair properties and transmit them to the underlying Hive table.
 
 :::note
 **Reserved**: Fields that cannot be passed to the Gravitino server.
@@ -178,7 +178,7 @@ The following table lists predefined table properties for a Hive table. Addition
 | `input-format`          | The input format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcInputFormat`.                                           | The property `format` sets the default value `org.apache.hadoop.mapred.TextInputFormat` and can change it to a different default.                   | No       | No       | Yes       | 0.2.0         |
 | `output-format`         | The output format class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat`.                                         | The property `format` sets the default value `org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat` and can change it to a different default. | No       | No       | Yes       | 0.2.0         |
 | `serde-lib`             | The serde library class for the table, such as `org.apache.hadoop.hive.ql.io.orc.OrcSerde`.                                                | The property `format` sets the default value `org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe` and can change it to a different default.         | No       | No       | Yes       | 0.2.0         |
-| `serde.parameter.`      | The prefix of the serde parameter, such as `"serde.parameter.orc.create.index" = "true"`, indicating `ORC` serde lib to create row indexes | (none)                                                                                                                                              | No       | No       | Yes       | 0.2.0         |
+| `serde.parameter.`      | Prefix for serde parameters. For example, `"serde.parameter.orc.create.index" = "true"` tells the ORC serde library to create row indexes. | (none)                                                                                                                                              | No       | No       | Yes       | 0.2.0         |
 | `serde-name`            | The name of the serde                                                                                                                      | Table name by default.                                                                                                                              | No       | No       | Yes       | 0.2.0         |
 | `comment`               | Used to store a table comment.                                                                                                             | (none)                                                                                                                                              | No       | Yes      | No        | 0.2.0         |
 | `numFiles`              | Used to store the number of files in the table.                                                                                            | (none)                                                                                                                                              | No       | Yes      | No        | 0.2.0         |
@@ -188,7 +188,7 @@ The following table lists predefined table properties for a Hive table. Addition
 
 ### Table Indexes
 
-- Doesn't support table indexes.
+The Hive catalog does not support table indexes.
 
 ### Table Operations
 
@@ -196,7 +196,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 #### Alter Operations
 
-Gravitino has already defined a unified set of [metadata operation interfaces](./manage-relational-metadata-using-gravitino.md#alter-a-table), and almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column) have corresponding table update requests which enable you to change the struct of an existing table.
+Gravitino defines a unified set of [metadata operation interfaces](./manage-relational-metadata-using-gravitino.md#alter-a-table), and almost all [Hive Alter operations](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-AlterTable/Partition/Column) have corresponding table update requests that let you change the structure of an existing table.
 The following table lists the mapping relationship between Hive Alter operations and Gravitino table update requests.
 
 ##### Alter table
@@ -247,6 +247,5 @@ Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gra
 
 ## Hive Catalog with S3 Storage
 
-To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-cloud-storage.md) documentation. No special configurations are required for the Hive catalog to work with S3 storage.
-The only difference is the storage location of the files, which is in S3. Use `location` to specify the S3 path for the database or table.
+To create a Hive catalog backed by S3 storage, see the [Hive catalog with S3](./hive-catalog-with-cloud-storage.md) documentation. No S3-specific catalog configuration is required; the Hive catalog works with S3 the same way it works with HDFS, with the storage path pointing at S3. Set the `location` property to the desired S3 path when creating the database or table.
 

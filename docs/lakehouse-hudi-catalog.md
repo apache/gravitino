@@ -25,9 +25,11 @@ Tested and verified with Apache Hudi `0.15.0`.
 
 ### Catalog Capabilities
 
-- Works as a catalog proxy, supporting `HMS` as catalog backend.
-- Only support read operations (list and load) for Hudi schemas and tables.
-- Doesn't support timeline management operations now.
+The Hudi catalog:
+
+- Acts as a catalog proxy backed by `HMS`.
+- Supports only read operations (list and load) on Hudi schemas and tables.
+- Does not support timeline management operations.
 
 ### Catalog Properties
 
@@ -42,18 +44,18 @@ Tested and verified with Apache Hudi `0.15.0`.
 
 #### Catalog Backend Security
 
-Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
+Configure backend security with the following properties. For a Kerberos Hive backend, for example, set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
 
 | Property name                                      | Description                                                                                                                                                    | Default value | Required                                                    | Since Version     |
 |----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|-------------------|
-| `authentication.type`                              | The type of authentication for hudi catalog backend. This configuration only applicable for for hms backend, and only supports `kerberos`, `simple` currently. | `simple`      | No                                                          | 1.0.0 |
+| `authentication.type`                              | Authentication type for the Hudi catalog backend. The HMS backend supports `kerberos` and `simple`.                                                            | `simple`      | No                                                          | 1.0.0 |
 | `authentication.impersonation-enable`              | Whether to enable impersonation for the hudi catalog                                                                                                           | `false`       | No                                                          | 1.0.0 |
 | `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                   | (none)        | required if the value of `authentication.type` is kerberos. | 1.0.0 |
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                         | (none)        | required if the value of `authentication.type` is kerberos. | 1.0.0 |
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for hudi catalog.                                                                                                    | 60            | No                                                          | 1.0.0 |
 | `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                     | 60            | No                                                          | 1.0.0 |
 
-Property name with this prefix passed down to the underlying backend client for use. Such as `gravitino.bypass.hive.metastore.kerberos.principal=XXXX`、`gravitino.bypass.hadoop.security.authentication=kerberos`、`gravitino.bypass.hive.metastore.sasl.enabled=ture` And so on.
+Properties with the `gravitino.bypass.` prefix are passed through to the underlying backend client. For example: `gravitino.bypass.hive.metastore.kerberos.principal=XXXX`, `gravitino.bypass.hadoop.security.authentication=kerberos`, `gravitino.bypass.hive.metastore.sasl.enabled=true`, and so on.
 
 
 ### Catalog Operations
@@ -64,42 +66,41 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-- Only support read operations: listSchema, loadSchema, and schemaExists.
+The Hudi catalog supports only read operations on schemas: `listSchema`, `loadSchema`, and `schemaExists`.
 
 ### Schema Properties
 
-- The `Location` is an optional property that shows the storage path to the Hudi database
+The optional `Location` property records the storage path of the Hudi database.
 
 ### Schema Operations
 
-Only support read operations: listSchema, loadSchema, and schemaExists.
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+The Hudi catalog supports only read operations: `listSchema`, `loadSchema`, and `schemaExists`. Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
 ### Table Capabilities
 
-- Only support read operations: listTable, loadTable, and tableExists.
+The Hudi catalog supports only read operations on tables: `listTable`, `loadTable`, and `tableExists`.
 
 ### Table Partitions
 
-- Support loading Hudi partitioned tables (Hudi only supports identity partitioning).
+The Hudi catalog can load partitioned tables. Hudi supports only identity partitioning.
 
 ### Table Sort Orders
 
-- Doesn't support table sort orders.
+The Hudi catalog does not support table sort orders.
 
 ### Table Distributions
 
-- Doesn't support table distributions.
+The Hudi catalog does not support table distributions.
 
 ### Table Indexes
 
-- Doesn't support table indexes.
+The Hudi catalog does not support table indexes.
 
 ### Table Properties
 
-- For HMS backend, it will bring out all the table parameters from the HMS.
+For the HMS backend, the Hudi catalog surfaces all table parameters from the HMS.
 
 ### Table Column Types
 
@@ -123,5 +124,4 @@ The following table shows the mapping between Gravitino and [Apache Hudi column 
 
 ### Table Operations
 
-Only support read operations: listTable, loadTable, and tableExists.
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+The Hudi catalog supports only read operations: `listTable`, `loadTable`, and `tableExists`. Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.

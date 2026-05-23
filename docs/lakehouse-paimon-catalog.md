@@ -22,10 +22,12 @@ Builds with Apache Paimon `1.2`.
 
 ### Catalog Capabilities
 
-- Works as a catalog proxy, supporting `FilesystemCatalog`, `JdbcCatalog` and `HiveCatalog`.
-- Supports DDL operations for Paimon schemas and tables.
+The Paimon catalog:
 
-- Doesn't support alterSchema.
+- Acts as a catalog proxy backed by `FilesystemCatalog`, `JdbcCatalog`, or `HiveCatalog`.
+- Supports DDL operations on Paimon schemas and tables.
+
+The Paimon catalog does not support `alterSchema`.
 
 ### Catalog Properties
 
@@ -35,8 +37,8 @@ Builds with Apache Paimon `1.2`.
 | `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                                                                         | required if the value of `catalog-backend` is not `filesystem`.                                                                                                      | 0.6.0-incubating |
 | `warehouse`                                        | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS  | (none)                                                                         | Yes                                                                                                                                                                  | 0.6.0-incubating |
 | `catalog-backend-name`                             | The catalog name passed to underlying Paimon catalog backend.                                                                                                                                               | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No                                                                                                                                                                   | 0.8.0-incubating |
-| `authentication.type`                              | The type of authentication for Paimon catalog backend, Gravitino only supports `Kerberos` and `simple`.                                                                                           | `simple`                                                                       | No                                                                                                                                                                   | 0.6.0-incubating |
-| `hive.metastore.sasl.enabled`                      | Whether to enable SASL authentication protocol when connect to Kerberos Hive metastore. This is a raw Hive configuration                                                                                    | `false`                                                                        | No, This value should be true in most case(Some will use SSL protocol, but it rather rare) if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.6.0-incubating |
+| `authentication.type`                              | Authentication type for the Paimon catalog backend. Supported values are `Kerberos` and `simple`.                                                                                                           | `simple`                                                                       | No                                                                                                                                                                   | 0.6.0-incubating |
+| `hive.metastore.sasl.enabled`                      | Whether to enable SASL when connecting to a Kerberos Hive metastore. This is a raw Hive configuration.                                                                                                      | `false`                                                                        | Should be `true` for most Kerberos setups (SSL is the rarer alternative) when `authentication.type` is `Kerberos`.                                                   | 0.6.0-incubating |
 | `authentication.kerberos.principal`                | The principal of the Kerberos authentication.                                                                                                                                                               | (none)                                                                         | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                      | (none)                                                                         | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Paimon catalog.                                                                                                                                               | 60                                                                             | No                                                                                                                                                                   | 0.6.0-incubating |
@@ -90,7 +92,7 @@ If you are using JDBC backend, you must specify the properties like `jdbc-user`,
 | `jdbc-driver`   | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL   | (none)          | required if the value of `catalog-backend` is `jdbc`. | 0.7.0-incubating |
 
 :::caution
-Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-paimon/libs` directory If you are using JDBC backend.
+When using the JDBC backend, download the corresponding JDBC driver and place it in the `catalogs/lakehouse-paimon/libs` directory.
 :::
 
 ### Catalog Operations
@@ -101,16 +103,15 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-- Supporting createSchema, dropSchema, loadSchema and listSchema.
-- Supporting cascade drop schema.
-
-- Doesn't support alterSchema.
+The Paimon catalog supports `createSchema`, `dropSchema`, `loadSchema`, `listSchema`, and cascade-dropping schemas. It does not support `alterSchema`.
 
 ### Schema Properties
 
-- Doesn't support specify location and store any schema properties when createSchema for FilesystemCatalog.
-- Doesn't return any schema properties when loadSchema for FilesystemCatalog.
-- Doesn't support store schema comment for FilesystemCatalog.
+For `FilesystemCatalog`, the Paimon catalog:
+
+- Does not support specifying a schema location or storing arbitrary schema properties at `createSchema`.
+- Does not return schema properties at `loadSchema`.
+- Does not store the schema comment.
 
 ### Schema Operations
 
@@ -120,18 +121,16 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Table Capabilities
 
-- Supporting createTable, purgeTable, alterTable, loadTable and listTable.
-- Supporting Column default value through table properties, such as `fields.{columnName}.default-value`, not column expression.
+The Paimon catalog supports `createTable`, `purgeTable`, `alterTable`, `loadTable`, and `listTable`. Column default values are supported through table properties such as `fields.{columnName}.default-value`; column-expression defaults are not supported.
 
-- Doesn't support dropTable.
-- Doesn't support table distribution and sort orders.
+The Paimon catalog does not support `dropTable`, table distribution, or table sort orders.
 
 :::info
-Gravitino Paimon Catalog does not support dropTable, because the dropTable in Paimon will both remove the table metadata and the table location from the file system and skip the trash, we should use purgeTable instead in Gravitino.
+The Paimon catalog deliberately omits `dropTable` because Paimon's `dropTable` removes both the metadata and the table location from the file system and skips the trash. Use `purgeTable` instead.
 :::
 
 :::info
-Paimon does not support auto increment column.
+Paimon does not support auto-increment columns.
 :::
 
 ### Table Changes
@@ -150,28 +149,26 @@ Paimon does not support auto increment column.
 
 ### Table Partitions
 
-- Only supports Identity partitions, such as `day`, `hour`, etc.
-
-Refer to [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spark/sql-ddl/#create-table) for more details.
+The Paimon catalog supports only identity partitions, such as `day` and `hour`. See [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spark/sql-ddl/#create-table) for more details.
 
 ### Table Sort Orders
 
-- Doesn't support table sort orders.
+The Paimon catalog does not support table sort orders.
 
 ### Table Distributions
 
-- Doesn't support table distributions.
+The Paimon catalog does not support table distributions.
 
 ### Table Indexes
 
-- Only supports primary key Index.
+The Paimon catalog supports only the primary-key index.
 
 :::info
-We cannot specify more than one primary key Index, and a primary key Index can contain multiple fields as a joint primary key.
+At most one primary-key index can be defined per table, but it may cover multiple fields as a joint primary key.
 :::
 
 :::info
-Paimon Table primary key constraint should not be same with partition fields, this will result in only one record in a partition.
+A Paimon table's primary key constraint must not include any of the partition fields. Including a partition field in the primary key results in only one record per partition.
 :::
 
 ### Table Column Types
@@ -251,5 +248,5 @@ Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gra
 Place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory to automatically load as the default HDFS configuration.
 
 :::caution
-When reading and writing to HDFS, the Gravitino server can only operate as the specified Kerberos user and doesn't support proxying to other Kerberos users now.
+When reading and writing HDFS, the Gravitino server operates only as the configured Kerberos user; proxying to other Kerberos users is not supported.
 :::

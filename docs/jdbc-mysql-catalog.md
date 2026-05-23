@@ -16,19 +16,20 @@ import TabItem from '@theme/TabItem';
 Apache Gravitino provides the ability to manage MySQL metadata.
 
 :::caution
-Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
+Gravitino saves some system information in schema and table comments, such as `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`. Do not edit or remove this message.
 :::
 
 ## Catalog
 
 ### Catalog Capabilities
 
-- Gravitino catalog corresponds to the MySQL instance.
-- Supports metadata management of MySQL (5.7, 8.0).
-- Supports DDL operation for MySQL databases and tables.
-- Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
-- Supports managing MySQL table features through table properties, like using `engine` to set MySQL storage engine.
+A Gravitino MySQL catalog corresponds to a MySQL instance and provides:
+
+- Metadata management for MySQL 5.7 and 8.0.
+- DDL operations on MySQL databases and tables.
+- Table indexes.
+- [Column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Management of MySQL table features through table properties (for example, `engine` to set the storage engine).
 
 ### Catalog Properties
 
@@ -36,7 +37,7 @@ Pass to a MySQL data source any property that isn't defined by Gravitino by addi
 
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
-When using Gravitino with Trino, pass the Trino MySQL connector configuration using the `trino.bypass.` prefix. For example, using `trino.bypass.join-pushdown.strategy` to pass the `join-pushdown.strategy` to the Gravitino MySQL catalog in Trino runtime.
+When you use Gravitino with Trino, pass Trino MySQL connector configuration through the `trino.bypass.` prefix. For example, set `trino.bypass.join-pushdown.strategy` to forward `join-pushdown.strategy` to the Gravitino MySQL catalog at Trino runtime.
 
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the MySQL catalog has the following properties:
@@ -90,14 +91,11 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-- Gravitino's schema concept corresponds to the MySQL database.
-- Supports creating schema, but does not support setting comment.
-- Supports dropping schema.
-- Supports cascade dropping schema.
+A Gravitino schema corresponds to a MySQL database. The MySQL catalog supports creating, dropping, and cascade-dropping schemas, but does not support setting a schema comment.
 
 ### Schema Properties
 
-- Doesn't support any schema property settings.
+The MySQL catalog does not support any schema-level properties.
 
 ### Schema Operations
 
@@ -107,11 +105,12 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Table Capabilities
 
-- Gravitino's table concept corresponds to the MySQL table.
-- Supports DDL operation for MySQL tables.
-- Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
-- Supports managing MySQL table features through table properties, like using `engine` to set MySQL storage engine.
+A Gravitino table corresponds to a MySQL table and supports:
+
+- DDL operations on MySQL tables.
+- Indexes.
+- [Column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Management of MySQL table features through table properties (for example, `engine` to set the storage engine).
 
 ### Table Column Types
 

@@ -24,10 +24,11 @@ Gravitino saves some system information in schema and table comments, like
 
 ### Catalog Capabilities
 
-- Gravitino catalog corresponds to the Doris instance.
-- Supports metadata management of Doris (1.2.x).
-- Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+A Gravitino Doris catalog corresponds to a Doris instance (1.2.x) and provides:
+
+- Metadata management.
+- Table indexes.
+- [Column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
 ### Catalog Properties
 
@@ -88,9 +89,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-- Gravitino's schema concept corresponds to the Doris database.
-- Supports creating schema.
-- Supports dropping schema.
+A Gravitino schema corresponds to a Doris database. The Doris catalog supports creating and dropping schemas.
 
 ### Schema Properties
 
@@ -105,9 +104,10 @@ Refer to
 
 ### Table Capabilities
 
-- Gravitino's table concept corresponds to the Doris table.
-- Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+A Gravitino table corresponds to a Doris table and supports:
+
+- Indexes.
+- [Column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
 #### Table Column Types
 

@@ -24,9 +24,10 @@ Gravitino saves some system information in table comments, like
 
 ### Catalog Capabilities
 
-- Gravitino catalog corresponds to the StarRocks instance.
-- Supports metadata management of StarRocks (3.3.x).
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+A Gravitino StarRocks catalog corresponds to a StarRocks instance (3.3.x) and provides:
+
+- Metadata management.
+- [Column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
 ### Catalog Properties
 
@@ -86,13 +87,11 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-- Gravitino's schema concept corresponds to the StarRocks database.
-- Supports creating schema.
-- Supports dropping schema.
+A Gravitino schema corresponds to a StarRocks database. The StarRocks catalog supports creating and dropping schemas.
 
 ### Schema Properties
 
-As StarRocks can't get thr properties after set, So now we do not support set Schema properties.  
+StarRocks does not expose schema properties after they are set, so the StarRocks catalog does not support setting them.
 
 ### Schema Operations
 
@@ -103,8 +102,7 @@ Refer to
 
 ### Table Capabilities
 
-- Gravitino's table concept corresponds to the StarRocks table.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+A Gravitino table corresponds to a StarRocks table and supports [column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
 #### Table Column Types
 
@@ -191,6 +189,6 @@ Please be aware that:
  - Schema changes, such as adding/modifying/dropping columns can be processed in batches.
  - The schema alteration in StarRocks is asynchronous. You might get an outdated schema if you
    execute a schema query immediately after the alteration. Pause briefly
-   after the alteration. Gravitino will surface the schema-alteration status in the
-   schema information in an upcoming release to solve this.
+   after the schema alteration. Gravitino will add the schema alteration status into
+   the schema information in the upcoming version to solve this problem.
 - StarRocks has limited support for [alert table properties](https://docs.starrocks.io/docs/3.3/sql-reference/sql-statements/table_bucket_part_index/ALTER_TABLE/#modify-table-properties), And it suggests modify one property at a time.  

@@ -24,11 +24,12 @@ Apache Gravitino provides the ability to manage OceanBase metadata.
 
 ### Catalog Capabilities
 
-- Gravitino catalog corresponds to the OceanBase instance.
-- Supports metadata management of OceanBase (4.x).
-- Supports DDL operation for OceanBase databases and tables.
-- Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+A Gravitino OceanBase catalog corresponds to an OceanBase instance (4.x) and provides:
+
+- Metadata management.
+- DDL operations on OceanBase databases and tables.
+- Table indexes.
+- [Column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
 ### Catalog Properties
 
@@ -90,10 +91,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-- Gravitino's schema concept corresponds to the OceanBase database.
-- Supports creating schema, but does not support setting comment.
-- Supports dropping schema.
-- Supports cascade dropping schema.
+A Gravitino schema corresponds to an OceanBase database. The OceanBase catalog supports creating, dropping, and cascade-dropping schemas, but does not support setting a schema comment.
 
 ### Schema Properties
 
@@ -107,10 +105,11 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Table Capabilities
 
-- Gravitino's table concept corresponds to the OceanBase table.
-- Supports DDL operation for OceanBase tables.
-- Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
+A Gravitino table corresponds to an OceanBase table and supports:
+
+- DDL operations on OceanBase tables.
+- Indexes.
+- [Column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
 ### Table Properties
 

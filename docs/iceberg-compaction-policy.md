@@ -130,5 +130,4 @@ Policy policy =
 
 ## Attach Policy to Metadata Objects
 
-After the policy is created, associate it with a catalog, schema, or table through standard policy association APIs.
-The optimizer will read the generated rules and properties to evaluate strategy triggering and job submission context.
+After the policy is created, associate it with a catalog, schema, or table through the standard policy-association APIs. The optimizer reads the generated rules and properties to evaluate strategy triggering and the job-submission context.

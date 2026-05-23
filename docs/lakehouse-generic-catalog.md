@@ -15,9 +15,9 @@ import TabItem from '@theme/TabItem';
 
 ## Overview
 
-The Generic Lakehouse Catalog is a Gravitino catalog implementation designed to seamlessly integrate with lakehouse storage systems built on file system-based architectures. This catalog enables unified metadata management for lakehouse tables stored on various storage backends, providing a consistent interface for data discovery, governance, and access control. 
+The generic lakehouse catalog integrates Gravitino with file-system-based lakehouse storage. It manages metadata for lakehouse tables across storage backends and exposes a consistent interface for data discovery, governance, and access control.
 
-Gravitino fully supports the **Lance** lakehouse format, with plans to extend support to additional formats in the future.
+Gravitino fully supports the **Lance** lakehouse format; support for additional formats is planned.
 
 ### Benefits
 
@@ -31,14 +31,13 @@ Gravitino fully supports the **Lance** lakehouse format, with plans to extend su
 
 ### Capabilities
 
-The Generic Lakehouse Catalog provides comprehensive relational metadata management capabilities equivalent to standard relational catalogs:
+The generic lakehouse catalog provides the same relational metadata management capabilities as standard relational catalogs:
 
-**Supported Operations:**
-- ✅ Create, read, update, and delete catalogs
-- ✅ List all catalogs in a metalake
-- ✅ Manage catalog properties and metadata
-- ✅ Set and modify catalog locations
-- ✅ Configure storage backend credentials
+- ✅ Create, read, update, and delete catalogs.
+- ✅ List all catalogs in a metalake.
+- ✅ Manage catalog properties and metadata.
+- ✅ Set and modify catalog locations.
+- ✅ Configure storage-backend credentials.
 
 For detailed information on available operations, see [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md).
 
@@ -131,15 +130,14 @@ Other catalog operations are general with relational catalogs. See [Catalog Oper
 
 ### Capabilities
 
-Schema operations follow the same patterns as relational catalogs:
+Schema operations follow the same pattern as in relational catalogs:
 
-**Supported Operations:**
-- ✅ Create schemas with custom properties
-- ✅ List all schemas in a catalog
-- ✅ Load schema metadata and properties
-- ✅ Update schema properties
-- ✅ Delete schemas
-- ✅ Check schema existence
+- ✅ Create schemas with custom properties.
+- ✅ List all schemas in a catalog.
+- ✅ Load schema metadata and properties.
+- ✅ Update schema properties.
+- ✅ Delete schemas.
+- ✅ Check schema existence.
 
 See [Schema Operations](./manage-relational-metadata-using-gravitino.md#schema-operations) for detailed documentation.
 
@@ -151,7 +149,7 @@ Schemas inherit catalog properties and can override specific settings:
 |------------|----------------------------------------------------------|------------------------------|----------|---------------|
 | `location` | Custom storage root path for all tables under the schema | 's3://bucket/path_to_schema' | No       | 1.1.0         |
 
-For location resolution hierarchy, see [Key Property: `location`](#key-property-location) in the Catalog Management section for more details.
+For location resolution, see [Key property: `location`](#key-property-location) in the catalog-management section.
 
 ### Schema Operations
 
@@ -197,6 +195,6 @@ For additional operations, refer to [Schema Operations documentation](./manage-r
 
 ### Supported Operations
 
-Since different lakehouse table formats have varying capabilities, table operation support may differ. The following are table operations for different lakehouse formats:
+Different lakehouse table formats have different capabilities, so table-operation support varies by format. See the per-format documentation:
 
-- [Lance Format Support](./lakehouse-generic-lance-table.md)
+- [Lance format](./lakehouse-generic-lance-table.md)

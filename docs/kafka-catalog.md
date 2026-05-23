@@ -8,8 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Kafka catalog is a messaging catalog that offers the ability to manage Apache Kafka topics' metadata.
-One Kafka catalog corresponds to one Kafka cluster.
+The Kafka catalog is a messaging catalog for managing Apache Kafka topic metadata. Each Kafka catalog corresponds to one Kafka cluster.
 
 ## Catalog
 
@@ -20,7 +19,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | Property Name       | Description                                                                                                                                                                                                   | Default Value | Required | Since Version |
 |---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `bootstrap.servers` | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      | 0.5.0         |
-| `gravitino.bypass.` | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for more details) | (none)        | No       | 0.5.0         |
+| `gravitino.bypass.` | Properties with this prefix are passed down to the underlying Kafka Admin client. See [Kafka Admin configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for the supported keys.        | (none)        | No       | 0.5.0         |
 
 ### Catalog Operations
 
@@ -28,11 +27,11 @@ Refer to [Catalog operations](./manage-messaging-metadata-using-gravitino.md#cat
 
 ## Schema
 
-A "default" schema, which includes all the topics in the Kafka cluster, will be automatically created when catalog is created.
+When a Kafka catalog is created, Gravitino automatically creates a `default` schema that contains all topics in the Kafka cluster.
 
 ### Schema Capabilities
 
-- Since the "default" schema is read-only, it only supports loading and listing schema.
+The `default` schema is read-only and supports only loading and listing.
 
 ### Schema Properties
 
@@ -46,16 +45,16 @@ Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schem
 
 ### Topic Capabilities
 
-- The Kafka catalog supports creating, updating, deleting, and listing topics.
+The Kafka catalog supports creating, updating, deleting, and listing topics.
 
 ### Topic Properties
 
 | Property name        | Description                              | Default value                                                                       | Required | Since Version |
 |----------------------|------------------------------------------|-------------------------------------------------------------------------------------|----------|---------------|
-| `partition-count`    | The number of partitions for the topic.  | if not specified, will use the `num.partition` property in the broker.              | No       | 0.5.0         |
-| `replication-factor` | The number of replications for the topic | if not specified, will use the `default.replication.factor` property in the broker. | No       | 0.5.0         |
+| `partition-count`    | Number of partitions for the topic.      | Falls back to `num.partition` from the broker.                                      | No       | 0.5.0         |
+| `replication-factor` | Number of replications for the topic.    | Falls back to `default.replication.factor` from the broker.                         | No       | 0.5.0         |
 
-Pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.
+Any other Kafka topic configuration can be passed through topic properties. See [Topic configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for the full list.
 
 ### Topic Operations
 

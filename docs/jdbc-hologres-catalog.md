@@ -25,14 +25,16 @@ Gravitino saves some system information in schema and table comment, like `(From
 
 ### Catalog Capabilities
 
-- Gravitino catalog corresponds to a Hologres database instance.
-- Supports metadata management of Hologres.
-- Supports DDL operation for Hologres schemas and tables.
-- Supports table index (PRIMARY KEY in CREATE TABLE).
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
-- Supports LIST partitioning (physical and logical partition tables).
-- Supports Hologres-specific table properties via `WITH` clause (orientation, clustering_key, distribution_key, etc.).
-- Does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+A Gravitino Hologres catalog corresponds to a Hologres database instance and provides:
+
+- Metadata management.
+- DDL operations on Hologres schemas and tables.
+- Table indexes (`PRIMARY KEY` in `CREATE TABLE`).
+- [Column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- `LIST` partitioning (physical and logical partition tables).
+- Hologres-specific table properties through the `WITH` clause (`orientation`, `clustering_key`, `distribution_key`, and others).
+
+The Hologres catalog does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
 ### Catalog Properties
 
@@ -65,14 +67,11 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-- Gravitino's schema concept corresponds to the Hologres (PostgreSQL) schema.
-- Supports creating schema with comment.
-- Supports dropping schema.
-- System schemas are automatically filtered: `pg_toast`, `pg_catalog`, `information_schema`, `hologres`, `hg_internal`, `hg_recyclebin`, `hologres_object_table`, `hologres_sample`, `hologres_streaming_mv`, `hologres_statistic`.
+A Gravitino schema corresponds to a Hologres (PostgreSQL) schema. The Hologres catalog supports creating schemas with comments and dropping schemas. The following system schemas are automatically filtered out: `pg_toast`, `pg_catalog`, `information_schema`, `hologres`, `hg_internal`, `hg_recyclebin`, `hologres_object_table`, `hologres_sample`, `hologres_streaming_mv`, and `hologres_statistic`.
 
 ### Schema Properties
 
-- Doesn't support any schema property settings.
+The Hologres catalog does not support any schema-level properties.
 
 ### Schema Operations
 
@@ -82,13 +81,15 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Table Capabilities
 
-- Gravitino's table concept corresponds to the Hologres table.
-- Supports DDL operation for Hologres tables.
-- Supports PRIMARY KEY index in CREATE TABLE.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
-- Supports expression columns via DEFAULT expressions (note: Gravitino maps these as column default values, not as true generated/computed columns in the Hologres sense).
-- Supports LIST partitioning (physical and logical).
-- Does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment). Creating auto-increment columns is rejected in both CREATE TABLE and ALTER TABLE.
+A Gravitino table corresponds to a Hologres table and supports:
+
+- DDL operations on Hologres tables.
+- `PRIMARY KEY` indexes in `CREATE TABLE`.
+- [Column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Expression columns through `DEFAULT` expressions. (Gravitino maps these as column default values, not as true generated/computed columns in the Hologres sense.)
+- `LIST` partitioning (physical and logical).
+
+The Hologres catalog does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment). Creating auto-increment columns is rejected in both `CREATE TABLE` and `ALTER TABLE`.
 
 ### Table Properties
 

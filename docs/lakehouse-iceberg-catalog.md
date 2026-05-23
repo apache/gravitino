@@ -25,12 +25,14 @@ Builds with Apache Iceberg `1.10.0`. The Apache Iceberg table format version is 
 
 ### Catalog Capabilities
 
-- Works as a catalog proxy, supporting `Hive`, `JDBC` and `REST` as catalog backend.
-- Supports DDL operations for Iceberg schemas and tables.
-- Doesn't support snapshot or table management operations.
-- Supports multi storage, including S3, GCS, ADLS, OSS and HDFS.
-- Supports Kerberos or simple authentication for Iceberg catalog with Hive backend.
-- Supports table metadata cache.
+The Iceberg catalog:
+
+- Acts as a catalog proxy backed by `Hive`, `JDBC`, or `REST`.
+- Supports DDL operations on Iceberg schemas and tables.
+- Does not support snapshot or table management operations.
+- Targets multiple storage backends, including S3, GCS, ADLS, OSS, and HDFS.
+- Supports Kerberos or simple authentication when using the Hive backend.
+- Caches table metadata.
 
 ### Catalog Properties
 
@@ -44,9 +46,9 @@ Builds with Apache Iceberg `1.10.0`. The Apache Iceberg table format version is 
 
 Any property not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
 
-If you are using the Gravitino with Trino, you can pass the Trino Iceberg connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.iceberg.table-statistics-enabled` to pass the `iceberg.table-statistics-enabled` to the Gravitino Iceberg catalog in Trino runtime.
+When using Gravitino with Trino, pass Trino Iceberg connector configuration through the `trino.bypass.` prefix. For example, set `trino.bypass.iceberg.table-statistics-enabled` to forward `iceberg.table-statistics-enabled` to the Gravitino Iceberg catalog at Trino runtime.
 
-If you are using the Gravitino with Spark, you can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector in Spark runtime.
+When using Gravitino with Spark, pass Spark Iceberg connector configuration through the `spark.bypass.` prefix. For example, set `spark.bypass.io-impl` to forward `io-impl` to the Spark Iceberg connector at Spark runtime.
 
 
 #### JDBC Backend
@@ -60,11 +62,11 @@ If you are using JDBC backend, you must provide properties like `jdbc-user`, `jd
 | `jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | (none)        | Yes      | 0.3.0         |
 | `jdbc-initialize` | Whether to initialize meta tables when create JDBC catalog                                              | `true`        | No       | 0.2.0         |
 
-If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
+If you already have a JDBC Iceberg catalog, set `catalog-backend-name` to match its catalog name so that the existing namespaces and tables remain accessible.
 
 :::caution
-Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-iceberg/libs` directory If you are using JDBC backend.
-If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDMS like `Mysql`, you should create Iceberg meta tables explicitly.
+When using the JDBC backend, download the corresponding JDBC driver and place it in the `catalogs/lakehouse-iceberg/libs` directory.
+When using multiple JDBC catalog backends, setting `jdbc-initialize` to `true` may not take effect for RDBMS like MySQL; in that case, create the Iceberg meta tables explicitly.
 :::
 
 #### REST Catalog Backend
@@ -101,7 +103,7 @@ To access a non-default catalog, set `warehouse` to the catalog name. This uses 
 
 #### S3
 
-Supports using static access-key-id and secret-access-key to access S3 data.
+The Iceberg catalog supports static `access-key-id` and `secret-access-key` for S3.
 
 | Configuration item     | Description                                                                                                                                                                                                         | Default value | Required | Since Version    |
 |------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -127,7 +129,7 @@ Since Gravitino 1.1.0, the Gravitino Iceberg AWS bundle jar has already included
 
 #### OSS
 
-Gravitino Iceberg REST service supports using static access-key-id and secret-access-key to access OSS data.
+The Iceberg catalog supports static `access-key-id` and `secret-access-key` for OSS.
 
 | Configuration item      | Description                                                                                           | Default value | Required | Since Version    |
 |-------------------------|-------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -139,7 +141,7 @@ Gravitino Iceberg REST service supports using static access-key-id and secret-ac
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.bypass.client.security-token`.
 
 :::info
-Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Gravitino Iceberg Aliyun bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
+Set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Additionally, download the [Gravitino Iceberg Aliyun bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
 :::note
@@ -148,7 +150,7 @@ Since Gravitino 1.1.0, the Gravitino Iceberg aliyun bundle jar has already inclu
 
 #### GCS
 
-Supports using google credential file to access GCS data.
+The Iceberg catalog supports a Google credential file for GCS access.
 
 | Configuration item | Description                                                                                        | Default value | Required | Since Version    |
 |--------------------|----------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -156,10 +158,10 @@ Supports using google credential file to access GCS data.
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.bypass.gcs.project-id`.
 
-Please make sure the credential file is accessible by Gravitino, like using `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before Gravitino server is started.
+Make sure the credential file is accessible by Gravitino, for example by setting `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` before starting the Gravitino server.
 
 :::info
-Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Gravitino Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+Set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download the [Gravitino Iceberg GCP bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle) and place it in `catalogs/lakehouse-iceberg/libs/`.
 :::
 
 :::note
@@ -168,7 +170,7 @@ Since Gravitino 1.1.0, the Gravitino Iceberg GCP bundle jar has already included
 
 #### ADLS
 
-Supports using Azure account name and secret key to access ADLS data.
+The Iceberg catalog supports an Azure storage account name and key for ADLS access.
 
 | Configuration item           | Description                                                                                               | Default value | Required | Since Version    |
 |------------------------------|-----------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -179,7 +181,7 @@ Supports using Azure account name and secret key to access ADLS data.
 For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
 
 :::info
-Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Gravitino Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle) and place it to `catalogs/lakehouse-iceberg/libs/`.
+Set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Gravitino Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle) and place it in `catalogs/lakehouse-iceberg/libs/`.
 :::
 
 :::note
@@ -197,18 +199,18 @@ For other storages that are not managed by Gravitino directly, you can manage th
 To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.bypass.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
 
 :::info
-Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the `catalogs/lakehouse-iceberg/libs/` directory.
+Set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`, and place the corresponding JARs in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
 #### Catalog Backend Security
 
-Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
+Configure backend security with the following properties. For a Kerberos Hive backend, for example, set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
 
 | Property name                                      | Description                                                                                                                                                                                                                                      | Default value | Required                                                                                                                                                             | Since Version    |
 |----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `authentication.type`                              | The type of authentication for Iceberg catalog backend. This configuration only applicable for for Hive backend, and only supports `Kerberos`, `simple` currently. As for JDBC backend, only username/password authentication was supported now. | `simple`      | No                                                                                                                                                                   | 0.6.0-incubating |
+| `authentication.type`                              | Authentication type for the Iceberg catalog backend. The Hive backend supports `Kerberos` and `simple`. The JDBC backend supports only username/password authentication.                                                                          | `simple`      | No                                                                                                                                                                   | 0.6.0-incubating |
 | `authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                                                                          | `false`       | No                                                                                                                                                                   | 0.6.0-incubating |
-| `hive.metastore.sasl.enabled`                      | Whether to enable SASL authentication protocol when connect to Kerberos Hive metastore. This is a raw Hive configuration                                                                                                                         | `false`       | No, This value should be true in most case(Some will use SSL protocol, but it rather rare) if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.6.0-incubating |
+| `hive.metastore.sasl.enabled`                      | Whether to enable SASL when connecting to a Kerberos Hive metastore. This is a raw Hive configuration.                                                                                                                                           | `false`       | Should be `true` for most Kerberos setups (SSL is the rarer alternative) when `gravitino.iceberg-rest.authentication.type` is `Kerberos`.                            | 0.6.0-incubating |
 | `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                                                     | (none)        | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
 | `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                                                           | (none)        | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
 | `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                   | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
@@ -216,7 +218,7 @@ Users can use the following properties to configure the security of the catalog 
 
 #### Table Metadata Cache
 
-Gravitino features a pluggable cache system for updating or retrieving table metadata in the cache. It validates the location of table metadata against the catalog backend to ensure the correctness of cached data.
+Gravitino includes a pluggable cache system for table metadata. It validates the cached metadata location against the catalog backend before returning a hit, so cached data stays correct.
 
 | Configuration item                    | Description                                 | Default value | Required | Since Version |
 |---------------------------------------|---------------------------------------------|---------------|----------|---------------|
@@ -224,7 +226,7 @@ Gravitino features a pluggable cache system for updating or retrieving table met
 | `table-metadata-cache-capacity`       | The capacity of table metadata cache.       | 200           | No       | 1.1.0         |
 | `table-metadata-cache-expire-minutes` | The expire minutes of table metadata cache. | 60            | No       | 1.1.0         |
 
-Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
+Gravitino provides the built-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache`, which stores cached data in memory. To plug in a custom cache, implement the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
 
 ### Catalog Operations
 
@@ -234,11 +236,11 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-- doesn't support cascade drop schema.
+The Iceberg catalog does not support cascade-dropping schemas.
 
 ### Schema Properties
 
-You could put properties except `comment`.
+Any schema property is allowed except `comment`.
 
 ### Schema Operations
 
@@ -248,11 +250,11 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Table Capabilities
 
-- Doesn't support column default value.
+The Iceberg catalog does not support column default values.
 
 ### Table Partitions
 
-Supports transforms:
+The Iceberg catalog supports the following partition transforms:
 
 - `IdentityTransform`
 - `BucketTransform`
@@ -269,7 +271,7 @@ Iceberg doesn't support `ApplyTransform`, `RangeTransform`, and `ListTransform`.
 
 ### Table Sort Orders
 
-supports expressions:
+The Iceberg catalog supports the following sort-order expressions:
 
 - `FieldReference`
 - `FunctionExpression`
@@ -286,12 +288,15 @@ For `bucket` and `truncate`, the first argument must be integer literal, and the
 
 ### Table Distributions
 
-- Support `HashDistribution`, which distribute data by partition key.
-- Support `RangeDistribution`, which distribute data by partition key or sort key for a SortOrder table.
-- Doesn't support `EvenDistribution`.
+The Iceberg catalog supports:
+
+- `HashDistribution`, which distributes data by partition key.
+- `RangeDistribution`, which distributes data by partition key (or sort key, for a sort-ordered table).
+
+`EvenDistribution` is not supported.
 
 :::info
-If you doesn't specify distribution expressions, the table distribution will be adjusted to `RangeDistribution` for a sort order table, to `HashDistribution` for a partition table.
+If no distribution expression is specified, the table distribution defaults to `RangeDistribution` for a sort-ordered table and `HashDistribution` for a partitioned table.
 :::
 
 ### Table Column Types
@@ -317,8 +322,8 @@ If you doesn't specify distribution expressions, the table distribution will be 
 | `UUID`            | `UUID`                      |
 
 :::info
-Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
+Apache Iceberg does not support the Gravitino `Varchar`, `Fixedchar`, `Byte`, `Short`, or `Union` types.
+Data types other than those listed above are mapped to the Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)**, which represents an unresolvable data type. (Since 0.6.0-incubating.)
 :::
 
 ### Table Properties
@@ -347,7 +352,7 @@ Pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configurat
 
 ### Table Indexes
 
-- Doesn't support table indexes.
+The Iceberg catalog does not support table indexes.
 
 ### Table Operations
 
@@ -355,7 +360,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 #### Alter Table Operations
 
-Supports operations:
+The Iceberg catalog supports the following alter-table operations:
 
 - `RenameTable`
 - `SetProperty`
@@ -370,11 +375,11 @@ Supports operations:
 - `UpdateColumnComment`
 
 :::info
-The default column position is `LAST` when you add a column. If you add a non nullability column, there may be compatibility issues.
+The default column position when adding a column is `LAST`. Adding a non-nullable column may cause compatibility issues with existing data.
 :::
 
 :::caution
-If you update a nullability column to non nullability, there may be compatibility issues.
+Changing a nullable column to non-nullable may cause compatibility issues with existing data.
 :::
 
 ## View

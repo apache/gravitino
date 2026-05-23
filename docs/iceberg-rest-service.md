@@ -19,20 +19,16 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 
 ### Capabilities
 
-- Supports the Apache Iceberg REST API defined in Iceberg 1.10, and supports most namespace, table and view interfaces. The following interfaces are not implemented yet:
-  - multi table transaction
-  - pagination
-  - register view
-- Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
-- Supports credential vending for `S3`、`GCS`、`OSS` and `ADLS`.
-- Supports different storages like `S3`, `HDFS`, `OSS`, `GCS`, `ADLS` and provides the capability to support other storages.
-- Supports event listener.
-- Supports Audit log.
+The Gravitino Iceberg REST server:
+
+- Acts as a catalog proxy backed by `Hive` or `JDBC`.
+- Implements the Apache Iceberg REST API as defined in Iceberg 1.10, covering most namespace, table, and view interfaces. The following are not yet implemented: multi-table transactions, pagination, and register-view.
+- Vends credentials for S3, GCS, OSS, and ADLS.
+- Targets multiple storage backends (S3, HDFS, OSS, GCS, and ADLS), with hooks for adding more.
+- Exposes event listeners, audit logging, and a pluggable metrics store interface for storing and deleting Iceberg metrics.
 - Supports OAuth2 and HTTPS.
-- Supports access control (when running as an auxiliary service).
-- Provides a pluggable metrics store interface to store and delete Iceberg metrics.
-- Supports table metadata cache.
-- Supports scan plan cache.
+- Provides access control when running as an auxiliary service.
+- Caches table metadata and scan plans.
 
 ## Server Management
 
@@ -372,7 +368,7 @@ The detailed configuration items are as follows:
 
 | Configuration item                                                        | Description                                                                                                                                                                                                                                            | Default value | Required                                                                                                                                                             | Since Version    |
 |---------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `gravitino.iceberg-rest.authentication.type`                              | The type of authentication for Iceberg rest catalog backend. This configuration only applicable for for Hive backend, and only supports `Kerberos`, `simple` currently. As for JDBC backend, only username/password authentication was supported now.  | `simple`      | No                                                                                                                                                                   | 0.7.0-incubating |
+| `gravitino.iceberg-rest.authentication.type`                              | The type of authentication for Iceberg rest catalog backend. This configuration only applicable for for Hive backend, and only supports `Kerberos` and `simple`. As for JDBC backend, only username/password authentication was supported now.  | `simple`      | No                                                                                                                                                                   | 0.7.0-incubating |
 | `gravitino.iceberg-rest.authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                                                                                | `false`       | No                                                                                                                                                                   | 0.7.0-incubating |
 | `gravitino.iceberg-rest.hive.metastore.sasl.enabled`                      | Whether to enable SASL authentication protocol when connect to Kerberos Hive metastore.                                                                                                                                                                | `false`       | No, This value should be true in most case(Some will use SSL protocol, but it rather rare) if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.7.0-incubating |
 | `gravitino.iceberg-rest.authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                                                           | (none)        | required if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos.                                                                                   | 0.7.0-incubating |

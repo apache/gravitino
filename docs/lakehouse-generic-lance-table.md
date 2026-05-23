@@ -15,30 +15,27 @@ import TabItem from '@theme/TabItem';
 
 ## Overview
 
-This document describes how to use Apache Gravitino to manage a generic lakehouse catalog using Lance as the underlying table format. 
+This document describes how to use Apache Gravitino to manage a generic lakehouse catalog with Lance as the underlying table format.
 
 
 ## Table Management
 
 ### Supported Operations
 
-For Lance tables in a Generic Lakehouse Catalog, the following table summarizes supported operations:
+For Lance tables in a generic lakehouse catalog, the following operations are supported:
 
-| Operation | Support Status  |
-|-----------|-----------------|
-| List      | ✅ Full          |
-| Load      | ✅ Full          |
-| Alter     | Not support now |
-| Create    | ✅ Full          |
-| Register  | ✅ Full          |
-| Drop      | ✅ Full          |
-| Purge     | ✅ Full          |
+| Operation | Support       |
+|-----------|---------------|
+| List      | ✅ Full        |
+| Load      | ✅ Full        |
+| Alter     | Not supported |
+| Create    | ✅ Full        |
+| Register  | ✅ Full        |
+| Drop      | ✅ Full        |
+| Purge     | ✅ Full        |
 
-:::note Feature Limitations
-- **Partitioning:** Not supported
-- **Sort Orders:** Not supported
-- **Distributions:** Not supported
-- **Indexes:** Not supported
+:::note
+Lance tables do not support partitioning, sort orders, distributions, or indexes.
 :::
 
 ### Data Type Mappings
@@ -99,7 +96,7 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 
 ### Table Properties
 
-Required and optional properties for tables in a Generic Lakehouse Catalog:
+Required and optional properties for tables in a generic lakehouse catalog:
 
 | Property              | Description                                                                                                                                                                                                                                                                                                                                     | Default  | Required     | Since Version |
 |-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|---------------|
@@ -114,15 +111,15 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 - `EXIST_OK`: Create a new table if it does not exist, otherwise do nothing.
 - `OVERWRITE`: Create a new table, overwrite if the table already exists, it will delete the existing data directory first if the table is not a registered table and then create a new one.
 
-**Location Requirement:** Must be specified at catalog, schema, or table level. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
+A location must be specified at the catalog, schema, or table level. See [Location resolution](./lakehouse-generic-catalog.md#key-property-location).
 
-Also set additional properties specific to your lakehouse format or custom requirements.
+Additional format-specific or custom properties can be added alongside the ones above.
 
 ### Table Operations
 
-Table operations follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for comprehensive documentation.
+Table operations follow standard relational catalog patterns. See [Table operations](./manage-relational-metadata-using-gravitino.md#table-operations) for comprehensive documentation.
 
-The following sections provide examples and important details for working with Lance tables. 
+The following sections cover examples and important details for working with Lance tables.
 
 #### Create a Lance Table
 
@@ -225,16 +222,11 @@ tableCatalog.createTable(
 </TabItem>
 </Tabs>
 
-:::tip Registration vs Creation
-- **Registration** (`lance.register: true`):
-  - Links to existing Lance dataset or a path placeholder
-  - Schema automatically detected from Lance metadata
-  - Useful for importing existing datasets
+:::tip
+Registration vs. creation:
 
-- **Creation** (default):
-  - Creates new Lance table from scratch
-  - Requires column schema definition
-  - Initializes new Lance dataset files
+- **Registration** (`lance.register: true`) — links to an existing Lance dataset or a path placeholder. The schema is detected from Lance metadata. Useful for importing existing datasets.
+- **Creation** (default) — creates a new Lance table from scratch. Requires a column schema definition. Initializes new Lance dataset files.
 :::
 
 ## Advanced Topics
@@ -243,32 +235,23 @@ tableCatalog.createTable(
 
 #### Common Issues
 
-**Issue: "Location not specified" error**
-```
-Solution: Ensure at least one level (catalog/schema/table) specifies the location property
-```
+**`Location not specified` error.** Ensure at least one level (catalog, schema, or table) specifies the `location` property.
 
-**Issue: Permission denied errors**
-```
-Solution: Check file system permissions and credentials for the storage backend
-```
+**Permission-denied errors.** Check the file-system permissions and credentials for the storage backend.
 
-**Issue: Table not found after registration**
-```
-Solution: Verify the location path points to a valid Lance dataset directory
-```
+**Table not found after registration.** Verify that the `location` path points to a valid Lance dataset directory.
 
 ### Migration Guide
 
 #### Migrate Existing Lance Tables
 
-1. **Inventory**: List all existing Lance table locations
-2. **Create Catalog**: Create Generic Lakehouse catalog pointing to root location
-3. **Register Tables**: Use register operation for each table
-4. **Verify**: Confirm all tables are accessible through Gravitino
-5. **Update Clients**: Point applications to Gravitino metadata instead of direct Lance access
+1. **Inventory** — list all existing Lance table locations.
+2. **Create the catalog** — create a generic lakehouse catalog pointing at the root location.
+3. **Register the tables** — use the register operation for each table.
+4. **Verify** — confirm all tables are accessible through Gravitino.
+5. **Update clients** — point applications at Gravitino metadata instead of direct Lance access.
 
-**Example Migration Script:**
+Example migration script:
 
 ```shell
 # List of existing Lance tables to register
@@ -300,11 +283,11 @@ for entry in "${tables_to_migrate[@]}"; do
 done
 ```
 
-Other table operations (load, alter, drop, truncate) follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for details.
+Other table operations (load, alter, drop, truncate) follow standard relational catalog patterns. See [Table operations](./manage-relational-metadata-using-gravitino.md#table-operations) for details.
 
 ### Lance Table with MinIO
 
-To use Lance tables stored in MinIO with Gravitino, configure the MinIO storage backend once on the Lance catalog. Gravitino will then return those storage options to Lance clients and Spark does not need to repeat them.
+To use Lance tables stored in MinIO with Gravitino, configure the MinIO storage backend once on the Lance catalog. Gravitino returns those storage options to Lance clients, so Spark and other engines do not need to repeat them.
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
