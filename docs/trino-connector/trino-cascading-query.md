@@ -15,8 +15,6 @@ based on the data distribution in the catalogs. By doing so, it significantly re
 transferred over the network, addressing the performance issues commonly found in traditional federated query engines
 where large volumes of data need to be transmitted across networks.
 
-# Deploy Trino
-
 ## Deploy Trino
 
 To set up the Trino cascading query environment, you should first deploy at least two Trino environments.
