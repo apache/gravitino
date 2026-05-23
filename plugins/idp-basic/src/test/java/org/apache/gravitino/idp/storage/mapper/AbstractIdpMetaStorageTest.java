@@ -43,7 +43,7 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 
-abstract class AbstractIdpMetaStorageTest {
+public abstract class AbstractIdpMetaStorageTest {
   private static final String H2_BACKEND = "h2";
   private static final String MYSQL_BACKEND = "mysql";
   private static final String POSTGRESQL_BACKEND = "postgresql";
@@ -51,12 +51,12 @@ abstract class AbstractIdpMetaStorageTest {
   private static final TestDatabaseName POSTGRESQL_TEST_DATABASE = TestDatabaseName.PG_JDBC_BACKEND;
 
   protected JDBCBackend backend;
-  protected SqlSession sharedSession;
+  public SqlSession sharedSession;
 
   private Config config;
   private Path h2Path;
 
-  static Stream<String> storageProvider() {
+  public static Stream<String> storageProvider() {
     return Stream.of(H2_BACKEND, MYSQL_BACKEND, POSTGRESQL_BACKEND);
   }
 
@@ -77,7 +77,7 @@ abstract class AbstractIdpMetaStorageTest {
     }
   }
 
-  protected void init(String type) throws IOException {
+  public void init(String type) throws IOException {
     config = createBackendConfig(type);
     backend = new JDBCBackend();
     backend.initialize(config);

@@ -67,7 +67,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash-a")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -113,7 +113,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash-a")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -122,7 +122,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(2L)
-            .withUserName("bob")
+            .withUsername("bob")
             .withPasswordHash("hash-b")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -168,7 +168,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash-a")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -177,7 +177,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(2L)
-            .withUserName("bob")
+            .withUsername("bob")
             .withPasswordHash("hash-b")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -226,7 +226,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("alice")
+            .withUsername("alice")
             .withPasswordHash("hash-a")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -235,7 +235,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(2L)
-            .withUserName("bob")
+            .withUsername("bob")
             .withPasswordHash("hash-b")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -280,7 +280,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(3L)
-            .withUserName("carol")
+            .withUsername("carol")
             .withPasswordHash("hash-c")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -333,7 +333,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(1L)
-            .withUserName("legacy-user")
+            .withUsername("legacy-user")
             .withPasswordHash("hash")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -342,7 +342,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(2L)
-            .withUserName("new-user")
+            .withUsername("new-user")
             .withPasswordHash("hash")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
@@ -351,7 +351,7 @@ class TestIdpUserGroupRelStorage extends AbstractIdpMetaStorageTest {
     idpUserMetaMapper.insertIdpUser(
         IdpUserPO.builder()
             .withUserId(3L)
-            .withUserName("active-user")
+            .withUsername("active-user")
             .withPasswordHash("hash")
             .withCurrentVersion(1L)
             .withLastVersion(0L)

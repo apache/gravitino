@@ -17,16 +17,22 @@
 
 from __future__ import annotations
 
-from gravitino.api.authorization.group import Group
-from gravitino.api.authorization.privileges import Privileges
-from gravitino.api.authorization.role import Role
-from gravitino.api.authorization.securable_objects import SecurableObjects
-from gravitino.api.authorization.user import User
+from dataclasses import dataclass, field
 
-__all__ = [
-    "Group",
-    "Role",
-    "SecurableObjects",
-    "Privileges",
-    "User",
-]
+from dataclasses_json import config, dataclass_json
+
+from gravitino.rest.rest_message import RESTRequest
+from gravitino.utils.precondition import Precondition
+
+
+@dataclass_json
+@dataclass
+class GroupAddRequest(RESTRequest):
+    """Represents a request to add a group."""
+
+    _name: str = field(metadata=config(field_name="name"))
+
+    def validate(self) -> None:
+        Precondition.check_string_not_empty(
+            self._name, "name is required and cannot be empty"
+        )

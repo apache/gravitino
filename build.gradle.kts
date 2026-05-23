@@ -789,7 +789,8 @@ tasks {
         ":authorizations:copyLibAndConfig",
         ":iceberg:iceberg-rest-server:copyLibAndConfigs",
         ":lance:lance-rest-server:copyLibAndConfigs",
-        ":maintenance:optimizer:copyLibAndConfigs"
+        ":maintenance:optimizer:copyLibAndConfigs",
+        ":plugins:idp-basic:copyLibAndConfigs"
       )
     if (!skipWeb) {
       dependencies.add(":web:web:build")
@@ -1103,6 +1104,7 @@ tasks {
         it.name != "integration-test" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
+        it.parent?.name != "plugins" &&
         it.name != "mcp-server"
       ) {
         from(it.configurations.runtimeClasspath) {

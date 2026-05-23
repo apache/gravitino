@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.base;
 
-import java.util.List;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.ibatis.annotations.Param;
@@ -35,21 +34,6 @@ public class IdpGroupMetaBaseSQLProvider {
         + " WHERE group_name = #{groupName} AND deleted_at = 0";
   }
 
-  public String selectIdpGroups(@Param("groupNames") List<String> groupNames) {
-    return "<script>"
-        + "SELECT group_id as groupId, group_name as groupName,"
-        + " current_version as currentVersion,"
-        + " last_version as lastVersion, deleted_at as deletedAt"
-        + " FROM "
-        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
-        + " WHERE deleted_at = 0 "
-        + "<foreach collection='groupNames' item='groupName'"
-        + " open='AND group_name IN (' separator=',' close=')'>"
-        + "#{groupName}"
-        + "</foreach>"
-        + "</script>";
-  }
-
   public String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
     return "INSERT INTO "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
@@ -63,12 +47,12 @@ public class IdpGroupMetaBaseSQLProvider {
         + " )";
   }
 
-  public String softDeleteIdpGroup(@Param("groupId") Long groupId) {
+  public String softDeleteIdpGroup(@Param("groupName") String groupName) {
     return "UPDATE "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " SET deleted_at = "
         + currentTimeMillisExpression()
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        + " WHERE group_name = #{groupName} AND deleted_at = 0";
   }
 
   public String deleteIdpGroupMetasByLegacyTimeline(
