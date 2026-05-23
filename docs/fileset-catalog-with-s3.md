@@ -53,7 +53,7 @@ For more details on creating a fileset, Refer to [Fileset configurations](./file
 
 This section demonstrates how to use the Fileset catalog with S3 in Gravitino, with a complete example.
 
-### Step1: Create a Fileset Catalog with S3
+### Step 1: Create a Fileset Catalog with S3
 
 First of all, you need to create a Fileset catalog with S3. The following example shows how to create a Fileset catalog with S3:
 
@@ -131,7 +131,7 @@ gravitino.bypass.fs.s3a.path.style.access=true
 ```
 :::
 
-### Step2: Create a Schema
+### Step 2: Create a Schema
 
 Once your Fileset catalog with S3 is created, you can create a schema under the catalog. Here are examples of how to do that:
 
@@ -181,7 +181,7 @@ catalog.as_schemas().create_schema(name="test_schema",
 </TabItem>
 </Tabs>
 
-### Step3: Create a Fileset
+### Step 3: Create a Fileset
 
 After creating the schema, you can create a fileset. Here are examples for creating a fileset:
 
