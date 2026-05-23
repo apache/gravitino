@@ -32,7 +32,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 
 ### Catalog properties
 
-You can pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+Pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
@@ -52,7 +52,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#apache-grav
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.      | `30000`       | No       | 1.1.0         |
 
 :::caution
-You must download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
+Download the corresponding JDBC driver to the `catalogs/jdbc-mysql/libs` directory.
 :::
 
 ### Driver Version Compatibility

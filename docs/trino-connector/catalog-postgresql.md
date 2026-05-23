@@ -66,7 +66,7 @@ PostgreSQL's tables and schemas cannot support properties.
 
 ## Basic usage examples
 
-You need to do the following steps before you can use the PostgreSQL catalog in Trino through Gravitino.
+Do the following steps before you can use the PostgreSQL catalog in Trino through Gravitino:
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `postgresql_test`, then you can use the following code to create them in Gravitino:
 

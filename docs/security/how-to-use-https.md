@@ -53,7 +53,7 @@ Refer to the "Additional JSSE Standard Names" section of the [Java security guid
 
 ### Example
 
-You can follow the steps to set up an HTTPS server.
+Follow these steps to set up an HTTPS server:
 
 1. Prerequisite
    - You need to install the JDK8, wget, and set the environment JAVA_HOME.

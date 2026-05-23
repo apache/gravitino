@@ -31,11 +31,11 @@ Gravitino saves some system information in schema and table comments, like
 
 ### Catalog properties
 
-You can pass to a Doris data source any property that isn't defined by Gravitino by adding
+Pass to a Doris data source any property that isn't defined by Gravitino by adding
 `gravitino.bypass.` prefix as a catalog property. For example, catalog property
 `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
-You can check the relevant data source configuration in
+Check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
 more details.
 

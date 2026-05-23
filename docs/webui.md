@@ -93,7 +93,7 @@ There are 3 actions you can perform on a metalake.
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this metalake in the drawer component on the right.
+See the detailed information of this metalake in the drawer component on the right.
 
 ![metalake-details](./assets/webui/metalake-details.png)
 
@@ -397,7 +397,7 @@ After verifying the values of these fields, clicking on the `CREATE` button crea
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this catalog in the drawer component on the right.
+See the detailed information of this catalog in the drawer component on the right.
 
 ![show-catalog-details](./assets/webui/show-catalog-details.png)
 
@@ -457,7 +457,7 @@ Creating a schema needs these fields:
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this schema in the drawer component on the right.
+See the detailed information of this schema in the drawer component on the right.
 
 ![schema-details](./assets/webui/schema-details.png)
 
@@ -504,13 +504,13 @@ Creating a table needs these fields:
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this table in the drawer component on the right.
+See the detailed information of this table in the drawer component on the right.
 
 ![table-details](./assets/webui/table-details.png)
 
 Click the table tree node on the left sidebar or the table name link in the table cell.
 
-You can see the columns and detailed information on the right page.
+See the columns and detailed information on the right page.
 
 ![list-columns](./assets/webui/list-columns.png)
 ![table-selected-details](./assets/webui/table-selected-details.png)
@@ -559,13 +559,13 @@ Creating a fileset needs these fields:
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this fileset in the drawer component on the right.
+See the detailed information of this fileset in the drawer component on the right.
 
 ![fileset-details](./assets/webui/fileset-details.png)
 
 Click the fileset tree node on the left sidebar or the fileset name link in the table cell.
 
-You can see the detailed information on the right page.
+See the detailed information on the right page.
 
 ![fileset-selected-details](./assets/webui/fileset-selected-details.png)
 
@@ -609,13 +609,13 @@ Creating a topic needs these fields:
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this topic in the drawer component on the right.
+See the detailed information of this topic in the drawer component on the right.
 
 ![topic-details](./assets/webui/topic-drawer-details.png)
 
 Click the topic tree node on the left sidebar or the topic name link in the table cell.
 
-You can see the detailed information on the right page.
+See the detailed information on the right page.
 
 ![topic-details](./assets/webui/topic-details.png)
 
@@ -659,7 +659,7 @@ Register a model needs these fields:
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this model in the drawer component on the right.
+See the detailed information of this model in the drawer component on the right.
 
 ![model-details](./assets/webui/model-details.png)
 
@@ -696,7 +696,7 @@ Link a version needs these fields:
 
 Click on the action icon <Icon icon='bx:show-alt' fontSize='24' /> in the table cell.
 
-You can see the detailed information of this version in the drawer component on the right.
+See the detailed information of this version in the drawer component on the right.
 
 ![version-details](./assets/webui/version-details.png)
 

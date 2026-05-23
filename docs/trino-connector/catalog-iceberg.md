@@ -154,7 +154,7 @@ Reserved properties: A reserved property is one can't be set by users but can be
 
 ## Basic usage examples
 
-You need to do the following steps before you can use the Iceberg catalog in Trino through Apache Gravitino.
+Do the following steps before you can use the Iceberg catalog in Trino through Apache Gravitino:
 
 - Create a metalake and catalog in Apache Gravitino. Assuming that the metalake name is `test` and the catalog name is `iceberg_test`,
 then you can use the following code to create them in Apache Gravitino:
@@ -319,7 +319,7 @@ DROP TABLE iceberg_test.database_01.table_01;
 
 Before running any `Insert` statements for Iceberg tables in Trino, 
 you must check that the user Trino is using to access HDFS has access to the warehouse directory.
-You can override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config, 
+Override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config, 
 replacing hdfs_user with the appropriate username:
 
 ```text

@@ -9,7 +9,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Apache Gravitino Docker image
 
-You can deploy the service with the Gravitino Docker image.
+Deploy the service with the Gravitino Docker image.
 
 Container startup commands
 
@@ -72,7 +72,7 @@ Changelog
 
 ## Apache Gravitino Iceberg REST server Docker image
 
-You can deploy the standalone Gravitino Iceberg REST server with the Docker image.
+Deploy the standalone Gravitino Iceberg REST server with the Docker image.
 
 Container startup commands
 
@@ -135,7 +135,7 @@ Changelog
 
 ## Apache Gravitino MCP server image
 
-You can deploy the Gravitino MCP server with the Docker image.
+Deploy the Gravitino MCP server with the Docker image.
 
 Container startup commands
 
@@ -158,7 +158,7 @@ Changelog
 
 ## Apache Gravitino Lance REST server Docker image
 
-You can deploy the standalone Gravitino Lance REST server with the Docker image.
+Deploy the standalone Gravitino Lance REST server with the Docker image.
 
 
 ```shell
@@ -192,7 +192,7 @@ Changelog
 
 ## Playground Docker image
 
-You can use the [playground](https://github.com/apache/gravitino-playground) to experience the whole Gravitino system with other components.
+Use the [playground](https://github.com/apache/gravitino-playground) to experience the whole Gravitino system with other components.
 
 The playground consists of multiple Docker images.
 
@@ -261,11 +261,11 @@ Changelog
 
 # Developer Docker images
 
-You can use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
+Use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
 
 ## Apache Gravitino CI Apache Hive image with kerberos enabled
 
-You can use this kind of image to test the catalog of Apache Hive with kerberos enable
+Use this kind of image to test the catalog of Apache Hive with kerberos enable
 
 Changelog
 
@@ -303,7 +303,7 @@ Changelog
 
 ## Apache Gravitino CI Apache Hive image
 
-You can use this kind of image to test the catalog of Apache Hive.
+Use this kind of image to test the catalog of Apache Hive.
 
 Changelog
 
@@ -420,7 +420,7 @@ Changelog
 
 ## Apache Gravitino CI Trino image
 
-You can use this image to test Trino.
+Use this image to test Trino.
 
 Changelog
 
@@ -450,7 +450,7 @@ Changelog
 
 ## Apache Gravitino CI Doris image
 
-You can use this image to test Apache Doris.
+Use this image to test Apache Doris.
 
 Changelog
 
@@ -484,7 +484,7 @@ Changelog
 
 ## Apache Gravitino CI Apache Ranger image
 
-You can use this image to control Trino's permissions.
+Use this image to control Trino's permissions.
 
 Changelog
 

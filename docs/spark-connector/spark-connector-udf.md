@@ -59,7 +59,7 @@ FROM my_catalog.my_schema.my_table;
 ```
 
 :::tip
-You can simplify the syntax by setting the default catalog and schema first:
+Simplify the syntax by setting the default catalog and schema first:
 
 ```sql
 USE my_catalog;

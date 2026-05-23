@@ -138,7 +138,7 @@ Evaluate monitor rules around an action time.
   --range-seconds 86400
 ```
 
-You can configure evaluator rules in `gravitino-optimizer.conf`:
+Configure evaluator rules in `gravitino-optimizer.conf`:
 
 ```properties
 gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules = table:row_count:avg:le,job:duration:latest:le

@@ -13,7 +13,7 @@ The Apache Gravitino project provides a set of Docker images to facilitate the p
 
 ## Publish Docker images to Docker Hub
 
-You can use GitHub actions to publish Docker images to the Docker Hub repository.
+Use GitHub actions to publish Docker images to the Docker Hub repository.
 
 1. Open the [Docker publish link](https://github.com/apache/gravitino/actions/workflows/docker-image.yml)
 2. Click the `Run workflow` button.

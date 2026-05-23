@@ -116,7 +116,7 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 
 **Location Requirement:** Must be specified at catalog, schema, or table level. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
 
-You may also set additional properties specific to your lakehouse format or custom requirements.
+Also set additional properties specific to your lakehouse format or custom requirements.
 
 ### Table Operations
 

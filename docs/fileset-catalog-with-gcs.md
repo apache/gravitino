@@ -376,7 +376,7 @@ In some Spark versions, a Hadoop environment is needed by the driver, adding the
 
 ### Access a fileset using the Hadoop fs command
 
-The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
+The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3:
 
 1. Adding the following contents to the `${HADOOP_HOME}/etc/hadoop/core-site.xml` file:
 

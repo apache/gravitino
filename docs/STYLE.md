@@ -77,6 +77,7 @@ Apply these rules when reviewing or writing messages:
 ## Documentation prose style
 
 - Voice: clear, direct, technical. Active over passive where natural. Address the reader as an engineer ("Configure the catalog by..." rather than "The catalog can be configured by...").
+- Drop "you can / you need to / you should" scaffolding. The imperative is shorter and matches engineering voice. "You can create a catalog by sending a POST request" -> "Create a catalog by sending a POST request"; "You need to provide the following" -> "Provide the following". Use "you" only when you really mean to address the reader (for example, conditionals like "if you want to...") — don't pad an instruction with it.
 - Cut filler: "in order to" → "to", "due to the fact that" → "because", "at this point in time" → "now", "make use of" → "use".
 - Avoid "currently" and "the current behavior". Docs describe the current state by default; the qualifier adds nothing. If something is genuinely about to change, name the version where it changes ("In 1.0, only X is supported; built-in support is planned for a future release") rather than handwaving with "currently". Adjectival uses are fine ("the currently selected item").
 - Use the Oxford comma.
@@ -85,6 +86,9 @@ Apply these rules when reviewing or writing messages:
 - Headings: Title Case for H1 and H2, sentence case for H3 and below.
 - Avoid gerund-led headings. Rare exceptions are acceptable for well-established phrases like "Getting started" that have no clean noun-phrase equivalent. When in doubt, use a noun phrase.
 - No fragment headings starting with prepositions or conjunctions. Headings like "With X", "Without X", "For X", "From X", "And X", "But X", "Or X" implicitly attach to a subject elsewhere and read as fragments. Prefer a noun phrase ("X", "X configuration", "No X") or an imperative ("Configure X").
+- Don't repeat the leading verb across consecutive bullets ("Supports X" / "Supports Y" / "Supports Z"). Either lift the verb into a shared lead-in ("The catalog supports:" followed by noun-phrase bullets) or vary the verb so each bullet says something distinct. Identical leading verbs are noise — readers skim the difference, not the repetition.
+- A sentence that introduces a numbered or bulleted list ends with a colon, not a period. When the sentence references the list forward with "the X", use "these X" instead.
+- Avoid the tautological qualifier "created" in operation descriptions ("list the created groups", "returns the created tables"). Listing or retrieving an entity that doesn't exist is impossible, so the qualifier adds no information. Use the bare noun: "list the groups", "returns the tables".
 - One sentence per line is encouraged for editability when it reads naturally. Never cram two sentences onto one line.
 - Numbers: spell out one through nine, use digits for 10 and above. Exception: numbers paired with units (5 GB, 3 ms) always digits.
 - Time: "5 ms", "30 s", "2 min", "1 hour" with a space.

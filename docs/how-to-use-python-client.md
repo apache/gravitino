@@ -17,7 +17,7 @@ Gravitino Python client helps data scientists easily manage metadata using Pytho
 
 ## Use Guidance
 
-You can use Gravitino Python client library with Spark, PyTorch, Tensorflow, Ray and Python environment.
+Use Gravitino Python client library with Spark, PyTorch, Tensorflow, Ray and Python environment.
 
 First of all, You must have a Gravitino server set up and run, You can refer document of
 [How to install Gravitino](./how-to-install.md) to build Gravitino server from source code and
@@ -65,7 +65,7 @@ contains the following code snippets:
 
 ## How to develop Apache Gravitino Python Client
 
-You can ues any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
+Ues any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
 
 ### Prerequisites
 

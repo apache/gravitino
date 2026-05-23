@@ -39,7 +39,7 @@ reconstructed from the serialized `flink.*` properties. Hive tables continue to 
 Hive schema.
 
 :::note
-You must set `connector=hive` explicitly when creating a raw Hive table. Otherwise, the table is
+Set `connector=hive` explicitly when creating a raw Hive table. Otherwise, the table is
 created as a generic table by default in HiveCatalog. Starting from Apache Flink 1.18,
 ManagedTable-related APIs are deprecated, so avoid relying on managed table behavior. Prefer
 Hive-compatible tables (use Hive dialect or set `connector=hive`) or external generic tables (set
@@ -112,6 +112,6 @@ The validated catalog properties are listed below. Any other properties with the
 | `metastore.uris`                              | `hive.metastore.uris`              | Hive metastore uri    | 0.6.0-incubating |
 
 :::caution
-You can set other hadoop properties (with the prefix `hadoop.`, `dfs.`, `fs.`, `hive.`) in Gravitino Catalog properties. If so, it will override
+Set other hadoop properties (with the prefix `hadoop.`, `dfs.`, `fs.`, `hive.`) in Gravitino Catalog properties. If so, it will override
 the configuration from the `hive-conf-dir` and `hadoop-conf-dir`.
 :::

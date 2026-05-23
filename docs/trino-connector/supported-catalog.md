@@ -77,7 +77,7 @@ The result is like:
 ```
 
 Example:
-You can run the following SQL to create a catalog named `mysql` with `jdbc-mysql` provider.
+Run the following SQL to create a catalog named `mysql` with `jdbc-mysql` provider.
 
 ```sql
 -- Call stored procedures with position.

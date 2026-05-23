@@ -14,7 +14,7 @@ It also provides users with unified metadata access for data and AI assets.
 
 ## Downloading
 
-You can get Gravitino from the [download page](https://gravitino.apache.org/downloads),
+Get Gravitino from the [download page](https://gravitino.apache.org/downloads),
 or you can build Gravitino from source code. See [How to build Gravitino](./how-to-build.md).
 
 Gravitino runs on both Linux and macOS platforms, and it requires the installation of Java 17.
@@ -49,7 +49,7 @@ To get started with Gravitino, see [Getting started](./getting-started/index.md)
 
 Gravitino provides two SDKs to manage metadata from different catalogs in a unified way:
 the REST API and the Java SDK.
-You can use either to manage metadata. See
+Use either to manage metadata. See
 
 * [Manage metalake using Gravitino](./manage-metalake-using-gravitino.md) to learn how to manage
   metalakes.

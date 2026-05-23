@@ -117,7 +117,7 @@ spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
 
 ### Simple Trino queries
 
-You can use simple queries to test in the Trino CLI.
+Use simple queries to test in the Trino CLI.
 
 ```SQL
 SHOW CATALOGS;
@@ -259,7 +259,7 @@ insert into customers (customer_id, customer_name, customer_email) values (12,'J
 ```
 
 2. Login Trino container and execute the steps.
-You can get all the customers from both the Hive and Iceberg tables.
+Get all the customers from both the Hive and Iceberg tables.
 
 ```shell
 docker exec -it playground-trino bash

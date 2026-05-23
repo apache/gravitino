@@ -71,9 +71,9 @@ Tag tag =
 </TabItem>
 </Tabs>
 
-### List created tags
+### List tags
 
-You can list all the created tag names as well as tag objects in a metalake in Gravitino.
+List all the tag names as well as tag objects in a metalake in Gravitino.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -101,7 +101,7 @@ Tag[] tags = client.listTagsInfo();
 
 ### Get a tag by name
 
-You can get a tag by its name.
+Get a tag by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -181,7 +181,7 @@ Gravitino support the following tag changes:
 
 ### Delete a tag
 
-You can delete a tag by its name.
+Delete a tag by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -209,7 +209,7 @@ Gravitino allows you to associate and disassociate tags with metadata objects. C
 
 ### Associate and disassociate tags with a metadata object
 
-You can associate and disassociate tags with a metadata object by providing the object type, object
+Associate and disassociate tags with a metadata object by providing the object type, object
 name and tag names.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/tags`.
@@ -248,7 +248,7 @@ schema1.supportsTags().associateTags(new String[] {"tag1"}， null);
 
 ### List associated tags for a metadata object
 
-You can list all the tags associated with a metadata object. The tags in Gravitino are
+List all the tags associated with a metadata object. The tags in Gravitino are
 inheritable, so listing tags of a metadata object will also list the tags of its parent metadata
 objects.
 
@@ -289,7 +289,7 @@ Tag[] tagsInfo = schema1.supportsTags().listTagsInfo();
 
 ### Get an associated tag by name for a metadata object
 
-You can get an associated tag by its name for a metadata object.
+Get an associated tag by its name for a metadata object.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/tags/{tagName}`.
 
@@ -320,7 +320,7 @@ Tag tag = schema1.supportsTags().getTag("tag1");
 
 ### List metadata objects associated with a tag
 
-You can list all the metadata objects associated with a tag.
+List all the metadata objects associated with a tag.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

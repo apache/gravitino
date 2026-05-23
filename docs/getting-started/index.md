@@ -134,7 +134,7 @@ follow these steps:
 
 ## Install Gravitino
 
-You can install Gravitino from the binary release packages or the container images.
+Install Gravitino from the binary release packages or the container images.
 Follow [how-to-install](../how-to-install.md).
 
 Or you can install Gravitino from scratch.
@@ -161,7 +161,7 @@ using the RESTful APIs to create and modify metadata.
 
 :::tip
 The following examples use `localhost` as the host name.
-You may need to revise it based on your environment.
+Revise based on your environment.
 :::
 
 1. Create a Metalake:

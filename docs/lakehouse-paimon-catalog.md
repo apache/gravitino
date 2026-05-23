@@ -90,7 +90,7 @@ If you are using JDBC backend, you must specify the properties like `jdbc-user`,
 | `jdbc-driver`   | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL   | (none)          | required if the value of `catalog-backend` is `jdbc`. | 0.7.0-incubating |
 
 :::caution
-You must download the corresponding JDBC driver and place it to the `catalogs/lakehouse-paimon/libs` directory If you are using JDBC backend.
+Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-paimon/libs` directory If you are using JDBC backend.
 :::
 
 ### Catalog operations
@@ -205,7 +205,7 @@ Gravitino doesn't support Paimon `MultisetType` type.
 
 ### Table properties
 
-You can pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/) to Gravitino when creating a Paimon table.
+Pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/) to Gravitino when creating a Paimon table.
 
 :::note
 **Reserved**: Fields that cannot be passed to the Gravitino server.
@@ -248,7 +248,7 @@ Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gra
 
 ## HDFS configuration
 
-You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory to automatically load as the default HDFS configuration.
+Place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory to automatically load as the default HDFS configuration.
 
 :::caution
 When reading and writing to HDFS, the Gravitino server can only operate as the specified Kerberos user and doesn't support proxying to other Kerberos users now.

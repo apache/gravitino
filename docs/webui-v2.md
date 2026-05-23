@@ -141,7 +141,7 @@ The navbar provides the following shortcuts:
 
 ### Catalog details & Schemas (Web V2)
 
-You can enter the catalog details page by clicking the catalog name either from the left tree or from the catalog name in the right list. The catalog name shows basic catalog information underneath it. Hover over the highlighted numbers to open a popover with more details.
+Enter the catalog details page by clicking the catalog name either from the left tree or from the catalog name in the right list. The catalog name shows basic catalog information underneath it. Hover over the highlighted numbers to open a popover with more details.
 
 Below the catalog information, the page shows the **Schemas** list and the catalog's **Associated Roles**. The **Associated Roles** section is visible only when `gravitino.authorization.enable=true`, and it lists the role name and its privileges.
 

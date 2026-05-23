@@ -51,7 +51,7 @@ pg_dump -U username -h hostname -d database_name -n schema_name -a -F c -f data_
 Dump your Gravitino database schema to a file
 
 #### MySQL
-You can use the mysqldump utility to dump the database schema to a file:
+Use the mysqldump utility to dump the database schema to a file:
 
 ```shell
 mysqldump --skip-add-drop-table --no-data <db_name> > schema-x.y.z-mysql.sql

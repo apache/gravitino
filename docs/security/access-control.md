@@ -237,7 +237,7 @@ Service admins automatically become the owner of metalakes they create. However,
 
 ### Custom Roles
 
-You can create custom roles tailored to your business needs using the API or client libraries. Custom roles allow you to:
+Create custom roles tailored to your business needs using the API or client libraries. Custom roles allow you to:
 - Define specific permission sets
 - Align access control with your organization's structure
 - Implement least-privilege access policies
@@ -627,7 +627,7 @@ User[] users = client.listUsers();
 
 ### Get a user
 
-You can get a user by its name.
+Get a user by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -651,7 +651,7 @@ User user =
 
 ### Remove a user
 
-You can remove a user by its name.
+Remove a user by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -677,7 +677,7 @@ boolean removed =
 
 ### Add a Group
 
-You should add the group to your metalake before you use the authorization.
+Add the group to your metalake before you use the authorization.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -703,7 +703,7 @@ Group group =
 
 ### List groups
 
-You can list the created groups in a metalake.
+List the groups in a metalake.
 Returns the list of groups if details is true, otherwise returns the list of group name.
 
 <Tabs groupId='language' queryString>
@@ -732,7 +732,7 @@ User[] users = client.listGroups();
 
 ### Get a group
 
-You can get a group by its name.
+Get a group by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -756,7 +756,7 @@ Group group =
 
 ### Remove a group
 
-You can remove a group by its name.
+Remove a group by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -782,7 +782,7 @@ boolean removed =
 
 ### Create a role
 
-You can create a role by given properties.
+Create a role by given properties.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -831,7 +831,7 @@ Role role =
 
 ### List roles
 
-You can list the created roles in a metalake.
+List the roles in a metalake.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -854,7 +854,7 @@ String[] usernames = client.listRoleNames();
 
 ### List roles for the metadata object
 
-You can list the binding roles for a metadata object in a metalake.
+List the binding roles for a metadata object in a metalake.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/roles`.
 
@@ -885,7 +885,7 @@ String[] roles = schema1.supportsRoles().listBindingRoleNames();
 
 ### Get a role
 
-You can get a role by its name.
+Get a role by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -909,7 +909,7 @@ Role role =
 
 ### Delete a role
 
-You can delete a role by its name.
+Delete a role by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -935,7 +935,7 @@ boolean deleted =
 
 ### Grant privileges to a role
 
-You can grant specific privileges to a role.
+Grant specific privileges to a role.
 The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/grant`.
 
 <Tabs groupId='language' queryString>
@@ -980,7 +980,7 @@ Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Priv
 
 ### Revoke privileges from a role
 
-You can revoke specific privileges from a role.
+Revoke specific privileges from a role.
 The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/revoke`.
 
 <Tabs groupId='language' queryString>
@@ -1026,7 +1026,7 @@ Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(P
 
 ### Override privileges in a role
 
-You can override all privileges in a role with a new set of securable objects and their privileges. This operation completely replaces the role's entire privilege configuration - any securable objects not included in the request will be removed from the role.
+Override all privileges in a role with a new set of securable objects and their privileges. This operation completely replaces the role's entire privilege configuration - any securable objects not included in the request will be removed from the role.
 
 The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/`.
 
@@ -1071,7 +1071,7 @@ Use this operation when you want to set the exact privilege configuration for a 
 
 ### Grant roles to a user
 
-You can grant specific roles to a user.
+Grant specific roles to a user.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1096,7 +1096,7 @@ User user = client.grantRolesToUser(Lists.newList("role1"), "user1");
 
 ### Revoke roles from a user
 
-You can revoke specific roles from a user.
+Revoke specific roles from a user.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1122,7 +1122,7 @@ User user = client.revokeRolesFromUser(Lists.newList("role1"), "user1");
 
 ### Grant roles to a group
 
-You can grant specific roles to a group.
+Grant specific roles to a group.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1147,7 +1147,7 @@ Group group = client.grantRolesToGroup(Lists.newList("role1"), "group1");
 
 ### Revoke roles from a group
 
-You can revoke specific roles from a group.
+Revoke specific roles from a group.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1174,7 +1174,7 @@ Group group = client.revokeRolesFromGroup(Lists.newList("role1"), "group1");
 
 ### get the owner
 
-You can get the owner of a metadata object.
+Get the owner of a metadata object.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1201,7 +1201,7 @@ Owner owner = client.getOwner(table);
 
 ### set the owner
 
-You can set the owner of a metadata object.
+Set the owner of a metadata object.
 
 The request path for REST API is `/api/metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectName}`.
 
@@ -1233,7 +1233,7 @@ client.setOwner(table, "user1", "USER");
 
 ## Example
 
-You can follow the steps to achieve the authorization of Gravitino.
+Follow the steps to achieve the authorization of Gravitino.
 
 ![concept_workflow_image](../assets/security/workflow.png)
 

@@ -55,7 +55,7 @@ Refer to [Schema operation](./manage-messaging-metadata-using-gravitino.md#schem
 | `partition-count`    | The number of partitions for the topic.  | if not specified, will use the `num.partition` property in the broker.              | No       | 0.5.0         |
 | `replication-factor` | The number of replications for the topic | if not specified, will use the `default.replication.factor` property in the broker. | No       | 0.5.0         |
 
-You can pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.
+Pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.
 
 ### Topic operations
 

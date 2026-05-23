@@ -402,7 +402,7 @@ gravitino.authenticator.oauth.jwksUri = https://your-oauth-provider/.well-known/
 
 ### Example 
 
-You can follow the steps to set up an OAuth mode Gravitino server.
+Follow these steps to set up an OAuth mode Gravitino server:
 
 1. Prerequisite
 

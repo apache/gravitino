@@ -17,7 +17,7 @@ The Gravitino package comprises both the Gravitino server and the Gravitino Iceb
 ### Get the Apache Gravitino binary distribution package
 
 Before installing Gravitino, make sure you have the Gravitino binary distribution package. You can download the latest Gravitino binary distribution package from [GitHub](https://github.com/apache/gravitino/releases).
-You can also build it yourself by following the instructions in [How to Build Gravitino](./how-to-build.md).
+Also, build it yourself by following the instructions in [How to Build Gravitino](./how-to-build.md).
 
 - If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the Gravitino binary distribution package in the `distribution/package` and `distribution/package-all` directory. The main difference between these two packages is that the `package-all` package contains all catalogs including catalog under folder `catalogs-contrib`, while the `package` package only contains the main catalogs under folder `catalogs`.
 
@@ -112,7 +112,7 @@ Alternatively, to start the Gravitino server Web UI, please run:
 ./bin/gravitino.sh run
 ```
 
-You can access the Gravitino Web UI by typing [http://localhost:8090](http://localhost:8090) in your browser, or you can run:
+Access the Gravitino Web UI by typing [http://localhost:8090](http://localhost:8090) in your browser, or you can run:
 
 ```shell
 curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" http://localhost:8090/api/version
@@ -126,7 +126,7 @@ If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` env
 
 #### Manage Gravitino Iceberg REST server in Gravitino package
 
-You can run the Iceberg REST server as either a standalone server or as an auxiliary service embedded in the Gravitino server. To start it as a standalone server, use the command `./bin/gravitino-iceberg-rest-server.sh start` with configurations specified in `./conf/gravitino-iceberg-rest-server.conf`. Alternatively, use `./bin/gravitino.sh start` to launch a Gravitino server that integrates both the Iceberg REST service and the Gravitino service, with all configurations centralized in `conf/gravitino.conf`. 
+Run the Iceberg REST server as either a standalone server or as an auxiliary service embedded in the Gravitino server. To start it as a standalone server, use the command `./bin/gravitino-iceberg-rest-server.sh start` with configurations specified in `./conf/gravitino-iceberg-rest-server.conf`. Alternatively, use `./bin/gravitino.sh start` to launch a Gravitino server that integrates both the Iceberg REST service and the Gravitino service, with all configurations centralized in `conf/gravitino.conf`. 
 
 For more detailed information about the Gravitino Iceberg REST server, refer to [Iceberg REST server document](./iceberg-rest-service.md).
 
