@@ -929,12 +929,6 @@ gcli.sh column list --name catalog_postgres.hr.departments
 gcli.sh column details --name catalog_postgres.hr.departments.name --audit
 ```
 
-#### Column Audit Information
-
-```bash
-gcli.sh column details --name catalog_postgres.hr.departments.name --audit
-```
-
 #### Add a Column
 
 ```bash
