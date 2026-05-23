@@ -8,7 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-This Helm chart deploys Apache Gravitino Iceberg REST Catalog Server on Kubernetes with customizable configurations.
+This Helm chart deploys the Apache Gravitino Iceberg REST catalog server on Kubernetes with customizable configurations.
 
 ## Prerequisites
 
@@ -54,9 +54,9 @@ helm upgrade --install gravitino-iceberg ./gravitino-iceberg-rest-server -n grav
 
 ## View Chart Values
 
-Customize values.yaml parameters to override chart default settings. Additionally, Gravitino Iceberg REST Catalog Server configurations in [gravitino-iceberg-rest-server.conf](../dev/charts/gravitino-iceberg-rest-server/resources/gravitino-iceberg-rest-server.conf) can be modified through Helm values.yaml.
+Override chart defaults by customizing parameters in `values.yaml`. Configuration in [gravitino-iceberg-rest-server.conf](../dev/charts/gravitino-iceberg-rest-server/resources/gravitino-iceberg-rest-server.conf) can also be modified through Helm `values.yaml`.
 
-To display the default values of the chart, run:
+To display the default values for the chart, run:
 
 ```console
 helm show values oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION>
@@ -70,7 +70,7 @@ helm upgrade --install [RELEASE_NAME] oci://registry-1.docker.io/apache/gravitin
 
 ### Deploy with Default Configuration
 
-Run the following command to deploy Gravitino Iceberg REST Catalog Server using the default settings:
+Deploy the Gravitino Iceberg REST catalog server with the default settings:
 
 ```console
 helm upgrade --install gravitino-iceberg oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION> \

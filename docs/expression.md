@@ -11,13 +11,13 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-This page introduces the expression system of Apache Gravitino. Expressions are vital component of metadata definition, through expressions, you can define [default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value) for columns, function arguments for [function partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning), [bucketing](./table-partitioning-distribution-sort-order-indexes.md#table-distribution), and sort term of [sort ordering](./table-partitioning-distribution-sort-order-indexes.md#sort-ordering) in tables.
-Gravitino expression system divides expressions into three basic parts: field reference, literal, and function. Function expressions can contain field references, literals, and other function expressions.
+This page introduces the expression system of Apache Gravitino. Expressions are a core part of metadata definition. They define [default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value) for columns, function arguments for [function partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning) and [bucketing](./table-partitioning-distribution-sort-order-indexes.md#table-distribution), and sort terms for [sort ordering](./table-partitioning-distribution-sort-order-indexes.md#sort-ordering).
+
+Gravitino divides expressions into three basic kinds: field references, literals, and functions. A function expression can contain field references, literals, and other function expressions.
 
 ## Field Reference
 
-Field reference is a reference to a field in a table.
-The following is an example of creating a field reference expression, demonstrating how to create a reference for the `student` field.
+A field reference points to a field in a table. The following example creates a field reference for the `student` field.
 
 <Tabs groupId='language' queryString>
   <TabItem value="Json" label="JSON">
@@ -45,8 +45,7 @@ NamedReference field = NamedReference.field("student");
 
 ## Literal
 
-Literal is a constant value.
-The following is an example of creating a literal expression, demonstrating how to create a `NULL` literal and three different data types of literal expressions for the value `1024`.
+A literal is a constant value. The following example creates a `NULL` literal and three literals for the value `1024` in different data types.
 
 <Tabs groupId='language' queryString>
   <TabItem value="Json" label="JSON">
@@ -94,8 +93,7 @@ Literal<?>[] literals =
 
 ## Function Expression
 
-Function expression represents a function call with/without arguments. The arguments can be field references, literals, or other function expressions.
-The following is an example of creating a function expression, demonstrating how to create function expressions for `rand()` and `date_trunc('year', birthday)`.
+A function expression represents a function call, with or without arguments. Arguments can be field references, literals, or other function expressions. The following example creates function expressions for `rand()` and `date_trunc('year', birthday)`.
 
 <Tabs groupId='language' queryString>
   <TabItem value="Json" label="JSON">
@@ -143,8 +141,7 @@ FunctionExpression[] functionExpressions =
 
 ## Unparsed Expression
 
-Unparsed expression is a special type of expression, serves exclusively for presenting the default value of a column when it's unsolvable.
-The following shows the data structure of an unparsed expression in JSON and Java, enabling easy retrieval of its value.
+The unparsed expression is a special expression type used to preserve a column default value that Gravitino cannot parse. The following examples show the data structure of an unparsed expression in JSON and Java, including how to retrieve its value.
 
 <Tabs groupId='language' queryString>
   <TabItem value="Json" label="JSON">
@@ -161,7 +158,7 @@ The following shows the data structure of an unparsed expression in JSON and Jav
 
 ```java
 // The result of the following expression is a string "(curdate() + interval 1 year)"
-String unparsedValue = ((UnparsedExpression) expressino).unparsedExpression();
+String unparsedValue = ((UnparsedExpression) expression).unparsedExpression();
 ```
 
   </TabItem>

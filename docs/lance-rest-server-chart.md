@@ -8,7 +8,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-This Helm chart deploys Apache Gravitino Lance REST Server on Kubernetes with customizable configurations.
+This Helm chart deploys the Apache Gravitino Lance REST server on Kubernetes with customizable configurations.
 
 ## Prerequisites
 
@@ -54,9 +54,9 @@ helm upgrade --install gravitino-lance ./gravitino-lance-rest-server -n gravitin
 
 ## View Chart Values
 
-Customize values.yaml parameters to override chart default settings. Additionally, Gravitino Lance REST Server configurations in [gravitino-lance-rest-server.conf](../dev/charts/gravitino-lance-rest-server/resources/gravitino-lance-rest-server.conf) can be modified through Helm values.yaml.
+Override chart defaults by customizing parameters in `values.yaml`. Configuration in [gravitino-lance-rest-server.conf](../dev/charts/gravitino-lance-rest-server/resources/gravitino-lance-rest-server.conf) can also be modified through Helm `values.yaml`.
 
-To display the default values of the chart, run:
+To display the default values for the chart, run:
 
 ```console
 helm show values oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version <VERSION>
@@ -70,7 +70,7 @@ helm upgrade --install [RELEASE_NAME] oci://registry-1.docker.io/apache/gravitin
 
 ### Deploy with Default Configuration
 
-Run the following command to deploy Gravitino Lance REST Server using the default settings:
+Deploy the Gravitino Lance REST server with the default settings:
 
 ```console
 helm upgrade --install gravitino-lance oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version <VERSION> \
@@ -115,10 +115,11 @@ lanceRest:
   gravitinoMetalake: your-metalake-name
 ```
 
-The Lance REST Server requires a running Gravitino instance to function. Ensure:
-1. The Gravitino server is accessible from the Lance REST Server pods
-2. The metalake specified in `gravitinoMetalake` exists in Gravitino
-3. Network policies allow communication between Lance REST and Gravitino
+The Lance REST server requires a running Gravitino instance. Ensure that:
+
+1. The Gravitino server is reachable from the Lance REST server pods.
+2. The metalake specified in `gravitinoMetalake` exists in Gravitino.
+3. Network policies allow communication between Lance REST and Gravitino.
 
 ## Uninstall Helm Chart
 

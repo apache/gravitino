@@ -6,21 +6,17 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake.
-It manages the metadata directly in different sources, types, and regions.
-It also provides users with unified metadata access for data and AI assets.
+Apache Gravitino is a high-performance, geo-distributed, federated metadata lake. It manages metadata directly across different sources, types, and regions, and provides unified access for data and AI assets.
 
 [Learn more](./overview.md)&rarr;
 
-## Downloading
+## Download
 
 Get Gravitino from the [download page](https://gravitino.apache.org/downloads),
 or you can build Gravitino from source code. See [How to build Gravitino](./how-to-build.md).
 
-Gravitino runs on both Linux and macOS platforms, and it requires the installation of Java 17.
-This should include JVMs on x86_64 and ARM64.
-It's easy to run locally on one machine, all you need is to have `java` installed on
-your system `PATH`, or the `JAVA_HOME` environment variable pointing to a Java installation.
+Gravitino runs on Linux and macOS and requires Java 17 (any JVM on x86_64 or ARM64).
+To run locally, ensure `java` is on the system `PATH` or set `JAVA_HOME` to a Java installation.
 
 See [How to install Gravitino](./how-to-install.md) to learn how to install the Gravitino server.
 
@@ -47,29 +43,17 @@ To get started with Gravitino, see [Getting started](./getting-started/index.md)
 
 ## Manage Metadata with Gravitino
 
-Gravitino provides two SDKs to manage metadata from different catalogs in a unified way:
-the REST API and the Java SDK.
-Use either to manage metadata. See
+Gravitino exposes a unified REST API along with Java and Python clients for managing metadata across catalogs. See:
 
-* [Manage metalake using Gravitino](./manage-metalake-using-gravitino.md) to learn how to manage
-  metalakes.
-* [Manage relational metadata using Gravitino](./manage-relational-metadata-using-gravitino.md)
-  to learn how to manage relational metadata.
-* [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md)
-  to learn how to manage view metadata.
-* [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
-  how to manage fileset metadata.
-* [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
-  messaging metadata.
-* [Manage model metadata using Gravitino](./manage-model-metadata-using-gravitino.md) to learn how to manage
-  model metadata.
-* [Manage user-defined functions using Gravitino](./manage-user-defined-function-using-gravitino.md) to learn how to manage
-  user-defined functions.
+* [Manage metalake using Gravitino](./manage-metalake-using-gravitino.md) for metalake operations.
+* [Manage relational metadata using Gravitino](./manage-relational-metadata-using-gravitino.md) for catalog, schema, and table operations.
+* [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md) for view operations.
+* [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) for fileset operations.
+* [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) for topic operations.
+* [Manage model metadata using Gravitino](./manage-model-metadata-using-gravitino.md) for model operations.
+* [Manage user-defined functions using Gravitino](./manage-user-defined-function-using-gravitino.md) for UDF operations.
 
-Also, you can find the complete REST API definition in
-[Gravitino Open API](./api/rest/gravitino-rest-api),
-Java SDK definition in [Gravitino Java doc](pathname:///docs/1.3.0-SNAPSHOT/api/java/index.html),
-and Python SDK definition in [Gravitino Python doc](pathname:///docs/1.3.0-SNAPSHOT/api/python/index.html).
+For the complete API references, see the [Gravitino OpenAPI definition](./api/rest/gravitino-rest-api), the [Gravitino Javadoc](pathname:///docs/1.3.0-SNAPSHOT/api/java/index.html), and the [Gravitino Python documentation](pathname:///docs/1.3.0-SNAPSHOT/api/python/index.html).
 
 Gravitino also provides a web UI to manage the metadata. Visit the web UI in the browser via `http://<ip-address>:8090`.
 See [Gravitino web UI](./webui.md) for details.
@@ -107,19 +91,13 @@ To manage table and partition statistics, see [Manage statistics in Gravitino](.
 
 * [**Model catalog**](./model-catalog.md)
 
-If you want to automate table maintenance workflows, see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md).
-Start with Gravitino built-in policies and built-in job templates, and extend via optimizer interfaces when needed.
+To automate table-maintenance workflows, see the [Table maintenance service (optimizer)](./table-maintenance-service/optimizer.md). Start with Gravitino's built-in policies and job templates, and extend through the optimizer interfaces when needed.
 
-Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image since 1.2.0.  In 1.2.0, Gravitino introduces 
-folder `catalogs-contrib` to host the contributed catalogs, which aren’t in the standard release but can be built and used separately. See [how to build Gravitino](./how-to-build.md#quick-start) for details.
+Catalogs marked with an asterisk (\*) are not in the standard release tarball or Docker image as of 1.2.0. From 1.2.0 onward, Gravitino hosts contributed catalogs in a `catalogs-contrib` folder; they are not in the standard release but can be built and used separately. See [How to build Gravitino](./how-to-build.md#quick-start) for details.
 
 ## Apache Gravitino Playground
 
-To experience Gravitino with other components easily, Gravitino provides a playground to run.
-It integrates Apache Hadoop, Apache Hive, Trino, MySQL, PostgreSQL, and Gravitino together as a
-complete environment. To experience all the features, see
-[Getting started](./getting-started/index.md) and
-[How to use the Gravitino playground](./how-to-use-the-playground.md).
+The Gravitino playground integrates Apache Hadoop, Apache Hive, Trino, MySQL, PostgreSQL, and Gravitino into a complete environment for trying out the system end-to-end. See [Getting started](./getting-started/index.md) and [How to use the Gravitino playground](./how-to-use-the-playground.md).
 
 * [Install Gravitino playground on AWS or GCP](./getting-started/playground.md):
   a quick guide to starting and using the Gravitino playground on AWS or GCP.
@@ -132,7 +110,7 @@ complete environment. To experience all the features, see
 
 ### Catalogs
 
-Gravitino supports different catalogs to manage the metadata in different sources. Please see:
+Gravitino supports several catalogs for managing metadata across different sources. See:
 
 * [Doris catalog](./jdbc-doris-catalog.md): a complete guide to using Gravitino to manage Doris data.
 * [Hologres catalog](./jdbc-hologres-catalog.md): a complete guide to using Gravitino to manage Hologres data.
@@ -176,48 +154,37 @@ Gravitino provides governance features to manage metadata in a unified way. See:
 
 #### Trino Connector
 
-Gravitino provides a Trino connector to manage Trino metadata in a unified way. To use the Trino connector, see:
-
 * [How to use Gravitino Trino connector](./trino-connector/index.md): a complete guide to using the Gravitino Trino connector.
 
 #### Spark Connector
-
-Gravitino provides a Spark connector to manage metadata in a unified way. To use the Spark connector, see:
 
 * [Gravitino Spark connector](./spark-connector/spark-connector.md): a complete guide to using the Gravitino Spark connector.
 
 #### Flink Connector
 
-Gravitino provides a Flink connector to manage metadata in a unified way. To use the Flink connector, see:
-
 * [Gravitino Flink connector](./flink-connector/flink-connector.md): a complete guide to using the Gravitino Flink connector.
 
 #### Daft Connector
 
-Gravitino provides a Daft connector to access Gravitino metadata from Daft dataframes. To use the Daft connector, see:
-
-* [Gravitino Daft connector](./daft-connector/daft-connector.md): an introduction to the Gravitino Daft connector.
+* [Gravitino Daft connector](./daft-connector/daft-connector.md): an introduction to the Gravitino Daft connector for accessing Gravitino metadata from Daft dataframes.
 
 
 ### Server Administration
 
-Gravitino provides several ways to configure and manage the Gravitino server. See:
-
-* [Gravitino metrics](./metrics.md): provides metrics configurations and detailed a metrics list
-  of the Gravitino server.
+* [Gravitino metrics](./metrics.md): metrics configuration and a detailed list of the metrics emitted by the Gravitino server.
 
 ### Security
 
-Gravitino provides security configurations for Gravitino, including HTTPS, authentication and access control configurations.
+Security configuration covers HTTPS, authentication, and access control.
 
-* [HTTPS](./security/how-to-use-https.md): provides HTTPS configurations.
-* [Authentication](./security/how-to-authenticate.md): provides authentication configurations including simple, OAuth, Kerberos.
-* [Access Control](./security/access-control.md): provides access control configurations.
-* [CORS](./security/how-to-use-cors.md): provides CORS configurations.
+* [HTTPS](./security/how-to-use-https.md): HTTPS configuration.
+* [Authentication](./security/how-to-authenticate.md): authentication configuration, including simple, OAuth, and Kerberos.
+* [Access control](./security/access-control.md): access-control configuration.
+* [CORS](./security/how-to-use-cors.md): CORS configuration.
 
 ### Gravitino MCP Server
 
-Gravitino MCP server provides the ability to manage Gravitino metadata for AI tools.
+The Gravitino MCP server lets AI tools manage Gravitino metadata.
 
 * [Gravitino MCP server](./gravitino-mcp-server.md): a complete guide to using the Gravitino MCP server.
 

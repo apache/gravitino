@@ -53,9 +53,9 @@ helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace
 
 ## View Chart Values
 
-Customize values.yaml parameters to override chart default settings. Additionally, Gravitino configurations in gravitino.conf can be modified through Helm values.yaml.
+Override chart defaults by customizing parameters in `values.yaml`. Gravitino configuration in `gravitino.conf` can also be modified through Helm `values.yaml`.
 
-To display the default values of the Gravitino chart, run:
+To display the default values for the Gravitino chart, run:
 
 ```console
 helm show values oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION>
@@ -116,11 +116,11 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
 
 Then manually create a PersistentVolume (PV).
 
-### Deploy Gravitino Using an Existed MySQL Database
+### Deploy Gravitino Using an Existing MySQL Database
 
-Ensure you have the following MySQL credentials ready: Username, Password, Database Name. When creating your database, we recommend calling it `gravitino`.
+Have the following MySQL credentials ready: username, password, and database name. Naming the database `gravitino` is recommended.
 
-Before deploying Gravitino, initialize your existing MySQL instance and create the necessary tables required for Gravitino to function properly.
+Before deploying Gravitino, initialize your MySQL instance and create the tables Gravitino requires.
 
 ```console
 mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOUR-PASSWORD> < schema-0.*.0-mysql.sql
@@ -137,10 +137,9 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
   --set entity.jdbcPassword="admin123"
 ```
 
-_Note: \
-Replace database-1.***.***.rds.amazonaws.com with your actual MySQL host. \
-Change admin and admin123 to your actual MySQL username and password. \
-Ensure the target MySQL database (gravitino) exists before deployment._
+:::note
+Replace `database-1.***.***.rds.amazonaws.com` with your actual MySQL host. Change `admin` and `admin123` to your actual MySQL username and password. Ensure the target MySQL database (for example, `gravitino`) exists before deployment.
+:::
 
 ## Uninstall Helm Chart
 

@@ -7,19 +7,19 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
+The Gravitino MCP server lets LLM tools manage Gravitino metadata through the Model Context Protocol.
 
 ## Requirements
 
-1. Python 3.10+
-2. uv is installed. Install uv by following the [official guide](https://docs.astral.sh/uv/getting-started/installation/).
+1. Python 3.10 or later.
+2. `uv` installed. Follow the [official guide](https://docs.astral.sh/uv/getting-started/installation/).
 
 ## Usage
 
-1. Clone the code from GitHub, and change to `mcp-server` directory
-2. Create virtual environment, `uv venv`
-3. Install the required Python packages. `uv pip install -e .`
-4. Add Gravitino MCP server to corresponding LLM tools. Take `cursor` for example, edit `~/.cursor/mcp.json`, use following configuration for local Gravitino MCP server:
+1. Clone the repository from GitHub and `cd` into the `mcp-server` directory.
+2. Create a virtual environment: `uv venv`.
+3. Install the required Python packages: `uv pip install -e .`.
+4. Register the Gravitino MCP server with your LLM tool. For example, with Cursor, edit `~/.cursor/mcp.json` and add this configuration for a local server:
 
 ```json
 {
@@ -41,7 +41,13 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 }
 ```
 
-Or start an HTTP MCP server by `uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 --transport http --mcp-url http://localhost:8000/mcp`, and use the configuration:
+To run the MCP server over HTTP instead, start it with:
+
+```shell
+uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 --transport http --mcp-url http://localhost:8000/mcp
+```
+
+Then use this configuration:
 
 ```json
 {
@@ -53,13 +59,23 @@ Or start an HTTP MCP server by `uv run mcp_server --metalake test --gravitino-ur
 }
 ```
 
-## Docker Instructions
+## Docker
 
-You could start Gravitino MCP server by Docker image, `docker run -p 8000:8000 --network=host apache/gravitino-mcp-server:latest --metalake test --transport http --mcp-url http://0.0.0.0:8000/mcp --gravitino-uri http://127.0.0.1:8090`. Please note that the MCP server in Docker container doesn't support `stdio` transport mode.
+Run the MCP server from the Docker image:
+
+```shell
+docker run -p 8000:8000 --network=host apache/gravitino-mcp-server:latest \
+  --metalake test \
+  --transport http \
+  --mcp-url http://0.0.0.0:8000/mcp \
+  --gravitino-uri http://127.0.0.1:8090
+```
+
+The MCP server inside a Docker container does not support the `stdio` transport.
 
 ## Supported Tools
 
-Gravitino MCP server supports the following tools, and you could export tool by tag.
+The Gravitino MCP server supports the following tools. You can export tools by tag.
 
 | Tool name                           | Description                                                                    | Tag          | Since version |
 |-------------------------------------|--------------------------------------------------------------------------------|--------------|---------------|
@@ -101,7 +117,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 
 ## Configuration
 
-You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
+Configure the Gravitino MCP server through command-line arguments. Run `uv run mcp_server -h` for the full list.
 
 | Argument          | Description                                                     | Default value               | Required | Since version |
 |-------------------|-----------------------------------------------------------------|-----------------------------|----------|---------------|
