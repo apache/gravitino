@@ -26,7 +26,7 @@ license: "This software is licensed under the Apache License version 2."
 
 # Daft Connector
 
-## What is Daft?
+## What Is Daft?
 
 [Daft](https://docs.daft.ai/) is a distributed dataframe library for Python, designed for complex data workflows on large datasets. It provides a familiar DataFrame API while offering powerful distributed computing capabilities for processing data at scale.
 

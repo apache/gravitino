@@ -9,15 +9,15 @@ license: This software is licensed under the Apache License version 2.
 
 Use kebab-case values such as `update-statistics`, not `update_statistics`.
 
-## `--statistics-payload and --file-path cannot be used together`
+## `--statistics-payload and --file-path Cannot Be Used together`
 
 For `local-stats-calculator`, use exactly one of them.
 
-## `requires one of --statistics-payload or --file-path`
+## `requires One of --statistics-payload or --file-path`
 
 When `--calculator-name local-stats-calculator` is used, one input source is required.
 
-## `--partition-path must be a JSON array`
+## `--partition-path Must Be a JSON array`
 
 Use a JSON array format, for example:
 
@@ -25,7 +25,7 @@ Use a JSON array format, for example:
 [{"dt":"2026-01-01"}]
 ```
 
-## Job status appears stale (`queued` or `started` for a long time)
+## Job Status Appears Stale (`queued` or `started` for a Long Time)
 
 Check `gravitino.job.statusPullIntervalInMs` and local staging logs under:
 
@@ -34,17 +34,17 @@ Check `gravitino.job.statusPullIntervalInMs` and local staging logs under:
 For local verification, reduce `gravitino.job.statusPullIntervalInMs` (for example `10000`) and
 restart Gravitino so REST status can refresh faster.
 
-## `No identifiers matched strategy name ...`
+## `No Identifiers Matched Strategy Name ...`
 
 `--strategy-name` must be the policy name (for example `iceberg_compaction_default`), not the policy type (`system_iceberg_compaction`) and not the strategy type (`iceberg-data-compaction`).
 
-## Dry-run returns no `DRY-RUN` or `SUBMIT` lines
+## Dry-run Returns No `DRY-RUN` or `SUBMIT` Lines
 
 This usually means trigger conditions are not met. For compaction, verify
 `custom-data-file-mse` and `custom-delete-file-number` in table statistics/metrics are large
 enough to satisfy policy rules.
 
-## `monitor-metrics` returns `evaluation=false` unexpectedly
+## `monitor-metrics` Returns `evaluation=false` Unexpectedly
 
 Check both rule names and metric samples:
 
@@ -53,7 +53,7 @@ Check both rule names and metric samples:
    `gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules`.
 3. Ensure `--action-time` is inside the range where both before and after samples exist.
 
-## `No StrategyHandler class configured for strategy type ...`
+## `No StrategyHandler Class Configured for Strategy Type ...`
 
 Add strategy handler mapping to optimizer config, for example:
 
@@ -63,7 +63,7 @@ gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apac
 
 If you already use the packaged default optimizer config, this mapping may already exist.
 
-## Spark job fails with `hdfs://localhost:9000` or filesystem errors
+## Spark Job Fails with `hdfs://localhost:9000` or Filesystem Errors
 
 Set local filesystem explicitly in Spark config:
 
@@ -71,7 +71,7 @@ Set local filesystem explicitly in Spark config:
 spark.hadoop.fs.defaultFS=file:///
 ```
 
-## Rewrite fails on multi-level partition (`identity + day(...)`)
+## Rewrite Fails on Multi-level Partition (`identity + day(...)`)
 
 In release `1.2.0`, rewrite may fail for partition filters combining identity and day transform
 (for example `PARTITIONED BY (p, days(ts))`) with error:
@@ -98,7 +98,7 @@ Observed compatibility matrix in release `1.2.0` (rewrite path):
 - FAIL: `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)`,
   `p, truncate(1, c2)`, `p, bucket(8, id)`
 
-## `submit-update-stats-job` fails with JDBC metrics errors
+## `submit-update-stats-job` Fails with JDBC Metrics Errors
 
 When `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, ensure the JDBC driver is
 available to Spark runtime classpath. Typical failures include `ClassNotFoundException` for driver
@@ -112,11 +112,11 @@ Example in `--spark-conf`:
 }
 ```
 
-## `Specified optimizer config file does not exist`
+## `Specified Optimizer Config File Does Not exist`
 
 Check your `--conf-path` and file permissions.
 
-## Related docs
+## Related Docs
 
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Configuration](./optimizer-configuration.md)

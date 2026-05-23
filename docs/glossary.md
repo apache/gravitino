@@ -28,11 +28,11 @@ license: "This software is licensed under the Apache License version 2."
   HDFS is designed as a distributed storage solution to store and process large-scale datasets.
   It features high reliability, fault tolerance, and excellent performance.
 
-## HTTP port
+## HTTP Port
 
 - The port number on which a server listens for incoming connections.
 
-## IP address
+## IP Address
 
 - Internet Protocol address, a numerical label assigned to each device in a computer network.
 
@@ -50,7 +50,7 @@ license: "This software is licensed under the Apache License version 2."
 - The software development kit for the Java programming language.
   A JDK provides tools for compiling, debugging, and running Java applications.
 
-## JMX 
+## JMX
 
 - Java Management Extensions provides tools for managing and monitoring Java applications.
 
@@ -67,12 +67,12 @@ license: "This software is licensed under the Apache License version 2."
 - A virtual machine that enables a computer to run Java applications.
   A JVM implements an abstract machine that is different from the underlying hardware.
 
-## JVM instrumentation 
+## JVM Instrumentation
 
 - The process of adding monitoring and management capabilities to the [JVM](#jvm).
   The purpose of instrumentation is mainly for the collection of performance metrics.
 
-## JVM metrics 
+## JVM Metrics
 
 - Metrics related to the performance and behavior of the [Java Virtual Machine](#jvm).
   Some valuable metrics are memory usage, garbage collection, and buffer pool metrics.
@@ -81,11 +81,11 @@ license: "This software is licensed under the Apache License version 2."
 
 - A compact, URL-safe representation for claims between two parties.
 
-## KEYS file
+## KEYS File
 
 - A file containing public keys used to sign previous releases, necessary for verifying signatures.
 
-## PGP signature
+## PGP Signature
 
 - A digital signature generated using the Pretty Good Privacy (PGP) algorithm.
   The signature is typically used to validate the authenticity of a file.
@@ -99,11 +99,11 @@ license: "This software is licensed under the Apache License version 2."
 - Representational State Transfer (REST) Application Programming Interface.
   A set of rules and conventions for building and interacting with Web services using standard HTTP methods.
 
-## SHA256 checksum
+## SHA256 Checksum
 
 - A cryptographic hash function used to verify the integrity of files.
 
-## SHA256 checksum file
+## SHA256 Checksum File
 
 - A file containing the SHA256 hash value of another file, used for verification purposes.
 
@@ -134,7 +134,7 @@ license: "This software is licensed under the Apache License version 2."
   Gravitino can manage metadata directly in different sources, types, and regions,
   providing data and AI assets with unified metadata access.
 
-## Apache Gravitino configuration file (gravitino.conf)
+## Apache Gravitino Configuration File (gravitino.conf)
 
 - The configuration file for the Gravitino server, located in the `conf` directory.
   It follows the standard properties file format and contains settings for the Gravitino server.
@@ -152,30 +152,30 @@ license: "This software is licensed under the Apache License version 2."
 
 - An open-source, versioned table format for large-scale data processing.
 
-## Apache Iceberg Hive catalog
+## Apache Iceberg Hive Catalog
 
 - The **Iceberg Hive catalog** is a metadata service designed for the Apache Iceberg table format.
   It allows external systems to interact with an Iceberg metadata using a Hive metastore thrift client.
 
-## Apache Iceberg JDBC catalog
+## Apache Iceberg JDBC Catalog
 
 - The **Iceberg JDBC catalog** is a metadata service designed for the Apache Iceberg table format.
   It enables external systems to interact with an Iceberg metadata service using [JDBC](#jdbc).
 
-## Apache Iceberg REST catalog
+## Apache Iceberg REST Catalog
 
 - The **Iceberg REST Catalog** is a metadata service designed for the Apache Iceberg table format.
   It enables external systems to interact with Iceberg metadata service using a [REST API](#rest-api).
 
-## Apache License version 2
+## Apache License Version 2
 
 - A permissive, open-source software license written by The Apache Software Foundation.
 
-## Authentication mechanism
+## Authentication Mechanism
 
 - The method used to verify the identity of users and clients accessing a server.
 
-## Binary distribution package
+## Binary Distribution Package
 
 - A software package containing the compiled executables for distribution and deployment.
 
@@ -183,7 +183,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - A collection of metadata from a specific metadata source.
 
-## Catalog provider 
+## Catalog Provider
 
 - The specific system or technology used to store and manage metadata catalogs.
 
@@ -192,7 +192,7 @@ license: "This software is licensed under the Apache License version 2."
 - The individual fields or attributes of a table.
   Each column has properties like name, data type, comment, and nullability.
 
-## Continuous integration (CI)
+## Continuous Integration (CI)
 
 - The practice of automatically building and testing code changes when they are committed to version control.
 
@@ -208,7 +208,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - A platform for developing, shipping, and running applications in containers.
 
-## Docker container
+## Docker Container
 
 - A lightweight, standalone package that includes everything needed to run the software.
   A container compiles an application with its dependencies and runtime for distribution.
@@ -218,7 +218,7 @@ license: "This software is licensed under the Apache License version 2."
 - A cloud-based registry service for Docker containers.
   Users can publish, browse and download containerized software using this service.
 
-## Docker image
+## Docker Image
 
 - A lightweight, standalone package that includes everything needed to run the software.
   A Docker image typically comprises the code, runtime, libraries, and system tools.
@@ -228,11 +228,11 @@ license: "This software is licensed under the Apache License version 2."
 - A configuration file for building a Docker image.
   A Dockerfile contains instructions to build a standard image for distributing the software.
 
-## Dropwizard metrics
+## Dropwizard Metrics
 
 - A Java library for measuring the performance of applications and providing support for various metric types.
 
-## Environment variables
+## Environment Variables
 
 - Variables used to customize the runtime configuration for a process.
 
@@ -253,19 +253,19 @@ license: "This software is licensed under the Apache License version 2."
 - A continuous integration and continuous deployment (CI/CD) service provided by GitHub.
   GitHub Actions automate the build, test, and deployment workflows.
 
-## GitHub labels
+## GitHub Labels
 
 - Labels assigned to GitHub issues or pull requests for organization or workflow automation.
 
-## GitHub pull request
+## GitHub Pull Request
 
 - A proposed change to a GitHub repository submitted by a user.
 
-## GitHub repository
+## GitHub Repository
 
 - The location where GitHub stores a project's source code and related files.
 
-## GitHub workflow
+## GitHub Workflow
 
 - A series of automated steps triggered by specific events on a GitHub repository.
 
@@ -286,12 +286,12 @@ license: "This software is licensed under the Apache License version 2."
 
 - A system without a local console.
 
-## Identity fields
+## Identity Fields
 
 - Fields in tables that define the identity of the records.
   In the scope of a table, the identity fields are used as the unique identifier of a row.
 
-## Integration tests
+## Integration Tests
 
 - Tests that ensure software correctness and compatibility when integrating components into a larger system.
 
@@ -315,7 +315,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - See [JVM](#jvm)
 
-## Key pair
+## Key Pair
 
 - A pair of cryptographic keys, including a public key used for verification and a private key used for signing.
 
@@ -329,7 +329,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - A list of files and their associated metadata that collectively define the structure and content of a release or distribution.
 
-## Merge operation
+## Merge Operation
 
 - A process in Iceberg that involves combining changes from multiple snapshots into a new snapshot.
 
@@ -347,7 +347,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - A distinct and separable part of a project.
 
-## Open authorization / OAuth
+## Open Authorization / OAuth
 
 - A standard protocol for authorization that allows third-party applications to authenticate a user.
   The application doesn't need to access the user credentials.
@@ -356,7 +356,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - A tool mentioned as an alternative to Docker for macOS when running Gravitino integration tests.
 
-## Private key
+## Private Key
 
 - A confidential key used for signing, decryption, or other operations that should remain confidential.
 
@@ -365,12 +365,12 @@ license: "This software is licensed under the Apache License version 2."
 - Configurable settings and attributes associated with catalogs, schemas, and tables.
   The property settings influence the behavior and storage of the corresponding entities.
 
-## Protocol buffers (protobuf)
+## Protocol Buffers (Protobuf)
 
 - A method developed by Google for serializing structured data, similar to XML or JSON.
   It is often used for efficient and extensible communication between systems.
 
-## Public key
+## Public Key
 
 - An openly shared key used for verification, encryption, or other operations intended for public knowledge.
 
@@ -390,7 +390,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - See [SSH](#ssh)
 
-## Security group
+## Security Group
 
 - A virtual firewall for your instance to control inbound and outbound traffic.
 
@@ -403,7 +403,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - A point-in-time capture of the state of an Iceberg table, representing a specific version of the table.
 
-## Sort order
+## Sort Order
 
 - The arrangement of data within a Hive table, specified by expression or direction.
 
@@ -432,7 +432,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - A query engine for big data processing.
 
-## Trino connector
+## Trino Connector
 
 - A connector module for integrating Gravitino with Trino.
 
@@ -440,7 +440,7 @@ license: "This software is licensed under the Apache License version 2."
 
 - A Linux distribution based on Debian, widely used for cloud computing and servers.
 
-## Unit test
+## Unit Test
 
 - A type of software testing where individual components or functions of a program are tested.
   Unit tests help to ensure that the component or function works as expected in isolation.

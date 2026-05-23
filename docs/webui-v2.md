@@ -12,7 +12,7 @@ This document outlines how users can manage metadata within Apache Gravitino usi
 
 [Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`. By default, it is [http://localhost:8090](http://localhost:8090).
 
-## UI Version 1.2.0 — Web V2 introduced
+## UI Version 1.2.0 — Web V2 Introduced
 
 Starting with version 1.2.0, Gravitino introduces Web V2. By default, the template does not set `GRAVITINO_USE_WEB_V2`, so the container or environment controls which UI is used. To force the v1 UI, explicitly set it to `false`; to enable the v2 UI, set it to `true` (for example: `export GRAVITINO_USE_WEB_V2=true`). If you want to enable Web V2 from the server env file, set the following environment variable in `conf/gravitino-env.sh` before starting the server:
 
@@ -34,7 +34,7 @@ The Web V2 introduces additional modules (such as Jobs, Job Templates, Data Comp
 
 Data Compliance includes **Tags** and **Policies**. The **Access** module is visible only when `gravitino.authorization.enable=true` and includes **Users**, **User Groups**, and **Roles**.
 
-### Initial page (Web V2)
+### Initial Page (Web V2)
 
 The Web V2 landing page depends on both the authentication mode and whether authorization is enabled in `<path-to-gravitino>/conf/gravitino.conf`.
 
@@ -56,7 +56,7 @@ Overview for Metalake in the Web V2.
 
 ![metalakes-list](./assets/webui-v2/metalakes-list.png)
 
-#### Create metalake (Web V2)
+#### Create Metalake (Web V2)
 
 Click the `CREATE METALAKE` button to open the create dialog. Fill in the form fields and submit to create the metalake.
 
@@ -64,7 +64,7 @@ Click the `CREATE METALAKE` button to open the create dialog. Fill in the form f
 
 After creation, the basic information is visible in the metalake list.
 
-#### Properties popover (Web V2)
+#### Properties Popover (Web V2)
 
 Hover over the number in the **Properties** column to view the properties popover.
 
@@ -79,7 +79,7 @@ In the **Actions** column, you can edit or delete the metalake. The settings dro
 
 ![metalake-actions](./assets/webui-v2/metalake-actions.png)
 
-#### Delete metalake (Web V2)
+#### Delete Metalake (Web V2)
 
 To delete a metalake, the metalake must be **not in-use** (set it in the [Actions (Web V2)](#actions-web-v2) settings dropdown), and all sub-entities must be deleted first. The delete dialog requires entering the metalake name for confirmation before deletion.
 
@@ -89,30 +89,30 @@ To delete a metalake, the metalake must be **not in-use** (set it in the [Action
 
 Overview for Catalog in the Web V2.
 
-#### Catalog type filter (Web V2)
+#### Catalog Type Filter (Web V2)
 
 On the catalogs page, use the catalog type selector at the top-left to switch between `relational`, `messaging`, `fileset`, and `model`. The list updates to show catalogs of the selected type.
 
 
-#### Tags and policies association (Web V2)
+#### Tags and Policies Association (Web V2)
 
 The catalog list shows basic catalog information along with associated **Tags** and **Policies**. Use **Associate Tag** and **Associate Policy** in the list to add associations. Click the **X** on a tag to remove it.
 
 ![catalogs-list](./assets/webui-v2/catalogs-list.png)
 
-#### Disable catalog (Web V2)
+#### Disable Catalog (Web V2)
 
 From the **Actions** settings dropdown, switch a catalog to **not in-use**. A disabled icon appears next to the catalog name, and the catalog name becomes non-clickable (you cannot enter the catalog details page).
 
 ![catalog-actions](./assets/webui-v2/catalog-actions.png)
 
-#### Provider filter (Web V2)
+#### Provider Filter (Web V2)
 
 Use the filter on the **Provider** table header to narrow the catalogs list by provider.
 
 ![catalogs-disabled-icon-and-filter-catalogs](./assets/webui-v2/catalogs-disabled-icon-and-filter-catalogs.png)
 
-#### Create catalog (Web V2)
+#### Create Catalog (Web V2)
 
 Click **Create Catalog** to open the creation form for the selected catalog type. In step 1, choose the provider for the selected type. Click **Next** to go to step 2, fill in the required properties, and submit to create the catalog. Some providers support **Test Connection** so you can validate connectivity before submitting.
 
@@ -120,7 +120,7 @@ Click **Create Catalog** to open the creation form for the selected catalog type
 
 ![catalogs-create-step2](./assets/webui-v2/create-catalog-step2.png)
 
-#### Delete catalog (Web V2)
+#### Delete Catalog (Web V2)
 
 If the catalog is still in-use, the UI shows the **Delete** entry as shown in **Figure 1 below**. After switching the catalog to **not in-use** (see [Disable catalog (Web V2)](#disable-catalog-web-v2)), the **Delete** entry changes to **Figure 2 below**. Enter the catalog name for the second confirmation, then you can delete it.
 
@@ -139,13 +139,13 @@ The navbar provides the following shortcuts:
 ![navbar-system-mode](./assets/webui-v2/navbar-system-mode.png)
 ![navbar-user-dropdown](./assets/webui-v2/navbar-user-dropdown.png)
 
-### Catalog details & Schemas (Web V2)
+### Catalog Details & Schemas (Web V2)
 
 Enter the catalog details page by clicking the catalog name either from the left tree or from the catalog name in the right list. The catalog name shows basic catalog information underneath it. Hover over the highlighted numbers to open a popover with more details.
 
 Below the catalog information, the page shows the **Schemas** list and the catalog's **Associated Roles**. The **Associated Roles** section is visible only when `gravitino.authorization.enable=true`, and it lists the role name and its privileges.
 
-#### Schemas list (Web V2)
+#### Schemas List (Web V2)
 
 Overview for Schemas in the Web V2.
 
@@ -264,7 +264,7 @@ Click **Create Tag** to open the create form. Fill in the required fields and su
 
 ![tags-create](./assets/webui-v2/tags-create.png)
 
-#### Tag metadata objects (Web V2)
+#### Tag Metadata Objects (Web V2)
 
 Click a tag to navigate to the **Metadata Objects** page, which lists all metadata objects associated with the selected tag.
 
@@ -282,13 +282,13 @@ Click **Create Policy** to open the create form. Fill in the required fields and
 
 ![policies-create](./assets/webui-v2/policies-create.png)
 
-#### Policy metadata objects (Web V2)
+#### Policy Metadata Objects (Web V2)
 
 Click a policy tag to navigate to the **Metadata Objects** page, which lists all metadata objects associated with the selected policy.
 
 ![policy-metadata-objects](./assets/webui-v2/policy-metadata-objects.png)
 
-### Access 
+### Access
 
 The Access module is visible only when `gravitino.authorization.enable=true`.
 

@@ -34,15 +34,15 @@ Gravitino's job system provides an extensible way to connect to different job ex
    support running a single job at a time, and it doesn't support job scheduling for now.
    :::
 
-## Job operations
+## Job Operations
 
-### Register a new job template
+### Register a New Job Template
 
 Before running a job, the first step is to register a job template. Gravitino
 supports two types of job templates: `shell` and `spark` (we will add more job templates in the
 future).
 
-#### Shell job template
+#### Shell Job Template
 
 The `shell` job template is used to run scripts, it can be a shell script, or any executable
 script. The template is defined as follows:
@@ -91,7 +91,7 @@ Please note that:
    when running the job, so you can use the relative path in the `executable` and `scripts` to
    refer to other scripts in the job working directory.
 
-#### Spark job template
+#### Spark Job Template
 
 The `spark` job template is used to run Spark jobs, it is a Spark application JAR file for now.
 
@@ -231,7 +231,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### List registered job templates
+### List Registered Job Templates
 
 List all the registered job templates under a metalake by using the REST API or the Java
 and Python SDKs.
@@ -268,7 +268,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Get a registered job template by name
+### Get a Registered Job Template by Name
 
 Get a registered job template by its name using the REST API or the Java and Python SDKs.
 
@@ -299,7 +299,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Delete a registered job template by name
+### Delete a Registered Job Template by Name
 
 Delete a registered job template by its name using the REST API or the Java and Python SDKs.
 
@@ -334,7 +334,7 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Alter a registered job template
+### Alter a Registered Job Template
 
 Alter a registered job template by its name using the REST API or the Java and Python
 SDKs. Gravitino supports altering the `name`, `comment` and `template` fields of the job template.
@@ -423,7 +423,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Run a job based on a job template
+### Run a Job Based on a Job Template
 
 To run a job based on the registered job template, you can use the REST API or the Java and Python SDKs.
 When running a job, you need to provide the job template name and the parameters to replace the
@@ -497,7 +497,7 @@ check the job status and cancel the job.
 The runJob API will return immediately after the job is submitted to the job executor, and the job will be
 executed asynchronously. You can check the job status using the job ID returned by the runJob API.
 
-### List all jobs
+### List All Jobs
 
 List all the jobs under a metalake by using the REST API or the Java and Python SDKs.
 
@@ -540,7 +540,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Get a job by job ID
+### Get a Job by Job ID
 
 Get a job by its job ID using the REST API or the Java and Python SDKs.
 
@@ -571,7 +571,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Cancel a job by job ID
+### Cancel a Job by Job ID
 
 Cancel a job by its job ID using the REST API or the Java and Python SDKs.
 
@@ -610,7 +610,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-### Configurations of the job system
+### Configurations of the Job System
 
 Configure the job system through the `gravitino.conf` file. The following are the
 default configurations:
@@ -623,7 +623,7 @@ default configurations:
 | `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       | 1.0.0         |
 
 
-#### Configurations for local job executor
+#### Configurations for Local Job Executor
 
 The local job executor is used for testing and development purposes, it runs the job in the local process.
 The following are the default configurations for the local job executor:
@@ -635,7 +635,7 @@ The following are the default configurations for the local job executor:
 | `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       | 1.0.0         |
 | `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       | 1.0.1         |
 
-### Implement a custom job executor
+### Implement a Custom Job Executor
 
 Gravitino's job system is designed to be extensible, allowing you to implement your own job executor
 to run jobs in a distributed environment. You can refer to the interface `JobExecutor` in the
@@ -660,7 +660,7 @@ gravitino.jobExecutor.airflow.password = mypassword
 
 These properties will be passed to the airflow job executor when it is instantiated.
 
-## Future work
+## Future Work
 
 The job system is a new feature introduced in Gravitino 1.0.0, and it still needs more work:
 

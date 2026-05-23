@@ -22,13 +22,13 @@ Gravitino saves some system information in table comments, like
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the StarRocks instance.
 - Supports metadata management of StarRocks (3.3.x).
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
-### Catalog properties
+### Catalog Properties
 
 Pass to a StarRocks data source any property that isn't defined by Gravitino by adding
 `gravitino.bypass.` prefix as a catalog property. For example, catalog property
@@ -78,35 +78,35 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 **Recommended driver versions:**
 - `mysql-connector-java-8.0.16` or higher
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino's schema concept corresponds to the StarRocks database.
 - Supports creating schema.
 - Supports dropping schema.
 
-### Schema properties
+### Schema Properties
 
 As StarRocks can't get thr properties after set, So now we do not support set Schema properties.  
 
-### Schema operations
+### Schema Operations
 
 Refer to
 [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Gravitino's table concept corresponds to the StarRocks table.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
-#### Table column types
+#### Table Column Types
 
 | Gravitino Type | StarRocks Type |
 |----------------|----------------|
@@ -134,20 +134,20 @@ Gravitino cannot load StarRocks `array`, `map` and `struct` type correctly, beca
 :::
 
 
-### Table column auto-increment
+### Table Column Auto-increment
 
 Unsupported for now.
 
-### Table properties
+### Table Properties
 
 - StarRocks supports table properties, and you can set them in the table properties.
 - Only supports StarRocks table properties and doesn't support user-defined properties.
 
-### Table indexes
+### Table Indexes
 
 Unsupported
 
-### Table partitioning
+### Table Partitioning
 
 The StarRocks catalog supports partitioned tables. 
 Users can create partitioned tables in the StarRocks catalog with specific partitioning attributes. It is also supported to pre-assign partitions when creating StarRocks tables. 
@@ -160,7 +160,7 @@ Note that although Gravitino supports several partitioning strategies, StarRocks
 The `fieldName` specified in the partitioning attributes must be the name of columns defined in the table.
 :::
 
-### Table distribution
+### Table Distribution
 
 Users can also specify the distribution strategy when creating tables in the StarRocks catalog. The StarRocks catalog supports the following distribution strategies:
 - `HASH`
@@ -169,11 +169,11 @@ Users can also specify the distribution strategy when creating tables in the Sta
 For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it. More information about the distribution strategy defined in Gravitino can be found [here](./table-partitioning-distribution-sort-order-indexes.md#table-distribution).
 
 
-### Table operations
+### Table Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Gravitino supports these table alteration operations:
 

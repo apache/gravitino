@@ -13,7 +13,7 @@ import TabItem from '@theme/TabItem';
 
 Although many catalogs inherently manage partitions automatically, there are scenarios where manual partition management is necessary. Usage scenarios like managing the TTL (Time-To-Live) of partition data, gathering statistics on partition metadata, and optimizing queries through partition pruning. For these reasons, Apache Gravitino provides capabilities of partition management.
 
-### Requirements and limitations
+### Requirements and Limitations
 
 - Partition management is based on the partitioned table, so please ensure that you are operating on a partitioned table.
 
@@ -31,9 +31,9 @@ The following table shows the partition operations supported across various cata
 If you need additional partition management support for a specific catalog, please feel free to [create an issue](https://github.com/apache/gravitino/issues/new/choose) on the [Gravitino repository](https://github.com/apache/gravitino).
 :::
 
-## Partition operations
+## Partition Operations
 
-### Add partition
+### Add Partition
 
 Match the partition types you want to add with the table's [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning) types; Gravitino supports adding the following partition types:
 
@@ -270,7 +270,7 @@ Partition addedPartition =
 </TabItem>
 </Tabs>
 
-### Get a partition by name
+### Get a Partition by Name
 
 Get a partition by its name via sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
 The following is an example of getting a partition by its name:
@@ -310,7 +310,7 @@ Partition Partition =
 </TabItem>
 </Tabs>
 
-### List partition names under a partitioned table
+### List Partition Names Under a Partitioned Table
 
 List all partition names under a partitioned table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
 The following is an example of listing all the partition names under a partitioned table:
@@ -346,7 +346,7 @@ String[] partitionNames =
 </TabItem>
 </Tabs>
 
-### List partitions under a partitioned table
+### List Partitions Under a Partitioned Table
 
 If you want to get more detailed information about the partitions under a partitioned table, you can list all partitions under a partitioned table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions` endpoint or by using the Gravitino Java client.
 The following is an example of listing all the partitions under a partitioned table:
@@ -377,7 +377,7 @@ Partition[] partitions =
 </TabItem>
 </Tabs>
 
-### Drop a partition by name
+### Drop a Partition by Name
 
 Drop a partition by its name via sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{partitioned_table_name}/partitions/{partition_name}` endpoint or by using the Gravitino Java client.
 The following is an example of dropping a partition by its name:

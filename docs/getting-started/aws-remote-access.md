@@ -4,7 +4,7 @@ slug: /getting-started/aws-remote-access
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Access Apache Gravitino on AWS externally
+## Access Apache Gravitino on AWS Externally
 
 When you deploy Gravitino on AWS, accessing it externally requires
 some additional configuration due to how AWS networking works.

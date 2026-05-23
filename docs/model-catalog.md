@@ -36,56 +36,56 @@ rather than just the storage path.
 
 ## Catalog
 
-### Catalog properties
+### Catalog Properties
 
 A Model catalog doesn't have specific properties. It uses the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration).
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Catalog operations](./manage-model-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 Schema is the second level of the model catalog namespace, the model catalog supports creating, updating, deleting, and listing schemas.
 
-### Schema properties
+### Schema Properties
 
 Schema in the model catalog doesn't have predefined properties. Users can define the properties for each schema.
 
-### Schema operations
+### Schema Operations
 
 Refer to [Schema operation](./manage-model-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Model
 
-### Model capabilities
+### Model Capabilities
 
 The Model catalog supports registering, listing and deleting models and model versions.
 
-### Model properties
+### Model Properties
 
 | Property name      | Description                                         | Default value | Required | Immutable | Since Version |
 |--------------------|-----------------------------------------------------|---------------|----------|-----------|---------------|
 | `default-uri-name` | The default URI name for the versions of the model. | (none)        | No       | No        | 1.0.0         |
 
-### Model operations
+### Model Operations
 
 Refer to [Model operation](./manage-model-metadata-using-gravitino.md#model-operations) for more details.
 
 ## ModelVersion
 
-### ModelVersion capabilities
+### ModelVersion Capabilities
 
 The Model catalog supports linking, listing and deleting model versions.
 
-### ModelVersion properties
+### ModelVersion Properties
 
 | Property name      | Description                                                                                                          | Default value | Required | Immutable | Since Version |
 |--------------------|----------------------------------------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
 | `default-uri-name` | The default URI name for the model version. If set, it will override the `default-uri-name` property at model level. | (none)        | No       | No        | 1.0.0         |
 
-### ModelVersion operations
+### ModelVersion Operations
 
 Refer to [ModelVersion operation](./manage-model-metadata-using-gravitino.md#modelversion-operations) for more details.

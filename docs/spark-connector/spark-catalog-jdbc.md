@@ -15,7 +15,7 @@ The Apache Gravitino Spark connector offers the capability to read JDBC tables, 
 
 Supports MySQL and PostgreSQL. For OceanBase which is compatible with Mysql Dialects could use Mysql driver and Mysql Dialects as a trackoff way. But for Doris which do not support MySQL Dialects, are not supported.
 
-#### Support DML and DDL operations:
+#### Support DML and DDL Operations
 
 - `CREATE TABLE`
 - `DROP TABLE`
@@ -27,13 +27,13 @@ Supports MySQL and PostgreSQL. For OceanBase which is compatible with Mysql Dial
   JDBCTable does not support distributed transaction. When writing data to RDBMS, each task is an independent transaction. If some tasks of spark succeed and some tasks fail, dirty data is generated.
   :::
 
-#### Not supported operations:
+#### Not Supported Operations
 
 - `UPDATE`
 - `DELETE`
 - `TRUNCATE`
 
-## SQL example
+## SQL Example
 
 ```sql
 -- Suppose mysql_a is the mysql catalog name managed by Gravitino
@@ -61,7 +61,7 @@ SELECT * FROM employee WHERE date(hire_date) = '2021-01-01';
 
 ```
 
-## Catalog properties
+## Catalog Properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark JDBC connector configuration.
 

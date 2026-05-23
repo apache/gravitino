@@ -38,7 +38,7 @@ name to the virtual path.
 The usage pattern for GVFS is the same as HDFS or S3. GVFS internally manages
 the path mapping and convert automatically.
 
-## 1. Managing files of Fileset with Java GVFS
+## 1. Managing Files of Fileset with Java GVFS
 
 ### Prerequisites
 
@@ -119,7 +119,7 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 [OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#using-the-gvfs-java-client-to-access-the-fileset)
 and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#using-the-gvfs-java-client-to-access-the-fileset) for more details.
 
-#### Custom fileset
+#### Custom Fileset
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding
 properties, for more, refer to [Custom Fileset](./fileset-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
 So, if you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
@@ -166,7 +166,7 @@ Configure these properties in two ways:
       </property>
     ```
 
-### Usage examples
+### Usage Examples
 
 First make sure to obtain the Gravitino Virtual File System runtime jar, which you can get in
 two ways:
@@ -190,7 +190,7 @@ For fileset with multiple locations, you can specify which location to access us
 3. If neither is specified, the system will use the value of `default-location-name` from the fileset properties
 :::
 
-#### Via Hadoop shell command
+#### Via Hadoop Shell Command
 
 Use the Hadoop shell command to perform operations on the fileset storage. For example:
 
@@ -213,7 +213,7 @@ kinit -kt your_kerberos.keytab your_kerberos@xxx.com
 ./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/test_catalog/test_schema/test_fileset_1
 ```
 
-#### Via Java code
+#### Via Java Code
 
 Also, perform operations on the files or directories managed by fileset through Java code.
 Make sure that your code is using the correct Hadoop environment, and that your environment
@@ -275,7 +275,7 @@ fs.getFileStatus(filesetPath);
     rdd.foreach(println)
     ```
 
-#### Via Tensorflow
+#### Via TensorFlow
 
 For Tensorflow to support GVFS, you need to recompile the [tensorflow-io](https://github.com/tensorflow/io) module.
 
@@ -322,7 +322,7 @@ Gravitino Virtual File System supports two kinds of authentication types to acce
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System.
 
-#### How to use authentication
+#### How to Use Authentication
 
 ##### Use `simple` authentication
 
@@ -395,7 +395,7 @@ Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_filese
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
 
-## 2. Managing files of Fileset with Python GVFS
+## 2. Managing Files of Fileset with Python GVFS
 
 ### Prerequisites
 
@@ -475,7 +475,7 @@ options = {
 The plain `fs_path_config_<name>` entry specifies the base path of the filesystem. Any additional key under the same prefix (`fs_path_config_<name>_<config_key>`) is treated as a location-scoped configuration (for example, `config.resource` for HDFS) and is forwarded directly to the underlying filesystem client.
 :::
 
-#### Configurations for S3, GCS, OSS and Azure Blob storage fileset
+#### Configurations for S3, GCS, OSS and Azure Blob Storage Fileset
 
 Please see the cloud-storage-specific configurations [GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#using-the-gvfs-python-client-to-access-a-fileset),
 [S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#using-the-gvfs-python-client-to-access-a-fileset),
@@ -486,7 +486,7 @@ and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-
 Gravitino python client does not support [customized file systems](fileset-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library.
 :::
 
-### Usage examples
+### Usage Examples
 
 :::note
 For fileset with multiple locations, you can specify which location to access using one of these methods (in priority order):
@@ -537,7 +537,7 @@ For fileset with multiple locations, you can specify which location to access us
     export CLASSPATH=`$HADOOP_HOME/bin/hdfs classpath --glob`
     ```
 
-#### Via fsspec-style interface
+#### Via Fsspec-style Interface
 
 Use the fsspec-style interface to perform operations on the fileset files.
 
@@ -604,7 +604,7 @@ fs.get_file(rpath="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/test-1.txt",
             lpath="/tmp/local-file-1.txt")
 ```
 
-#### Integrate with Third-party Python libraries
+#### Integrate with Third-party Python Libraries
 
 Also, perform operations on the files or directories managed by fileset
 integrating with some Third-party Python libraries which support fsspec compatible filesystems.
@@ -701,7 +701,7 @@ Gravitino Virtual File System in Python supports three kinds of authentication t
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System in Python.
 
-#### How to use authentication
+#### How to Use Authentication
 
 ##### Use `simple` authentication
 

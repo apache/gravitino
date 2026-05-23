@@ -16,7 +16,7 @@ By leveraging OpenLineage Spark plugin, Gravitino provides a separate Spark plug
 - Supports extract Gravitino dataset from GVFS.
 - Supports Gravitino spark connector and non Gravitino Spark connector.
 
-## Gravitino dataset
+## Gravitino Dataset
 
 The Gravitino OpenLineage Spark plugin transforms the Gravitino metalake name into the dataset namespace. The dataset name varies by dataset type when generating lineage information.
 
@@ -56,7 +56,7 @@ For GVFS location, this plugin adds `fileset-location` facets which contains the
 }
 ```
 
-## How to use 
+## How to Use
 
 1. Download [Gravitino OpenLineage plugin jar](https://github.com/datastrato/gravitino-openlineage-plugins/tree/main/spark-plugin/) and place it to the classpath of Spark.
 2. Add configuration to the Spark to enable lineage collection.

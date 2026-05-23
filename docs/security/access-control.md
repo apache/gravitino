@@ -246,31 +246,31 @@ Create custom roles tailored to your business needs using the API or client libr
 
 Gravitino provides a comprehensive set of privileges organized by the type of operation and securable object. The following sections detail all available privileges.
 
-### User privileges
+### User Privileges
 
 | Name         | Supports Securable Object | Operation           |
 |--------------|---------------------------|---------------------|
 | MANAGE_USERS | Metalake                  | Add or remove users |
 
-### Group privileges
+### Group Privileges
 
 | Name          | Supports Securable Object | Operation            |
 |---------------|---------------------------|----------------------|
 | MANAGE_GROUPS | Metalake                  | Add or remove groups |
 
-### Role privileges
+### Role Privileges
 
 | Name        | Supports Securable Object | Operation     |
 |-------------|---------------------------|---------------|
 | CREATE_ROLE | Metalake                  | Create a role |
 
-### Permission privileges
+### Permission Privileges
 
 | Name          | Supports Securable Object | Operation                                                                                                     |
 |---------------|---------------------------|---------------------------------------------------------------------------------------------------------------|
 | MANAGE_GRANTS | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function | Grants the ability to manage privileges on securable objects. When bound to a **Metalake**, also allows assigning and revoking roles for users and groups across the entire metalake. When bound to a **Catalog, Schema, Table, View, Topic, Fileset, Model, or Function**, privilege management is scoped to that object and its descendants only. |
 
-### Catalog privileges
+### Catalog Privileges
 
 | Name           | Supports Securable Object | Operation        |
 |----------------|---------------------------|------------------|
@@ -286,7 +286,7 @@ For example, to select data from a table, users need to have the `SELECT_TABLE` 
 
 :::
 
-### Schema privileges
+### Schema Privileges
 
 | Name          | Supports Securable Object | Operation       |
 |---------------|---------------------------|-----------------|
@@ -302,7 +302,7 @@ and `USE_SCHEMA` privileges on its parent schema.
 
 :::
 
-### Table privileges
+### Table Privileges
 
 | Name         | Supports Securable Object         | Operation                                                                 |
 |--------------|-----------------------------------|---------------------------------------------------------------------------|
@@ -313,14 +313,14 @@ and `USE_SCHEMA` privileges on its parent schema.
 DENY `MODIFY_TABLE` won't deny the `SELECT_TABLE` operation if the user has the privilege to `ALLOW SELECT_TABLE` on the table.
 DENY `SELECT_TABLE` won't deny the `MODIFY_TABLE` operation if the user has the privilege `ALLOW MODIFY_TABLE` on the table. 
 
-### View privileges
+### View Privileges
 
 | Name        | Supports Securable Object       | Operation                |
 |-------------|---------------------------------|--------------------------|
 | CREATE_VIEW | Metalake, Catalog, Schema       | Create a view            |
 | SELECT_VIEW | Metalake, Catalog, Schema, View | Select data from a view  |
 
-### Topic privileges
+### Topic Privileges
 
 | Name          | Supports Securable Object        | Operation                                             |
 |---------------|----------------------------------|-------------------------------------------------------|
@@ -331,7 +331,7 @@ DENY `SELECT_TABLE` won't deny the `MODIFY_TABLE` operation if the user has the 
 DENY `PRODUCE_TOPIC` won't deny the `COMSUME_TOPIC` operation if the user has the privilege to `ALLOW CONSUME_TOPIC` on the topic.
 DENY `CONSUME_TOPIC` won‘t deny the `PRODUCE_TOPIC` operation if the user has the privilege `ALLOW PRODUCE_TOPIC` on the topic.
 
-### Fileset privileges
+### Fileset Privileges
 
 | Name           | Supports Securable Object          | Operation                                            |
 |----------------|------------------------------------|------------------------------------------------------|
@@ -342,7 +342,7 @@ DENY `CONSUME_TOPIC` won‘t deny the `PRODUCE_TOPIC` operation if the user has 
 DENY `READ_FILESET` won't deny the `WRITE_FILESET` operation if the user has the privilege to `ALLOW WRITE_FILESET` on the fileset.
 DENY `WRITE_FILESET` won‘t deny the `READ_FILESET` operation if the user has the privilege `ALLOW READ_FILESET` on the fileset.
 
-### Model privileges
+### Model Privileges
 
 :::caution Deprecated Privileges
 The privileges `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated and will be removed in a future release. Please use `REGISTER_MODEL` and `LINK_MODEL_VERSION` instead. The deprecated privileges still work for backward compatibility.
@@ -356,7 +356,7 @@ The privileges `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated and will
 | CREATE_MODEL         | Metalake, Catalog, Schema        | Register a model, this is deprecated. Please use `REGISTER_MODEL` instead.         |
 | CREATE_MODEL_VERSION | Metalake, Catalog, Schema, Model | Link a model version, this is deprecated. Please use `LINK_MODEL_VERSION` instead. |
 
-### Function privileges
+### Function Privileges
 
 | Name              | Supports Securable Object           | Operation                                                                             |
 |-------------------|-------------------------------------|---------------------------------------------------------------------------------------|
@@ -364,28 +364,28 @@ The privileges `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated and will
 | EXECUTE_FUNCTION  | Metalake, Catalog, Schema, Function | View the metadata of the function and execute the function                            |
 | MODIFY_FUNCTION   | Metalake, Catalog, Schema, Function | Alter or drop the function                                                            |
 
-### Tag privileges
+### Tag Privileges
 
 | Name       | Supports Securable Object | Operation                             |
 |------------|---------------------------|---------------------------------------|
 | CREATE_TAG | Metalake                  | Create a tag                          |
 | APPLY_TAG  | Metalake, Tag             | Associate tags with metadata objects. |
 
-### Policy privileges
+### Policy Privileges
 
 | Name          | Supports Securable Object | Operation                                 |
 |---------------|---------------------------|-------------------------------------------|
 | CREATE_POLICY | Metalake                  | Create a policy                           |
 | APPLY_POLICY  | Metalake, Policy          | Associate policies with metadata objects. |
 
-### Job template privileges
+### Job Template Privileges
 
 | Name                  | Supports Securable Object | Operation                               |
 |-----------------------|---------------------------|-----------------------------------------|
 | REGISTER_JOB_TEMPLATE | Metalake                  | Register a job template                 |
 | USE_JOB_TEMPLATE      | Metalake, JobTemplate     | Use a job template when running the job |
 
-### Job privileges
+### Job Privileges
 | Name    | Supports Securable Object | Operation |
 |---------|---------------------------|-----------|
 | RUN_JOB | Metalake                  | Run a job |
@@ -571,7 +571,7 @@ The following sections demonstrate how to perform common access control operatio
 
 ## User Operations
 
-### Add a user
+### Add a User
 
 Add a user to your metalake before using authorization features.
 
@@ -597,7 +597,7 @@ User user =
 </TabItem>
 </Tabs>
 
-### List users
+### List Users
 
 List all users in a metalake. Use `details=true` to get full user objects instead of just names.
 
@@ -625,7 +625,7 @@ User[] users = client.listUsers();
 </TabItem>
 </Tabs>
 
-### Get a user
+### Get a User
 
 Get a user by its name.
 
@@ -649,7 +649,7 @@ User user =
 </TabItem>
 </Tabs>
 
-### Remove a user
+### Remove a User
 
 Remove a user by its name.
 
@@ -701,7 +701,7 @@ Group group =
 </TabItem>
 </Tabs>
 
-### List groups
+### List Groups
 
 List the groups in a metalake.
 Returns the list of groups if details is true, otherwise returns the list of group name.
@@ -730,7 +730,7 @@ User[] users = client.listGroups();
 </TabItem>
 </Tabs>
 
-### Get a group
+### Get a Group
 
 Get a group by its name.
 
@@ -754,7 +754,7 @@ Group group =
 </TabItem>
 </Tabs>
 
-### Remove a group
+### Remove a Group
 
 Remove a group by its name.
 
@@ -780,7 +780,7 @@ boolean removed =
 
 ## Role Operation
 
-### Create a role
+### Create a Role
 
 Create a role by given properties.
 
@@ -829,7 +829,7 @@ Role role =
 </TabItem>
 </Tabs>
 
-### List roles
+### List Roles
 
 List the roles in a metalake.
 
@@ -852,7 +852,7 @@ String[] usernames = client.listRoleNames();
 </TabItem>
 </Tabs>
 
-### List roles for the metadata object
+### List Roles for the Metadata Object
 
 List the binding roles for a metadata object in a metalake.
 
@@ -883,7 +883,7 @@ String[] roles = schema1.supportsRoles().listBindingRoleNames();
 </TabItem>
 </Tabs>
 
-### Get a role
+### Get a Role
 
 Get a role by its name.
 
@@ -907,7 +907,7 @@ Role role =
 </TabItem>
 </Tabs>
 
-### Delete a role
+### Delete a Role
 
 Delete a role by its name.
 
@@ -933,7 +933,7 @@ boolean deleted =
 
 ## Permission Operation
 
-### Grant privileges to a role
+### Grant Privileges to a Role
 
 Grant specific privileges to a role.
 The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/grant`.
@@ -978,7 +978,7 @@ Role role = client.grantPrivilegesToRole("role1", table, Lists.newArrayList(Priv
 </TabItem>
 </Tabs>
 
-### Revoke privileges from a role
+### Revoke Privileges from a Role
 
 Revoke specific privileges from a role.
 The request path for REST API is `/api/metalakes/{metalake}/permissions/roles/{role}/{metadataObjectType}/{metadataObjectName}/revoke`.
@@ -1024,7 +1024,7 @@ Role role = client.revokePrivilegesFromRole("role1", table, Lists.newArrayList(P
 </TabItem>
 </Tabs>
 
-### Override privileges in a role
+### Override Privileges in a Role
 
 Override all privileges in a role with a new set of securable objects and their privileges. This operation completely replaces the role's entire privilege configuration - any securable objects not included in the request will be removed from the role.
 
@@ -1069,7 +1069,7 @@ This operation completely replaces **all privileges** in the role. The role will
 Use this operation when you want to set the exact privilege configuration for a role, replacing its entire state.
 :::
 
-### Grant roles to a user
+### Grant Roles to a User
 
 Grant specific roles to a user.
 
@@ -1094,7 +1094,7 @@ User user = client.grantRolesToUser(Lists.newList("role1"), "user1");
 </TabItem>
 </Tabs>
 
-### Revoke roles from a user
+### Revoke Roles from a User
 
 Revoke specific roles from a user.
 
@@ -1120,7 +1120,7 @@ User user = client.revokeRolesFromUser(Lists.newList("role1"), "user1");
 </Tabs>
 
 
-### Grant roles to a group
+### Grant Roles to a Group
 
 Grant specific roles to a group.
 
@@ -1145,7 +1145,7 @@ Group group = client.grantRolesToGroup(Lists.newList("role1"), "group1");
 </TabItem>
 </Tabs>
 
-### Revoke roles from a group
+### Revoke Roles from a Group
 
 Revoke specific roles from a group.
 
@@ -1172,7 +1172,7 @@ Group group = client.revokeRolesFromGroup(Lists.newList("role1"), "group1");
 
 ## Ownership Operation
 
-### get the owner
+### Get the Owner
 
 Get the owner of a metadata object.
 
@@ -1199,7 +1199,7 @@ Owner owner = client.getOwner(table);
 </TabItem>
 </Tabs>
 
-### set the owner
+### Set the Owner
 
 Set the owner of a metadata object.
 
@@ -1263,7 +1263,7 @@ Follow the steps to achieve the authorization of Gravitino.
 
 13. `Staff` can use Gravitino connector to query the tables from different catalogs.
 
-## API required conditions
+## API Required Conditions
 
 The following table lists the required privileges for each API.
 

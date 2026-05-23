@@ -35,9 +35,9 @@ Javadoc and REST API documentation.
    list with `inherited` value `false`.
 :::
 
-## Policy operations
+## Policy Operations
 
-### Create new policies
+### Create New Policies
 
 The first step to managing policies is to create new policies. You can create a new policy by providing a policy
 name, type, and other optional fields like comment, enabled, etc.
@@ -104,11 +104,11 @@ Policy policy = client.createPolicy(
 </TabItem>
 </Tabs>
 
-### Built-in Iceberg compaction policy
+### Built-in Iceberg Compaction Policy
 
 For the built-in `system_iceberg_compaction` policy content, field definitions, and examples, see [Iceberg compaction policy](./iceberg-compaction-policy.md).
 
-### List policies
+### List Policies
 
 List all the policy names as well as policy objects in a metalake in Gravitino.
 
@@ -138,7 +138,7 @@ Policy[] policies = client.listPolicyInfos();
 </TabItem>
 </Tabs>
 
-### Get a policy by name
+### Get a Policy by Name
 
 Get a policy by its name.
 
@@ -161,7 +161,7 @@ Policy policy = client.getPolicy("my_policy1");
 </TabItem>
 </Tabs>
 
-### Update a policy
+### Update a Policy
 
 Gravitino allows you to update a policy by providing changes.
 
@@ -231,7 +231,7 @@ Gravitino supports the following policy changes:
 | Update a comment       | `{"@type":"updateComment","newComment":"new_comment"}`               | `PolicyChange.updateComment("new_comment")`           |
 | Update policy content  | `{"@type":"updateContent","policyType":"custom","newContent":{...}}` | `PolicyChange.updateContent("test_type", newContent)` |
 
-### Enable or disable a policy
+### Enable or Disable a Policy
 
 Enable or disable a policy.
 
@@ -277,7 +277,7 @@ client.enablePolicy("my_policy_new");
 </TabItem>
 </Tabs>
 
-### Delete a policy
+### Delete a Policy
 
 Delete a policy by its name.
 
@@ -300,12 +300,12 @@ client.deletePolicy("my_policy_new");
 </TabItem>
 </Tabs>
 
-## Policy associations
+## Policy Associations
 
 Gravitino allows you to associate and disassociate policies with metadata objects. Currently,
 `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `MODEL` objects can have policies.
 
-### Associate and disassociate policies with a metadata object
+### Associate and Disassociate Policies with a Metadata Object
 
 Associate and disassociate policies with a metadata object by providing the object type, object
 name and policy names.
@@ -379,7 +379,7 @@ schema.supportsPolicies().associatePolicies(new String[] {"policy1"}, null);
 </TabItem>
 </Tabs>
 
-### List associated policies for a metadata object
+### List Associated Policies for a Metadata Object
 
 List all the policies associated with a metadata object. If a policy is inheritable, 
 listing policies of a metadata object will also list the policies of its parent metadata objects.
@@ -415,7 +415,7 @@ Policy[] schemaPolicies = schema.supportsPolicies().listPolicyInfos();
 </TabItem>
 </Tabs>
 
-### Get an associated policy by name for a metadata object
+### Get an Associated Policy by Name for a Metadata Object
 
 Get an associated policy by its name for a metadata object.
 
@@ -446,7 +446,7 @@ Policy schemaPolicy = schema.supportsPolicies().getPolicy("policy1");
 </TabItem>
 </Tabs>
 
-### List metadata objects associated with a policy
+### List Metadata Objects Associated with a Policy
 
 List all the metadata objects **directly associated with** a policy.
 

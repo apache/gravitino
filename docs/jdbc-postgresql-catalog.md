@@ -21,7 +21,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the PostgreSQL database.
 - Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
@@ -29,7 +29,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports table index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value). and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
-### Catalog properties
+### Catalog Properties
 
 Any property that isn't defined by Gravitino can pass to PostgreSQL data source by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
@@ -58,30 +58,30 @@ Explicitly specify the database in both `jdbc-url` and `jdbc-database`. An error
 In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema corresponds to the Gravitino schema.
 :::
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino schema corresponds to the PostgreSQL schema.
 - Supports creating schema with comments.
 - Supports dropping schema.
 - Supports cascade dropping schema.
 
-### Schema properties
+### Schema Properties
 
 - Doesn't support any schema property settings.
 
-### Schema operations
+### Schema Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - The Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
@@ -89,7 +89,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Support [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 - Doesn't support table property settings.
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type    | PostgreSQL Type  |
 |-------------------|------------------|
@@ -116,15 +116,15 @@ PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `Inter
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-### Table column auto-increment
+### Table Column Auto-increment
 
 - Supports setting auto-increment.
 
-### Table properties
+### Table Properties
 
 - Doesn't support table properties.
 
-### Table indexes
+### Table Indexes
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
@@ -161,11 +161,11 @@ Index[] indexes = new Index[] {
 </TabItem>
 </Tabs>
 
-### Table operations
+### Table Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Supports operations:
 

@@ -124,7 +124,7 @@ CREATE TABLE paimon_bucketed_table (
 );
 ```
 
-## Catalog properties
+## Catalog Properties
 
 Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink Paimon connector configuration.
 

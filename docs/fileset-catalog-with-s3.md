@@ -22,7 +22,7 @@ $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 
 Once the server is up and running, you can proceed to configure the Fileset catalog with S3. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
 
-## Configurations for creating a Fileset catalog with S3
+## Configurations for Creating a Fileset Catalog with S3
 
 ### Configurations for S3 Fileset Catalog
 
@@ -41,15 +41,15 @@ In addition to the basic configurations mentioned in [Fileset-catalog-catalog-co
 `default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aws-bundle`).
 :::
 
-### Configurations for a schema
+### Configurations for a Schema
 
 To learn how to create a schema, refer to [Schema configurations](./fileset-catalog.md#schema-properties).
 
-### Configurations for a fileset
+### Configurations for a Fileset
 
 For more details on creating a fileset, Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties).
 
-## Use the Fileset catalog with S3
+## Use the Fileset Catalog with S3
 
 This section demonstrates how to use the Fileset catalog with S3 in Gravitino, with a complete example.
 
@@ -131,7 +131,7 @@ gravitino.bypass.fs.s3a.path.style.access=true
 ```
 :::
 
-### Step2: Create a schema
+### Step2: Create a Schema
 
 Once your Fileset catalog with S3 is created, you can create a schema under the catalog. Here are examples of how to do that:
 
@@ -181,7 +181,7 @@ catalog.as_schemas().create_schema(name="test_schema",
 </TabItem>
 </Tabs>
 
-### Step3: Create a fileset
+### Step3: Create a Fileset
 
 After creating the schema, you can create a fileset. Here are examples for creating a fileset:
 
@@ -243,9 +243,9 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "e
 </TabItem>
 </Tabs>
 
-## Access a fileset with S3
+## Access a Fileset with S3
 
-### Use the GVFS Java client to access the fileset
+### Use the GVFS Java Client to Access the Fileset
 
 To access fileset with S3 using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -318,7 +318,7 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
   </dependency>
 ```
 
-### Use Spark to access the fileset
+### Use Spark to Access the Fileset
 
 The following Python code demonstrates how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
@@ -385,7 +385,7 @@ Please choose the correct jar according to your environment.
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
-### Access a fileset using the Hadoop fs command
+### Access a Fileset Using the Hadoop Fs Command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3:
 
@@ -439,7 +439,7 @@ For S3, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versio
 ./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/s3_catalog/s3_schema/s3_fileset
 ```
 
-### Use the GVFS Python client to access a fileset
+### Use the GVFS Python Client to Access a Fileset
 
 To access fileset with S3 using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -474,7 +474,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")                                                                         ")
 ```
 
-### Use fileset with pandas
+### Use Fileset with Pandas
 
 The following are examples of how to use the pandas library to access the S3 fileset
 
@@ -497,11 +497,11 @@ ds.head()
 
 For more use cases, refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
-## Fileset with credential vending
+## Fileset with Credential Vending
 
 Since 0.8.0-incubating, Gravitino supports credential vending for S3 fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access S3 fileset without providing authentication information like `s3-access-key-id` and `s3-secret-access-key` in the properties.
 
-### How to create a S3 Fileset catalog with credential vending
+### How to Create a S3 Fileset Catalog with Credential Vending
 
 Apart from configuration method in [create-s3-fileset-catalog](#configurations-for-s3-fileset-catalog),
 properties needed by [s3-credential](./security/credential-vending.md#s3-credentials)
@@ -525,7 +525,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### How to access S3 fileset with credential vending
+### How to Access S3 Fileset with Credential Vending
 
 When the catalog is configured with credentials and client-side credential vending is enabled,
 you can access S3 filesets directly using the GVFS Java/Python client or Spark without providing authentication details.

@@ -17,7 +17,7 @@ The Lance REST service provides a RESTful interface for managing Lance datasets 
 
 The service implements the [Lance REST API specification](https://docs.lancedb.com/api-reference/introduction). For detailed specification documentation, see the [official Lance REST documentation](https://lance.org/format/namespace/rest/catalog-spec/).
 
-### What is Lance?
+### What Is Lance?
 
 [Lance](https://lance.org/format/) is a modern columnar data format designed for AI/ML workloads. It provides:
 

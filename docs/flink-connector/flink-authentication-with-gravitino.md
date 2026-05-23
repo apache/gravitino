@@ -13,13 +13,13 @@ Flink connector supports `simple`, `oauth2`, and `kerberos` authentication when 
 |-----------------------------------------------------------|--------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
 | table.catalog-store.gravitino.gravitino.client.auth.type  | string | (none)        | When explicitly set, only `oauth` is supported. If unset, Flink selects Kerberos or simple authentication based on its security settings.  | No       | 1.2.0         |
 
-## Simple mode
+## Simple Mode
 
 In simple mode, the username originates from Flink. The resolution order is:
 1. `HADOOP_USER_NAME` environment variable
 2. The logged-in OS user
 
-## OAuth2 mode
+## OAuth2 Mode
 
 In OAuth2 mode, configure the following settings to fetch an OAuth2 token to access the Gravitino server:
 
@@ -43,7 +43,7 @@ table.catalog-store.gravitino.gravitino.client.oauth2.credential: client-id:clie
 table.catalog-store.gravitino.gravitino.client.oauth2.scope: your-scope
 ```
 
-## Kerberos mode
+## Kerberos Mode
 
 In Kerberos mode, use Flink security configurations to obtain a Kerberos ticket for accessing the Gravitino server. Configure `security.kerberos.login.principal` and `security.kerberos.login.keytab` for the Kerberos principal and keytab.
 

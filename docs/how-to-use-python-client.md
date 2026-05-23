@@ -5,7 +5,7 @@ date: 2024-05-09
 keyword: Gravitino Python client
 license: This software is licensed under the Apache License version 2.
 ---
-# Apache Gravitino Python client
+# Apache Gravitino Python Client
 
 Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake.
 It manages the metadata directly in different sources, types, and regions, also provides users
@@ -23,7 +23,7 @@ First of all, You must have a Gravitino server set up and run, You can refer doc
 [How to install Gravitino](./how-to-install.md) to build Gravitino server from source code and
 install it in your local.
 
-### Apache Gravitino Python client API
+### Apache Gravitino Python Client API
 
 ```shell
 pip install apache-gravitino
@@ -63,7 +63,7 @@ contains the following code snippets:
 11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
     not deleted in HDFS.
 
-## How to develop Apache Gravitino Python Client
+## How to Develop Apache Gravitino Python Client
 
 Ues any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
 
@@ -73,7 +73,7 @@ Ues any IDE to develop Gravitino Python Client. Directly open the client-python 
 + Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
   environment ready for building.
 
-### Build and testing
+### Build and Testing
 
 1. Clone the Gravitino project.
 
@@ -121,7 +121,7 @@ Ues any IDE to develop Gravitino Python Client. Directly open the client-python 
     ./gradlew :clients:client-python:deploy
     ```
    
-### IDE specific settings
+### IDE Specific Settings
 
 #### JetBrains IntelliJ IDEA
 
@@ -162,7 +162,7 @@ And you will see a new Python SDK is added, and it has several packages installe
 
 9. Done! Now, open any python files and start developing Gravitino Python Client.
 
-##### Note about running integration tests of Gravitino Python client in IntelliJ IDEA.
+##### Running Integration Tests in IntelliJ IDEA
 
 Since integration tests require Gravitino Java distribution, so you cannot run tests with IntelliJ
 [Run tests button](https://www.jetbrains.com/help/idea/performing-tests.html),

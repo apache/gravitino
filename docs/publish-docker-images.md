@@ -11,7 +11,7 @@ license: "This software is licensed under the Apache License version 2."
 The Apache Gravitino project provides a set of Docker images to facilitate the publishing, development, and testing of the Gravitino project.
 [Apache Docker Hub](https://hub.docker.com/u/apache) repository publishes the official Gravitino Docker images.
 
-## Publish Docker images to Docker Hub
+## Publish Docker Images to Docker Hub
 
 Use GitHub actions to publish Docker images to the Docker Hub repository.
 
@@ -35,6 +35,6 @@ Use GitHub actions to publish Docker images to the Docker Hub repository.
 
 ![Publish Docker image](assets/publish-docker-image.png)
 
-## More details of Apache Gravitino Docker images
+## More Details of Apache Gravitino Docker Images
 
 + [Gravitino Docker images](docker-image-details.md)

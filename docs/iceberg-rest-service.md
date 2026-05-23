@@ -35,7 +35,7 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 - Supports table metadata cache.
 - Supports scan plan cache.
 
-## Server management
+## Server Management
 
 There are three deployment scenarios for Gravitino Iceberg REST server:
 - A standalone server in a standalone Gravitino Iceberg REST server package, the classpath is `libs`.
@@ -58,13 +58,13 @@ For detailed instructions on how to build and install the Gravitino server packa
     |── logs/                                   # Gravitino Iceberg REST server logs. Automatically created after the server starts.
 ```
 
-## Apache Gravitino Iceberg REST catalog server configuration
+## Apache Gravitino Iceberg REST Catalog Server Configuration
 
 There are distinct configuration files for standalone and auxiliary server: `gravitino-iceberg-rest-server.conf` is used for the standalone server, while `gravitino.conf` is for the auxiliary server. Although the configuration files differ, the configuration items remain the same.
 
 Starting with version `0.6.0-incubating`, the prefix `gravitino.auxService.iceberg-rest.` for auxiliary server configurations has been deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the latter will take precedence. The configurations listed below use the `gravitino.iceberg-rest.` prefix.
 
-### Configuration to enable Iceberg REST service in Gravitino server.
+### Configuration to Enable Iceberg REST Service in Gravitino Server
 
 | Configuration item                 | Description                                                                                                                                                                                                                            | Default value | Required | Since Version |
 |------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -73,7 +73,7 @@ Starting with version `0.6.0-incubating`, the prefix `gravitino.auxService.icebe
 
 Please note that, it only takes affect in `gravitino.conf`, you don't need to specify the above configurations if start as a standalone server.
 
-### HTTP server configuration
+### HTTP Server Configuration
 
 | Configuration item                               | Description                                                                                                                                                                                                                                          | Default value                                                                | Required | Since Version |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
@@ -91,13 +91,13 @@ Please note that, it only takes affect in `gravitino.conf`, you don't need to sp
 The filter in `customFilters` should be a standard javax servlet filter.
 Also, specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
 
-### Catalog backend configuration
+### Catalog Backend Configuration
 
 :::info
 The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can specify a Hive, JDBC or REST catalog backend for production environment.
 :::
 
-#### Hive backend configuration
+#### Hive Backend Configuration
 
 | Configuration item                                                        | Description                                                                                                                                  | Default value                                                                  | Required | Since Version |
 |---------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------|---------------|
@@ -106,7 +106,7 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 | `gravitino.iceberg-rest.warehouse`                                        | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                                                           | (none)                                                                         | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.catalog-backend-name`                             | The catalog backend name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables. | `hive` for Hive backend, `jdbc` for JDBC backend, `memory` for memory backend  | No       | 0.5.2         |
 
-#### JDBC backend configuration
+#### JDBC Backend Configuration
 
 | Configuration item                            | Description                                                                                                                                                                                                                                            | Default value           | Required | Since Version |
 |-----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
@@ -128,7 +128,7 @@ Download the corresponding JDBC driver to the `iceberg-rest-server/libs` directo
 If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDBMS like `Mysql`, you should create Iceberg meta tables explicitly.
 :::
 
-#### REST backend configuration
+#### REST Backend Configuration
 
 Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gravitino Iceberg REST service acts as IRC1 and forwards catalog operations to IRC2.
 
@@ -172,7 +172,7 @@ If IRC2 does not enforce authorization, keeping `gravitino.iceberg-rest.disable-
 - `vended-credentials`: clients should request credential vending (`X-Iceberg-Access-Delegation: vended-credentials`).
 - `remote-signing`: Gravitino doesn't support this mode yet.
 
-#### Custom backend configuration
+#### Custom Backend Configuration
 
 | Configuration item                            | Description                                                                                                                   | Default value | Required | Since Version    |
 |-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -181,7 +181,7 @@ If IRC2 does not enforce authorization, keeping `gravitino.iceberg-rest.disable-
 
 If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a corresponding jar file to the classpath and load a custom Iceberg Catalog implementation by specifying the `catalog-backend-impl` property.
 
-### Multiple catalog backend support
+### Multiple Catalog Backend Support
 
 The Gravitino Iceberg REST server supports multiple catalog backend, and you could use `catalog-config-provider` to control the behavior about how to manage catalog backend configurations.
 
@@ -192,7 +192,7 @@ The Gravitino Iceberg REST server supports multiple catalog backend, and you cou
 Use `static-config-provider` to manage catalog configuration in the file, the catalog configuration is loaded when the server start up and couldn't be changed.
 While `dynamic-config-provider` is used to manage catalog config through Gravitino server, you could add&delete&change the catalog configurations dynamically.
 
-#### Static catalog configuration provider
+#### Static Catalog Configuration Provider
 
 The static catalog configuration provider retrieves the catalog configuration from the configuration file of the Gravitino Iceberg REST server. You could configure the default catalog with `gravitino.iceberg-rest.<param name>=<value>`. For others, use `gravitino.iceberg-rest.catalog.<catalog name>.<param name>=<value>` to config the catalog with `catalog name`.
 
@@ -213,7 +213,7 @@ gravitino.iceberg-rest.catalog.jdbc_backend.warehouse = hdfs://127.0.0.1:9000/us
 ...
 ```
 
-#### Dynamic catalog configuration provider
+#### Dynamic Catalog Configuration Provider
 
 The dynamic catalog configuration provider retrieves the catalog configuration from the Gravitino server, and the catalog configuration could be updated dynamically.
 
@@ -244,7 +244,7 @@ gravitino.iceberg-rest.gravitino-metalake = test
 
 Suppose there are two Iceberg catalogs `hive_catalog` and `jdbc_catalog` in Gravitino server, `dynamic-config-provider` will poll the catalog properties internally and register `hive_catalog` and `jdbc_catalog` in Iceberg REST server side. Dynamic config provider will get all catalog properties, for the properties that start with `gravitino.bypass.` prefix, it will remove the prefix and use the rest part as the catalog property key.
 
-#### How to access the specific catalog
+#### How to Access the Specific Catalog
 
 Access different catalogs by setting the `warehouse` to the specific catalog name in the Iceberg REST client configuration. The default catalog will be used if you do not specify a `warehouse`. For instance, suppose there are three catalog backends: default catalog, `hive_catalog` and `jdbc_catalog`, consider the case of SparkSQL:
 
@@ -367,7 +367,7 @@ Omit `iceberg.rest-catalog.session=NONE` because `NONE` is the default value.
 
 Refer to [HTTPS Configuration](./security/how-to-use-https/#apache-iceberg-rest-services-configuration) for how to enable HTTPS for Gravitino Iceberg REST server.
 
-#### Backend authentication
+#### Backend Authentication
 
 For JDBC backend, you can use the `gravitino.iceberg-rest.jdbc-user` and `gravitino.iceberg-rest.jdbc-password` to authenticate the JDBC connection. For Hive backend, you can use the `gravitino.iceberg-rest.authentication.type` to specify the authentication type, and use the `gravitino.iceberg-rest.authentication.kerberos.principal` and `gravitino.iceberg-rest.authentication.kerberos.keytab-uri` to authenticate the Kerberos connection.
 The detailed configuration items are as follows:
@@ -382,11 +382,11 @@ The detailed configuration items are as follows:
 | `gravitino.iceberg-rest.authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                         | 60            | No                                                                                                                                                                   | 0.7.0-incubating |
 | `gravitino.iceberg-rest.authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                             | 60            | No                                                                                                                                                                   | 0.7.0-incubating |
 
-### Credential vending
+### Credential Vending
 
 Refer to [Credential vending](./security/credential-vending.md) for more details.
 
-### Access control
+### Access Control
 
 #### Prerequisites
 
@@ -404,7 +404,7 @@ When running as an auxiliary service, the `gravitino.iceberg-rest.gravitino-uri`
 
 Refer to [Access Control](./security/access-control.md) for details on how to configure authorization, create roles, and grant privileges in Gravitino.
 
-#### How access control works
+#### How Access Control Works
 
 When access control is enabled:
 
@@ -418,7 +418,7 @@ Refer to [Access Control](./security/access-control.md) for the complete list of
 
 ### Storage
 
-#### S3 configuration
+#### S3 Configuration
 
 | Configuration item                            | Description                                                                                                                                                                                                         | Default value | Required                                       | Since Version    |
 |-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------------------------|------------------|
@@ -437,7 +437,7 @@ Refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for c
  - Additionally, download the [Gravitino Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
-#### OSS configuration
+#### OSS Configuration
 
 | Configuration item                                | Description                                                                                                                                                                                           | Default value   | Required                                             | Since Version    |
 |---------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|------------------------------------------------------|------------------|
@@ -489,7 +489,7 @@ Refer to [ADLS credentials](./security/credential-vending.md#adls-credentials) f
 Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Gravitino Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
-#### HDFS configuration
+#### HDFS Configuration
 
 Place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
 
@@ -497,7 +497,7 @@ Place HDFS configuration file to the classpath of the Iceberg REST server, `iceb
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
 :::
 
-#### Other storages
+#### Other Storages
 
 For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.
 
@@ -511,7 +511,7 @@ To pass custom properties such as `security-token` to your custom `FileIO`, you 
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the classpath of Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
 :::
 
-### View support
+### View Support
 
 View operations are supported when using the JDBC catalog backend with schema version `V1`. The default schema version is now `V1`, so view support is enabled out of the box. Iceberg will automatically migrate the database schema on the first restart and detect the migration on all subsequent restarts.
 
@@ -519,7 +519,7 @@ View operations are supported when using the JDBC catalog backend with schema ve
 |----------------------------------------------|----------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Defaults to `V1` to enable view operations. Set to `V0` to opt out.  | `V1`          | No       | 1.2.0         |
 
-### Other Apache Iceberg catalog properties
+### Other Apache Iceberg Catalog Properties
 
 Add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.10.0/configuration/#catalog-properties).
 The `clients` property for example:
@@ -532,15 +532,15 @@ The `clients` property for example:
 `catalog-impl` has no effect.
 :::
 
-### Event listener
+### Event Listener
 
 Gravitino generates pre-event and post-event for table operations and provide a pluggable event listener to allow you to inject custom logic. For more details, refer to [Event listener configuration](gravitino-server-config.md#event-listener-configuration).
 
-### Audit log
+### Audit Log
 
 Gravitino provides a pluggable audit log mechanism, refer to [Audit log configuration](gravitino-server-config.md#audit-log-configuration).
 
-### Apache Iceberg metrics store configuration
+### Apache Iceberg Metrics Store Configuration
 
 Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `org.apache.gravitino.iceberg.service.metrics.IcebergMetricsStore` and add the corresponding jar file to the Iceberg REST service classpath directory.
 
@@ -561,7 +561,7 @@ Download the corresponding JDBC driver to the `iceberg-rest-server/libs` directo
 | `gravitino.iceberg-rest.jdbc-metrics.jdbc-password` | The password of the JDBC connection.                                                                                                                | (none)        | No       | 1.1.0         |
 | `gravitino.iceberg-rest.jdbc-metrics.jdbc-driver`   | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                                            | (none)        | Yes      | 1.1.0         |
 
-### Iceberg table metadata cache configuration
+### Iceberg Table Metadata Cache Configuration
 
 Gravitino features a pluggable cache system for updating or retrieving table metadata in the cache. It validates the location of table metadata against the catalog backend to ensure the correctness of cached data.
 
@@ -573,7 +573,7 @@ Gravitino features a pluggable cache system for updating or retrieving table met
 
 Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
 
-### Iceberg scan plan cache configuration
+### Iceberg Scan Plan Cache Configuration
 
 Gravitino caches scan plan results to speed up repeated queries with identical parameters. The cache uses snapshot ID as part of the cache key, so queries against different snapshots will not use stale cached data.
 
@@ -589,13 +589,13 @@ The scan plan cache uses snapshot ID as part of the cache key, ensuring automati
 
 Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache` to store the cached data in memory. You can also implement your custom scan plan cache by implementing the `org.apache.gravitino.iceberg.service.cache.ScanPlanCache` interface.
 
-### Misc configurations
+### Misc Configurations
 
 | Configuration item                          | Description                                                  | Default value | Required | Since Version    |
 |---------------------------------------------|--------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.extension-packages` | Comma-separated list of Iceberg REST API packages to expand. | (none)        | No       | 0.7.0-incubating |
 
-### Health check endpoints
+### Health Check Endpoints
 
 The Iceberg REST server exposes three health check endpoints following the same [MicroProfile Health](https://microprofile.io/project/eclipse/microprofile-health) semantics as the main Gravitino server. All endpoints are exempt from authentication. The readiness probe checks whether the `IcebergCatalogWrapperManager` has been initialized — it performs no I/O and has no configurable timeout.
 
@@ -644,7 +644,7 @@ Unhealthy response (HTTP 503):
 }
 ```
 
-### Memory settings
+### Memory Settings
 
 The Iceberg REST server uses `GRAVITINO_MEM` for JVM heap/metaspace flags. Default: `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`; set it to adjust heap/metaspace sizes.
 Example tuning:
@@ -652,7 +652,7 @@ Example tuning:
 - Medium workloads: `GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`
 - Higher concurrency or catalog counts: increase heap and metaspace accordingly.
 
-## Start the Iceberg REST server
+## Start the Iceberg REST Server
 
 To start as an auxiliary service with Gravitino server:
 
@@ -674,7 +674,7 @@ curl  http://127.0.0.1:9001/iceberg/v1/config
 
 Normally you will see the output like `{"defaults":{},"overrides":{}, "endpoints":["GET /v1/{prefix}/namespaces", ...]}%`.
 
-## Docker instructions
+## Docker Instructions
 
 You could run Gravitino Iceberg REST server through docker container:
 
@@ -811,7 +811,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ---
 
-#### Verify Access is Denied Without Privileges
+#### Verify Access Is Denied Without Privileges
 
 Before granting any privileges, verify that the user cannot access the catalog. Try to list tables as `user1` (replace with your actual authentication method):
 
@@ -837,7 +837,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ---
 
-#### Verify Access is Granted With Privileges
+#### Verify Access Is Granted with Privileges
 
 After granting the role with privileges, repeat the request as `user1`:
 

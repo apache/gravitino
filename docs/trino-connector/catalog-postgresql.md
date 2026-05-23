@@ -14,7 +14,7 @@ To connect to PostgreSQL, you need:
 - PostgreSQL 10.x or higher.
 - Network access from the Trino coordinator and workers to PostgreSQL. Port 5432 is the default port.
 
-## Case sensitivity
+## Case Sensitivity
 
 PostgreSQL treats unquoted identifiers as case insensitive.
 For example, the table name MyTable is equivalent to mytable and MYTABLE.
@@ -24,7 +24,7 @@ However, if you create a table with quoted identifiers, such as "MyTable", it be
 When using the Gravitino Trino connector with PostgreSQL, you must use unquoted identifiers to avoid case sensitivity issues.
 Otherwise, schema names, table names or column names containing uppercase letters may not be found.
 
-## Create table
+## Create Table
 
 At present, the Apache Gravitino Trino connector only supports basic PostgreSQL table creation statements, which involve fields, null allowances, and comments. However, it does not support advanced features like primary keys, indexes, default values, and auto-increment.
 The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
@@ -33,7 +33,7 @@ The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
 `CREATE OR REPLACE TABLE AS SELECT` is not supported. Use `DROP TABLE` followed by `CREATE TABLE AS SELECT` as an alternative.
 :::
 
-## Alter table
+## Alter Table
 
 Gravitino Trino connector supports the following alter table operations:
 - Rename table
@@ -60,11 +60,11 @@ If the `WHERE` clause is specified, only the matching rows are deleted. Otherwis
 
 Not support.
 
-## Table and Schema properties
+## Table and Schema Properties
 
 PostgreSQL's tables and schemas cannot support properties.
 
-## Basic usage examples
+## Basic Usage Examples
 
 Do the following steps before you can use the PostgreSQL catalog in Trino through Gravitino:
 
@@ -123,7 +123,7 @@ The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `postgresql_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
-### Create tables and schemas
+### Create Tables and Schemas
 
 Create a new schema named `database_01` in `postgresql_test` catalog.
 
@@ -141,7 +141,7 @@ salary int
 );
 ```
 
-### Write data
+### Write Data
 
 Insert data into the table `table_01`:
 
@@ -168,7 +168,7 @@ DELETE FROM postgresql_test.database_01.table_01 WHERE salary = 12;
 DELETE FROM postgresql_test.database_01.table_01;
 ```
 
-### Query data
+### Query Data
 
 Query the `table_01` table:
 
@@ -176,7 +176,7 @@ Query the `table_01` table:
 SELECT * FROM postgresql_test.database_01.table_01;
 ```
 
-### Modify a table
+### Modify a Table
 
 Add a new column `age` to the `table_01` table:
 

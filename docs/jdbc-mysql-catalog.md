@@ -21,7 +21,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the MySQL instance.
 - Supports metadata management of MySQL (5.7, 8.0).
@@ -30,7 +30,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 - Supports managing MySQL table features through table properties, like using `engine` to set MySQL storage engine.
 
-### Catalog properties
+### Catalog Properties
 
 Pass to a MySQL data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
@@ -82,30 +82,30 @@ Returning null for TIMESTAMP type precision. Driver version: mysql-connector-jav
 **Recommended driver versions:**
 - `mysql-connector-java-8.0.16` or higher
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino's schema concept corresponds to the MySQL database.
 - Supports creating schema, but does not support setting comment.
 - Supports dropping schema.
 - Supports cascade dropping schema.
 
-### Schema properties
+### Schema Properties
 
 - Doesn't support any schema property settings.
 
-### Schema operations
+### Schema Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Gravitino's table concept corresponds to the MySQL table.
 - Supports DDL operation for MySQL tables.
@@ -113,7 +113,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
 - Supports managing MySQL table features through table properties, like using `engine` to set MySQL storage engine.
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type       | MySQL Type          |
 |----------------------|---------------------|
@@ -143,7 +143,7 @@ MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `Int
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-### Table column auto-increment
+### Table Column Auto-increment
 
 :::note
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
@@ -196,7 +196,7 @@ Index[] indexes = new Index[] {
 </TabItem>
 </Tabs>
 
-### Table properties
+### Table Properties
 
 Although MySQL itself does not support table properties, Gravitino offers table property management for MySQL tables through the `jdbc-mysql` catalog, enabling control over table features. The supported properties are listed as follows:
 
@@ -221,7 +221,7 @@ Some MySQL storage engines, such as FEDERATED, are not enabled by default and re
 refer to the [MySQL documentation](https://dev.mysql.com/doc/refman/8.0/en/federated-storage-engine.html).
 :::
 
-### Table indexes
+### Table Indexes
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
@@ -263,11 +263,11 @@ Index[] indexes = new Index[] {
 </TabItem>
 </Tabs>
 
-### Table operations
+### Table Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Gravitino supports these table alteration operations:
 

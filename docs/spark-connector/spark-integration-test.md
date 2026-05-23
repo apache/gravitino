@@ -9,7 +9,7 @@ license: "This software is licensed under the Apache License version 2."
 
 There are two types of integration tests in spark connector, normal integration test like `SparkXXCatalogIT`, and the golden file integration test.
 
-## Normal integration test
+## Normal Integration Test
 
 Normal integration test are mainly used to test the correctness of the metadata, it's enabled in the GitHub CI. You could run tests with specific Spark version like:
 
@@ -17,7 +17,7 @@ Normal integration test are mainly used to test the correctness of the metadata,
 ./gradlew :spark-connector:spark-3.3:test --tests "org.apache.gravitino.spark.connector.integration.test.hive.SparkHiveCatalogIT33.testCreateHiveFormatPartitionTable"
 ```
 
-## Golden file integration test
+## Golden File Integration Test
 
 Golden file integration test are mainly to test the correctness of the SQL result with massive data, it's disabled in the GitHub CI, you could run tests with following command:
 

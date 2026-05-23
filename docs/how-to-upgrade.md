@@ -15,13 +15,13 @@ document and familiarize yourself with the required tools.
 
 ## Upgrade Steps
 
-### Step 1: Shutdown your Gravitino instance
+### Step 1: Shutdown Your Gravitino Instance
 Shutdown your Gravitino instance and restrict access to the
 Apache Gravitino's database. It is very important that no one else
 accesses or modifies the contents of database while you are
 performing the schema upgrade.
 
-### Step 2: Backup your Gravitino instance
+### Step 2: Backup Your Gravitino Instance
 Create a backup of your database. This will allow
 you to revert any changes made during the upgrade process if
 something goes wrong. 
@@ -47,7 +47,7 @@ For PostgreSQL, you can use the following command to backup your database:
 pg_dump -U username -h hostname -d database_name -n schema_name -a -F c -f data_backup.sql
 ```
 
-### Step 3: Dump your Gravitino database
+### Step 3: Dump Your Gravitino Database
 Dump your Gravitino database schema to a file
 
 #### MySQL
@@ -73,7 +73,7 @@ For PostgreSQL, you can use the following command to dump the database schema to
 pg_dump -U username -h hostname -d database_name -n schema_name -s -F c -f schema-x.y.z-postgresql.sql
 ```
 
-### Step 4: Determine differences between your schema and the official schema
+### Step 4: Determine Differences Between Your Schema and the Official Schema
 The schema upgrade scripts assume that the schema you are upgrading
 closely matches the official schema for your particular version of
 Gravitino. The files in this directory with names like
@@ -85,7 +85,7 @@ you created in the previous step. Some differences are acceptable and will not i
 with the upgrade process, but others need to be resolved manually
 or the upgrade scripts will fail to complete.
 
-### Step 5: Apply the upgrade scripts
+### Step 5: Apply the Upgrade Scripts
 You are now ready to run the schema upgrade scripts. If you are
 upgrading from Gravitino 0.6.0 to Gravitino 0.7.0 you need to run the
 `upgrade-0.6.0-to-0.7.0-<type>.sql` script, but if you are upgrading
@@ -123,7 +123,7 @@ These scripts should run to completion without any errors. If you
 do encounter errors you need to analyze the cause and attempt to
 trace it back to one of the preceding steps.
 
-### Step 6: Verify the upgrade
+### Step 6: Verify the Upgrade
 The final step of the upgrade process is validating your freshly
 upgraded schema against the official schema for your particular
 version of Gravitino. This is accomplished by repeating steps (3) and

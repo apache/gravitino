@@ -45,7 +45,7 @@ Gravitino will initially create three roles in Apache Ranger:
 - GRAVITINO_CATALOG_OWNER_ROLE: Includes users and user groups designated as catalog owners, corresponding to the owner's privileges in Ranger policies.
 - GRAVITINO_OWNER_ROLE: Used to label Ranger policy items related to schema and table owner privileges. It does not include any users or user groups.
 
-#### Example of using the Ranger Hadoop SQL Plugin
+#### Configure the Ranger Hadoop SQL Plugin
 
 Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions.
 The Ranger service is accessible at `172.0.0.100:6080`, with the username `Jack` and the password `PWD123`.
@@ -67,7 +67,7 @@ Spark can use Kyuubi authorization plugin to access Gravitino's catalog. But the
 More data source authorization is under development.
 :::
 
-### chain authorization plugin
+### Chain Authorization Plugin
 
 Gravitino supports chaining multiple authorization plugins to secure one catalog.
 The authorization plugin chain is defined in the `authorization.chain.plugins` property, with the plugin names separated by commas.
@@ -90,7 +90,7 @@ The Gravitino chain authorization plugin only supports the Apache Ranger HadoopS
 The properties of every chained authorization plugin should use `authorization.chain.${plugin-name}` as the prefix.
 :::
 
-#### Example of using the chain authorization Plugin
+#### Configure the Chain Authorization Plugin
 
 Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions.
 The Apache Hive service will use HDFS to store its data. You have created a `hdfsRepo` in Apache Ranger to manage HDFS's permissions.

@@ -12,7 +12,7 @@ The catalogs currently supported by the Apache Gravitino Trino connector are as 
 - [MySQL](catalog-mysql.md)
 - [PostgreSQL](catalog-postgresql.md)
 
-## Create catalog
+## Create Catalog
 
 Users can create catalogs through the Gravitino Trino connector and then load them into Trino.
 The Gravitino Trino connector provides the following stored procedures to create, delete, and alter catalogs.
@@ -120,7 +120,7 @@ call gravitino.system.alter_catalog(
 If you need more information about catalog, refer to:
 [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog).
 
-## Pass Trino connector configuration
+## Pass Trino Connector Configuration
 A Gravitino catalog is implemented by the Trino connector, so you can pass the Trino connector configuration to the Gravitino catalog.
 For example, you want to set the `hive.config.resources` configuration for the Hive catalog, you can pass the configuration to the
 Gravitino catalog like this:
@@ -148,7 +148,7 @@ More Trino connector configurations can refer to:
 - [MySQL catalog](https://trino.io/docs/current/connector/mysql.html#general-configuration-properties)
 - [PostgreSQL catalog](https://trino.io/docs/current/connector/postgresql.html#general-configuration-properties)
 
-## Data type mapping between Trino and Apache Gravitino
+## Data Type Mapping Between Trino and Apache Gravitino
 
 Gravitino Trino connector supports the following data type conversions between Trino and Gravitino currently. Depending on the detailed catalog, Gravitino may not support some data types conversion for this specific catalog, for example,
 Hive does not support `TIME` data type.

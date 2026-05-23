@@ -33,14 +33,14 @@ To use view management, please make sure that:
  - A relational catalog has been created within the metalake.
  - A schema has been created within the catalog.
 
-## View operations
+## View Operations
 
 :::tip
 Users should create a metalake, a catalog, and a schema, and ensure that the metalake and
 catalog are enabled before operating views.
 :::
 
-### Create a view
+### Create a View
 
 Create a view by sending a `POST` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views` endpoint or just use the
@@ -122,7 +122,7 @@ representations for the same logical view. Supported dialects, representation co
 default-resolution fields depend on the catalog provider.
 :::
 
-#### Create request fields
+#### Create Request Fields
 
 Use the following fields when creating a view:
 
@@ -138,7 +138,7 @@ Use the following fields when creating a view:
 Column types use the same Gravitino type system as table columns. For the full type list and the
 behavior of special types such as external and unparsed types, refer to [Apache Gravitino table column type](./manage-relational-metadata-using-gravitino.md#apache-gravitino-table-column-type).
 
-### Load a view
+### Load a View
 
 Load a view by sending a `GET` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}` endpoint or just use
@@ -174,7 +174,7 @@ stored representations, default catalog, default schema, comment, and properties
 directly without a separate import step.
 :::
 
-### Alter a view
+### Alter a View
 
 Modify a view by sending a `PUT` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}` endpoint or just use
@@ -226,7 +226,7 @@ Gravitino supports the following changes to a view:
 change one part of the body, load the current view first and pass the unchanged fields back in the
 replacement request.
 
-### Drop a view
+### Drop a View
 
 Remove a view by sending a `DELETE` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}` endpoint or just use
@@ -258,7 +258,7 @@ viewCatalog.dropView(NameIdentifier.of("schema", "example_view"));
 Dropping a view removes the view metadata definition only. It does not remove underlying table
 data because a view does not own storage.
 
-### List all views under a schema
+### List All Views Under a Schema
 
 List all views in a schema by sending a `GET` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views` endpoint or just use the

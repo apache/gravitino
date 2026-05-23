@@ -5,7 +5,7 @@ keyword: playground
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Playground introduction
+## Playground Introduction
 
 The playground is a complete Apache Gravitino Docker runtime environment with `Apache Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Apache Gravitino` server.
 
@@ -19,7 +19,7 @@ Install Git (optional), Docker, Docker Compose.
 
 2 CPU cores, 8 GB RAM, 25 GB disk storage, MacOS or Linux OS (Verified Ubuntu22.04 Ubuntu24.04 AmazonLinux).
 
-## TCP ports used
+## TCP Ports Used
 
 The playground runs several services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
 
@@ -34,15 +34,15 @@ The playground runs several services. The TCP ports used may clash with existing
 | playground-prometheus | 19090                  |
 | playground-grafana    | 13000                  |
 
-## Playground usage
+## Playground Usage
 
-### Curl command to launch the playground
+### Curl Command to Launch the Playground
 
 ```shell
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/apache/gravitino-playground/HEAD/install.sh)"
 ```
 
-### Use git to download and launch the playground
+### Use Git to Download and Launch the Playground
 
 ```shell
 git clone git@github.com:apache/gravitino-playground.git
@@ -55,13 +55,13 @@ cd gravitino-playground
 ./playground.sh start
 ```
 
-#### Check status
+#### Check Status
 
 ```shell 
 ./playground.sh status
 ```
 
-#### Stop playground
+#### Stop Playground
 
 ```shell
 ./playground.sh stop
@@ -91,7 +91,7 @@ trino@container_id:/$ trino
 
 3. Start the notebook and run the cells.
 
-## Use Spark client
+## Use Spark Client
 
 1. Login to the Gravitino playground Spark Docker container using the following command:
 
@@ -115,7 +115,7 @@ spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
 
 ## Example
 
-### Simple Trino queries
+### Simple Trino Queries
 
 Use simple queries to test in the Trino CLI.
 
@@ -147,7 +147,7 @@ DESCRIBE catalog_hive.company.employees;
 SHOW TABLES from catalog_hive.company;
 ```
 
-### Cross-catalog queries
+### Cross-catalog Queries
 
 In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data, and the sales department uses PostgreSQL. You can run some interesting queries by joining the two departments' data together with Gravitino.
 
@@ -220,7 +220,7 @@ SELECT * FROM catalog_hive.product.employees WHERE department = 'Engineering';
 The demo is located in the `jupyter` folder, and you can open the `gravitino-spark-trino-example.ipynb`
 demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
 
-### Use Apache Iceberg REST service
+### Use Apache Iceberg REST Service
 
 Suppose you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
 Gravitino provides an Iceberg REST catalog service. You can use Spark to access the REST catalog to write the table data.

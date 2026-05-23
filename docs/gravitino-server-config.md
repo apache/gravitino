@@ -14,14 +14,14 @@ Apache Gravitino supports several configurations:
 2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
 3. **Some other configurations**: Includes HDFS and other configurations.
 
-## Apache Gravitino server configurations
+## Apache Gravitino Server Configurations
 
 Customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
 We strongly recommend that you read the following sections to understand the configuration file, so you can change the default values to suit your specific situation and usage scenario.
 
 The `gravitino.conf` file lists the configuration items in the following table. It groups those items into the following categories:
 
-### Apache Gravitino HTTP Server configuration
+### Apache Gravitino HTTP Server Configuration
 
 | Configuration item                                   | Description                                                                                                                                                                           | Default value                                                                | Required | Since version    |
 |------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|------------------|
@@ -42,9 +42,9 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 The filter in the customFilters should be a standard javax servlet filter.
 Also, specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
 
-### Storage configuration
+### Storage Configuration
 
-#### Storage backend configuration
+#### Storage Backend Configuration
 
 Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
 If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. It's highly recommended using MySQL as the backend database.  
@@ -74,11 +74,11 @@ The following table lists the storage configuration items:
 We strongly recommend that you change the default value of `gravitino.entity.store.relational.storagePath`, as it's under the deployment directory and future version upgrades may remove it.
 :::
 
-#### Create JDBC backend schema and table 
+#### Create JDBC Backend Schema and Table
 
 For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up. For MySQL, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
 
-### Storage cache configuration
+### Storage Cache Configuration
 
 To enable storage caching, please modify the following settings in the `${GRAVITINO_HOME}/conf/gravitino.conf` file:
 
@@ -107,7 +107,7 @@ gravitino.cache.lockSegments=16
 - `gravitino.cache.expireTimeInMs`: Controls the cache TTL in milliseconds.
 - If `gravitino.cache.enableStats` is enabled, Gravitino will log cache statistics (hit count, miss count, load failures, etc.) every 5 minutes at the Info level.
 
-#### Eviction strategies
+#### Eviction Strategies
 
 Gravitino supports multiple eviction strategies including capacity-based, weight-based, and time-based (TTL) eviction. The following describes how they work with Caffeine:
 
@@ -132,7 +132,7 @@ All cache entries are subject to a TTL (Time-To-Live) expiration policy. By defa
 - TTL can work in conjunction with both capacity and weight-based eviction;
 - Expired entries will also trigger asynchronous cleanup mechanisms for resource release and logging.
 
-### Tree lock configuration
+### Tree Lock Configuration
 
 Gravitino server uses tree lock to ensure the consistency of the data. The tree lock is a memory lock (Gravitino only supports in memory lock) that can be used to ensure the consistency of the data in Gravitino server. The configuration items are as follows:
 
@@ -142,7 +142,7 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 | `gravitino.lock.minNodes`            | The minimum number of tree lock nodes to keep in memory       | 1000          | No       | 0.5.0         |
 | `gravitino.lock.cleanIntervalInSecs` | The interval in seconds to clean up the stale tree lock nodes | 60            | No       | 0.5.0         |
 
-### Catalog configuration
+### Catalog Configuration
 
 | Configuration item                           | Description                                                                                                                                                                                         | Default value | Required | Since version |
 |----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -156,7 +156,7 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 |-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.schema.separator` | The separator used to represent a hierarchical (multi-level) schema in schema names at the API boundary, e.g. `:` for `A:B:C`. It only takes effect for catalogs that support hierarchical schemas (currently the Iceberg catalog). The value must not be blank and must not contain `.` or the internal physical separator (ASCII-1, `\u0001`). See [Hierarchical schema](./lakehouse-iceberg-catalog.md#hierarchical-schema). | `:`           | No       | 1.3.0         |
 
-### Auxiliary service configuration
+### Auxiliary Service Configuration
 
 | Configuration item            | Description                                                                                                                    | Default value | Since Version |
 |-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
@@ -164,7 +164,7 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 
 Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configuration details.
 
-### Event listener configuration
+### Event Listener Configuration
 
 Gravitino provides event listener mechanism to allow users to capture the events which are provided by Gravitino server to integrate some custom operations.
 
@@ -231,7 +231,7 @@ Gravitino triggers a pre-event before the operation, a post-event after the comp
 | policy operation                        | `CreatePolicyPreEvent`, `AlterPolicyPreEvent`, `DeletePolicyPreEvent`, `GetPolicyPreEvent`, `ListPoliciesPreEvent`, `ListPolicyInfosPreEvent`, `EnablePolicyPreEvent`, `DisablePolicyPreEvent`, `GetPolicyForMetadataObjectPreEvent`, `AssociatePoliciesForMetadataObjectPreEvent`, `ListPolicyInfosForMetadataObjectPreEvent`, `ListMetadataObjectsForPolicyPreEvent` | 1.1.0 |
 | function operation                      | `RegisterFunctionPreEvent`, `GetFunctionPreEvent`, `AlterFunctionPreEvent`, `DropFunctionPreEvent`, `ListFunctionPreEvent`                                                                                                                                                                                                        | 1.3.0 |
 
-#### Event listener plugin
+#### Event Listener Plugin
 
 The `EventListenerPlugin` defines an interface for event listeners that manage the lifecycle and state of a plugin. This includes handling its initialization, startup, and shutdown processes, as well as handing events triggered by various operations.
 
@@ -245,7 +245,7 @@ The plugin provides several operational modes for how to process event, supporti
 
 When processing pre-event, you could throw a `ForbiddenException` to skip the following executions. For more details, refer to the definition of the plugin.
 
-### Audit log configuration
+### Audit Log Configuration
 
 The audit log framework defines how audit logs are formatted and written to various storages. The formatter defines an interface that transforms different `Event` types into a unified `AuditLog`. The writer defines an interface to writing AuditLog to different storages.
 
@@ -257,11 +257,11 @@ Gravitino provides a default implementation to log basic audit information to a 
 | `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter      | NO       | 0.7.0-incubating  |
 | `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.v2.SimpleFormatterV2 | NO       | 0.7.0-incubating  |
 
-#### Audit log formatter
+#### Audit Log Formatter
 
 The `Formatter` interface transforms an `Event` into an `AuditLog`. `SimpleFormatterV2` is the default implementation and requires no extra configuration. It produces a tab-separated line with the following fields: timestamp, user, operation type, identifier, operation status, event source, remote address, and custom info.
 
-#### Audit log writer
+#### Audit Log Writer
 
 The `AuditLogWriter` interface enables writing audit logs to different storage mediums (files, databases, etc.).
 
@@ -291,17 +291,17 @@ Example — adjust retention to 90 days:
 appender.audit_file.strategy.delete.ifLastModified.age = 90d
 ```
 
-### Security configuration
+### Security Configuration
 
 Refer to [security](security/security.md) for HTTPS and authentication configurations.
 
-### Metrics configuration
+### Metrics Configuration
 
 | Property name                             | Description                                          | Default value | Required | Since Version |
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
 
-### Health check endpoints
+### Health Check Endpoints
 
 Gravitino exposes three health check endpoints following [MicroProfile Health](https://microprofile.io/project/eclipse/microprofile-health) semantics. All endpoints are exempt from authentication so that Kubernetes probes, load balancers, and global traffic managers can reach them without credentials.
 
@@ -358,7 +358,7 @@ Unhealthy response (HTTP 503):
 
 Possible `reason` values in the `entityStore` DOWN check: `timeout`, `interrupted`, `probe-rejected`, or the class name of an unexpected exception.
 
-### Memory settings
+### Memory Settings
 
 `GRAVITINO_MEM` sets JVM heap/metaspace flags for the Gravitino server and is also read by the Iceberg REST server and Lance REST server launchers.
 
@@ -369,7 +369,7 @@ Typical values:
 - Moderate production: `-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g`
 - Larger deployments: `-Xms8g -Xmx8g -XX:MaxMetaspaceSize=1g` or higher depending on catalog count, plugins, and query concurrency
 
-## Apache Gravitino catalog properties configuration
+## Apache Gravitino Catalog Properties Configuration
 
 There are three types of catalog properties:
 
@@ -419,11 +419,11 @@ The following table lists the catalog specific properties and their default path
 The Gravitino server automatically adds the catalog properties configuration directory to classpath.
 :::
 
-## Some other configurations
+## Some Other Configurations
 
 You could put HDFS configuration file to the catalog properties configuration dir, like `catalogs/lakehouse-iceberg/conf/`.
 
-## Docker instructions
+## Docker Instructions
 
 You could run Gravitino server though docker container:
 
@@ -502,14 +502,14 @@ If both `gravitino.conf` and environment variable exist, the container’s start
 :::
 
 
-## How to set up runtime environment variables
+## How to Set Up Runtime Environment Variables
 
 The Gravitino server supports configuring runtime environment variables in two ways:
 
 1. **Local deployment:** Modify `gravitino-env.sh` located in the `conf` directory.
 2. **Docker container deployment:** Use environment variable injection during container startup. *(Since 1.0.0)*
 
-### How to access Apache Hadoop
+### How to Access Apache Hadoop
 
 Due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
 Apache Hadoop access. Ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access

@@ -30,7 +30,7 @@ Before using Gravitino UDFs in Spark, ensure the following:
 3. The **JAR containing the UDF class** is available on the Spark classpath (e.g. via
    `--jars` or `spark.jars` configuration).
 
-## Java UDF requirements
+## Java UDF Requirements
 
 The Java class specified in `className` of the function implementation must implement Spark's
 `org.apache.spark.sql.connector.catalog.functions.UnboundFunction` interface. For details on
@@ -44,7 +44,7 @@ Key points:
 - Only functions with `RuntimeType.SPARK` are visible to the Spark connector; implementations
   targeting other runtimes (e.g. `TRINO`) are filtered out.
 
-## Call functions in Spark SQL
+## Call Functions in Spark SQL
 
 Use the fully qualified three-part name `catalog.schema.function_name` to call a
 Gravitino-registered function:
@@ -68,7 +68,7 @@ SELECT add_one(42);
 ```
 :::
 
-## Discover functions
+## Discover Functions
 
 The Spark connector only exposes functions that have at least one Java implementation with
 `RuntimeType.SPARK`. Functions with only non-Spark implementations (e.g. `TRINO`) are not

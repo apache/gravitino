@@ -57,12 +57,12 @@ results in a full-screen pager.
 $FLINK_HOME/bin/sql-client.sh
 ```
 
-## Register the catalog
+## Register the Catalog
 
 At the Flink SQL Client prompt, run the following `CREATE CATALOG` statement. Replace
 `<gravitino-host>` with your Gravitino server address and supply your S3 credentials.
 
-### No authentication
+### No Authentication
 
 ```sql
 CREATE CATALOG gravitino_irc WITH (
@@ -76,7 +76,7 @@ CREATE CATALOG gravitino_irc WITH (
 );
 ```
 
-### OAuth2 authentication
+### OAuth2 Authentication
 
 ```sql
 CREATE CATALOG gravitino_irc WITH (
@@ -112,33 +112,33 @@ See [gravitino-irc-quickstart](https://github.com/markhoerth/gravitino-irc-quick
 complete local development environment using MinIO.
 :::
 
-## Usage examples
+## Usage Examples
 
-### Use the catalog
+### Use the Catalog
 
 ```sql
 USE CATALOG gravitino_irc;
 ```
 
-### List databases
+### List Databases
 
 ```sql
 SHOW DATABASES;
 ```
 
-### List tables
+### List Tables
 
 ```sql
 SHOW TABLES IN <namespace>;
 ```
 
-### Query a table
+### Query a Table
 
 ```sql
 SELECT * FROM <namespace>.<table>;
 ```
 
-### Create a table
+### Create a Table
 
 ```sql
 CREATE TABLE gravitino_irc.<namespace>.new_table (
@@ -148,13 +148,13 @@ CREATE TABLE gravitino_irc.<namespace>.new_table (
 );
 ```
 
-### Insert data
+### Insert Data
 
 ```sql
 INSERT INTO gravitino_irc.<namespace>.new_table VALUES (1, 'example', CURRENT_TIMESTAMP);
 ```
 
-## Gravitino connector vs Iceberg REST
+## Gravitino Connector Vs Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

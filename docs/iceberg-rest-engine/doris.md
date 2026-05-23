@@ -31,7 +31,7 @@ CREATE CATALOG iceberg PROPERTIES (
 );
 ```
 
-## Usage examples
+## Usage Examples
 
 ```sql
 SWITCH iceberg;
@@ -42,7 +42,7 @@ INSERT INTO t VALUES (1);
 SELECT * FROM t;
 ```
 
-## Gravitino connector vs Iceberg REST
+## Gravitino Connector Vs Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

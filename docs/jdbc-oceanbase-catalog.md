@@ -22,7 +22,7 @@ Apache Gravitino provides the ability to manage OceanBase metadata.
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the OceanBase instance.
 - Supports metadata management of OceanBase (4.x).
@@ -30,7 +30,7 @@ Apache Gravitino provides the ability to manage OceanBase metadata.
 - Supports table index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
 
-### Catalog properties
+### Catalog Properties
 
 Pass to a OceanBase data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
@@ -82,41 +82,41 @@ Returning null for TIMESTAMP type precision. Driver version: mysql-connector-jav
 - `mysql-connector-java-8.0.16` or higher
 - `com.oceanbase.jdbc.Driver` (OceanBase official driver)
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino's schema concept corresponds to the OceanBase database.
 - Supports creating schema, but does not support setting comment.
 - Supports dropping schema.
 - Supports cascade dropping schema.
 
-### Schema properties
+### Schema Properties
 
 - Doesn't support any schema property settings.
 
-### Schema operations
+### Schema Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Gravitino's table concept corresponds to the OceanBase table.
 - Supports DDL operation for OceanBase tables.
 - Supports index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
 
-### Table properties
+### Table Properties
 
 - Doesn't support table properties.
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type      | OceanBase Type      |
 |---------------------|---------------------|
@@ -145,7 +145,7 @@ OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `Int
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-### Table column auto-increment
+### Table Column Auto-increment
 
 :::note
 OceanBase setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.
@@ -199,7 +199,7 @@ Index[] indexes = new Index[] {
 </Tabs>
 
 
-### Table indexes
+### Table Indexes
 
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
@@ -236,7 +236,7 @@ Index[] indexes = new Index[] {
 </TabItem>
 </Tabs>
 
-### Table operations
+### Table Operations
 
 :::note
 The OceanBase catalog does not support creating partitioned tables in the current version.
@@ -244,7 +244,7 @@ The OceanBase catalog does not support creating partitioned tables in the curren
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Gravitino supports these table alteration operations:
 

@@ -6,7 +6,7 @@ keyword: Fileset catalog index S3 GCS ADLS OSS
 license: "This software is licensed under the Apache License version 2."
 ---
 
-### Fileset catalog overall
+### Fileset Catalog Overall
 
 Gravitino Fileset catalog index includes the following chapters:
 
@@ -14,7 +14,7 @@ Gravitino Fileset catalog index includes the following chapters:
 - [Manage Fileset catalog with Gravitino API](./manage-fileset-metadata-using-gravitino.md): This chapter explains how to manage fileset metadata using Gravitino API and provides detailed examples.
 - [Using Fileset catalog with Gravitino virtual file system](how-to-use-gvfs.md): This chapter explains how to use Fileset catalog with the Gravitino virtual file system and provides detailed examples.
 
-### Fileset catalog with cloud storage
+### Fileset Catalog with Cloud Storage
 
 Apart from the above, you can also refer to the following topics to manage and access cloud storage like S3, GCS, ADLS, and OSS:
 

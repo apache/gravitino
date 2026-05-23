@@ -35,9 +35,9 @@ per catalog:
 - TEXTFILE
 
 
-## Schema operations
+## Schema Operations
 
-### Create a schema 
+### Create a Schema
 
 Users can create a schema with properties through Apache Gravitino Trino connector as follows:
 
@@ -45,9 +45,9 @@ Users can create a schema with properties through Apache Gravitino Trino connect
 CREATE SCHEMA catalog.schema_name 
 ```
 
-## Table operations
+## Table Operations
 
-### Create table
+### Create Table
 
 The Gravitino Trino connector supports basic Hive table creation statements, such as defining fields,
 allowing null values, and adding comments. The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
@@ -67,7 +67,7 @@ CREATE TABLE catalog.schema_name.table_name
 ```
 
 
-### Alter table
+### Alter Table
 
 Support for the following alter table operations:
 
@@ -98,13 +98,13 @@ Transactional Hive tables with ORC format support "row-by-row" deletion, in whic
 
 See also [more limitation](https://trino.io/docs/current/connector/hive.html#data-management).
 
-## Schema and table properties
+## Schema and Table Properties
 
 Set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE"
 statement.
 
 
-### Create a schema with properties
+### Create a Schema with Properties
 
 Users can use the following example to create a schema with properties: 
 
@@ -124,7 +124,7 @@ The following tables are the properties supported by the Hive schema:
 Reserved properties: A reserved property is one can't be set by users but can be read by users.
 
 
-### Create a table with properties
+### Create a Table with Properties
 
 Users can use the following example to create a table with properties: 
 
@@ -164,7 +164,7 @@ The following properties are automatically added and managed as reserved propert
 | external       | Indicate whether it's an external table | 0.2.0         |
 | table_type     | The type of Hive table                  | 0.2.0         |
 
-## Basic usage examples
+## Basic Usage Examples
 
 Do the following steps before you can use the Hive catalog in Trino through Gravitino:
 
@@ -222,7 +222,7 @@ The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `hive_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
-### Create tables and schemas
+### Create Tables and Schemas
 
 Create a new schema named `database_01` in `hive_test` catalog.
 
@@ -256,7 +256,7 @@ WITH (
 );
 ```
 
-### Write data
+### Write Data
 
 Insert data into the table `table_01`:
 
@@ -317,7 +317,7 @@ MERGE INTO hive_test.database_01.test_acid t USING hive_test.database_01.table_0
               VALUES (3, s.name, s.salary);
 ```
 
-### Query data
+### Query Data
 
 Query the `table_01` table:
 
@@ -325,7 +325,7 @@ Query the `table_01` table:
 SELECT * FROM hive_test.database_01.table_01;
 ```
 
-### Modify a table
+### Modify a Table
 
 Add a new column `age` to the `table_01` table:
 
@@ -359,7 +359,7 @@ Drop a table:
 DROP TABLE hive_test.database_01.table_01;
 ```
 
-## HDFS config and permissions
+## HDFS Config and Permissions
 
 For basic setups, the Apache Gravitino Trino connector configures the HDFS client
 using catalog configurations. It supports configuring the HDFS client with `hdfs-site.xml`

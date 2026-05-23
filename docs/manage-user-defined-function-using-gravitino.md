@@ -40,9 +40,9 @@ To use function management, please make sure that:
  - A catalog has been created within the metalake.
  - A schema has been created within the catalog.
 
-## Function operations
+## Function Operations
 
-### Register a function
+### Register a Function
 
 Register a function by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
 endpoint or use the Gravitino Java/Python client. The following is an example of registering
@@ -256,7 +256,7 @@ function = function_catalog.register_function(
 </TabItem>
 </Tabs>
 
-### Get a function
+### Get a Function
 
 Get a function by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of getting
@@ -298,7 +298,7 @@ function = catalog.as_function_catalog().get_function(
 </TabItem>
 </Tabs>
 
-### List functions
+### List Functions
 
 List all the functions in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
 endpoint or by using the Gravitino Java/Python client. The following is an example of listing
@@ -379,7 +379,7 @@ functions = catalog.as_function_catalog().list_function_infos(
 </TabItem>
 </Tabs>
 
-### Alter a function
+### Alter a Function
 
 Modify a function by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
 endpoint or using the Gravitino Java/Python client. The following is an example of updating a
@@ -430,7 +430,7 @@ function = catalog.as_function_catalog().alter_function(
 </TabItem>
 </Tabs>
 
-#### Supported modifications
+#### Supported Modifications
 
 The following operations are supported for altering a function:
 
@@ -519,7 +519,7 @@ function = catalog.as_function_catalog().alter_function(
 </TabItem>
 </Tabs>
 
-### Drop a function
+### Drop a Function
 
 Drop a function by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of dropping
@@ -559,9 +559,9 @@ dropped: bool = catalog.as_function_catalog().drop_function(
 </TabItem>
 </Tabs>
 
-## Advanced examples
+## Advanced Examples
 
-### Register a function with multiple overloads
+### Register a Function with Multiple Overloads
 
 A function can have multiple definitions (overloads) with different parameter lists. Each
 definition has its own return type and implementations.
@@ -688,7 +688,7 @@ function = function_catalog.register_function(
 </TabItem>
 </Tabs>
 
-## Use functions in compute engines
+## Use Functions in Compute Engines
 
 Once a function is registered in Gravitino, it can be used in supported compute engines.
 The engine's connector loads the function from Gravitino and invokes the appropriate

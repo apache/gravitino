@@ -4,7 +4,7 @@ slug: /how-to-install
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Install Apache Gravitino from scratch
+## Install Apache Gravitino from Scratch
 
 :::note
 Apache Gravitino supports running on Java 17, and higher versions should also work but not fully tested. Make sure you have Java installed and
@@ -14,7 +14,7 @@ Apache Gravitino supports running on Java 17, and higher versions should also wo
 
 The Gravitino package comprises both the Gravitino server and the Gravitino Iceberg REST server. You can manage these servers independently or run them concurrently on a single server.
 
-### Get the Apache Gravitino binary distribution package
+### Get the Apache Gravitino Binary Distribution Package
 
 Before installing Gravitino, make sure you have the Gravitino binary distribution package. You can download the latest Gravitino binary distribution package from [GitHub](https://github.com/apache/gravitino/releases).
 Also, build it yourself by following the instructions in [How to Build Gravitino](./how-to-build.md).
@@ -67,19 +67,19 @@ For more details about it, refer to [Reorg catalogs structure](https://github.co
 
 If you want to use the relational backend storage, you need to initialize the RDBMS first. For the details on initializing the RDBMS, please check [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
 
-#### Configure the Apache Gravitino server
+#### Configure the Apache Gravitino Server
 
 The Gravitino server configuration file is `conf/gravitino.conf`. You can configure the Gravitino server by modifying this file. Basic configurations have already been added to this file. All the configurations are listed in [Gravitino Server Configurations](./gravitino-server-config.md).
 
-#### Configure the Apache Gravitino server log
+#### Configure the Apache Gravitino Server Log
 
 The Gravitino server log configuration file is `conf/log4j2.properties`. Gravitino uses Log4j2 as the Logging system. You can [Log4j2](https://logging.apache.org/log4j/2.x/) to do the log configuration.
 
-#### Configure the Apache Gravitino server environment
+#### Configure the Apache Gravitino Server Environment
 
 The Gravitino server environment configuration file is `conf/gravitino-env.sh`. Gravitino exposes several environment variables. You can modify them in this file.
 
-#### Configure Apache Gravitino catalogs
+#### Configure Apache Gravitino Catalogs
 
 Gravitino supports multiple catalogs. You can configure the catalog-level configurations by modifying the related configuration file in the `catalogs/<catalog-provider>/conf` directory. The configurations you set here apply to all the catalogs of the same type you create.
 
@@ -98,7 +98,7 @@ Gravitino supports passing in catalog-specific configurations if you add `gravit
 
 Also, Gravitino supports loading catalog-specific configurations from external files. For example,you can put your own `hive-site.xml` file in the `catalogs/hive/conf` directory, and Gravitino loads it automatically.
 
-#### Start Apache Gravitino server
+#### Start Apache Gravitino Server
 
 After configuring the Gravitino server, start the Gravitino server by running:
 
@@ -124,15 +124,15 @@ to make sure Gravitino is running.
 If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` environment variable in the `conf/gravitino-env.sh` file. Then create a `Remote JVM Debug` configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
 :::
 
-#### Manage Gravitino Iceberg REST server in Gravitino package
+#### Manage Gravitino Iceberg REST Server in Gravitino Package
 
 Run the Iceberg REST server as either a standalone server or as an auxiliary service embedded in the Gravitino server. To start it as a standalone server, use the command `./bin/gravitino-iceberg-rest-server.sh start` with configurations specified in `./conf/gravitino-iceberg-rest-server.conf`. Alternatively, use `./bin/gravitino.sh start` to launch a Gravitino server that integrates both the Iceberg REST service and the Gravitino service, with all configurations centralized in `conf/gravitino.conf`. 
 
 For more detailed information about the Gravitino Iceberg REST server, refer to [Iceberg REST server document](./iceberg-rest-service.md).
 
-## Install Apache Gravitino using Docker
+## Install Apache Gravitino Using Docker
 
-### Get the Apache Gravitino Docker image
+### Get the Apache Gravitino Docker Image
 
 Gravitino publishes the Docker image to [Docker Hub](https://hub.docker.com/r/apache/gravitino/tags).
 Run the Gravitino Docker image by running:
@@ -150,7 +150,7 @@ curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: 
 
 to make sure Gravitino is running.
 
-## Install Apache Gravitino using Docker compose
+## Install Apache Gravitino Using Docker Compose
 
 The published Gravitino Docker image only contains the Gravitino server with a basic configuration. If you want to experience the whole Gravitino system with other components, use the Docker `compose` file.
 
