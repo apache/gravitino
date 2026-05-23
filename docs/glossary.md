@@ -69,8 +69,8 @@ license: "This software is licensed under the Apache License version 2."
 
 ## JVM Instrumentation
 
-- The process of adding monitoring and management capabilities to the [JVM](#jvm).
-  The purpose of instrumentation is mainly for the collection of performance metrics.
+- The process of adding monitoring and management capabilities to the [JVM](#jvm),
+  primarily to collect performance metrics.
 
 ## JVM Metrics
 

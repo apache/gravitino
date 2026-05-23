@@ -190,7 +190,7 @@ Please be aware that:
  - Not all table alteration operations can be processed in batches.
  - Schema changes, such as adding/modifying/dropping columns can be processed in batches.
  - The schema alteration in StarRocks is asynchronous. You might get an outdated schema if you
-   execute a schema query immediately after the alteration. It is recommended to pause briefly
-   after the schema alteration. Gravitino will add the schema alteration status into
-   the schema information in the upcoming version to solve this problem.
+   execute a schema query immediately after the alteration. Pause briefly
+   after the alteration. Gravitino will surface the schema-alteration status in the
+   schema information in an upcoming release to solve this.
 - StarRocks has limited support for [alert table properties](https://docs.starrocks.io/docs/3.3/sql-reference/sql-statements/table_bucket_part_index/ALTER_TABLE/#modify-table-properties), And it suggests modify one property at a time.  

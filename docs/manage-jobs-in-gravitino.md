@@ -637,7 +637,7 @@ The following are the default configurations for the local job executor:
 
 ### Implement a Custom Job Executor
 
-Gravitino's job system is designed to be extensible, allowing you to implement your own job executor
+Gravitino's job system is extensible: you can implement your own job executor
 to run jobs in a distributed environment. You can refer to the interface `JobExecutor` in the
 code [here](https://github.com/apache/gravitino/blob/main/core/src/main/java/org/apache/gravitino/connector/job/JobExecutor.java).
 

@@ -224,6 +224,6 @@ Please be aware that:
  - Supports modifying multiple column comments at the same time.
  - Doesn't support modifying the column type and column comment at the same time.
  - The schema alteration in Doris is asynchronous. You might get an outdated schema if you
-   execute a schema query immediately after the alteration. It is recommended to pause briefly
-   after the schema alteration. Gravitino will add the schema alteration status into
-   the schema information in the upcoming version to solve this problem.
+   execute a schema query immediately after the alteration. Pause briefly
+   after the alteration. Gravitino will surface the schema-alteration status in the
+   schema information in an upcoming release to solve this.
