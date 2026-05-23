@@ -322,9 +322,7 @@ Gravitino Virtual File System supports two kinds of authentication types to acce
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System.
 
-#### How to Use Authentication
-
-##### Use `simple` authentication
+#### Use `simple` Authentication
 
 First, make sure that your Gravitino server is also configured to use the `simple` authentication mode.
 
@@ -348,7 +346,7 @@ Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_filese
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
 
-##### Use `OAuth` authentication
+#### Use `OAuth` Authentication
 
 If you want to use `oauth2` authentication for the Gravitino client in the Gravitino Virtual File System,
 refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](security/security.md).
@@ -372,7 +370,7 @@ Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_filese
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
 
-##### Use `Kerberos` authentication
+#### Use `Kerberos` Authentication
 
 If you want to use `kerberos` authentication for the Gravitino client in the Gravitino Virtual File System,
 refer to this document to complete the configuration of the Gravitino server: [Security](security/security.md).
@@ -701,9 +699,7 @@ Gravitino Virtual File System in Python supports three kinds of authentication t
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System in Python.
 
-#### How to Use Authentication
-
-##### Use `simple` authentication
+#### Use `simple` Authentication
 
 First, make sure that your Gravitino server is also configured to use the `simple` authentication mode.
 
@@ -717,7 +713,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 print(fs.ls("gvfs://fileset/fileset_catalog/tmp/test_fileset"))
 ```
 
-##### Use `basic` authentication
+#### Use `basic` Authentication
 
 First, make sure that your Gravitino server is also configured to use the `basic` authentication mode.
 See [How to authenticate](security/how-to-authenticate.md#basic-mode) for server-side setup.
@@ -737,7 +733,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 print(fs.ls("gvfs://fileset/fileset_catalog/tmp/test_fileset"))
 ```
 
-##### Use `OAuth` authentication
+#### Use `OAuth` Authentication
 
 First, make sure that your Gravitino server is also configured to use the `oauth2` authentication mode,
 and you have an OAuth server to fetch the token: [Security](security/security.md).
