@@ -65,7 +65,7 @@ contains the following code snippets:
 
 ## Python Client Development
 
-Ues any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
+Use any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
 
 ### Prerequisites
 

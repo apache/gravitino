@@ -152,7 +152,7 @@ OceanBase setting an auto-increment column requires simultaneously setting a uni
 :::
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -204,7 +204,7 @@ Index[] indexes = new Index[] {
 - Supports PRIMARY_KEY and UNIQUE_KEY.
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {

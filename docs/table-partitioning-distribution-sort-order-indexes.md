@@ -61,7 +61,7 @@ To create a distribution(bucketed) table, you should use the following three com
 - funcArgs. It defines the arguments of the strategy, the argument must be an [expression](./expression.md).
 
 <Tabs groupId='language' queryString>
-<TabItem value="Json" label="Json">
+<TabItem value="Json" label="JSON">
 
 ```json
 {
@@ -113,7 +113,7 @@ Note: If the direction value is `ascending`, the default ordering value is `null
 - sortTerm. It shows which field or function Gravitino uses to sort the table, must be an [expression](./expression.md).
 
 <Tabs groupId='language' queryString>
-<TabItem value="Json" label="Json">
+<TabItem value="Json" label="JSON">
 
 ```json
  {
@@ -255,7 +255,7 @@ To define an indexed table, you should utilize the following three components to
 - FieldNames. It defines which table fields Gravitino uses to index the table.
 
 <Tabs groupId='language' queryString>
-<TabItem value="Json" label="Json">
+<TabItem value="Json" label="JSON">
 
 ```json
  {
