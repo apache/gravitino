@@ -25,7 +25,7 @@ create_catalog(CATALOG varchar, PROVIDER varchar, PROPERTIES MAP(VARCHAR, VARCHA
 ```
 
 - CATALOG: The catalog name to be created.
-- PROVIDER: The catalog provider, supports only `hive`, `lakehouse-iceberg`, `jdbc-mysql`, `jdbc-postgresql`.
+- PROVIDER: The catalog provider. Supported values: `hive`, `lakehouse-iceberg`, `jdbc-mysql`, `jdbc-postgresql`.
 - PROPERTIES: The properties of the catalog.
 - IGNORE_EXIST: The flag to ignore the error if the catalog already exists. It's optional, the default value is `false`.
 

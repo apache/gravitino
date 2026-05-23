@@ -11,7 +11,7 @@ Spark connector supports `simple` `oauth2` and `kerberos` authentication when ac
 
 | Property                     | Type   | Default Value | Description                                                                                                         | Required | Since Version    |
 |------------------------------|--------|---------------|---------------------------------------------------------------------------------------------------------------------|----------|------------------|
-| spark.sql.gravitino.authType | string | `simple`      | The authentication mechanisms when communicating with Gravitino server, supports `simple`, `oauth2` and `kerberos`. | No       | 0.7.0-incubating |
+| spark.sql.gravitino.authType | string | `simple`      | The authentication mechanism for communicating with the Gravitino server. Supported values: `simple`, `oauth2`, `kerberos`. | No       | 0.7.0-incubating |
 
 ## Simple Mode
 

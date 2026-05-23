@@ -276,7 +276,7 @@ When enabling OAuth2 and leveraging a dynamic configuration provider to retrieve
 
 | Configuration item                                   | Description                                                                         | Default value         | Required          | Since Version |
 |------------------------------------------------------|-------------------------------------------------------------------------------------|-----------------------|-------------------|---------------|
-| `gravitino.iceberg-rest.gravitino-auth-type`         | The auth type to communicate with Gravitino server, supports `simple` and `oauth2`. | `simple`              | No                | 1.0.0         |
+| `gravitino.iceberg-rest.gravitino-auth-type`         | The auth type for communicating with the Gravitino server. Supported values: `simple`, `oauth2`. | `simple`              | No                | 1.0.0         |
 | `gravitino.iceberg-rest.gravitino-simple.user-name`  | The username when using `simple` auth type.                                         | `iceberg-rest-server` | No                | 1.0.0         |
 | `gravitino.iceberg-rest.gravitino-oauth2.server-uri` | The OAuth2 server uri address.                                                      | (none)                | Yes, for `oauth2` | 1.0.0         | 
 | `gravitino.iceberg-rest.gravitino-oauth2.credential` | The credential to request the OAuth2 token.                                         | (none)                | Yes, for `oauth2` | 1.0.0         | 
