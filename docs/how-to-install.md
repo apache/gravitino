@@ -4,7 +4,7 @@ slug: /how-to-install
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Install Apache Gravitino from Scratch
+## Install Apache Gravitino from a Binary Release
 
 :::note
 Apache Gravitino supports running on Java 17, and higher versions should also work but not fully tested. Make sure you have Java installed and
