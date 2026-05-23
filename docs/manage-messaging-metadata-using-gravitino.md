@@ -93,12 +93,12 @@ in relational catalog for more details. For a messaging catalog, the drop operat
 
 ### List all catalogs in a metalake
 
-Please refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
+Refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
 in relational catalog for more details. For a messaging catalog, the list operation is the same.
 
 ### List all catalogs' information in a metalake
 
-Please refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
+Refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
 in relational catalog for more details. For a messaging catalog, the list operation is the same.
 
 ## Schema operations
@@ -112,27 +112,27 @@ Gravitino supports only the Kafka catalog. Since Kafka does not support topic gr
 
 ### Create a schema
 
-Please refer to [Create a schema](./manage-relational-metadata-using-gravitino.md#create-a-schema)
+Refer to [Create a schema](./manage-relational-metadata-using-gravitino.md#create-a-schema)
 in relational catalog for more details. For a messaging catalog, the create operation is the same.
 
 ### Load a schema
 
-Please refer to [Load a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
+Refer to [Load a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
 in relational catalog for more details. For a messaging catalog, the load operation is the same.
 
 ### Alter a schema
 
-Please refer to [Alter a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
+Refer to [Alter a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
 in relational catalog for more details. For a messaging catalog, the alter operation is the same.
 
 ### Drop a schema
 
-Please refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
+Refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
 in relational catalog for more details. For a messaging catalog, the drop operation is the same.
 
 ### List all schemas under a catalog
 
-Please refer to [List all schemas under a catalog](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
+Refer to [List all schemas under a catalog](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
 in relational catalog for more details. For a messaging catalog, the list operation is the same.
 
 ## Topic operations

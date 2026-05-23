@@ -49,4 +49,4 @@ The connector provides read access and write access to data and metadata stored 
 - [COMMIT](https://trino.io/docs/current/sql/commit.html)
 - [ROLLBACK](https://trino.io/docs/current/sql/rollback.html)
 
-For more information, please refer to Trino [SQL statements support](https://trino.io/docs/current/language/sql-support.html#sql-globally-available)
+For more information, refer to Trino [SQL statements support](https://trino.io/docs/current/language/sql-support.html#sql-globally-available)

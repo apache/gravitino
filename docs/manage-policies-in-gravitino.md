@@ -16,7 +16,7 @@ metadata objects. Policies are a set of rules that can be associated with a meta
 object for data governance and similar purposes.
 
 This document provides a brief introduction to using policies in Gravitino, covering both the Gravitino Java client and 
-REST APIs. If you want to know more about the policy system in Gravitino, please refer to the
+REST APIs. If you want to know more about the policy system in Gravitino, refer to the
 Javadoc and REST API documentation.
 
 :::info

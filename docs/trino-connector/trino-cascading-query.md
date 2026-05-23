@@ -21,7 +21,7 @@ where large volumes of data need to be transmitted across networks.
 
 To set up the Trino cascading query environment, you should first deploy at least two Trino environments.
 Next, install the `Apache Gravitino Trino connector` plugin and `Gravitino Trino cascading connector` plugin into Trino.
-For detailed steps, please refer to the [Deploying Trino documentation](installation.md).
+For detailed steps, refer to the [Deploying Trino documentation](installation.md).
 
 Follow these steps:
 
@@ -62,7 +62,7 @@ Also, verify that the Trino containers on `c1-trino` and `c2-trino` can communic
 
 ## Configure Trino
 
-For detailed instructions on configuring Trino, please refer to the [Trino documentation](https://trino.io/docs/current/installation/deployment.html#configuring-trino).
+For detailed instructions on configuring Trino, refer to the [Trino documentation](https://trino.io/docs/current/installation/deployment.html#configuring-trino).
 After completing the basic configuration, proceed to configure the Gravitino connector.
 Create a `gravitino.properties` file in the `etc/catalog` directory on the `c1-trino` host with the following contents:
 

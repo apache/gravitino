@@ -16,7 +16,7 @@ filesets to manage non-tabular data like training datasets and other raw data.
 Typically, a fileset is mapped to a directory on a file system like HDFS, S3, ADLS, GCS, etc.
 With the fileset managed by Gravitino, the non-tabular data can be managed as assets together with
 tabular data in Gravitino in a unified way. The following operations will use HDFS as an example, for other
-HCFS like S3, OSS, GCS, etc., please refer to the corresponding operations [fileset-with-s3](./fileset-catalog-with-s3.md),
+HCFS like S3, OSS, GCS, etc., refer to the corresponding operations [fileset-with-s3](./fileset-catalog-with-s3.md),
 [fileset-with-oss](./fileset-catalog-with-oss.md), [fileset-with-gcs](./fileset-catalog-with-gcs.md) and
 [fileset-with-adls](./fileset-catalog-with-adls.md).
 
@@ -125,12 +125,12 @@ to drop all the schemas and filesets under the catalog before dropping the catal
 
 ### List all catalogs in a metalake
 
-Please refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
+Refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
 in relational catalog for more details. For a fileset catalog, the list operation is the same.
 
 ### List all catalogs' information in a metalake
 
-Please refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
+Refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
 in relational catalog for more details. For a fileset catalog, the list operation is the same.
 
 ## Schema operations
@@ -210,19 +210,19 @@ Gravitino supports the following schema property:
 
 ### Load a schema
 
-Please refer to [Load a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
+Refer to [Load a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
 in relational catalog for more details. For a fileset catalog, the schema load operation is the
 same.
 
 ### Alter a schema
 
-Please refer to [Alter a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
+Refer to [Alter a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
 in relational catalog for more details. For a fileset catalog, the schema alter operation is the
 same.
 
 ### Drop a schema
 
-Please refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
+Refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
 in relational catalog for more details. For a fileset catalog, the schema drop operation is the
 same.
 
@@ -233,7 +233,7 @@ the metadata of this fileset.
 
 ### List all schemas under a catalog
 
-Please refer to [List all schemas under a catalog](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
+Refer to [List all schemas under a catalog](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
 in relational catalog for more details. For a fileset catalog, the schema list operation is the
 same.
 

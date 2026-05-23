@@ -160,7 +160,7 @@ Schema schema = supportsSchemas.createSchema("hive_schema",
 </TabItem>
 </Tabs>
 
-After creating the database, you can proceed to create tables under this schema using S3 storage. For further details on table operations, please refer to [Table operations](./manage-relational-metadata-using-gravitino.md#table-operations).
+After creating the database, you can proceed to create tables under this schema using S3 storage. For further details on table operations, refer to [Table operations](./manage-relational-metadata-using-gravitino.md#table-operations).
 
 ## Access tables with S3 storage by Hive CLI
 

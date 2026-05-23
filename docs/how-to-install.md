@@ -60,7 +60,7 @@ The Gravitino binary distribution package contains the following files:
 :::note
 Catalogs `OceanBase` and `ClickHouse` are not included in the Gravitino binary distribution package (see above) by default due to package size limitations and License compatibility issues since 1.2.0.
 If you want to use these two catalogs, please build the Gravitino binary distribution package by yourself and use tarball `gravitino-<version>-bin-all.tar.gz`, which contains all catalogs including those in the `catalogs-contrib` module.
-For more details about it, please refer to [Reorg catalogs structure](https://github.com/apache/gravitino/pull/9781)
+For more details about it, refer to [Reorg catalogs structure](https://github.com/apache/gravitino/pull/9781)
 :::
 
 #### Initialize the RDBMS (Optional)
@@ -128,7 +128,7 @@ If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` env
 
 You can run the Iceberg REST server as either a standalone server or as an auxiliary service embedded in the Gravitino server. To start it as a standalone server, use the command `./bin/gravitino-iceberg-rest-server.sh start` with configurations specified in `./conf/gravitino-iceberg-rest-server.conf`. Alternatively, use `./bin/gravitino.sh start` to launch a Gravitino server that integrates both the Iceberg REST service and the Gravitino service, with all configurations centralized in `conf/gravitino.conf`. 
 
-For more detailed information about the Gravitino Iceberg REST server, please refer to [Iceberg REST server document](./iceberg-rest-service.md).
+For more detailed information about the Gravitino Iceberg REST server, refer to [Iceberg REST server document](./iceberg-rest-service.md).
 
 ## Install Apache Gravitino using Docker
 

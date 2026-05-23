@@ -81,10 +81,10 @@ The Lance REST service provides comprehensive support for namespace management, 
 | TableExists       | Check whether a table exists                                                                                                                                                       | POST        | `/lance/v1/table/{id}/exists`         | 1.1.0         |
 | RegisterTable     | Register an existing Lance table to a namespace                                                                                                                                    | POST        | `/lance/v1/table/{id}/register`       | 1.1.0         |
 | DeregisterTable   | Unregister a table from a namespace (metadata only, data remains)                                                                                                                  | POST        | `/lance/v1/table/{id}/deregister`     | 1.1.0         |
-| CreateEmptyTable  | **Deprecated**: Use `DeclareTable` instead. Declare a table and store the metadata without touching lance table data, for more, please refer to [doc](https://docs.lancedb.com/api-reference/rest/table/create-an-empty-table) | POST        | `/lance/v1/table/{id}/create-empty`   | 1.1.0         |
+| CreateEmptyTable  | **Deprecated**: Use `DeclareTable` instead. Declare a table and store the metadata without touching lance table data, for more, refer to [doc](https://docs.lancedb.com/api-reference/rest/table/create-an-empty-table) | POST        | `/lance/v1/table/{id}/create-empty`   | 1.1.0         |
 | DeclareTable      | Declare a table and store the metadata without touching lance table data. This is the preferred replacement for `CreateEmptyTable`.                                                | POST        | `/lance/v1/table/{id}/declare`        | 1.3.0         |
 
-More details, please refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
+More details, refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
 
 ### Operation Details
 
@@ -431,4 +431,4 @@ response.raise_for_status()
 
 ## Integration with Lance REST
 
-To use the Lance REST service with Apache Spark, Ray and other engines, please refer to [lance-rest-integration](./lance-rest-integration.md) for more details.
+To use the Lance REST service with Apache Spark, Ray and other engines, refer to [lance-rest-integration](./lance-rest-integration.md) for more details.

@@ -121,7 +121,7 @@ and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-
 
 #### Custom fileset
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding
-properties, for more, please refer to [Custom Fileset](./fileset-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
+properties, for more, refer to [Custom Fileset](./fileset-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
 So, if you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
 
 | Configuration item             | Description                                                                                             | Default value | Required | Since version    |
@@ -351,7 +351,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 ##### Use `OAuth` authentication
 
 If you want to use `oauth2` authentication for the Gravitino client in the Gravitino Virtual File System,
-please refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](security/security.md).
+refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](security/security.md).
 
 Then, you can configure the Hadoop configuration like this:
 
@@ -375,7 +375,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 ##### Use `Kerberos` authentication
 
 If you want to use `kerberos` authentication for the Gravitino client in the Gravitino Virtual File System,
-please refer to this document to complete the configuration of the Gravitino server: [Security](security/security.md).
+refer to this document to complete the configuration of the Gravitino server: [Security](security/security.md).
 
 Then, you can configure the Hadoop configuration like this:
 

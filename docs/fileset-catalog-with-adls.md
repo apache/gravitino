@@ -484,7 +484,7 @@ ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}
 ds.head()
 ```
 
-For other use cases, please refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
+For other use cases, refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
 ## Fileset with credential vending
 

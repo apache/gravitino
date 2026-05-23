@@ -15,7 +15,7 @@ Starting from 0.6.0, Gravitino introduces a new tag system that allows you to ma
 metadata objects. Tags are a way to categorize and organize metadata objects in Gravitino.
 
 This document briefly introduces how to use tags in Gravitino by both Gravitino Java client and
-REST APIs. If you want to know more about the tag system in Gravitino, please refer to the
+REST APIs. If you want to know more about the tag system in Gravitino, refer to the
 Javadoc and REST API documentation.
 
 Note that current tag system is a basic implementation, some advanced features will be added in

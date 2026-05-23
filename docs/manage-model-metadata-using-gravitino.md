@@ -101,12 +101,12 @@ in relational catalog for more details. For a model catalog, the drop operation 
 
 ### List all catalogs in a metalake
 
-Please refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
+Refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
 in relational catalog for more details. For a model catalog, the list operation is the same.
 
 ### List all catalogs' information in a metalake
 
-Please refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
+Refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
 in relational catalog for more details. For a model catalog, the list operation is the same.
 
 ## Schema operations
@@ -178,19 +178,19 @@ catalog.as_schemas().create_schema(name="model_schema",
 
 ### Load a schema
 
-Please refer to [Load a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
+Refer to [Load a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
 in relational catalog for more details. For a model catalog, the schema load operation is the
 same.
 
 ### Alter a schema
 
-Please refer to [Alter a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
+Refer to [Alter a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
 in relational catalog for more details. For a model catalog, the schema alter operation is the
 same.
 
 ### Drop a schema
 
-Please refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
+Refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
 in relational catalog for more details. For a model catalog, the schema drop operation is the
 same.
 
@@ -199,7 +199,7 @@ set to `true`.
 
 ### List all schemas under a catalog
 
-Please refer to [List all schemas under a catalog](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
+Refer to [List all schemas under a catalog](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
 in relational catalog for more details. For a model catalog, the schema list operation is the
 same.
 
