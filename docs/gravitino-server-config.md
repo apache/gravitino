@@ -425,7 +425,7 @@ You could put HDFS configuration file to the catalog properties configuration di
 
 ## Docker Instructions
 
-You could run Gravitino server though docker container:
+Run the Gravitino server in a Docker container:
 
 ```shell
 docker run -d -p 8090:8090 apache/gravitino:latest

@@ -676,13 +676,13 @@ Normally you will see the output like `{"defaults":{},"overrides":{}, "endpoints
 
 ## Docker Instructions
 
-You could run Gravitino Iceberg REST server through docker container:
+Run the Gravitino Iceberg REST server in a Docker container:
 
 ```shell
 docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:latest
 ```
 
-Gravitino Iceberg REST server in docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, refer to [storage section](#storage) for more details.
+Gravitino Iceberg REST server in the Docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, refer to [storage section](#storage) for more details.
 
 | Environment variables                  | Configuration items                                 | Since version    |
 |----------------------------------------|-----------------------------------------------------|------------------|

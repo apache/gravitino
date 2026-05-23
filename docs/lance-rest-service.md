@@ -193,7 +193,7 @@ Access the service at `http://localhost:9101`.
 
 :::tip Configuration Tips
 - **Required:** Set `LANCE_REST_GRAVITINO_METALAKE_NAME` to your Gravitino metalake name
-- **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost` in the docker instance.
+- **Conditional:** Update `LANCE_REST_GRAVITINO_URI` if Gravitino server is not on `localhost` in the Docker instance.
 - **Optional:** Other variables can use default values unless you have specific requirements
 :::
 
