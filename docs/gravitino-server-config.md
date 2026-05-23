@@ -46,21 +46,21 @@ You can also specify filter parameters by setting configuration entries of the f
 
 #### Storage backend configuration
 
-Currently, Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
+Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
 If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. It's highly recommended using MySQL as the backend database.  
 
 The following table lists the storage configuration items:
 
 | Configuration item                                | Description                                                                                                                                                                                                                                             | Default value                     | Required                                        | Since version    |
 |---------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|-------------------------------------------------|------------------|
-| `gravitino.entity.store`                          | Which entity storage implementation to use. Only`relational` storage is currently supported.                                                                                                                                                            | `relational`                      | No                                              | 0.1.0            |
+| `gravitino.entity.store`                          | Which entity storage implementation to use. Only`relational` storage is supported.                                                                                                                                                            | `relational`                      | No                                              | 0.1.0            |
 | `gravitino.entity.store.maxTransactionSkewTimeMs` | The maximum skew time of transactions in milliseconds.                                                                                                                                                                                                  | `2000`                            | No                                              | 0.3.0            |
 | `gravitino.entity.store.deleteAfterTimeMs`        | The maximum time in milliseconds that deleted and old-version data is kept. Set to at least 10 minutes and no longer than 30 days.                                                                                                                      | `604800000`(7 days)               | No                                              | 0.5.0            |
 | `gravitino.entity.store.versionRetentionCount`    | The Count of versions allowed to be retained, including the current version, used to delete old versions data. Set to at least 1 and no greater than 10.                                                                                                | `1`                               | No                                              | 0.5.0            |
 | `gravitino.entityChangeLog.pollIntervalSecs`      | The interval in seconds for polling the entity change log. The poller invalidates stale local caches (e.g. the catalog cache) across HA nodes by consuming change log records. Must be positive.                                                        | `3`                               | No                                              | 1.3.0            |
 | `gravitino.entityChangeLog.retentionSecs`         | The retention time in seconds for entity change log rows. Expired rows are pruned periodically. Set to `0` to disable automatic cleanup. Must be non-negative.                                                                                          | `86400`(1 day)                    | No                                              | 1.3.0            |
 | `gravitino.entityChangeLog.cleanupIntervalSecs`   | The interval in seconds for pruning expired entity change log rows. Must be positive.                                                                                                                                                                   | `3600`(1 hour)                    | No                                              | 1.3.0            |
-| `gravitino.entity.store.relational`               | Detailed implementation of Relational storage. `H2`, `MySQL` and `PostgreSQL` is currently supported, and the implementation is `JDBCBackend`.                                                                                                          | `JDBCBackend`                     | No                                              | 0.5.0            |
+| `gravitino.entity.store.relational`               | Detailed implementation of Relational storage. `H2`, `MySQL` and `PostgreSQL` is supported, and the implementation is `JDBCBackend`.                                                                                                          | `JDBCBackend`                     | No                                              | 0.5.0            |
 | `gravitino.entity.store.relational.jdbcUrl`       | The database url that the `JDBCBackend` needs to connect to. If you use `MySQL` or `PostgreSQL`, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/{DATABASE_TYPE}/` directory. | `jdbc:h2`                         | No                                              | 0.5.0            |
 | `gravitino.entity.store.relational.jdbcDriver`    | The jdbc driver name that the `JDBCBackend` needs to use. You should place the driver Jar package in the `${GRAVITINO_HOME}/libs/` directory.                                                                                                           | `org.h2.Driver`                   | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
 | `gravitino.entity.store.relational.jdbcUser`      | The username that the `JDBCBackend` needs to use when connecting the database. It is required for `MySQL`.                                                                                                                                              | `gravitino`                       | Yes if the jdbc connection url is not `jdbc:h2` | 0.5.0            |
@@ -134,7 +134,7 @@ All cache entries are subject to a TTL (Time-To-Live) expiration policy. By defa
 
 ### Tree lock configuration
 
-Gravitino server uses tree lock to ensure the consistency of the data. The tree lock is a memory lock (Currently, Gravitino only supports in memory lock) that can be used to ensure the consistency of the data in Gravitino server. The configuration items are as follows:
+Gravitino server uses tree lock to ensure the consistency of the data. The tree lock is a memory lock (Gravitino only supports in memory lock) that can be used to ensure the consistency of the data in Gravitino server. The configuration items are as follows:
 
 | Configuration item                   | Description                                                   | Default value | Required | Since Version |
 |--------------------------------------|---------------------------------------------------------------|---------------|----------|---------------|
@@ -511,7 +511,7 @@ The Gravitino server supports configuring runtime environment variables in two w
 
 ### How to access Apache Hadoop
 
-Currently, due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
+Due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
 Apache Hadoop access. Ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
 permissions; otherwise, you may encounter a `Permission denied` error. There are two ways to resolve this error:
 

@@ -76,7 +76,7 @@ See [Gravitino web UI](./webui.md) for details.
 
 Gravitino also provides a Command Line Interface (CLI) to manage the metadata. See [Gravitino CLI](./cli.md) for details.
 
-Gravitino currently supports the following catalogs:
+Gravitino supports the following catalogs:
 
 **Relational catalogs:**
 

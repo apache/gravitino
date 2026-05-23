@@ -25,7 +25,7 @@ create_catalog(CATALOG varchar, PROVIDER varchar, PROPERTIES MAP(VARCHAR, VARCHA
 ```
 
 - CATALOG: The catalog name to be created.
-- PROVIDER: The catalog provider, currently only supports `hive`, `lakehouse-iceberg`, `jdbc-mysql`, `jdbc-postgresql`.
+- PROVIDER: The catalog provider, supports only `hive`, `lakehouse-iceberg`, `jdbc-mysql`, `jdbc-postgresql`.
 - PROPERTIES: The properties of the catalog.
 - IGNORE_EXIST: The flag to ignore the error if the catalog already exists. It's optional, the default value is `false`.
 
@@ -117,7 +117,7 @@ call gravitino.system.alter_catalog(
 );
 ```
 
-if you need more information about catalog, please refer to:
+If you need more information about catalog, please refer to:
 [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog).
 
 ## Passing Trino connector configuration

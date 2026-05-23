@@ -35,10 +35,10 @@ For Lance tables in a Generic Lakehouse Catalog, the following table summarizes 
 | Purge     | ✅ Full          |
 
 :::note Feature Limitations
-- **Partitioning:** Not currently supported
-- **Sort Orders:** Not currently supported
-- **Distributions:** Not currently supported
-- **Indexes:** Not currently supported
+- **Partitioning:** Not supported
+- **Sort Orders:** Not supported
+- **Distributions:** Not supported
+- **Indexes:** Not supported
 :::
 
 ### Data Type Mappings
@@ -103,8 +103,8 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 
 | Property              | Description                                                                                                                                                                                                                                                                                                                                     | Default  | Required     | Since Version |
 |-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|---------------|
-| `format`              | Table format: `lance`, currently only `lance` is fully supported.                                                                                                                                                                                                                                                                               | (none)   | Yes          | 1.1.0         |
-| `location`            | Storage path for table metadata and data, Lance currently supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                       | (none)   | Conditional* | 1.1.0         |
+| `format`              | Table format: `lance`, only `lance` is fully supported.                                                                                                                                                                                                                                                                               | (none)   | Yes          | 1.1.0         |
+| `location`            | Storage path for table metadata and data, Lance supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                       | (none)   | Conditional* | 1.1.0         |
 | `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both.                                                                                        | false    | No           | 1.1.0         |
 | `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` or `OVERWRITE` for registering tables                                                                                                                                                                                                   | `CREATE` | No           | 1.1.0         |
 | `lance.register`      | Whether it is a register table operation. If it's `true`, This API will not create data directory actually and it's the user's responsibility to create and manage the data directory. `false` it will actually create a table.                                                                                                                 | false    | No           | 1.1.0         |

@@ -10,7 +10,7 @@ license: 'This software is licensed under the Apache License version 2.'
 
 This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.
 
-Currently, the CLI allows users to view, create and update metadata information for metalakes, catalogs, schemas, tables, models, columns, users, roles, groups, tags, topics and filesets. Future updates will expand on these capabilities.
+The CLI allows users to view, create and update metadata information for metalakes, catalogs, schemas, tables, models, columns, users, roles, groups, tags, topics and filesets. Future updates will expand on these capabilities.
 
 ## Running the CLI
 
@@ -459,7 +459,7 @@ gcli.sh schema create --name catalog_postgres.new_db
 gcli.sh schema properties --name catalog_postgres.hr
 ```
 
-Setting and removing schema properties is not currently supported by the Java API or the Gravitino CLI.
+Setting and removing schema properties is not supported by the Java API or the Gravitino CLI.
 
 ### Table commands
 
@@ -912,7 +912,7 @@ gcli.sh fileset remove --name hadoop.schema.fileset --property test
 
 Note that some commands are not supported depending on what the database supports.
 
-When setting the datatype of a column the following basic types are currently supported:
+When setting the datatype of a column the following basic types are supported:
 null, boolean, byte, ubyte, short, ushort, integer, uinteger, long, ulong, float, double, date, time, timestamp, tztimestamp, intervalyear, intervalday, uuid, string, binary
 
 In addition decimal(precision,scale), fixed(length), fixedchar(length) and varchar(length).

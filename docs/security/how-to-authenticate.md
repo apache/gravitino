@@ -139,7 +139,7 @@ GravitinoClient client = GravitinoClient.builder(uri)
 ```
 
 :::info
-Currently, the Iceberg REST service does not support Kerberos authentication.
+The Iceberg REST service does not support Kerberos authentication.
 The URI must be the server's hostname instead of its IP address.
 :::
 

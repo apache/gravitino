@@ -141,7 +141,7 @@ FunctionExpression[] functionExpressions =
 
 ## Unparsed expression
 
-Unparsed expression is a special type of expression, currently serves exclusively for presenting the default value of a column when it's unsolvable.
+Unparsed expression is a special type of expression, serves exclusively for presenting the default value of a column when it's unsolvable.
 The following shows the data structure of an unparsed expression in JSON and Java, enabling easy retrieval of its value.
 
 <Tabs groupId='language' queryString>

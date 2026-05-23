@@ -18,7 +18,7 @@ take advantage of relational storage to manage metadata.
 
 ### What kind of backend storage is supported
 
-Currently, relational backend storage supports the `JDBCBackend`, and `H2`, `MySQL` and `PostgreSQL` are supported currently for `JDBCBackend`, `H2` is the
+Relational backend storage supports the `JDBCBackend`, and `H2`, `MySQL` and `PostgreSQL` are supported for `JDBCBackend`, `H2` is the
 default storage for `JDBCBackend`.
 
 ## How to use H2

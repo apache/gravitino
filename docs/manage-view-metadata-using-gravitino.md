@@ -24,7 +24,7 @@ support, see:
 
 Unlike tables, views define query output and one or more representations, but do not manage
 partitions, sort orders, indexes, or physical storage locations. The representation model is
-extensible, but currently only SQL representations are supported.
+extensible, but only SQL representations are supported.
 
 To use view management, please make sure that:
 
@@ -128,7 +128,7 @@ Use the following fields when creating a view:
 
 - `columns`: Defines the output schema of the view.
 - `representations`: Provides one or more SQL definitions. The API uses the extensible
-  `Representation` model, but currently only the `sql` type is supported, which maps to
+  `Representation` model, but only the `sql` type is supported, which maps to
   `SQLRepresentation` in Java.
 - `defaultCatalog` and `defaultSchema`: Optionally define how unqualified identifiers in the SQL
   text are resolved for dialects that use them. For the `hive` dialect in Hive catalogs, both
@@ -213,7 +213,7 @@ View view = viewCatalog.alterView(
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following changes to a view:
+Gravitino supports the following changes to a view:
 
 | Supported modification                                 | REST / JSON                                                                                                    | Java                                                                                                  |
 |--------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
