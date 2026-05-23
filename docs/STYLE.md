@@ -46,6 +46,7 @@ Code identifiers (class names, method names, config keys, CLI flags) stay in the
 - Prefer **engine** over "compute" when referring to query engines (Trino, Spark, Flink).
 - Prefer **credential vending** over "credential issuing" or "credential generation" in IRC context.
 - **OSI** stands for Open Semantic Catalog in Gravitino docs, not Open Systems Interconnection.
+- Use **pushdown** (one word) for the noun and adjective forms ("supports pushdown", "predicate pushdown"). Reserve "push down" (two words) for the rare phrasal-verb use ("the engine pushes the filter down"). Do not use the hyphenated "push-down".
 
 ## Initialisms
 
