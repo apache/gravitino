@@ -7,16 +7,17 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-The Apache Gravitino Flink connector implements the [Catalog Store](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/dev/table/catalogs/#catalog-store) to manage the catalogs under Gravitino.
-This capability allows users to perform federation queries, accessing data from various catalogs through a unified interface and consistent access control.
+The Apache Gravitino Flink connector implements the [catalog store](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/dev/table/catalogs/#catalog-store) interface to manage catalogs under Gravitino. This lets users run federation queries across catalogs through a unified interface with consistent access control.
 
 ## Capabilities
 
-1. Supports [Hive catalog](flink-catalog-hive.md)
-2. Supports [Iceberg catalog](flink-catalog-iceberg.md)
-3. Supports [Paimon catalog](flink-catalog-paimon.md)
-4. Supports [Jdbc catalog](flink-catalog-jdbc.md)
-5. Supports most DDL and DML SQLs.
+The Flink connector supports:
+
+- [Hive catalog](flink-catalog-hive.md)
+- [Iceberg catalog](flink-catalog-iceberg.md)
+- [Paimon catalog](flink-catalog-paimon.md)
+- [JDBC catalog](flink-catalog-jdbc.md)
+- Most DDL and DML SQL statements.
 
 ## Prerequisites
 

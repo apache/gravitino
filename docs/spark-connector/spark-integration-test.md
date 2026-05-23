@@ -7,26 +7,25 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-There are two types of integration tests in spark connector, normal integration test like `SparkXXCatalogIT`, and the golden file integration test.
+The Spark connector has two kinds of integration tests: normal integration tests (such as `SparkXXCatalogIT`) and golden-file integration tests.
 
-## Normal Integration Test
+## Normal Integration Tests
 
-Normal integration test are mainly used to test the correctness of the metadata, it's enabled in the GitHub CI. You could run tests with specific Spark version like:
+Normal integration tests check the correctness of the metadata. They run in GitHub CI. To run them against a specific Spark version:
 
 ```
 ./gradlew :spark-connector:spark-3.3:test --tests "org.apache.gravitino.spark.connector.integration.test.hive.SparkHiveCatalogIT33.testCreateHiveFormatPartitionTable"
 ```
 
-## Golden File Integration Test
+## Golden-file Integration Tests
 
-Golden file integration test are mainly to test the correctness of the SQL result with massive data, it's disabled in the GitHub CI, you could run tests with following command:
+Golden-file integration tests check the correctness of SQL results against larger datasets. They are disabled in GitHub CI. Run them with:
 
 ```
 ./gradlew :spark-connector:spark-3.3:test --tests  "org.apache.gravitino.spark.connector.integration.test.sql.SparkSQLRegressionTest33" -PenableSparkSQLITs
 ```
 
-Please change the Spark version number if you want to test other Spark versions.
-If you want to change the test behaviour, modify `spark-connector/spark-common/src/test/resources/spark-test.conf`.
+Change the Spark version number to test other versions. To change test behavior, modify `spark-connector/spark-common/src/test/resources/spark-test.conf`.
 
 | Configuration item                         | Description                                                                                                                                                                            | Default value                                        | Required | Since Version    |
 |--------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|----------|------------------|

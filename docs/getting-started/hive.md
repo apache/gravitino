@@ -6,13 +6,9 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-To install Apache Hive and Hadoop on Google Cloud Platform manually,
-follow [Apache Hive](https://cwiki.apache.org/confluence/display/Hive/) and
-[Hadoop](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SingleCluster.html).
+To install Apache Hive and Hadoop on Google Cloud Platform manually, follow the [Apache Hive](https://cwiki.apache.org/confluence/display/Hive/) and [Hadoop](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SingleCluster.html) documentation.
 
-Installing and configuring Hive can be a little complex.
-If you don't already have Hive set up and running, you can use the Docker container
-that Datastrato provides to get Gravitino up and running.
+Installing and configuring Hive can be complex. If you don't already have Hive running, use the Apache Gravitino playground Docker image instead.
 
 Follow these instructions for setting up
 [Docker on Ubuntu](https://docs.docker.com/engine/install/ubuntu/).

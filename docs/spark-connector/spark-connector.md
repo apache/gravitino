@@ -7,13 +7,15 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface to facilitate the management of diverse catalogs under Gravitino. This capability allows users to perform federation queries, accessing data from various catalogs through a unified interface and consistent access control.
+The Apache Gravitino Spark connector uses the Spark DataSourceV2 interface to manage catalogs through Gravitino. This lets users run federation queries across catalogs through a unified interface with consistent access control.
 
 ## Capabilities
 
-1. Supports [Hive catalog](spark-catalog-hive.md), [Iceberg catalog](spark-catalog-iceberg.md), [Paimon catalog](spark-catalog-paimon.md) and [Jdbc catalog](spark-catalog-jdbc.md).
-2. Supports federation query.
-3. Supports most DDL and DML SQLs.
+The Spark connector supports:
+
+- [Hive catalog](spark-catalog-hive.md), [Iceberg catalog](spark-catalog-iceberg.md), [Paimon catalog](spark-catalog-paimon.md), and [JDBC catalog](spark-catalog-jdbc.md).
+- Federation queries.
+- Most DDL and DML SQL statements.
 
 ## Requirement
 

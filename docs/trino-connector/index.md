@@ -9,7 +9,7 @@ license: "This software is licensed under the Apache License version 2."
 
 Apache Gravitino Trino connector index:
 
-- [Trino Support](trino-connector.md)
+- [Trino support](trino-connector.md)
   - [Requirements](requirements.md)
   - [Installation](installation.md)
   - [Configuration](configuration.md)

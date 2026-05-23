@@ -7,7 +7,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-Spark connector supports `simple` `oauth2` and `kerberos` authentication when accessing Gravitino server.
+The Spark connector supports `simple`, `oauth2`, and `kerberos` authentication when accessing the Gravitino server.
 
 | Property                     | Type   | Default Value | Description                                                                                                         | Required | Since Version    |
 |------------------------------|--------|---------------|---------------------------------------------------------------------------------------------------------------------|----------|------------------|
@@ -15,14 +15,15 @@ Spark connector supports `simple` `oauth2` and `kerberos` authentication when ac
 
 ## Simple Mode
 
-In the simple mode, the username originates from Spark, and is obtained using the following sequences:
-1. The environment variable of `SPARK_USER`
-2. The environment variable of `HADOOP_USER_NAME`
-3. The user login in the machine
+In simple mode, the username comes from Spark and is resolved in this order:
+
+1. The `SPARK_USER` environment variable.
+2. The `HADOOP_USER_NAME` environment variable.
+3. The current OS user.
 
 ## OAuth2 Mode
 
-In the OAuth2 mode, you could use the following configuration to fetch an OAuth2 token to access Gravitino server.
+In OAuth2 mode, use the following configuration to fetch an OAuth2 token for accessing the Gravitino server.
 
 | Property                              | Type   | Default Value | Description                                   | Required             | Since Version    |
 |---------------------------------------|--------|---------------|-----------------------------------------------|----------------------|------------------|
@@ -33,7 +34,6 @@ In the OAuth2 mode, you could use the following configuration to fetch an OAuth2
 
 ## Kerberos Mode
 
-In kerberos mode, you could use the Spark kerberos configuration to fetch a kerberos ticket to access Gravitino server, use `spark.kerberos.principal`, `spark.kerberos.keytab` to specify kerberos principal and keytab.
+In Kerberos mode, use the Spark Kerberos configuration to fetch a Kerberos ticket for accessing the Gravitino server. Set `spark.kerberos.principal` and `spark.kerberos.keytab` to specify the principal and keytab.
 
-The Gravitino server principal has the form `HTTP/$host@$realm`. Keep `$host` consistent with the host in the Gravitino server URI.
-Please make sure `krb5.conf` is accessible by Spark, like by specifying the configuration `spark.driver.extraJavaOptions="-Djava.security.krb5.conf=/xx/krb5.conf"`.
+The Gravitino server principal has the form `HTTP/$host@$realm`. Keep `$host` consistent with the host in the Gravitino server URI. Make sure `krb5.conf` is accessible from Spark, for example by setting `spark.driver.extraJavaOptions="-Djava.security.krb5.conf=/xx/krb5.conf"`.
