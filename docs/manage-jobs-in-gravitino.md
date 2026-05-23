@@ -146,7 +146,7 @@ Here is a brief description of the fields in the Spark job template:
 Note that:
 
 1. The `executable`, `jars`, `files`, and `archives` must be accessible by the Gravitino server.
-   Gravitino support accessing files from the local file system, HTTP(S) URLs, and
+   Gravitino supports accessing files from the local file system, HTTP(S) URLs, and
    FTP(S) URLs (more distributed file system supports will be added in the future). So the
    `executable`, `jars`, `files`, and `archives` can be a local file path, or a URL like
    `http://example.com/my_spark_app.jar`.

@@ -170,7 +170,7 @@ Tag tag = client.alterTag(
 </TabItem>
 </Tabs>
 
-Gravitino support the following tag changes:
+Gravitino supports the following tag changes:
 
 | Supported modification | JSON                                                         | Java                                      |
 |------------------------|--------------------------------------------------------------|-------------------------------------------|
