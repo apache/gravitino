@@ -1,13 +1,13 @@
 ---
-title: "Authorization Push-down"
-slug: /security/authorization-push-down
+title: "Authorization Pushdown"
+slug: /security/authorization-pushdown
 keyword: security
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Authorization Push-down
+## Authorization Pushdown
 
-![authorization push down](../assets/security/authorization-pushdown.png)
+![authorization pushdown](../assets/security/authorization-pushdown.png)
 
 Gravitino offers a set of authorization frameworks that integrate with various underlying data source permission systems, such as MySQL's native permission management and Apache Ranger for big data. These frameworks align with Gravitino's own authorization model and methodology.
 Gravitino manages different data sources through Catalogs, and when a user performs an authorization operation on data within a Catalog, Gravitino invokes the Authorization Plugin module for that Catalog.
