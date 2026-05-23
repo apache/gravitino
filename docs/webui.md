@@ -173,7 +173,7 @@ Creating a catalog requires these fields:
 
 > Required properties in various providers
 
-###### 1. type `relational`
+###### 1. Type `relational`
 
 <Tabs>
   <TabItem value='hive' label='Hive'>
@@ -363,7 +363,7 @@ Creating a catalog requires these fields:
   </TabItem>
 </Tabs>
 
-###### 2. type `fileset`
+###### 2. Type `fileset`
 
 <Tabs>
   <TabItem value='fileset' label='Fileset'>
@@ -374,7 +374,7 @@ Creating a catalog requires these fields:
   </TabItem>
 </Tabs>
 
-###### 3. type `messaging`
+###### 3. Type `messaging`
 
 <Tabs>
   <TabItem value='kafka' label='Kafka'>
