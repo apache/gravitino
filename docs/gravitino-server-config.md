@@ -40,7 +40,7 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 | `gravitino.server.visibleConfigs`                    | List of configs that are visible in the config servlet                                                                                                                                | (none)                                                                       | No       | 0.9.0-incubating |
 
 The filter in the customFilters should be a standard javax servlet filter.
-Also, specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
+Specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
 
 ### Storage Configuration
 

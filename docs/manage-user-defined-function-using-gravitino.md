@@ -340,7 +340,7 @@ functions = catalog.as_function_catalog().list_functions(
 </TabItem>
 </Tabs>
 
-Also, list functions with detailed information by adding the `details` query parameter.
+List functions with detailed information by adding the `details` query parameter.
 This returns the full function objects instead of just the identifiers.
 
 <Tabs groupId="language" queryString>

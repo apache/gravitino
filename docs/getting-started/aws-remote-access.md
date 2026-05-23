@@ -32,5 +32,5 @@ To access Hive you need to open port 10000 in the security group.
 
 After completing these steps, you can access the Gravitino REST interface
 from the command line or a web browser on your local computer.
-Also, connect to Hive via DBeaver or any other database IDE.
+Connect to Hive via DBeaver or any other database IDE.
 
