@@ -36,7 +36,7 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 Only supports Paimon FilesystemCatalog on HDFS now.
 :::
 
-#### Not Supported Operations
+#### Unsupported Operations
 
 - `ALTER NAMESPACE`
   - Paimon does not support alter namespace.

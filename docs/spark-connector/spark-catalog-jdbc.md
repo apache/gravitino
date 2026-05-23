@@ -27,7 +27,7 @@ Supports MySQL and PostgreSQL. For OceanBase which is compatible with Mysql Dial
   JDBCTable does not support distributed transaction. When writing data to RDBMS, each task is an independent transaction. If some tasks of spark succeed and some tasks fail, dirty data is generated.
   :::
 
-#### Not Supported Operations
+#### Unsupported Operations
 
 - `UPDATE`
 - `DELETE`

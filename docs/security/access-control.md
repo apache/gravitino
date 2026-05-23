@@ -1233,7 +1233,7 @@ client.setOwner(table, "user1", "USER");
 
 ## Example
 
-Follow the steps to achieve the authorization of Gravitino.
+Follow these steps to set up authorization in Gravitino:
 
 ![concept_workflow_image](../assets/security/workflow.png)
 
