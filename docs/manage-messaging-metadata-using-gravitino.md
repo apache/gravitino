@@ -18,9 +18,9 @@ To use messaging catalog, please make sure that:
  - Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
  - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).
 
-## Catalog operations
+## Catalog Operations
 
-### Create a catalog
+### Create a Catalog
 
 :::tip
 For a messaging catalog, you must specify the `type` as `messaging` when creating a catalog.
@@ -76,32 +76,32 @@ Gravitino supports the following catalog providers:
 |------------------|-----------------------------------------------------------------|
 | `kafka`          | [Kafka catalog property](./kafka-catalog.md#catalog-properties) |
 
-### Load a catalog
+### Load a Catalog
 
 Refer to [Load a catalog](./manage-relational-metadata-using-gravitino.md#load-a-catalog)
 in relational catalog for more details. For a messaging catalog, the load operation is the same.
 
-### Alter a catalog
+### Alter a Catalog
 
 Refer to [Alter a catalog](./manage-relational-metadata-using-gravitino.md#alter-a-catalog)
 in relational catalog for more details. For a messaging catalog, the alter operation is the same.
 
-### Drop a catalog
+### Drop a Catalog
 
 Refer to [Drop a catalog](./manage-relational-metadata-using-gravitino.md#drop-a-catalog)
 in relational catalog for more details. For a messaging catalog, the drop operation is the same.
 
-### List all catalogs in a metalake
+### List All Catalogs in a Metalake
 
 Refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
 in relational catalog for more details. For a messaging catalog, the list operation is the same.
 
-### List all catalogs' information in a metalake
+### List All Catalogs' Information in a Metalake
 
 Refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
 in relational catalog for more details. For a messaging catalog, the list operation is the same.
 
-## Schema operations
+## Schema Operations
 
 `Schema` is a logical grouping of topics in a messaging catalog, if the messaging system does not support topics grouping, 
 schema operations are not supported but a "default" schema will be automatically created to include all topics
@@ -110,38 +110,38 @@ schema operations are not supported but a "default" schema will be automatically
 Gravitino supports only the Kafka catalog. Since Kafka does not support topic grouping, only list and load operations are supported for schema.
 :::
 
-### Create a schema
+### Create a Schema
 
 Refer to [Create a schema](./manage-relational-metadata-using-gravitino.md#create-a-schema)
 in relational catalog for more details. For a messaging catalog, the create operation is the same.
 
-### Load a schema
+### Load a Schema
 
 Refer to [Load a schema](./manage-relational-metadata-using-gravitino.md#load-a-schema)
 in relational catalog for more details. For a messaging catalog, the load operation is the same.
 
-### Alter a schema
+### Alter a Schema
 
 Refer to [Alter a schema](./manage-relational-metadata-using-gravitino.md#alter-a-schema)
 in relational catalog for more details. For a messaging catalog, the alter operation is the same.
 
-### Drop a schema
+### Drop a Schema
 
 Refer to [Drop a schema](./manage-relational-metadata-using-gravitino.md#drop-a-schema)
 in relational catalog for more details. For a messaging catalog, the drop operation is the same.
 
-### List all schemas under a catalog
+### List All Schemas Under a Catalog
 
 Refer to [List all schemas under a catalog](./manage-relational-metadata-using-gravitino.md#list-all-schemas-under-a-catalog)
 in relational catalog for more details. For a messaging catalog, the list operation is the same.
 
-## Topic operations
+## Topic Operations
 
 :::tip
 Users should create a metalake, a catalog and a schema, then ensure that the metalake and catalog are enabled before operating topics.
 :::
 
-### Create a topic
+### Create a Topic
 
 Create a topic by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics`
 endpoint or use the Gravitino Java client. The following is an example of creating a topic:
@@ -190,7 +190,7 @@ topicCatalog.createTopic(
 </TabItem>
 </Tabs>
 
-### Alter a topic
+### Alter a Topic
 
 Modify a topic by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics/{topic_name}`
 endpoint or use the Gravitino Java client. The following is an example of altering a topic:
@@ -241,7 +241,7 @@ Gravitino supports the following changes to a topic:
 | Set a topic property    | `{"@type":"setProperty","property":"key1","value":"value1"}` | `TopicChange.setProperty("key1", "value1")` |
 | Remove a topic property | `{"@type":"removeProperty","property":"key1"}`               | `TopicChange.removeProperty("key1")`        |
 
-### Drop a topic
+### Drop a Topic
 
 Remove a topic by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/topics/{topic_name}` endpoint or by using the
@@ -274,7 +274,7 @@ topicCatalog.dropTopic(NameIdentifier.of("default", "topic"));
 </TabItem>
 </Tabs>
 
-### List all topics under a schema
+### List All Topics Under a Schema
 
 List all topics in a schema by sending a `GET` request to the `/api/metalakes/
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics` endpoint or by using the

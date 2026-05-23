@@ -21,7 +21,7 @@ ClickHouse catalog is not included in the standard Gravitino server distribution
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 | Item              | Description                                                                                                                                                                                                   |
 |-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -31,7 +31,7 @@ ClickHouse catalog is not included in the standard Gravitino server distribution
 | Drivers           | Requires user-provided ClickHouse JDBC driver in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`, please download the jar from [link](https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/) |
 | Supported version | All the codes are tested by ClickHouse `24.8.14`, newer versions like `25.x` may also work but we did not conduct thorough tests. Report to the community if something does not work as expected.             |                                                
 
-### ClickHouse server and JDBC driver compatibility matrix
+### ClickHouse Server and JDBC Driver Compatibility Matrix
 
 | ClickHouse version             | Supported ClickHouse JDBC driver versions |
 |--------------------------------|-------------------------------------------|
@@ -42,7 +42,7 @@ For other ClickHouse versions (not 24.8.x), the required JDBC driver version may
 Use your staging validation results and the official ClickHouse documentation as the final reference.
 :::
 
-### Catalog properties
+### Catalog Properties
 
 Pass any JDBC pool property that Gravitino does not define by adding the `gravitino.bypass.` prefix (for example `gravitino.bypass.maxWaitMillis`). See [commons-dbcp configuration](https://commons.apache.org/proper/commons-dbcp/configuration.html) for details.
 
@@ -58,7 +58,7 @@ When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-us
 | `jdbc.pool.max-size`    | Maximum pool size                                                           | `10`          | No       | 1.2.0         |
 | `jdbc.pool.max-wait-ms` | Max wait time for a connection                                              | `30000`       | No       | 1.2.0         |
 
-### Create a ClickHouse catalog
+### Create a ClickHouse Catalog
 
 The following example creates a ClickHouse catalog with the required JDBC properties and optional connection pool settings. Note that the `jdbc-driver` class must be available in the Gravitino classpath (for example by placing the ClickHouse JDBC driver JAR in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`).
 Description about some of the properties:
@@ -111,7 +111,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 | Item         | Description                                                        |
 |--------------|--------------------------------------------------------------------|
@@ -120,7 +120,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 | Comments     | Schema comments supported                                          |
 | Cluster mode | Optional `ON CLUSTER` for creation when `cluster-name` is provided |
 
-### Schema properties
+### Schema Properties
 
 | Property Name  | Description                                                                        | Default Value | Required | Immutable | Since version |
 |----------------|------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
@@ -131,7 +131,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 **Cluster properties only reflect Gravitino-managed schemas.** Gravitino embeds the cluster name inside the schema's `COMMENT` field at creation time (because `SHOW CREATE DATABASE` does not include `ON CLUSTER` for standard Atomic databases). Schemas created outside Gravitino will not have this metadata, so `on-cluster` and `cluster-name` will be absent when loaded, and `DROP SCHEMA` will not propagate `ON CLUSTER` to other cluster nodes.
 :::
 
-### Create a schema
+### Create a Schema
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -165,7 +165,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 | Area                | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 |---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -177,7 +177,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 | Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                                                                                                                                                                                                                                                                          |
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type      | ClickHouse Type                        |
 |---------------------|----------------------------------------|
@@ -201,7 +201,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 Other ClickHouse types are exposed as [External Type](./manage-relational-metadata-using-gravitino.md#external-type).
 
-### Table properties
+### Table Properties
 
 :::note
 - `settings.*` keys are passed to the ClickHouse `SETTINGS` clause verbatim.
@@ -236,14 +236,14 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 \* Required when `on-cluster=true` or `engine=Distributed`.  
 \*\* Required when `engine=Distributed`.
 
-### Table indexes
+### Table Indexes
 
 - `PRIMARY_KEY`
 - Data-skipping indexes:
   - `DATA_SKIPPING_MINMAX` (`GRANULARITY` fixed to 1)
   - `DATA_SKIPPING_BLOOM_FILTER` (`GRANULARITY` fixed to 3)
 
-### Partitioning, sorting, and distribution
+### Partitioning, Sorting, and Distribution
 
 - `ORDER BY`: required for MergeTree-family engines and only columns identity are supported;
    - Accept format: `id`, `(id, name)`, `(func(id), name)`, `func(id)`;
@@ -257,7 +257,7 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 
 - Distribution: fixed to `Distributions.NONE`. For a `Distributed` engine table, you can specify the sharding key and remote database/table through table properties to fulfill the same use cases. We will later consider adding more flexible distribution strategies if there is demand.
 
-### Create a table
+### Create a Table
 
 The following example creates a `MergeTree` table with `ORDER BY`, partitioning, indexes, comments, and properties including `ON CLUSTER`. Note that the `engine` property is required for MergeTree-family tables, and that the cluster properties must align with the schema-level cluster settings if `on-cluster=true`.
 
@@ -339,7 +339,7 @@ tableCatalog.createTable(
 </TabItem>
 </Tabs>
 
-### Table operations
+### Table Operations
 
 Supported:
 - Create table with engine, `ORDER BY`, optional partition, indexes, comments, default values, and `SETTINGS`.

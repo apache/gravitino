@@ -12,7 +12,7 @@ import TabItem from '@theme/TabItem';
 This page introduces the expression system of Apache Gravitino. Expressions are vital component of metadata definition, through expressions, you can define [default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value) for columns, function arguments for [function partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning), [bucketing](./table-partitioning-distribution-sort-order-indexes.md#table-distribution), and sort term of [sort ordering](./table-partitioning-distribution-sort-order-indexes.md#sort-ordering) in tables.
 Gravitino expression system divides expressions into three basic parts: field reference, literal, and function. Function expressions can contain field references, literals, and other function expressions.
 
-## Field reference
+## Field Reference
 
 Field reference is a reference to a field in a table.
 The following is an example of creating a field reference expression, demonstrating how to create a reference for the `student` field.
@@ -90,7 +90,7 @@ Literal<?>[] literals =
   </TabItem>
 </Tabs>
 
-## Function expression
+## Function Expression
 
 Function expression represents a function call with/without arguments. The arguments can be field references, literals, or other function expressions.
 The following is an example of creating a function expression, demonstrating how to create function expressions for `rand()` and `date_trunc('year', birthday)`.
@@ -139,7 +139,7 @@ FunctionExpression[] functionExpressions =
   </TabItem>
 </Tabs>
 
-## Unparsed expression
+## Unparsed Expression
 
 Unparsed expression is a special type of expression, serves exclusively for presenting the default value of a column when it's unsolvable.
 The following shows the data structure of an unparsed expression in JSON and Java, enabling easy retrieval of its value.

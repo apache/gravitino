@@ -22,14 +22,14 @@ Gravitino saves some system information in schema and table comments, like
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to the Doris instance.
 - Supports metadata management of Doris (1.2.x).
 - Supports table index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
-### Catalog properties
+### Catalog Properties
 
 Pass to a Doris data source any property that isn't defined by Gravitino by adding
 `gravitino.bypass.` prefix as a catalog property. For example, catalog property
@@ -80,36 +80,36 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 **Recommended driver versions:**
 - `mysql-connector-java-8.0.16` or higher
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino's schema concept corresponds to the Doris database.
 - Supports creating schema.
 - Supports dropping schema.
 
-### Schema properties
+### Schema Properties
 
 - Support schema properties, including Doris database properties and user-defined properties.
 
-### Schema operations
+### Schema Operations
 
 Refer to
 [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Gravitino's table concept corresponds to the Doris table.
 - Supports index.
 - Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
-#### Table column types
+#### Table Column Types
 
 | Gravitino Type   | Doris Type      |
 |------------------|-----------------|
@@ -136,16 +136,16 @@ Gravitino cannot load Doris `array`, `map` and `struct` type correctly, because 
 :::
 
 
-### Table column auto-increment
+### Table Column Auto-increment
 
 Unsupported for now.
 
-### Table properties
+### Table Properties
 
 - Doris supports table properties, and you can set them in the table properties.
 - Only supports Doris table properties and doesn't support user-defined properties.
 
-### Table indexes
+### Table Indexes
 
 - Supports PRIMARY_KEY
 
@@ -178,7 +178,7 @@ Unsupported for now.
     </TabItem>
     </Tabs>
 
-### Table partitioning
+### Table Partitioning
 
 The Doris catalog supports partitioned tables. 
 Users can create partitioned tables in the Doris catalog with specific partitioning attributes. It is also supported to pre-assign partitions when creating Doris tables. 
@@ -191,7 +191,7 @@ Note that although Gravitino supports several partitioning strategies, Apache Do
 The `fieldName` specified in the partitioning attributes must be the name of columns defined in the table.
 :::
 
-### Table distribution
+### Table Distribution
 
 Users can also specify the distribution strategy when creating tables in the Doris catalog. The Doris catalog supports the following distribution strategies:
 - `HASH`
@@ -200,11 +200,11 @@ Users can also specify the distribution strategy when creating tables in the Dor
 For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it. More information about the distribution strategy defined in Gravitino can be found [here](./table-partitioning-distribution-sort-order-indexes.md#table-distribution).
 
 
-### Table operations
+### Table Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Gravitino supports these table alteration operations:
 

@@ -31,7 +31,7 @@ Or install directly:
 helm upgrade --install gravitino-lance oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version <VERSION> -n gravitino --create-namespace
 ```
 
-### Install from Local Repository (For Development or Unreleased Versions)
+### Install from Local Repository (for Development or Unreleased Versions)
 
 Clone the repository and navigate to the chart directory:
 

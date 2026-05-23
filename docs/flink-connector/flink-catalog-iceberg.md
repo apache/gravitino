@@ -10,7 +10,7 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 
 ## Capabilities
 
-#### Supported DML and DDL operations:
+#### Supported DML and DDL Operations
 
 - `CREATE CATALOG`
 - `CREATE DATABASE`
@@ -20,7 +20,7 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 - `INSERT INTO & OVERWRITE`
 - `SELECT`
 
-#### Operations not supported:
+#### Operations Not Supported
 
 - Partition operations
 - View operations
@@ -31,7 +31,7 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 - `DELETE` clause
 - `CREATE TABLE LIKE` clause
 
-## SQL example
+## SQL Example
 
 ```sql
 
@@ -55,7 +55,7 @@ SELECT * FROM sample WHERE data = 'B';
 
 ```
 
-## Catalog properties
+## Catalog Properties
 
 The Gravitino Flink connector transforms the following properties in a catalog to Flink connector configuration.
 

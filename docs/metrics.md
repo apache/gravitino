@@ -18,9 +18,9 @@ curl http://127.0.0.1:8090/metrics
 curl http://127.0.0.1:8090/prometheus/metrics
 ```
 
-### Metrics source
+### Metrics Source
 
-#### HTTP server metrics
+#### HTTP Server Metrics
 
 HTTP server metrics encompass the histogram of HTTP request processing time and the number of HTTP response codes, categorized by different HTTP interfaces such as `create-table` and `load-table`.
 
@@ -45,12 +45,12 @@ gravitino_server_http_request_duration_seconds{operation="create-table",quantile
 Metrics with the `gravitino-server` prefix pertain to the Gravitino server, while those with the `iceberg-rest-server` prefix are for the Gravitino Iceberg REST server.
 :::
 
-#### JVM metrics
+#### JVM Metrics
 
 JVM metrics source uses [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html) with BufferPoolMetricSet, GarbageCollectorMetricSet, and MemoryUsageGaugeSet.
 These metrics start with the `jvm` prefix, like `jvm.heap.used` in JSON format, `jvm_heap_used` in Prometheus format.
 
-#### Catalog metrics
+#### Catalog Metrics
 
 Catalog metrics provide the metrics from different catalog instances.
 All the catalog metrics start with the `gravitino-catalog` prefix in Prometheus format and with labels `provider`, `metalake`, and `catalog` to distinguish different catalog instances.

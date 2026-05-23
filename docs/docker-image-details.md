@@ -5,9 +5,9 @@ keyword: docker
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# User Docker images
+# User Docker Images
 
-## Apache Gravitino Docker image
+## Apache Gravitino Docker Image
 
 Deploy the service with the Gravitino Docker image.
 
@@ -70,7 +70,7 @@ Changelog
     - `8090` Gravitino Web UI
     - `9001` Iceberg REST service
 
-## Apache Gravitino Iceberg REST server Docker image
+## Apache Gravitino Iceberg REST Server Docker Image
 
 Deploy the standalone Gravitino Iceberg REST server with the Docker image.
 
@@ -133,7 +133,7 @@ Changelog
   - Expose ports:
     - `9001` Iceberg REST service
 
-## Apache Gravitino MCP server image
+## Apache Gravitino MCP Server Image
 
 Deploy the Gravitino MCP server with the Docker image.
 
@@ -156,7 +156,7 @@ Changelog
   - Supports associate&disassociate tag, policy to metadata
   - Supports submit&cancel jobs.
 
-## Apache Gravitino Lance REST server Docker image
+## Apache Gravitino Lance REST Server Docker Image
 
 Deploy the standalone Gravitino Lance REST server with the Docker image.
 
@@ -190,7 +190,7 @@ Changelog
   - Support Lance tables integration through REST API
   - Built with Gravitino 1.1.0. For more information, see 1.1.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.1.0).
 
-## Playground Docker image
+## Playground Docker Image
 
 Use the [playground](https://github.com/apache/gravitino-playground) to experience the whole Gravitino system with other components.
 
@@ -198,7 +198,7 @@ The playground consists of multiple Docker images.
 
 The Docker images of the playground have suitable configurations for users to experience.
 
-### Apache Hive image
+### Apache Hive Image
 
 Changelog
 
@@ -211,7 +211,7 @@ Changelog
   - `hive-2.3.9`
   - Don't start YARN when container startup
 
-### Trino image
+### Trino Image
 
 Changelog
 
@@ -259,11 +259,11 @@ Changelog
   - Base on `trino:426`
   - Added Gravitino trino-connector-0.3.0 libraries into the `/usr/lib/trino/plugin/gravitino`
 
-# Developer Docker images
+# Developer Docker Images
 
 Use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
 
-## Apache Gravitino CI Apache Hive image with kerberos enabled
+## Apache Gravitino CI Apache Hive Image with Kerberos Enabled
 
 Use this kind of image to test the catalog of Apache Hive with kerberos enable
 
@@ -301,7 +301,7 @@ Changelog
     - Set up a Hive cluster with kerberos enabled.
     - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)
 
-## Apache Gravitino CI Apache Hive image
+## Apache Gravitino CI Apache Hive Image
 
 Use this kind of image to test the catalog of Apache Hive.
 
@@ -418,7 +418,7 @@ Changelog
     - `10000` HiveServer2
     - `10002` HiveServer2 HTTP
 
-## Apache Gravitino CI Trino image
+## Apache Gravitino CI Trino Image
 
 Use this image to test Trino.
 
@@ -448,7 +448,7 @@ Changelog
   - Expose ports:
     - `8080` Trino JDBC port
 
-## Apache Gravitino CI Doris image
+## Apache Gravitino CI Doris Image
 
 Use this image to test Apache Doris.
 
@@ -482,7 +482,7 @@ Changelog
     - `8030` Doris FE HTTP port
     - `9030` Doris FE MySQL server port
 
-## Apache Gravitino CI Apache Ranger image
+## Apache Gravitino CI Apache Ranger Image
 
 Use this image to control Trino's permissions.
 

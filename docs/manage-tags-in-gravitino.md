@@ -37,9 +37,9 @@ the future versions.
    list with `inherited` value `false`.
 :::
 
-## Tag operations
+## Tag Operations
 
-### Create new tags
+### Create New Tags
 
 The first step to manage tags is to create new tags. You can create a new tag by providing a tag
 name, optional comment and properties.
@@ -71,7 +71,7 @@ Tag tag =
 </TabItem>
 </Tabs>
 
-### List tags
+### List Tags
 
 List all the tag names as well as tag objects in a metalake in Gravitino.
 
@@ -99,7 +99,7 @@ Tag[] tags = client.listTagsInfo();
 </TabItem>
 </Tabs>
 
-### Get a tag by name
+### Get a Tag by Name
 
 Get a tag by its name.
 
@@ -122,7 +122,7 @@ Tag tag = client.getTag("tag1");
 </TabItem>
 </Tabs>
 
-### Update a tag
+### Update a Tag
 
 Gravitino allows you to update a tag by providing a new tag name, comment and properties.
 
@@ -179,7 +179,7 @@ Gravitino support the following tag changes:
 | Set a tag property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `TagChange.setProperty("key1", "value1")` |
 | Remove a tag property  | `{"@type":"removeProperty","property":"key1"}`               | `TagChange.removeProperty("key1")`        |
 
-### Delete a tag
+### Delete a Tag
 
 Delete a tag by its name.
 
@@ -202,12 +202,12 @@ client.deleteTag("tag2");
 </TabItem>
 </Tabs>
 
-## Tag associations
+## Tag Associations
 
 Gravitino allows you to associate and disassociate tags with metadata objects. Currently,
 `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` objects can be tagged.
 
-### Associate and disassociate tags with a metadata object
+### Associate and Disassociate Tags with a Metadata Object
 
 Associate and disassociate tags with a metadata object by providing the object type, object
 name and tag names.
@@ -246,7 +246,7 @@ schema1.supportsTags().associateTags(new String[] {"tag1"}， null);
 </TabItem>
 </Tabs>
 
-### List associated tags for a metadata object
+### List Associated Tags for a Metadata Object
 
 List all the tags associated with a metadata object. The tags in Gravitino are
 inheritable, so listing tags of a metadata object will also list the tags of its parent metadata
@@ -287,7 +287,7 @@ Tag[] tagsInfo = schema1.supportsTags().listTagsInfo();
 </TabItem>
 </Tabs>
 
-### Get an associated tag by name for a metadata object
+### Get an Associated Tag by Name for a Metadata Object
 
 Get an associated tag by its name for a metadata object.
 
@@ -318,7 +318,7 @@ Tag tag = schema1.supportsTags().getTag("tag1");
 </TabItem>
 </Tabs>
 
-### List metadata objects associated with a tag
+### List Metadata Objects Associated with a Tag
 
 List all the metadata objects associated with a tag.
 

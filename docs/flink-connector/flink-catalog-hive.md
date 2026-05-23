@@ -23,7 +23,7 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 - `DELETE` clause
 - `CALL` clause
 
-## Generic table support
+## Generic Table Support
 
 Flink generic tables are non-Hive tables. Their schema and partition keys are stored in table
 properties in Hive metastore. Gravitino Flink connector follows the Flink Hive catalog behavior:
@@ -52,7 +52,7 @@ https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/table/hive/
 * Hive metastore 2.x
 * HDFS 2.x or 3.x
 
-## SQL example
+## SQL Example
 
 ```sql
 
@@ -97,7 +97,7 @@ INSERT INTO employees VALUES (1, 'John Doe', 20240101), (2, 'Jane Smith', 202401
 SELECT * FROM employees WHERE dt = 20240101;
 ```
 
-## Catalog properties
+## Catalog Properties
 
 The configuration of Flink Hive Connector is the same with the original Flink Hive connector.
 Gravitino catalog property names with the prefix `flink.bypass.` are passed to Flink Hive connector. For example, using `flink.bypass.hive-conf-dir` to pass the `hive-conf-dir` to the Flink Hive connector.

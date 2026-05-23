@@ -30,7 +30,7 @@ Or install directly:
 helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> -n gravitino --create-namespace
 ```
 
-### Install from Local Repository (For Development or Unreleased Versions)
+### Install from Local Repository (for Development or Unreleased Versions)
 
 Clone the repository and navigate to the chart directory:
 
@@ -116,7 +116,7 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
 
 Then manually create a PersistentVolume (PV).
 
-### Deploy Gravitino using an existed MySQL Database
+### Deploy Gravitino Using an Existed MySQL Database
 
 Ensure you have the following MySQL credentials ready: Username, Password, Database Name. When creating your database, we recommend calling it `gravitino`.
 

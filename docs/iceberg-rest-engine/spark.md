@@ -45,7 +45,7 @@ If the file doesn't exist yet, copy the template:
 cp $SPARK_HOME/conf/spark-defaults.conf.template $SPARK_HOME/conf/spark-defaults.conf
 ```
 
-### Simple authentication
+### Simple Authentication
 
 Add the following to `$SPARK_HOME/conf/spark-defaults.conf`:
 
@@ -78,7 +78,7 @@ be supplied via environment variables (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_
 instance profile, in which case the explicit credential lines can be omitted.
 :::
 
-### OAuth2 authentication
+### OAuth2 Authentication
 
 If Gravitino is configured with OAuth2, add the auth properties to the same
 `$SPARK_HOME/conf/spark-defaults.conf` file:
@@ -132,7 +132,7 @@ See [gravitino-irc-quickstart](https://github.com/markhoerth/gravitino-irc-quick
 complete local development environment using MinIO.
 :::
 
-### Credential vending
+### Credential Vending
 
 If Gravitino is configured with credential vending, add the following to enable it on the client side:
 
@@ -156,45 +156,45 @@ spark.sql.catalog.gravitino_irc.<configuration-key>    <property-value>
 Once `spark-defaults.conf` is in place, start your Spark session normally. The Gravitino IRC
 catalog is available immediately without any additional flags.
 
-### spark-shell (Scala)
+### Spark-shell (Scala)
 
 ```bash
 $SPARK_HOME/bin/spark-shell
 ```
 
-### spark-sql
+### Spark-sql
 
 ```bash
 $SPARK_HOME/bin/spark-sql
 ```
 
-### pyspark
+### Pyspark
 
 ```bash
 $SPARK_HOME/bin/pyspark
 ```
 
-## Usage examples
+## Usage Examples
 
-### List namespaces
+### List Namespaces
 
 ```sql
 SHOW NAMESPACES IN gravitino_irc;
 ```
 
-### List tables
+### List Tables
 
 ```sql
 SHOW TABLES IN gravitino_irc.<namespace>;
 ```
 
-### Query a table
+### Query a Table
 
 ```sql
 SELECT * FROM gravitino_irc.<namespace>.<table> LIMIT 10;
 ```
 
-### Create a table
+### Create a Table
 
 ```sql
 CREATE TABLE gravitino_irc.<namespace>.new_table (
@@ -204,13 +204,13 @@ CREATE TABLE gravitino_irc.<namespace>.new_table (
 ) USING iceberg;
 ```
 
-### Insert data
+### Insert Data
 
 ```sql
 INSERT INTO gravitino_irc.<namespace>.new_table VALUES (1, 'example', current_timestamp());
 ```
 
-## Gravitino connector vs Iceberg REST
+## Gravitino Connector Vs Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

@@ -34,9 +34,9 @@ and update them to Gravitino. Gravitino can't judge the expiration of the statis
 Ensure the statistics are up-to-date.
 
 
-## Metadata object statistic operations
+## Metadata Object Statistic Operations
 
-### Update statistics of metadata objects
+### Update Statistics of Metadata Objects
 
 Update the statistics of a metadata object by providing the statistics key and value.
 Now only table statistics can be updated.
@@ -69,7 +69,7 @@ table.updateStatistics(updateStatistics);
 </TabItem>
 </Tabs>
 
-### List statistics of metadata objects
+### List Statistics of Metadata Objects
 
 List all the statistics of a metadata object.
 Now only table statistics can be listed.
@@ -96,7 +96,7 @@ table.listStatistics();
 </TabItem>
 </Tabs>
 
-### Drop statistics of metadata objects
+### Drop Statistics of Metadata Objects
 
 Drop the statistics of a metadata object by providing the statistics keys.
 Now only table statistics can be dropped.
@@ -125,9 +125,9 @@ table.dropStatistics(statisticsToDrop);
 </TabItem>
 </Tabs>
 
-### Partition statistics operations
+### Partition Statistics Operations
 
-### Update statistics of partitions
+### Update Statistics of Partitions
 
 Update the statistics of a partition by providing the statistics key and value. If the statistics
 already exist, it will be updated; otherwise, a new statistic will be created.
@@ -166,7 +166,7 @@ table.updatePartitionStatistics(statisticsToUpdate);
 </Tabs>
 
 
-### List statistics of partitions
+### List Statistics of Partitions
 
 List the statistics of specified partitions.
 Specify a range of partitions by providing the `from` and `to` parameters,
@@ -196,7 +196,7 @@ table.listPartitionStatistics(range);
 </Tabs>
 
 
-### Drop statistics of partitions
+### Drop Statistics of Partitions
 
 Drop the statistics of specified partitions by providing the statistics keys.
 
@@ -232,7 +232,7 @@ table.dropPartitionStatistics(statisticsToDrop);
 </Tabs>
 
 
-### Server configuration
+### Server Configuration
 
 | Configuration item                              | Description                                                                                                                                                                                                                          | Default value                                                            | Required  | Since version |
 |-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|-----------|---------------|
@@ -328,7 +328,7 @@ gravitino.stats.partition.storageFactoryClass = org.apache.gravitino.stats.stora
 gravitino.stats.partition.storageOption.location = /data/lance
 ```
 
-### Implement a custom partition storage
+### Implement a Custom Partition Storage
 
 Implement a custom partition storage by implementing the interface `org.apache.gravitino.stats.storage.PartitionStatisticStorageFactory` and
 setting the configuration item `gravitino.stats.partition.storageFactoryClass` to your class name.

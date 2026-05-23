@@ -14,7 +14,7 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 
 ## Capabilities
 
-### Support DDL and DML operations:
+### Support DDL and DML Operations
 
 - `CREATE NAMESPACE`
 - `DROP NAMESPACE`
@@ -36,7 +36,7 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 Only supports Paimon FilesystemCatalog on HDFS now.
 :::
 
-#### Not supported operations:
+#### Not Supported Operations
 
 - `ALTER NAMESPACE`
   - Paimon does not support alter namespace.
@@ -48,7 +48,7 @@ Only supports Paimon FilesystemCatalog on HDFS now.
 - Time Travel
 - Hive and Jdbc backend, and Object Storage for FilesystemCatalog
 
-## SQL example
+## SQL Example
 
 ```sql
 -- Suppose paimon_catalog is the Paimon catalog name managed by Gravitino
@@ -79,7 +79,7 @@ SHOW PARTITIONS employee;
 ALTER TABLE employee DROP PARTITION (`name`='Alice');
 ```
 
-## Catalog properties
+## Catalog Properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Paimon connector configuration.
 

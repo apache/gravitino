@@ -21,9 +21,9 @@ $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 
 Once the server is up and running, you can proceed to configure the Fileset catalog with GCS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, please replace it with your actual server URL.
 
-## Configurations for creating a Fileset catalog with GCS
+## Configurations for Creating a Fileset Catalog with GCS
 
-### Configurations for a GCS Fileset catalog
+### Configurations for a GCS Fileset Catalog
 
 Apart from configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with GCS:
 
@@ -38,19 +38,19 @@ Apart from configurations mentioned in [Fileset-catalog-catalog-configuration](.
 `default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-gcp-bundle`).
 :::
 
-### Configurations for a schema
+### Configurations for a Schema
 
 Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.
 
-### Configurations for a fileset
+### Configurations for a Fileset
 
 Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
-## Example of creating Fileset catalog with GCS
+## Create a Fileset Catalog with GCS
 
 This section will show you how to use the Fileset catalog with GCS in Gravitino, including detailed examples.
 
-### Step1: Create a Fileset catalog with GCS
+### Step1: Create a Fileset Catalog with GCS
 
 First, you need to create a Fileset catalog with GCS. The following example shows how to create a Fileset catalog with GCS:
 
@@ -112,7 +112,7 @@ gcs_properties = gravitino_client.create_catalog(name="test_catalog",
 </TabItem>
 </Tabs>
 
-### Step2: Create a schema
+### Step2: Create a Schema
 
 Once you’ve created a Fileset catalog with GCS, you can create a schema. The following example shows how to create a schema:
 
@@ -163,7 +163,7 @@ catalog.as_schemas().create_schema(name="test_schema",
 </Tabs>
 
 
-### Step3: Create a fileset
+### Step3: Create a Fileset
 
 After creating a schema, you can create a fileset. The following example shows how to create a fileset:
 
@@ -225,9 +225,9 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 </TabItem>
 </Tabs>
 
-## Access a fileset with GCS
+## Access a Fileset with GCS
 
-### Use the GVFS Java client to access the fileset
+### Use the GVFS Java Client to Access the Fileset
 
 To access fileset with GCS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -293,7 +293,7 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
   </dependency>
 ```
 
-### Use Spark to access the fileset
+### Use Spark to Access the Fileset
 
 The following code snippet shows how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
@@ -374,7 +374,7 @@ Please choose the correct jar according to your environment.
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
-### Access a fileset using the Hadoop fs command
+### Access a Fileset Using the Hadoop Fs Command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3:
 
@@ -418,7 +418,7 @@ For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 ./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
 ```
 
-### Use the GVFS Python client to access a fileset
+### Use the GVFS Python Client to Access a Fileset
 
 To access fileset with GCS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -448,7 +448,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
 ```
 
-### Use fileset with pandas
+### Use Fileset with Pandas
 
 The following are examples of how to use the pandas library to access the GCS fileset
 
@@ -469,11 +469,11 @@ ds.head()
 
 For other use cases, refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
-## Fileset with credential vending
+## Fileset with Credential Vending
 
 Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access GCS fileset without providing authentication information like `gcs-service-account-file` in the properties.
 
-### How to create a GCS Fileset catalog with credential vending
+### How to Create a GCS Fileset Catalog with Credential Vending
 
 Apart from configuration method in [create-gcs-fileset-catalog](#configurations-for-a-gcs-fileset-catalog),
 properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also
@@ -493,7 +493,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### How to access GCS fileset with credential vending
+### How to Access GCS Fileset with Credential Vending
 
 When the catalog is configured with credentials and client-side credential vending is enabled,
 you can access GCS filesets directly using the GVFS Java/Python client or Spark without providing authentication details.

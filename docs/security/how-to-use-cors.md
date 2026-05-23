@@ -5,9 +5,9 @@ keyword: security cors
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Cross-origin resource filter
+## Cross-origin Resource Filter
 
-### Server configuration
+### Server Configuration
 
 | Configuration item                                 | Description                                                                                                                                                                                                                            | Default value                                 | Required | Since version |
 |----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|----------|---------------|
@@ -21,7 +21,7 @@ license: "This software is licensed under the Apache License version 2."
 | `gravitino.server.webserver.exposedHeaders`        | A comma separated list of allowed HTTP headers exposed on the client. The default value is the empty list.                                                                                                                             | ''(empty string)                              | No       | 0.4.0         |
 | `gravitino.server.webserver.chainPreflight`        | If true chained preflight requests for normal handling (as an OPTION request). Otherwise, the filter responds to the preflight. The default is true.                                                                                   | `true`                                        | No       | 0.4.0         |
 
-### Apache Iceberg REST service's configuration
+### Apache Iceberg REST Service's Configuration
 
 | Configuration item                             | Description                                                                                                                                                                                                  | Default value                                 | Required | Since version |
 |------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|----------|---------------|

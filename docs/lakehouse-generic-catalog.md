@@ -193,7 +193,7 @@ catalog.asSchemas().createSchema(
 
 For additional operations, refer to [Schema Operations documentation](./manage-relational-metadata-using-gravitino.md#schema-operations).
 
-## Table management
+## Table Management
 
 ### Supported Operations
 

@@ -18,9 +18,9 @@ To use Iceberg, you need:
   - ORC
   - Parquet (default)
 
-## Schema operations
+## Schema Operations
 
-### Create a schema
+### Create a Schema
 
 Users can create a schema through Apache Gravitino Trino connector as follows:
 
@@ -28,9 +28,9 @@ Users can create a schema through Apache Gravitino Trino connector as follows:
 CREATE SCHEMA catalog.schema_name
 ```
 
-## Table operations
+## Table Operations
 
-### Create table
+### Create Table
 
 The Apache Gravitino Trino connector supports basic Iceberg table creation statements, such as defining fields,
 allowing null values, and adding comments. The Apache Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
@@ -52,7 +52,7 @@ CREATE TABLE catalog.schema_name.table_name
 )
 ```
 
-### Alter table
+### Alter Table
 
 Support for the following alter table operations:
 - Rename table
@@ -80,7 +80,7 @@ See also [Delete limitation](https://trino.io/docs/current/connector/iceberg.htm
 
 `MERGE` is only supported for table using v2 or higher of the Iceberg specification.
 
-### Table procedures
+### Table Procedures
 
 The Apache Gravitino Trino connector delegates Iceberg table maintenance procedures
 to the underlying Iceberg connector, so they can be invoked via
@@ -122,13 +122,13 @@ ALTER TABLE iceberg_test.database_01.table_01 EXECUTE rewrite_manifests;
 For the full list of parameters accepted by each procedure, see the
 [Trino Iceberg connector documentation](https://trino.io/docs/current/connector/iceberg.html#alter-table-execute).
 
-## Table and Schema properties
+## Table and Schema Properties
 
-### Create a schema with properties
+### Create a Schema with Properties
 
 Iceberg schema does not support properties.
 
-### Create a table with properties
+### Create a Table with Properties
 
 Users can use the following example to create a table with properties:
 
@@ -152,7 +152,7 @@ The following tables are the properties supported by the Iceberg table:
 
 Reserved properties: A reserved property is one can't be set by users but can be read by users. 
 
-## Basic usage examples
+## Basic Usage Examples
 
 Do the following steps before you can use the Iceberg catalog in Trino through Apache Gravitino:
 
@@ -211,7 +211,7 @@ The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `iceberg_test` catalog is the catalog created by you in Apache Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
-### Create tables and schemas
+### Create Tables and Schemas
 
 Create a new schema named `database_01` in `test.iceberg_test` catalog.
 
@@ -232,7 +232,7 @@ salary int
 );
 ```
 
-### Write data
+### Write Data
 
 Insert data into the table `table_01`:
 
@@ -273,7 +273,7 @@ MERGE INTO iceberg_test.database_01.table_01 t USING iceberg_test.database_01.ta
               VALUES (s.name, s.salary);
 ```
 
-### Query data
+### Query Data
 
 Query the `table_01` table:
 
@@ -281,7 +281,7 @@ Query the `table_01` table:
 SELECT * FROM iceberg_test.database_01.table_01;
 ```
 
-### Modify a table
+### Modify a Table
 
 Add a new column `age` to the `table_01` table:
 
@@ -315,7 +315,7 @@ Drop a table:
 DROP TABLE iceberg_test.database_01.table_01;
 ```
 
-## HDFS username and permissions
+## HDFS Username and Permissions
 
 Before running any `Insert` statements for Iceberg tables in Trino, 
 you must check that the user Trino is using to access HDFS has access to the warehouse directory.

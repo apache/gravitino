@@ -31,7 +31,7 @@ If you want to access the instance remotely, be sure to read
 [Accessing Gravitino on AWS externally](./aws-remote-access.md).
 :::
 
-## Environment preparation
+## Environment Preparation
 
 ### AWS
 
@@ -116,7 +116,7 @@ To work on the GCP platform, follow these steps:
 
    You should see information about the OpenJDK version.
 
-### Local workstation
+### Local Workstation
 
 To build and install Gravitino locally on a macOS or a Linux workstation,
 follow these steps:
@@ -226,7 +226,7 @@ Revise based on your environment.
    be adapted to your environment.
    :::
 
-## Next steps
+## Next Steps
 
 - Delve deeper into the [documentation](https://gravitino.apache.org/docs/latest)
   for advanced features and configuration options.

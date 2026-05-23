@@ -14,7 +14,7 @@ To connect to MySQL, you need:
 - MySQL 5.7, 8.0 or higher.
 - Network access from the Trino coordinator and workers to MySQL. Port 3306 is the default port.
 
-## Create table
+## Create Table
 
 At present, the Apache Gravitino Trino connector only supports basic MySQL table creation statements, which involve fields, null allowances, comments, primary keys, indexes, default values and auto-increment.
 The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
@@ -23,7 +23,7 @@ The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
 `CREATE OR REPLACE TABLE AS SELECT` is not supported. Use `DROP TABLE` followed by `CREATE TABLE AS SELECT` as an alternative.
 :::
 
-## Alter table
+## Alter Table
 
 Support for the following alter table operations:
 - Rename table
@@ -49,7 +49,7 @@ If the `WHERE` clause is specified, only the matching rows are deleted. Otherwis
 
 Not support.
 
-## Table and Schema properties
+## Table and Schema Properties
 
 MySQL's schemas cannot support properties.
 
@@ -88,7 +88,7 @@ The following are Trino type which support configuration of default values:
 | TIME      | 01:01:01                                | 
 | TIMESTAMP | 2025-08-07 01:01:01 (CURRENT_TIMESTAMP) | 
 
-## Basic usage examples
+## Basic Usage Examples
 
 Do the following steps before you can use the MySQL catalog in Trino through Gravitino:
 
@@ -148,7 +148,7 @@ The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `mysql_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
-### Create tables and schemas
+### Create Tables and Schemas
 
 Create a new schema named `database_01` in `test.mysql_test` catalog.
 
@@ -211,7 +211,7 @@ WITH (
 );
 ```
 
-### Write data
+### Write Data
 
 Insert data into the table `table_01`:
 
@@ -238,7 +238,7 @@ DELETE FROM mysql_test.database_01.table_01 WHERE salary = 12;
 DELETE FROM mysql_test.database_01.table_01;
 ```
 
-### Query data
+### Query Data
 
 Query the `table_01` table:
 
@@ -246,7 +246,7 @@ Query the `table_01` table:
 SELECT * FROM mysql_test.database_01.table_01;
 ```
 
-### Modify a table
+### Modify a Table
 
 Add a new column `age` to the `table_01` table:
 

@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 
 Apache Gravitino provides the ability to manage Apache Hudi metadata.
 
-### Requirements and limitations
+### Requirements and Limitations
 
 :::info
 Tested and verified with Apache Hudi `0.15.0`.
@@ -23,13 +23,13 @@ Tested and verified with Apache Hudi `0.15.0`.
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Works as a catalog proxy, supporting `HMS` as catalog backend.
 - Only support read operations (list and load) for Hudi schemas and tables.
 - Doesn't support timeline management operations now.
 
-### Catalog properties
+### Catalog Properties
 
 | Property name                            | Description                                                                                                                                                                                                                            | Default value | Required | Since Version    |
 |------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -40,7 +40,7 @@ Tested and verified with Apache Hudi `0.15.0`.
 | `gravitino.bypass.`                      | Property name with this prefix passed down to the underlying backend client for use. Such as `gravitino.bypass.hive.metastore.failure.retries = 3` indicate 3 times of retries upon failure of Thrift metastore calls for HMS backend. | (none)        | No       | 0.7.0-incubating |
 | `default.catalog`                        | The default catalog name for the Hive3 metastore backend; this configuration is ignored when using a Hive2 metastore.                                                                                                                  | hive          | No       | 1.1.0            |
 
-#### Catalog backend security
+#### Catalog Backend Security
 
 Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
 
@@ -56,52 +56,52 @@ Users can use the following properties to configure the security of the catalog 
 Property name with this prefix passed down to the underlying backend client for use. Such as `gravitino.bypass.hive.metastore.kerberos.principal=XXXX`、`gravitino.bypass.hadoop.security.authentication=kerberos`、`gravitino.bypass.hive.metastore.sasl.enabled=ture` And so on.
 
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
-## Schema 
+## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Only support read operations: listSchema, loadSchema, and schemaExists.
 
-### Schema properties
+### Schema Properties
 
 - The `Location` is an optional property that shows the storage path to the Hudi database
 
-### Schema operations
+### Schema Operations
 
 Only support read operations: listSchema, loadSchema, and schemaExists.
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
-## Table 
+## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Only support read operations: listTable, loadTable, and tableExists.
 
-### Table partitions
+### Table Partitions
 
 - Support loading Hudi partitioned tables (Hudi only supports identity partitioning).
 
-### Table sort orders
+### Table Sort Orders
 
 - Doesn't support table sort orders.
 
-### Table distributions
+### Table Distributions
 
 - Doesn't support table distributions.
 
-### Table indexes
+### Table Indexes
 
 - Doesn't support table indexes.
 
-### Table properties
+### Table Properties
 
 - For HMS backend, it will bring out all the table parameters from the HMS.
 
-### Table column types
+### Table Column Types
 
 The following table shows the mapping between Gravitino and [Apache Hudi column types](https://hudi.apache.org/docs/sql_ddl#supported-types):
 
@@ -121,7 +121,7 @@ The following table shows the mapping between Gravitino and [Apache Hudi column 
 | `map`          | `map`            |
 | `struct`       | `struct`         |
 
-### Table operations
+### Table Operations
 
 Only support read operations: listTable, loadTable, and tableExists.
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.

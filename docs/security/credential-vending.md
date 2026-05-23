@@ -20,7 +20,7 @@ Gravitino credential vending is used to generate temporary or static credentials
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
 - No support for Spark/Trino/Flink connector yet.
 
-## General configurations
+## General Configurations
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations           | Description                                                                                | Default value | Required | Since Version    |
 |-------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -29,11 +29,11 @@ Gravitino credential vending is used to generate temporary or static credentials
 | `credential-cache-expire-ratio`     | `gravitino.iceberg-rest.credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino remove credential from the cache. | 0.15          | No       | 0.8.0-incubating |
 | `credential-cache-max-size`         | `gravitino.iceberg-rest.cache-max-size`                | Max size for the credential cache.                                                         | 10000         | No       | 0.8.0-incubating |
 
-## Build-in credentials configurations
+## Build-in Credentials Configurations
 
-### S3 credentials
+### S3 Credentials
 
-#### S3 IRSA credential
+#### S3 IRSA Credential
 
 A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with temporary credentials, typically used in EKS environments. This provider supports both basic IRSA credentials and fine-grained path-based access control with dynamically generated IAM policies.
 
@@ -60,7 +60,7 @@ A credential using AWS IAM Roles for Service Accounts (IRSA) to access S3 with t
 - IAM role with permissions to assume the target role specified in `s3-role-arn`
 - Target IAM role with necessary S3 permissions for the data locations
 
-#### S3 secret key credential
+#### S3 Secret Key Credential
 
 A credential with static S3 access key id and secret access key.
 
@@ -70,7 +70,7 @@ A credential with static S3 access key id and secret access key.
 | `s3-access-key-id`                  | `gravitino.iceberg-rest.s3-access-key-id`         | The static access key ID used to access S3 data.       | (none)        | Yes      | 0.6.0-incubating |
 | `s3-secret-access-key`              | `gravitino.iceberg-rest.s3-secret-access-key`     | The static secret access key used to access S3 data.   | (none)        | Yes      | 0.6.0-incubating |
 
-#### S3 token credential
+#### S3 Token Credential
 
 An S3 token is a token credential with scoped privileges, by leveraging STS [Assume Role](https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html). To use an S3 token credential, you should create a role and grant it proper privileges.
 
@@ -85,9 +85,9 @@ An S3 token is a token credential with scoped privileges, by leveraging STS [Ass
 | `s3-token-expire-in-secs`           | `gravitino.iceberg-rest.s3-token-expire-in-secs`   | The S3 session token expire time in secs, it couldn't exceed the max session time of the assumed role.                                                      | 3600          | No       | 0.7.0-incubating |
 | `s3-token-service-endpoint`         | `gravitino.iceberg-rest.s3-token-service-endpoint` | An alternative endpoint of the S3 token service, This could be used with s3-compatible object storage service like MINIO that has a different STS endpoint. | (none)        | No       | 0.8.0-incubating |
 
-### OSS credentials
+### OSS Credentials
 
-#### OSS secret key credential
+#### OSS Secret Key Credential
 
 A credential with static OSS access key id and secret access key.
 
@@ -97,7 +97,7 @@ A credential with static OSS access key id and secret access key.
 | `oss-access-key-id`                 | `gravitino.iceberg-rest.oss-access-key-id`        | The static access key ID used to access OSS data.                             | (none)        | Yes      | 0.7.0-incubating |
 | `oss-secret-access-key`             | `gravitino.iceberg-rest.oss-secret-access-key`    | The static secret access key used to access OSS data.                         | (none)        | Yes      | 0.7.0-incubating |
 
-#### OSS token credential
+#### OSS Token Credential
 
 An OSS token is a token credential with scoped privileges, by leveraging STS [Assume Role](https://www.alibabacloud.com/help/en/oss/developer-reference/use-temporary-access-credentials-provided-by-sts-to-access-oss). To use an OSS token credential, you should create a role and grant it proper privileges.
 
@@ -111,9 +111,9 @@ An OSS token is a token credential with scoped privileges, by leveraging STS [As
 | `oss-external-id`                   | `gravitino.iceberg-rest.oss-external-id`          | The OSS external id to generate token.                                                                       | (none)        | No       | 0.8.0-incubating |
 | `oss-token-expire-in-secs`          | `gravitino.iceberg-rest.oss-token-expire-in-secs` | The OSS security token expire time in secs.                                                                  | 3600          | No       | 0.8.0-incubating |
 
-### ADLS credentials
+### ADLS Credentials
 
-#### Azure account key credential
+#### Azure Account Key Credential
 
 A credential with static Azure storage account name and key.
 
@@ -123,7 +123,7 @@ A credential with static Azure storage account name and key.
 | `azure-storage-account-name`        | `gravitino.iceberg-rest.azure-storage-account-name` | The static storage account name used to access ADLS data. | (none)        | Yes      | 0.8.0-incubating |
 | `azure-storage-account-key`         | `gravitino.iceberg-rest.azure-storage-account-key`  | The static storage account key used to access ADLS data.  | (none)        | Yes      | 0.8.0-incubating |
 
-#### ADLS token credential
+#### ADLS Token Credential
 
 An ADLS token is a token credential with scoped privileges, by leveraging Azure [User Delegation Sas](https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas). To use an ADLS token credential, you should create a Microsoft Entra ID service principal and grant it proper privileges.
 
@@ -137,9 +137,9 @@ An ADLS token is a token credential with scoped privileges, by leveraging Azure 
 | `azure-client-secret`               | `gravitino.iceberg-rest.azure-client-secret`        | Azure Active Directory (AAD) client secret used for authentication. | (none)        | Yes      | 0.8.0-incubating |
 | `adls-token-expire-in-secs`         | `gravitino.iceberg-rest.adls-token-expire-in-secs`  | The ADLS SAS token expire time in secs.                             | 3600          | No       | 0.8.0-incubating | 
 
-### GCS credentials
+### GCS Credentials
 
-#### GCS token credential
+#### GCS Token Credential
 
 An GCS token is a token credential with scoped privileges, by leveraging GCS [Credential Access Boundaries](https://cloud.google.com/iam/docs/downscoping-short-lived-credentials). To use an GCS token credential, you should create an GCS service account and grant it proper privileges.
 
@@ -153,7 +153,7 @@ An GCS token is a token credential with scoped privileges, by leveraging GCS [Cr
 For Gravitino Iceberg REST server, please ensure that the credential file can be accessed by the server. For example, if the server is running on a GCE machine, or you can set the environment variable as `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, even when the `gcs-service-account-file` has already been configured.
 :::
 
-## Custom credentials
+## Custom Credentials
 
 Gravitino supports custom credentials, you can implement the `org.apache.gravitino.credential.CredentialProvider` interface to support custom credentials, and place the corresponding jar to the classpath of Iceberg catalog server or Fileset catalog.
 
@@ -184,9 +184,9 @@ The classpath of the server:
 - Iceberg REST server: the classpath differs in different deploy mode, refer to [Server management](../iceberg-rest-service.md#server-management) part.
 - Fileset catalog: `catalogs/fileset/libs/`
 
-## Usage example
+## Usage Example
 
-### Credential vending for Iceberg REST server
+### Credential Vending for Iceberg REST Server
 
 Suppose the Iceberg table data is stored in S3, follow the steps below:
 

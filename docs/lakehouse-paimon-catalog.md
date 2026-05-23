@@ -20,14 +20,14 @@ Builds with Apache Paimon `1.2`.
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Works as a catalog proxy, supporting `FilesystemCatalog`, `JdbcCatalog` and `HiveCatalog`.
 - Supports DDL operations for Paimon schemas and tables.
 
 - Doesn't support alterSchema.
 
-### Catalog properties
+### Catalog Properties
 
 | Property name                                      | Description                                                                                                                                                                                                 | Default value                                                                  | Required                                                                                                                                                             | Since Version    |
 |----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
@@ -79,7 +79,7 @@ connect to Aliyun DLF, more information can be found in the [Paimon REST Catalog
 
 Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pass to Paimon catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.table.type`, `table.type` will pass to Paimon catalog properties.
 
-#### JDBC backend
+#### JDBC Backend
 
 If you are using JDBC backend, you must specify the properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`.
 
@@ -93,32 +93,32 @@ If you are using JDBC backend, you must specify the properties like `jdbc-user`,
 Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-paimon/libs` directory If you are using JDBC backend.
 :::
 
-### Catalog operations
+### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Supporting createSchema, dropSchema, loadSchema and listSchema.
 - Supporting cascade drop schema.
 
 - Doesn't support alterSchema.
 
-### Schema properties
+### Schema Properties
 
 - Doesn't support specify location and store any schema properties when createSchema for FilesystemCatalog.
 - Doesn't return any schema properties when loadSchema for FilesystemCatalog.
 - Doesn't support store schema comment for FilesystemCatalog.
 
-### Schema operations
+### Schema Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Supporting createTable, purgeTable, alterTable, loadTable and listTable.
 - Supporting Column default value through table properties, such as `fields.{columnName}.default-value`, not column expression.
@@ -134,7 +134,7 @@ Gravitino Paimon Catalog does not support dropTable, because the dropTable in Pa
 Paimon does not support auto increment column.
 :::
 
-### Table changes
+### Table Changes
 
 - RenameTable
 - AddColumn
@@ -148,21 +148,21 @@ Paimon does not support auto increment column.
 - SetProperty
 - RemoveProperty
 
-### Table partitions
+### Table Partitions
 
 - Only supports Identity partitions, such as `day`, `hour`, etc.
 
 Refer to [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spark/sql-ddl/#create-table) for more details.
 
-### Table sort orders
+### Table Sort Orders
 
 - Doesn't support table sort orders.
 
-### Table distributions
+### Table Distributions
 
 - Doesn't support table distributions.
 
-### Table indexes
+### Table Indexes
 
 - Only supports primary key Index.
 
@@ -174,7 +174,7 @@ We cannot specify more than one primary key Index, and a primary key Index can c
 Paimon Table primary key constraint should not be same with partition fields, this will result in only one record in a partition.
 :::
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type    | Apache Paimon Type           |
 |-------------------|------------------------------|
@@ -203,7 +203,7 @@ Paimon Table primary key constraint should not be same with partition fields, th
 Gravitino doesn't support Paimon `MultisetType` type.
 :::
 
-### Table properties
+### Table Properties
 
 Pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/configurations/) to Gravitino when creating a Paimon table.
 
@@ -228,13 +228,13 @@ Bucket settings are defined via Gravitino table distribution (HASH strategy). Th
 | `primary-key`      | The table primary-key.    | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 | `partition`        | The table partition.      | (none)        | No        | Yes      | No        | 0.6.0-incubating  |
 
-### Table operations
+### Table Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
 ## View
 
-### View capabilities
+### View Capabilities
 
 - Supports list, create, load, alter, and drop for views stored in the Paimon catalog.
 - Each view must include exactly one SQL representation with dialect `query`, which serves as the canonical view definition.
@@ -242,11 +242,11 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - The `defaultCatalog` and `defaultSchema` fields are stored as Paimon view options and can be used to resolve unqualified identifiers in the SQL text.
 - View support depends on the selected Paimon backend and requires backend view API support.
 
-### View operations
+### View Operations
 
 Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md) for more details.
 
-## HDFS configuration
+## HDFS Configuration
 
 Place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory to automatically load as the default HDFS configuration.
 

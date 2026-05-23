@@ -24,7 +24,7 @@ This capability allows users to perform federation queries, accessing data from 
 * Scala 2.12
 * JDK 8, 11 or 17
 
-## How to use it
+## How to Use It
 
 1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18) the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
 
@@ -97,7 +97,7 @@ INSERT INTO hive_students VALUES (1, 'Alice'), (2, 'Bob');
 SELECT * FROM hive_students;
 ```
 
-## Catalog naming restrictions
+## Catalog Naming Restrictions
 
 :::caution
 When creating catalogs that will be used with the Flink connector, the catalog name **cannot start with a number**. This is a Flink limitation. For example:
@@ -107,7 +107,7 @@ When creating catalogs that will be used with the Flink connector, the catalog n
 If you create a catalog with a name starting with a number, it will not be accessible from Flink.
 :::
 
-## Datatype mapping
+## Datatype Mapping
 
 Gravitino flink connector support the following datatype mapping between Flink and Gravitino.
 

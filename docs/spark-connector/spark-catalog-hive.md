@@ -28,7 +28,7 @@ Don't support reading and writing tables with `org.apache.hadoop.hive.serde2.Ope
 * Hive metastore 2.x
 * HDFS 2.x or 3.x
 
-## SQL example
+## SQL Example
 
 
 ```sql
@@ -56,7 +56,7 @@ SELECT * FROM employees WHERE department = 'Engineering';
 ```
 
 
-## Catalog properties
+## Catalog Properties
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Hive connector configuration.
 

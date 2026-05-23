@@ -10,7 +10,7 @@ Use `--help` to list all commands, or `--help --type <command>` for command-spec
 By default, optimizer CLI loads `conf/gravitino-optimizer.conf` from the current working
 directory. Use `--conf-path` only when you need a custom config file.
 
-## Command quick reference
+## Command Quick Reference
 
 | Command (`--type`) | Required options | Optional options | Purpose |
 | --- | --- | --- | --- |
@@ -22,7 +22,7 @@ directory. Use `--conf-path` only when you need a custom config file.
 | `list-job-metrics` | `--identifiers` | None | Query stored job metrics |
 | `submit-update-stats-job` | `--identifiers` | `--dry-run`, `--update-mode`, `--updater-options`, `--spark-conf` | Submit built-in Iceberg update stats/metrics Spark jobs |
 
-### Option field meanings
+### Option Field Meanings
 
 | Option | Meaning | Used by |
 | --- | --- | --- |
@@ -44,11 +44,11 @@ Global option:
 
 - `--conf-path`: Optional custom config file path. If omitted, CLI uses `conf/gravitino-optimizer.conf`.
 
-## Input format for `local-stats-calculator`
+## Input Format for `local-stats-calculator`
 
 `local-stats-calculator` reads JSON Lines (one JSON object per line).
 
-### Reserved fields
+### Reserved Fields
 
 - `stats-type`: `table`, `partition`, or `job`
 - `identifier`: object identifier
@@ -57,7 +57,7 @@ Global option:
 
 All other fields are treated as metric or statistic values.
 
-### Supported examples by scope
+### Supported Examples by Scope
 
 Use JSON Lines (one JSON object per line). The following examples focus on table, partition, and
 job scopes with multiple metric/statistic fields:
@@ -71,15 +71,15 @@ job scopes with multiple metric/statistic fields:
 {"stats-type":"job","identifier":"job-1","timestamp":1735689800,"duration_ms":12500,"rewritten_files":18}
 ```
 
-### Identifier rules
+### Identifier Rules
 
 - Table and partition records: `catalog.schema.table`
 - If `gravitino.optimizer.gravitinoDefaultCatalog` is set, `schema.table` is also accepted
 - Job records: parsed as a regular Gravitino `NameIdentifier`
 
-## CLI workflow examples
+## CLI Workflow Examples
 
-### Update statistics in batch
+### Update Statistics in Batch
 
 Calculate and persist table or partition statistics from JSONL input.
 
@@ -90,7 +90,7 @@ Calculate and persist table or partition statistics from JSONL input.
   --file-path ./table-stats.jsonl
 ```
 
-### Append metrics in batch
+### Append Metrics in Batch
 
 Calculate and append table or job metrics from JSONL input.
 
@@ -101,7 +101,7 @@ Calculate and append table or job metrics from JSONL input.
   --file-path ./table-stats.jsonl
 ```
 
-### Dry-run strategy submission
+### Dry-run Strategy Submission
 
 Preview recommendations without actually submitting jobs.
 
@@ -114,7 +114,7 @@ Preview recommendations without actually submitting jobs.
   --limit 10
 ```
 
-### Submit strategy jobs
+### Submit Strategy Jobs
 
 Submit jobs for identifiers that match the given policy name.
 
@@ -126,7 +126,7 @@ Submit jobs for identifiers that match the given policy name.
   --limit 10
 ```
 
-### Monitor metrics
+### Monitor Metrics
 
 Evaluate monitor rules around an action time.
 
@@ -154,7 +154,7 @@ When metrics are produced by `submit-update-stats-job --update-mode metrics`, me
 often `custom-*` (for example `custom-data-file-mse`). Use `list-table-metrics` first and
 configure rules with the exact metric names returned by your environment.
 
-### Submit built-in update stats jobs
+### Submit Built-in Update Stats Jobs
 
 Submit built-in Iceberg update stats/metrics Spark jobs directly.
 
@@ -177,7 +177,7 @@ Notes:
   runtime classpath (for example via `spark.jars` in `--spark-conf`).
 - `--spark-conf` and `--updater-options` are flat JSON maps.
 
-### List table metrics
+### List Table Metrics
 
 Query stored metrics at table scope.
 
@@ -196,7 +196,7 @@ For partition scope, provide a partition path JSON array:
   --partition-path '[{"dt":"2026-01-01"}]'
 ```
 
-### List job metrics
+### List Job Metrics
 
 Query stored metrics at job scope.
 
@@ -206,7 +206,7 @@ Query stored metrics at job scope.
   --identifiers catalog.db.optimizer_job
 ```
 
-## Output guide
+## Output Guide
 
 - `SUMMARY: ...`: summary for `update-statistics` and `append-metrics`
 - `DRY-RUN: ...`: recommendation preview without job submission
@@ -227,7 +227,7 @@ MetricsResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<tab
 EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, evaluation=true, evaluatorName=gravitino-metrics-evaluator, actionTimeSeconds=1735689600, rangeSeconds=86400, beforeMetrics={row_count=[MetricSample{timestampSeconds=1735686000, value=120}]}, afterMetrics={row_count=[MetricSample{timestampSeconds=1735689600, value=100}]}}
 ```
 
-## Related docs
+## Related Docs
 
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Configuration](./optimizer-configuration.md)

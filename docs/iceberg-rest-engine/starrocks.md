@@ -39,7 +39,7 @@ PROPERTIES
 `client.factory` must be set explicitly for StarRocks to correctly initialize the Iceberg AWS client.
 :::
 
-## Usage examples
+## Usage Examples
 
 ```sql
 SET CATALOG iceberg;
@@ -50,7 +50,7 @@ INSERT INTO t VALUES (1);
 SELECT * FROM t;
 ```
 
-## Gravitino connector vs Iceberg REST
+## Gravitino Connector Vs Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

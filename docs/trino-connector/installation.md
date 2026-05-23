@@ -10,7 +10,7 @@ Refer to the [Deploying Trino documentation](https://trino.io/docs/current/insta
 
 The examples in this document use Trino `469` by default.
 
-## Get the connector package
+## Get the Connector Package
 
 Gravitino provides different Trino connector packages for different Trino version segments.
 Choose the package by your Trino server version first.
@@ -57,7 +57,7 @@ After unpacking, you can see the connector directory:
 
 `gravitino-trino-connector-469-472-<version>`
 
-## Install the connector package
+## Install the Connector Package
 
 1. Download and unpack the correct Gravitino Trino connector tarball for your Trino version.
 2. Rename the unpacked connector directory to `gravitino`, and then copy it to the Trino plugin directory.
@@ -78,7 +78,7 @@ discovery.uri=http://0.0.0.0:8080
 
 Install the Gravitino Trino connector in Trino office docker images step by step.
 
-### Run the container
+### Run the Container
 
 Use the docker command to create a container from the `trinodb/trino` image. Assign it the trino-gravitino name.
 Run it in the background, and map the default Trino port, which is 8080, from inside the container to port 8080 on your machine.
@@ -90,7 +90,7 @@ docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:469
 Run `docker ps` to check whether the container is running.
 
 
-### Install the Apache Gravitino Trino connector
+### Install the Apache Gravitino Trino Connector
 
 Download the Gravitino Trino connector tarball for Trino `469` and unpack it.
 
@@ -131,7 +131,7 @@ discovery.uri=http://localhost:8080
 catalog.management=dynamic
 ```
 
-### Configure the Apache Gravitino Trino connector
+### Configure the Apache Gravitino Trino Connector
 
 Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, refer to the [Gravitino getting started](../getting-started/index.md).
 
@@ -161,7 +161,7 @@ And then restart the Trino container to load the Gravitino Trino connector.
 docker restart trino-gravitino
 ```
 
-### Verify the Apache Gravitino Trino connector
+### Verify the Apache Gravitino Trino Connector
 
 Use the Trino CLI to connect to the Trino container and run a query.
 

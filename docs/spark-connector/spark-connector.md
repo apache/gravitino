@@ -21,7 +21,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 * Scala 2.12 or 2.13
 * JDK 8, 11 or 17
 
-## How to use it
+## How to Use It
 
 1. [Build](../how-to-build.md) or download the package ([gravitino-spark-connector-runtime-3.3](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.3), [gravitino-spark-connector-runtime-3.4](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.4), [gravitino-spark-connector-runtime-3.5](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5)), and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
@@ -80,7 +80,7 @@ SELECT hs.name, is.score FROM hive.db.hive_students hs JOIN iceberg_scores is ON
 The command `SHOW CATALOGS` will only display the Spark default catalog, named spark_catalog, due to limitations within the Spark catalog manager. It does not list the catalogs present in the metalake. However, after explicitly using the `USE` command with a specific catalog name, that catalog name then becomes visible in the output of `SHOW CATALOGS`.
 :::
 
-## Datatype mapping
+## Datatype Mapping
 
 Gravitino spark connector support the following datatype mapping between Spark and Gravitino.
 

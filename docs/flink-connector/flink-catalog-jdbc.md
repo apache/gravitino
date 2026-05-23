@@ -115,7 +115,7 @@ SELECT * FROM jdbc_table_a;
      
 ```
 
-## Catalog properties
+## Catalog Properties
 
 Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink JDBC connector configuration.
 

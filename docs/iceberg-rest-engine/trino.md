@@ -33,7 +33,7 @@ The `warehouse` property is managed by the Gravitino IRC server and does not nee
 the Trino catalog configuration.
 :::
 
-### No authentication
+### No Authentication
 
 ```properties
 connector.name=iceberg
@@ -51,7 +51,7 @@ iceberg.file-format=PARQUET
 iceberg.compression-codec=ZSTD
 ```
 
-### OAuth2 authentication
+### OAuth2 Authentication
 
 ```properties
 connector.name=iceberg
@@ -113,29 +113,29 @@ Or connect without specifying a default catalog and qualify queries fully:
 trino --server http://<trino-host>:8080
 ```
 
-## Usage examples
+## Usage Examples
 
 Once connected, use the Trino CLI or any Trino-compatible client.
 
-### List schemas
+### List Schemas
 
 ```sql
 SHOW SCHEMAS FROM gravitino_irc;
 ```
 
-### List tables
+### List Tables
 
 ```sql
 SHOW TABLES FROM gravitino_irc.<namespace>;
 ```
 
-### Query a table
+### Query a Table
 
 ```sql
 SELECT * FROM gravitino_irc.<namespace>.<table> LIMIT 10;
 ```
 
-### Create a schema
+### Create a Schema
 
 When creating a schema in Trino, a storage location must be specified:
 
@@ -144,7 +144,7 @@ CREATE SCHEMA gravitino_irc.<namespace>
 WITH (location = 's3://<bucket>/<namespace>/');
 ```
 
-### Create a table
+### Create a Table
 
 ```sql
 CREATE TABLE gravitino_irc.<namespace>.new_table (
@@ -158,9 +158,9 @@ WITH (
 );
 ```
 
-## Known issues
+## Known Issues
 
-### `TIMESTAMP WITH TIME ZONE` values are not adjusted to the client session time zone
+### `TIMESTAMP with TIME ZONE` Values Are Not Adjusted to the Client Session Time Zone
 
 For `TIMESTAMP WITH TIME ZONE` values, Trino does not adjust query results according to the client
 session time zone. Unlike Spark and Flink, Trino displays these values based on the stored
@@ -176,7 +176,7 @@ SELECT
 FROM <catalog>.<namespace>.<table>;
 ```
 
-## Gravitino connector vs Iceberg REST
+## Gravitino Connector Vs Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|
@@ -185,9 +185,9 @@ FROM <catalog>.<namespace>.<table>;
 | Supported engines        | Trino, Spark, Flink, Daft   | Any Iceberg-compatible engine |
 | Credential vending       | Varies                      | Yes (S3, GCS, OSS, ADLS)      |
 
-## Known issues
+## Known Issues
 
-### Trino identifiers are not treated as case sensitive
+### Trino Identifiers Are Not Treated as Case Sensitive
 
 Trino identifiers are not treated as case sensitive. As a result, metadata names that differ
 only by letter case cannot be distinguished. See [Trino identifier

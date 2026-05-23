@@ -83,8 +83,10 @@ Apply these rules when reviewing or writing messages:
 - Use the Oxford comma.
 - No em dashes. Use commas, parentheses, or two separate sentences.
 - Avoid starting sentences with "This" as a bare pronoun. Use "This [noun]" with an explicit referent, or restructure.
-- Headings: Title Case for H1 and H2, sentence case for H3 and below.
+- Headings use Title Case at H1 through H4. Capitalize the first word, the last word, and all nouns, verbs, adjectives, adverbs, and pronouns. Lowercase articles (a, an, the), coordinating conjunctions (and, but, or, nor), and prepositions of four letters or fewer (with, in, for, by, to, of, at, on) unless they are the first or last word of the heading. Use sentence case at H5 and below if any exist.
 - Avoid gerund-led headings. Rare exceptions are acceptable for well-established phrases like "Getting started" that have no clean noun-phrase equivalent. When in doubt, use a noun phrase.
+- Avoid "Example of <gerund-ing> X" headings. When the section walks the reader through doing something, use a specific-imperative heading instead ("Configure X", "Create X", "Connect X").
+- No terminal punctuation in headings. Headings do not end with a period, colon, exclamation mark, or other terminal punctuation. The content below the heading speaks for itself.
 - No fragment headings starting with prepositions or conjunctions. Headings like "With X", "Without X", "For X", "From X", "And X", "But X", "Or X" implicitly attach to a subject elsewhere and read as fragments. Prefer a noun phrase ("X", "X configuration", "No X") or an imperative ("Configure X").
 - Don't repeat the leading verb across consecutive bullets ("Supports X" / "Supports Y" / "Supports Z"). Either lift the verb into a shared lead-in ("The catalog supports:" followed by noun-phrase bullets) or vary the verb so each bullet says something distinct. Identical leading verbs are noise — readers skim the difference, not the repetition.
 - A sentence that introduces a numbered or bulleted list ends with a colon, not a period. When the sentence references the list forward with "the X", use "these X" instead.

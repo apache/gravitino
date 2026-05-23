@@ -12,7 +12,7 @@ last_update:
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-## Table partitioning
+## Table Partitioning
 
 To create a partitioned table, you should provide the following two components to construct a valid partitioned table:
 
@@ -45,7 +45,7 @@ For function partitioning, you should provide the function name and the function
 
 Once a partitioned table is created, you can [manage its partitions using Gravitino](./manage-table-partition-using-gravitino.md).
 
-## Table distribution
+## Table Distribution
 
 To create a distribution(bucketed) table, you should use the following three components to construct a valid bucketed table:
 
@@ -90,7 +90,7 @@ Distributions.auto(Strategy.HASH, NamedReference.field("score"));
 
 </Tabs>
 
-## Sort ordering
+## Sort Ordering
 
 To define a sorted order table, you should use the following three components to construct a valid sorted order table:
 
