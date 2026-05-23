@@ -45,7 +45,7 @@ To use function management, please make sure that:
 ### Register a function
 
 You can register a function by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
-endpoint or just use the Gravitino Java/Python client. The following is an example of registering
+endpoint or use the Gravitino Java/Python client. The following is an example of registering
 a scalar function:
 
 <Tabs groupId="language" queryString>

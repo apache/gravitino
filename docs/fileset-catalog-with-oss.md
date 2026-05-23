@@ -439,7 +439,7 @@ For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 
 ### Using the GVFS Python client to access a fileset
 
-In order to access fileset with OSS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+To access fileset with OSS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
 | Configuration item      | Description                       | Default value | Required | Since version    |
 |-------------------------|-----------------------------------|---------------|----------|------------------|

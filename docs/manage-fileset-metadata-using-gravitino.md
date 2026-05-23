@@ -39,7 +39,7 @@ For a fileset catalog, you must specify the catalog `type` as `FILESET` when cre
 :::
 
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
-endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
+endpoint or use the Gravitino Java client. The following is an example of creating a catalog:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -145,7 +145,7 @@ Users should create a metalake and a catalog before creating a schema.
 ### Create a schema
 
 You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas`
-endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
+endpoint or use the Gravitino Java client. The following is an example of creating a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -247,7 +247,7 @@ same.
 ### Create a fileset
 
 You can create a fileset by sending a `POST` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/filesets` endpoint or just use the Gravitino Java
+/catalogs/{catalog_name}/schemas/{schema_name}/filesets` endpoint or use the Gravitino Java
 client. The following is an example of creating a fileset with single storage location:
 
 <Tabs groupId="language" queryString>

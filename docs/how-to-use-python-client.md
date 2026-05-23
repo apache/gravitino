@@ -164,7 +164,7 @@ And you will see a new Python SDK is added, and it has several packages installe
 
 ##### Note about running integration tests of Gravitino Python client in IntelliJ IDEA.
 
-Since integration tests require Gravitino Java distribution, so you can not run tests with IntelliJ
+Since integration tests require Gravitino Java distribution, so you cannot run tests with IntelliJ
 [Run tests button](https://www.jetbrains.com/help/idea/performing-tests.html),
 Please execute this gradle task with [Gradle Plugin](https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html)
 or in command line to run integration tests.

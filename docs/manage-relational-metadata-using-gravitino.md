@@ -62,7 +62,7 @@ similar, but the catalog type, provider, and properties may be different. For mo
 For relational catalog, you must specify the catalog `type` as `RELATIONAL` when creating a catalog.
 :::
 
-You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of creating a catalog:
+You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or use the Gravitino Java client. The following is an example of creating a catalog:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -140,7 +140,7 @@ Currently, Gravitino supports the following catalog providers:
 
 ### Load a catalog
 
-You can load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a catalog:
+You can load a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client. The following is an example of loading a catalog:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -174,7 +174,7 @@ catalog = gravitino_client.load_catalog("catalog")
 
 ### Alter a catalog
 
-You can modify a catalog by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of altering a catalog:
+You can modify a catalog by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client. The following is an example of altering a catalog:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -341,7 +341,7 @@ Deleting a catalog by "force" will:
 - Delete the catalog itself even if it is enabled.
 - Not delete the external resources (such as database, table, etc.) associated with sub-entities unless they are managed (such as managed fileset).
 
-You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a catalog:
+You can remove a catalog by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}` endpoint or use the Gravitino Java client. The following is an example of dropping a catalog:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -380,7 +380,7 @@ gravitino_client.drop_catalog(name="catalog", force=False)
 
 ### List all catalogs in a metalake
 
-You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs in
+You can list all catalogs under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs` endpoint or use the Gravitino Java client. The following is an example of listing all the catalogs in
 a metalake:
 
 <Tabs groupId="language" queryString>
@@ -417,7 +417,7 @@ catalog_names = gravitino_client.list_catalogs()
 
 ### List all catalogs' information in a metalake
 
-You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or just use the Gravitino Java client. The following is an example of listing all the catalogs' information in a metalake:
+You can list all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or use the Gravitino Java client. The following is an example of listing all the catalogs' information in a metalake:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -460,7 +460,7 @@ Users should create a metalake and a catalog, then ensure that the metalake and 
 
 ### Create a schema
 
-You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of creating a schema:
+You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or use the Gravitino Java client. The following is an example of creating a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -528,7 +528,7 @@ Currently, Gravitino supports the following schema property:
 
 ### Load a schema
 
-You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a schema:
+You can create a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or use the Gravitino Java client. The following is an example of loading a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -565,7 +565,7 @@ schema: Schema = catalog.as_schemas().load_schema(name="schema")
 
 ### Alter a schema
 
-You can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a schema:
+You can change a schema by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or use the Gravitino Java client. The following is an example of modifying a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -628,7 +628,7 @@ Currently, Gravitino supports the following changes to a schema:
 | Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `SchemaChange.removeProperty("key1")`         |
 
 ### Drop a schema
-You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a schema:
+You can remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or use the Gravitino Java client. The following is an example of dropping a schema:
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -671,7 +671,7 @@ Some catalogs may not support cascading deletion of a schema, please refer to th
 
 ### List all schemas under a catalog
 
-You can list all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or just use the Gravitino Java client. The following is an example of listing all the schemas
+You can list all schemas under a catalog by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas` endpoint or use the Gravitino Java client. The following is an example of listing all the schemas
     in a catalog:
 
 
@@ -716,7 +716,7 @@ Users should create a metalake, a catalog and a schema, then ensure that the met
 
 ### Create a table
 
-You can create a table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of creating a table:
+You can create a table by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or use the Gravitino Java client. The following is an example of creating a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -886,7 +886,7 @@ tableCatalog.createTable(
 The provided example demonstrates table creation but isn't directly executable in Gravitino, since not all catalogs fully support these capabilities.
 :::
 
-In order to create a table, you need to provide the following information:
+To create a table, you need to provide the following information:
 
 - Table column name and type
 - Table column default value (optional)
@@ -1069,7 +1069,7 @@ The code above is an example of creating a Hive table. For other catalogs, the c
 
 ### Load a table
 
-You can load a table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of loading a table:
+You can load a table by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or use the Gravitino Java client. The following is an example of loading a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1103,7 +1103,7 @@ tableCatalog.loadTable(NameIdentifier.of("schema", "table"));
 
 ### Alter a table
 
-You can modify a table by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of modifying a table:
+You can modify a table by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or use the Gravitino Java client. The following is an example of modifying a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1161,7 +1161,7 @@ Currently, Gravitino supports the following changes to a table:
 
 ### Drop a table
 
-You can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or just use the Gravitino Java client. The following is an example of dropping a table:
+You can remove a table by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables/{table_name}` endpoint or use the Gravitino Java client. The following is an example of dropping a table:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -1204,7 +1204,7 @@ Hive catalog and lakehouse-iceberg catalog supports `purgeTable` while jdbc-mysq
 
 ### List all tables under a schema
 
-You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or just use the Gravitino Java client. The following is an example of listing all the tables in a schema:
+You can list all tables in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/tables` endpoint or use the Gravitino Java client. The following is an example of listing all the tables in a schema:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
