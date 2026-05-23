@@ -21,11 +21,11 @@ take advantage of relational storage to manage metadata.
 Relational backend storage supports the `JDBCBackend`, and `H2`, `MySQL` and `PostgreSQL` are supported for `JDBCBackend`, `H2` is the
 default storage for `JDBCBackend`.
 
-## How to Use H2
+## H2
 
 As mentioned above, `H2` is the default storage for `JDBCBackend`, so you can use `H2` directly without any additional configuration.
 
-## How to Use MySQL
+## MySQL
 
 ### Prerequisites
 
@@ -91,7 +91,7 @@ Finally, you can run the script in the distribution package directory to start t
 ./${GRAVITINO_HOME}/bin/gravitino.sh start
 ```
 
-## How to Use PostgreSQL
+## PostgreSQL
 
 ### Prerequisites
 
