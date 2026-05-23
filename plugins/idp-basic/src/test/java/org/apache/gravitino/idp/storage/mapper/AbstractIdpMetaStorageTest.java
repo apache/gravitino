@@ -53,6 +53,10 @@ public abstract class AbstractIdpMetaStorageTest {
   protected JDBCBackend backend;
   public SqlSession sharedSession;
 
+  protected Config getConfig() {
+    return config;
+  }
+
   private Config config;
   private Path h2Path;
 

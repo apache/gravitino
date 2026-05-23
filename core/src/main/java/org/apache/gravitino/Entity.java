@@ -60,6 +60,9 @@ public interface Entity extends Serializable {
 
   String JOB_SCHEMA_NAME = "job";
 
+  /** The reserved namespace for built-in IdP entities. */
+  String IDP_RESERVED_NAMESPACE = "idp";
+
   /** Enumeration defining the types of entities in the Gravitino framework. */
   @Getter
   enum EntityType {
@@ -82,7 +85,9 @@ public interface Entity extends Serializable {
     JOB_TEMPLATE,
     JOB,
     AUDIT,
-    FUNCTION;
+    FUNCTION,
+    IDP_USER,
+    IDP_GROUP;
   }
 
   /**

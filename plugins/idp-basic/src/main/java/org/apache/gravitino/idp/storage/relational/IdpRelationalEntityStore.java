@@ -1,0 +1,407 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.idp.storage.relational;
+
+import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.cache.CacheFactory;
+import org.apache.gravitino.cache.CachedEntityIdResolver;
+import org.apache.gravitino.cache.EntityCache;
+import org.apache.gravitino.cache.EntityCacheKey;
+import org.apache.gravitino.cache.EntityCacheRelationKey;
+import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.relational.RelationalBackend;
+import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.utils.Executable;
+
+/**
+ * Relational entity store for built-in IdP entities. It mirrors {@link
+ * org.apache.gravitino.storage.relational.RelationalEntityStore} but uses {@link IdpJDBCBackend}.
+ */
+public class IdpRelationalEntityStore implements EntityStore, SupportsRelationOperations {
+  private RelationalBackend backend;
+  private IdpRelationalGarbageCollector garbageCollector;
+  private EntityCache cache;
+
+  @VisibleForTesting
+  public EntityCache getCache() {
+    return cache;
+  }
+
+  @Override
+  public void initialize(Config config) throws RuntimeException {
+    if (config.get(Configs.CACHE_ENABLED)) {
+      this.cache = CacheFactory.getEntityCache(config);
+      EntityIdService.initialize(
+          new CachedEntityIdResolver(cache, new IdpRelationalEntityStoreIdResolver()));
+    } else {
+      this.cache = new NoOpsCache(config);
+      EntityIdService.initialize(new IdpRelationalEntityStoreIdResolver());
+    }
+
+    this.backend = createRelationalEntityBackend(config);
+    this.garbageCollector = new IdpRelationalGarbageCollector(backend, config);
+    this.garbageCollector.start();
+  }
+
+  private RelationalBackend createRelationalEntityBackend(Config config) {
+    RelationalBackend relationalBackend = new IdpJDBCBackend();
+    relationalBackend.initialize(config);
+    return relationalBackend;
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, Entity.EntityType entityType) throws IOException {
+    return backend.list(namespace, entityType, false);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> list(
+      Namespace namespace, Class<E> type, Entity.EntityType entityType, boolean allFields)
+      throws IOException {
+    return backend.list(namespace, entityType, allFields);
+  }
+
+  @Override
+  public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+    boolean existsInCache = cache.contains(ident, entityType);
+    return existsInCache || backend.exists(ident, entityType);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
+      throws IOException, EntityAlreadyExistsException {
+    backend.insert(e, overwritten);
+    cache.put(e);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E update(
+      NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    E updatedEntity = backend.update(ident, entityType, updater);
+    cache.invalidate(ident, entityType);
+    return updatedEntity;
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E get(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
+      throws NoSuchEntityException, IOException {
+    return cache.withCacheLock(
+        EntityCacheRelationKey.of(ident, entityType),
+        () -> {
+          Optional<E> entityFromCache = cache.getIfPresent(ident, entityType);
+          if (entityFromCache.isPresent()) {
+            return entityFromCache.get();
+          }
+
+          E entity = backend.get(ident, entityType);
+          cache.put(entity);
+          return entity;
+        });
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> batchGet(
+      List<NameIdentifier> idents, Entity.EntityType entityType, Class<E> clazz) {
+    List<E> allEntities = new ArrayList<>();
+    List<NameIdentifier> noCacheIdents =
+        idents.stream()
+            .filter(
+                ident -> {
+                  Optional<E> entity = cache.getIfPresent(ident, entityType);
+                  entity.ifPresent(allEntities::add);
+                  return entity.isEmpty();
+                })
+            .toList();
+    List<E> fetchEntities = backend.batchGet(noCacheIdents, entityType);
+    for (E entity : fetchEntities) {
+      cache.put(entity);
+      allEntities.add(entity);
+    }
+    return allEntities;
+  }
+
+  @Override
+  public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
+      throws IOException {
+    try {
+      boolean deleted = backend.delete(ident, entityType, cascade);
+      return deleted;
+    } catch (NoSuchEntityException e) {
+      return false;
+    } finally {
+      cache.invalidate(ident, entityType);
+    }
+  }
+
+  @Override
+  public <R, E extends Exception> R executeInTransaction(Executable<R, E> executable) {
+    throw new UnsupportedOperationException("Unsupported operation in relational entity store.");
+  }
+
+  @Override
+  public void close() throws IOException {
+    cache.clear();
+    garbageCollector.close();
+    backend.close();
+  }
+
+  @Override
+  public SupportsRelationOperations relationOperations() {
+    return this;
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
+      Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
+      throws IOException {
+    return cache.withCacheLock(
+        EntityCacheRelationKey.of(nameIdentifier, identType, relType),
+        () -> {
+          Optional<List<E>> entities = cache.getIfPresent(relType, nameIdentifier, identType);
+          if (entities.isPresent()) {
+            return entities.get();
+          }
+
+          // Use allFields=true to cache complete entities
+          List<E> backendEntities =
+              backend.listEntitiesByRelation(relType, nameIdentifier, identType, true);
+
+          cache.put(nameIdentifier, identType, relType, backendEntities);
+
+          return backendEntities;
+        });
+  }
+
+  @Override
+  public List<RelationalEntity<?>> batchListEntitiesByRelation(
+      Type relType, List<NameIdentifier> nameIdentifiers, Entity.EntityType identType)
+      throws IOException {
+    if (nameIdentifiers == null || nameIdentifiers.isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    List<EntityCacheKey> lockKeys = new ArrayList<>();
+    for (NameIdentifier id : nameIdentifiers) {
+      lockKeys.add(EntityCacheRelationKey.of(id, identType, relType));
+    }
+
+    return cache.withMultipleKeyCacheLock(
+        lockKeys,
+        () -> {
+          List<RelationalEntity<?>> result = new ArrayList<>();
+          List<NameIdentifier> uncachedIdentifiers = new ArrayList<>();
+
+          for (NameIdentifier nameIdentifier : nameIdentifiers) {
+            Optional<List<RelationalEntity<?>>> cachedRelations =
+                getCachedRelations(relType, nameIdentifier, identType);
+            if (cachedRelations.isPresent()) {
+              result.addAll(cachedRelations.get());
+            } else {
+              uncachedIdentifiers.add(nameIdentifier);
+            }
+          }
+
+          if (!uncachedIdentifiers.isEmpty()) {
+            List<RelationalEntity<?>> backendRelations =
+                backend.batchListEntitiesByRelation(relType, uncachedIdentifiers, identType);
+            result.addAll(backendRelations);
+
+            batchPopulateRelationCache(relType, identType, uncachedIdentifiers, backendRelations);
+          }
+
+          return result;
+        });
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getEntityByRelation(
+      Type relType,
+      NameIdentifier srcIdentifier,
+      Entity.EntityType srcType,
+      NameIdentifier destEntityIdent)
+      throws IOException, NoSuchEntityException {
+    return cache.withCacheLock(
+        EntityCacheRelationKey.of(srcIdentifier, srcType, relType),
+        () -> {
+          Optional<List<E>> entities = cache.getIfPresent(relType, srcIdentifier, srcType);
+          if (entities.isPresent()) {
+            return entities.get().stream()
+                .filter(e -> e.nameIdentifier().equals(destEntityIdent))
+                .findFirst()
+                .orElseThrow(
+                    () ->
+                        new NoSuchEntityException(
+                            "No such entity with ident: %s", destEntityIdent));
+          }
+
+          // Use allFields=true to cache complete entities
+          List<E> backendEntities =
+              backend.listEntitiesByRelation(relType, srcIdentifier, srcType, true);
+
+          E r =
+              backendEntities.stream()
+                  .filter(e -> e.nameIdentifier().equals(destEntityIdent))
+                  .findFirst()
+                  .orElseThrow(
+                      () ->
+                          new NoSuchEntityException(
+                              "No such entity with ident: %s", destEntityIdent));
+
+          cache.put(srcIdentifier, srcType, relType, backendEntities);
+
+          return r;
+        });
+  }
+
+  @Override
+  public void insertRelation(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier srcIdentifier,
+      Entity.EntityType srcType,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType,
+      boolean override)
+      throws IOException {
+    backend.insertRelation(relType, srcIdentifier, srcType, dstIdentifier, dstType, override);
+    cache.invalidate(srcIdentifier, srcType, relType);
+    cache.invalidate(dstIdentifier, dstType, relType);
+  }
+
+  @Override
+  public void batchInsertRelations(
+      Type relType,
+      List<NameIdentifier> srcIdentifiers,
+      Entity.EntityType srcType,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType,
+      boolean override)
+      throws IOException {
+    if (srcIdentifiers == null || srcIdentifiers.isEmpty()) {
+      return;
+    }
+    backend.batchInsertRelations(
+        relType, srcIdentifiers, srcType, dstIdentifier, dstType, override);
+    for (NameIdentifier ident : srcIdentifiers) {
+      cache.invalidate(ident, srcType, relType);
+    }
+    cache.invalidate(dstIdentifier, dstType, relType);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
+      Type relType,
+      NameIdentifier srcEntityIdent,
+      Entity.EntityType srcEntityType,
+      NameIdentifier[] destEntitiesToAdd,
+      NameIdentifier[] destEntitiesToRemove)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+
+    // Invalidate after the backend write, not before. Invalidating before creates a window where
+    // a concurrent read can repopulate the cache with stale pre-commit data.
+    List<E> result =
+        backend.updateEntityRelations(
+            relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+
+    cache.invalidate(srcEntityIdent, srcEntityType, relType);
+    for (NameIdentifier destToAdd : destEntitiesToAdd) {
+      cache.invalidate(destToAdd, srcEntityType, relType);
+    }
+
+    for (NameIdentifier destToRemove : destEntitiesToRemove) {
+      cache.invalidate(destToRemove, srcEntityType, relType);
+    }
+
+    return result;
+  }
+
+  @Override
+  public int batchDelete(
+      List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
+      throws IOException {
+    return backend.batchDelete(entitiesToDelete, cascade);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
+      throws IOException, EntityAlreadyExistsException {
+    backend.batchPut(entities, overwritten);
+  }
+
+  private <E extends Entity & HasIdentifier> Optional<List<RelationalEntity<?>>> getCachedRelations(
+      SupportsRelationOperations.Type relType,
+      NameIdentifier nameIdentifier,
+      Entity.EntityType identType) {
+    Optional<List<E>> entitiesOpt = cache.getIfPresent(relType, nameIdentifier, identType);
+    if (entitiesOpt.isPresent()) {
+      List<RelationalEntity<?>> cachedRelations = new ArrayList<>();
+      for (E entity : entitiesOpt.get()) {
+        cachedRelations.add(new RelationalEntity<>(relType, nameIdentifier, identType, entity));
+      }
+      return Optional.of(cachedRelations);
+    }
+    return Optional.empty();
+  }
+
+  private <E extends Entity & HasIdentifier> void batchPopulateRelationCache(
+      SupportsRelationOperations.Type relType,
+      Entity.EntityType identType,
+      List<NameIdentifier> uncachedIdentifiers,
+      List<RelationalEntity<?>> backendRelations) {
+    Map<NameIdentifier, List<RelationalEntity<?>>> relationsBySource = new HashMap<>();
+    for (RelationalEntity<?> relation : backendRelations) {
+      relationsBySource.computeIfAbsent(relation.source(), k -> new ArrayList<>()).add(relation);
+    }
+
+    for (NameIdentifier sourceId : uncachedIdentifiers) {
+      List<RelationalEntity<?>> sourceRelations = relationsBySource.get(sourceId);
+      List<E> entityList = new ArrayList<>();
+      if (sourceRelations != null) {
+        for (RelationalEntity<?> rel : sourceRelations) {
+          @SuppressWarnings("unchecked")
+          E entity = (E) rel.targetEntity();
+          entityList.add(entity);
+        }
+      }
+
+      cache.put(sourceId, identType, relType, entityList);
+    }
+  }
+}
