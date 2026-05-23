@@ -174,7 +174,7 @@ sudo apt install apt-transport-https ca-certificates curl software-properties-co
 
 Updating the package list ensures you have the latest information on the newest versions of packages and dependencies. Installing the necessary packages lets your system download and manage additional software securely.
 
-### Download and Setup Java SDK 17
+### Download and Set Up Java SDK 17
 
 **On Ubuntu (WSL):**
 

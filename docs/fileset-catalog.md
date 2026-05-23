@@ -83,7 +83,7 @@ files.
 - For OSS, refer to [Fileset-catalog-with-oss](./fileset-catalog-with-oss.md) for more details.
 - For Azure Blob Storage, refer to [Fileset-catalog-with-adls](./fileset-catalog-with-adls.md) for more details.
 
-### How to Custom Your Own HCFS File System Fileset?
+### Implement a Custom HCFS File System Fileset
 
 Developers and users can custom their own HCFS file system fileset by implementing the`FileSystemProvider` interface in
 the jar [gravitino-hadoop-common](https://repo1.maven.org/maven2/org/apache/gravitino/gravitino-hadoop-common/). The
