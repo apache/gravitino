@@ -149,7 +149,7 @@ SHOW TABLES from catalog_hive.company;
 
 ### Cross-catalog Queries
 
-In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data, and the sales department uses PostgreSQL. You can run some interesting queries by joining the two departments' data together with Gravitino.
+In a company, there may be different departments using different data stacks. In this example, the HR department uses Apache Hive to store its data, and the sales department uses PostgreSQL. Gravitino lets you join the two departments' data together with interesting queries.
 
 To know which employee has the largest sales amount, run this SQL:
 
@@ -223,7 +223,7 @@ demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
 ### Use Apache Iceberg REST Service
 
 Suppose you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
-Gravitino provides an Iceberg REST catalog service. You can use Spark to access the REST catalog to write the table data.
+Gravitino provides an Iceberg REST catalog service. Use Spark to access the REST catalog to write the table data.
 Then, you can use Trino to read the data from the Hive table and join it with the Iceberg table.
 
 `spark-defaults.conf` is as follows (It's already configured in the playground):

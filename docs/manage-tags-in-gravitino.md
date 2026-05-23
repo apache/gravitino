@@ -41,8 +41,8 @@ the future versions.
 
 ### Create New Tags
 
-The first step to manage tags is to create new tags. You can create a new tag by providing a tag
-name, optional comment and properties.
+The first step to manage tags is to create new tags. Create a tag by providing a
+name, optional comment, and properties.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

@@ -39,7 +39,7 @@ Javadoc and REST API documentation.
 
 ### Create New Policies
 
-The first step to managing policies is to create new policies. You can create a new policy by providing a policy
+The first step to managing policies is to create new policies. Create a policy by providing a
 name, type, and other optional fields like comment, enabled, etc.
 
 Gravitino supports two kinds of policies: built-in policies and custom policies.

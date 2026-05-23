@@ -20,7 +20,7 @@ This document describes how to use Apache Gravitino to manage a generic lakehous
 
 :::info Current Support
 Gravitino supports **external Delta tables only**. This means:
-- You can register existing Delta tables in Gravitino
+- Register existing Delta tables in Gravitino
 - Gravitino manages metadata only (schema, location, properties)
 - The physical Delta table data remains independent
 - Dropping tables from Gravitino does not delete the underlying Delta data

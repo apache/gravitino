@@ -88,9 +88,9 @@ license: "This software is licensed under the Apache License version 2."
  
   You can add `-x test` to skip the tests using `./gradlew build -x test`.
 
-  The built Gravitino libraries are Java 17 compatible and verified under 17 environments. You can use Java 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
+  The built Gravitino libraries are Java 17 compatible and verified under 17 environments. Use Java 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
 
-  The built jars are under the modules `build/libs` directory. You can publish them in your Maven repository for use in your project.
+  The built jars are under the modules `build/libs` directory. Publish them in your Maven repository for use in your project.
   :::
 
 3. Get the Gravitino server binary package.
@@ -120,9 +120,9 @@ license: "This software is licensed under the Apache License version 2."
 
   The `assembleDistribution` command creates `gravitino-{version}-bin.tar.gz`, `gravitino-{version}-bin.tar.gz.sha256`, `gravitino-{version}-bin-all.tar.gz`, `gravitino-{version}-bin-all.tar.gz.sha256` under the `distribution` directory.
   
-  About the difference between `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin-all.tar.gz`, refer to the explanation of the difference between `package` and `package-all` in the previous step.  
+  `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin-all.tar.gz` follow the same distinction as `package` and `package-all` from the previous step.  
 
-  You can deploy these to your production environment.
+  Deploy these to your production environment.
 
   :::note
   The `gravitino-{version}-bin.tar.gz` file is the Gravitino **server** distribution package, and the `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino server distribution package.

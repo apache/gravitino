@@ -339,5 +339,5 @@ If a compile error occurs due to `The following artifacts could not be resolved:
    Download the `trino-cli` jar from the [Trino release page](https://trino.io/docs/469/client/cli.html). Use the CLI version that matches your Trino server version.
    :::
 
-10. You can now develop the Gravitino Trino connector in the Gravitino project and debug it in the Trino project.
+10. Develop the Gravitino Trino connector in the Gravitino project and debug it in the Trino project.
     ![](../assets/trino/show-catalogs.jpg)

@@ -491,11 +491,11 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 </TabItem>
 </Tabs>
 
-The returned `JobHandle` contains the job ID and other information about the job. You can use the job ID to
+The returned `JobHandle` contains the job ID and other information about the job. Use the job ID to
 check the job status and cancel the job.
 
 The runJob API will return immediately after the job is submitted to the job executor, and the job will be
-executed asynchronously. You can check the job status using the job ID returned by the runJob API.
+executed asynchronously. Check the job status using the job ID returned by the runJob API.
 
 ### List All Jobs
 
@@ -638,7 +638,7 @@ The following are the default configurations for the local job executor:
 ### Implement a Custom Job Executor
 
 Gravitino's job system is extensible: you can implement your own job executor
-to run jobs in a distributed environment. You can refer to the interface `JobExecutor` in the
+to run jobs in a distributed environment. Refer to the interface `JobExecutor` in the
 code [here](https://github.com/apache/gravitino/blob/main/core/src/main/java/org/apache/gravitino/connector/job/JobExecutor.java).
 
 After you implement your own job executor, you need to register it in the Gravitino server by

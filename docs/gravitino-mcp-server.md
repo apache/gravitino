@@ -10,7 +10,7 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 ### Requirements
 
 1. Python 3.10+
-2. uv is installed. You can install uv by following the [official guide](https://docs.astral.sh/uv/getting-started/installation/).
+2. uv is installed. Install uv by following the [official guide](https://docs.astral.sh/uv/getting-started/installation/).
 
 ### How to Run
 
