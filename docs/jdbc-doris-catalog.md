@@ -152,7 +152,7 @@ Unsupported for now.
     Please be aware that the index can only apply to a single column.
 
     <Tabs groupId='language' queryString>
-    <TabItem value="json" label="Json">
+    <TabItem value="json" label="JSON">
 
     ```json
     {

@@ -939,7 +939,7 @@ represented by ExternalType.
 The following shows the data structure of an external type in JSON and Java, enabling easy retrieval of its string value.
 
 <Tabs groupId='language' queryString>
-  <TabItem value="Json" label="Json">
+  <TabItem value="Json" label="JSON">
 
 ```json
 {
@@ -967,7 +967,7 @@ that the client does not recognize, it will be treated as an unparsed type on th
 The following shows the data structure of an unparsed type in JSON and Java, enabling easy retrieval of its value.
 
 <Tabs groupId='language' queryString>
-  <TabItem value="Json" label="Json">
+  <TabItem value="Json" label="JSON">
 
 ```json
 {

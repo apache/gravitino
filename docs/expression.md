@@ -18,7 +18,7 @@ Field reference is a reference to a field in a table.
 The following is an example of creating a field reference expression, demonstrating how to create a reference for the `student` field.
 
 <Tabs groupId='language' queryString>
-  <TabItem value="Json" label="Json">
+  <TabItem value="Json" label="JSON">
 
 ```json
 [
@@ -47,7 +47,7 @@ Literal is a constant value.
 The following is an example of creating a literal expression, demonstrating how to create a `NULL` literal and three different data types of literal expressions for the value `1024`.
 
 <Tabs groupId='language' queryString>
-  <TabItem value="Json" label="Json">
+  <TabItem value="Json" label="JSON">
 
 ```json
 [
@@ -96,7 +96,7 @@ Function expression represents a function call with/without arguments. The argum
 The following is an example of creating a function expression, demonstrating how to create function expressions for `rand()` and `date_trunc('year', birthday)`.
 
 <Tabs groupId='language' queryString>
-  <TabItem value="Json" label="Json">
+  <TabItem value="Json" label="JSON">
 
 ```json
 [
@@ -145,7 +145,7 @@ Unparsed expression is a special type of expression, serves exclusively for pres
 The following shows the data structure of an unparsed expression in JSON and Java, enabling easy retrieval of its value.
 
 <Tabs groupId='language' queryString>
-  <TabItem value="Json" label="Json">
+  <TabItem value="Json" label="JSON">
 
 ```json
 {

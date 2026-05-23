@@ -150,7 +150,7 @@ MySQL setting an auto-increment column requires simultaneously setting a unique 
 :::
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -231,7 +231,7 @@ The index name of the PRIMARY_KEY must be PRIMARY
 :::
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {

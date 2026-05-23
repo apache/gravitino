@@ -19,7 +19,7 @@ Although many catalogs inherently manage partitions automatically, there are sce
 
 The following table shows the partition operations supported across various catalogs in Gravitino:
 
-| Operation             | Hive catalog | Iceberg catalog | Jdbc-Mysql catalog | Jdbc-PostgreSQL catalog | Jdbc-Doris catalog |
+| Operation             | Hive catalog | Iceberg catalog | Jdbc-MySQL catalog | Jdbc-PostgreSQL catalog | Jdbc-Doris catalog |
 |-----------------------|--------------|-----------------|--------------------|-------------------------|--------------------|
 | Add Partition         | &#10004;     | &#10008;        | &#10008;           | &#10008;                | &#10004;           |
 | Get Partition by Name | &#10004;     | &#10008;        | &#10008;           | &#10008;                | &#10004;           |

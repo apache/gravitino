@@ -149,7 +149,7 @@ Hologres-specific table properties are set via the `WITH` clause during CREATE T
 Hologres supports HASH distribution via the `distribution_key` property in the `WITH` clause.
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -184,7 +184,7 @@ Hologres supports LIST partitioning with two variants:
 - **Logical partition tables** (Hologres V3.1+): `LOGICAL PARTITION BY LIST(col1[, col2])` — supports 1–2 partition columns. Enabled by setting property `is_logical_partitioned_table` to `true`.
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -219,7 +219,7 @@ Creating partition child tables (e.g., `CREATE TABLE child PARTITION OF parent F
 - Adding or deleting indexes via ALTER TABLE is not yet supported by Gravitino (Hologres natively supports index modification via rebuild commands, but this is not yet implemented in Gravitino).
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
