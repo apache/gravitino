@@ -15,13 +15,13 @@ document and familiarize yourself with the required tools.
 
 ## Upgrade Steps
 
-### Step 1: Shutdown Your Gravitino Instance
-Shutdown your Gravitino instance and restrict access to the
+### Step 1: Shut Down the Gravitino Instance
+Shut down the Gravitino instance and restrict access to the
 Apache Gravitino's database. It is very important that no one else
 accesses or modifies the contents of database while you are
 performing the schema upgrade.
 
-### Step 2: Backup Your Gravitino Instance
+### Step 2: Back Up the Gravitino Instance
 Create a backup of your database. This will allow
 you to revert any changes made during the upgrade process if
 something goes wrong. 
@@ -47,7 +47,7 @@ For PostgreSQL, you can use the following command to backup your database:
 pg_dump -U username -h hostname -d database_name -n schema_name -a -F c -f data_backup.sql
 ```
 
-### Step 3: Dump Your Gravitino Database
+### Step 3: Dump the Gravitino Database
 Dump your Gravitino database schema to a file
 
 #### MySQL
@@ -73,7 +73,7 @@ For PostgreSQL, you can use the following command to dump the database schema to
 pg_dump -U username -h hostname -d database_name -n schema_name -s -F c -f schema-x.y.z-postgresql.sql
 ```
 
-### Step 4: Determine Differences Between Your Schema and the Official Schema
+### Step 4: Determine Differences Between the Existing Schema and the Official Schema
 The schema upgrade scripts assume that the schema you are upgrading
 closely matches the official schema for your particular version of
 Gravitino. The files in this directory with names like
