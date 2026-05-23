@@ -20,7 +20,7 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 - `DROP NAMESPACE`
 - `LIST NAMESPACE`
 - `LOAD NAMESPACE`
-  - It can not return any user-specified configs now, as we only support FilesystemCatalog in spark-connector now.
+  - It cannot return any user-specified configs now, as we only support FilesystemCatalog in spark-connector now.
 - `CREATE TABLE`
   - Doesn't support distribution and sort orders.
 - `DROP TABLE`

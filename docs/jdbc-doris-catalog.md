@@ -132,7 +132,7 @@ Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYe
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
 
 :::note
-Gravitino can not load Doris `array`, `map` and `struct` type correctly, because Doris doesn't support these types in JDBC.
+Gravitino cannot load Doris `array`, `map` and `struct` type correctly, because Doris doesn't support these types in JDBC.
 :::
 
 

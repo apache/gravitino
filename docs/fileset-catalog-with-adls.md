@@ -433,7 +433,7 @@ For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-vers
 
 ### Using the GVFS Python client to access a fileset
 
-In order to access fileset with Azure Blob storage (ADLS) using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+To access fileset with Azure Blob storage (ADLS) using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
 | Configuration item           | Description                            | Default value | Required | Since version    |
 |------------------------------|----------------------------------------|---------------|----------|------------------|

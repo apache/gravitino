@@ -27,7 +27,7 @@ For a messaging catalog, you must specify the `type` as `messaging` when creatin
 :::
 
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
-endpoint or just use the Gravitino Java client. The following is an example of creating a messaging catalog:
+endpoint or use the Gravitino Java client. The following is an example of creating a messaging catalog:
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -144,7 +144,7 @@ Users should create a metalake, a catalog and a schema, then ensure that the met
 ### Create a topic
 
 You can create a topic by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics`
-endpoint or just use the Gravitino Java client. The following is an example of creating a topic:
+endpoint or use the Gravitino Java client. The following is an example of creating a topic:
 
 
 <Tabs groupId='language' queryString>
@@ -193,7 +193,7 @@ topicCatalog.createTopic(
 ### Alter a topic
 
 You can modify a topic by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics/{topic_name}`
-endpoint or just use the Gravitino Java client. The following is an example of altering a topic:
+endpoint or use the Gravitino Java client. The following is an example of altering a topic:
 
 
 <Tabs groupId='language' queryString>

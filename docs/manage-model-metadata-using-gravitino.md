@@ -31,7 +31,7 @@ Please also be aware that the `provider` is not required for a model catalog.
 :::
 
 You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
-endpoint or just use the Gravitino Java/Python client. The following is an example of creating a
+endpoint or use the Gravitino Java/Python client. The following is an example of creating a
 catalog:
 
 <Tabs groupId="language" queryString>
@@ -121,7 +121,7 @@ Users should create a metalake and a catalog before creating a schema.
 ### Create a schema
 
 You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas`
-endpoint or just use the Gravitino Java/Python client. The following is an example of creating a
+endpoint or use the Gravitino Java/Python client. The following is an example of creating a
 schema:
 
 <Tabs groupId="language" queryString>
@@ -212,7 +212,7 @@ same.
 ### Register a model
 
 You can register a model by sending a `POST` request to the `/api/metalakes/{metalake_name}
-/catalogs/{catalog_name}/schemas/{schema_name}/models` endpoint or just use the Gravitino
+/catalogs/{catalog_name}/schemas/{schema_name}/models` endpoint or use the Gravitino
 Java/Python client. The following is an example of creating a model:
 
 <Tabs groupId="language" queryString>

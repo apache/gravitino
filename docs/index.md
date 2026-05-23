@@ -93,7 +93,7 @@ Gravitino currently supports the following catalogs:
 * [**ClickHouse catalog**](./jdbc-clickhouse-catalog.md)\*
 * [**Lakehouse generic catalog**](./lakehouse-generic-catalog.md)
 
-If you want to operate table and partition statistics, you can refer to the [document](./manage-statistics-in-gravitino.md).
+To manage table and partition statistics, see [Manage statistics in Gravitino](./manage-statistics-in-gravitino.md).
 
 **Fileset catalogs:**
 

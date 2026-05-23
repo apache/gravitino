@@ -15,7 +15,7 @@ This module translates Gravitino's authorization model into the permission rules
 
 ### Ranger Hadoop SQL Plugin
 
-In order to use the Ranger Hadoop SQL Plugin, you need to configure the following properties:
+To use the Ranger Hadoop SQL Plugin, you need to configure the following properties:
 
 | Property Name                                         | Description                                                                                                                                          | Default Value                     | Required | Since Version    |
 |-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|----------|------------------|
@@ -73,7 +73,7 @@ Gravitino supports chaining multiple authorization plugins to secure one catalog
 The authorization plugin chain is defined in the `authorization.chain.plugins` property, with the plugin names separated by commas.
 When a user performs an authorization operation on data within a catalog, the chained plugin will apply the authorization rules for every plugin defined in the chain.
 
-In order to use the chained authorization plugin, you need to configure the following properties:
+To use the chained authorization plugin, you need to configure the following properties:
 
 | Property Name                                             | Description                                                                            | Default Value | Required                    | Since Version    |
 |-----------------------------------------------------------|----------------------------------------------------------------------------------------|---------------|-----------------------------|------------------|

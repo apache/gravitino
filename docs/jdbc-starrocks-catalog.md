@@ -130,7 +130,7 @@ StarRocks doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `Interv
 The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 1.0.0.
 
 :::note
-Gravitino can not load StarRocks `array`, `map` and `struct` type correctly, because StarRocks doesn't support these types in JDBC.
+Gravitino cannot load StarRocks `array`, `map` and `struct` type correctly, because StarRocks doesn't support these types in JDBC.
 :::
 
 
