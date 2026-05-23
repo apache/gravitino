@@ -47,6 +47,7 @@ Code identifiers (class names, method names, config keys, CLI flags) stay in the
 - Prefer **credential vending** over "credential issuing" or "credential generation" in IRC context.
 - **OSI** stands for Open Semantic Catalog in Gravitino docs, not Open Systems Interconnection.
 - Use **pushdown** (one word) for the noun and adjective forms ("supports pushdown", "predicate pushdown"). Reserve "push down" (two words) for the rare phrasal-verb use ("the engine pushes the filter down"). Do not use the hyphenated "push-down".
+- Verb vs. noun: "shut down" / "back up" / "set up" / "log in" / "log out" are verbs (two words). "Shutdown" / "backup" / "setup" / "login" / "logout" are nouns (one word). Match the form to the grammatical use.
 
 ## Initialisms
 
@@ -88,6 +89,7 @@ Apply these rules when reviewing or writing messages:
 - Headings use Title Case at H1 through H4. Capitalize the first word, the last word, and all nouns, verbs, adjectives, adverbs, and pronouns. Lowercase articles (a, an, the), coordinating conjunctions (and, but, or, nor), and prepositions of four letters or fewer (with, in, for, by, to, of, at, on) unless they are the first or last word of the heading. Use sentence case at H5 and below if any exist.
 - Avoid gerund-led headings. Rare exceptions are acceptable for well-established phrases like "Getting started" that have no clean noun-phrase equivalent. When in doubt, use a noun phrase.
 - Parallel structure: when a heading pairs two or more verbs with "and", use the same verb form for both. Prefer the imperative ("Build and Test", not "Build and Testing").
+- Avoid second-person possessives ("your X") in headings, consistent with the broader rule against second-person scaffolding. Use "the X" or drop the determiner.
 - Avoid "Example of <gerund-ing> X" headings. When the section walks the reader through doing something, use a specific-imperative heading instead ("Configure X", "Create X", "Connect X").
 - Avoid "X of (the) Y" prepositional-phrase headings. Use the attributive form "Y X" instead ("Job System Configuration", not "Configurations of the Job System"). Prefer singular over plural for the X noun unless the section enumerates multiple distinct instances.
 - Headings should not use the possessive (singular `'s` or plural `s'`). Use an attributive noun ("Service Configuration", "Catalog Information") or a prepositional phrase ("Configuration of the Service") instead.
