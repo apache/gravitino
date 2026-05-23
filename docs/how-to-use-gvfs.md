@@ -215,7 +215,7 @@ kinit -kt your_kerberos.keytab your_kerberos@xxx.com
 
 #### Via Java Code
 
-Also, perform operations on the files or directories managed by fileset through Java code.
+Perform operations on the files or directories managed by fileset through Java code.
 Make sure that your code is using the correct Hadoop environment, and that your environment
 has the `gravitino-filesystem-hadoop3-runtime-{version}.jar` dependency.
 
@@ -604,7 +604,7 @@ fs.get_file(rpath="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/test-1.txt",
 
 #### Integrate with Third-party Python Libraries
 
-Also, perform operations on the files or directories managed by fileset
+Perform operations on the files or directories managed by fileset
 integrating with some Third-party Python libraries which support fsspec compatible filesystems.
 
 For example:

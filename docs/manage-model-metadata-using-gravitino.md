@@ -553,7 +553,7 @@ catalog.as_model_catalog().link_model_version(model_ident=NameIdentifier.of("mod
 
 The comment and properties of ModelVersion can be different from the model.
 
-Also, link a ModelVersion with multiple model URIs. The URIs is a map of URI name to URI. 
+Link a ModelVersion with multiple model URIs. The URIs is a map of URI name to URI. 
 
 If you associate only one URI with a ModelVersion and do not specify a URI name
 (as introduced in the previous paragraph), Gravitino will automatically generate a default URI name "unknown".
@@ -650,7 +650,7 @@ catalog.as_model_catalog().get_model_version(model_ident=NameIdentifier.of("mode
 
 ### Get a ModelVersion by Alias
 
-Also, get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
+Get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or
 by using the Gravitino Java/Python client. The following is an example of getting a ModelVersion
 by alias:
@@ -769,7 +769,7 @@ catalog.as_model_catalog().get_model_version_uri(model_ident=NameIdentifier.of("
 
 ### Get ModelVersion URI by Alias
 
-Also, get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
+Get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}/uri?uriName={uriName}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of getting
 the URI of a ModelVersion:
@@ -985,7 +985,7 @@ updated_model = model_catalog.alter_model_version(
 
 ### Alter a ModelVersion by Alias
 
-Also, modify a modelVersion's metadata (e.g. update uri, update comment, or modify 
+Modify a modelVersion's metadata (e.g. update uri, update comment, or modify 
 properties) by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/
 {catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or using the Gravitino
 Java/Python client. The following is an example of modifying a model version:
@@ -1167,7 +1167,7 @@ catalog.as_model_catalog().delete_model_version(model_ident=NameIdentifier.of("m
 
 ### Delete a ModelVersion by Alias
 
-Also, delete a ModelVersion by sending a `DELETE` request to the `/api/metalakes/
+Delete a ModelVersion by sending a `DELETE` request to the `/api/metalakes/
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or
 by using the Gravitino Java/Python client. The following is an example of deleting a ModelVersion
 by alias:

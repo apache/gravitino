@@ -17,7 +17,7 @@ The Gravitino package comprises both the Gravitino server and the Gravitino Iceb
 ### Get the Apache Gravitino Binary Distribution Package
 
 Before installing Gravitino, make sure you have the Gravitino binary distribution package. You can download the latest Gravitino binary distribution package from [GitHub](https://github.com/apache/gravitino/releases).
-Also, build it yourself by following the instructions in [How to Build Gravitino](./how-to-build.md).
+To build it yourself, follow the instructions in [How to Build Gravitino](./how-to-build.md).
 
 - If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the Gravitino binary distribution package in the `distribution/package` and `distribution/package-all` directory. The main difference between these two packages is that the `package-all` package contains all catalogs including catalog under folder `catalogs-contrib`, while the `package` package only contains the main catalogs under folder `catalogs`.
 

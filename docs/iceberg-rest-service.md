@@ -89,7 +89,7 @@ Please note that, it only takes affect in `gravitino.conf`, you don't need to sp
 | `gravitino.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                                                                                     | (none)                                                                       | No       | 0.4.0         |
 
 The filter in `customFilters` should be a standard javax servlet filter.
-Also, specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
+Specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
 
 ### Catalog Backend Configuration
 
@@ -449,7 +449,7 @@ For other Iceberg OSS properties not managed by Gravitino like `client.security-
 
 Refer to [OSS credentials](./security/credential-vending.md#oss-credentials) for credential related configurations.
 
-Additionally, please download the [Gravitino Iceberg Aliyun bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the classpath of Iceberg REST server, you can refer to [server management](#server-management) for classpath details.
+Download the [Gravitino Iceberg Aliyun bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the classpath of the Iceberg REST server. For classpath details, refer to [server management](#server-management).
 
 :::info
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_name}/${prefix_name}`.

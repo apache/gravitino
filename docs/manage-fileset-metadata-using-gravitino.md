@@ -458,7 +458,7 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 </Tabs>
 
 #### StorageLocations
-Also, create a fileset with multiple storage locations. The `storageLocations` is a map of location name to storage location.
+Create a fileset with multiple storage locations. The `storageLocations` is a map of location name to storage location.
 The generation rules of each location follow the generation rules of a single location.
 The following is an example of creating a fileset with multiple storage locations:
 

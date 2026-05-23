@@ -58,7 +58,7 @@ docker run --name c2-trino -d -p 8080:8080 <image-name> -v `gravitino-trino-conn
 ```
 
 After starting the Trino containers, ensure the configuration directory `/etc/trino` is correctly set up.
-Also, verify that the Trino containers on `c1-trino` and `c2-trino` can communicate with each other over the network.
+Verify that the Trino containers on `c1-trino` and `c2-trino` can communicate with each other over the network.
 
 ## Configure Trino
 

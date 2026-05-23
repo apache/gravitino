@@ -650,7 +650,7 @@ gravitino.job.executor = airflow
 gravitino.jobExecutor.airflow.class = com.example.MyAirflowJobExecutor
 ```
 
-Also, configure the job executor with additional properties, like:
+Configure the job executor with additional properties, like:
 
 ```
 gravitino.jobExecutor.airflow.host = http://localhost:8080
