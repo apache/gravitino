@@ -23,19 +23,16 @@ import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIM
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.RelationalEntity;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.idp.authorization.IdpAuthorizationUtils;
 import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.idp.meta.IdpEntity;
+import org.apache.gravitino.idp.meta.IdpEntityType;
 import org.apache.gravitino.idp.meta.IdpGroupEntity;
 import org.apache.gravitino.idp.meta.IdpUserEntity;
 import org.apache.gravitino.idp.storage.converter.IdpPOConverters;
@@ -46,45 +43,45 @@ import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 
 /**
- * JDBC backend for built-in IdP entities. It mirrors {@link JDBCBackend} but only supports {@link
- * Entity.EntityType#IDP_USER} and {@link Entity.EntityType#IDP_GROUP}.
- *
- * <p>Entity/PO conversion stays in this class so {@link IdpUserMetaService} and {@link
- * IdpGroupMetaService} remain unchanged PO-level services.
+ * JDBC backend for built-in IdP entities. It reuses JDBC initialization from {@link JDBCBackend}
+ * without modifying core entity types.
  */
 public class IdpJDBCBackend extends JDBCBackend {
 
-  @Override
-  public <E extends Entity & HasIdentifier> List<E> list(
-      Namespace namespace, Entity.EntityType entityType, boolean allFields) throws IOException {
+  /**
+   * Lists entities under the namespace.
+   *
+   * @param namespace The namespace of the entities.
+   * @param entityType The built-in IdP entity type.
+   * @param allFields Whether to fetch all fields.
+   * @param <E> The entity type.
+   * @return The entities.
+   * @throws IOException If the list operation fails.
+   */
+  public <E extends IdpEntity & HasIdentifier> List<E> list(
+      Namespace namespace, IdpEntityType entityType, boolean allFields) throws IOException {
     throw new UnsupportedOperationException(
         "List is not supported for built-in IdP entity type: " + entityType);
   }
 
-  @Override
-  public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
+  public boolean exists(NameIdentifier ident, IdpEntityType entityType) throws IOException {
+    return entityExists(ident, entityType);
+  }
+
+  public <E extends IdpEntity & HasIdentifier> void insert(E entity, boolean overwritten)
       throws EntityAlreadyExistsException, IOException {
-    if (e instanceof IdpUserEntity) {
-      insertIdpUser((IdpUserEntity) e, overwritten);
-    } else if (e instanceof IdpGroupEntity) {
-      insertIdpGroup((IdpGroupEntity) e, overwritten);
+    if (entity instanceof IdpUserEntity) {
+      insertIdpUser((IdpUserEntity) entity, overwritten);
+    } else if (entity instanceof IdpGroupEntity) {
+      insertIdpGroup((IdpGroupEntity) entity, overwritten);
     } else {
       throw new UnsupportedEntityTypeException(
-          "Unsupported entity type: %s for insert operation", e.type());
+          "Unsupported entity type: %s for insert operation", entity.type());
     }
   }
 
-  @Override
-  public <E extends Entity & HasIdentifier> E update(
-      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
-      throws IOException, NoSuchEntityException {
-    throw new UnsupportedOperationException(
-        "Update is not supported for built-in IdP entity type: " + entityType);
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E get(
-      NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+  public <E extends IdpEntity & HasIdentifier> E get(NameIdentifier ident, IdpEntityType entityType)
+      throws IOException {
     switch (entityType) {
       case IDP_USER:
         return (E) getIdpUser(ident);
@@ -96,9 +93,8 @@ public class IdpJDBCBackend extends JDBCBackend {
     }
   }
 
-  @Override
-  public <E extends Entity & HasIdentifier> List<E> batchGet(
-      List<NameIdentifier> identifiers, Entity.EntityType entityType) {
+  public <E extends IdpEntity & HasIdentifier> List<E> batchGet(
+      List<NameIdentifier> identifiers, IdpEntityType entityType) {
     List<E> entities = new ArrayList<>(identifiers.size());
     for (NameIdentifier identifier : identifiers) {
       try {
@@ -110,10 +106,9 @@ public class IdpJDBCBackend extends JDBCBackend {
     return entities;
   }
 
-  @Override
-  public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
+  public boolean delete(NameIdentifier ident, IdpEntityType entityType, boolean cascade)
       throws IOException {
-    if (!exists(ident, entityType)) {
+    if (!entityExists(ident, entityType)) {
       return false;
     }
     switch (entityType) {
@@ -129,8 +124,7 @@ public class IdpJDBCBackend extends JDBCBackend {
     }
   }
 
-  @Override
-  public int hardDeleteLegacyData(Entity.EntityType entityType, long legacyTimeline)
+  public int hardDeleteLegacyData(IdpEntityType entityType, long legacyTimeline)
       throws IOException {
     switch (entityType) {
       case IDP_USER:
@@ -147,8 +141,7 @@ public class IdpJDBCBackend extends JDBCBackend {
     }
   }
 
-  @Override
-  public int deleteOldVersionData(Entity.EntityType entityType, long versionRetentionCount)
+  public int deleteOldVersionData(IdpEntityType entityType, long versionRetentionCount)
       throws IOException {
     switch (entityType) {
       case IDP_USER:
@@ -158,87 +151,6 @@ public class IdpJDBCBackend extends JDBCBackend {
         throw new IllegalArgumentException(
             "Unsupported entity type when collectAndRemoveOldVersionData: " + entityType);
     }
-  }
-
-  @Override
-  public int batchDelete(
-      List<Pair<NameIdentifier, Entity.EntityType>> entitiesToDelete, boolean cascade)
-      throws IOException {
-    throw new IllegalArgumentException("Batch delete is not supported for built-in IdP entities");
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
-      throws IOException, EntityAlreadyExistsException {
-    throw new IllegalArgumentException("Batch put is not supported for built-in IdP entities");
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier nameIdentifier,
-      Entity.EntityType identType,
-      boolean allFields)
-      throws IOException {
-    throw new UnsupportedOperationException(
-        "Relation operations are not supported for built-in IdP entities");
-  }
-
-  @Override
-  public List<RelationalEntity<?>> batchListEntitiesByRelation(
-      SupportsRelationOperations.Type relType,
-      List<NameIdentifier> nameIdentifiers,
-      Entity.EntityType identType)
-      throws IOException {
-    throw new UnsupportedOperationException(
-        "Relation operations are not supported for built-in IdP entities");
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E getEntityByRelation(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier srcIdentifier,
-      Entity.EntityType srcType,
-      NameIdentifier destEntityIdent)
-      throws IOException, NoSuchEntityException {
-    throw new UnsupportedOperationException(
-        "Relation operations are not supported for built-in IdP entities");
-  }
-
-  @Override
-  public void insertRelation(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier srcIdentifier,
-      Entity.EntityType srcType,
-      NameIdentifier dstIdentifier,
-      Entity.EntityType dstType,
-      boolean override) {
-    throw new UnsupportedOperationException(
-        "Relation operations are not supported for built-in IdP entities");
-  }
-
-  @Override
-  public void batchInsertRelations(
-      SupportsRelationOperations.Type relType,
-      List<NameIdentifier> srcIdentifiers,
-      Entity.EntityType srcType,
-      NameIdentifier dstIdentifier,
-      Entity.EntityType dstType,
-      boolean override) {
-    throw new UnsupportedOperationException(
-        "Relation operations are not supported for built-in IdP entities");
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(
-      SupportsRelationOperations.Type relType,
-      NameIdentifier srcEntityIdent,
-      Entity.EntityType srcEntityType,
-      NameIdentifier[] destEntitiesToAdd,
-      NameIdentifier[] destEntitiesToRemove)
-      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    throw new UnsupportedOperationException(
-        "Relation operations are not supported for built-in IdP entities");
   }
 
   private static IdpUserEntity getIdpUser(NameIdentifier ident) {
@@ -251,7 +163,7 @@ public class IdpJDBCBackend extends JDBCBackend {
     } catch (NotFoundException e) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.IDP_USER.name().toLowerCase(),
+          IdpEntityType.IDP_USER.name().toLowerCase(),
           ident.name());
     }
   }
@@ -266,7 +178,7 @@ public class IdpJDBCBackend extends JDBCBackend {
     } catch (NotFoundException e) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.IDP_GROUP.name().toLowerCase(),
+          IdpEntityType.IDP_GROUP.name().toLowerCase(),
           ident.name());
     }
   }
@@ -274,7 +186,7 @@ public class IdpJDBCBackend extends JDBCBackend {
   private static void insertIdpUser(IdpUserEntity userEntity, boolean overwritten)
       throws EntityAlreadyExistsException {
     IdpAuthorizationUtils.checkIdpUser(userEntity.nameIdentifier());
-    if (!overwritten && entityExists(userEntity.nameIdentifier(), Entity.EntityType.IDP_USER)) {
+    if (!overwritten && entityExists(userEntity.nameIdentifier(), IdpEntityType.IDP_USER)) {
       throw new EntityAlreadyExistsException(
           "Entity %s already exists", userEntity.nameIdentifier().toString());
     }
@@ -284,7 +196,7 @@ public class IdpJDBCBackend extends JDBCBackend {
   private static void insertIdpGroup(IdpGroupEntity groupEntity, boolean overwritten)
       throws EntityAlreadyExistsException {
     IdpAuthorizationUtils.checkIdpGroup(groupEntity.nameIdentifier());
-    if (!overwritten && entityExists(groupEntity.nameIdentifier(), Entity.EntityType.IDP_GROUP)) {
+    if (!overwritten && entityExists(groupEntity.nameIdentifier(), IdpEntityType.IDP_GROUP)) {
       throw new EntityAlreadyExistsException(
           "Entity %s already exists", groupEntity.nameIdentifier().toString());
     }
@@ -292,7 +204,7 @@ public class IdpJDBCBackend extends JDBCBackend {
         .insertIdpGroup(IdpPOConverters.initializeIdpGroupPO(groupEntity));
   }
 
-  private static boolean entityExists(NameIdentifier ident, Entity.EntityType entityType) {
+  private static boolean entityExists(NameIdentifier ident, IdpEntityType entityType) {
     try {
       switch (entityType) {
         case IDP_USER:

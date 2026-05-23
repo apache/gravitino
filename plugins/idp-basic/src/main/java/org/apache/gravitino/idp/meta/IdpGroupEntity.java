@@ -25,17 +25,16 @@ import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.authorization.IdpGroup;
+import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.utils.CollectionUtils;
 
 /** A class representing a built-in IdP group metadata entity in Apache Gravitino. */
 @ToString
-public class IdpGroupEntity implements IdpGroup, Entity, Auditable, HasIdentifier {
+public class IdpGroupEntity implements IdpGroup, IdpEntity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the built-in IdP group entity.");
@@ -78,8 +77,8 @@ public class IdpGroupEntity implements IdpGroup, Entity, Auditable, HasIdentifie
   }
 
   @Override
-  public EntityType type() {
-    return EntityType.IDP_GROUP;
+  public IdpEntityType type() {
+    return IdpEntityType.IDP_GROUP;
   }
 
   @Override

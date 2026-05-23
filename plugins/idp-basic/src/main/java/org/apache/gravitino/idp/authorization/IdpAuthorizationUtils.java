@@ -28,6 +28,9 @@ public final class IdpAuthorizationUtils {
   static final String IDP_USER_DOES_NOT_EXIST_MSG = "IdP user %s does not exist";
   static final String IDP_GROUP_DOES_NOT_EXIST_MSG = "IdP group %s does not exist";
 
+  /** The reserved namespace for built-in IdP entities. */
+  public static final String IDP_RESERVED_NAMESPACE = "idp";
+
   private IdpAuthorizationUtils() {}
 
   /**
@@ -36,7 +39,7 @@ public final class IdpAuthorizationUtils {
    * @return The namespace for built-in IdP users.
    */
   public static Namespace ofIdpUserNamespace() {
-    return Namespace.of(Entity.IDP_RESERVED_NAMESPACE, Entity.USER_SCHEMA_NAME);
+    return Namespace.of(IDP_RESERVED_NAMESPACE, Entity.USER_SCHEMA_NAME);
   }
 
   /**
@@ -45,7 +48,7 @@ public final class IdpAuthorizationUtils {
    * @return The namespace for built-in IdP groups.
    */
   public static Namespace ofIdpGroupNamespace() {
-    return Namespace.of(Entity.IDP_RESERVED_NAMESPACE, Entity.GROUP_SCHEMA_NAME);
+    return Namespace.of(IDP_RESERVED_NAMESPACE, Entity.GROUP_SCHEMA_NAME);
   }
 
   /**
@@ -55,7 +58,7 @@ public final class IdpAuthorizationUtils {
    * @return The name identifier for the built-in IdP user.
    */
   public static NameIdentifier ofIdpUser(String username) {
-    return NameIdentifier.of(Entity.IDP_RESERVED_NAMESPACE, Entity.USER_SCHEMA_NAME, username);
+    return NameIdentifier.of(IDP_RESERVED_NAMESPACE, Entity.USER_SCHEMA_NAME, username);
   }
 
   /**
@@ -65,7 +68,7 @@ public final class IdpAuthorizationUtils {
    * @return The name identifier for the built-in IdP group.
    */
   public static NameIdentifier ofIdpGroup(String groupName) {
-    return NameIdentifier.of(Entity.IDP_RESERVED_NAMESPACE, Entity.GROUP_SCHEMA_NAME, groupName);
+    return NameIdentifier.of(IDP_RESERVED_NAMESPACE, Entity.GROUP_SCHEMA_NAME, groupName);
   }
 
   /**

@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.time.Instant;
 import org.apache.gravitino.Configs;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.idp.authorization.IdpAuthorizationUtils;
+import org.apache.gravitino.idp.meta.IdpEntityType;
 import org.apache.gravitino.idp.meta.IdpUserEntity;
 import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
 import org.apache.gravitino.meta.AuditInfo;
@@ -57,21 +57,18 @@ public class TestIdpJDBCBackend extends AbstractIdpMetaStorageTest {
             .build();
     idpBackend.insert(user, false);
 
-    assertTrue(
-        idpBackend.exists(IdpAuthorizationUtils.ofIdpUser("bob"), Entity.EntityType.IDP_USER));
+    assertTrue(idpBackend.exists(IdpAuthorizationUtils.ofIdpUser("bob"), IdpEntityType.IDP_USER));
     assertEquals(
         "bob",
-        idpBackend.get(IdpAuthorizationUtils.ofIdpUser("bob"), Entity.EntityType.IDP_USER).name());
+        idpBackend.get(IdpAuthorizationUtils.ofIdpUser("bob"), IdpEntityType.IDP_USER).name());
     assertThrows(
         UnsupportedOperationException.class,
         () ->
             idpBackend.list(
-                IdpAuthorizationUtils.ofIdpUserNamespace(), Entity.EntityType.IDP_USER, true));
+                IdpAuthorizationUtils.ofIdpUserNamespace(), IdpEntityType.IDP_USER, true));
     assertTrue(
-        idpBackend.delete(
-            IdpAuthorizationUtils.ofIdpUser("bob"), Entity.EntityType.IDP_USER, false));
-    assertFalse(
-        idpBackend.exists(IdpAuthorizationUtils.ofIdpUser("bob"), Entity.EntityType.IDP_USER));
+        idpBackend.delete(IdpAuthorizationUtils.ofIdpUser("bob"), IdpEntityType.IDP_USER, false));
+    assertFalse(idpBackend.exists(IdpAuthorizationUtils.ofIdpUser("bob"), IdpEntityType.IDP_USER));
 
     idpBackend.close();
   }

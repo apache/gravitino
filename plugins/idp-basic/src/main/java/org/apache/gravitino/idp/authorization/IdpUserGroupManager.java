@@ -23,18 +23,18 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.authorization.IdpGroup;
-import org.apache.gravitino.authorization.IdpUser;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
 import org.apache.gravitino.idp.exception.AlreadyExistsException;
 import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.idp.meta.IdpEntityType;
 import org.apache.gravitino.idp.meta.IdpGroupEntity;
 import org.apache.gravitino.idp.meta.IdpUserEntity;
+import org.apache.gravitino.idp.model.IdpGroup;
+import org.apache.gravitino.idp.model.IdpUser;
+import org.apache.gravitino.idp.storage.relational.IdpEntityStore;
 import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.apache.gravitino.meta.AuditInfo;
@@ -51,7 +51,7 @@ public class IdpUserGroupManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpUserGroupManager.class);
 
-  private final EntityStore store;
+  private final IdpEntityStore store;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
 
@@ -61,11 +61,12 @@ public class IdpUserGroupManager {
    * @param store The entity store for built-in IdP entities.
    * @param idGenerator The id generator.
    */
-  public IdpUserGroupManager(EntityStore store, IdGenerator idGenerator) {
+  public IdpUserGroupManager(IdpEntityStore store, IdGenerator idGenerator) {
     this(store, idGenerator, PasswordHasherFactory.create());
   }
 
-  IdpUserGroupManager(EntityStore store, IdGenerator idGenerator, PasswordHasher passwordHasher) {
+  IdpUserGroupManager(
+      IdpEntityStore store, IdGenerator idGenerator, PasswordHasher passwordHasher) {
     this.store = store;
     this.idGenerator = idGenerator;
     this.passwordHasher = passwordHasher;
@@ -112,7 +113,7 @@ public class IdpUserGroupManager {
    */
   public boolean removeUser(String user) {
     try {
-      return store.delete(IdpAuthorizationUtils.ofIdpUser(user), Entity.EntityType.IDP_USER);
+      return store.delete(IdpAuthorizationUtils.ofIdpUser(user), IdpEntityType.IDP_USER);
     } catch (IOException ioe) {
       LOG.error("Removing IdP user {} failed due to storage issues", user, ioe);
       throw new RuntimeException(ioe);
@@ -128,7 +129,7 @@ public class IdpUserGroupManager {
   public IdpUser getUser(String user) {
     try {
       return store.get(
-          IdpAuthorizationUtils.ofIdpUser(user), Entity.EntityType.IDP_USER, IdpUserEntity.class);
+          IdpAuthorizationUtils.ofIdpUser(user), IdpEntityType.IDP_USER, IdpUserEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("IdP user {} does not exist", user, e);
       throw new NotFoundException(IdpAuthorizationUtils.IDP_USER_DOES_NOT_EXIST_MSG, user);
@@ -200,7 +201,7 @@ public class IdpUserGroupManager {
       }
     }
     try {
-      return store.delete(IdpAuthorizationUtils.ofIdpGroup(group), Entity.EntityType.IDP_GROUP);
+      return store.delete(IdpAuthorizationUtils.ofIdpGroup(group), IdpEntityType.IDP_GROUP);
     } catch (IOException ioe) {
       LOG.error("Removing IdP group {} failed due to storage issues", group, ioe);
       throw new RuntimeException(ioe);
@@ -216,9 +217,7 @@ public class IdpUserGroupManager {
   public IdpGroup getGroup(String group) {
     try {
       return store.get(
-          IdpAuthorizationUtils.ofIdpGroup(group),
-          Entity.EntityType.IDP_GROUP,
-          IdpGroupEntity.class);
+          IdpAuthorizationUtils.ofIdpGroup(group), IdpEntityType.IDP_GROUP, IdpGroupEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("IdP group {} does not exist", group, e);
       throw new NotFoundException(IdpAuthorizationUtils.IDP_GROUP_DOES_NOT_EXIST_MSG, group);

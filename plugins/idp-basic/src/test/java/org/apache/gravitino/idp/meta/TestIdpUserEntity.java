@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.Lists;
 import java.time.Instant;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.idp.authorization.IdpAuthorizationUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.junit.jupiter.api.Test;
@@ -43,7 +42,7 @@ public class TestIdpUserEntity {
             .withPasswordHash("hash")
             .build();
 
-    assertEquals(Entity.EntityType.IDP_USER, entity.type());
+    assertEquals(IdpEntityType.IDP_USER, entity.type());
     assertEquals("alice", entity.name());
     assertEquals(1L, entity.id());
     assertEquals(Lists.newArrayList("dev"), entity.groupNames());

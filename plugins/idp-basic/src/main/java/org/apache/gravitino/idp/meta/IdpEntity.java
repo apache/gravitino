@@ -16,27 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.idp.meta;
 
-import java.util.List;
-import org.apache.gravitino.Auditable;
-import org.apache.gravitino.annotation.Evolving;
+import java.io.Serializable;
+import java.util.Map;
+import org.apache.gravitino.Field;
 
-/** The interface of a built-in IdP user. */
-@Evolving
-public interface IdpUser extends Auditable {
-
-  /**
-   * The username of the built-in IdP user.
-   *
-   * @return The username of the built-in IdP user.
-   */
-  String name();
+/** A built-in IdP metadata entity within the idp-basic plugin. */
+public interface IdpEntity extends Serializable {
 
   /**
-   * The group names that the built-in IdP user belongs to.
+   * Validates the entity by ensuring the validity of its field arguments.
    *
-   * @return The group names of the built-in IdP user.
+   * @throws IllegalArgumentException If the validation fails.
    */
-  List<String> groupNames();
+  default void validate() throws IllegalArgumentException {
+    fields().forEach(Field::validate);
+  }
+
+  /**
+   * Retrieves the fields and their associated values of the entity.
+   *
+   * @return A map of Field to Object representing the entity's schema with values.
+   */
+  Map<Field, Object> fields();
+
+  /**
+   * Retrieves the type of the built-in IdP entity.
+   *
+   * @return The type of the built-in IdP entity.
+   */
+  IdpEntityType type();
 }

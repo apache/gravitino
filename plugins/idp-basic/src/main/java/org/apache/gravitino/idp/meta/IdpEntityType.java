@@ -16,27 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.idp.meta;
 
-import java.util.List;
-import org.apache.gravitino.Auditable;
-import org.apache.gravitino.annotation.Evolving;
-
-/** The interface of a built-in IdP group. */
-@Evolving
-public interface IdpGroup extends Auditable {
-
-  /**
-   * The name of the built-in IdP group.
-   *
-   * @return The name of the built-in IdP group.
-   */
-  String name();
-
-  /**
-   * The usernames that belong to the built-in IdP group.
-   *
-   * @return The usernames of the built-in IdP group.
-   */
-  List<String> userNames();
+/** Built-in IdP entity types managed by the idp-basic plugin. */
+public enum IdpEntityType {
+  IDP_USER,
+  IDP_GROUP
 }

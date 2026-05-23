@@ -25,17 +25,16 @@ import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.authorization.IdpUser;
+import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.utils.CollectionUtils;
 
 /** A class representing a built-in IdP user metadata entity in Apache Gravitino. */
 @ToString
-public class IdpUserEntity implements IdpUser, Entity, Auditable, HasIdentifier {
+public class IdpUserEntity implements IdpUser, IdpEntity, Auditable, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the built-in IdP user entity.");
@@ -79,8 +78,8 @@ public class IdpUserEntity implements IdpUser, Entity, Auditable, HasIdentifier 
   }
 
   @Override
-  public EntityType type() {
-    return EntityType.IDP_USER;
+  public IdpEntityType type() {
+    return IdpEntityType.IDP_USER;
   }
 
   @Override

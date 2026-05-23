@@ -31,8 +31,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.storage.relational.RelationalBackend;
+import org.apache.gravitino.idp.meta.IdpEntityType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,10 +40,10 @@ public final class IdpRelationalGarbageCollector implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpRelationalGarbageCollector.class);
 
-  private static final List<Entity.EntityType> IDP_ENTITY_TYPES =
-      ImmutableList.of(Entity.EntityType.IDP_USER, Entity.EntityType.IDP_GROUP);
+  private static final List<IdpEntityType> IDP_ENTITY_TYPES =
+      ImmutableList.of(IdpEntityType.IDP_USER, IdpEntityType.IDP_GROUP);
 
-  private final RelationalBackend backend;
+  private final IdpJDBCBackend backend;
   private final long storeDeleteAfterTimeMillis;
   private final long versionRetentionCount;
 
@@ -53,7 +52,7 @@ public final class IdpRelationalGarbageCollector implements Closeable {
       new ScheduledThreadPoolExecutor(
           2,
           r -> {
-            Thread t = new Thread(r, "IdpRelationalBackend-Garbage-Collector");
+            Thread t = new Thread(r, "IdpJDBCBackend-Garbage-Collector");
             t.setDaemon(true);
             return t;
           },
@@ -65,7 +64,7 @@ public final class IdpRelationalGarbageCollector implements Closeable {
    * @param backend The relational backend.
    * @param config The server configuration.
    */
-  public IdpRelationalGarbageCollector(RelationalBackend backend, Config config) {
+  public IdpRelationalGarbageCollector(IdpJDBCBackend backend, Config config) {
     this.backend = backend;
     storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
     versionRetentionCount = config.get(VERSION_RETENTION_COUNT);
@@ -85,7 +84,7 @@ public final class IdpRelationalGarbageCollector implements Closeable {
 
     try {
       long legacyTimeline = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
-      for (Entity.EntityType entityType : IDP_ENTITY_TYPES) {
+      for (IdpEntityType entityType : IDP_ENTITY_TYPES) {
         long deletedCount = Long.MAX_VALUE;
         try {
           while (deletedCount > 0) {
@@ -96,7 +95,7 @@ public final class IdpRelationalGarbageCollector implements Closeable {
         }
       }
 
-      for (Entity.EntityType entityType : IDP_ENTITY_TYPES) {
+      for (IdpEntityType entityType : IDP_ENTITY_TYPES) {
         long deletedCount = Long.MAX_VALUE;
         try {
           while (deletedCount > 0) {
