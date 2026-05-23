@@ -76,11 +76,11 @@ discovery.uri=http://0.0.0.0:8080
 
 ## Example
 
-Install the Gravitino Trino connector in Trino office docker images step by step.
+Install the Gravitino Trino connector into the official Trino Docker image.
 
 ### Run the Container
 
-Use the docker command to create a container from the `trinodb/trino` image. Assign it the trino-gravitino name.
+Use the Docker command to create a container from the `trinodb/trino` image. Assign it the trino-gravitino name.
 Run it in the background, and map the default Trino port, which is 8080, from inside the container to port 8080 on your machine.
 
 ```shell

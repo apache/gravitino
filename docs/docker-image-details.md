@@ -172,7 +172,7 @@ Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspa
 Gravitino Lance REST server supports setting the following environment variables
 - LANCE_REST_GRAVITINO_METALAKE_NAME: It will overwrite the configuration "gravitino.lance-rest.gravitino-metalake" in configuration file `conf/gravitino-lance-rest-server.conf`. **You should set it to your Gravitino metalake name.**
 - LANCE_REST_NAMESPACE_BACKEND: It will overwrite the configuration "gravitino.lance-rest.namespace-backend" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "gravitino" and you should not change it as of now.
-- LANCE_REST_GRAVITINO_URI: It will overwrite the configuration "gravitino.lance-rest.gravitino-uri" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "http://localhost:8090" and you can change it to your Gravitino server address. **Be care that Gravitino server URI `http://localhost:8090` is a docker container internal address, if your Gravitino server is running outside the docker container, you should set it to your host IP address like `http://host-ip:8090`.**
+- LANCE_REST_GRAVITINO_URI: It will overwrite the configuration "gravitino.lance-rest.gravitino-uri" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "http://localhost:8090" and you can change it to your Gravitino server address. **Be care that Gravitino server URI `http://localhost:8090` is a Docker container internal address; if your Gravitino server is running outside the Docker container, you should set it to your host IP address like `http://host-ip:8090`.**
 - LANCE_REST_HOST: It will overwrite the configuration "gravitino.lance-rest.host" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is `0.0.0.0`.
 - LANCE_REST_PORT: It will overwrite the configuration "gravitino.lance-rest.httpPort" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is `9101`.
 
@@ -496,12 +496,12 @@ Changelog
 
 - datastrato/gravitino-ci-ranger:0.1.1
   - Docker image datastrato/gravitino-ci-ranger:0.1.1
-  - Use `ranger-admin` release from `datastrato/apache-ranger:2.4.0` to build docker image.
+  - Use `ranger-admin` release from `datastrato/apache-ranger:2.4.0` to build the Docker image.
   - Remove unnecessary hack in `start-ranger-service.sh`.
-  - Reduce docker image build time from `~1h` to `~5min`.
+  - Reduce Docker image build time from `~1h` to `~5min`.
   - How to debug Ranger admin service:
-    - Use `docker exec -it <container_id> bash` to enter the docker container.
-    - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001` into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh` in the docker container.
+    - Use `docker exec -it <container_id> bash` to enter the Docker container.
+    - Add these context `export JAVA_OPTS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5001` into `/opt/ranger-admin/ews/webapp/WEB-INF/classes/conf/ranger-admin-env-debug.sh` in the Docker container.
     - Execute `./opt/ranger-admin/stop-ranger-admin.sh` and `./opt/ranger-admin/start-ranger-admin.sh` to restart Ranger admin.
     - Clone the `Apache Ranger` project from GitHub and checkout the `2.4.0` release.
     - Create a remote debug configuration (`Use model classpath` = `EmbeddedServer`) in your IDE and connect to the Ranger admin container.

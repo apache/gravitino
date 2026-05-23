@@ -49,6 +49,7 @@ Code identifiers (class names, method names, config keys, CLI flags) stay in the
 - Use **pushdown** (one word) for the noun and adjective forms ("supports pushdown", "predicate pushdown"). Reserve "push down" (two words) for the rare phrasal-verb use ("the engine pushes the filter down"). Do not use the hyphenated "push-down".
 - Verb vs. noun: "shut down" / "back up" / "set up" / "log in" / "log out" are verbs (two words). "Shutdown" / "backup" / "setup" / "login" / "logout" are nouns (one word). Match the form to the grammatical use.
 - Hyphenate compound adjectives before nouns: "in-memory cache", "real-time updates", "long-running operation", "open-source project". When the same phrase is used as a predicate adverbial ("the data is stored in memory"), no hyphen.
+- **Docker**, **Kubernetes**, **Linux**, **Python**, **Java**, **MySQL**, **PostgreSQL**, and other product/language names are always capitalized in prose. Lowercase forms in code, file paths, and config keys are technically meaningful and should not be changed.
 
 ## Initialisms
 
