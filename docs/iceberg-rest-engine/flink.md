@@ -3,7 +3,7 @@ title: Connect Flink via Iceberg REST
 sidebar_label: Flink
 ---
 
-# Connecting Apache Flink via Iceberg REST
+# Connect Apache Flink via Iceberg REST
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible engine can connect to directly — without installing a Gravitino-specific
@@ -51,18 +51,18 @@ sql-client.execution.result-mode: tableau
 results in a full-screen pager.
 :::
 
-### Starting the Flink SQL Client
+### Start the Flink SQL Client
 
 ```bash
 $FLINK_HOME/bin/sql-client.sh
 ```
 
-## Registering the catalog
+## Register the catalog
 
 At the Flink SQL Client prompt, run the following `CREATE CATALOG` statement. Replace
 `<gravitino-host>` with your Gravitino server address and supply your S3 credentials.
 
-### Without authentication
+### No authentication
 
 ```sql
 CREATE CATALOG gravitino_irc WITH (
@@ -76,7 +76,7 @@ CREATE CATALOG gravitino_irc WITH (
 );
 ```
 
-### With OAuth2 authentication
+### OAuth2 authentication
 
 ```sql
 CREATE CATALOG gravitino_irc WITH (

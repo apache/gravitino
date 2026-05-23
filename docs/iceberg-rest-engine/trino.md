@@ -3,7 +3,7 @@ title: Connect Trino via Iceberg REST
 sidebar_label: Trino
 ---
 
-# Connecting Trino via Iceberg REST
+# Connect Trino via Iceberg REST
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible engine can connect to directly — without installing a Gravitino-specific
@@ -33,7 +33,7 @@ The `warehouse` property is managed by the Gravitino IRC server and does not nee
 the Trino catalog configuration.
 :::
 
-### Without authentication
+### No authentication
 
 ```properties
 connector.name=iceberg
@@ -51,7 +51,7 @@ iceberg.file-format=PARQUET
 iceberg.compression-codec=ZSTD
 ```
 
-### With OAuth2 authentication
+### OAuth2 authentication
 
 ```properties
 connector.name=iceberg
@@ -92,7 +92,7 @@ See [gravitino-irc-quickstart](https://github.com/markhoerth/gravitino-irc-quick
 complete local development environment using MinIO.
 :::
 
-## Starting Trino
+## Start Trino
 
 Trino is a server process — the catalog is picked up automatically when Trino starts. After
 placing `gravitino_irc.properties` in `etc/catalog/`, restart Trino:

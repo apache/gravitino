@@ -124,7 +124,7 @@ Table operations follow standard relational catalog patterns. See [Table Operati
 
 The following sections provide examples and important details for working with Lance tables. 
 
-#### Creating a Lance Table
+#### Create a Lance Table
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -179,7 +179,7 @@ tableCatalog.createTable(
 </TabItem>
 </Tabs>
 
-#### Registering External Tables
+#### Register External Tables
 
 Register existing Lance tables without moving or copying data:
 
@@ -260,7 +260,7 @@ Solution: Verify the location path points to a valid Lance dataset directory
 
 ### Migration Guide
 
-#### Migrating Existing Lance Tables
+#### Migrate Existing Lance Tables
 
 1. **Inventory**: List all existing Lance table locations
 2. **Create Catalog**: Create Generic Lakehouse catalog pointing to root location
@@ -302,7 +302,7 @@ done
 
 Other table operations (load, alter, drop, truncate) follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for details.
 
-### Using Lance table with MinIO
+### Use Lance table with MinIO
 To use Lance tables stored in MinIO with Gravitino, configure the MinIO storage backend once on the Lance catalog. Gravitino will then return those storage options to Lance clients and Spark does not need to repeat them.
 
 ```shell

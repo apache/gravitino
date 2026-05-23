@@ -3,7 +3,7 @@ title: Connect StarRocks via Iceberg REST
 sidebar_label: StarRocks
 ---
 
-# Connecting StarRocks via Iceberg REST
+# Connect StarRocks via Iceberg REST
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible engine can connect to directly. This page describes how to configure StarRocks

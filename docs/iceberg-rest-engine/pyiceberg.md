@@ -3,7 +3,7 @@ title: Connect PyIceberg via Iceberg REST
 sidebar_label: PyIceberg
 ---
 
-# Connecting PyIceberg via Iceberg REST
+# Connect PyIceberg via Iceberg REST
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible client can connect to directly. This page describes how to use PyIceberg with
@@ -30,7 +30,7 @@ catalog = load_catalog(
 )
 ```
 
-### With credential vending
+### Credential vending
 
 ```python
 catalog = load_catalog(
@@ -43,7 +43,7 @@ catalog = load_catalog(
 )
 ```
 
-### With OAuth2 authentication
+### OAuth2 authentication
 
 ```python
 catalog = load_catalog(

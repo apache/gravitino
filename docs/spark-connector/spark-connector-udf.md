@@ -44,7 +44,7 @@ Key points:
 - Only functions with `RuntimeType.SPARK` are visible to the Spark connector; implementations
   targeting other runtimes (e.g. `TRINO`) are filtered out.
 
-## Calling functions in Spark SQL
+## Call functions in Spark SQL
 
 Use the fully qualified three-part name `catalog.schema.function_name` to call a
 Gravitino-registered function:
@@ -68,7 +68,7 @@ SELECT add_one(42);
 ```
 :::
 
-## Discovering functions
+## Discover functions
 
 The Spark connector only exposes functions that have at least one Java implementation with
 `RuntimeType.SPARK`. Functions with only non-Spark implementations (e.g. `TRINO`) are not

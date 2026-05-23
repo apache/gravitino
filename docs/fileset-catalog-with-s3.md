@@ -49,7 +49,7 @@ To learn how to create a schema, refer to [Schema configurations](./fileset-cata
 
 For more details on creating a fileset, Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties).
 
-## Using the Fileset catalog with S3
+## Use the Fileset catalog with S3
 
 This section demonstrates how to use the Fileset catalog with S3 in Gravitino, with a complete example.
 
@@ -243,9 +243,9 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "e
 </TabItem>
 </Tabs>
 
-## Accessing a fileset with S3
+## Access a fileset with S3
 
-### Using the GVFS Java client to access the fileset
+### Use the GVFS Java client to access the fileset
 
 To access fileset with S3 using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -318,7 +318,7 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
   </dependency>
 ```
 
-### Using Spark to access the fileset
+### Use Spark to access the fileset
 
 The following Python code demonstrates how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
@@ -385,7 +385,7 @@ Please choose the correct jar according to your environment.
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
-### Accessing a fileset using the Hadoop fs command
+### Access a fileset using the Hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
 
@@ -439,7 +439,7 @@ For S3, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versio
 ./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/s3_catalog/s3_schema/s3_fileset
 ```
 
-### Using the GVFS Python client to access a fileset
+### Use the GVFS Python client to access a fileset
 
 To access fileset with S3 using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -474,7 +474,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")                                                                         ")
 ```
 
-### Using fileset with pandas
+### Use fileset with pandas
 
 The following are examples of how to use the pandas library to access the S3 fileset
 

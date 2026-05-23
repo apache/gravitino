@@ -62,7 +62,7 @@ Requirements:
 
 ## Register with ServiceLoader
 
-### For `Provider` implementations
+### `Provider` implementation
 
 Create file:
 
@@ -75,13 +75,13 @@ com.example.optimizer.MyStatisticsProvider
 com.example.optimizer.MyJobSubmitter
 ```
 
-### For `StatisticsCalculator`
+### `StatisticsCalculator` implementation
 
 Create file:
 
 `META-INF/services/org.apache.gravitino.maintenance.optimizer.api.updater.StatisticsCalculator`
 
-### For `MetricsEvaluator`
+### `MetricsEvaluator` implementation
 
 Create file:
 

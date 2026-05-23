@@ -211,7 +211,7 @@ The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `iceberg_test` catalog is the catalog created by you in Apache Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
-### Creating tables and schemas
+### Create tables and schemas
 
 Create a new schema named `database_01` in `test.iceberg_test` catalog.
 
@@ -232,7 +232,7 @@ salary int
 );
 ```
 
-### Writing data
+### Write data
 
 Insert data into the table `table_01`:
 
@@ -273,7 +273,7 @@ MERGE INTO iceberg_test.database_01.table_01 t USING iceberg_test.database_01.ta
               VALUES (s.name, s.salary);
 ```
 
-### Querying data
+### Query data
 
 Query the `table_01` table:
 

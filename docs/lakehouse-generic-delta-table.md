@@ -92,7 +92,7 @@ Table operations follow standard relational catalog patterns with Delta-specific
 
 The following sections provide examples and important details for working with Delta tables.
 
-#### Registering an External Delta Table
+#### Register an External Delta Table
 
 Register an existing Delta table in Gravitino without moving or modifying the underlying data:
 
@@ -183,7 +183,7 @@ When registering a Delta table in Gravitino, you must provide the schema (column
 **Best Practice:** Ensure the schema you provide matches the actual Delta table schema to avoid inconsistencies.
 :::
 
-#### Loading a Delta Table
+#### Load a Delta Table
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -208,7 +208,7 @@ System.out.println("Columns: " + Arrays.toString(table.columns()));
 </TabItem>
 </Tabs>
 
-#### Dropping a Delta Table
+#### Drop a Delta Table
 
 Dropping a Delta table from Gravitino removes only the metadata entry. The physical Delta table data remains intact.
 
@@ -242,9 +242,9 @@ Since Delta tables are external, dropping them from Gravitino:
 The Delta table can still be accessed directly via Delta Lake APIs, Spark, or other tools.
 :::
 
-## Working with Delta Tables
+## Work with Delta Tables
 
-### Using Spark to Modify Delta Tables
+### Use Spark to Modify Delta Tables
 
 Since Gravitino does not support ALTER operations for Delta tables, use Apache Spark or other Delta Lake tools to modify table structure:
 
@@ -281,7 +281,7 @@ After modifying the Delta table, you can:
 1. Drop the table from Gravitino
 2. Re-register it with the updated schema
 
-### Reading Delta Tables via Gravitino
+### Read Delta Tables via Gravitino
 
 Once registered in Gravitino, you can query Delta table metadata and use the location to read data:
 

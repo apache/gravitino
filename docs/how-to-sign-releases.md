@@ -33,7 +33,7 @@ Before signing or verifying a Gravitino release, ensure you have the following p
     brew install gpg
     ```
 
-## Signing a release
+## Sign a release
 
 1. **Create a Public/Private Key Pair:**
 
@@ -155,7 +155,7 @@ Keep your private key secure and saved somewhere other than just on your compute
 
     Upload the generated .asc and .sha256 files along with the release artifacts and KEYS file to the release area.
 
-## Verifying a release
+## Verify a release
 
 1. **Import public keys:**
 

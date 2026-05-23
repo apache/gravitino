@@ -12,7 +12,7 @@ This document provides guidance on managing metadata within Apache Gravitino usi
 
 The CLI allows users to view, create and update metadata information for metalakes, catalogs, schemas, tables, models, columns, users, roles, groups, tags, topics and filesets. Future updates will expand on these capabilities.
 
-## Running the CLI
+## Run the CLI
 
 To run the Gravitino CLI, please use the `gcli.sh` script located in Gravitino's bin directory. If you define the `GRAVITINO_HOME` environment variable, you can run the script from any location using `$GRAVITINO_HOME/bin/gcli.sh`.
 
@@ -80,7 +80,7 @@ The following commands are used for entity management:
 - remove: Remove a property from an entity
 - properties: Display an entities properties
 
-### Setting the Metalake name
+### Set the Metalake name
 
 As dealing with one Metalake is a typical scenario, you can set the Metalake name in several ways so it doesn't need to be passed on the command line.
 
@@ -90,7 +90,7 @@ As dealing with one Metalake is a typical scenario, you can set the Metalake nam
 
 The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
-### Setting the Gravitino URL
+### Set the Gravitino URL
 
 As you need to set the Gravitino URL for every command, you can set the URL in several ways.
 
@@ -100,7 +100,7 @@ As you need to set the Gravitino URL for every command, you can set the URL in s
 
 The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
-### Setting the Gravitino Authentication Type
+### Set the Gravitino Authentication Type
 
 The authentication type can also be set in several ways.
 
@@ -201,7 +201,7 @@ For commands that accept multiple properties they can be specified in a couple o
 
 3. gcli.sh --properties n1=v1 --properties n2=v2 --properties n3=v3
 
-### Setting properties and tags
+### Set properties and tags
 
  Different options are needed to add a tag and set a property of a tag with `gcli.sh tag set`. To add a
  tag, specify the tag (via --tag) and the entity to tag (via --name). To set the property of a tag
@@ -315,7 +315,7 @@ gcli.sh catalog details --name catalog_postgres
 gcli.sh catalog details --name catalog_postgres --audit
 ```
 
-#### Creating a catalog
+#### Create a catalog
 
 The type of catalog to be created is specified by the `--provider` option. Different catalogs require different properties, for example, a Hive catalog requires a metastore-uri property.
 

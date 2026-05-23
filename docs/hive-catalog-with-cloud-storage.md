@@ -76,7 +76,7 @@ It's also applicable for Azure Blob Storage(ADLS) and GCS.
 
 ```
 
-### Adding Required JARs
+### Add Required JARs
 
 After updating the `hive-site.xml`, you need to ensure that the necessary S3-related JARs are included in the Hive classpath. You can do this by executing the following command:
 ```shell
@@ -98,7 +98,7 @@ Alternatively, you can download the required JARs from the Maven repository and 
 Once all configurations have been correctly set, restart the Hive cluster to apply the changes. This step is essential to ensure that the new configurations take effect and that the Hive services can communicate with S3.
 
 
-## Creating Tables or Databases with S3 Storage using Gravitino
+## Create Tables or Databases with S3 Storage using Gravitino
 
 Assuming you have already set up a Hive catalog with Gravitino, you can proceed to create tables or databases using S3 storage. For more information on catalog operations, refer to [Catalog operations](./manage-fileset-metadata-using-gravitino.md#catalog-operations)
 
@@ -230,7 +230,7 @@ Time taken: 0.116 seconds, Fetched: 1 row(s)
 
 This command shows the creation details of the database hive_schema, including its location in S3 and any associated properties.
 
-## Accessing Tables with S3 Storage via Spark
+## Access Tables with S3 Storage via Spark
 
 To access S3-stored tables using Spark, you need to configure the SparkSession appropriately. Below is an example of how to set up the SparkSession with the necessary S3 configurations:
 

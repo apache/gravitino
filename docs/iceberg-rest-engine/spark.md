@@ -3,7 +3,7 @@ title: Connect Spark via Iceberg REST
 sidebar_label: Spark
 ---
 
-# Connecting Apache Spark via Iceberg REST
+# Connect Apache Spark via Iceberg REST
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible engine can connect to directly — without installing a Gravitino-specific
@@ -78,7 +78,7 @@ be supplied via environment variables (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_
 instance profile, in which case the explicit credential lines can be omitted.
 :::
 
-### With OAuth2 authentication
+### OAuth2 authentication
 
 If Gravitino is configured with OAuth2, add the auth properties to the same
 `$SPARK_HOME/conf/spark-defaults.conf` file:
@@ -132,7 +132,7 @@ See [gravitino-irc-quickstart](https://github.com/markhoerth/gravitino-irc-quick
 complete local development environment using MinIO.
 :::
 
-### With credential vending
+### Credential vending
 
 If Gravitino is configured with credential vending, add the following to enable it on the client side:
 
@@ -151,7 +151,7 @@ spark.sql.catalog.gravitino_irc.<configuration-key>    <property-value>
 ```
 :::
 
-## Starting Spark
+## Start Spark
 
 Once `spark-defaults.conf` is in place, start your Spark session normally. The Gravitino IRC
 catalog is available immediately without any additional flags.
