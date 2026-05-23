@@ -652,7 +652,7 @@ Example tuning:
 - Medium workloads: `GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`
 - Higher concurrency or catalog counts: increase heap and metaspace accordingly.
 
-## Starting the Iceberg REST server
+## Start the Iceberg REST server
 
 To start as an auxiliary service with Gravitino server:
 

@@ -222,7 +222,7 @@ The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `hive_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
-### Creating tables and schemas
+### Create tables and schemas
 
 Create a new schema named `database_01` in `hive_test` catalog.
 
@@ -256,7 +256,7 @@ WITH (
 );
 ```
 
-### Writing data
+### Write data
 
 Insert data into the table `table_01`:
 
@@ -317,7 +317,7 @@ MERGE INTO hive_test.database_01.test_acid t USING hive_test.database_01.table_0
               VALUES (3, s.name, s.salary);
 ```
 
-### Querying data
+### Query data
 
 Query the `table_01` table:
 

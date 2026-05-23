@@ -225,9 +225,9 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 </TabItem>
 </Tabs>
 
-## Accessing a fileset with GCS
+## Access a fileset with GCS
 
-### Using the GVFS Java client to access the fileset
+### Use the GVFS Java client to access the fileset
 
 To access fileset with GCS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -293,7 +293,7 @@ Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
   </dependency>
 ```
 
-### Using Spark to access the fileset
+### Use Spark to access the fileset
 
 The following code snippet shows how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
 
@@ -374,7 +374,7 @@ Please choose the correct jar according to your environment.
 In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
 :::
 
-### Accessing a fileset using the Hadoop fs command
+### Access a fileset using the Hadoop fs command
 
 The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3.
 
@@ -418,7 +418,7 @@ For GCS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-versi
 ./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/gcs_catalog/gcs_schema/gcs_example
 ```
 
-### Using the GVFS Python client to access a fileset
+### Use the GVFS Python client to access a fileset
 
 To access fileset with GCS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
@@ -448,7 +448,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
 ```
 
-### Using fileset with pandas
+### Use fileset with pandas
 
 The following are examples of how to use the pandas library to access the GCS fileset
 

@@ -120,7 +120,7 @@ The `version` field of `CreateTable` response is always null, which stands for t
 
 ## Deployment
 
-### Running with Gravitino Server
+### Run with Gravitino Server
 
 To enable the Lance REST service within Gravitino server, configure the following properties in your Gravitino configuration file `${GRAVITINO_HOME}/conf/gravitino.conf`:
 
@@ -145,7 +145,7 @@ gravitino.lance-rest.gravitino-uri = http://localhost:8090
 gravitino.lance-rest.gravitino-metalake = my_metalake
 ```
 
-### Running Standalone
+### Run Standalone
 
 To run Lance REST service independently without Gravitino server (You need to start Gravitino server first):
 
@@ -168,7 +168,7 @@ In most cases, you only need to configure `gravitino.lance-rest.gravitino-metala
 :::
 
 
-### Running with Docker
+### Run with Docker
 
 Launch Lance REST service using Docker(You need to start Gravitino server first):
 

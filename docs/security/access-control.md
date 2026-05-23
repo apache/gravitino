@@ -502,7 +502,7 @@ gravitino.authorization.jcasbin.changePollIntervalSecs = 3
 
 If you have metalakes that were created before authorization was enabled, you need to perform a migration to ensure proper access control.
 
-### Migrating Existing Metalakes
+### Migrate Existing Metalakes
 
 When you created metalakes with `gravitino.authorization.enable = false`, those metalakes don't have owners assigned. To enable authorization for these existing metalakes:
 

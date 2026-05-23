@@ -24,7 +24,7 @@ Functions registered with other runtimes (e.g., `SPARK`) are **not** visible in 
 - The Gravitino catalog must support function operations (i.e., implement `FunctionCatalog`).
 - Functions must be registered in Gravitino via the Gravitino client or REST API before they can be queried from Trino.
 
-## Registering a UDF
+## Register a UDF
 
 Use the Gravitino Java client to register a function:
 
@@ -43,7 +43,7 @@ functionCatalog.registerFunction(
                 FunctionImpls.ofSql(FunctionImpl.RuntimeType.TRINO, "RETURN x + 1")))));
 ```
 
-## Querying UDFs from Trino
+## Query UDFs from Trino
 
 Once registered, the function appears in Trino:
 

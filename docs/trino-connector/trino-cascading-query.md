@@ -15,9 +15,9 @@ based on the data distribution in the catalogs. By doing so, it significantly re
 transferred over the network, addressing the performance issues commonly found in traditional federated query engines
 where large volumes of data need to be transmitted across networks.
 
-# Deploying Trino
+# Deploy Trino
 
-## Deploying Trino
+## Deploy Trino
 
 To set up the Trino cascading query environment, you should first deploy at least two Trino environments.
 Next, install the `Apache Gravitino Trino connector` plugin and `Gravitino Trino cascading connector` plugin into Trino.
@@ -36,7 +36,7 @@ Ensure that the `plugin` directory includes the `gravitino` and `trino` subdirec
 Verify the network connectivity between the machines hosting the two Trino clusters, identified as `c1-trino` and `c2-trino`.
 
 
-## Deploying Trino in Containers
+## Deploy Trino in Containers
 
 Download the `Apache Gravitino Trino connector` tarball and `Gravitino Trino cascading connector` tarball, then unpack them.
 After unpacking, you will find the directories named `gravitino-trino-connector-<version>`
@@ -60,7 +60,7 @@ docker run --name c2-trino -d -p 8080:8080 <image-name> -v `gravitino-trino-conn
 After starting the Trino containers, ensure the configuration directory `/etc/trino` is correctly set up.
 Also, verify that the Trino containers on `c1-trino` and `c2-trino` can communicate with each other over the network.
 
-## Configuring Trino
+## Configure Trino
 
 For detailed instructions on configuring Trino, please refer to the [Trino documentation](https://trino.io/docs/current/installation/deployment.html#configuring-trino).
 After completing the basic configuration, proceed to configure the Gravitino connector.
@@ -92,7 +92,7 @@ thus queries for catalogs in this region will execute on c2-trino.
 Ensure that the `gravitino.uri` setting on both `c1-trino` and `c2-trino` points to the same Gravitino server.
 Verify that the server is operational and properly connected. Restart Trino after making any configuration changes.
 
-## Creating Catalogs
+## Create Catalogs
 
 To verify federated queries, create catalogs. 
 Below is an example using the `gt_mysql` catalog in the `c2` region, configured for federated querying from `c1-trino`. 
@@ -126,7 +126,7 @@ After successfully creating the catalog, use the Trino CLI on both `c1-trino` an
 SHOW CATALOGS;
 ```
 
-## Adding Data
+## Add Data
 
 After creating the catalog, the next step is to add data to verify queries. Since the `Gravitino Trino cascading connector`
 does not support data writing directly, execute the following commands using the `c2-trino` CLI to set up your data environment:

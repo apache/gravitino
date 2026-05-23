@@ -80,7 +80,7 @@ Catalog location: hdfs://namenode:9000/lakehouse
     
 ```
 
-### Creating a Catalog
+### Create a Catalog
 
 Use `provider: "lakehouse-generic"` when creating a generic lakehouse catalog.
 

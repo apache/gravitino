@@ -148,7 +148,7 @@ The `gravitino` catalog is a catalog defined By Trino catalog configuration.
 The `mysql_test` catalog is the catalog created by you in Gravitino.
 Other catalogs are regular user-configured Trino catalogs.
 
-### Creating tables and schemas
+### Create tables and schemas
 
 Create a new schema named `database_01` in `test.mysql_test` catalog.
 
@@ -211,7 +211,7 @@ WITH (
 );
 ```
 
-### Writing data
+### Write data
 
 Insert data into the table `table_01`:
 
@@ -238,7 +238,7 @@ DELETE FROM mysql_test.database_01.table_01 WHERE salary = 12;
 DELETE FROM mysql_test.database_01.table_01;
 ```
 
-### Querying data
+### Query data
 
 Query the `table_01` table:
 

@@ -83,6 +83,8 @@ Apply these rules when reviewing or writing messages:
 - No em dashes. Use commas, parentheses, or two separate sentences.
 - Avoid starting sentences with "This" as a bare pronoun. Use "This [noun]" with an explicit referent, or restructure.
 - Headings: Title Case for H1 and H2, sentence case for H3 and below.
+- Avoid gerund-led headings. Rare exceptions are acceptable for well-established phrases like "Getting started" that have no clean noun-phrase equivalent. When in doubt, use a noun phrase.
+- No fragment headings starting with prepositions or conjunctions. Headings like "With X", "Without X", "For X", "From X", "And X", "But X", "Or X" implicitly attach to a subject elsewhere and read as fragments. Prefer a noun phrase ("X", "X configuration", "No X") or an imperative ("Configure X").
 - One sentence per line is encouraged for editability when it reads naturally. Never cram two sentences onto one line.
 - Numbers: spell out one through nine, use digits for 10 and above. Exception: numbers paired with units (5 GB, 3 ms) always digits.
 - Time: "5 ms", "30 s", "2 min", "1 hour" with a space.

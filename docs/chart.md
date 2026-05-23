@@ -93,7 +93,7 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
   -f /path/to/values.yaml
 ```
 
-### Deploying Gravitino with MySQL as the Storage Backend
+### Deploy Gravitino with MySQL as the Storage Backend
 
 To deploy both Gravitino and MySQL, where MySQL is used as the storage backend, enable the built-in MySQL instance:
 

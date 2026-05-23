@@ -78,7 +78,7 @@ discovery.uri=http://0.0.0.0:8080
 
 You can install the Gravitino Trino connector in Trino office docker images step by step.
 
-### Running the container
+### Run the container
 
 Use the docker command to create a container from the `trinodb/trino` image. Assign it the trino-gravitino name.
 Run it in the background, and map the default Trino port, which is 8080, from inside the container to port 8080 on your machine.
@@ -90,7 +90,7 @@ docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:469
 Run `docker ps` to check whether the container is running.
 
 
-### Installing the Apache Gravitino Trino connector
+### Install the Apache Gravitino Trino connector
 
 Download the Gravitino Trino connector tarball for Trino `469` and unpack it.
 
@@ -118,7 +118,7 @@ cd /lib/trino/plugin
 
 Now you can see the Gravitino Trino connector directory in the plugin directory.
 
-### Configuring the Trino
+### Configure the Trino
 
 You can find the Trino configuration file `config.properties` in the directory `/etc/trino`. You need changed the file like this:
 
@@ -131,7 +131,7 @@ discovery.uri=http://localhost:8080
 catalog.management=dynamic
 ```
 
-### Configuring the Apache Gravitino Trino connector
+### Configure the Apache Gravitino Trino connector
 
 Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, please refer to the [Gravitino getting started](../getting-started/index.md).
 
@@ -161,7 +161,7 @@ And then restart the Trino container to load the Gravitino Trino connector.
 docker restart trino-gravitino
 ```
 
-### Verifying the Apache Gravitino Trino connector
+### Verify the Apache Gravitino Trino connector
 
 Use the Trino CLI to connect to the Trino container and run a query.
 
