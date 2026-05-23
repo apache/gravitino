@@ -72,11 +72,11 @@ df.write.format("hudi")
 The corresponding `_ro` / `_rt` siblings are removed automatically based on the base table name.
 :::
 
-When you use the Gravitino with Trino. You can pass the Trino Hive connector configuration using prefix `trino.bypass.`. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
+When using Gravitino with Trino, pass the Trino Hive connector configuration using the `trino.bypass.` prefix. For example, using `trino.bypass.hive.config.resources` to pass the `hive.config.resources` to the Gravitino Hive catalog in Trino runtime.
 
-When you use the Gravitino with Spark. You can pass the Spark Hive connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
+When using Gravitino with Spark, pass the Spark Hive connector configuration using the `spark.bypass.` prefix. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
 
-When you use the Gravitino authorization Hive with Apache Ranger. You can see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#example-of-using-the-ranger-hadoop-sql-plugin)
+When using Gravitino authorization for Hive with Apache Ranger, see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#example-of-using-the-ranger-hadoop-sql-plugin)
 ### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
@@ -247,5 +247,5 @@ Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gra
 ## Hive Catalog with S3 Storage
 
 To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-s3.md) documentation. No special configurations are required for the Hive catalog to work with S3 storage.
-The only difference is the storage location of the files, which is in S3. You can use `location` to specify the S3 path for the database or table.
+The only difference is the storage location of the files, which is in S3. Use `location` to specify the S3 path for the database or table.
 

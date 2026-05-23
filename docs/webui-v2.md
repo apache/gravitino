@@ -42,7 +42,7 @@ The Web V2 landing page depends on both the authentication mode and whether auth
 
   ![metalakes-list](./assets/webui-v2/metalakes-list.png)
 
-- When `gravitino.authorization.enable=true`, authorization is enabled. In `simple` mode, the UI shows a login page. You can enter any username without a password.
+- When `gravitino.authorization.enable=true`, authorization is enabled. In `simple` mode, the UI shows a login page. Enter any username without a password.
 
   ![simple-with-login](./assets/webui-v2/simple-with-login.png)
 
@@ -189,7 +189,7 @@ Depending on the provider, you can configure **Partitions**, **Sort Orders**, an
 ![create-table-sortOrders](./assets/webui-v2/create-table-sortOrders.png)
 
 
-In **Properties**, default values are prefilled and can be changed. You can reselect and update the values before submitting.
+In **Properties**, default values are prefilled and can be changed. Reselect and update the values before submitting.
 
 ![tables-create-properties](./assets/webui-v2/tables-create-properties.png)
 

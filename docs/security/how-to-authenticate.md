@@ -166,7 +166,7 @@ Gravitino supports group mapping to transform authenticated groups (from OAuth) 
 
 #### OAuth Group Mapping
 
-For OAuth authentication, groups are extracted from JWT claims (configured via `gravitino.authenticator.oauth.groupsFields`). You can customize how these groups are mapped:
+For OAuth authentication, groups are extracted from JWT claims (configured via `gravitino.authenticator.oauth.groupsFields`). Customize how these groups are mapped:
 
 ```text
 # Use default regex mapper that extracts everything (passes through unchanged)
@@ -217,7 +217,7 @@ gravitino.authenticator.oauth.groupMapper = com.example.MyCustomGroupMapper
 
 #### OAuth Principal Mapping
 
-For OAuth authentication, principals are extracted from JWT claims (configured via `gravitino.authenticator.oauth.principalFields`). You can customize how these principals are mapped:
+For OAuth authentication, principals are extracted from JWT claims (configured via `gravitino.authenticator.oauth.principalFields`). Customize how these principals are mapped:
 
 ```text
 # Use default regex mapper that extracts everything (passes through unchanged)
@@ -523,7 +523,7 @@ gravitino.authenticator.oauth.serverUri = http://localhost:8177
 
    ![oauth_login_image](../assets/oauth.png)
 
-8. You can also use the curl command to access Gravitino.
+8. Use the curl command to access Gravitino.
 
 Get access token
 
@@ -587,7 +587,7 @@ docker run -dti -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRA
 
    ![create-client.png](../assets/security/create-client.png)
 
-7. You can refer to the [Configurations](../gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
+7. Refer to the [Configurations](../gravitino-server-config.md) and append the configurations to the conf/gravitino.conf.
 
 ```text
 gravitino.authenticators = oauth

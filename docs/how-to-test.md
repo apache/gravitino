@@ -14,7 +14,7 @@ Apache Gravitino has two types of tests:
   environment.
 * Refer to [How to build Gravitino](./how-to-build.md) to make sure you have
   a build environment ready.
-* You can use [OrbStack](https://orbstack.dev/) to replace Docker Desktop
+* Use [OrbStack](https://orbstack.dev/) to replace Docker Desktop
   on macOS. OrbStack automatically configures the network between the Docker containers.
 * If you are using Docker Desktop for macOS, launch the
   [mac-docker-connector](https://github.com/wenjunxiao/mac-docker-connector) before running the tests.

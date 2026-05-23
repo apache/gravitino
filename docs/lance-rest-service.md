@@ -208,7 +208,7 @@ When using Lance REST service with Gravitino backend, keep the following conside
 Gravitino follows a three-level hierarchy: **catalog → schema → table**. When creating namespaces or tables:
 
 1. **Parent must exist:** Before creating `lance_catalog/schema`, ensure `lance_catalog` catalog exists in Gravitino metalake.
-2. **Two-level limit:** You can create namespace `lance_catalog/schema`, but **not** `lance_catalog/schema/sub_schema`.
+2. **Two-level limit:** Create namespace `lance_catalog/schema`, but **not** `lance_catalog/schema/sub_schema`.
 3. **Table placement:** Tables can only be created under `lance_catalog/schema`, not at catalog level.
 
 **Example Hierarchy:**

@@ -94,7 +94,7 @@ Specify filter parameters by setting configuration entries in the style `graviti
 ### Catalog Backend Configuration
 
 :::info
-The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. You can specify a Hive, JDBC or REST catalog backend for production environment.
+The Gravitino Iceberg REST catalog service uses the memory catalog backend by default. Specify a Hive, JDBC or REST catalog backend for production environment.
 :::
 
 #### Hive Backend Configuration
@@ -468,7 +468,7 @@ For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`,
 Refer to [GCS credentials](./security/credential-vending.md#gcs-credentials) for credential related configurations.
 
 :::note
-Please ensure that the credential file can be accessed by the Gravitino server. For example, if the server is running on a GCE machine, or you can set the environment variable as `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, even when the `gcs-service-account-file` has already been configured.
+Ensure that the credential file is accessible by the Gravitino server. For example, the server may be running on a GCE machine, or you may set the environment variable `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even when `gcs-service-account-file` is already configured.
 :::
 
 :::info
@@ -499,13 +499,13 @@ Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hado
 
 #### Other Storages
 
-For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.
+For storages not managed by Gravitino directly, configure them through custom catalog properties.
 
 | Configuration item               | Description                                                                             | Default value | Required | Since Version    |
 |----------------------------------|-----------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0-incubating |
 
-To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.iceberg-rest.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
+To pass custom properties such as `security-token` to your custom `FileIO`, configure them via `gravitino.iceberg-rest.security-token`. The `security-token` is included in the properties when the `FileIO` initialize method is invoked.
 
 :::info
 Please set the `gravitino.iceberg-rest.warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`. Additionally, download corresponding jars in the classpath of Iceberg REST server, `iceberg-rest-server/libs` for the auxiliary server, `libs` for the standalone server.
@@ -542,7 +542,7 @@ Gravitino provides a pluggable audit log mechanism, refer to [Audit log configur
 
 ### Apache Iceberg Metrics Store Configuration
 
-Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. You can develop a class that implements `org.apache.gravitino.iceberg.service.metrics.IcebergMetricsStore` and add the corresponding jar file to the Iceberg REST service classpath directory.
+Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. Develop a class that implements `org.apache.gravitino.iceberg.service.metrics.IcebergMetricsStore` and add the corresponding jar file to the Iceberg REST service classpath directory.
 
 | Configuration item                              | Description                                                                                                                         | Default value | Required | Since Version |
 |-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -587,7 +587,7 @@ Plan scan responses follow the Iceberg 1.11 REST API: completed plans return str
 
 The scan plan cache uses snapshot ID as part of the cache key, ensuring automatic invalidation when table data changes. This can provide significant speedup for repeated queries like dashboard refreshes or BI tool queries.
 
-Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache` to store the cached data in memory. You can also implement your custom scan plan cache by implementing the `org.apache.gravitino.iceberg.service.cache.ScanPlanCache` interface.
+Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache` to store the cached data in memory. Also implement your custom scan plan cache by implementing the `org.apache.gravitino.iceberg.service.cache.ScanPlanCache` interface.
 
 ### Misc Configurations
 

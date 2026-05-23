@@ -12,11 +12,11 @@ Apache Gravitino supports running on Java 17, and higher versions should also wo
 `${JAVA_HOME}/bin/java -version` command.
 :::
 
-The Gravitino package comprises both the Gravitino server and the Gravitino Iceberg REST server. You can manage these servers independently or run them concurrently on a single server.
+The Gravitino package comprises both the Gravitino server and the Gravitino Iceberg REST server. Manage these servers independently or run them concurrently on a single server.
 
 ### Get the Apache Gravitino Binary Distribution Package
 
-Before installing Gravitino, make sure you have the Gravitino binary distribution package. You can download the latest Gravitino binary distribution package from [GitHub](https://github.com/apache/gravitino/releases).
+Before installing Gravitino, make sure you have the Gravitino binary distribution package. Download the latest Gravitino binary distribution package from [GitHub](https://github.com/apache/gravitino/releases).
 To build it yourself, follow the instructions in [How to Build Gravitino](./how-to-build.md).
 
 - If you build Gravitino yourself using the `./gradlew compileDistribution` command, you can find the Gravitino binary distribution package in the `distribution/package` and `distribution/package-all` directory. The main difference between these two packages is that the `package-all` package contains all catalogs including catalog under folder `catalogs-contrib`, while the `package` package only contains the main catalogs under folder `catalogs`.
@@ -69,19 +69,19 @@ If you want to use the relational backend storage, you need to initialize the RD
 
 #### Configure the Apache Gravitino Server
 
-The Gravitino server configuration file is `conf/gravitino.conf`. You can configure the Gravitino server by modifying this file. Basic configurations have already been added to this file. All the configurations are listed in [Gravitino Server Configurations](./gravitino-server-config.md).
+The Gravitino server configuration file is `conf/gravitino.conf`. Configure the Gravitino server by modifying this file. Basic configurations have already been added to this file. All the configurations are listed in [Gravitino Server Configurations](./gravitino-server-config.md).
 
 #### Configure the Apache Gravitino Server Log
 
-The Gravitino server log configuration file is `conf/log4j2.properties`. Gravitino uses Log4j2 as the Logging system. You can [Log4j2](https://logging.apache.org/log4j/2.x/) to do the log configuration.
+The Gravitino server log configuration file is `conf/log4j2.properties`. Gravitino uses Log4j2 as the logging system. Refer to the [Log4j2 configuration guide](https://logging.apache.org/log4j/2.x/) to do the log configuration.
 
 #### Configure the Apache Gravitino Server Environment
 
-The Gravitino server environment configuration file is `conf/gravitino-env.sh`. Gravitino exposes several environment variables. You can modify them in this file.
+The Gravitino server environment configuration file is `conf/gravitino-env.sh`. Gravitino exposes several environment variables. Modify them in this file.
 
 #### Configure Apache Gravitino Catalogs
 
-Gravitino supports multiple catalogs. You can configure the catalog-level configurations by modifying the related configuration file in the `catalogs/<catalog-provider>/conf` directory. The configurations you set here apply to all the catalogs of the same type you create.
+Gravitino supports multiple catalogs. Configure the catalog-level configurations by modifying the related configuration file in the `catalogs/<catalog-provider>/conf` directory. The configurations you set here apply to all the catalogs of the same type you create.
 
 For example, if you want to configure the Hive catalog, you can modify the file `catalogs/hive/conf/hive.conf`. The detailed configurations are listed in the specific catalog documentation.
 
