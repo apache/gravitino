@@ -79,7 +79,7 @@ To configure the Gravitino client, use properties prefixed with `fs.gravitino.cl
 
 :::note
 When users work with a multi-cluster fileset catalog, they can configure separate sets of properties for the base paths
-of the different clusters. [Manage fileset with multiple clusters](./manage-fileset-metadata-using-gravitino.md#manage-fileset-with-multiple-clusters)
+of the different clusters. [Manage filesets across multiple clusters](./manage-fileset-metadata-using-gravitino.md#manage-filesets-across-multiple-clusters)
 
 For example, a complex catalog structure might look like this:
 
@@ -441,7 +441,7 @@ To configure the Gravitino client, use properties prefixed with `gvfs_gravitino_
 
 :::note
 When users work with a multi-cluster fileset catalog, they can configure separate sets of properties for the base paths
-of the different clusters. [Manage fileset with multiple clusters](./manage-fileset-metadata-using-gravitino.md#manage-fileset-with-multiple-clusters)
+of the different clusters. [Manage filesets across multiple clusters](./manage-fileset-metadata-using-gravitino.md#manage-filesets-across-multiple-clusters)
 
 For example, a complex catalog structure might look like this:
 

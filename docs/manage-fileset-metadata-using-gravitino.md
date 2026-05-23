@@ -801,7 +801,7 @@ fileset_list: List[NameIdentifier] = catalog.as_fileset_catalog().list_filesets(
 </Tabs>
 
 
-## Manage Fileset with Multiple Clusters
+## Manage Filesets Across Multiple Clusters
 
 
 In general, the locations of all schemas and filesets under a fileset
