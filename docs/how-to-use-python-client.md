@@ -73,7 +73,7 @@ Ues any IDE to develop Gravitino Python Client. Directly open the client-python 
 + Refer to [How to build Gravitino](./how-to-build.md#prerequisites) to have necessary build
   environment ready for building.
 
-### Build and Testing
+### Build and Test
 
 1. Clone the Gravitino project.
 
