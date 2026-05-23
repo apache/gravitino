@@ -123,6 +123,7 @@ When reviewing a document, follow this pattern:
 5. Do not bundle unrelated edits in the same proposal. One conceptual change per accept/reject decision.
 6. After all proposals in a file are reviewed, draft a conventional-commit message: `docs(<area>): <improvement>`.
 7. When applying a mechanical pattern sweep, if the resulting sentence reads awkwardly (comma splice, dangling fragment, missing connector, awkward parallel structure), fix the whole sentence in the same commit rather than leaving cleanup for a later pass. The goal is that any sentence the sweep touches reads cleanly after the commit lands.
+8. Run a typo and misspelling pass as part of the polish workflow, especially after sweeps that strip leading words (which can expose misspelled words that were partially hidden in the original phrasing).
 
 ## Priority of issues
 
