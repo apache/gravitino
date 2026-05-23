@@ -181,7 +181,7 @@ curl -X POST -H "Content-Type: application/json" \
 }' http://gravitino-host:8090/api/metalakes/test/catalogs
 ```
 
-For More information about the Iceberg catalog, please refer to [Iceberg catalog](../lakehouse-iceberg-catalog.md).
+For More information about the Iceberg catalog, refer to [Iceberg catalog](../lakehouse-iceberg-catalog.md).
 
 - Set the value of configuration `gravitino.metalake` to the metalake you have created, named 'test', and start the Trino container.
 
@@ -329,7 +329,7 @@ replacing hdfs_user with the appropriate username:
 ## S3
 
 When using AWS S3 within the Iceberg catalog, users need to configure the Trino Iceberg connector's
-AWS S3-related properties in the catalog's properties. Please refer to the documentation
+AWS S3-related properties in the catalog's properties. Refer to the documentation
 of [Hive connector with Amazon S3](https://trino.io/docs/current/connector/hive-s3.html).
 These configurations must use the `trino.bypass.` prefix in the Iceberg catalog's attributes to be effective.
 
@@ -372,5 +372,5 @@ After running the command, the tables are ready for data reading and writing ope
 
 :::note
 TThe Iceberg catalog module in the Apache Gravitino server should add AWS S3 support.
-Please refer to [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
+Refer to [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
 :::

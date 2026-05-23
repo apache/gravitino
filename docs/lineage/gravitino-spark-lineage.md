@@ -78,7 +78,7 @@ Configuration example For Spark shell:
 --conf spark.openlineage.columnLineage.datasetLineageEnabled=true 
 ```
 
-Please refer to [OpenLineage Spark guides](https://openlineage.io/docs/guides/spark/) and [Gravitino Spark connector](/spark-connector/spark-connector.md) for more details. Additionally, Gravitino provides following configurations for lineage. 
+Refer to [OpenLineage Spark guides](https://openlineage.io/docs/guides/spark/) and [Gravitino Spark connector](/spark-connector/spark-connector.md) for more details. Additionally, Gravitino provides following configurations for lineage. 
 
 <table>
   <thead>

@@ -42,7 +42,7 @@ There are three deployment scenarios for Gravitino Iceberg REST server:
 - A standalone server in the Gravitino server package, the classpath is `iceberg-rest-server/libs`.
 - An auxiliary service embedded in the Gravitino server, the classpath is `iceberg-rest-server/libs`.
 
-For detailed instructions on how to build and install the Gravitino server package, please refer to [How to build](./how-to-build.md) and [How to install](./how-to-install.md). To build the Gravitino Iceberg REST server package, use the command `./gradlew compileIcebergRESTServer -x test`. Alternatively, to create the corresponding compressed package in the distribution directory, use `./gradlew assembleIcebergRESTServer -x test`. The Gravitino Iceberg REST server package includes the following files:
+For detailed instructions on how to build and install the Gravitino server package, refer to [How to build](./how-to-build.md) and [How to install](./how-to-install.md). To build the Gravitino Iceberg REST server package, use the command `./gradlew compileIcebergRESTServer -x test`. Alternatively, to create the corresponding compressed package in the distribution directory, use `./gradlew assembleIcebergRESTServer -x test`. The Gravitino Iceberg REST server package includes the following files:
 
 ```text
 |── ...
@@ -270,7 +270,7 @@ In the Spark SQL side, you could use `default_rest_catalog` to access the defaul
 
 #### OAuth2
 
-Please refer to [OAuth2 Configuration](./security/how-to-authenticate#server-configuration) for how to enable OAuth2.
+Refer to [OAuth2 Configuration](./security/how-to-authenticate#server-configuration) for how to enable OAuth2.
 
 When enabling OAuth2 and leveraging a dynamic configuration provider to retrieve catalog information from the Gravitino server, please use the following configuration parameters to establish OAuth2 authentication for secure communication with the Gravitino server:
 
@@ -365,7 +365,7 @@ You can omit `iceberg.rest-catalog.session=NONE` because `NONE` is the default v
 
 #### HTTPS
 
-Please refer to [HTTPS Configuration](./security/how-to-use-https/#apache-iceberg-rest-services-configuration) for how to enable HTTPS for Gravitino Iceberg REST server.
+Refer to [HTTPS Configuration](./security/how-to-use-https/#apache-iceberg-rest-services-configuration) for how to enable HTTPS for Gravitino Iceberg REST server.
 
 #### Backend authentication
 
@@ -384,7 +384,7 @@ The detailed configuration items are as follows:
 
 ### Credential vending
 
-Please refer to [Credential vending](./security/credential-vending.md) for more details.
+Refer to [Credential vending](./security/credential-vending.md) for more details.
 
 ### Access control
 
@@ -402,7 +402,7 @@ Access control for the Iceberg REST Catalog (IRC) is only supported when running
 When running as an auxiliary service, the `gravitino.iceberg-rest.gravitino-uri` configuration is **not required**. The service will use internal interfaces to access Gravitino directly, providing better performance and avoiding the need for HTTP-based communication.
 :::
 
-Please refer to [Access Control](./security/access-control.md) for details on how to configure authorization, create roles, and grant privileges in Gravitino.
+Refer to [Access Control](./security/access-control.md) for details on how to configure authorization, create roles, and grant privileges in Gravitino.
 
 #### How access control works
 
@@ -413,7 +413,7 @@ When access control is enabled:
 3. Gravitino verifies the user has the necessary privileges to perform the operation on the specified metadata object
 4. Upon successful authorization, the Iceberg REST service executes the operation; otherwise, it returns an authorization error
 
-Please refer to [Access Control](./security/access-control.md) for the complete list of privileges and how to grant them.
+Refer to [Access Control](./security/access-control.md) for the complete list of privileges and how to grant them.
 
 
 ### Storage
@@ -429,7 +429,7 @@ Please refer to [Access Control](./security/access-control.md) for the complete 
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.iceberg-rest.s3.sse.type`.
 
-Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for credential related configurations.
+Refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for credential related configurations.
 
 :::info
  - For the JDBC catalog backend, set the `gravitino.iceberg-rest.warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. 
@@ -447,7 +447,7 @@ Please refer to [S3 credentials](./security/credential-vending.md#s3-credentials
 
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.iceberg-rest.client.security-token`.
 
-Please refer to [OSS credentials](./security/credential-vending.md#oss-credentials) for credential related configurations.
+Refer to [OSS credentials](./security/credential-vending.md#oss-credentials) for credential related configurations.
 
 Additionally, please download the [Gravitino Iceberg Aliyun bundle jar](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle) and place it in the classpath of Iceberg REST server, you can refer to [server management](#server-management) for classpath details.
 
@@ -465,7 +465,7 @@ Supports using static GCS credential file or generating GCS token to access GCS 
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.iceberg-rest.gcs.project-id`.
 
-Please refer to [GCS credentials](./security/credential-vending.md#gcs-credentials) for credential related configurations.
+Refer to [GCS credentials](./security/credential-vending.md#gcs-credentials) for credential related configurations.
 
 :::note
 Please ensure that the credential file can be accessed by the Gravitino server. For example, if the server is running on a GCE machine, or you can set the environment variable as `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, even when the `gcs-service-account-file` has already been configured.
@@ -483,7 +483,7 @@ Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_na
 
 For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
 
-Please refer to [ADLS credentials](./security/credential-vending.md#adls-credentials) for credential related configurations.
+Refer to [ADLS credentials](./security/credential-vending.md#adls-credentials) for credential related configurations.
 
 :::info
 Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Gravitino Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle) and place it in the classpath of Iceberg REST server.
@@ -534,11 +534,11 @@ The `clients` property for example:
 
 ### Event listener
 
-Gravitino generates pre-event and post-event for table operations and provide a pluggable event listener to allow you to inject custom logic. For more details, please refer to [Event listener configuration](gravitino-server-config.md#event-listener-configuration).
+Gravitino generates pre-event and post-event for table operations and provide a pluggable event listener to allow you to inject custom logic. For more details, refer to [Event listener configuration](gravitino-server-config.md#event-listener-configuration).
 
 ### Audit log
 
-Gravitino provides a pluggable audit log mechanism, please refer to [Audit log configuration](gravitino-server-config.md#audit-log-configuration).
+Gravitino provides a pluggable audit log mechanism, refer to [Audit log configuration](gravitino-server-config.md#audit-log-configuration).
 
 ### Apache Iceberg metrics store configuration
 
@@ -682,7 +682,7 @@ You could run Gravitino Iceberg REST server through docker container:
 docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:latest
 ```
 
-Gravitino Iceberg REST server in docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, please refer to [storage section](#storage) for more details.
+Gravitino Iceberg REST server in docker image could access local storage by default, you could set the following environment variables if the storage is cloud/remote storage like S3, refer to [storage section](#storage) for more details.
 
 | Environment variables                  | Configuration items                                 | Since version    |
 |----------------------------------------|-----------------------------------------------------|------------------|

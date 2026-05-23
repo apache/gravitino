@@ -98,7 +98,7 @@ Before proceeding, ensure the following requirements are met:
 
 2. **Lance Catalog**: A Lance catalog created in Gravitino using either:
     - Lance REST namespace API (`CreateNamespace` operation - see [Lance REST Service documentation](./lance-rest-service.md)
-    - Gravitino REST API, for more, please refer to [lakehouse-generic-catalog](./lakehouse-generic-catalog.md)
+    - Gravitino REST API, for more, refer to [lakehouse-generic-catalog](./lakehouse-generic-catalog.md)
     - Example catalog name: `lance_catalog`
 
 3. **Lance Spark Bundle** (for Spark integration):

@@ -228,7 +228,7 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 
 ### Catalog operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -243,7 +243,7 @@ You could put properties except `comment`.
 
 ### Schema operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ### Hierarchical schema
 
@@ -440,7 +440,7 @@ You can pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/co
 
 ### Table operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
 #### Alter table operations
 

@@ -18,7 +18,7 @@ For dedicated view examples and APIs, see [Manage view metadata using Gravitino]
 In this document, Gravitino uses Apache Hive catalog as an example to show how to manage
 relational metadata by Gravitino. Other relational catalogs are similar to Hive catalog,
 but they may have some differences, especially in catalog property, table property, and column type.
-For more details, please refer to the related doc.
+For more details, refer to the related doc.
 
 - [**Apache Hive**](./apache-hive-catalog.md)
 - [**MySQL**](./jdbc-mysql-catalog.md)
@@ -57,7 +57,7 @@ This is a Flink limitation. For example, `catalog_hive` is valid, but `1_catalog
 
 :::tip
 The code below is an example of creating a Hive catalog. For other relational catalogs, the code is
-similar, but the catalog type, provider, and properties may be different. For more details, please refer to the related doc.
+similar, but the catalog type, provider, and properties may be different. For more details, refer to the related doc.
 
 For relational catalog, you must specify the catalog `type` as `RELATIONAL` when creating a catalog.
 :::
@@ -667,7 +667,7 @@ catalog.as_schemas().drop_schema("schema", cascade=True)
 </Tabs>
 
 If `cascade` is true, Gravitino will drop all tables under the schema. Otherwise, Gravitino will throw an exception if there are tables under the schema. 
-Some catalogs may not support cascading deletion of a schema, please refer to the related doc for more details.
+Some catalogs may not support cascading deletion of a schema, refer to the related doc for more details.
 
 ### List all schemas under a catalog
 
@@ -854,7 +854,7 @@ TableCatalog tableCatalog = catalog.asTableCatalog();
 // table properties of other catalogs.
 Map<String, String> tablePropertiesMap = ImmutableMap.<String, String>builder()
         .put("format", "ORC")
-        // For more table properties, please refer to the related doc.
+        // For more table properties, refer to the related doc.
         .build();
 
 tableCatalog.createTable(
@@ -1048,7 +1048,7 @@ The following is the table property that Gravitino supports:
 | `jdbc-starrocks`    | [StarRocks table property](./jdbc-starrocks-catalog.md#table-properties)                                                                                                                                                   | [StarRocks type mapping](./jdbc-starrocks-catalog.md#table-column-types)                                                                                    |
 | `jdbc-clickhouse`   | [ClickHouse table property](./jdbc-clickhouse-catalog.md#table-properties)                                                                                                                                                 | [ClickHouse type mapping](./jdbc-clickhouse-catalog.md#table-column-types)                                                                                  |
 | `jdbc-hologres`     | [Hologres table property](./jdbc-hologres-catalog.md#table-properties)                                                                                                                                                     | [Hologres type mapping](./jdbc-hologres-catalog.md#table-column-types)                                                                                      |
-| `lakehouse-generic` | Lakehouse generic table property depends on specific table implementation, for Lance table, please refer to [doc](./lakehouse-generic-lance-table.md#table-properties), other table format, please refer to related docs.  | Lakehouse generic type mapping. Similar to table properties, for Lance table, please refer to [docs](./lakehouse-generic-lance-table.md#data-type-mappings) |
+| `lakehouse-generic` | Lakehouse generic table property depends on specific table implementation, for Lance table, refer to [doc](./lakehouse-generic-lance-table.md#table-properties), other table format, refer to related docs.  | Lakehouse generic type mapping. Similar to table properties, for Lance table, refer to [docs](./lakehouse-generic-lance-table.md#data-type-mappings) |
 
 #### Table partitioning, distribution, sort ordering and indexes
 
@@ -1064,7 +1064,7 @@ In addition to the basic settings, Gravitino supports the following features:
 For more information, please see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
 
 :::note
-The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, and table properties may be different. For more details, please refer to the related doc.
+The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, and table properties may be different. For more details, refer to the related doc.
 :::
 
 ### Load a table

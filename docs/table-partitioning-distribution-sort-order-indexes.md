@@ -138,7 +138,7 @@ SortOrders.of(NamedReference.field("score"), SortDirection.ASCENDING, NullOrderi
 
 
 :::tip
-**Not all catalogs may support those features**. Please refer to the related document for more details.
+**Not all catalogs may support those features**. Refer to the related document for more details.
 :::
 
 The following is an example of creating a partitioned, bucketed table, and sorted order table:

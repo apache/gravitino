@@ -15,7 +15,7 @@ the storage location of the fileset. It supports the local filesystem and HDFS. 
 
 The rest of this document will use HDFS or local file as an example to illustrate how to use the Fileset catalog.
 For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS,
-please refer to the corresponding document for more details.
+refer to the corresponding document for more details.
 
 Note that Gravitino uses Hadoop 3 dependencies to build Fileset catalog. Theoretically, it should be
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
@@ -46,7 +46,7 @@ the Fileset catalog has the following properties:
 `default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aws-bundle`, `gravitino-azure-bundle`, `gravitino-aliyun-bundle`, or `gravitino-gcp-bundle`).
 :::
 
-Please refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
+Refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
 
 ### HDFS fileset
 
@@ -78,10 +78,10 @@ In the current implementation, the fileset uses the HDFS protocol to access its 
 or Azure Blob Storage, they can also configure the `config.resources` to specify custom configuration
 files.
 
-- For S3, please refer to [Fileset-catalog-with-s3](./fileset-catalog-with-s3.md) for more details.
-- For GCS, please refer to [Fileset-catalog-with-gcs](./fileset-catalog-with-gcs.md) for more details.
-- For OSS, please refer to [Fileset-catalog-with-oss](./fileset-catalog-with-oss.md) for more details.
-- For Azure Blob Storage, please refer to [Fileset-catalog-with-adls](./fileset-catalog-with-adls.md) for more details.
+- For S3, refer to [Fileset-catalog-with-s3](./fileset-catalog-with-s3.md) for more details.
+- For GCS, refer to [Fileset-catalog-with-gcs](./fileset-catalog-with-gcs.md) for more details.
+- For OSS, refer to [Fileset-catalog-with-oss](./fileset-catalog-with-oss.md) for more details.
+- For Azure Blob Storage, refer to [Fileset-catalog-with-adls](./fileset-catalog-with-adls.md) for more details.
 
 ### How to custom your own HCFS file system fileset?
 
@@ -121,9 +121,9 @@ Specifically:
 
 - **Catalog**: The default authentication is `simple`.
 - **Schema**: Inherits the authentication setting from the catalog if not explicitly set. For more information about
-  schema settings, please refer to [Schema properties](#schema-properties).
+  schema settings, refer to [Schema properties](#schema-properties).
 - **Fileset**: Inherits the authentication setting from the schema if not explicitly set. For more information about
-  fileset settings, please refer to [Fileset properties](#fileset-properties).
+  fileset settings, refer to [Fileset properties](#fileset-properties).
 
 The default value of `authentication.impersonation-enable` is false, and the default value for catalogs about this
 configuration is false, for

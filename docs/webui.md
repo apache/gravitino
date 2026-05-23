@@ -57,7 +57,7 @@ Such as Safari need to enable the developer menu, and select `Disable Cross-Orig
 
 ![webui-login-with-oauth](./assets/webui/login-with-oauth.png)
 
-1. Enter the values corresponding to your specific configuration. For detailed instructions, please refer to [Security](security/security.md).
+1. Enter the values corresponding to your specific configuration. For detailed instructions, refer to [Security](security/security.md).
 
 2. Click on the `LOGIN` button takes you to the homepage.
 

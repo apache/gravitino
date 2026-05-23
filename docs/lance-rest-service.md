@@ -83,7 +83,7 @@ The Lance REST service provides comprehensive support for namespace management, 
 | DeregisterTable   | Unregister a table from a namespace (metadata only, data remains)                                                                                                                  | POST        | `/lance/v1/table/{id}/deregister`     | 1.1.0         |
 | DeclareTable      | Declare a table and store the metadata without touching lance table data.                                                                                                           | POST        | `/lance/v1/table/{id}/declare`        | 1.3.0         |
 
-More details, please refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
+More details, refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
 
 ### Operation Details
 
@@ -420,4 +420,4 @@ response.raise_for_status()
 
 ## Integration with Lance REST
 
-To use the Lance REST service with Apache Spark, Ray and other engines, please refer to [lance-rest-integration](./lance-rest-integration.md) for more details.
+To use the Lance REST service with Apache Spark, Ray and other engines, refer to [lance-rest-integration](./lance-rest-integration.md) for more details.

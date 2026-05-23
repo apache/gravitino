@@ -95,7 +95,7 @@ You must download the corresponding JDBC driver and place it to the `catalogs/la
 
 ### Catalog operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -114,7 +114,7 @@ Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational
 
 ### Schema operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
 
 ## Table
 
@@ -152,7 +152,7 @@ Paimon does not support auto increment column.
 
 - Only supports Identity partitions, such as `day`, `hour`, etc.
 
-Please refer to [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spark/sql-ddl/#create-table) for more details.
+Refer to [Paimon DDL Create Table](https://paimon.apache.org/docs/0.8/spark/sql-ddl/#create-table) for more details.
 
 ### Table sort orders
 
@@ -230,7 +230,7 @@ Bucket settings are defined via Gravitino table distribution (HASH strategy). Th
 
 ### Table operations
 
-Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
+Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
 ## View
 

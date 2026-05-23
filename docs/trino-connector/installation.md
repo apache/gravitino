@@ -6,7 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 ---
 
 To install the Apache Gravitino Trino connector, you should first deploy the Trino environment, and then install the Gravitino Trino connector plugin into Trino.
-Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html) and do the following steps:
+Refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html) and do the following steps:
 
 The examples in this document use Trino `469` by default.
 
@@ -133,7 +133,7 @@ catalog.management=dynamic
 
 ### Configure the Apache Gravitino Trino connector
 
-Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, please refer to the [Gravitino getting started](../getting-started/index.md).
+Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, refer to the [Gravitino getting started](../getting-started/index.md).
 
 To configure Gravitino Trino connector correctly, you need to put the following configurations to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
 
@@ -180,7 +180,7 @@ system
 
 You can see the `gravitino` catalog in the result set. This signifies the successful installation of the Gravitino Trino connector.
 
-Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or please refer to [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
+Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or refer to [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
 
 ```text
 docker exec -it trino-gravitino trino
