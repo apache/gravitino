@@ -14,7 +14,7 @@ import TabItem from '@theme/TabItem';
 
 ## Table partitioning
 
-To create a partitioned table, you should provide the following two components to construct a valid partitioned table.
+To create a partitioned table, you should provide the following two components to construct a valid partitioned table:
 
 - Partitioning strategy. It defines how Gravitino distributes table data across partitions. Gravitino supports the following partitioning strategies.
 
@@ -47,7 +47,7 @@ Once a partitioned table is created, you can [manage its partitions using Gravit
 
 ## Table distribution
 
-To create a distribution(bucketed) table, you should use the following three components to construct a valid bucketed table.
+To create a distribution(bucketed) table, you should use the following three components to construct a valid bucketed table:
 
 - Strategy. It defines how Gravitino distributes table data across partitions.
 
@@ -92,7 +92,7 @@ Distributions.auto(Strategy.HASH, NamedReference.field("score"));
 
 ## Sort ordering
 
-To define a sorted order table, you should use the following three components to construct a valid sorted order table.
+To define a sorted order table, you should use the following three components to construct a valid sorted order table:
 
 - Direction. It defines in which direction Gravitino sorts the table. The default value is `ascending`.
 
@@ -241,7 +241,7 @@ tableCatalog.createTable(
 
 ## Indexes
 
-To define an indexed table, you should utilize the following three components to construct a valid indexed table.
+To define an indexed table, you should utilize the following three components to construct a valid indexed table:
 
 - IndexType. Represents the type of index, such as primary key or unique key.
 

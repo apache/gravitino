@@ -108,9 +108,9 @@ Policy policy = client.createPolicy(
 
 For the built-in `system_iceberg_compaction` policy content, field definitions, and examples, see [Iceberg compaction policy](./iceberg-compaction-policy.md).
 
-### List created policies
+### List policies
 
-You can list all the created policy names as well as policy objects in a metalake in Gravitino.
+List all the policy names as well as policy objects in a metalake in Gravitino.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -140,7 +140,7 @@ Policy[] policies = client.listPolicyInfos();
 
 ### Get a policy by name
 
-You can get a policy by its name.
+Get a policy by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -233,7 +233,7 @@ Gravitino supports the following policy changes:
 
 ### Enable or disable a policy
 
-You can enable or disable a policy.
+Enable or disable a policy.
 
 The `enabled` field of a policy is only a display attribute that marks whether the policy is enabled or disabled.
 It does not affect the actual behavior or characteristics of the policy itself. This field is intended for 
@@ -279,7 +279,7 @@ client.enablePolicy("my_policy_new");
 
 ### Delete a policy
 
-You can delete a policy by its name.
+Delete a policy by its name.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -307,7 +307,7 @@ Gravitino allows you to associate and disassociate policies with metadata object
 
 ### Associate and disassociate policies with a metadata object
 
-You can associate and disassociate policies with a metadata object by providing the object type, object
+Associate and disassociate policies with a metadata object by providing the object type, object
 name and policy names.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies`.
@@ -381,7 +381,7 @@ schema.supportsPolicies().associatePolicies(new String[] {"policy1"}, null);
 
 ### List associated policies for a metadata object
 
-You can list all the policies associated with a metadata object. If a policy is inheritable, 
+List all the policies associated with a metadata object. If a policy is inheritable, 
 listing policies of a metadata object will also list the policies of its parent metadata objects.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies`.
@@ -417,7 +417,7 @@ Policy[] schemaPolicies = schema.supportsPolicies().listPolicyInfos();
 
 ### Get an associated policy by name for a metadata object
 
-You can get an associated policy by its name for a metadata object.
+Get an associated policy by its name for a metadata object.
 
 The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies/{policy}`.
 
@@ -448,7 +448,7 @@ Policy schemaPolicy = schema.supportsPolicies().getPolicy("policy1");
 
 ### List metadata objects associated with a policy
 
-You can list all the metadata objects **directly associated with** a policy.
+List all the metadata objects **directly associated with** a policy.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">

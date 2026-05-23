@@ -154,4 +154,4 @@ Please downloading the [Iceberg Azure bundle](https://mvnrepository.com/artifact
 
 ### Other storage
 
-You may need to add custom configurations with the format `spark.sql.catalog.${iceberg_catalog_name}.{configuration_key}`. Additionally, place corresponding jars which implement `FileIO` in the classpath of Spark.
+Add custom configurations with the format `spark.sql.catalog.${iceberg_catalog_name}.{configuration_key}`. Additionally, place corresponding jars which implement `FileIO` in the classpath of Spark.

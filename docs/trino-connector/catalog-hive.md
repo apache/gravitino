@@ -100,7 +100,7 @@ See also [more limitation](https://trino.io/docs/current/connector/hive.html#dat
 
 ## Schema and table properties
 
-You can set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE"
+Set additional properties for tables and schemas in the Hive catalog using "WITH" keyword in the "CREATE"
 statement.
 
 
@@ -166,7 +166,7 @@ The following properties are automatically added and managed as reserved propert
 
 ## Basic usage examples
 
-You need to do the following steps before you can use the Hive catalog in Trino through Gravitino.
+Do the following steps before you can use the Hive catalog in Trino through Gravitino:
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `hive_test`,
 then you can use the following code to create them in Gravitino:
@@ -367,7 +367,7 @@ and `core-site.xml` files via the `trino.bypass.hive.config.resources` setting i
 
 Before running any `Insert` statements for Hive tables in Trino,
 you must check that the user Trino is using to access HDFS has access to the Hive warehouse directory.
-You can override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config,
+Override this username by setting the HADOOP_USER_NAME system property in the Trino JVM config,
 replacing hdfs_user with the appropriate username:
 
 ```text

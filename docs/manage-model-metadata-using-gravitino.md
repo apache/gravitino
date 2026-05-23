@@ -30,7 +30,7 @@ For a model catalog, you must specify the catalog `type` as `MODEL` when creatin
 Please also be aware that the `provider` is not required for a model catalog.
 :::
 
-You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
+Create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
 endpoint or use the Gravitino Java/Python client. The following is an example of creating a
 catalog:
 
@@ -120,7 +120,7 @@ Users should create a metalake and a catalog before creating a schema.
 
 ### Create a schema
 
-You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas`
+Create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas`
 endpoint or use the Gravitino Java/Python client. The following is an example of creating a
 schema:
 
@@ -211,7 +211,7 @@ same.
 
 ### Register a model
 
-You can register a model by sending a `POST` request to the `/api/metalakes/{metalake_name}
+Register a model by sending a `POST` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models` endpoint or use the Gravitino
 Java/Python client. The following is an example of creating a model:
 
@@ -266,7 +266,7 @@ model: Model = catalog.as_model_catalog().register_model(ident=NameIdentifier.of
 
 ### Get a model
 
-You can get a model by sending a `GET` request to the `/api/metalakes/{metalake_name}
+Get a model by sending a `GET` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}` endpoint or by using the
 Gravitino Java/Python client. The following is an example of getting a model:
 
@@ -304,7 +304,7 @@ model: Model = catalog.as_model_catalog().get_model(ident=NameIdentifier.of("mod
 
 ### Alter a model
 
-You can modify a model's metadata (e.g. rename, update comment, or modify properties) by 
+Modify a model's metadata (e.g. rename, update comment, or modify properties) by 
 sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/
 {schema_name}/models/{model_name}` endpoint or using the Gravitino Java/Python client. The following is an example of modifying a model:
 
@@ -416,7 +416,7 @@ The following operations are supported for altering a model:
 
 ### Delete a model
 
-You can delete a model by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
+Delete a model by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}` endpoint or by using the
 Gravitino Java/Python client. The following is an example of deleting a model:
 
@@ -456,7 +456,7 @@ Note that the delete operation will delete all the model versions under this mod
 
 ### List models
 
-You can list all the models in a schema by sending a `GET` request to the `/api/metalakes/
+List all the models in a schema by sending a `GET` request to the `/api/metalakes/
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models` endpoint or by using the
 Gravitino Java/Python client. The following is an example of listing all the models in a schema:
 
@@ -501,7 +501,7 @@ model_list = catalog.as_model_catalog().list_models(namespace=Namespace.of("mode
 
 ### Link a ModelVersion
 
-You can link a ModelVersion by sending a `POST` request to the `/api/metalakes/{metalake_name}
+Link a ModelVersion by sending a `POST` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions` endpoint or by using
 the Gravitino Java/Python client. The following is an example of linking a ModelVersion:
 
@@ -553,7 +553,7 @@ catalog.as_model_catalog().link_model_version(model_ident=NameIdentifier.of("mod
 
 The comment and properties of ModelVersion can be different from the model.
 
-You can also link a ModelVersion with multiple model URIs. The URIs is a map of URI name to URI. 
+Also, link a ModelVersion with multiple model URIs. The URIs is a map of URI name to URI. 
 
 If you associate only one URI with a ModelVersion and do not specify a URI name
 (as introduced in the previous paragraph), Gravitino will automatically generate a default URI name "unknown".
@@ -611,7 +611,7 @@ catalog.as_model_catalog().link_model_version_with_multiple_uris(model_ident=Nam
 
 ### Get a ModelVersion
 
-You can get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
+Get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version_number}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of getting
 a ModelVersion:
@@ -650,7 +650,7 @@ catalog.as_model_catalog().get_model_version(model_ident=NameIdentifier.of("mode
 
 ### Get a ModelVersion by alias
 
-You can also get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
+Also, get a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or
 by using the Gravitino Java/Python client. The following is an example of getting a ModelVersion
 by alias:
@@ -689,7 +689,7 @@ model_version: ModelVersion = catalog.as_model_catalog().get_model_version_by_al
 
 ### Get ModelVersion URI
 
-You can get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
+Get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version_number}/uri?uriName={uriName}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of getting
 the URI of a ModelVersion:
@@ -728,7 +728,7 @@ catalog.as_model_catalog().get_model_version_uri(model_ident=NameIdentifier.of("
 
 The param `uriName` is not required. If it is not specified, Gravitino will obtain 
 the corresponding URI based on the `default-uri-name` property set in the Model or ModelVersion.
-You can refer to [Model Properties](./model-catalog.md#Model properties) and
+Refer to [Model Properties](./model-catalog.md#Model properties) and
 [ModelVersion properties](./model-catalog.md#ModelVersion properties) for more details.
 If the `default-uri-name` property is not set in either the model or the model version, 
 an `IllegalArgumentException` will be thrown.
@@ -769,7 +769,7 @@ catalog.as_model_catalog().get_model_version_uri(model_ident=NameIdentifier.of("
 
 ### Get ModelVersion URI by alias
 
-You can also get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
+Also, get the URI of a ModelVersion by sending a `GET` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}/uri?uriName={uriName}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of getting
 the URI of a ModelVersion:
@@ -843,7 +843,7 @@ catalog.as_model_catalog().get_model_version_uri_by_alias(model_ident=NameIdenti
 
 ### Alter a ModelVersion
 
-You can modify a modelVersion's metadata (e.g. update uri, update comment, or modify properties) 
+Modify a modelVersion's metadata (e.g. update uri, update comment, or modify properties) 
 by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}
 /schemas/{schema_name} /models/{model_name}/versions/{version_number}` endpoint or using the Gravitino 
 Java/Python client. The following is an example of modifying a model version:
@@ -985,7 +985,7 @@ updated_model = model_catalog.alter_model_version(
 
 ### Alter a ModelVersion by alias
 
-You can also modify a modelVersion's metadata (e.g. update uri, update comment, or modify 
+Also, modify a modelVersion's metadata (e.g. update uri, update comment, or modify 
 properties) by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/
 {catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or using the Gravitino
 Java/Python client. The following is an example of modifying a model version:
@@ -1128,7 +1128,7 @@ updated_model = model_catalog.alter_model_version_by_alias(
 
 ### Delete a ModelVersion
 
-You can delete a ModelVersion by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
+Delete a ModelVersion by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions/{version_number}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of deleting
 a ModelVersion:
@@ -1167,7 +1167,7 @@ catalog.as_model_catalog().delete_model_version(model_ident=NameIdentifier.of("m
 
 ### Delete a ModelVersion by alias
 
-You can also delete a ModelVersion by sending a `DELETE` request to the `/api/metalakes/
+Also, delete a ModelVersion by sending a `DELETE` request to the `/api/metalakes/
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/aliases/{alias}` endpoint or
 by using the Gravitino Java/Python client. The following is an example of deleting a ModelVersion
 by alias:
@@ -1206,7 +1206,7 @@ catalog.as_model_catalog().delete_model_version_by_alias(model_ident=NameIdentif
 
 ### List ModelVersions
 
-You can list all the ModelVersions in a model by sending a `GET` request to the `/api/metalakes/
+List all the ModelVersions in a model by sending a `GET` request to the `/api/metalakes/
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions` endpoint
 or by using the Gravitino Java/Python client. The following is an example of listing all the 
 ModelVersions in a model:
@@ -1245,7 +1245,7 @@ model_versions: List[int] = catalog.as_model_catalog().list_model_versions(model
 
 ### List all versions' information in a model
 
-You can list all versions' information in a model by sending a `GET` request to the `/api/metalakes/
+List all versions' information in a model by sending a `GET` request to the `/api/metalakes/
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions?detail=true` endpoint
 or by using the Gravitino Java/Python client. The following is an example of listing all the
 versions' information in a model:

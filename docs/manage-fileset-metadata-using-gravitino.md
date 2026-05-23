@@ -38,7 +38,7 @@ To use fileset, please make sure that:
 For a fileset catalog, you must specify the catalog `type` as `FILESET` when creating the catalog.
 :::
 
-You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
+Create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
 endpoint or use the Gravitino Java client. The following is an example of creating a catalog:
 
 <Tabs groupId="language" queryString>
@@ -144,7 +144,7 @@ Users should create a metalake and a catalog before creating a schema.
 
 ### Create a schema
 
-You can create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas`
+Create a schema by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas`
 endpoint or use the Gravitino Java client. The following is an example of creating a schema:
 
 <Tabs groupId="language" queryString>
@@ -246,7 +246,7 @@ same.
 
 ### Create a fileset
 
-You can create a fileset by sending a `POST` request to the `/api/metalakes/{metalake_name}
+Create a fileset by sending a `POST` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/filesets` endpoint or use the Gravitino Java
 client. The following is an example of creating a fileset with single storage location:
 
@@ -458,7 +458,7 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 </Tabs>
 
 #### storageLocations
-You can also create a fileset with multiple storage locations. The `storageLocations` is a map of location name to storage location.
+Also, create a fileset with multiple storage locations. The `storageLocations` is a map of location name to storage location.
 The generation rules of each location follow the generation rules of a single location.
 The following is an example of creating a fileset with multiple storage locations:
 
@@ -647,7 +647,7 @@ catalog.as_fileset_catalog().create_multiple_location_fileset(
 
 ### Alter a fileset
 
-You can modify a fileset by sending a `PUT` request to the `/api/metalakes/{metalake_name}
+Modify a fileset by sending a `PUT` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/filesets/{fileset_name}` endpoint or just use the
 Gravitino Java client. The following is an example of modifying a fileset:
 
@@ -715,7 +715,7 @@ Gravitino supports the following changes to a fileset:
 
 ### Drop a fileset
 
-You can remove a fileset by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
+Remove a fileset by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/filesets/{fileset_name}` endpoint or by using the
 Gravitino Java client. The following is an example of dropping a fileset:
 
@@ -761,7 +761,7 @@ dropped. For `EXTERNAL` fileset, only the metadata of the fileset will be remove
 
 ### List filesets
 
-You can list all filesets in a schema by sending a `GET` request to the `/api/metalakes/
+List all filesets in a schema by sending a `GET` request to the `/api/metalakes/
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/filesets` endpoint or by using the
 Gravitino Java client. The following is an example of listing all the filesets in a schema:
 

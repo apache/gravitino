@@ -53,7 +53,7 @@ helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace
 
 ## View Chart Values
 
-You can customize values.yaml parameters to override chart default settings. Additionally, Gravitino configurations in gravitino.conf can be modified through Helm values.yaml.
+Customize values.yaml parameters to override chart default settings. Additionally, Gravitino configurations in gravitino.conf can be modified through Helm values.yaml.
 
 To display the default values of the Gravitino chart, run:
 
@@ -114,7 +114,7 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
   --set global.defaultStorageClass="-"
 ```
 
-You must then manually create a PersistentVolume (PV).
+Then manually create a PersistentVolume (PV).
 
 ### Deploy Gravitino using an existed MySQL Database
 

@@ -44,7 +44,7 @@ To use function management, please make sure that:
 
 ### Register a function
 
-You can register a function by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
+Register a function by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
 endpoint or use the Gravitino Java/Python client. The following is an example of registering
 a scalar function:
 
@@ -258,7 +258,7 @@ function = function_catalog.register_function(
 
 ### Get a function
 
-You can get a function by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
+Get a function by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of getting
 a function:
 
@@ -300,7 +300,7 @@ function = catalog.as_function_catalog().get_function(
 
 ### List functions
 
-You can list all the functions in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
+List all the functions in a schema by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions`
 endpoint or by using the Gravitino Java/Python client. The following is an example of listing
 all the functions in a schema:
 
@@ -340,7 +340,7 @@ functions = catalog.as_function_catalog().list_functions(
 </TabItem>
 </Tabs>
 
-You can also list functions with detailed information by adding the `details` query parameter.
+Also, list functions with detailed information by adding the `details` query parameter.
 This returns the full function objects instead of just the identifiers.
 
 <Tabs groupId="language" queryString>
@@ -381,7 +381,7 @@ functions = catalog.as_function_catalog().list_function_infos(
 
 ### Alter a function
 
-You can modify a function by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
+Modify a function by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
 endpoint or using the Gravitino Java/Python client. The following is an example of updating a
 function's comment:
 
@@ -521,7 +521,7 @@ function = catalog.as_function_catalog().alter_function(
 
 ### Drop a function
 
-You can drop a function by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
+Drop a function by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/functions/{function_name}`
 endpoint or by using the Gravitino Java/Python client. The following is an example of dropping
 a function:
 

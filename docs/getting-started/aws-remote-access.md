@@ -11,7 +11,7 @@ some additional configuration due to how AWS networking works.
 
 AWS assigns your instance a public IP address, but Gravitino can't bind to that address.
 To resolve this, you must find the internal IP address assigned to your AWS instance.
-You can locate the private IP address in the AWS console, or by running the following command:
+Locate the private IP address in the AWS console, or by running the following command:
 
 ```shell
 ip a
@@ -32,5 +32,5 @@ To access Hive you need to open port 10000 in the security group.
 
 After completing these steps, you can access the Gravitino REST interface
 from the command line or a web browser on your local computer.
-You can also connect to Hive via DBeaver or any other database IDE.
+Also, connect to Hive via DBeaver or any other database IDE.
 

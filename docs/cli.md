@@ -92,7 +92,7 @@ The command line option overrides the environment variable and the environment v
 
 ### Set the Gravitino URL
 
-As you need to set the Gravitino URL for every command, you can set the URL in several ways.
+As you need to set the Gravitino URL for every command, you can set the URL in several ways:
 
 1. Passed in on the command line via the `--url` parameter.
 2. Set via the 'GRAVITINO_URL' environment variable.
@@ -102,7 +102,7 @@ The command line option overrides the environment variable and the environment v
 
 ### Set the Gravitino Authentication Type
 
-The authentication type can also be set in several ways.
+The authentication type can also be set in several ways:
 
 1. Passed in on the command line via the `--simple` flag.
 2. Set via the 'GRAVITINO_AUTH' environment variable.

@@ -26,7 +26,7 @@ To use messaging catalog, please make sure that:
 For a messaging catalog, you must specify the `type` as `messaging` when creating a catalog.
 :::
 
-You can create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
+Create a catalog by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs`
 endpoint or use the Gravitino Java client. The following is an example of creating a messaging catalog:
 
 <Tabs groupId='language' queryString>
@@ -143,7 +143,7 @@ Users should create a metalake, a catalog and a schema, then ensure that the met
 
 ### Create a topic
 
-You can create a topic by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics`
+Create a topic by sending a `POST` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics`
 endpoint or use the Gravitino Java client. The following is an example of creating a topic:
 
 
@@ -192,7 +192,7 @@ topicCatalog.createTopic(
 
 ### Alter a topic
 
-You can modify a topic by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics/{topic_name}`
+Modify a topic by sending a `PUT` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics/{topic_name}`
 endpoint or use the Gravitino Java client. The following is an example of altering a topic:
 
 
@@ -243,7 +243,7 @@ Gravitino supports the following changes to a topic:
 
 ### Drop a topic
 
-You can remove a topic by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
+Remove a topic by sending a `DELETE` request to the `/api/metalakes/{metalake_name}
 /catalogs/{catalog_name}/schemas/{schema_name}/topics/{topic_name}` endpoint or by using the
 Gravitino Java client. The following is an example of dropping a topic:
 
@@ -276,7 +276,7 @@ topicCatalog.dropTopic(NameIdentifier.of("default", "topic"));
 
 ### List all topics under a schema
 
-You can list all topics in a schema by sending a `GET` request to the `/api/metalakes/
+List all topics in a schema by sending a `GET` request to the `/api/metalakes/
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/topics` endpoint or by using the
 Gravitino Java client. The following is an example of listing all the topics in a schema:
 

@@ -16,7 +16,7 @@ Apache Gravitino supports several configurations:
 
 ## Apache Gravitino server configurations
 
-You can customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
+Customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
 We strongly recommend that you read the following sections to understand the configuration file, so you can change the default values to suit your specific situation and usage scenario.
 
 The `gravitino.conf` file lists the configuration items in the following table. It groups those items into the following categories:
@@ -40,7 +40,7 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 | `gravitino.server.visibleConfigs`                    | List of configs that are visible in the config servlet                                                                                                                                | (none)                                                                       | No       | 0.9.0-incubating |
 
 The filter in the customFilters should be a standard javax servlet filter.
-You can also specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
+Also, specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
 
 ### Storage configuration
 
@@ -491,7 +491,7 @@ docker run --rm -d \
   apache/gravitino:<tag>
 ```
 
-You can verify that the configuration was applied correctly by inspecting the container's `gravitino.conf`:
+Verify that the configuration was applied correctly by inspecting the container's `gravitino.conf`:
 
 ```shell
 docker exec -it <container_id> cat /root/gravitino/conf/gravitino.conf

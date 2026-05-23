@@ -89,7 +89,7 @@ Please note that, it only takes affect in `gravitino.conf`, you don't need to sp
 | `gravitino.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                                                                                     | (none)                                                                       | No       | 0.4.0         |
 
 The filter in `customFilters` should be a standard javax servlet filter.
-You can also specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
+Also, specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
 
 ### Catalog backend configuration
 
@@ -124,7 +124,7 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
 :::caution
-You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
+Download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 If you are using multiple JDBC catalog backends, setting `jdbc-initialize` to true may not take effect for RDBMS like `Mysql`, you should create Iceberg meta tables explicitly.
 :::
 
@@ -246,7 +246,7 @@ Suppose there are two Iceberg catalogs `hive_catalog` and `jdbc_catalog` in Grav
 
 #### How to access the specific catalog
 
-You can access different catalogs by setting the `warehouse` to the specific catalog name in the Iceberg REST client configuration. The default catalog will be used if you do not specify a `warehouse`. For instance, suppose there are three catalog backends: default catalog, `hive_catalog` and `jdbc_catalog`, consider the case of SparkSQL:
+Access different catalogs by setting the `warehouse` to the specific catalog name in the Iceberg REST client configuration. The default catalog will be used if you do not specify a `warehouse`. For instance, suppose there are three catalog backends: default catalog, `hive_catalog` and `jdbc_catalog`, consider the case of SparkSQL:
 
 ```shell
 ./bin/spark-sql -v \
@@ -293,7 +293,7 @@ gravitino.authenticator.oauth.tokenPath = oauth2/token
 gravitino.authenticator.oauth.serverUri = http://localhost:8177
 ```
 
-You should add extra configurations if using `dynamic-config-provider` in standalone mode:
+Add extra configurations if using `dynamic-config-provider` in standalone mode:
 
 ```text
 gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
@@ -361,7 +361,7 @@ iceberg.rest-catalog.session=NONE
 iceberg.rest-catalog.oauth2.token-exchange-enabled=false
 ```
 
-You can omit `iceberg.rest-catalog.session=NONE` because `NONE` is the default value.
+Omit `iceberg.rest-catalog.session=NONE` because `NONE` is the default value.
 
 #### HTTPS
 
@@ -491,7 +491,7 @@ Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{st
 
 #### HDFS configuration
 
-You should place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
+Place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
 
 :::info
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
@@ -521,7 +521,7 @@ View operations are supported when using the JDBC catalog backend with schema ve
 
 ### Other Apache Iceberg catalog properties
 
-You can add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.11.0/configuration/#catalog-properties).
+Add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.10.0/configuration/#catalog-properties).
 The `clients` property for example:
 
 | Configuration item               | Description                          | Default value | Required |
@@ -551,8 +551,8 @@ Gravitino provides a pluggable metrics store interface to store and delete Icebe
 | `gravitino.iceberg-rest.metricsQueueCapacity`   | The size of queue to store metrics temporally before storing to the persistent storage. Metrics will be dropped when queue is full. | 1000          | No       | 0.4.0         |
 
 If you want to use jdbc as metrics store, you can set the `gravitino.iceberg-rest.metricsStore` to `jdbc`, and set the following configurations to connect to the database.
-You should initialize the database using the sql scripts in the directory `scripts`.
-You must download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
+Initialize the database using the sql scripts in the directory `scripts`.
+Download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 
 | Configuration item                                  | Description                                                                                                                                         | Default value | Required | Since Version |
 |-----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|

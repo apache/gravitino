@@ -202,7 +202,7 @@ Access the service at `http://localhost:9101`.
 When using Lance REST service with Gravitino backend, keep the following considerations in mind:
 
 ### Prerequisites
-- A running Gravitino server with a created metalake
+- A running Gravitino server with a metalake
 
 ### Namespace Hierarchy
 Gravitino follows a three-level hierarchy: **catalog → schema → table**. When creating namespaces or tables:

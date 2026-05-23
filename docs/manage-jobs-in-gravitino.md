@@ -233,7 +233,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### List registered job templates
 
-You can list all the registered job templates under a metalake by using the REST API or the Java
+List all the registered job templates under a metalake by using the REST API or the Java
 and Python SDKs.
 
 <Tabs groupId='language' queryString>
@@ -270,7 +270,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### Get a registered job template by name
 
-You can get a registered job template by its name using the REST API or the Java and Python SDKs.
+Get a registered job template by its name using the REST API or the Java and Python SDKs.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -301,7 +301,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### Delete a registered job template by name
 
-You can delete a registered job template by its name using the REST API or the Java and Python SDKs.
+Delete a registered job template by its name using the REST API or the Java and Python SDKs.
 
 Note that deleting a job template will also delete all the jobs that are using this job template.
 If there are queued, started, or to be cancelled jobs that are using this job template, the deletion
@@ -336,7 +336,7 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### Alter a registered job template
 
-You can alter a registered job template by its name using the REST API or the Java and Python
+Alter a registered job template by its name using the REST API or the Java and Python
 SDKs. Gravitino supports altering the `name`, `comment` and `template` fields of the job template.
 
 <Tabs groupId='language' queryString>
@@ -499,7 +499,7 @@ executed asynchronously. You can check the job status using the job ID returned 
 
 ### List all jobs
 
-You can list all the jobs under a metalake by using the REST API or the Java and Python SDKs.
+List all the jobs under a metalake by using the REST API or the Java and Python SDKs.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -542,7 +542,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### Get a job by job ID
 
-You can get a job by its job ID using the REST API or the Java and Python SDKs.
+Get a job by its job ID using the REST API or the Java and Python SDKs.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -573,7 +573,7 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### Cancel a job by job ID
 
-You can cancel a job by its job ID using the REST API or the Java and Python SDKs.
+Cancel a job by its job ID using the REST API or the Java and Python SDKs.
 
 The job will be cancelled asynchronously, and the job status will be updated to `CANCELLING` first,
 then to `CANCELLED` when the cancellation is completed. If the job is already in `SUCCEEDED`,
@@ -612,7 +612,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### Configurations of the job system
 
-You can configure the job system through the `gravitino.conf` file. The following are the
+Configure the job system through the `gravitino.conf` file. The following are the
 default configurations:
 
 | Property name                          | Description                                                                       | Default value                 | Required | Since Version |
@@ -650,7 +650,7 @@ gravitino.job.executor = airflow
 gravitino.jobExecutor.airflow.class = com.example.MyAirflowJobExecutor
 ```
 
-You can also configure the job executor with additional properties, like:
+Also, configure the job executor with additional properties, like:
 
 ```
 gravitino.jobExecutor.airflow.host = http://localhost:8080

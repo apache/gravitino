@@ -32,7 +32,7 @@ fileset/${catalog_name}/${schema_name}/${fileset_name}/sub_dir/
 
 Here `gvfs` is the scheme of the GVFS, `fileset` is the root directory of the GVFS which can't
 modified, and `${catalog_name}/${schema_name}/${fileset_name}` is the virtual path of the fileset.
-You can access the files and folders under this virtual path by concatenating a file or folder
+Access the files and folders under this virtual path by concatenating a file or folder
 name to the virtual path.
 
 The usage pattern for GVFS is the same as HDFS or S3. GVFS internally manages
@@ -128,7 +128,7 @@ So, if you want to access the custom fileset through GVFS, you need to configure
 |--------------------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `your-custom-properties`       | The properties will be used to create a FileSystem instance in `CustomFileSystemProvider#getFileSystem` | (none)        | No       | -                |
 
-You can configure these properties in two ways:
+Configure these properties in two ways:
 
 1. Before obtaining the `FileSystem` in the code, construct a `Configuration` object and set its properties:
 
@@ -192,7 +192,7 @@ For fileset with multiple locations, you can specify which location to access us
 
 #### Via Hadoop shell command
 
-You can use the Hadoop shell command to perform operations on the fileset storage. For example:
+Use the Hadoop shell command to perform operations on the fileset storage. For example:
 
 ```shell
 # 1. Configure the hadoop `core-site.xml` configuration
@@ -215,7 +215,7 @@ kinit -kt your_kerberos.keytab your_kerberos@xxx.com
 
 #### Via Java code
 
-You can also perform operations on the files or directories managed by fileset through Java code.
+Also, perform operations on the files or directories managed by fileset through Java code.
 Make sure that your code is using the correct Hadoop environment, and that your environment
 has the `gravitino-filesystem-hadoop3-runtime-{version}.jar` dependency.
 
@@ -539,7 +539,7 @@ For fileset with multiple locations, you can specify which location to access us
 
 #### Via fsspec-style interface
 
-You can use the fsspec-style interface to perform operations on the fileset files.
+Use the fsspec-style interface to perform operations on the fileset files.
 
 For example:
 
@@ -606,7 +606,7 @@ fs.get_file(rpath="gvfs://fileset/fileset_catalog/tmp/tmp_fileset/test-1.txt",
 
 #### Integrate with Third-party Python libraries
 
-You can also perform operations on the files or directories managed by fileset
+Also, perform operations on the files or directories managed by fileset
 integrating with some Third-party Python libraries which support fsspec compatible filesystems.
 
 For example:

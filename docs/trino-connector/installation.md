@@ -13,7 +13,7 @@ The examples in this document use Trino `469` by default.
 ## Get the connector package
 
 Gravitino provides different Trino connector packages for different Trino version segments.
-You need to choose the package by your Trino server version first.
+Choose the package by your Trino server version first.
 
 | Trino server version | Connector package segment |
 |----------------------|---------------------------|
@@ -34,7 +34,7 @@ For example:
 
 `gravitino-trino-connector-469-472-<version>.tar.gz`
 
-You can get the package in the following ways:
+Get the package in the following ways:
 
 1. Download a released package from [GitHub Releases](https://github.com/apache/gravitino/releases). For Trino `469`, download the `469-472` package:
 
@@ -76,7 +76,7 @@ discovery.uri=http://0.0.0.0:8080
 
 ## Example
 
-You can install the Gravitino Trino connector in Trino office docker images step by step.
+Install the Gravitino Trino connector in Trino office docker images step by step.
 
 ### Run the container
 
@@ -100,7 +100,7 @@ wget https://github.com/apache/gravitino/releases/download/<version>/gravitino-t
 tar -zxvf gravitino-trino-connector-469-472-<version>.tar.gz
 ```
 
-You can see the connector directory `gravitino-trino-connector-469-472-<version>` after unpacking.
+See the connector directory `gravitino-trino-connector-469-472-<version>` after unpacking.
 
 Rename the connector directory to `gravitino`, then copy it to the Trino container's plugin directory.
 
@@ -120,7 +120,7 @@ Now you can see the Gravitino Trino connector directory in the plugin directory.
 
 ### Configure the Trino
 
-You can find the Trino configuration file `config.properties` in the directory `/etc/trino`. You need changed the file like this:
+Find the Trino configuration file `config.properties` in the directory `/etc/trino`. You need changed the file like this:
 
 ```text
 #single node install config
@@ -178,7 +178,7 @@ tpch
 system
 ```
 
-You can see the `gravitino` catalog in the result set. This signifies the successful installation of the Gravitino Trino connector.
+See the `gravitino` catalog in the result set. This signifies the successful installation of the Gravitino Trino connector.
 
 Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or refer to [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
 

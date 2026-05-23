@@ -42,7 +42,7 @@ catalog are enabled before operating views.
 
 ### Create a view
 
-You can create a view by sending a `POST` request to the
+Create a view by sending a `POST` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views` endpoint or just use the
 Gravitino Java client. The following is an example of creating a view:
 
@@ -140,7 +140,7 @@ behavior of special types such as external and unparsed types, refer to [Apache 
 
 ### Load a view
 
-You can load a view by sending a `GET` request to the
+Load a view by sending a `GET` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}` endpoint or just use
 the Gravitino Java client. The following is an example of loading a view:
 
@@ -176,7 +176,7 @@ directly without a separate import step.
 
 ### Alter a view
 
-You can modify a view by sending a `PUT` request to the
+Modify a view by sending a `PUT` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}` endpoint or just use
 the Gravitino Java client. The following is an example of modifying a view:
 
@@ -228,7 +228,7 @@ replacement request.
 
 ### Drop a view
 
-You can remove a view by sending a `DELETE` request to the
+Remove a view by sending a `DELETE` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}` endpoint or just use
 the Gravitino Java client. The following is an example of dropping a view:
 
@@ -260,7 +260,7 @@ data because a view does not own storage.
 
 ### List all views under a schema
 
-You can list all views in a schema by sending a `GET` request to the
+List all views in a schema by sending a `GET` request to the
 `/api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views` endpoint or just use the
 Gravitino Java client. The following is an example of listing all the views in a schema:
 

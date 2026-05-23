@@ -197,6 +197,6 @@ For additional operations, refer to [Schema Operations documentation](./manage-r
 
 ### Supported Operations
 
-Since different lakehouse table formats have varying capabilities, table operation support may differ. The following are table operations for different lakehouse formats.
+Since different lakehouse table formats have varying capabilities, table operation support may differ. The following are table operations for different lakehouse formats:
 
 - [Lance Format Support](./lakehouse-generic-lance-table.md)

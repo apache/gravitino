@@ -6,7 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 ---
 
 The MySQL catalog allows querying and creating tables in an external MySQL instance. 
-You can join data between different systems like MySQL and Hive, or between two different MySQL instances by this.
+Join data between different systems like MySQL and Hive, or between two different MySQL instances by this.
 
 ## Requirements
 
@@ -90,7 +90,7 @@ The following are Trino type which support configuration of default values:
 
 ## Basic usage examples
 
-You need to do the following steps before you can use the MySQL catalog in Trino through Gravitino.
+Do the following steps before you can use the MySQL catalog in Trino through Gravitino:
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `mysql_test`,
 then you can use the following code to create them in Gravitino:
