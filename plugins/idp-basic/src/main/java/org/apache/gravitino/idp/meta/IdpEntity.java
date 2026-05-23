@@ -42,6 +42,20 @@ public interface IdpEntity extends Serializable {
   Map<Field, Object> fields();
 
   /**
+   * Retrieves the unique id of the built-in IdP entity.
+   *
+   * @return The unique id of the built-in IdP entity.
+   */
+  Long id();
+
+  /**
+   * Retrieves the name of the built-in IdP entity.
+   *
+   * @return The name of the built-in IdP entity.
+   */
+  String name();
+
+  /**
    * Retrieves the type of the built-in IdP entity.
    *
    * @return The type of the built-in IdP entity.

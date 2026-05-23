@@ -21,10 +21,8 @@ package org.apache.gravitino.idp.storage.relational;
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.idp.exception.AlreadyExistsException;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.meta.IdpEntity;
 import org.apache.gravitino.idp.meta.IdpEntityType;
 
@@ -46,32 +44,31 @@ public class IdpRelationalEntityStore implements IdpEntityStore {
   }
 
   @Override
-  public boolean exists(NameIdentifier ident, IdpEntityType entityType) throws IOException {
-    return backend.exists(ident, entityType);
+  public boolean exists(String name, IdpEntityType entityType) throws IOException {
+    return backend.exists(name, entityType);
   }
 
   @Override
-  public <E extends IdpEntity & HasIdentifier> void put(E entity, boolean overwritten)
-      throws IOException, EntityAlreadyExistsException {
+  public <E extends IdpEntity> void put(E entity, boolean overwritten)
+      throws IOException, AlreadyExistsException {
     backend.insert(entity, overwritten);
   }
 
   @Override
-  public <E extends IdpEntity & HasIdentifier> E get(
-      NameIdentifier ident, IdpEntityType entityType, Class<E> clazz)
-      throws NoSuchEntityException, IOException {
-    return clazz.cast(backend.get(ident, entityType));
+  public <E extends IdpEntity> E get(String name, IdpEntityType entityType, Class<E> clazz)
+      throws NotFoundException, IOException {
+    return clazz.cast(backend.get(name, entityType));
   }
 
   @Override
-  public <E extends IdpEntity & HasIdentifier> List<E> batchGet(
-      List<NameIdentifier> idents, IdpEntityType entityType, Class<E> clazz) {
-    return (List<E>) backend.batchGet(idents, entityType);
+  public <E extends IdpEntity> List<E> batchGet(
+      List<String> names, IdpEntityType entityType, Class<E> clazz) {
+    return (List<E>) backend.batchGet(names, entityType);
   }
 
   @Override
-  public boolean delete(NameIdentifier ident, IdpEntityType entityType) throws IOException {
-    return backend.delete(ident, entityType, false);
+  public boolean delete(String name, IdpEntityType entityType) throws IOException {
+    return backend.delete(name, entityType, false);
   }
 
   @Override

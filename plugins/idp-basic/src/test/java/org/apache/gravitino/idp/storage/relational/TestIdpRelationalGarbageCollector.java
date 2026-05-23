@@ -82,17 +82,12 @@ class TestIdpRelationalGarbageCollector extends AbstractIdpMetaStorageTest {
       garbageCollector.close();
       idpBackend.close();
     }
+    reinitializeBackend();
     reopenSession();
 
     assertEquals(0, countUsers());
     assertEquals(0, countGroups());
     assertEquals(0, countUserGroupRels());
-  }
-
-  private void reopenSession() {
-    closeSession();
-    sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-    initializeMappers();
   }
 
   private void insertGroups() {

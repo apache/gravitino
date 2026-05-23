@@ -22,8 +22,6 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
 import org.apache.gravitino.idp.exception.AlreadyExistsException;
@@ -47,6 +45,9 @@ import org.slf4j.LoggerFactory;
 public class IdpUserGroupManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpUserGroupManager.class);
+
+  private static final String IDP_USER_DOES_NOT_EXIST_MSG = "IdP user %s does not exist";
+  private static final String IDP_GROUP_DOES_NOT_EXIST_MSG = "IdP group %s does not exist";
 
   private final IdpEntityStore store;
   private final IdGenerator idGenerator;
@@ -82,15 +83,14 @@ public class IdpUserGroupManager {
           IdpUserEntity.builder()
               .withId(idGenerator.nextId())
               .withName(name)
-              .withNamespace(IdpAuthorizationUtils.ofIdpUserNamespace())
               .withGroupNames(Lists.newArrayList())
               .withPasswordHash(passwordHasher.hash(password))
               .build();
       store.put(userEntity, false);
       return getUser(name);
-    } catch (EntityAlreadyExistsException e) {
+    } catch (AlreadyExistsException e) {
       LOG.warn("IdP user {} already exists", name, e);
-      throw new AlreadyExistsException("IdP user %s already exists", name);
+      throw e;
     } catch (IOException ioe) {
       LOG.error("Adding IdP user {} failed due to storage issues", name, ioe);
       throw new RuntimeException(ioe);
@@ -105,7 +105,7 @@ public class IdpUserGroupManager {
    */
   public boolean removeUser(String user) {
     try {
-      return store.delete(IdpAuthorizationUtils.ofIdpUser(user), IdpEntityType.IDP_USER);
+      return store.delete(user, IdpEntityType.IDP_USER);
     } catch (IOException ioe) {
       LOG.error("Removing IdP user {} failed due to storage issues", user, ioe);
       throw new RuntimeException(ioe);
@@ -120,11 +120,10 @@ public class IdpUserGroupManager {
    */
   public IdpUser getUser(String user) {
     try {
-      return store.get(
-          IdpAuthorizationUtils.ofIdpUser(user), IdpEntityType.IDP_USER, IdpUserEntity.class);
-    } catch (NoSuchEntityException e) {
+      return store.get(user, IdpEntityType.IDP_USER, IdpUserEntity.class);
+    } catch (NotFoundException e) {
       LOG.warn("IdP user {} does not exist", user, e);
-      throw new NotFoundException(IdpAuthorizationUtils.IDP_USER_DOES_NOT_EXIST_MSG, user);
+      throw new NotFoundException(IDP_USER_DOES_NOT_EXIST_MSG, user);
     } catch (IOException ioe) {
       LOG.error("Getting IdP user {} failed due to storage issues", user, ioe);
       throw new RuntimeException(ioe);
@@ -141,7 +140,7 @@ public class IdpUserGroupManager {
   public IdpUser resetPassword(String user, String password) {
     if (!IdpUserMetaService.getInstance()
         .updateIdpUserPassword(user, passwordHasher.hash(password))) {
-      throw new NotFoundException(IdpAuthorizationUtils.IDP_USER_DOES_NOT_EXIST_MSG, user);
+      throw new NotFoundException(IDP_USER_DOES_NOT_EXIST_MSG, user);
     }
     return getUser(user);
   }
@@ -158,14 +157,13 @@ public class IdpUserGroupManager {
           IdpGroupEntity.builder()
               .withId(idGenerator.nextId())
               .withName(group)
-              .withNamespace(IdpAuthorizationUtils.ofIdpGroupNamespace())
               .withUserNames(Collections.emptyList())
               .build();
       store.put(groupEntity, false);
       return getGroup(group);
-    } catch (EntityAlreadyExistsException e) {
+    } catch (AlreadyExistsException e) {
       LOG.warn("IdP group {} already exists", group, e);
-      throw new AlreadyExistsException("IdP group %s already exists", group);
+      throw e;
     } catch (IOException ioe) {
       LOG.error("Adding IdP group {} failed due to storage issues", group, ioe);
       throw new RuntimeException(ioe);
@@ -188,7 +186,7 @@ public class IdpUserGroupManager {
       }
     }
     try {
-      return store.delete(IdpAuthorizationUtils.ofIdpGroup(group), IdpEntityType.IDP_GROUP);
+      return store.delete(group, IdpEntityType.IDP_GROUP);
     } catch (IOException ioe) {
       LOG.error("Removing IdP group {} failed due to storage issues", group, ioe);
       throw new RuntimeException(ioe);
@@ -203,11 +201,10 @@ public class IdpUserGroupManager {
    */
   public IdpGroup getGroup(String group) {
     try {
-      return store.get(
-          IdpAuthorizationUtils.ofIdpGroup(group), IdpEntityType.IDP_GROUP, IdpGroupEntity.class);
-    } catch (NoSuchEntityException e) {
+      return store.get(group, IdpEntityType.IDP_GROUP, IdpGroupEntity.class);
+    } catch (NotFoundException e) {
       LOG.warn("IdP group {} does not exist", group, e);
-      throw new NotFoundException(IdpAuthorizationUtils.IDP_GROUP_DOES_NOT_EXIST_MSG, group);
+      throw new NotFoundException(IDP_GROUP_DOES_NOT_EXIST_MSG, group);
     } catch (IOException ioe) {
       LOG.error("Getting IdP group {} failed due to storage issues", group, ioe);
       throw new RuntimeException(ioe);

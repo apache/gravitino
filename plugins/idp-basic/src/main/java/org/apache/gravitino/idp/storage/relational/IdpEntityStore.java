@@ -22,10 +22,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.EntityAlreadyExistsException;
-import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.idp.exception.AlreadyExistsException;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.meta.IdpEntity;
 import org.apache.gravitino.idp.meta.IdpEntityType;
 
@@ -43,12 +41,12 @@ public interface IdpEntityStore extends Closeable {
   /**
    * Checks whether the entity exists.
    *
-   * @param ident The name identifier of the entity.
+   * @param name The name of the entity.
    * @param entityType The built-in IdP entity type.
    * @return True if the entity exists, false otherwise.
    * @throws IOException If the check operation fails.
    */
-  boolean exists(NameIdentifier ident, IdpEntityType entityType) throws IOException;
+  boolean exists(String name, IdpEntityType entityType) throws IOException;
 
   /**
    * Stores the entity.
@@ -57,45 +55,44 @@ public interface IdpEntityStore extends Closeable {
    * @param overwritten Whether to overwrite an existing entity.
    * @param <E> The entity type.
    * @throws IOException If the store operation fails.
-   * @throws EntityAlreadyExistsException If the entity already exists and overwrite is false.
+   * @throws AlreadyExistsException If the entity already exists and overwrite is false.
    */
-  <E extends IdpEntity & HasIdentifier> void put(E entity, boolean overwritten)
-      throws IOException, EntityAlreadyExistsException;
+  <E extends IdpEntity> void put(E entity, boolean overwritten)
+      throws IOException, AlreadyExistsException;
 
   /**
    * Gets the entity.
    *
-   * @param ident The name identifier of the entity.
+   * @param name The name of the entity.
    * @param entityType The built-in IdP entity type.
    * @param clazz The entity class.
    * @param <E> The entity type.
    * @return The entity.
-   * @throws NoSuchEntityException If the entity does not exist.
+   * @throws NotFoundException If the entity does not exist.
    * @throws IOException If the retrieve operation fails.
    */
-  <E extends IdpEntity & HasIdentifier> E get(
-      NameIdentifier ident, IdpEntityType entityType, Class<E> clazz)
-      throws NoSuchEntityException, IOException;
+  <E extends IdpEntity> E get(String name, IdpEntityType entityType, Class<E> clazz)
+      throws NotFoundException, IOException;
 
   /**
    * Batch gets entities.
    *
-   * @param idents The name identifiers of the entities.
+   * @param names The names of the entities.
    * @param entityType The built-in IdP entity type.
    * @param clazz The entity class.
    * @param <E> The entity type.
    * @return The entities.
    */
-  <E extends IdpEntity & HasIdentifier> List<E> batchGet(
-      List<NameIdentifier> idents, IdpEntityType entityType, Class<E> clazz);
+  <E extends IdpEntity> List<E> batchGet(
+      List<String> names, IdpEntityType entityType, Class<E> clazz);
 
   /**
    * Deletes the entity.
    *
-   * @param ident The name identifier of the entity.
+   * @param name The name of the entity.
    * @param entityType The built-in IdP entity type.
    * @return True if the entity existed and was deleted, false otherwise.
    * @throws IOException If the delete operation fails.
    */
-  boolean delete(NameIdentifier ident, IdpEntityType entityType) throws IOException;
+  boolean delete(String name, IdpEntityType entityType) throws IOException;
 }

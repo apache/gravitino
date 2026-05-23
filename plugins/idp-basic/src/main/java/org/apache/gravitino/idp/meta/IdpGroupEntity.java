@@ -25,14 +25,12 @@ import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
 import org.apache.gravitino.Field;
-import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.utils.CollectionUtils;
 
 /** A class representing a built-in IdP group metadata entity in Apache Gravitino. */
 @ToString
-public class IdpGroupEntity implements IdpGroup, IdpEntity, HasIdentifier {
+public class IdpGroupEntity implements IdpGroup, IdpEntity {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the built-in IdP group entity.");
@@ -46,7 +44,6 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity, HasIdentifier {
   private Long id;
   private String name;
   private List<String> userNames;
-  private Namespace namespace;
 
   private IdpGroupEntity() {}
 
@@ -75,11 +72,6 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity, HasIdentifier {
   }
 
   @Override
-  public Namespace namespace() {
-    return namespace;
-  }
-
-  @Override
   public List<String> userNames() {
     return userNames;
   }
@@ -96,7 +88,6 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity, HasIdentifier {
     IdpGroupEntity that = (IdpGroupEntity) o;
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
-        && Objects.equals(namespace, that.namespace)
         && CollectionUtils.isEqualCollection(userNames, that.userNames);
   }
 
@@ -147,17 +138,6 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity, HasIdentifier {
      */
     public Builder withUserNames(List<String> userNames) {
       groupEntity.userNames = userNames;
-      return this;
-    }
-
-    /**
-     * Sets the namespace of the built-in IdP group entity.
-     *
-     * @param namespace The namespace of the built-in IdP group entity.
-     * @return The builder instance.
-     */
-    public Builder withNamespace(Namespace namespace) {
-      groupEntity.namespace = namespace;
       return this;
     }
 

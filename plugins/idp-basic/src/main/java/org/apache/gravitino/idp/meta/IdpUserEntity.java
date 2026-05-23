@@ -25,14 +25,12 @@ import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
 import org.apache.gravitino.Field;
-import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.utils.CollectionUtils;
 
 /** A class representing a built-in IdP user metadata entity in Apache Gravitino. */
 @ToString
-public class IdpUserEntity implements IdpUser, IdpEntity, HasIdentifier {
+public class IdpUserEntity implements IdpUser, IdpEntity {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the built-in IdP user entity.");
@@ -46,7 +44,6 @@ public class IdpUserEntity implements IdpUser, IdpEntity, HasIdentifier {
   private Long id;
   private String name;
   private List<String> groupNames;
-  private Namespace namespace;
   private String passwordHash;
 
   private IdpUserEntity() {}
@@ -76,11 +73,6 @@ public class IdpUserEntity implements IdpUser, IdpEntity, HasIdentifier {
   }
 
   @Override
-  public Namespace namespace() {
-    return namespace;
-  }
-
-  @Override
   public List<String> groupNames() {
     return groupNames;
   }
@@ -107,7 +99,6 @@ public class IdpUserEntity implements IdpUser, IdpEntity, HasIdentifier {
     IdpUserEntity that = (IdpUserEntity) o;
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
-        && Objects.equals(namespace, that.namespace)
         && CollectionUtils.isEqualCollection(groupNames, that.groupNames);
   }
 
@@ -158,17 +149,6 @@ public class IdpUserEntity implements IdpUser, IdpEntity, HasIdentifier {
      */
     public Builder withGroupNames(List<String> groupNames) {
       userEntity.groupNames = groupNames;
-      return this;
-    }
-
-    /**
-     * Sets the namespace of the built-in IdP user entity.
-     *
-     * @param namespace The namespace of the built-in IdP user entity.
-     * @return The builder instance.
-     */
-    public Builder withNamespace(Namespace namespace) {
-      userEntity.namespace = namespace;
       return this;
     }
 

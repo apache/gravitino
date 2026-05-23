@@ -21,8 +21,6 @@ package org.apache.gravitino.idp.storage.converter;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
-import org.apache.gravitino.Namespace;
-import org.apache.gravitino.idp.authorization.IdpAuthorizationUtils;
 import org.apache.gravitino.idp.meta.IdpGroupEntity;
 import org.apache.gravitino.idp.meta.IdpUserEntity;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
@@ -74,16 +72,11 @@ public final class IdpPOConverters {
    *
    * @param userPO The persistence object.
    * @param groupNames The group names of the user.
-   * @param namespace The namespace of the user.
    * @return The built-in IdP user entity.
    */
-  public static IdpUserEntity fromIdpUserPO(
-      IdpUserPO userPO, List<String> groupNames, Namespace namespace) {
+  public static IdpUserEntity fromIdpUserPO(IdpUserPO userPO, List<String> groupNames) {
     IdpUserEntity.Builder builder =
-        IdpUserEntity.builder()
-            .withId(userPO.getUserId())
-            .withName(userPO.getUsername())
-            .withNamespace(namespace);
+        IdpUserEntity.builder().withId(userPO.getUserId()).withName(userPO.getUsername());
     if (groupNames != null && !groupNames.isEmpty()) {
       builder.withGroupNames(groupNames);
     }
@@ -95,16 +88,11 @@ public final class IdpPOConverters {
    *
    * @param groupPO The persistence object.
    * @param userNames The user names of the group.
-   * @param namespace The namespace of the group.
    * @return The built-in IdP group entity.
    */
-  public static IdpGroupEntity fromIdpGroupPO(
-      IdpGroupPO groupPO, List<String> userNames, Namespace namespace) {
+  public static IdpGroupEntity fromIdpGroupPO(IdpGroupPO groupPO, List<String> userNames) {
     IdpGroupEntity.Builder builder =
-        IdpGroupEntity.builder()
-            .withId(groupPO.getGroupId())
-            .withName(groupPO.getGroupName())
-            .withNamespace(namespace);
+        IdpGroupEntity.builder().withId(groupPO.getGroupId()).withName(groupPO.getGroupName());
     if (userNames != null && !userNames.isEmpty()) {
       builder.withUserNames(userNames);
     }
@@ -118,8 +106,7 @@ public final class IdpPOConverters {
    * @return The built-in IdP user entity.
    */
   public static IdpUserEntity fromIdpUserPO(IdpUserPO userPO) {
-    return fromIdpUserPO(
-        userPO, Collections.emptyList(), IdpAuthorizationUtils.ofIdpUserNamespace());
+    return fromIdpUserPO(userPO, Collections.emptyList());
   }
 
   /**
@@ -129,7 +116,6 @@ public final class IdpPOConverters {
    * @return The built-in IdP group entity.
    */
   public static IdpGroupEntity fromIdpGroupPO(IdpGroupPO groupPO) {
-    return fromIdpGroupPO(
-        groupPO, Collections.emptyList(), IdpAuthorizationUtils.ofIdpGroupNamespace());
+    return fromIdpGroupPO(groupPO, Collections.emptyList());
   }
 }

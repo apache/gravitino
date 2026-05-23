@@ -26,7 +26,6 @@ plugins {
 dependencies {
   annotationProcessor(libs.lombok)
 
-  implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
 
