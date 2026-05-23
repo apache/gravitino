@@ -134,7 +134,7 @@ All cache entries are subject to a TTL (Time-To-Live) expiration policy. By defa
 
 ### Tree Lock Configuration
 
-Gravitino server uses tree lock to ensure the consistency of the data. The tree lock is a memory lock (Gravitino only supports in memory lock) that can be used to ensure the consistency of the data in Gravitino server. The configuration items are as follows:
+The Gravitino server uses a tree lock to ensure data consistency. The tree lock is an in-memory lock; Gravitino currently supports only in-memory locks. The configuration items are as follows:
 
 | Configuration item                   | Description                                                   | Default value | Required | Since Version |
 |--------------------------------------|---------------------------------------------------------------|---------------|----------|---------------|
