@@ -24,17 +24,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
-import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.idp.model.IdpGroup;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.utils.CollectionUtils;
 
 /** A class representing a built-in IdP group metadata entity in Apache Gravitino. */
 @ToString
-public class IdpGroupEntity implements IdpGroup, IdpEntity, Auditable, HasIdentifier {
+public class IdpGroupEntity implements IdpGroup, IdpEntity, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the built-in IdP group entity.");
@@ -42,15 +40,11 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity, Auditable, HasIdenti
   public static final Field NAME =
       Field.required("name", String.class, "The name of the built-in IdP group entity.");
 
-  public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "The audit details of the built-in IdP group.");
-
   public static final Field USER_NAMES =
       Field.optional("user_names", List.class, "The user names of the built-in IdP group.");
 
   private Long id;
   private String name;
-  private AuditInfo auditInfo;
   private List<String> userNames;
   private Namespace namespace;
 
@@ -61,7 +55,6 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity, Auditable, HasIdenti
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
     fields.put(NAME, name);
-    fields.put(AUDIT_INFO, auditInfo);
     fields.put(USER_NAMES, userNames);
     return Collections.unmodifiableMap(fields);
   }
@@ -87,11 +80,6 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity, Auditable, HasIdenti
   }
 
   @Override
-  public AuditInfo auditInfo() {
-    return auditInfo;
-  }
-
-  @Override
   public List<String> userNames() {
     return userNames;
   }
@@ -109,13 +97,12 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity, Auditable, HasIdenti
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
-        && Objects.equals(auditInfo, that.auditInfo)
         && CollectionUtils.isEqualCollection(userNames, that.userNames);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, userNames);
+    return Objects.hash(id, name, userNames);
   }
 
   public static Builder builder() {
@@ -149,17 +136,6 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity, Auditable, HasIdenti
      */
     public Builder withName(String name) {
       groupEntity.name = name;
-      return this;
-    }
-
-    /**
-     * Sets the audit details of the built-in IdP group entity.
-     *
-     * @param auditInfo The audit details of the built-in IdP group entity.
-     * @return The builder instance.
-     */
-    public Builder withAuditInfo(AuditInfo auditInfo) {
-      groupEntity.auditInfo = auditInfo;
       return this;
     }
 

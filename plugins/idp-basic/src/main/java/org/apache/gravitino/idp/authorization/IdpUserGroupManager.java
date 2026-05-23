@@ -20,7 +20,6 @@ package org.apache.gravitino.idp.authorization;
 
 import com.google.common.collect.Lists;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -37,9 +36,7 @@ import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.relational.IdpEntityStore;
 import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,11 +85,6 @@ public class IdpUserGroupManager {
               .withNamespace(IdpAuthorizationUtils.ofIdpUserNamespace())
               .withGroupNames(Lists.newArrayList())
               .withPasswordHash(passwordHasher.hash(password))
-              .withAuditInfo(
-                  AuditInfo.builder()
-                      .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                      .withCreateTime(Instant.now())
-                      .build())
               .build();
       store.put(userEntity, false);
       return getUser(name);
@@ -168,11 +160,6 @@ public class IdpUserGroupManager {
               .withName(group)
               .withNamespace(IdpAuthorizationUtils.ofIdpGroupNamespace())
               .withUserNames(Collections.emptyList())
-              .withAuditInfo(
-                  AuditInfo.builder()
-                      .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                      .withCreateTime(Instant.now())
-                      .build())
               .build();
       store.put(groupEntity, false);
       return getGroup(group);

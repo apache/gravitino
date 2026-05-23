@@ -24,17 +24,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lombok.ToString;
-import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.idp.model.IdpUser;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.utils.CollectionUtils;
 
 /** A class representing a built-in IdP user metadata entity in Apache Gravitino. */
 @ToString
-public class IdpUserEntity implements IdpUser, IdpEntity, Auditable, HasIdentifier {
+public class IdpUserEntity implements IdpUser, IdpEntity, HasIdentifier {
 
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the built-in IdP user entity.");
@@ -42,15 +40,11 @@ public class IdpUserEntity implements IdpUser, IdpEntity, Auditable, HasIdentifi
   public static final Field NAME =
       Field.required("name", String.class, "The name of the built-in IdP user entity.");
 
-  public static final Field AUDIT_INFO =
-      Field.required("audit_info", AuditInfo.class, "The audit details of the built-in IdP user.");
-
   public static final Field GROUP_NAMES =
       Field.optional("group_names", List.class, "The group names of the built-in IdP user.");
 
   private Long id;
   private String name;
-  private AuditInfo auditInfo;
   private List<String> groupNames;
   private Namespace namespace;
   private String passwordHash;
@@ -62,7 +56,6 @@ public class IdpUserEntity implements IdpUser, IdpEntity, Auditable, HasIdentifi
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
     fields.put(NAME, name);
-    fields.put(AUDIT_INFO, auditInfo);
     fields.put(GROUP_NAMES, groupNames);
     return Collections.unmodifiableMap(fields);
   }
@@ -85,11 +78,6 @@ public class IdpUserEntity implements IdpUser, IdpEntity, Auditable, HasIdentifi
   @Override
   public Namespace namespace() {
     return namespace;
-  }
-
-  @Override
-  public AuditInfo auditInfo() {
-    return auditInfo;
   }
 
   @Override
@@ -120,13 +108,12 @@ public class IdpUserEntity implements IdpUser, IdpEntity, Auditable, HasIdentifi
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
         && Objects.equals(namespace, that.namespace)
-        && Objects.equals(auditInfo, that.auditInfo)
         && CollectionUtils.isEqualCollection(groupNames, that.groupNames);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, auditInfo, groupNames);
+    return Objects.hash(id, name, groupNames);
   }
 
   public static Builder builder() {
@@ -160,17 +147,6 @@ public class IdpUserEntity implements IdpUser, IdpEntity, Auditable, HasIdentifi
      */
     public Builder withName(String name) {
       userEntity.name = name;
-      return this;
-    }
-
-    /**
-     * Sets the audit details of the built-in IdP user entity.
-     *
-     * @param auditInfo The audit details of the built-in IdP user entity.
-     * @return The builder instance.
-     */
-    public Builder withAuditInfo(AuditInfo auditInfo) {
-      userEntity.auditInfo = auditInfo;
       return this;
     }
 

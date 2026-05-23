@@ -24,13 +24,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.time.Instant;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.idp.authorization.IdpAuthorizationUtils;
 import org.apache.gravitino.idp.meta.IdpEntityType;
 import org.apache.gravitino.idp.meta.IdpUserEntity;
 import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -52,8 +50,6 @@ public class TestIdpJDBCBackend extends AbstractIdpMetaStorageTest {
             .withName("bob")
             .withNamespace(IdpAuthorizationUtils.ofIdpUserNamespace())
             .withPasswordHash("hash")
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
     idpBackend.insert(user, false);
 

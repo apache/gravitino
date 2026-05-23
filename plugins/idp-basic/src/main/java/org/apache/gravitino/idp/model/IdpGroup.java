@@ -19,10 +19,9 @@
 package org.apache.gravitino.idp.model;
 
 import java.util.List;
-import org.apache.gravitino.Auditable;
 
 /** The interface of a built-in IdP group exposed by local authentication management APIs. */
-public interface IdpGroup extends Auditable {
+public interface IdpGroup {
 
   /**
    * The name of the built-in IdP group.

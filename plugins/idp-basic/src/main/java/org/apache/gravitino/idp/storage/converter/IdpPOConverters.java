@@ -19,7 +19,6 @@
 package org.apache.gravitino.idp.storage.converter;
 
 import com.google.common.base.Preconditions;
-import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.Namespace;
@@ -28,7 +27,6 @@ import org.apache.gravitino.idp.meta.IdpGroupEntity;
 import org.apache.gravitino.idp.meta.IdpUserEntity;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 
 /** Converts between built-in IdP persistence objects and entity objects. */
@@ -85,8 +83,7 @@ public final class IdpPOConverters {
         IdpUserEntity.builder()
             .withId(userPO.getUserId())
             .withName(userPO.getUsername())
-            .withNamespace(namespace)
-            .withAuditInfo(defaultAuditInfo());
+            .withNamespace(namespace);
     if (groupNames != null && !groupNames.isEmpty()) {
       builder.withGroupNames(groupNames);
     }
@@ -107,8 +104,7 @@ public final class IdpPOConverters {
         IdpGroupEntity.builder()
             .withId(groupPO.getGroupId())
             .withName(groupPO.getGroupName())
-            .withNamespace(namespace)
-            .withAuditInfo(defaultAuditInfo());
+            .withNamespace(namespace);
     if (userNames != null && !userNames.isEmpty()) {
       builder.withUserNames(userNames);
     }
@@ -135,9 +131,5 @@ public final class IdpPOConverters {
   public static IdpGroupEntity fromIdpGroupPO(IdpGroupPO groupPO) {
     return fromIdpGroupPO(
         groupPO, Collections.emptyList(), IdpAuthorizationUtils.ofIdpGroupNamespace());
-  }
-
-  private static AuditInfo defaultAuditInfo() {
-    return AuditInfo.builder().withCreator("").withCreateTime(Instant.EPOCH).build();
   }
 }
