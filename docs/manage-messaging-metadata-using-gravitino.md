@@ -96,9 +96,9 @@ in relational catalog for more details. For a messaging catalog, the drop operat
 Refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
 in relational catalog for more details. For a messaging catalog, the list operation is the same.
 
-### List All Catalogs' Information in a Metalake
+### List All Catalog Information in a Metalake
 
-Refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
+Refer to [List all catalog information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalog-information-in-a-metalake)
 in relational catalog for more details. For a messaging catalog, the list operation is the same.
 
 ## Schema Operations

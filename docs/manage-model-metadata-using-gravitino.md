@@ -104,9 +104,9 @@ in relational catalog for more details. For a model catalog, the drop operation 
 Refer to [List all catalogs in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-in-a-metalake)
 in relational catalog for more details. For a model catalog, the list operation is the same.
 
-### List All Catalogs' Information in a Metalake
+### List All Catalog Information in a Metalake
 
-Refer to [List all catalogs' information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalogs-information-in-a-metalake)
+Refer to [List all catalog information in a metalake](./manage-relational-metadata-using-gravitino.md#list-all-catalog-information-in-a-metalake)
 in relational catalog for more details. For a model catalog, the list operation is the same.
 
 ## Schema Operations
@@ -1243,7 +1243,7 @@ model_versions: List[int] = catalog.as_model_catalog().list_model_versions(model
 </TabItem>
 </Tabs>
 
-### List All Versions' Information in a Model
+### List All Version Information in a Model
 
 List all versions' information in a model by sending a `GET` request to the `/api/metalakes/
 {metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}/models/{model_name}/versions?detail=true` endpoint

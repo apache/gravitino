@@ -415,7 +415,7 @@ catalog_names = gravitino_client.list_catalogs()
 </TabItem>
 </Tabs>
 
-### List All Catalogs' Information in a Metalake
+### List All Catalog Information in a Metalake
 
 List all catalogs' information under a metalake by sending a `GET` request to the `/api/metalakes/{metalake_name}/catalogs?details=true` endpoint or use the Gravitino Java client. The following is an example of listing all the catalogs' information in a metalake:
 

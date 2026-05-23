@@ -223,13 +223,13 @@ Please set the metalake in the Gravitino configuration file or the environment v
 gcli.sh metalake list
 ```
 
-#### Show a Metalake Details
+#### Metalake Details
 
 ```bash
 gcli.sh metalake details
 ```
 
-#### Show a Metalake's Audit Information
+#### Metalake Audit Information
 
 ```bash
 gcli.sh metalake details --audit
@@ -253,25 +253,25 @@ gcli.sh metalake delete
 gcli.sh metalake update --rename demo
 ```
 
-#### Update a Metalake's Comment
+#### Update a Metalake Comment
 
 ```bash
 gcli.sh metalake update --comment "new comment"
 ```
 
-#### Display a Metalake's Properties
+#### Metalake Properties
 
 ```bash
 gcli.sh metalake properties
 ```
 
-#### Set a Metalake's Property
+#### Set a Metalake Property
 
 ```bash
 gcli.sh metalake set --property test --value value
 ```
 
-#### Remove a Metalake's Property
+#### Remove a Metalake Property
 
 ```bash
 gcli.sh metalake remove --property test
@@ -303,13 +303,13 @@ gcli.sh metalake update -m metalake_demo --disable
 gcli.sh catalog list
 ```
 
-#### Show a Catalog Details
+#### Catalog Details
 
 ```bash
 gcli.sh catalog details --name catalog_postgres
 ```
 
-#### Show a Catalog's Audit Information
+#### Catalog Audit Information
 
 ```bash
 gcli.sh catalog details --name catalog_postgres --audit
@@ -391,19 +391,19 @@ gcli.sh catalog update --name catalog_mysql --rename mysql
 gcli.sh catalog update --name catalog_mysql --comment "new comment"
 ```
 
-#### Display a Catalog's Properties
+#### Catalog Properties
 
 ```bash
 gcli.sh catalog properties --name catalog_mysql
 ```
 
-#### Set a Catalog's Property
+#### Set a Catalog Property
 
 ```bash
 gcli.sh catalog set --name catalog_mysql --property test --value value
 ```
 
-#### Remove a Catalog's Property
+#### Remove a Catalog Property
 
 ```bash
 gcli.sh catalog remove --name catalog_mysql --property test
@@ -415,7 +415,7 @@ gcli.sh catalog remove --name catalog_mysql --property test
 gcli.sh catalog update -m metalake_demo --name catalog --enable 
 ```
 
-#### Enable a Catalog and It's Metalake
+#### Enable a Catalog and Its Metalake
 
 ```bash
 gcli.sh catalog update -m metalake_demo --name catalog --enable --all
@@ -435,13 +435,13 @@ gcli.sh catalog update -m metalake_demo --name catalog --disable
 gcli.sh schema list --name catalog_postgres
 ```
 
-#### Show Schema Details
+#### Schema Details
 
 ```bash
 gcli.sh schema details --name catalog_postgres.hr
 ```
 
-#### Show Schema's Audit Information
+#### Schema Audit Information
 
 ```bash
 gcli.sh schema details --name catalog_postgres.hr --audit
@@ -453,7 +453,7 @@ gcli.sh schema details --name catalog_postgres.hr --audit
 gcli.sh schema create --name catalog_postgres.new_db
 ```
 
-#### Display Schema Properties
+#### Schema Properties
 
 ```bash
 gcli.sh schema properties --name catalog_postgres.hr
@@ -480,37 +480,37 @@ location,String,city they work in,false,false,Sydney,String
 gcli.sh table list --name catalog_postgres.hr
 ```
 
-#### Show Tables Details
+#### Tables Details
 
 ```bash
 gcli.sh table details --name catalog_postgres.hr.departments
 ```
 
-#### Show Tables Audit Information
+#### Tables Audit Information
 
 ```bash
 gcli.sh table details --name catalog_postgres.hr.departments --audit
 ```
 
-#### Show Tables Distribution Information
+#### Tables Distribution Information
 
 ```bash
 gcli.sh table details --name catalog_postgres.hr.departments --distribution
 ```
 
-#### Show Tables Partition Information
+#### Tables Partition Information
 
 ```bash
 gcli.sh table details --name catalog_postgres.hr.departments --partition
 ```
 
-#### Show Tables Sort Order Information
+#### Tables Sort Order Information
 
 ```bash
 gcli.sh table details --name catalog_postgres.hr.departments --sortorder
 ```
 
-### Show Table Indexes
+### Table Indexes
 
 ```bash
 gcli.sh table details --name catalog_mysql.db.iceberg_namespace_properties --index
@@ -522,19 +522,19 @@ gcli.sh table details --name catalog_mysql.db.iceberg_namespace_properties --ind
 gcli.sh table delete --name catalog_postgres.hr.salaries
 ```
 
-#### Display a Tables's Properties
+#### Table Properties
 
 ```bash
 gcli.sh table properties --name catalog_postgres.hr.salaries
 ```
 
-#### Set a Tables's Property
+#### Set a Table Property
 
 ```bash
 gcli.sh table set --name catalog_postgres.hr.salaries --property test --value value
 ```
 
-#### Remove a Tables's Property
+#### Remove a Table Property
 
 ```bash
 gcli.sh table remove --name catalog_postgres.hr.salaries --property test
@@ -554,7 +554,7 @@ gcli.sh table create --name catalog_postgres.hr.salaries --comment "comment" --c
 gcli.sh user create --user new_user
 ```
 
-#### Show a User's Details
+#### User Details
 
 ```bash
 gcli.sh user details --user new_user
@@ -566,7 +566,7 @@ gcli.sh user details --user new_user
 gcli.sh user list
 ```
 
-#### Show a Roles's Audit Information
+#### Role Audit Information
 
 ```bash
 gcli.sh user details --user new_user --audit
@@ -586,7 +586,7 @@ gcli.sh user delete --user new_user
 gcli.sh group create --group new_group
 ```
 
-#### Display a Group's Details
+#### Group Details
 
 ```bash
 gcli.sh group details --group new_group
@@ -598,7 +598,7 @@ gcli.sh group details --group new_group
 gcli.sh group list
 ```
 
-#### Show a Groups's Audit Information
+#### Group Audit Information
 
 ```bash
 gcli.sh group details --group new_group --audit
@@ -612,7 +612,7 @@ gcli.sh group delete --group new_group
 
 ### Tag Commands
 
-#### Display a Tag's Details
+#### Tag Details
 
 ```bash
 gcli.sh tag details --tag tagA
@@ -684,7 +684,7 @@ gcli.sh tag remove --tag tagA --property test
 gcli.sh tag update --tag tagA --rename newTag
 ```
 
-#### Update a Tag's Comment
+#### Update a Tag Comment
 
 ```bash
 gcli.sh tag update --tag tagA --comment "new comment"
@@ -718,7 +718,7 @@ create_catalog, use_catalog, create_schema, use_schema, create_table, modify_tab
 
 Note that some are only valid for certain entities.
 
-#### Display Role Details
+#### Role Details
 
 ```bash
 gcli.sh role details --role admin
@@ -730,7 +730,7 @@ gcli.sh role details --role admin
 gcli.sh role list
 ```
 
-#### Show a Roles's Audit Information
+#### Role Audit Information
 
 ```bash
 gcli.sh role details --role admin --audit
@@ -804,7 +804,7 @@ gcli.sh role revoke --metalake metalake_demo --name catalog_postgres --role admi
 
 ### Topic Commands
 
-#### Display a Topic's Details
+#### Topic Details
 
 ```bash
 gcli.sh topic details --name kafka.default.topic3
@@ -828,25 +828,25 @@ gcli.sh topic list --name kafka.default
 gcli.sh topic delete --name kafka.default.topic3
 ```
 
-#### Change a Topic's Comment
+#### Change a Topic Comment
 
 ```bash
 gcli.sh topic update --name kafka.default.topic3 --comment new_comment
 ```
 
-#### Display a Topics's Properties
+#### Topic Properties
 
 ```bash
 gcli.sh topic properties --name kafka.default.topic3
 ```
 
-#### Set a Topics's Property
+#### Set a Topic Property
 
 ```bash
 gcli.sh topic set --name kafka.default.topic3 --property test --value value
 ```
 
-#### Remove a Topics's Property
+#### Remove a Topic Property
 
 ```bash
 gcli.sh topic remove --name kafka.default.topic3 --property test
@@ -866,7 +866,7 @@ gcli.sh fileset create --name hadoop.schema.fileset --properties managed=true,lo
 gcli.sh fileset list --name hadoop.schema
 ```
 
-#### Display a Fileset's Details
+#### Fileset Details
 
 ```bash
 gcli.sh fileset details --name hadoop.schema.fileset
@@ -878,7 +878,7 @@ gcli.sh fileset details --name hadoop.schema.fileset
 gcli.sh fileset delete --name hadoop.schema.fileset
 ```
 
-#### Update a Fileset's Comment
+#### Update a Fileset Comment
 
 ```bash
 gcli.sh fileset update --name hadoop.schema.fileset --comment new_comment
@@ -890,19 +890,19 @@ gcli.sh fileset update --name hadoop.schema.fileset --comment new_comment
 gcli.sh fileset update --name hadoop.schema.fileset --rename new_name
 ```
 
-#### Display a Fileset's Properties
+#### Fileset Properties
 
 ```bash
 gcli.sh fileset properties --name hadoop.schema.fileset 
 ```
 
-#### Set a Fileset's Property
+#### Set a Fileset Property
 
 ```bash
 gcli.sh fileset set  --name hadoop.schema.fileset --property test --value value
 ```
 
-#### Remove a Fileset's Property
+#### Remove a Fileset Property
 
 ```bash
 gcli.sh fileset remove --name hadoop.schema.fileset --property test
@@ -923,13 +923,13 @@ In addition decimal(precision,scale), fixed(length), fixedchar(length) and varch
 gcli.sh column list --name catalog_postgres.hr.departments
 ```
 
-#### Show Column's Audit Information
+#### Column Audit Information
 
 ```bash
 gcli.sh column details --name catalog_postgres.hr.departments.name --audit
 ```
 
-#### Show a Column's Audit Information
+#### Column Audit Information
 
 ```bash
 gcli.sh column details --name catalog_postgres.hr.departments.name --audit
@@ -987,13 +987,13 @@ gcli.sh model create --name catalog_model.schema.model
 gcli.sh model list --name catalog_model.schema
 ```
 
-#### Display a Model's Details
+#### Model Details
 
 ```bash
 gcli.sh model details --name catalog_model.schema.model
 ```
 
-#### Display a Model's Audit Information
+#### Model Audit Information
 
 ```bash
 gcli.sh model details --name catalog_model.schema.model --audit
@@ -1005,7 +1005,7 @@ gcli.sh model details --name catalog_model.schema.model --audit
 gcli.sh model delete --name catalog_model.schema.model
 ```
 
-#### Update a Model's Comment
+#### Update a Model Comment
 
 ```bash
 gcli.sh model update --name catalog_model.schema.model --comment new_comment
@@ -1017,13 +1017,13 @@ gcli.sh model update --name catalog_model.schema.model --comment new_comment
 gcli.sh model update --name catalog_model.schema.model --rename new_name
 ```
 
-#### Set a Model's Property
+#### Set a Model Property
 
 ```bash
 gcli.sh model set --name catalog_model.schema.model --property k --value v
 ```
 
-#### Remove a Model's Property
+#### Remove a Model Property
 
 ```bash
 gcli.sh model remove --name catalog_model.schema.model --property k
@@ -1035,7 +1035,7 @@ gcli.sh model remove --name catalog_model.schema.model --property k
 gcli.sh model update --name catalog_model.schema.model --uris s3=s3://path,hdfs=hdfs://path --alias alias1
 ```
 
-#### Update a Model Version's Comment
+#### Update a Model Version Comment
 
 ```bash
 gcli.sh model update --name catalog_model.schema.model --version 0 --comment new_comment
@@ -1053,13 +1053,13 @@ gcli.sh model update --name catalog_model.schema.model --version 0 --newalias al
 gcli.sh model remove --name catalog_model.schema.model --version 0 --removealias alias1
 ```
 
-#### Set a Model Version's Property
+#### Set a Model Version Property
 
 ```bash
 gcli.sh model set --name catalog_model.schema.model --version 0 --property k --value v
 ```
 
-#### Remove a Model Version's Property
+#### Remove a Model Version Property
 
 ```bash
 gcli.sh model remove --name catalog_model.schema.model --version 0 --property k

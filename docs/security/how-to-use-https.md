@@ -13,7 +13,7 @@ Note that Gravitino cannot simultaneously support both HTTP and HTTPS within a s
 
 Both the Gravitino server and Iceberg REST service can configure and support HTTPS.
 
-### Apache Gravitino Server's Configuration
+### Apache Gravitino Server Configuration
 
 | Configuration item                                  | Description                                                        | Default value       | Required                                          | Since version |
 |-----------------------------------------------------|--------------------------------------------------------------------|---------------------|---------------------------------------------------|---------------|
@@ -30,7 +30,7 @@ Both the Gravitino server and Iceberg REST service can configure and support HTT
 | `gravitino.server.webserver.trustStorePassword`     | Password to the trust store.                                       | (none)              | Yes if use HTTPS and the authentication of client | 0.3.0         |
 | `gravitino.server.webserver.trustStoreType`         | The type to the trust store.                                       | `JKS`               | No                                                | 0.3.0         |
 
-### Apache Iceberg REST Service's Configuration
+### Apache Iceberg REST Service Configuration
 
 | Configuration item                              | Description                                                        | Default value     | Required                                          | Since version |
 |-------------------------------------------------|--------------------------------------------------------------------|-------------------|---------------------------------------------------|---------------|
