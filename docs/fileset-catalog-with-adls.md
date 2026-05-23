@@ -52,7 +52,7 @@ Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for m
 
 This section demonstrates how to create the Fileset catalog with ADLS in Gravitino, with a complete example.
 
-### Step1: Create a Fileset Catalog with ADLS
+### Step 1: Create a Fileset Catalog with ADLS
 
 First, you need to create a Fileset catalog with ADLS. The following example shows how to create a Fileset catalog with ADLS:
 
@@ -117,7 +117,7 @@ adls_properties = gravitino_client.create_catalog(name="example_catalog",
 </TabItem>
 </Tabs>
 
-### Step2: Create a Schema
+### Step 2: Create a Schema
 
 Once the catalog is created, you can create a schema. The following example shows how to create a schema:
 
@@ -167,7 +167,7 @@ catalog.as_schemas().create_schema(name="test_schema",
 </TabItem>
 </Tabs>
 
-### Step3: Create a Fileset
+### Step 3: Create a Fileset
 
 After creating the schema, you can create a fileset. The following example shows how to create a fileset:
 

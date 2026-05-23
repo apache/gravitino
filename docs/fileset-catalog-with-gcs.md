@@ -50,7 +50,7 @@ Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for m
 
 This section will show you how to use the Fileset catalog with GCS in Gravitino, including detailed examples.
 
-### Step1: Create a Fileset Catalog with GCS
+### Step 1: Create a Fileset Catalog with GCS
 
 First, you need to create a Fileset catalog with GCS. The following example shows how to create a Fileset catalog with GCS:
 
@@ -112,7 +112,7 @@ gcs_properties = gravitino_client.create_catalog(name="test_catalog",
 </TabItem>
 </Tabs>
 
-### Step2: Create a Schema
+### Step 2: Create a Schema
 
 Once you’ve created a Fileset catalog with GCS, you can create a schema. The following example shows how to create a schema:
 
@@ -163,7 +163,7 @@ catalog.as_schemas().create_schema(name="test_schema",
 </Tabs>
 
 
-### Step3: Create a Fileset
+### Step 3: Create a Fileset
 
 After creating a schema, you can create a fileset. The following example shows how to create a fileset:
 

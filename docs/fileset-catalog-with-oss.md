@@ -53,7 +53,7 @@ For instructions on how to create a fileset, refer to [Fileset configurations](.
 
 This section will show you how to use the Fileset catalog with OSS in Gravitino, including detailed examples.
 
-### Step1: Create a Fileset Catalog with OSS
+### Step 1: Create a Fileset Catalog with OSS
 
 First, you need to create a Fileset catalog for OSS. The following examples demonstrate how to create a Fileset catalog with OSS:
 
@@ -172,7 +172,7 @@ catalog.as_schemas().create_schema(name="test_schema",
 </Tabs>
 
 
-### Step3: Create a Fileset
+### Step 3: Create a Fileset
 
 Now that the schema is created, you can create a fileset inside it. Here’s how:
 
