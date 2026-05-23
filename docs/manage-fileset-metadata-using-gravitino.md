@@ -95,7 +95,7 @@ catalog = gravitino_client.create_catalog(name="catalog",
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following catalog providers:
+Gravitino supports the following catalog providers:
 
 | Catalog provider    | Catalog property                                                    |
 |---------------------|---------------------------------------------------------------------|
@@ -117,7 +117,7 @@ Refer to [Drop a catalog](./manage-relational-metadata-using-gravitino.md#drop-a
 in relational catalog for more details. For a fileset catalog, the drop operation is the same.
 
 :::note
-- Currently, Gravitino doesn't support dropping a catalog with schemas and filesets under it. You have
+- Gravitino doesn't support dropping a catalog with schemas and filesets under it. You have
 to drop all the schemas and filesets under the catalog before dropping the catalog.
 - The value of location property in a catalog should be a directory on a file system
   (HDFS) or path prefix on a cloud storage (S3, GCS, etc.).** The same goes for schema and fileset.
@@ -202,7 +202,7 @@ catalog.as_schemas().create_schema(name="schema",
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following schema property:
+Gravitino supports the following schema property:
 
 | Catalog provider | Schema property                                                   |
 |------------------|-------------------------------------------------------------------|
@@ -241,7 +241,7 @@ same.
 
 :::tip
  - Users should create a metalake, a catalog, and a schema before creating a fileset.
- - Currently, Gravitino only supports managing Hadoop Compatible File System (HCFS) locations.
+ - Gravitino only supports managing Hadoop Compatible File System (HCFS) locations.
 :::
 
 ### Create a fileset
@@ -308,7 +308,7 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "e
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports two **types** of filesets:
+Gravitino supports two **types** of filesets:
 
  - `MANAGED`: The storage location of the fileset is managed by Gravitino when specified as
    `MANAGED`, the physical location of the fileset will be deleted when this fileset is dropped.
@@ -703,7 +703,7 @@ fileset_new = catalog.as_fileset_catalog().alter_fileset(NameIdentifier.of("sche
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following changes to a fileset:
+Gravitino supports the following changes to a fileset:
 
 | Supported modification      | JSON                                                         | Java                                          |
 |-----------------------------|--------------------------------------------------------------|-----------------------------------------------|

@@ -35,7 +35,7 @@ Support for the following alter table operations:
 ## Select
 
 The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
-Currently, it doesn't support certain query optimizations, such as indexes and pushdowns.
+It doesn't support certain query optimizations, such as indexes and pushdowns.
 
 ## Update
 

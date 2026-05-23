@@ -162,7 +162,7 @@ The `fieldName` specified in the partitioning attributes must be the name of col
 
 ### Table distribution
 
-Users can also specify the distribution strategy when creating tables in the StarRocks catalog. Currently, the StarRocks catalog supports the following distribution strategies:
+Users can also specify the distribution strategy when creating tables in the StarRocks catalog. The StarRocks catalog supports the following distribution strategies:
 - `HASH`
 - `RANDOM`
 

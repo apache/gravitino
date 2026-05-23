@@ -17,7 +17,7 @@ import TabItem from '@theme/TabItem';
 
 The Generic Lakehouse Catalog is a Gravitino catalog implementation designed to seamlessly integrate with lakehouse storage systems built on file system-based architectures. This catalog enables unified metadata management for lakehouse tables stored on various storage backends, providing a consistent interface for data discovery, governance, and access control. 
 
-Currently, Gravitino fully supports the **Lance** lakehouse format, with plans to extend support to additional formats in the future.
+Gravitino fully supports the **Lance** lakehouse format, with plans to extend support to additional formats in the future.
 
 ### Why Use Generic Lakehouse Catalog?
 

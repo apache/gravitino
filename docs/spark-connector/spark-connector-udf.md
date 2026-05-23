@@ -13,7 +13,7 @@ in the Gravitino function registry. Once a function is
 invoke it through standard Spark SQL syntax — no additional `CREATE FUNCTION` statement is needed.
 
 :::note
-Currently, only **Java implementations** with `RuntimeType.SPARK` are supported in the Spark
+Only **Java implementations** with `RuntimeType.SPARK` are supported in the Spark
 connector. SQL and Python implementations registered in Gravitino cannot yet be invoked
 directly from Spark. Support for additional languages is planned for future releases.
 :::

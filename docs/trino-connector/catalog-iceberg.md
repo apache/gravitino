@@ -32,7 +32,7 @@ CREATE SCHEMA catalog.schema_name
 
 ### Create table
 
-The Apache Gravitino Trino connector currently supports basic Iceberg table creation statements, such as defining fields,
+The Apache Gravitino Trino connector supports basic Iceberg table creation statements, such as defining fields,
 allowing null values, and adding comments. The Apache Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
 
 :::note
@@ -65,7 +65,7 @@ Support for the following alter table operations:
 ### Select
 
 The Apache Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
-Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
+It doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
 ### Update
 

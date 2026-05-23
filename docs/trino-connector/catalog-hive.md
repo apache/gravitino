@@ -49,7 +49,7 @@ CREATE SCHEMA catalog.schema_name
 
 ### Create table
 
-The Gravitino Trino connector currently supports basic Hive table creation statements, such as defining fields,
+The Gravitino Trino connector supports basic Hive table creation statements, such as defining fields,
 allowing null values, and adding comments. The Gravitino Trino connector supports `CREATE TABLE AS SELECT`.
 
 :::note
@@ -81,7 +81,7 @@ Support for the following alter table operations:
 ### Select
 
 The Gravitino Trino connector supports most SELECT statements, allowing the execution of queries successfully.
-Currently, it doesn't support certain query optimizations, such as pushdown and pruning functionalities.
+It doesn't support certain query optimizations, such as pushdown and pruning functionalities.
 
 ### Update
 

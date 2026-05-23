@@ -14,7 +14,7 @@ is a kind of model registry, which provides the ability to manage machine learni
 versioned metadata. It follows the typical Gravitino 3-level namespace (catalog, schema, and
 model) and supports managing the versions for each model.
 
-Currently, it supports model and model version registering, listing, loading, and deleting.
+It supports model and model version registering, listing, loading, and deleting.
 
 To use the model catalog, please make sure that:
 

@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 
 To create a partitioned table, you should provide the following two components to construct a valid partitioned table.
 
-- Partitioning strategy. It defines how Gravitino distributes table data across partitions. Currently, Gravitino supports the following partitioning strategies.
+- Partitioning strategy. It defines how Gravitino distributes table data across partitions. Gravitino supports the following partitioning strategies.
 
 :::note
 The `score`, `createTime`, and `city` appearing in the table below refer to the field names in a table.

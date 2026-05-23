@@ -55,7 +55,7 @@ These metrics start with the `jvm` prefix, like `jvm.heap.used` in JSON format, 
 Catalog metrics provide the metrics from different catalog instances.
 All the catalog metrics start with the `gravitino-catalog` prefix in Prometheus format and with labels `provider`, `metalake`, and `catalog` to distinguish different catalog instances.
 
-Currently, Catalog metrics only support Fileset catalog and JDBC catalog. 
+Catalog metrics only support Fileset catalog and JDBC catalog. 
 
 You can get Prometheus metrics for a Fileset catalog named `test_catalog` under a metalake named `test_metalake` in the Gravitino server as follows:
 

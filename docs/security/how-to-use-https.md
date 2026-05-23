@@ -11,7 +11,7 @@ For users choosing OAuth 2.0 as the authentication method, it is recommended to 
 
 Note that Gravitino cannot simultaneously support both HTTP and HTTPS within a single server instance. If HTTPS is enabled, Gravitino will no longer provide HTTP service.
 
-Currently, both the Gravitino server and Iceberg REST service can configure and support HTTPS.
+Both the Gravitino server and Iceberg REST service can configure and support HTTPS.
 
 ### Apache Gravitino server's configuration
 

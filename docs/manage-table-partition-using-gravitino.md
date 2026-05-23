@@ -35,7 +35,7 @@ If you need additional partition management support for a specific catalog, plea
 
 ### Add partition
 
-You must match the partition types you want to add with the table's [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning) types; Gravitino currently supports adding the following partition types:
+You must match the partition types you want to add with the table's [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning) types; Gravitino supports adding the following partition types:
 
 | Partition Type | Description                                                                                                                                    |
 |----------------|------------------------------------------------------------------------------------------------------------------------------------------------|

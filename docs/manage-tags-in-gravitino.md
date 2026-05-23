@@ -28,7 +28,7 @@ the future versions.
    "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
    object has a name "catalog1.schema1.table1" with type "TABLE", a `COLUMN` object has a name 
    "catalog1.schema1.table1.column1" with type "COLUMN".
-2. Currently, `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` objects can be tagged.
+2`CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` objects can be tagged.
 3. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
    tags of its parent metadata objects. For example, listing tags of a `Table` will also list
    the tags of its parent `Schema` and `Catalog`.
@@ -170,7 +170,7 @@ Tag tag = client.alterTag(
 </TabItem>
 </Tabs>
 
-Currently, Gravitino support the following tag changes:
+Gravitino support the following tag changes:
 
 | Supported modification | JSON                                                         | Java                                      |
 |------------------------|--------------------------------------------------------------|-------------------------------------------|

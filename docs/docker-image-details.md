@@ -169,7 +169,7 @@ Memory settings
 
 Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`). Example: `-e GRAVITINO_MEM="-Xms2g -Xmx2g -XX:MaxMetaspaceSize=512m"`. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`, so set it whenever you need different heap/metaspace sizes.
 
-Currently, Gravitino Lance REST server supports setting the following environment variables
+Gravitino Lance REST server supports setting the following environment variables
 - LANCE_REST_GRAVITINO_METALAKE_NAME: It will overwrite the configuration "gravitino.lance-rest.gravitino-metalake" in configuration file `conf/gravitino-lance-rest-server.conf`. **You should set it to your Gravitino metalake name.**
 - LANCE_REST_NAMESPACE_BACKEND: It will overwrite the configuration "gravitino.lance-rest.namespace-backend" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "gravitino" and you should not change it as of now.
 - LANCE_REST_GRAVITINO_URI: It will overwrite the configuration "gravitino.lance-rest.gravitino-uri" in configuration file `conf/gravitino-lance-rest-server.conf`. The default value is "http://localhost:8090" and you can change it to your Gravitino server address. **Be care that Gravitino server URI `http://localhost:8090` is a docker container internal address, if your Gravitino server is running outside the docker container, you should set it to your host IP address like `http://host-ip:8090`.**

@@ -70,7 +70,7 @@ Catalog catalog = gravitinoClient.createCatalog("catalog",
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following catalog providers:
+Gravitino supports the following catalog providers:
 
 | Catalog provider | Catalog property                                                |
 |------------------|-----------------------------------------------------------------|
@@ -107,7 +107,7 @@ in relational catalog for more details. For a messaging catalog, the list operat
 schema operations are not supported but a "default" schema will be automatically created to include all topics
 
 :::caution note
-Gravitino currently only supports the Kafka catalog. Since Kafka does not support topic grouping, only list and load operations are supported for schema.
+Gravitino supports only the Kafka catalog. Since Kafka does not support topic grouping, only list and load operations are supported for schema.
 :::
 
 ### Create a schema
@@ -233,7 +233,7 @@ Topic t = topicCatalog.alterTopic(NameIdentifier.of("default", "topic"),
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following changes to a topic:
+Gravitino supports the following changes to a topic:
 
 | Supported modification  | JSON                                                         | Java                                        |
 |-------------------------|--------------------------------------------------------------|---------------------------------------------|

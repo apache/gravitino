@@ -25,7 +25,7 @@ Javadoc and REST API documentation.
    `name`. For example, a `CATALOG` object has a name "catalog1" with type "CATALOG", a `SCHEMA`
    object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE` object has a name
    "catalog1.schema1.table1" with type "TABLE".
-2. Currently, `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `MODEL` objects can be
+2`CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `MODEL` objects can be
    associated with policies. 
 3. Policies in Gravitino are inheritable, so listing policies of a metadata object will also list the
    policies of its parent metadata objects. For example, listing policies of a `Table` will also list
@@ -223,7 +223,7 @@ Policy policy = client.alterPolicy(
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following policy changes:
+Gravitino supports the following policy changes:
 
 | Supported modification | JSON                                                                 | Java                                                  |
 |------------------------|----------------------------------------------------------------------|-------------------------------------------------------|

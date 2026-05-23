@@ -56,7 +56,7 @@ regions or clouds.
 
 ### Multi-engine support
 
-Gravitino supports different query engines to access the metadata. Currently, it supports
+Gravitino supports different query engines to access the metadata. It supports
 [Trino](https://trino.io/), users can use Trino to query the metadata and data without needing to
 change the existing SQL dialects.
 

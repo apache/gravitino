@@ -29,7 +29,7 @@ you can create a statistic named `custom-tableLastModifiedTime` to record the la
 Then you can create a policy to check if the table hasn't been modified for a long time, and archive the table data to
 cold storage.
 
-Currently, Gravitino doesn't handle the computation of the statistics, you need to compute the statistics
+Gravitino doesn't handle the computation of the statistics, you need to compute the statistics
 and update them to Gravitino. Gravitino can't judge the expiration of the statistics, 
 You need to ensure the statistics are up-to-date.
 

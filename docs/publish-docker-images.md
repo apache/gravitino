@@ -24,7 +24,7 @@ You can use GitHub actions to publish Docker images to the Docker Hub repository
    + `apache/gravitino-ci:hive`.
    + `apache/gravitino-ci:trino`.
    + Future plans include support for other data sources.
-5. Input the `tag name`, for example: `0.1.0`, Then build and push the Docker image name. Currently, the Docker image name is in the format:
+5. Input the `tag name`, for example: `0.1.0`, Then build and push the Docker image name. The Docker image name is in the format:
    1. `apache/gravitino-ci:{image-type}-0.1.0` if this is a trino CI image, image-type is `trino`, `hive`, `kerberos-hive`, `doris`, `ranger`.
    2. `apache/gravitino-playground:{image-type}-0.1.0` if this is a playground image, image-type is `trino`, `hive`, `ranger`.
    3. `apache/gravitino:0.1.0` if this is a gravitino server image.

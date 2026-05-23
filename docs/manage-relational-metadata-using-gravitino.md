@@ -120,7 +120,7 @@ gravitino_client.create_catalog(name="catalog",
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following catalog providers:
+Gravitino supports the following catalog providers:
 
 | Catalog provider    | Catalog property                                                                        |
 |---------------------|-----------------------------------------------------------------------------------------|
@@ -221,7 +221,7 @@ catalog = gravitino_client.alterCatalog("catalog", *changes)
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following changes to a catalog:
+Gravitino supports the following changes to a catalog:
 
 | Supported modification | JSON                                                         | Java                                          |
 |------------------------|--------------------------------------------------------------|-----------------------------------------------|
@@ -508,7 +508,7 @@ catalog.as_schemas().create_schema(name="schema",
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following schema property:
+Gravitino supports the following schema property:
 
 | Catalog provider    | Schema property                                                                       |
 |---------------------|---------------------------------------------------------------------------------------|
@@ -620,7 +620,7 @@ schema_new: Schema = catalog.as_schemas().alter_schema("schema",
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following changes to a schema:
+Gravitino supports the following changes to a schema:
 
 | Supported modification | JSON                                                         | Java                                          |
 |------------------------|--------------------------------------------------------------|-----------------------------------------------|
@@ -1142,7 +1142,7 @@ Table t = tableCatalog.alterTable(NameIdentifier.of("schema", "table"),
 </TabItem>
 </Tabs>
 
-Currently, Gravitino supports the following changes to a table:
+Gravitino supports the following changes to a table:
 
 | Supported modification               | JSON                                                                                                                                                                                                                                                         | Java                                                                                         |
 |--------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------|

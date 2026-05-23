@@ -58,7 +58,7 @@ SELECT catalog.my_schema.add_one(5);
 
 ## Limitations
 
-- **Read-only**: The Trino connector currently supports listing and invoking Gravitino UDFs. Creating or dropping functions via Trino SQL (`CREATE FUNCTION` / `DROP FUNCTION`) is not yet supported.
+- **Read-only**: The Trino connector supports listing and invoking Gravitino UDFs. Creating or dropping functions via Trino SQL (`CREATE FUNCTION` / `DROP FUNCTION`) is not yet supported.
 - **SQL only**: Only SQL-language implementations are mapped. Java and Python implementations are not exposed to Trino.
 - **TRINO runtime only**: Only functions with `RuntimeType.TRINO` are visible. Functions registered with `RuntimeType.SPARK` or other runtimes are filtered out.
 - **Type mapping**: Function parameter and return types are converted from Gravitino types to Trino types. Unsupported types will cause the function to be skipped with a warning log.
