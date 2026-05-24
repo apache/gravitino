@@ -1,11 +1,11 @@
 ---
 title: "Apache Gravitino Web UI"
-slug: /webui
-keyword: webui
+slug: "/webui"
+keyword: "webui"
 last_update:
   date: 2024-10-30
   author: LauraXia123
-license: 'This software is licensed under the Apache License version 2.'
+license: "This software is licensed under the Apache License version 2."
 ---
 
 This document primarily outlines how users can manage metadata within Apache Gravitino using the web UI, the graphical interface is accessible through a web browser as an alternative to writing code or using the REST interface.

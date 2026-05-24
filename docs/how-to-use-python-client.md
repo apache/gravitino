@@ -1,9 +1,9 @@
 ---
 title: "Use the Apache Gravitino Python Client"
-slug: /how-to-use-gravitino-python-client
+slug: "/how-to-use-gravitino-python-client"
 date: 2024-05-09
-keyword: Gravitino Python client
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino Python client"
+license: "This software is licensed under the Apache License version 2."
 ---
 Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake.
 It manages the metadata directly in different sources, types, and regions, also provides users

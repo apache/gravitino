@@ -1,7 +1,7 @@
 ---
 title: "Flink Connector: JDBC Catalog"
-slug: /flink-connector/flink-catalog-jdbc
-keyword: flink connector jdbc catalog
+slug: "/flink-connector/flink-catalog-jdbc"
+keyword: "flink connector jdbc catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 

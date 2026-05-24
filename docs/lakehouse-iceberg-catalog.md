@@ -1,6 +1,6 @@
 ---
 title: "Iceberg Catalog"
-slug: /lakehouse-iceberg-catalog
+slug: "/lakehouse-iceberg-catalog"
 keywords:
   - lakehouse
   - iceberg

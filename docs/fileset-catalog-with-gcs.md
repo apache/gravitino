@@ -1,8 +1,8 @@
 ---
 title: "Fileset Catalog with GCS"
-slug: /fileset-catalog-with-gcs
+slug: "/fileset-catalog-with-gcs"
 date: 2024-01-03
-keyword: Fileset catalog GCS
+keyword: "Fileset catalog GCS"
 license: "This software is licensed under the Apache License version 2."
 ---
 

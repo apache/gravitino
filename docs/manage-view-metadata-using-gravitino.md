@@ -1,9 +1,9 @@
 ---
 title: "Manage View Metadata with Gravitino"
-slug: /manage-view-metadata-using-gravitino
+slug: "/manage-view-metadata-using-gravitino"
 date: 2026-5-17
-keyword: Gravitino view metadata manage
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino view metadata manage"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';

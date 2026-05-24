@@ -1,6 +1,6 @@
 ---
 title: "Generic Lakehouse Catalog"
-slug: /lakehouse-generic-catalog
+slug: "/lakehouse-generic-catalog"
 keywords:
   - lakehouse
   - lance

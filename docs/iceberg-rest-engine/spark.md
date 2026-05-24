@@ -1,6 +1,6 @@
 ---
-title: Connect Spark via Iceberg REST
-sidebar_label: Spark
+title: "Connect Spark via Iceberg REST"
+sidebar_label: "Spark"
 ---
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any

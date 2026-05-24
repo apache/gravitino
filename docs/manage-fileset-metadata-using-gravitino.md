@@ -1,9 +1,9 @@
 ---
-title: Manage Fileset Metadata with Gravitino
-slug: /manage-fileset-metadata-using-gravitino
+title: "Manage Fileset Metadata with Gravitino"
+slug: "/manage-fileset-metadata-using-gravitino"
 date: 2024-4-2
-keyword: Gravitino fileset metadata manage
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino fileset metadata manage"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';

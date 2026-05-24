@@ -1,7 +1,7 @@
 ---
 title: "Flink Connector: Iceberg Catalog"
-slug: /flink-connector/flink-catalog-iceberg
-keyword: flink connector iceberg catalog
+slug: "/flink-connector/flink-catalog-iceberg"
+keyword: "flink connector iceberg catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 

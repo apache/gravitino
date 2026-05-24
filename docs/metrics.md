@@ -1,6 +1,6 @@
 ---
-title: Apache Gravitino Metrics
-slug: /metrics
+title: "Apache Gravitino Metrics"
+slug: "/metrics"
 keywords:
   - metrics
 license: "This software is licensed under the Apache License version 2."

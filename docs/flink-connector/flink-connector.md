@@ -1,7 +1,7 @@
 ---
 title: "Apache Gravitino Flink Connector"
-slug: /flink-connector/flink-connector
-keyword: flink connector federation query 
+slug: "/flink-connector/flink-connector"
+keyword: "flink connector federation query"
 license: "This software is licensed under the Apache License version 2."
 ---
 

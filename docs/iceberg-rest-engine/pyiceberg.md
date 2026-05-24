@@ -1,6 +1,6 @@
 ---
-title: Connect PyIceberg via Iceberg REST
-sidebar_label: PyIceberg
+title: "Connect PyIceberg via Iceberg REST"
+sidebar_label: "PyIceberg"
 ---
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any

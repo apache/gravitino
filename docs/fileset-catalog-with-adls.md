@@ -1,8 +1,8 @@
 ---
 title: "Fileset Catalog with ADLS"
-slug: /fileset-catalog-with-adls
+slug: "/fileset-catalog-with-adls"
 date: 2025-01-03
-keyword: Fileset catalog ADLS
+keyword: "Fileset catalog ADLS"
 license: "This software is licensed under the Apache License version 2."
 ---
 

@@ -1,6 +1,6 @@
 ---
 title: "Iceberg REST Catalog Service"
-slug: /iceberg-rest-service
+slug: "/iceberg-rest-service"
 keywords:
   - Iceberg REST catalog
 license: "This software is licensed under the Apache License version 2."

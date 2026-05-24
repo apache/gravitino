@@ -1,6 +1,6 @@
 ---
-title: Connect Doris via Iceberg REST
-sidebar_label: Doris
+title: "Connect Doris via Iceberg REST"
+sidebar_label: "Doris"
 ---
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any

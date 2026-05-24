@@ -1,7 +1,7 @@
 ---
 title: "Authorization Pushdown"
-slug: /security/authorization-pushdown
-keyword: security
+slug: "/security/authorization-pushdown"
+keyword: "security"
 license: "This software is licensed under the Apache License version 2."
 ---
 

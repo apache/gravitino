@@ -1,6 +1,6 @@
 ---
-title: Use Relational Backend Storage
-slug: /how-to-use-relational-backend-storage
+title: "Use Relational Backend Storage"
+slug: "/how-to-use-relational-backend-storage"
 license: "This software is licensed under the Apache License version 2."
 ---
 

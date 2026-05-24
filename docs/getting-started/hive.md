@@ -1,6 +1,6 @@
 ---
 title: "Install Apache Hive"
-slug: /getting-started/hive
+slug: "/getting-started/hive"
 license: "This software is licensed under the Apache License version 2."
 ---
 

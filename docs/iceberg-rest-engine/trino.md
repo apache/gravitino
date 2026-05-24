@@ -1,6 +1,6 @@
 ---
-title: Connect Trino via Iceberg REST
-sidebar_label: Trino
+title: "Connect Trino via Iceberg REST"
+sidebar_label: "Trino"
 ---
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any

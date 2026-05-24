@@ -1,6 +1,6 @@
 ---
 title: "Lance REST Service"
-slug: /lance-rest-service
+slug: "/lance-rest-service"
 keywords:
   - Lance REST
   - Lance datasets

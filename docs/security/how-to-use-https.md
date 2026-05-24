@@ -1,7 +1,7 @@
 ---
 title: "Use HTTPS"
-slug: /security/how-to-use-https
-keyword: security HTTPS protocol
+slug: "/security/how-to-use-https"
+keyword: "security HTTPS protocol"
 license: "This software is licensed under the Apache License version 2."
 ---
 

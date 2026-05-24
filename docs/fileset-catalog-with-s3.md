@@ -1,8 +1,8 @@
 ---
 title: "Fileset Catalog with S3"
-slug: /fileset-catalog-with-s3
+slug: "/fileset-catalog-with-s3"
 date: 2025-01-03
-keyword: Fileset catalog S3
+keyword: "Fileset catalog S3"
 license: "This software is licensed under the Apache License version 2."
 ---
 

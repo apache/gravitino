@@ -1,8 +1,8 @@
 ---
 title: "Fileset Catalog"
-slug: /fileset-catalog
+slug: "/fileset-catalog"
 date: 2024-4-2
-keyword: fileset catalog
+keyword: "fileset catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 

@@ -1,7 +1,7 @@
 ---
 title: "Spark Connector: Hive Catalog"
-slug: /spark-connector/spark-catalog-hive
-keyword: spark connector hive catalog
+slug: "/spark-connector/spark-catalog-hive"
+keyword: "spark connector hive catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 

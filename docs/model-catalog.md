@@ -1,8 +1,8 @@
 ---
 title: "Model Catalog"
-slug: /model-catalog
+slug: "/model-catalog"
 date: 2024-12-26
-keyword: model catalog
+keyword: "model catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 

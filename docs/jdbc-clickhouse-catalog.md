@@ -1,6 +1,6 @@
 ---
 title: "ClickHouse Catalog"
-slug: /jdbc-clickhouse-catalog
+slug: "/jdbc-clickhouse-catalog"
 keywords:
 - jdbc
 - clickhouse

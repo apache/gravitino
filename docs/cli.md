@@ -1,11 +1,11 @@
 ---
-title: 'Apache Gravitino Command Line Interface'
-slug: /cli
-keyword: cli
+title: "Apache Gravitino Command Line Interface"
+slug: "/cli"
+keyword: "cli"
 last_update:
   date: 2024-10-23
   author: justinmclean
-license: 'This software is licensed under the Apache License version 2.'
+license: "This software is licensed under the Apache License version 2."
 ---
 
 This document provides guidance on managing metadata within Apache Gravitino using the Command Line Interface (CLI). The CLI offers a terminal based alternative to using code or the REST interface for metadata management.

@@ -1,7 +1,7 @@
 ---
 title: "Trino Connector: MySQL Catalog"
-slug: /trino-connector/catalog-mysql
-keyword: gravitino connector trino
+slug: "/trino-connector/catalog-mysql"
+keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 

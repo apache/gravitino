@@ -1,8 +1,8 @@
 ---
 title: "Optimizer Configuration"
-slug: /table-maintenance-service/optimizer-configuration
-keyword: table maintenance, optimizer, configuration, job template, spark
-license: This software is licensed under the Apache License version 2.
+slug: "/table-maintenance-service/optimizer-configuration"
+keyword: "table maintenance, optimizer, configuration, job template, spark"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Configuration Layers

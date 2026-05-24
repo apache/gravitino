@@ -1,7 +1,7 @@
 ---
 title: "Spark Connector: JDBC Catalog"
-slug: /spark-connector/spark-catalog-jdbc
-keyword: spark connector jdbc catalog
+slug: "/spark-connector/spark-catalog-jdbc"
+keyword: "spark connector jdbc catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 

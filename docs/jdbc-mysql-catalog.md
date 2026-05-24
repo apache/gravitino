@@ -1,6 +1,6 @@
 ---
 title: "MySQL Catalog"
-slug: /jdbc-mysql-catalog
+slug: "/jdbc-mysql-catalog"
 keywords:
 - jdbc
 - MySQL

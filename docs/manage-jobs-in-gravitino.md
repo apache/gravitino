@@ -1,6 +1,6 @@
 ---
 title: "Manage Jobs with Gravitino"
-slug: /manage-jobs-in-gravitino
+slug: "/manage-jobs-in-gravitino"
 date: 2025-08-13
 keywords:
   - job

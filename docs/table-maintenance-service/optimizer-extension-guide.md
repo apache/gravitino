@@ -1,8 +1,8 @@
 ---
 title: "Optimizer Extension Guide"
-slug: /table-maintenance-service/extension-guide
-keyword: table maintenance, optimizer, extension, provider, ServiceLoader
-license: This software is licensed under the Apache License version 2.
+slug: "/table-maintenance-service/extension-guide"
+keyword: "table maintenance, optimizer, extension, provider, ServiceLoader"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 Use this guide when built-in optimizer components do not match your environment and you need custom implementations.

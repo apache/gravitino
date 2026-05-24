@@ -1,7 +1,7 @@
 ---
 title: "Access Control"
-slug: /security/access-control
-keyword: security
+slug: "/security/access-control"
+keyword: "security"
 license: "This software is licensed under the Apache License version 2."
 ---
 

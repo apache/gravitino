@@ -1,6 +1,6 @@
 ---
 title: "Paimon Catalog"
-slug: /lakehouse-paimon-catalog
+slug: "/lakehouse-paimon-catalog"
 keywords:
   - lakehouse
   - Paimon

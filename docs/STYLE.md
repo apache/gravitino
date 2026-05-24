@@ -110,6 +110,8 @@ Apply these rules when reviewing or writing messages:
 
 Page title convention: every doc uses the frontmatter `title:` field as its page title. Docusaurus renders this as the rendered page H1. Body markdown must not contain any `# H1` headings — they create duplicate page titles. All section headings in the body start at H2 (`##`).
 
+Frontmatter quoting: all string values in YAML frontmatter (`title:`, `description:`, `license:`, `keyword:`, `slug:`, `sidebar_label:`, and any other string fields) use double quotes uniformly. This prevents parse failures when values contain colons or other YAML-special characters, and removes the need for case-by-case quoting judgment.
+
 ## What to leave alone
 
 These are out of scope for prose review. Do not edit without explicit approval:
