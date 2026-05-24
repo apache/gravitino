@@ -47,14 +47,14 @@ actively or passively from underlying systems, Gravitino manages these systems d
 It provides a set of connectors to connect to different metadata sources.
 The changes in Gravitino directly reflect in the underlying systems, and vice versa.
 
-### Geo-distribution Support (WIP)
+### Geo-Distribution Support
 
 Gravitino supports geo-distribution deployment, which means different instances of Gravitino
 can deploy in different regions or clouds, and they can connect to get
 the metadata from each other. With this, users can get a global view of metadata across the
 regions or clouds.
 
-### Multi-engine Support
+### Multi-Engine Support
 
 Gravitino supports different query engines to access the metadata. It supports
 [Trino](https://trino.io/), users can use Trino to query the metadata and data without needing to
