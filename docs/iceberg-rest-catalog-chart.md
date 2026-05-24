@@ -6,8 +6,6 @@ keyword:
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# Install Iceberg REST Catalog Server on Kubernetes
-
 This Helm chart deploys Apache Gravitino Iceberg REST Catalog Server on Kubernetes with customizable configurations.
 
 ## Prerequisites

@@ -5,7 +5,7 @@ keyword: docker
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# User Docker Images
+## User Docker Images
 
 ## Apache Gravitino Docker Image
 
@@ -259,7 +259,7 @@ Changelog
   - Base on `trino:426`
   - Added Gravitino trino-connector-0.3.0 libraries into the `/usr/lib/trino/plugin/gravitino`
 
-# Developer Docker Images
+## Developer Docker Images
 
 Use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
 

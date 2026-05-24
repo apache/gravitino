@@ -5,7 +5,7 @@ keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# Background
+## Background
 With the `Apache Gravitino Trino connector` and the [`Gravitino Trino cascading connector`](https://github.com/datastrato/trino-cascading-connector), you can implement cascading queries in Trino.
 These connectors allow you to treat other Trino clusters as data sources for the current Trino cluster,
 enabling queries across catalogs in different Trino clusters.
