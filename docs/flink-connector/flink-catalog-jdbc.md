@@ -5,6 +5,8 @@ keyword: "flink connector jdbc catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 This document provides a comprehensive guide on configuring and using Apache Gravitino Flink connector to access the JDBC catalog managed by the Gravitino server.
 
 ## Capabilities

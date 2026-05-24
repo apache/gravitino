@@ -5,6 +5,8 @@ keyword: "gravitino connector trino udf function"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 The Gravitino Trino connector supports user-defined functions (UDFs) registered in Apache Gravitino.
 Functions with `RuntimeType.TRINO` and SQL language implementations are automatically exposed as
 [Trino language functions](https://trino.io/docs/current/routines/function.html), making them available for use in Trino queries.

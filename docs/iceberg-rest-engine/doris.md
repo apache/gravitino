@@ -3,6 +3,8 @@ title: "Connect Doris via Iceberg REST"
 sidebar_label: "Doris"
 ---
 
+## Introduction
+
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible engine can connect to directly. This page describes how to configure Apache Doris
 to use Gravitino's Iceberg REST (IRC) endpoint.

@@ -4,6 +4,8 @@ slug: "/getting-started/index"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 There are several options for getting started with Apache Gravitino.
 
 <!--Docker option-->

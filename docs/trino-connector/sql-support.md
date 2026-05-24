@@ -5,6 +5,8 @@ keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 The connector provides read access and write access to data and metadata stored in Apache Gravitino.
 
 ### Globally Available Statements

@@ -4,6 +4,8 @@ slug: "/how-to-build"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
 - [Build on Windows (Using WSL)](#build-on-windows-using-wsl)

@@ -6,6 +6,8 @@ keyword: "Fileset catalog GCS"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 This document describes how to configure a Fileset catalog with GCS.
 
 ## Prerequisites

@@ -6,6 +6,8 @@ keyword: "Fileset catalog S3"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 This document explains how to configure a Fileset catalog with S3 in Gravitino.
 
 ## Prerequisites

@@ -5,6 +5,8 @@ keyword: "table maintenance, optimizer, cli, commands, metrics, statistics"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 Use `--help` to list all commands, or `--help --type <command>` for command-specific help.
 
 By default, optimizer CLI loads `conf/gravitino-optimizer.conf` from the current working

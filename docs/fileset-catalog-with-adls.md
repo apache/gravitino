@@ -6,6 +6,8 @@ keyword: "Fileset catalog ADLS"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 This document describes how to configure a Fileset catalog with ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2)).
 
 ## Prerequisites

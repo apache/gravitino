@@ -4,6 +4,8 @@ slug: "/how-to-sign-releases"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 These instructions provide a guide to signing and verifying Apache Gravitino releases to enhance the security of releases. A signed release enables people to confirm the author of the release and guarantees that the code hasn't been altered.
 
 ## Prerequisites

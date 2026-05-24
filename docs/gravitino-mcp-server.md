@@ -5,6 +5,8 @@ keyword: "Gravitino MCP metadata"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 
 ## Requirements

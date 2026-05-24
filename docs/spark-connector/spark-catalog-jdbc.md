@@ -5,6 +5,8 @@ keyword: "spark connector jdbc catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 The Apache Gravitino Spark connector offers the capability to read JDBC tables, with the metadata managed by the Gravitino server.
 
 ## Preparation

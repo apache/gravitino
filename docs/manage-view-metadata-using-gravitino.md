@@ -9,6 +9,8 @@ license: "This software is licensed under the Apache License version 2."
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+## Introduction
+
 This page introduces how to manage view metadata by Apache Gravitino. A view stores a logical
 query definition rather than physical data. Through Gravitino, you can create, load, alter,
 drop, and list views in supported catalogs via unified REST APIs or the Java client.

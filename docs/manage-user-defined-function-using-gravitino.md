@@ -8,6 +8,8 @@ license: "This software is licensed under the Apache License version 2."
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+## Introduction
+
 This page introduces how to manage user-defined functions (UDFs) in Apache Gravitino. Gravitino
 provides a centralized function registry that allows you to define custom functions once and
 share them across multiple compute engines like Spark and Trino.

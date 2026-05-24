@@ -3,6 +3,8 @@ title: "Connect Ray via Iceberg REST"
 sidebar_label: "Ray"
 ---
 
+## Introduction
+
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible client can connect to directly. This page describes how to use Ray Data with
 Gravitino's Iceberg REST (IRC) endpoint.

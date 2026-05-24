@@ -8,6 +8,8 @@ last_update:
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 This document outlines how users can manage metadata within Apache Gravitino using the Web V2 UI, the latest graphical interface accessible through a web browser as an alternative to writing code or using the REST interface.
 
 [Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`. By default, it is [http://localhost:8090](http://localhost:8090).
