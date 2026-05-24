@@ -19,7 +19,7 @@ Install Git (optional), Docker, Docker Compose.
 
 2 CPU cores, 8 GB RAM, 25 GB disk storage, MacOS or Linux OS (Verified Ubuntu22.04 Ubuntu24.04 AmazonLinux).
 
-## TCP Ports Used
+## TCP Ports
 
 The playground runs several services. The TCP ports used may clash with existing services you run, such as MySQL or Postgres.
 
@@ -42,7 +42,7 @@ The playground runs several services. The TCP ports used may clash with existing
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/apache/gravitino-playground/HEAD/install.sh)"
 ```
 
-### Use Git to Download and Launch the Playground
+### Launch the Playground with Git
 
 ```shell
 git clone git@github.com:apache/gravitino-playground.git
@@ -69,7 +69,7 @@ cd gravitino-playground
 
 ## Experience Apache Gravitino with Trino SQL
 
-### Use Trino CLI in Docker Container
+### Trino CLI in Docker Container
 
 1. Login to the Gravitino playground Trino Docker container using the following command:
 
@@ -83,7 +83,7 @@ docker exec -it playground-trino bash
 trino@container_id:/$ trino
 ```
 
-## Use Jupyter Notebook
+## Jupyter Notebook
 
 1. Open the Jupyter Notebook in the browser at [http://localhost:18888](http://localhost:18888).
 
@@ -91,7 +91,7 @@ trino@container_id:/$ trino
 
 3. Start the notebook and run the cells.
 
-## Use Spark Client
+## Spark Client
 
 1. Login to the Gravitino playground Spark Docker container using the following command:
 
@@ -186,7 +186,7 @@ WHERE e.employee_id = p.employee_id AND p.employee_id = s.employee_id
 GROUP BY e.employee_id,  given_name, family_name;
 ```
 
-### Use Spark and Trino
+### Spark and Trino
 
 Consider generating data with SparkSQL and then querying this data using Trino. Give it a try with Gravitino:
 
@@ -220,7 +220,7 @@ SELECT * FROM catalog_hive.product.employees WHERE department = 'Engineering';
 The demo is located in the `jupyter` folder, and you can open the `gravitino-spark-trino-example.ipynb`
 demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
 
-### Use Apache Iceberg REST Service
+### Apache Iceberg REST Service
 
 Suppose you want to migrate your business from Hive to Iceberg. Some tables will use Hive, and the other tables will use Iceberg.
 Gravitino provides an Iceberg REST catalog service. Use Spark to access the REST catalog to write the table data.
@@ -278,7 +278,7 @@ select * from catalog_iceberg.sales.customers;
 The demo is located in the `jupyter` folder, and you can open the `gravitino-spark-trino-example.ipynb`
 demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
 
-### Use Gravitino with LlamaIndex
+### Gravitino with LlamaIndex
 
 The Gravitino playground also provides a simple RAG demo with LlamaIndex. This demo will show you the
 ability to use Gravitino to manage both tabular and non-tabular datasets, connecting to

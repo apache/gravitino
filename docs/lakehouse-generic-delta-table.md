@@ -244,7 +244,7 @@ The Delta table can still be accessed directly via Delta Lake APIs, Spark, or ot
 
 ## Work with Delta Tables
 
-### Use Spark to Modify Delta Tables
+### Modify Delta Tables with Spark
 
 Since Gravitino does not support ALTER operations for Delta tables, use Apache Spark or other Delta Lake tools to modify table structure:
 

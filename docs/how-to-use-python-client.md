@@ -15,7 +15,7 @@ Gravitino Python client helps data scientists easily manage metadata using Pytho
 
 ![gravitino-python-client-introduction](./assets/gravitino-python-client-introduction.png)
 
-## Use Guidance
+## Usage
 
 Use Gravitino Python client library with Spark, PyTorch, Tensorflow, Ray and Python environment.
 

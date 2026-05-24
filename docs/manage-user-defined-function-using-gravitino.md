@@ -690,7 +690,7 @@ function = function_catalog.register_function(
 </TabItem>
 </Tabs>
 
-## Use Functions in Compute Engines
+## Functions in Compute Engines
 
 Once a function is registered in Gravitino, it can be used in supported compute engines.
 The engine's connector loads the function from Gravitino and invokes the appropriate
