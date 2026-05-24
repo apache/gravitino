@@ -90,7 +90,7 @@ Recommended `rewriteOptions`:
 - `min-input-files = 5`
 - `delete-file-threshold = 1`
 
-## Create Policy Examples
+## Policy Examples
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
