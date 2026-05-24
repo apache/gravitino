@@ -6,9 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-- [Prerequisites](#prerequisites)
-- [Quick start](#quick-start)
-- [Build on Windows (Using WSL)](#build-on-windows-using-wsl)
+Gravitino builds from source on Linux and macOS natively, and on Windows through WSL. The sections below cover prerequisites, the quick-start build sequence for the server and connectors, and the Windows-specific setup steps.
 
 ## Prerequisites
 
