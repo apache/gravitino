@@ -21,7 +21,7 @@ First of all, You must have a Gravitino server set up and run, You can refer doc
 [How to install Gravitino](./how-to-install.md) to build Gravitino server from source code and
 install it in your local.
 
-### Apache Gravitino Python Client API
+### Python Client API
 
 ```shell
 pip install apache-gravitino
@@ -30,7 +30,7 @@ pip install apache-gravitino
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 
-### Apache Gravitino Fileset Example
+### Fileset Example
 
 We offer a playground environment to help you quickly understand how to use Gravitino Python
 client to manage non-tabular data on HDFS via Fileset in Gravitino. You can refer to the

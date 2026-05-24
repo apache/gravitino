@@ -90,7 +90,7 @@ docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:469
 Run `docker ps` to check whether the container is running.
 
 
-### Install the Apache Gravitino Trino Connector
+### Install the Trino Connector
 
 Download the Gravitino Trino connector tarball for Trino `469` and unpack it.
 
@@ -131,7 +131,7 @@ discovery.uri=http://localhost:8080
 catalog.management=dynamic
 ```
 
-### Configure the Apache Gravitino Trino Connector
+### Configure the Trino Connector
 
 Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, refer to the [Gravitino getting started](../getting-started/index.md).
 
@@ -161,7 +161,7 @@ And then restart the Trino container to load the Gravitino Trino connector.
 docker restart trino-gravitino
 ```
 
-### Verify the Apache Gravitino Trino Connector
+### Verify the Trino Connector
 
 Use the Trino CLI to connect to the Trino container and run a query.
 

@@ -54,7 +54,7 @@ Gravitino has two modes to run the integration tests, the default `embedded` mod
 Running the `./gradlew build` command triggers the build and runs the integration tests in embedded mode.
 :::
 
-### Deploy the Apache Gravitino Server and Run the Integration Tests in Deploy Mode
+### Deploy the Server and Run the Integration Tests in Deploy Mode
 
 To deploy the Gravitino server locally to run the integration tests, follow these steps:
 

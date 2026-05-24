@@ -100,7 +100,7 @@ As you need to set the Gravitino URL for every command, you can set the URL in s
 
 The command line option overrides the environment variable and the environment variable overrides the configuration file.
 
-### Set the Gravitino Authentication Type
+### Set the Authentication Type
 
 The authentication type can also be set in several ways:
 
@@ -108,7 +108,7 @@ The authentication type can also be set in several ways:
 2. Set via the 'GRAVITINO_AUTH' environment variable.
 3. Stored in the Gravitino CLI configuration file.
 
-### Gravitino CLI Configuration File
+### CLI Configuration File
 
 The gravitino CLI can read commonly used CLI options from a configuration file. By default, the file is `.gravitino` in the user's home directory. The metalake, URL and ignore parameters can be set in this file.
 
