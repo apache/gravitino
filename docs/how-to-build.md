@@ -151,7 +151,7 @@ license: "This software is licensed under the Apache License version 2."
 
   This creates `gravitino-iceberg-rest-server-{version}.tar.gz` and `gravitino-iceberg-rest-server-{version}.tar.gz.sha256` under the `distribution` directory. You can uncompress and deploy it to use the Gravitino Iceberg REST server.
 
-## How to Build Apache Gravitino on Windows (Using WSL)
+## Build on Windows (Using WSL)
 
 ### Download WSL (Ubuntu)
 
