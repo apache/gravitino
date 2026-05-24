@@ -34,10 +34,10 @@ import org.apache.gravitino.idp.meta.IdpEntityType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Garbage collector for built-in IdP relational entities. */
-public final class IdpRelationalGarbageCollector implements Closeable {
+/** Garbage collector for built-in IdP entities. */
+public final class IdpGarbageCollector implements Closeable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(IdpRelationalGarbageCollector.class);
+  private static final Logger LOG = LoggerFactory.getLogger(IdpGarbageCollector.class);
 
   private static final List<IdpEntityType> IDP_ENTITY_TYPES =
       ImmutableList.of(IdpEntityType.IDP_USER, IdpEntityType.IDP_GROUP);
@@ -57,12 +57,12 @@ public final class IdpRelationalGarbageCollector implements Closeable {
           new ThreadPoolExecutor.AbortPolicy());
 
   /**
-   * Creates a garbage collector for built-in IdP relational entities.
+   * Creates a garbage collector for built-in IdP entities.
    *
    * @param backend The relational backend.
    * @param config The server configuration.
    */
-  public IdpRelationalGarbageCollector(IdpJDBCBackend backend, Config config) {
+  public IdpGarbageCollector(IdpJDBCBackend backend, Config config) {
     this.backend = backend;
     storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
   }

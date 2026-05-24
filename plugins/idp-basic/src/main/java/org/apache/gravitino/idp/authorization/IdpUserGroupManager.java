@@ -31,7 +31,7 @@ import org.apache.gravitino.idp.meta.IdpGroupEntity;
 import org.apache.gravitino.idp.meta.IdpUserEntity;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
-import org.apache.gravitino.idp.storage.relational.IdpEntityStore;
+import org.apache.gravitino.idp.storage.relational.IdpStore;
 import org.apache.gravitino.storage.IdGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +47,7 @@ public class IdpUserGroupManager {
   private static final String IDP_USER_DOES_NOT_EXIST_MSG = "IdP user %s does not exist";
   private static final String IDP_GROUP_DOES_NOT_EXIST_MSG = "IdP group %s does not exist";
 
-  private final IdpEntityStore store;
+  private final IdpStore store;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
 
@@ -57,12 +57,11 @@ public class IdpUserGroupManager {
    * @param store The entity store for built-in IdP entities.
    * @param idGenerator The id generator.
    */
-  public IdpUserGroupManager(IdpEntityStore store, IdGenerator idGenerator) {
+  public IdpUserGroupManager(IdpStore store, IdGenerator idGenerator) {
     this(store, idGenerator, PasswordHasherFactory.create());
   }
 
-  IdpUserGroupManager(
-      IdpEntityStore store, IdGenerator idGenerator, PasswordHasher passwordHasher) {
+  IdpUserGroupManager(IdpStore store, IdGenerator idGenerator, PasswordHasher passwordHasher) {
     this.store = store;
     this.idGenerator = idGenerator;
     this.passwordHasher = passwordHasher;

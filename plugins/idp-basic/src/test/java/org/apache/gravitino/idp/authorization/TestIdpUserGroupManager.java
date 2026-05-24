@@ -31,7 +31,7 @@ import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
-import org.apache.gravitino.idp.storage.relational.IdpRelationalEntityStore;
+import org.apache.gravitino.idp.storage.relational.IdpEntityStore;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -44,7 +44,7 @@ public class TestIdpUserGroupManager extends AbstractIdpMetaStorageTest {
     init(backendType);
 
     getConfig().set(Configs.CACHE_ENABLED, false);
-    IdpRelationalEntityStore entityStore = new IdpRelationalEntityStore();
+    IdpEntityStore entityStore = new IdpEntityStore();
     entityStore.initialize(getConfig());
     IdpUserGroupManager manager = new IdpUserGroupManager(entityStore, RandomIdGenerator.INSTANCE);
 

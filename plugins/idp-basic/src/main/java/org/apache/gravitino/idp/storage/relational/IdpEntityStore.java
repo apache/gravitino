@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.idp.storage.relational;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
 import org.apache.gravitino.Config;
@@ -27,85 +26,60 @@ import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.meta.IdpEntity;
 import org.apache.gravitino.idp.meta.IdpEntityType;
 
-/** Entity store for built-in IdP metadata. */
-public interface IdpEntityStore extends Closeable {
+/** Entity store for built-in IdP entities backed by JDBC. */
+public class IdpEntityStore implements IdpStore {
 
-  /**
-   * Initializes the built-in IdP entity store.
-   *
-   * @param config The configuration for the entity store.
-   * @throws RuntimeException If the initialization fails.
-   */
-  void initialize(Config config) throws RuntimeException;
+  private IdpJDBCBackend backend;
+  private IdpGarbageCollector garbageCollector;
 
-  /**
-   * Checks whether the entity exists.
-   *
-   * @param name The name of the entity.
-   * @param entityType The built-in IdP entity type.
-   * @return True if the entity exists, false otherwise.
-   * @throws IOException If the check operation fails.
-   */
-  boolean exists(String name, IdpEntityType entityType) throws IOException;
+  @Override
+  public void initialize(Config config) throws RuntimeException {
+    this.backend = new IdpJDBCBackend();
+    this.backend.initialize(config);
+    this.garbageCollector = new IdpGarbageCollector(backend, config);
+    this.garbageCollector.start();
+  }
 
-  /**
-   * Stores the entity.
-   *
-   * @param entity The entity to store.
-   * @param overwritten Whether to overwrite an existing entity.
-   * @param <E> The entity type.
-   * @throws IOException If the store operation fails.
-   * @throws AlreadyExistsException If the entity already exists and overwrite is false.
-   */
-  <E extends IdpEntity> void put(E entity, boolean overwritten)
-      throws IOException, AlreadyExistsException;
+  @Override
+  public boolean exists(String name, IdpEntityType entityType) throws IOException {
+    return backend.exists(name, entityType);
+  }
 
-  /**
-   * Gets the entity.
-   *
-   * @param name The name of the entity.
-   * @param entityType The built-in IdP entity type.
-   * @param clazz The entity class.
-   * @param <E> The entity type.
-   * @return The entity.
-   * @throws NotFoundException If the entity does not exist.
-   * @throws IOException If the retrieve operation fails.
-   */
-  <E extends IdpEntity> E get(String name, IdpEntityType entityType, Class<E> clazz)
-      throws NotFoundException, IOException;
+  @Override
+  public <E extends IdpEntity> void put(E entity, boolean overwritten)
+      throws IOException, AlreadyExistsException {
+    backend.insert(entity, overwritten);
+  }
 
-  /**
-   * Changes the password hash for a built-in IdP user.
-   *
-   * @param username The username.
-   * @param passwordHash The new password hash.
-   * @throws NotFoundException If the user does not exist.
-   */
-  void changePassword(String username, String passwordHash) throws NotFoundException;
+  @Override
+  public <E extends IdpEntity> E get(String name, IdpEntityType entityType, Class<E> clazz)
+      throws NotFoundException, IOException {
+    return clazz.cast(backend.get(name, entityType));
+  }
 
-  /**
-   * Adds users to a built-in IdP group.
-   *
-   * @param groupName The group name.
-   * @param usernames The usernames to add.
-   */
-  void addUsersToGroup(String groupName, List<String> usernames);
+  @Override
+  public void changePassword(String username, String passwordHash) throws NotFoundException {
+    backend.changePassword(username, passwordHash);
+  }
 
-  /**
-   * Removes users from a built-in IdP group.
-   *
-   * @param groupName The group name.
-   * @param usernames The usernames to remove.
-   */
-  void removeUsersFromGroup(String groupName, List<String> usernames);
+  @Override
+  public void addUsersToGroup(String groupName, List<String> usernames) {
+    backend.addUsersToGroup(groupName, usernames);
+  }
 
-  /**
-   * Deletes the entity.
-   *
-   * @param name The name of the entity.
-   * @param entityType The built-in IdP entity type.
-   * @return True if the entity existed and was deleted, false otherwise.
-   * @throws IOException If the delete operation fails.
-   */
-  boolean delete(String name, IdpEntityType entityType) throws IOException;
+  @Override
+  public void removeUsersFromGroup(String groupName, List<String> usernames) {
+    backend.removeUsersFromGroup(groupName, usernames);
+  }
+
+  @Override
+  public boolean delete(String name, IdpEntityType entityType) throws IOException {
+    return backend.delete(name, entityType, false);
+  }
+
+  @Override
+  public void close() throws IOException {
+    garbageCollector.close();
+    backend.close();
+  }
 }

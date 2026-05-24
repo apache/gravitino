@@ -41,7 +41,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 @Tag("gravitino-docker-test")
-class TestIdpRelationalGarbageCollector extends AbstractIdpMetaStorageTest {
+class TestIdpGarbageCollector extends AbstractIdpMetaStorageTest {
   private IdpUserMetaMapper idpUserMetaMapper;
   private IdpGroupMetaMapper idpGroupMetaMapper;
   private IdpUserGroupRelMapper idpUserGroupRelMapper;
@@ -74,8 +74,7 @@ class TestIdpRelationalGarbageCollector extends AbstractIdpMetaStorageTest {
     closeSession();
     IdpJDBCBackend idpBackend = new IdpJDBCBackend();
     idpBackend.initialize(getConfig());
-    IdpRelationalGarbageCollector garbageCollector =
-        new IdpRelationalGarbageCollector(idpBackend, getConfig());
+    IdpGarbageCollector garbageCollector = new IdpGarbageCollector(idpBackend, getConfig());
     try {
       garbageCollector.collectAndClean();
     } finally {
