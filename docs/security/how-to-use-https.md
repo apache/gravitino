@@ -5,7 +5,7 @@ keyword: "security HTTPS protocol"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## HTTPS
+## Introduction
 
 For users choosing OAuth 2.0 as the authentication method, it is recommended to use HTTPS instead of HTTP. HTTPS encrypts the request headers, offering better protection against smuggling attacks.
 

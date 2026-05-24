@@ -5,7 +5,7 @@ keyword: "playground"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Playground Introduction
+## Introduction
 
 The playground is a complete Apache Gravitino Docker runtime environment with `Apache Hive`, `HDFS`, `Trino`, `MySQL`, `PostgreSQL`, `Jupyter`, and a `Apache Gravitino` server.
 
