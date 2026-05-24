@@ -302,8 +302,7 @@ client.deletePolicy("my_policy_new");
 
 ## Policy Associations
 
-Gravitino allows you to associate and disassociate policies with metadata objects. Currently,
-`CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `MODEL` objects can have policies.
+Gravitino lets you associate and disassociate policies with metadata objects. The `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, and `MODEL` object types can have policies.
 
 ### Associate and Disassociate Policies with a Metadata Object
 
