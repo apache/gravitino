@@ -14,14 +14,14 @@ Apache Gravitino supports several configurations:
 2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
 3. **Some other configurations**: Includes HDFS and other configurations.
 
-## Apache Gravitino Server Configurations
+## Gravitino Server Configurations
 
 Customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
 We strongly recommend that you read the following sections to understand the configuration file, so you can change the default values to suit your specific situation and usage scenario.
 
 The `gravitino.conf` file lists the configuration items in the following table. It groups those items into the following categories:
 
-### Apache Gravitino HTTP Server Configuration
+### HTTP Server Configuration
 
 | Configuration item                                   | Description                                                                                                                                                                           | Default value                                                                | Required | Since version    |
 |------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|------------------|
@@ -369,7 +369,7 @@ Typical values:
 - Moderate production: `-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g`
 - Larger deployments: `-Xms8g -Xmx8g -XX:MaxMetaspaceSize=1g` or higher depending on catalog count, plugins, and query concurrency
 
-## Apache Gravitino Catalog Properties Configuration
+## Catalog Properties Configuration
 
 There are three types of catalog properties:
 

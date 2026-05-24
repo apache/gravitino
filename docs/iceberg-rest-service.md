@@ -58,13 +58,13 @@ For detailed instructions on how to build and install the Gravitino server packa
     |── logs/                                   # Gravitino Iceberg REST server logs. Automatically created after the server starts.
 ```
 
-## Apache Gravitino Iceberg REST Catalog Server Configuration
+## Iceberg REST Server Configuration
 
 There are distinct configuration files for standalone and auxiliary server: `gravitino-iceberg-rest-server.conf` is used for the standalone server, while `gravitino.conf` is for the auxiliary server. Although the configuration files differ, the configuration items remain the same.
 
 Starting with version `0.6.0-incubating`, the prefix `gravitino.auxService.iceberg-rest.` for auxiliary server configurations has been deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the latter will take precedence. The configurations listed below use the `gravitino.iceberg-rest.` prefix.
 
-### Configuration to Enable Iceberg REST Service in Gravitino Server
+### Enable Iceberg REST Service
 
 | Configuration item                 | Description                                                                                                                                                                                                                            | Default value | Required | Since Version |
 |------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -519,7 +519,7 @@ View operations are supported when using the JDBC catalog backend with schema ve
 |----------------------------------------------|----------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Defaults to `V1` to enable view operations. Set to `V0` to opt out.  | `V1`          | No       | 1.2.0         |
 
-### Other Apache Iceberg Catalog Properties
+### Other Iceberg Catalog Properties
 
 Add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.10.0/configuration/#catalog-properties).
 The `clients` property for example:
