@@ -1,5 +1,5 @@
 ---
-title: "Supported Trino Catalogs"
+title: "Trino Connector Catalog Support"
 slug: "/trino-connector/supported-catalog"
 keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
