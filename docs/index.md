@@ -4,7 +4,7 @@ slug: /
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## What's Apache Gravitino?
+## Overview
 
 Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake.
 It manages the metadata directly in different sources, types, and regions.

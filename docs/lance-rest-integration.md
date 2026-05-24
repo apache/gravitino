@@ -80,7 +80,7 @@ matrix can be re-verified (and extended) without ad-hoc scripting:
     -PlanceRayVersions=0.4.2,0.3.0
 ```
 
-### Why Maintain a Compatibility Matrix?
+### Rationale
 
 The Lance ecosystem is under active development, with frequent updates to APIs and features. Gravitino's Lance REST service depends on specific connector behaviors to ensure reliable operation. Using incompatible versions may result in:
 
