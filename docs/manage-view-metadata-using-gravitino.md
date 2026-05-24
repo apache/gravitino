@@ -136,7 +136,7 @@ Use the following fields when creating a view:
 - `properties`: Carries provider-specific metadata.
 
 Column types use the same Gravitino type system as table columns. For the full type list and the
-behavior of special types such as external and unparsed types, refer to [Apache Gravitino table column type](./manage-relational-metadata-using-gravitino.md#apache-gravitino-table-column-type).
+behavior of special types such as external and unparsed types, refer to [Apache Gravitino table column type](./manage-relational-metadata-using-gravitino.md#table-column-type).
 
 ### Load a View
 

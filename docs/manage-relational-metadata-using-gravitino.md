@@ -1061,7 +1061,7 @@ In addition to the basic settings, Gravitino supports the following features:
 | Table sort ordering | Equal to `SORTED BY` in Apache Hive, sort ordering is a method to sort the data in specific ways such as by a column or a function, and then store table data. it will highly improve the query performance under certain scenarios.                                                           | [SortOrder](pathname:///docs/1.3.0-SNAPSHOT/api/java/org/apache/gravitino/rel/expressions/sorts/SortOrder.html)               |
 | Table indexes       | Equal to `KEY/INDEX` in MySQL , unique key enforces uniqueness of values in one or more columns within a table. It ensures that no two rows have identical values in specified columns, thereby facilitating data integrity and enabling efficient data retrieval and manipulation operations. | [Index](pathname:///docs/1.3.0-SNAPSHOT/api/java/org/apache/gravitino/rel/indexes/Index.html)                                 |
 
-For more information, see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-bucketing-sort-order-indexes.md).
+For more information, see the related document on [partitioning, bucketing, sorting, and indexes](table-partitioning-distribution-sort-order-indexes.md).
 
 :::note
 The code above is an example of creating a Hive table. For other catalogs, the code is similar, but the supported column type, and table properties may be different. For more details, refer to the related doc.

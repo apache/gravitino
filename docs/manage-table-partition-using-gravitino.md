@@ -35,13 +35,13 @@ If you need additional partition management support for a specific catalog, [cre
 
 ### Add Partition
 
-Match the partition types you want to add with the table's [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning) types; Gravitino supports adding the following partition types:
+Match the partition types you want to add with the table's [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning) types; Gravitino supports adding the following partition types:
 
 | Partition Type | Description                                                                                                                                    |
 |----------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| identity       | An identity partition represents a result of identity [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning). |
-| range          | A range partition represents a result of range [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).        |
-| list           | A list partition represents a result of list [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).          |
+| identity       | An identity partition represents a result of identity [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning). |
+| range          | A range partition represents a result of range [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning).        |
+| list           | A list partition represents a result of list [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning).          |
 
 For JSON examples:
 
@@ -138,7 +138,7 @@ When adding an identity partition to a partitioned Hive table, the specified par
 ```
 
 :::note
-Each list in the lists must have the same length. The values in each list must correspond to the field definitions in the list [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).
+Each list in the lists must have the same length. The values in each list must correspond to the field definitions in the list [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning).
 :::
 
 </TabItem>
@@ -200,7 +200,7 @@ Partition partition =
 ```
 
 :::note
-Each list in the lists must have the same length. The values in each list must correspond to the field definitions in the list [partitioning](./table-partitioning-bucketing-sort-order-indexes.md#table-partitioning).
+Each list in the lists must have the same length. The values in each list must correspond to the field definitions in the list [partitioning](./table-partitioning-distribution-sort-order-indexes.md#table-partitioning).
 :::
 
 </TabItem>

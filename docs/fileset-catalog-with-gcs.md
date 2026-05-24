@@ -475,7 +475,7 @@ Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. I
 
 ### How to Create a GCS Fileset Catalog with Credential Vending
 
-Apart from configuration method in [create-gcs-fileset-catalog](#configurations-for-a-gcs-fileset-catalog),
+Apart from configuration method in [create-gcs-fileset-catalog](#configuration-for-a-gcs-fileset-catalog),
 properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also
 be set to enable credential vending for GCS fileset. Take `gcs-token` credential provider for example:
 

@@ -36,7 +36,7 @@ and [How to use the playground](./how-to-use-the-playground.md).
 
 To get started with Gravitino, see [Getting started](./getting-started/index.md) for the details.
 
-* [Getting started locally](./getting-started/index.md#local): a quick guide to starting
+* [Getting started locally](./getting-started/index.md#local-workstation): a quick guide to starting
   and using Gravitino locally.
 
 * [Running on Amazon Web Services](./getting-started/index.md#aws): a

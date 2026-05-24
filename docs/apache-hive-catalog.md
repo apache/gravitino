@@ -27,7 +27,7 @@ The Hive catalog supports creating, updating, and deleting databases and tables 
 
 ### Catalog Properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Hive catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Hive catalog has the following properties:
 
 | Property Name                            | Description                                                                                                                                                                                                                                         | Default Value | Required                     | Since Version |
 |------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------|---------------|
@@ -76,7 +76,7 @@ When using Gravitino with Trino, pass the Trino Hive connector configuration usi
 
 When using Gravitino with Spark, pass the Spark Hive connector configuration using the `spark.bypass.` prefix. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
 
-When using Gravitino authorization for Hive with Apache Ranger, see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#example-of-using-the-ranger-hadoop-sql-plugin)
+When using Gravitino authorization for Hive with Apache Ranger, see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#configure-the-ranger-hadoop-sql-plugin)
 ### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
@@ -246,6 +246,6 @@ Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gra
 
 ## Hive Catalog with S3 Storage
 
-To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-s3.md) documentation. No special configurations are required for the Hive catalog to work with S3 storage.
+To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-cloud-storage.md) documentation. No special configurations are required for the Hive catalog to work with S3 storage.
 The only difference is the storage location of the files, which is in S3. Use `location` to specify the S3 path for the database or table.
 

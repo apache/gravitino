@@ -25,7 +25,7 @@ Hadoop 3. If there's any compatibility issue, create an [issue](https://github.c
 
 ### Catalog Properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration),
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration),
 the Fileset catalog has the following properties:
 
 | Property Name                        | Description                                                                                                                                                                                                                                                                                                                     | Default Value   | Required | Since Version    |

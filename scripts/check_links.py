@@ -8,7 +8,11 @@ from collections import defaultdict
 
 LINK_RE = re.compile(r'\[([^\]]*)\]\(([^)]+)\)')
 HEADING_RE = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
-EXTERNAL_PREFIXES = ('http://', 'https://', 'mailto:', 'tel:', 'ftp://')
+EXTERNAL_PREFIXES = ('http://', 'https://', 'mailto:', 'tel:', 'ftp://', 'pathname://')
+
+# Docusaurus auto-generated / plugin-resolved paths that don't exist as files
+# in docs/ but resolve at build time. These are not real broken links.
+DOCUSAURUS_BUILD_PATHS = ('api/rest/', 'api/java-api', 'api/python-api')
 
 
 def slugify(text):
@@ -24,8 +28,22 @@ def slugify(text):
 
 
 def extract_anchors(content):
-    """Return set of valid anchors in a Markdown file (from headings)."""
-    return {slugify(m.group(2)) for m in HEADING_RE.finditer(content)}
+    """Return set of valid anchors in a Markdown file (from headings).
+
+    Mirrors Docusaurus's duplicate-heading handling: if the same slug appears
+    multiple times, the second gets ``-1``, the third ``-2``, and so on.
+    """
+    anchors = set()
+    seen = {}
+    for m in HEADING_RE.finditer(content):
+        slug = slugify(m.group(2))
+        if slug in seen:
+            anchors.add(f"{slug}-{seen[slug]}")
+            seen[slug] += 1
+        else:
+            anchors.add(slug)
+            seen[slug] = 1
+    return anchors
 
 
 def extract_links(path):
@@ -77,6 +95,8 @@ def validate_docs(docs_root):
     for md in md_files:
         for line_no, text, target in extract_links(md):
             if target.startswith(EXTERNAL_PREFIXES):
+                continue
+            if any(target.startswith(p) or target.startswith('./' + p) for p in DOCUSAURUS_BUILD_PATHS):
                 continue
             if target.startswith('#'):
                 # Same-file anchor

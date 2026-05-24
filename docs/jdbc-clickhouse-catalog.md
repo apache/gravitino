@@ -46,7 +46,7 @@ Use your staging validation results and the official ClickHouse documentation as
 
 Pass any JDBC pool property that Gravitino does not define by adding the `gravitino.bypass.` prefix (for example `gravitino.bypass.maxWaitMillis`). See [commons-dbcp configuration](https://commons.apache.org/proper/commons-dbcp/configuration.html) for details.
 
-When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user`, and `jdbc-password`. Common catalog properties are listed [here](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration); ClickHouse adds no extra catalog-scoped keys.
+When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user`, and `jdbc-password`. Common catalog properties are listed [here](./gravitino-server-config.md#catalog-properties-configuration); ClickHouse adds no extra catalog-scoped keys.
 
 | Configuration item      | Description                                                                 | Default value | Required | Since Version |
 |-------------------------|-----------------------------------------------------------------------------|---------------|----------|---------------|

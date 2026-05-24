@@ -363,7 +363,7 @@ Omit `iceberg.rest-catalog.session=NONE` because `NONE` is the default value.
 
 #### HTTPS
 
-Refer to [HTTPS Configuration](./security/how-to-use-https/#apache-iceberg-rest-services-configuration) for how to enable HTTPS for Gravitino Iceberg REST server.
+Refer to [HTTPS Configuration](./security/how-to-use-https.md#apache-iceberg-rest-service-configuration) for how to enable HTTPS for Gravitino Iceberg REST server.
 
 #### Backend Authentication
 
@@ -676,7 +676,7 @@ Or build it manually to add custom configuration or logics:
 sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image apache/gravitino-iceberg-rest --tag $tag
 ```
 
-You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#using-apache-iceberg-rest-service).
+You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#use-apache-iceberg-rest-service).
 
 ## Quick Start: Enable Access Control for Iceberg REST Server
 

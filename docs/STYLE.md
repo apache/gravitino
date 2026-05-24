@@ -149,6 +149,7 @@ When reviewing a document, follow this pattern:
 6. After all proposals in a file are reviewed, draft a conventional-commit message: `docs(<area>): <improvement>`.
 7. When applying a mechanical pattern sweep, if the resulting sentence reads awkwardly (comma splice, dangling fragment, missing connector, awkward parallel structure), fix the whole sentence in the same commit rather than leaving cleanup for a later pass. The goal is that any sentence the sweep touches reads cleanly after the commit lands.
 8. Run a typo and misspelling pass as part of the polish workflow, especially after sweeps that strip leading words (which can expose misspelled words that were partially hidden in the original phrasing).
+9. Run `scripts/check_links.py docs/` before every docs PR to catch broken internal links and anchors. Heading renames silently break `#anchor` references; the script's anchor validation catches these, and the "available anchors (sample)" hint usually points directly at the renamed target. When changing a heading, treat updating inbound anchor links as part of the same change, not a follow-up.
 
 ## Priority of issues
 

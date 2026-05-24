@@ -503,7 +503,7 @@ Since 0.8.0-incubating, Gravitino supports credential vending for S3 fileset. If
 
 ### How to Create a S3 Fileset Catalog with Credential Vending
 
-Apart from configuration method in [create-s3-fileset-catalog](#configurations-for-s3-fileset-catalog),
+Apart from configuration method in [create-s3-fileset-catalog](#configuration-for-an-s3-fileset-catalog),
 properties needed by [s3-credential](./security/credential-vending.md#s3-credentials)
 should also be set to enable credential vending for S3 fileset. Take `s3-token` credential provider for example:
 

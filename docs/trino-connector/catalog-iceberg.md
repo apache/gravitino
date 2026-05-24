@@ -354,7 +354,7 @@ call gravitino.system.create_catalog(
 - The configurations of `trino.bypass.hive.s3.aws-access-key`, `trino.bypass.hive.s3.aws-secret-key`, `trino.bypass.hive.s3.region`
 are the required the configurations for the Apache Gravitino Trino connector.
 - The configurations of `s3-access-key-id`, `s3-secret-access-key`, `io-impl` and `s3-region`.
-are the required the configurations for the [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
+are the required the configurations for the [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#s3).
 - The `location` specifies the storage path on AWS S3. Ensure that the specified directory exists on AWS S3 before proceeding.
 
 Once the Iceberg catalog is successfully created, users can create schemas and tables as follows:
@@ -372,5 +372,5 @@ After running the command, the tables are ready for data reading and writing ope
 
 :::note
 TThe Iceberg catalog module in the Apache Gravitino server should add AWS S3 support.
-Refer to [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#S3).
+Refer to [Apache Gravitino Iceberg catalog](../lakehouse-iceberg-catalog.md#s3).
 :::
