@@ -68,7 +68,7 @@ SET 'execution.runtime-mode' = 'batch';
 SET 'sql-client.execution.result-mode' = 'tableau';
 -- [INFO] Execute statement succeed.
 
-// Create a raw hive table, please make sure setting 'connector'='hive'.
+// Create a raw hive table; make sure to set 'connector'='hive'.
 CREATE TABLE IF NOT EXISTS employees (
     id INT,
     name STRING,

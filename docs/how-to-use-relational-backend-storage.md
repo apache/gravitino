@@ -35,7 +35,7 @@ As mentioned above, `H2` is the default storage for `JDBCBackend`, so you can us
 
 ### Step 1: Get the Initialization Script
 
-You need to `download` and `unzip` the distribution package firstly, please see
+You need to `download` and `unzip` the distribution package first; see
 [How to install Gravitino](how-to-install.md).
 
 Then you can get the initialization script in the directory:
@@ -58,7 +58,7 @@ You should **download** the MySQL connector Jar for the corresponding version of
 (You can download it from the [maven-central-repo](https://repo1.maven.org/maven2/mysql/mysql-connector-java/)),
 which is name like `mysql-connector-java-{version}.jar`.
 
-Then please place it in the distribution package directory:
+Then place it in the distribution package directory:
 
 ```text
 ${GRAVITINO_HOME}/libs/
@@ -101,7 +101,7 @@ Finally, you can run the script in the distribution package directory to start t
 
 ### Step 1: Get the Initialization Script
 
-You need to `download` and `unzip` the distribution package firstly, please see
+You need to `download` and `unzip` the distribution package first; see
 [How to install Gravitino](how-to-install.md).
 
 Then you can get the initialization script in the directory:
@@ -141,7 +141,7 @@ You should **download** the PostgreSQL connector Jar for the corresponding versi
 (You can download it from the [PostgreSQL-driver-jar](https://jdbc.postgresql.org/download/postgresql-42.7.0.jar)),
 which is name like `postgresql-{version}.jar`.
 
-Then please place it in the distribution package directory:
+Then place it in the distribution package directory:
 
 ```text
 ${GRAVITINO_HOME}/libs/

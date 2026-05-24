@@ -28,7 +28,7 @@ The following table outlines the tested compatibility between Gravitino versions
 :::note
 - These version ranges show which versions are expected to work together.
 - Not all versions in these ranges have been tested. Only some versions were tested.
-- Before using in production, please test the exact connector versions in your own environment.
+- Before using in production, test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
 

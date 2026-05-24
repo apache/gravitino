@@ -19,7 +19,7 @@ refer to the corresponding document for more details.
 
 Note that Gravitino uses Hadoop 3 dependencies to build Fileset catalog. Theoretically, it should be
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
-Hadoop 3. If there's any compatibility issue, please create an [issue](https://github.com/apache/gravitino/issues).
+Hadoop 3. If there's any compatibility issue, create an [issue](https://github.com/apache/gravitino/issues).
 
 ## Catalog
 

@@ -35,5 +35,5 @@ In the OAuth2 mode, you could use the following configuration to fetch an OAuth2
 
 In kerberos mode, you could use the Spark kerberos configuration to fetch a kerberos ticket to access Gravitino server, use `spark.kerberos.principal`, `spark.kerberos.keytab` to specify kerberos principal and keytab.
 
-The principal of Gravitino server is like `HTTP/$host@$realm`, please keep the `$host` consistent with the host in Gravitino server uri address.
+The Gravitino server principal has the form `HTTP/$host@$realm`. Keep `$host` consistent with the host in the Gravitino server URI.
 Please make sure `krb5.conf` is accessible by Spark, like by specifying the configuration `spark.driver.extraJavaOptions="-Djava.security.krb5.conf=/xx/krb5.conf"`.

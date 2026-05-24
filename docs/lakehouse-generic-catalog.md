@@ -151,7 +151,7 @@ Schemas inherit catalog properties and can override specific settings:
 |------------|----------------------------------------------------------|------------------------------|----------|---------------|
 | `location` | Custom storage root path for all tables under the schema | 's3://bucket/path_to_schema' | No       | 1.1.0         |
 
-About location resolution hierarchy, please see [Key Property: `location`](#key-property-location) in the Catalog Management section for more details.
+For location resolution hierarchy, see [Key Property: `location`](#key-property-location) in the Catalog Management section for more details.
 
 ### Schema Operations
 

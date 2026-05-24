@@ -26,7 +26,7 @@ Golden file integration test are mainly to test the correctness of the SQL resul
 ```
 
 Please change the Spark version number if you want to test other Spark versions.
-If you want to change the test behaviour, please modify `spark-connector/spark-common/src/test/resources/spark-test.conf`.
+If you want to change the test behaviour, modify `spark-connector/spark-common/src/test/resources/spark-test.conf`.
 
 | Configuration item                         | Description                                                                                                                                                                            | Default value                                        | Required | Since Version    |
 |--------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|----------|------------------|
