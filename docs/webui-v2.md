@@ -141,7 +141,7 @@ The navbar provides the following shortcuts:
 ![navbar-system-mode](./assets/webui-v2/navbar-system-mode.png)
 ![navbar-user-dropdown](./assets/webui-v2/navbar-user-dropdown.png)
 
-### Catalog Details & Schemas
+### Catalog Details and Schemas
 
 Enter the catalog details page by clicking the catalog name either from the left tree or from the catalog name in the right list. The catalog name shows basic catalog information underneath it. Hover over the highlighted numbers to open a popover with more details.
 
@@ -254,7 +254,7 @@ Click **Register Job Template** to open the create template form. Choose a job t
 ![job-template-register](./assets/webui-v2/job-template-register.png)
 
 
-### Data Compliance: Tags
+### Tags
 
 Overview for Data Compliance Tags in the Web V2.
 
@@ -272,7 +272,7 @@ Click a tag to navigate to the **Metadata Objects** page, which lists all metada
 
 ![tag-metadata-objects](./assets/webui-v2/tag-metadata-objects.png)
 
-### Data Compliance: Policies
+### Policies
 
 Overview for Data Compliance Policies in the Web V2.
 
@@ -294,7 +294,7 @@ Click a policy tag to navigate to the **Metadata Objects** page, which lists all
 
 The Access module is visible only when `gravitino.authorization.enable=true`.
 
-### Access: Users
+### User Access
 
 Overview for Access Users in the Web V2.
 
@@ -312,7 +312,7 @@ From the **Actions**, click **Grant Role** icon to assign roles to the selected 
 
 ![users-grant-role](./assets/webui-v2/users-grant-role.png)
 
-### Access: User Groups
+### User Group Access
 
 Overview for Access User Groups in the Web V2.
 
@@ -330,7 +330,7 @@ From the **Actions**, click **Grant Role** icon to assign roles to the selected 
 
 ![userGroups-grant-role](./assets/webui-v2/userGroups-grant-role.png)
 
-### Access: Roles
+### Role Access
 
 Overview for Access Roles in the Web V2.
 
