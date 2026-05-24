@@ -252,9 +252,50 @@ SELECT * FROM iceberg_purge_job
 ```
 
 then updates the row to `RUNNING` with `lease_owner=:me`,
-`lease_expires_at=:now+leaseTimeout`. `SKIP LOCKED` is the cluster-safety
-primitive: any number of replicas can run the worker without external
-coordination. H2 falls back to a conditional update.
+`lease_expires_at=:now+leaseTimeout`. `SKIP LOCKED` is a performance
+optimization (it avoids lock waiting between replicas), not the correctness
+guarantee — see the leasing model below.
+
+#### Multi-replica leasing model
+
+Three distinct races, handled deliberately:
+
+1. **Two replicas claim the same job.** The claiming `UPDATE` is the
+   serialization point, so this cannot happen — see the CAS rule below. Any
+   number of replicas can run the worker with no external coordinator.
+2. **A held lease expires while its owner is still alive** (long GC, network
+   partition). The lease expires, another replica reclaims, and both may
+   delete the same files concurrently. We *accept* this race rather than
+   eliminate it: deletes are idempotent and `NotFoundException` counts as
+   success (§5.5), so the only cost is duplicated work, never incorrect
+   results. This is what lets failover stay coordinator-free.
+3. **A replica dies mid-job.** Identical to case 2 from the survivors' point
+   of view — the lease expires and the job is reclaimed.
+
+To stay portable, claiming is expressed as an optimistic compare-and-swap that
+works on **every** SQL backend, not just those with `SKIP LOCKED`:
+
+```sql
+-- read candidates (no lock required)
+SELECT id FROM iceberg_purge_job
+ WHERE state IN ('PENDING','RUNNING')
+   AND next_attempt_at <= :now
+   AND (lease_expires_at IS NULL OR lease_expires_at < :now)
+ ORDER BY next_attempt_at LIMIT :batch;
+
+-- claim each candidate; the row is ours only if affected_rows = 1
+UPDATE iceberg_purge_job
+   SET state='RUNNING', lease_owner=:me, lease_expires_at=:now+:leaseTimeout
+ WHERE id=:id
+   AND (lease_expires_at IS NULL OR lease_expires_at < :now);
+```
+
+A loser sees `affected_rows = 0` and moves to the next candidate. Where
+`SKIP LOCKED` is available (MySQL 8+, PostgreSQL), the worker uses the
+`FOR UPDATE SKIP LOCKED` form shown above to skip locked rows up front and
+cut contention; where it is not (H2, older MySQL), it falls back to the CAS
+form. Both are correct; `SKIP LOCKED` is purely an optimization. We do not use
+DB-specific advisory locks, whose semantics differ across engines.
 
 Execution mirrors `CatalogHandlers.purgeTable`:
 
@@ -457,9 +498,10 @@ synchronous path remains only as a rollback flag.
    lease-renewal time, or require static credentials for catalogs that
    opt into async purge? Leaning toward refresh so long-retention soft
    delete (R2) keeps working; cost/complexity trade-off still open.
-3. **Multi-server coordination on H2** — fall back to advisory locks or
-   conditional updates where `SKIP LOCKED` is unavailable? Needs a
-   decision before implementation.
+3. ~~**Multi-server coordination on H2**~~ — **Resolved (§5.4).** Claiming is
+   an optimistic compare-and-swap `UPDATE` that works on every SQL backend;
+   `SKIP LOCKED` is used as an optimization where available and the CAS form is
+   the fallback elsewhere. No advisory locks.
 4. **Job row vs. catalog row** — if name-reuse (Q1) is resolved by keeping
    a tombstone on the catalog's table row, could the lease/retry fields
    live on that row instead of a separate `iceberg_purge_job` table
