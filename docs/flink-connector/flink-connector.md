@@ -26,7 +26,7 @@ The connector is published as a version-specific runtime JAR for each supported 
 * Flink 1.18, 1.19, or 1.20
 * JDK 8, 11 or 17
 
-## How to Use It
+## Usage
 
 1. [Build](../how-to-build.md) or download the Gravitino Flink connector runtime JAR that matches your Flink minor version, and place it in the classpath of Flink.
 
