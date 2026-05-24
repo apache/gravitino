@@ -53,7 +53,7 @@ catalog_kwargs = {
 See [How to authenticate](../security/how-to-authenticate.md) for Gravitino authentication
 configuration options.
 
-## Usage Examples
+## Examples
 
 ### Write to an Iceberg Table
 

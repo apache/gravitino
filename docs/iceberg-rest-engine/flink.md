@@ -110,7 +110,7 @@ See [gravitino-irc-quickstart](https://github.com/markhoerth/gravitino-irc-quick
 complete local development environment using MinIO.
 :::
 
-## Usage Examples
+## Examples
 
 ### Use the Catalog
 

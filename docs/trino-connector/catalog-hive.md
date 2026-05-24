@@ -164,7 +164,7 @@ The following properties are automatically added and managed as reserved propert
 | external       | Indicate whether it's an external table | 0.2.0         |
 | table_type     | The type of Hive table                  | 0.2.0         |
 
-## Basic Usage Examples
+## Examples
 
 Do the following steps before you can use the Hive catalog in Trino through Gravitino:
 

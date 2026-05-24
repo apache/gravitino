@@ -111,7 +111,7 @@ Or connect without specifying a default catalog and qualify queries fully:
 trino --server http://<trino-host>:8080
 ```
 
-## Usage Examples
+## Examples
 
 Once connected, use the Trino CLI or any Trino-compatible client.
 

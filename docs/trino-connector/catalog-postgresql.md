@@ -64,7 +64,7 @@ Not support.
 
 PostgreSQL's tables and schemas cannot support properties.
 
-## Basic Usage Examples
+## Examples
 
 Do the following steps before you can use the PostgreSQL catalog in Trino through Gravitino:
 

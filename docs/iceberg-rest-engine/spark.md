@@ -172,7 +172,7 @@ $SPARK_HOME/bin/spark-sql
 $SPARK_HOME/bin/pyspark
 ```
 
-## Usage Examples
+## Examples
 
 ### List Namespaces
 

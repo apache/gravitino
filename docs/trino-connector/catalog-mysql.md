@@ -88,7 +88,7 @@ The following are Trino type which support configuration of default values:
 | TIME      | 01:01:01                                | 
 | TIMESTAMP | 2025-08-07 01:01:01 (CURRENT_TIMESTAMP) | 
 
-## Basic Usage Examples
+## Examples
 
 Do the following steps before you can use the MySQL catalog in Trino through Gravitino:
 
