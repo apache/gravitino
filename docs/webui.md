@@ -71,7 +71,9 @@ At the top-right, there is an icon button that takes you to the login page when 
 
 ### Metalake
 
-#### [Create metalake](./getting-started/index.md#interact-with-apache-gravitino-api)
+#### Create Metalake
+
+See the [API reference](./getting-started/index.md#interact-with-apache-gravitino-api) for the underlying REST call.
 
 On the homepage, clicking on the `CREATE METALAKE` button displays a dialog to create a metalake.
 
