@@ -7,12 +7,12 @@ license: "This software is licensed under the Apache License version 2."
 
 Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 
-### Requirements
+## Requirements
 
 1. Python 3.10+
 2. uv is installed. Install uv by following the [official guide](https://docs.astral.sh/uv/getting-started/installation/).
 
-### How to Run
+## Usage
 
 1. Clone the code from GitHub, and change to `mcp-server` directory
 2. Create virtual environment, `uv venv`
@@ -51,11 +51,11 @@ Or start an HTTP MCP server by `uv run mcp_server --metalake test --gravitino-ur
 }
 ```
 
-### Docker Instructions
+## Docker Instructions
 
 You could start Gravitino MCP server by Docker image, `docker run -p 8000:8000 --network=host apache/gravitino-mcp-server:latest --metalake test --transport http --mcp-url http://0.0.0.0:8000/mcp --gravitino-uri http://127.0.0.1:8090`. Please note that the MCP server in Docker container doesn't support `stdio` transport mode.
 
-### Supported Tools
+## Supported Tools
 
 Gravitino MCP server supports the following tools, and you could export tool by tag.
 
@@ -97,7 +97,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `get_policy_for_metadata`           | Get a policy associated with a specific metadata item.                         | `policy`     | 1.0.0         |
 
 
-### Configuration
+## Configuration
 
 You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
 
