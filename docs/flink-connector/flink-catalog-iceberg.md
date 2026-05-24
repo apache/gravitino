@@ -20,7 +20,7 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 - `INSERT INTO & OVERWRITE`
 - `SELECT`
 
-#### Operations Not Supported
+#### Unsupported Operations
 
 - Partition operations
 - View operations
