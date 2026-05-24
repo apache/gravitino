@@ -111,17 +111,17 @@ The plain `fs.path.config.<name>` entry specifies the base path of the filesyste
 
 **Example:** Setting `fs.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
 
-**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](./how-to-use-gravitino-client.md#gravitino-java-client-configuration) for more support client configuration.
+**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](./how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
 
 Apart from the above properties, to access fileset like S3, GCS, OSS and custom fileset, extra properties are needed; see
-[S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#using-the-gvfs-java-client-to-access-the-fileset),
-[GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#using-the-gvfs-java-client-to-access-the-fileset),
-[OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#using-the-gvfs-java-client-to-access-the-fileset)
-and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#using-the-gvfs-java-client-to-access-the-fileset) for more details.
+[S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#use-the-gvfs-java-client-to-access-the-fileset),
+[GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#use-the-gvfs-java-client-to-access-the-fileset),
+[OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#use-the-gvfs-java-client-to-access-the-fileset)
+and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#use-the-gvfs-java-client-to-access-the-fileset) for more details.
 
 #### Custom Fileset
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding
-properties, for more, refer to [Custom Fileset](./fileset-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset).
+properties, for more, refer to [Custom Fileset](./fileset-catalog.md#implement-a-custom-hcfs-file-system-fileset).
 So, if you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
 
 | Configuration item             | Description                                                                                             | Default value | Required | Since version    |
@@ -288,7 +288,7 @@ For Tensorflow to support GVFS, you need to recompile the [tensorflow-io](https:
 2. Then you need to configure the Hadoop configuration.
 
    You need to configure the Hadoop configuration and add `gravitino-filesystem-hadoop3-runtime-{version}.jar`,
-   and set up the Kerberos environment according to the [Use GVFS via Hadoop shell command](#use-gvfs-via-hadoop-shell-command) sections.
+   and set up the Kerberos environment according to the [Use GVFS via Hadoop shell command](#via-hadoop-shell-command) sections.
 
    Then you need to set your environment as follows:
 
@@ -437,7 +437,7 @@ To configure the Gravitino client, use properties prefixed with `gvfs_gravitino_
 
 **Example:** Setting `gvfs_gravitino_client_request_timeout` is equivalent to setting `gravitino_client_request_timeout` for the Gravitino client.
 
-**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Python client configurations](./how-to-use-gravitino-client.md#gravitino-python-client-configuration) for more support client configuration.
+**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Python client configurations](./how-to-use-gravitino-client.md#python-client-configuration) for more support client configuration.
 
 :::note
 When users work with a multi-cluster fileset catalog, they can configure separate sets of properties for the base paths
@@ -475,13 +475,13 @@ The plain `fs_path_config_<name>` entry specifies the base path of the filesyste
 
 #### Configurations for S3, GCS, OSS and Azure Blob Storage Fileset
 
-Please see the cloud-storage-specific configurations [GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#using-the-gvfs-python-client-to-access-a-fileset),
-[S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#using-the-gvfs-python-client-to-access-a-fileset),
-[OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#using-the-gvfs-python-client-to-access-a-fileset)
-and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#using-the-gvfs-python-client-to-access-a-fileset) for more details.
+Please see the cloud-storage-specific configurations [GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#use-the-gvfs-python-client-to-access-a-fileset),
+[S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#use-the-gvfs-python-client-to-access-a-fileset),
+[OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#use-the-gvfs-python-client-to-access-a-fileset)
+and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#use-the-gvfs-python-client-to-access-a-fileset) for more details.
 
 :::note
-Gravitino python client does not support [customized file systems](fileset-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library.
+Gravitino python client does not support [customized file systems](fileset-catalog.md#implement-a-custom-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library.
 :::
 
 ### Examples

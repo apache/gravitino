@@ -127,7 +127,7 @@ We use Conda Environment to manage Python Environment, to configure Python
 SDK, you need to:
 
 1. Make sure you installed [Python Plugin](https://plugins.jetbrains.com/plugin/631-python).
-2. Make sure you followed the step to build python module in [Build and testing](#build-and-testing)
+2. Make sure you followed the step to build python module in [Build and Test](#build-and-test)
 3. Make sure you are at the root directory of Gravitino Git repository. 
 4. Find conda executable by executing this command
 

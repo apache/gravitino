@@ -728,8 +728,8 @@ catalog.as_model_catalog().get_model_version_uri(model_ident=NameIdentifier.of("
 
 The param `uriName` is not required. If it is not specified, Gravitino will obtain 
 the corresponding URI based on the `default-uri-name` property set in the Model or ModelVersion.
-Refer to [Model Properties](./model-catalog.md#Model properties) and
-[ModelVersion properties](./model-catalog.md#ModelVersion properties) for more details.
+Refer to [Model Properties](./model-catalog.md#model-properties) and
+[ModelVersion properties](./model-catalog.md#modelversion-properties) for more details.
 If the `default-uri-name` property is not set in either the model or the model version, 
 an `IllegalArgumentException` will be thrown.
 

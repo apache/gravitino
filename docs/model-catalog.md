@@ -38,7 +38,7 @@ rather than just the storage path.
 
 ### Catalog Properties
 
-A Model catalog doesn't have specific properties. It uses the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration).
+A Model catalog doesn't have specific properties. It uses the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration).
 
 ### Catalog Operations
 

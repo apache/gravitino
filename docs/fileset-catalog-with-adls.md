@@ -492,7 +492,7 @@ Since 0.8.0-incubating, Gravitino supports credential vending for ADLS fileset. 
 
 ### How to Create an ADLS Fileset Catalog with Credential Vending
 
-Apart from configuration method in [create-adls-fileset-catalog](#configuration-for-a-adls-fileset-catalog),
+Apart from configuration method in [create-adls-fileset-catalog](#configuration-for-an-adls-fileset-catalog),
 properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should
 also be set to enable credential vending for ADLS fileset. Take `adls-token` credential provider for example:
 

@@ -164,7 +164,7 @@ After creating the database, you can proceed to create tables under this schema 
 
 ## Access Tables with S3 Storage by Hive CLI
 
-Assuming you have already created a table in the section [Creating Tables or Databases with S3 Storage using Gravitino](#creating-tables-or-databases-with-s3-storage-using-gravitino), let’s say the table is named `hive_table`. You can access the database/table and view its details using the Hive CLI as follows:
+Assuming you have already created a table in the section [Create Tables or Databases with S3 Storage Using Gravitino](#create-tables-or-databases-with-s3-storage-using-gravitino), let’s say the table is named `hive_table`. You can access the database/table and view its details using the Hive CLI as follows:
 
 
 ```shell

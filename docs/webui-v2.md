@@ -81,7 +81,7 @@ In the **Actions** column, you can edit or delete the metalake. The settings dro
 
 #### Delete Metalake
 
-To delete a metalake, the metalake must be **not in-use** (set it in the [Actions (Web V2)](#actions-web-v2) settings dropdown), and all sub-entities must be deleted first. The delete dialog requires entering the metalake name for confirmation before deletion.
+To delete a metalake, the metalake must be **not in-use** (set it in the [Actions](#actions) settings dropdown), and all sub-entities must be deleted first. The delete dialog requires entering the metalake name for confirmation before deletion.
 
 ![metalake-delete-confirm](./assets/webui-v2/metalake-delete-confirm.png)
 
@@ -122,7 +122,7 @@ Click **Create Catalog** to open the creation form for the selected catalog type
 
 #### Delete Catalog
 
-If the catalog is still in-use, the UI shows the **Delete** entry as shown in **Figure 1 below**. After switching the catalog to **not in-use** (see [Disable catalog (Web V2)](#disable-catalog-web-v2)), the **Delete** entry changes to **Figure 2 below**. Enter the catalog name for the second confirmation, then you can delete it.
+If the catalog is still in-use, the UI shows the **Delete** entry as shown in **Figure 1 below**. After switching the catalog to **not in-use** (see [Disable Catalog](#disable-catalog)), the **Delete** entry changes to **Figure 2 below**. Enter the catalog name for the second confirmation, then you can delete it.
 
 ![catalog-delete-figure-1](./assets/webui-v2/catalog-delete-figure-1.png)
 
