@@ -731,7 +731,7 @@ sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-serve
 
 You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#apache-iceberg-rest-service).
 
-## Quick Start: Enable Access Control for Iceberg REST Server
+## Enable Access Control
 
 To enable access control for the Iceberg REST server using Gravitino's dynamic configuration provider, follow these steps:
 
