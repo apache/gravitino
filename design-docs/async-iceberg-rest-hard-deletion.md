@@ -107,7 +107,39 @@ chose a single async implementation with a synchronous rollback flag.
 | Reuse `RelationalGarbageCollector` | Proven worker/scheduling pattern already in the codebase | Different IO surface (object store vs. JDBC) and failure model (best-effort per-file vs. transactional rows) | **Rejected** — share patterns, not code |
 | External job system only (Quartz / Temporal) | Mature scheduling, retries, observability | Heavy operational burden imposed on every operator | **Rejected** — disproportionate for one deletion workload |
 | Enumerate files at enqueue time | Worker needs no metadata re-read | Enumeration is slow on large tables (defeats the latency goal) and bloats job rows | **Rejected** — store `metadata_location`, re-read at run time |
-| **Single async purger (JDBC job table + worker pool) with a synchronous fallback flag** | Smallest bug surface; reliable, restart-safe, cluster-safe via `SKIP LOCKED`; one code path to test | No built-in extension point — a second strategy would need a follow-up refactor | **Chosen** |
+| Object-store job markers (no DB table) — write a purge-intent object to S3, workers `LIST` and claim via conditional write (`If-None-Match`) | No schema / migration; co-located with the data | See below | **Rejected** — higher net complexity for Gravitino |
+| **Single async purger (JDBC job table + worker pool) with a synchronous fallback flag** | Smallest bug surface; reliable, restart-safe, cluster-safe via `SKIP LOCKED` (CAS fallback elsewhere); one code path to test | No built-in extension point — a second strategy would need a follow-up refactor | **Chosen** |
+
+#### Why not an S3-only control plane (no DB table)?
+
+Technically feasible — S3 has supported conditional writes (`If-None-Match` /
+`If-Match`) since 2024, so workers could compare-and-swap a lease object to
+claim a job without a relational backend. We rejected it because it *raises*
+net complexity for Gravitino rather than lowering it:
+
+- **Coordination is harder, not easier.** A DB gives `SELECT … FOR UPDATE SKIP
+  LOCKED` (or the CAS fallback in §5.4) for free. S3 forces us to hand-roll
+  lease acquisition *and* lease renewal on top of conditional writes and
+  object metadata.
+- **No scheduling primitive.** Backoff / `next_attempt_at` is one indexed
+  `WHERE` clause in SQL. With markers there is no index — state and timestamps
+  must be encoded into object keys or metadata and discovered by `LIST`, which
+  is slow and billed per request as the job count grows.
+- **Fragmented across storage backends.** One server serves many catalogs
+  across S3 / GCS / ADLS. A single job table is a uniform control plane;
+  object markers either fragment per-bucket (no cross-cloud view) or require a
+  dedicated control bucket, adding a new dependency and credential surface.
+- **Dead-letter and audit.** Operators can query a DB table directly; markers
+  need separate tooling.
+- **The DB is already there.** Gravitino runs a relational metastore, so its
+  connection pool, migration framework, and transaction management are
+  existing infrastructure — one extra table is low marginal cost. S3-only
+  would *remove* a uniform, strongly-consistent coordination primitive and
+  replace it with an eventually-consistent, per-bucket one we maintain
+  ourselves. It would only pay off in a deployment with no relational backend,
+  which is not Gravitino's case. The lower-complexity way to drop the table, if
+  desired, is §8.4 (fold lease/retry fields onto a catalog tombstone row), not
+  a move to object-store markers.
 
 ---
 
