@@ -208,7 +208,7 @@ CREATE TABLE gravitino_irc.<namespace>.new_table (
 INSERT INTO gravitino_irc.<namespace>.new_table VALUES (1, 'example', current_timestamp());
 ```
 
-## Gravitino Connector Vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

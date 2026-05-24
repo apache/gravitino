@@ -48,7 +48,7 @@ INSERT INTO t VALUES (1);
 SELECT * FROM t;
 ```
 
-## Gravitino Connector Vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

@@ -81,7 +81,7 @@ ds = ray.data.read_iceberg(
 ds.show(limit=1)
 ```
 
-## Gravitino Connector Vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|
