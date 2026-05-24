@@ -166,7 +166,7 @@ The following properties are automatically added and managed as reserved propert
 
 ## Examples
 
-Do the following steps before you can use the Hive catalog in Trino through Gravitino:
+Complete the following steps before you can use the Hive catalog in Trino through Gravitino:
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `hive_test`,
 then you can use the following code to create them in Gravitino:
