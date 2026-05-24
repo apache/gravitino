@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Configuration"
+title: "Server Configuration"
 slug: "/gravitino-server-config"
 keywords:
   - configuration

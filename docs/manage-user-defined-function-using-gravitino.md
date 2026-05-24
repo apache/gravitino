@@ -1,5 +1,5 @@
 ---
-title: "Manage User-Defined Functions with Gravitino"
+title: "Manage User-Defined Functions"
 slug: "/manage-user-defined-function-using-gravitino"
 keyword: "Gravitino user-defined function UDF manage"
 license: "This software is licensed under the Apache License version 2."

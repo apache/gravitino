@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Spark Connector"
+title: "Spark Connector"
 slug: "/spark-connector/spark-connector"
 keyword: "spark connector federation query"
 license: "This software is licensed under the Apache License version 2."

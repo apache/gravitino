@@ -1,5 +1,5 @@
 ---
-title: "Use GVFS with Filesets"
+title: "Gravitino Virtual File System"
 slug: "/how-to-use-gvfs"
 license: "This software is licensed under the Apache License version 2."
 ---

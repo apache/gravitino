@@ -1,5 +1,5 @@
 ---
-title: "Hive Catalog with S3, ADLS, and GCS"
+title: "Hive Catalog with Cloud Storage"
 slug: "/hive-catalog"
 date: 2024-9-24
 keyword: "Hive catalog cloud storage S3 ADLS GCS"

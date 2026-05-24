@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Glossary"
+title: "Glossary"
 date: 2023-11-28
 license: "This software is licensed under the Apache License version 2."
 ---

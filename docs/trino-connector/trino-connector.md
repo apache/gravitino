@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Trino Connector"
+title: "Trino Connector"
 slug: "/trino-connector/trino-connector"
 keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."

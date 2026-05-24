@@ -1,5 +1,5 @@
 ---
-title: "Use CORS"
+title: "CORS"
 slug: "/security/how-to-use-cors"
 keyword: "security cors"
 license: "This software is licensed under the Apache License version 2."

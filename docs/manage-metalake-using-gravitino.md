@@ -1,5 +1,5 @@
 ---
-title: "Manage Metalakes with Gravitino"
+title: "Manage Metalakes"
 slug: "/manage-metalake-using-gravitino"
 date: 2023-12-10
 keyword: "Gravitino metalake manage"

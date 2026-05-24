@@ -1,5 +1,5 @@
 ---
-title: "Manage Relational Metadata with Gravitino"
+title: "Manage Relational Metadata"
 slug: "/manage-relational-metadata-using-gravitino"
 date: 2023-12-10
 keyword: "Gravitino relational metadata manage"

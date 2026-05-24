@@ -1,5 +1,5 @@
 ---
-title: "Apache Hive Catalog"
+title: "Hive Catalog"
 slug: "/apache-hive-catalog"
 date: 2023-12-10
 keyword: "hive catalog"

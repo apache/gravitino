@@ -1,5 +1,5 @@
 ---
-title: "Use the Apache Gravitino Python Client"
+title: "Python Client"
 slug: "/how-to-use-gravitino-python-client"
 date: 2024-05-09
 keyword: "Gravitino Python client"
