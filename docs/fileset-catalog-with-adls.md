@@ -492,7 +492,7 @@ For other use cases, refer to the [Gravitino Virtual File System](./how-to-use-g
 
 Since 0.8.0-incubating, Gravitino supports credential vending for ADLS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access ADLS fileset without providing authentication information like `azure-storage-account-name` and `azure-storage-account-key` in the properties.
 
-### How to Create an ADLS Fileset Catalog with Credential Vending
+### Create an ADLS Fileset Catalog with Credential Vending
 
 Apart from configuration method in [create-adls-fileset-catalog](#configuration-for-an-adls-fileset-catalog),
 properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should
@@ -516,7 +516,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### How to Access ADLS Fileset with Credential Vending
+### Access an ADLS Fileset with Credential Vending
 
 When the catalog is configured with credentials and client-side credential vending is enabled, 
 you can access ADLS filesets directly using the GVFS Java/Python client or Spark without providing authentication details.

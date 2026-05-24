@@ -11,7 +11,7 @@ The Gravitino Trino connector supports user-defined functions (UDFs) registered 
 Functions with `RuntimeType.TRINO` and SQL language implementations are automatically exposed as
 [Trino language functions](https://trino.io/docs/current/routines/function.html), making them available for use in Trino queries.
 
-## How It Works
+## Mechanism
 
 When Gravitino catalogs contain registered functions, the Trino connector:
 

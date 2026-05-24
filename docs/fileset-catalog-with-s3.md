@@ -503,7 +503,7 @@ For more use cases, refer to the [Gravitino Virtual File System](./how-to-use-gv
 
 Since 0.8.0-incubating, Gravitino supports credential vending for S3 fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access S3 fileset without providing authentication information like `s3-access-key-id` and `s3-secret-access-key` in the properties.
 
-### How to Create a S3 Fileset Catalog with Credential Vending
+### Create an S3 Fileset Catalog with Credential Vending
 
 Apart from configuration method in [create-s3-fileset-catalog](#configuration-for-an-s3-fileset-catalog),
 properties needed by [s3-credential](./security/credential-vending.md#s3-credentials)
@@ -527,7 +527,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### How to Access S3 Fileset with Credential Vending
+### Access an S3 Fileset with Credential Vending
 
 When the catalog is configured with credentials and client-side credential vending is enabled,
 you can access S3 filesets directly using the GVFS Java/Python client or Spark without providing authentication details.
