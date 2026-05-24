@@ -34,7 +34,7 @@ Ensure that the `plugin` directory includes the `gravitino` and `trino` subdirec
 Verify the network connectivity between the machines hosting the two Trino clusters, identified as `c1-trino` and `c2-trino`.
 
 
-## Deploy Trino in Containers
+### Deploy Trino in Containers
 
 Download the `Apache Gravitino Trino connector` tarball and `Gravitino Trino cascading connector` tarball, then unpack them.
 After unpacking, you will find the directories named `gravitino-trino-connector-<version>`
