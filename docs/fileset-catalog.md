@@ -113,7 +113,7 @@ the custom file system provider. For example, the content of `S3FileSystemProvid
 After implementing the `FileSystemProvider` interface, you need to put the jar file into the
 `$GRAVITINO_HOME/catalogs/fileset/libs` directory. Then you can use your custom file system provider.
 
-### Authentication for Fileset Catalog
+### Fileset Catalog Authentication
 
 The Fileset catalog supports multi-level authentication to control access, allowing different authentication settings
 for the catalog, schema, and fileset. The priority of authentication settings is as follows: catalog < schema < fileset.

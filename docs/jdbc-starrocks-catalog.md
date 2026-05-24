@@ -134,7 +134,7 @@ Gravitino cannot load StarRocks `array`, `map` and `struct` type correctly, beca
 :::
 
 
-### Table Column Auto-increment
+### Table Column Auto-Increment
 
 Unsupported for now.
 

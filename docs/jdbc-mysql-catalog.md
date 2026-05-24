@@ -143,7 +143,7 @@ MySQL doesn't support Gravitino `Fixed` `Struct` `List` `Map` `IntervalDay` `Int
 Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
 :::
 
-### Table Column Auto-increment
+### Table Column Auto-Increment
 
 :::note
 MySQL setting an auto-increment column requires simultaneously setting a unique index; otherwise, an error will occur.

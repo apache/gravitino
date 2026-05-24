@@ -89,7 +89,7 @@ gravitino.client.kerberos.keytabFilePath=/path/to/user.keytab
 | `gravitino.client.kerberos.keytabFilePath` | Path to keytab file | (none)        | No (uses ticket cache if not specified) | 1.3.0         |
 
 
-### Example: Connecting to OAuth-protected Gravitino Server
+### Example: Connecting to OAuth-Protected Gravitino Server
 
 This example shows how to configure the Trino connector to connect to a Gravitino server protected by OAuth authentication.
 
