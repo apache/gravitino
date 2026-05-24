@@ -129,6 +129,8 @@ Frontmatter quoting: all string values in YAML frontmatter (`title:`, `descripti
 
 First body H2 must not duplicate the frontmatter title. The title renders as the page H1; an immediate H2 with the same wording creates a visual stutter. Use `## Introduction` (or `## Overview` / `## Background` if those better match the content) for the opening section. Reserve glossary-style files (every H2 is a term, not a section) as the only exception. Run `scripts/title_h2_audit.py` to find candidates.
 
+Every doc page opens with an H2 heading after the frontmatter. Prose, admonitions, or code blocks before the first H2 read as orphan content and look inconsistent against pages that open with a section heading. The default opening heading is `## Introduction`. Use `## Overview` or `## Background` when the existing content has clearly moved past introductory framing. MDX imports/exports and license HTML comments between the frontmatter and the first H2 are not orphan content and stay above the heading. Run `scripts/intro_audit.py` to find candidates.
+
 ## What to leave alone
 
 These are out of scope for prose review. Do not edit without explicit approval:
