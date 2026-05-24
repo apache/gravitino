@@ -20,7 +20,7 @@ The connector is published as a version-specific runtime JAR for each supported 
 4. Supports [Jdbc catalog](flink-catalog-jdbc.md)
 5. Supports most DDL and DML SQLs.
 
-## Requirement
+## Prerequisites
 
 * Scala 2.12
 * Flink 1.18, 1.19, or 1.20

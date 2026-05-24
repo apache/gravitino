@@ -23,7 +23,7 @@ Supports most DDL and DML operations in SparkSQL, except such operations:
 Don't support reading and writing tables with `org.apache.hadoop.hive.serde2.OpenCSVSerde` row format.
 :::
 
-## Requirement
+## Prerequisites
 
 * Hive metastore 2.x
 * HDFS 2.x or 3.x

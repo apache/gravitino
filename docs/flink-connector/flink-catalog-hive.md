@@ -47,7 +47,7 @@ an explicit `connector`). For details, see the Flink documentation on Hive gener
 https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/table/hive/hive_catalog/#generic-tables
 :::
 
-## Requirement
+## Prerequisites
 
 * Hive metastore 2.x
 * HDFS 2.x or 3.x
