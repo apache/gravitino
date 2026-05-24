@@ -238,8 +238,7 @@ grep -E "Rewritten data files|Added data files|completed successfully" \
 By default, Gravitino pulls job status every `300000` ms (`gravitino.job.statusPullIntervalInMs`).
 REST status may lag real Spark process state by up to about 5 minutes.
 
-## Next Read
-
+## Related
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer CLI Reference](./optimizer-cli-reference.md)
 - [Optimizer Troubleshooting](./optimizer-troubleshooting.md)

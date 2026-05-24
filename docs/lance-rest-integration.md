@@ -291,8 +291,7 @@ Most Lance-compatible engines follow this general pattern:
 
 Refer to each engine's specific documentation for detailed configuration parameters and code examples.
 
-## Additional Resources
-
+## Related
 - [Lance REST Service Documentation](./lance-rest-service)
 - [Lance Format Specification](https://lance.org/)
 - [Apache Gravitino Documentation](https://gravitino.apache.org/)

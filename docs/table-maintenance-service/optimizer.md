@@ -121,8 +121,7 @@ For strategy submission, `--strategy-name` must use policy name, not policy type
 Quick start prerequisites and success checks are documented in
 [Optimizer Quick Start and Verification](./optimizer-quick-start.md).
 
-## Related Docs
-
+## Related
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer Extension Guide](./optimizer-extension-guide.md)
 - [Optimizer Quick Start and Verification](./optimizer-quick-start.md)

@@ -227,8 +227,7 @@ MetricsResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<tab
 EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, evaluation=true, evaluatorName=gravitino-metrics-evaluator, actionTimeSeconds=1735689600, rangeSeconds=86400, beforeMetrics={row_count=[MetricSample{timestampSeconds=1735686000, value=120}]}, afterMetrics={row_count=[MetricSample{timestampSeconds=1735689600, value=100}]}}
 ```
 
-## Related Docs
-
+## Related
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer Extension Guide](./optimizer-extension-guide.md)
