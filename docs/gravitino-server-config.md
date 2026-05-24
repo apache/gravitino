@@ -502,14 +502,14 @@ If both `gravitino.conf` and environment variable exist, the container’s start
 :::
 
 
-## How to Set Up Runtime Environment Variables
+## Set Up Runtime Environment Variables
 
 The Gravitino server supports configuring runtime environment variables in two ways:
 
 1. **Local deployment:** Modify `gravitino-env.sh` located in the `conf` directory.
 2. **Docker container deployment:** Use environment variable injection during container startup. *(Since 1.0.0)*
 
-### How to Access Apache Hadoop
+### Access Apache Hadoop
 
 Due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
 Apache Hadoop access. Ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
