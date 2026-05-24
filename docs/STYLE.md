@@ -127,6 +127,8 @@ Page title convention: every doc uses the frontmatter `title:` field as its page
 
 Frontmatter quoting: all string values in YAML frontmatter (`title:`, `description:`, `license:`, `keyword:`, `slug:`, `sidebar_label:`, and any other string fields) use double quotes uniformly. This prevents parse failures when values contain colons or other YAML-special characters, and removes the need for case-by-case quoting judgment.
 
+First body H2 must not duplicate the frontmatter title. The title renders as the page H1; an immediate H2 with the same wording creates a visual stutter. Use `## Introduction` (or `## Overview` / `## Background` if those better match the content) for the opening section. Reserve glossary-style files (every H2 is a term, not a section) as the only exception. Run `scripts/title_h2_audit.py` to find candidates.
+
 ## What to leave alone
 
 These are out of scope for prose review. Do not edit without explicit approval:
