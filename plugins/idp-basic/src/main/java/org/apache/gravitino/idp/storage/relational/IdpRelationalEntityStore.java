@@ -61,9 +61,18 @@ public class IdpRelationalEntityStore implements IdpEntityStore {
   }
 
   @Override
-  public <E extends IdpEntity> List<E> batchGet(
-      List<String> names, IdpEntityType entityType, Class<E> clazz) {
-    return (List<E>) backend.batchGet(names, entityType);
+  public void changePassword(String username, String passwordHash) throws NotFoundException {
+    backend.changePassword(username, passwordHash);
+  }
+
+  @Override
+  public void addUsersToGroup(String groupName, List<String> usernames) {
+    backend.addUsersToGroup(groupName, usernames);
+  }
+
+  @Override
+  public void removeUsersFromGroup(String groupName, List<String> usernames) {
+    backend.removeUsersFromGroup(groupName, usernames);
   }
 
   @Override

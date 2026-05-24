@@ -22,7 +22,6 @@ import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIM
 
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.exception.AlreadyExistsException;
@@ -74,16 +73,18 @@ public class IdpJDBCBackend implements Closeable {
     }
   }
 
-  public <E extends IdpEntity> List<E> batchGet(List<String> names, IdpEntityType entityType) {
-    List<E> entities = new ArrayList<>(names.size());
-    for (String name : names) {
-      try {
-        entities.add(get(name, entityType));
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
+  public void changePassword(String username, String passwordHash) throws NotFoundException {
+    if (!IdpUserMetaService.getInstance().updateIdpUserPassword(username, passwordHash)) {
+      throw new NotFoundException("IdP user %s does not exist", username);
     }
-    return entities;
+  }
+
+  public void addUsersToGroup(String groupName, List<String> usernames) {
+    IdpGroupMetaService.getInstance().addUsersToGroup(groupName, usernames);
+  }
+
+  public void removeUsersFromGroup(String groupName, List<String> usernames) {
+    IdpGroupMetaService.getInstance().removeUsersFromGroup(groupName, usernames);
   }
 
   public boolean delete(String name, IdpEntityType entityType, boolean cascade) throws IOException {
@@ -115,18 +116,6 @@ public class IdpJDBCBackend implements Closeable {
       default:
         throw new IllegalArgumentException(
             "Unsupported entity type when collectAndRemoveLegacyData: " + entityType);
-    }
-  }
-
-  public int deleteOldVersionData(IdpEntityType entityType, long versionRetentionCount)
-      throws IOException {
-    switch (entityType) {
-      case IDP_USER:
-      case IDP_GROUP:
-        return 0;
-      default:
-        throw new IllegalArgumentException(
-            "Unsupported entity type when collectAndRemoveOldVersionData: " + entityType);
     }
   }
 

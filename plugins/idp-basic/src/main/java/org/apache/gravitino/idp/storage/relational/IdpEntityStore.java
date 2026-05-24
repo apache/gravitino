@@ -75,16 +75,29 @@ public interface IdpEntityStore extends Closeable {
       throws NotFoundException, IOException;
 
   /**
-   * Batch gets entities.
+   * Changes the password hash for a built-in IdP user.
    *
-   * @param names The names of the entities.
-   * @param entityType The built-in IdP entity type.
-   * @param clazz The entity class.
-   * @param <E> The entity type.
-   * @return The entities.
+   * @param username The username.
+   * @param passwordHash The new password hash.
+   * @throws NotFoundException If the user does not exist.
    */
-  <E extends IdpEntity> List<E> batchGet(
-      List<String> names, IdpEntityType entityType, Class<E> clazz);
+  void changePassword(String username, String passwordHash) throws NotFoundException;
+
+  /**
+   * Adds users to a built-in IdP group.
+   *
+   * @param groupName The group name.
+   * @param usernames The usernames to add.
+   */
+  void addUsersToGroup(String groupName, List<String> usernames);
+
+  /**
+   * Removes users from a built-in IdP group.
+   *
+   * @param groupName The group name.
+   * @param usernames The usernames to remove.
+   */
+  void removeUsersFromGroup(String groupName, List<String> usernames);
 
   /**
    * Deletes the entity.

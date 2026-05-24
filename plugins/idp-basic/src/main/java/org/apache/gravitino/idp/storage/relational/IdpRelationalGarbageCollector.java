@@ -19,7 +19,6 @@
 package org.apache.gravitino.idp.storage.relational;
 
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
-import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -45,7 +44,6 @@ public final class IdpRelationalGarbageCollector implements Closeable {
 
   private final IdpJDBCBackend backend;
   private final long storeDeleteAfterTimeMillis;
-  private final long versionRetentionCount;
 
   @VisibleForTesting
   final ScheduledExecutorService garbageCollectorPool =
@@ -67,7 +65,6 @@ public final class IdpRelationalGarbageCollector implements Closeable {
   public IdpRelationalGarbageCollector(IdpJDBCBackend backend, Config config) {
     this.backend = backend;
     storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
-    versionRetentionCount = config.get(VERSION_RETENTION_COUNT);
   }
 
   /** Starts the scheduled garbage collector. */
@@ -91,18 +88,7 @@ public final class IdpRelationalGarbageCollector implements Closeable {
             deletedCount = backend.hardDeleteLegacyData(entityType, legacyTimeline);
           }
         } catch (RuntimeException e) {
-          LOG.error("Failed to physically delete type of {}'s legacy data: ", entityType, e);
-        }
-      }
-
-      for (IdpEntityType entityType : IDP_ENTITY_TYPES) {
-        long deletedCount = Long.MAX_VALUE;
-        try {
-          while (deletedCount > 0) {
-            deletedCount = backend.deleteOldVersionData(entityType, versionRetentionCount);
-          }
-        } catch (RuntimeException e) {
-          LOG.error("Failed to softly delete type of {}'s old version data: ", entityType, e);
+          LOG.error("Failed to physically delete {} legacy data: ", entityType, e);
         }
       }
     } catch (Exception e) {
