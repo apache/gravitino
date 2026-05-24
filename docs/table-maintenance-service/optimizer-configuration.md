@@ -98,8 +98,7 @@ Without this, Spark jobs may try `hdfs://localhost:9000` and fail.
 - `submit-strategy-jobs` prints `SUBMIT` lines.
 - Rewrite logs show `Rewritten data files: <N>` where `N > 0` for non-empty tables.
 
-## Related Docs
-
+## Related
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Extension Guide](./optimizer-extension-guide.md)
 - [Optimizer Quick Start and Verification](./optimizer-quick-start.md)

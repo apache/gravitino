@@ -120,8 +120,7 @@ If you also extend Gravitino server job execution, see [Manage jobs in Gravitino
 3. Strategy flow can resolve both handler and job adapter mappings.
 4. Dry-run (`submit-strategy-jobs --dry-run`) prints expected recommendations.
 
-## Related Docs
-
+## Related
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer CLI Reference](./optimizer-cli-reference.md)

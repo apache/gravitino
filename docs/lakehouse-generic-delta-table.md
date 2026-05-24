@@ -382,8 +382,7 @@ Future versions may include:
 - Integration with Delta Lake time travel features
 - Enhanced metadata synchronization
 
-## See Also
-
+## Related
 - [Generic Lakehouse Catalog](./lakehouse-generic-catalog.md)
 - [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations)
 - [Delta Lake Documentation](https://docs.delta.io/)
