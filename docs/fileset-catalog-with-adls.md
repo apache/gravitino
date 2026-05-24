@@ -22,7 +22,7 @@ $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 
 Once the server is up and running, you can proceed to configure the Fileset catalog with ADLS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, replace with your actual server URL.
 
-## Configurations for Creating a Fileset Catalog with ADLS
+## ADLS Catalog Configuration
 
 ### Configuration for an ADLS Fileset Catalog
 
@@ -48,7 +48,7 @@ Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for mor
 
 Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
-## Create a Fileset Catalog with ADLS
+## Create the Catalog, Schema, and Fileset
 
 This section demonstrates how to create the Fileset catalog with ADLS in Gravitino, with a complete example.
 

@@ -22,7 +22,7 @@ $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 
 Once the server is up and running, you can proceed to configure the Fileset catalog with S3. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, replace with your actual server URL.
 
-## Configurations for Creating a Fileset Catalog with S3
+## S3 Catalog Configuration
 
 ### Configuration for an S3 Fileset Catalog
 
@@ -49,7 +49,7 @@ To learn how to create a schema, refer to [Schema configurations](./fileset-cata
 
 For more details on creating a fileset, Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties).
 
-## Use the Fileset Catalog with S3
+## Create the Catalog, Schema, and Fileset
 
 This section demonstrates how to use the Fileset catalog with S3 in Gravitino, with a complete example.
 

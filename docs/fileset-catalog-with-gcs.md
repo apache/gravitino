@@ -21,7 +21,7 @@ $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 
 Once the server is up and running, you can proceed to configure the Fileset catalog with GCS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, replace with your actual server URL.
 
-## Configurations for Creating a Fileset Catalog with GCS
+## GCS Catalog Configuration
 
 ### Configuration for a GCS Fileset Catalog
 
@@ -46,7 +46,7 @@ Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for mor
 
 Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
-## Create a Fileset Catalog with GCS
+## Create the Catalog, Schema, and Fileset
 
 This section will show you how to use the Fileset catalog with GCS in Gravitino, including detailed examples.
 
