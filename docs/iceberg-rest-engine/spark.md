@@ -156,19 +156,19 @@ spark.sql.catalog.gravitino_irc.<configuration-key>    <property-value>
 Once `spark-defaults.conf` is in place, start your Spark session normally. The Gravitino IRC
 catalog is available immediately without any additional flags.
 
-### Spark-shell (Scala)
+### Spark Shell (Scala)
 
 ```bash
 $SPARK_HOME/bin/spark-shell
 ```
 
-### Spark-sql
+### Spark SQL
 
 ```bash
 $SPARK_HOME/bin/spark-sql
 ```
 
-### Pyspark
+### PySpark
 
 ```bash
 $SPARK_HOME/bin/pyspark

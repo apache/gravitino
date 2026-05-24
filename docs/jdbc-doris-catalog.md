@@ -136,7 +136,7 @@ Gravitino cannot load Doris `array`, `map` and `struct` type correctly, because 
 :::
 
 
-### Table Column Auto-increment
+### Table Column Auto-Increment
 
 Unsupported for now.
 

@@ -120,7 +120,7 @@ cd /lib/trino/plugin
 
 Now you can see the Gravitino Trino connector directory in the plugin directory.
 
-### Configure the Trino
+### Configure Trino
 
 Find the Trino configuration file `config.properties` in the directory `/etc/trino`. You need changed the file like this:
 
