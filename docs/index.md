@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Overview"
+title: "Apache Gravitino"
 slug: "/"
 license: "This software is licensed under the Apache License version 2."
 ---

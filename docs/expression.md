@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Expression System"
+title: "Expression System"
 slug: "/expression"
 date: 2024-02-02
 keyword: "expression function field literal reference"

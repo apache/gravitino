@@ -1,5 +1,5 @@
 ---
-title: "Remote Access for Apache Gravitino on AWS"
+title: "Remote Access on AWS"
 slug: "/getting-started/aws-remote-access"
 license: "This software is licensed under the Apache License version 2."
 ---

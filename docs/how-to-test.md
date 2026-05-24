@@ -1,5 +1,5 @@
 ---
-title: "Test Apache Gravitino"
+title: "Test Gravitino"
 slug: "/how-to-test"
 license: "This software is licensed under the Apache License version 2."
 ---

@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Web UI"
+title: "Web UI"
 slug: "/webui"
 keyword: "webui"
 last_update:

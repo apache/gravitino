@@ -1,5 +1,5 @@
 ---
-title: "Manage Fileset Metadata with Gravitino"
+title: "Manage Fileset Metadata"
 slug: "/manage-fileset-metadata-using-gravitino"
 date: 2024-4-2
 keyword: "Gravitino fileset metadata manage"

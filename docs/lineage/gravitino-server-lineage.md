@@ -1,5 +1,5 @@
 ---
-title: "Gravitino Server Lineage Support"
+title: "Server Lineage"
 slug: "/lineage/gravitino-server-lineage"
 keyword: "Gravitino OpenLineage"
 license: "This software is licensed under the Apache License version 2."

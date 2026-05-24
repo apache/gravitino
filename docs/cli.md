@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Command Line Interface"
+title: "Command Line Interface"
 slug: "/cli"
 keyword: "cli"
 last_update:

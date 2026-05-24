@@ -1,5 +1,5 @@
 ---
-title: "Manage Messaging Metadata with Gravitino"
+title: "Manage Messaging Metadata"
 slug: "/manage-massaging-metadata-using-gravitino"
 date: 2024-4-22
 keyword: "Gravitino massaging metadata manage"

@@ -1,5 +1,5 @@
 ---
-title: "Gravitino Spark Lineage Support"
+title: "Spark Lineage"
 slug: "/lineage/gravitino-spark-lineage"
 keyword: "Gravitino Spark OpenLineage"
 license: "This software is licensed under the Apache License version 2."

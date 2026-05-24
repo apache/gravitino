@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Metrics"
+title: "Metrics"
 slug: "/metrics"
 keywords:
   - metrics
