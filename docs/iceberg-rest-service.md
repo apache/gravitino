@@ -418,7 +418,7 @@ Refer to [Access Control](./security/access-control.md) for the complete list of
 
 ### Storage
 
-#### S3 Configuration
+#### S3
 
 | Configuration item                            | Description                                                                                                                                                                                                         | Default value | Required                                       | Since Version    |
 |-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------------------------|------------------|
@@ -437,7 +437,7 @@ Refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for c
  - Additionally, download the [Gravitino Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
-#### OSS Configuration
+#### OSS
 
 | Configuration item                                | Description                                                                                                                                                                                           | Default value   | Required                                             | Since Version    |
 |---------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|------------------------------------------------------|------------------|
@@ -489,7 +489,7 @@ Refer to [ADLS credentials](./security/credential-vending.md#adls-credentials) f
 Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs.core.windows.net/{path}`, and download the [Gravitino Iceberg Azure bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle) and place it in the classpath of Iceberg REST server.
 :::
 
-#### HDFS Configuration
+#### HDFS
 
 Place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [How to access Apache Hadoop](gravitino-server-config.md#how-to-access-apache-hadoop) for more details.
 
@@ -497,7 +497,7 @@ Place HDFS configuration file to the classpath of the Iceberg REST server, `iceb
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
 :::
 
-#### Other Storages
+#### Other Storage
 
 For storages not managed by Gravitino directly, configure them through custom catalog properties.
 

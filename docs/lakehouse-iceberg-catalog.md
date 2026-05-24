@@ -186,7 +186,7 @@ Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs
 Since Gravitino 1.1.0, the Gravitino Iceberg Azure bundle jar has already included the Iceberg Azure bundle jar, no need to download and include it separately.
 :::
 
-#### Other Storages
+#### Other Storage
 
 For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.
 
