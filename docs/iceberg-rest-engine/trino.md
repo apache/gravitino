@@ -1,5 +1,5 @@
 ---
-title: "Connect Trino via Iceberg REST"
+title: "Connect Trino to Iceberg REST"
 sidebar_label: "Trino"
 ---
 

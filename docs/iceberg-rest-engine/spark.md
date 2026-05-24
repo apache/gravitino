@@ -1,5 +1,5 @@
 ---
-title: "Connect Spark via Iceberg REST"
+title: "Connect Spark to Iceberg REST"
 sidebar_label: "Spark"
 ---
 

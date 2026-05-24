@@ -1,5 +1,5 @@
 ---
-title: "Connect Doris via Iceberg REST"
+title: "Connect Doris to Iceberg REST"
 sidebar_label: "Doris"
 ---
 
