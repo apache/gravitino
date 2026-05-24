@@ -630,6 +630,7 @@ Gravitino supports the following changes to a schema:
 | Remove a property      | `{"@type":"removeProperty","property":"key1"}`               | `SchemaChange.removeProperty("key1")`         |
 
 ### Drop a Schema
+
 Remove a schema by sending a `DELETE` request to the `/api/metalakes/{metalake_name}/catalogs/{catalog_name}/schemas/{schema_name}` endpoint or use the Gravitino Java client. The following is an example of dropping a schema:
 
 <Tabs groupId="language" queryString>

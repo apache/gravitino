@@ -303,6 +303,7 @@ done
 Other table operations (load, alter, drop, truncate) follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for details.
 
 ### Use Lance Table with MinIO
+
 To use Lance tables stored in MinIO with Gravitino, configure the MinIO storage backend once on the Lance catalog. Gravitino will then return those storage options to Lance clients and Spark does not need to repeat them.
 
 ```shell

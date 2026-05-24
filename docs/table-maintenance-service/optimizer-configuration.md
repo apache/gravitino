@@ -99,6 +99,7 @@ Without this, Spark jobs may try `hdfs://localhost:9000` and fail.
 - Rewrite logs show `Rewritten data files: <N>` where `N > 0` for non-empty tables.
 
 ## Related
+
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Extension Guide](./optimizer-extension-guide.md)
 - [Optimizer Quick Start and Verification](./optimizer-quick-start.md)

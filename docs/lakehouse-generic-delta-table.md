@@ -383,6 +383,7 @@ Future versions may include:
 - Enhanced metadata synchronization
 
 ## Related
+
 - [Generic Lakehouse Catalog](./lakehouse-generic-catalog.md)
 - [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations)
 - [Delta Lake Documentation](https://docs.delta.io/)

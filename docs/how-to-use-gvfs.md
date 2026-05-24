@@ -118,6 +118,7 @@ Apart from the above properties, to access fileset like S3, GCS, OSS and custom 
 and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#use-the-gvfs-java-client-to-access-the-fileset) for more details.
 
 #### Custom Fileset
+
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding
 properties, for more, refer to [Custom Fileset](./fileset-catalog.md#implement-a-custom-hcfs-file-system-fileset).
 So, if you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
