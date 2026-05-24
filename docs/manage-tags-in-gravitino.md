@@ -204,8 +204,7 @@ client.deleteTag("tag2");
 
 ## Tag Associations
 
-Gravitino allows you to associate and disassociate tags with metadata objects. Currently,
-`CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` objects can be tagged.
+Gravitino lets you associate and disassociate tags with metadata objects. The `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` object types can be tagged.
 
 ### Associate and Disassociate Tags with a Metadata Object
 

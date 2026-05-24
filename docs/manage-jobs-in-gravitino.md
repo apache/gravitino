@@ -80,8 +80,7 @@ Here is a brief description of the fields in the job template:
 
 Please note that:
 
-1. The `executable` and `scripts` must be accessible by the Gravitino server. Currently,
-   Gravitino supports accessing files from the local file system, HTTP(S) URLs, and FTP(S) URLs
+1. The `executable` and `scripts` must be accessible by the Gravitino server. Gravitino supports accessing files from the local file system, HTTP(S) URLs, and FTP(S) URLs
    (more distributed file system support will be added in the future). So the `executable` and
    `scripts` can be a local file path, or a URL like `http://example.com/my_script.sh`.
 2. The `executable`, `arguments`, `environments`, `customFields` and `scripts` can use placeholders

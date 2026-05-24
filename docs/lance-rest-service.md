@@ -234,7 +234,7 @@ URL encoded:        lance_catalog%24schema%24table01
 ```
 
 :::caution Important Limitations
-- Currently supports only **two levels of namespaces** before tables
+- Supports only **two levels of namespaces** before tables
 - Tables **cannot** be nested deeper than schema level  
 - Parent catalog must be created in Gravitino before using Lance REST API
 - Namespace deletion is recursive and irreversible

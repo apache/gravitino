@@ -18,7 +18,7 @@ import TabItem from '@theme/TabItem';
 
 This document describes how to use Apache Gravitino to manage a generic lakehouse catalog using Delta Lake as the underlying table format. Gravitino supports registering and managing metadata for external Delta tables.
 
-:::info Current Support
+:::info Supported Operations
 Gravitino supports **external Delta tables only**. This means:
 - Register existing Delta tables in Gravitino
 - Gravitino manages metadata only (schema, location, properties)
@@ -366,7 +366,7 @@ manually remove files from the storage location
 
 ## Limitations and Future Work
 
-### Current Limitations
+### Limitations
 
 - **Managed Tables**: Not supported; only external tables are available
 - **ALTER Operations**: Cannot modify table schema through Gravitino; use Delta Lake APIs

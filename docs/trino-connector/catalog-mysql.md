@@ -69,8 +69,7 @@ The following are supported MySQL column properties:
 | auto_increment                     | boolean | false         | The auto increment column.                        | No       | 1.0.0         |
 | default                            | string  | (none)        | The default value for column.                     | No       | 1.0.0         |
 
-**Note:** Currently, creating tables only supports constant default values and does not support expression default values, 
-and `show create table` also exclusively renders constant default values in its output.
+**Note:** Creating tables supports constant default values only. Expression default values are not supported. `show create table` also renders only constant default values.
 The following are Trino type which support configuration of default values:
 
 | Type name | Default Value example                   |
