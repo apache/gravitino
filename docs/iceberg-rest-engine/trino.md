@@ -3,8 +3,6 @@ title: Connect Trino via Iceberg REST
 sidebar_label: Trino
 ---
 
-# Connect Trino via Iceberg REST
-
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible engine can connect to directly — without installing a Gravitino-specific
 connector plugin. This page describes how to configure Trino to use Gravitino's Iceberg REST

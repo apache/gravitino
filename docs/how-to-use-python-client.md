@@ -5,8 +5,6 @@ date: 2024-05-09
 keyword: Gravitino Python client
 license: This software is licensed under the Apache License version 2.
 ---
-# Apache Gravitino Python Client
-
 Apache Gravitino is a high-performance, geo-distributed, and federated metadata lake.
 It manages the metadata directly in different sources, types, and regions, also provides users
 the unified metadata access for data and AI assets.

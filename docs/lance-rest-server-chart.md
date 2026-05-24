@@ -6,8 +6,6 @@ keyword:
 license: "This software is licensed under the Apache License version 2."
 ---
 
-# Install Lance REST Server on Kubernetes
-
 This Helm chart deploys Apache Gravitino Lance REST Server on Kubernetes with customizable configurations.
 
 ## Prerequisites
