@@ -24,7 +24,7 @@ This capability allows users to perform federation queries, accessing data from 
 * Scala 2.12
 * JDK 8, 11 or 17
 
-## How to Use It
+## Usage
 
 1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18) the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
 
