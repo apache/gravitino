@@ -79,7 +79,7 @@ job scopes with multiple metric/statistic fields:
 
 ## CLI Workflow Examples
 
-### Update Statistics in Batch
+### Batch Statistics Update
 
 Calculate and persist table or partition statistics from JSONL input.
 
@@ -90,7 +90,7 @@ Calculate and persist table or partition statistics from JSONL input.
   --file-path ./table-stats.jsonl
 ```
 
-### Append Metrics in Batch
+### Batch Metrics Append
 
 Calculate and append table or job metrics from JSONL input.
 
@@ -101,7 +101,7 @@ Calculate and append table or job metrics from JSONL input.
   --file-path ./table-stats.jsonl
 ```
 
-### Dry-run Strategy Submission
+### Dry-Run Strategy Submission
 
 Preview recommendations without actually submitting jobs.
 
@@ -154,7 +154,7 @@ When metrics are produced by `submit-update-stats-job --update-mode metrics`, me
 often `custom-*` (for example `custom-data-file-mse`). Use `list-table-metrics` first and
 configure rules with the exact metric names returned by your environment.
 
-### Submit Built-in Update Stats Jobs
+### Submit Built-In Update Stats Jobs
 
 Submit built-in Iceberg update stats/metrics Spark jobs directly.
 

@@ -104,7 +104,7 @@ Policy policy = client.createPolicy(
 </TabItem>
 </Tabs>
 
-### Built-in Iceberg Compaction Policy
+### Built-In Iceberg Compaction Policy
 
 For the built-in `system_iceberg_compaction` policy content, field definitions, and examples, see [Iceberg compaction policy](./iceberg-compaction-policy.md).
 

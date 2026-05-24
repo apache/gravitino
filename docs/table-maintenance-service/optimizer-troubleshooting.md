@@ -38,7 +38,7 @@ restart Gravitino so REST status can refresh faster.
 
 `--strategy-name` must be the policy name (for example `iceberg_compaction_default`), not the policy type (`system_iceberg_compaction`) and not the strategy type (`iceberg-data-compaction`).
 
-## Dry-run Returns No `DRY-RUN` or `SUBMIT` Lines
+## Dry-Run Returns No `DRY-RUN` or `SUBMIT` Lines
 
 This usually means trigger conditions are not met. For compaction, verify
 `custom-data-file-mse` and `custom-delete-file-number` in table statistics/metrics are large
