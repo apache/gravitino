@@ -263,7 +263,7 @@ Changelog
 
 Use these kinds of Docker images to facilitate integration testing of all catalog and connector modules within Gravitino.
 
-## Apache Gravitino CI Apache Hive Image with Kerberos Enabled
+## Hive Image with Kerberos
 
 Use this kind of image to test the catalog of Apache Hive with kerberos enable
 
@@ -301,7 +301,7 @@ Changelog
     - Set up a Hive cluster with kerberos enabled.
     - Install a KDC server and create a principal for Hive. For more, see [kerberos-hive](../dev/docker/kerberos-hive)
 
-## Apache Gravitino CI Apache Hive Image
+## Hive Image
 
 Use this kind of image to test the catalog of Apache Hive.
 
@@ -418,7 +418,7 @@ Changelog
     - `10000` HiveServer2
     - `10002` HiveServer2 HTTP
 
-## Apache Gravitino CI Trino Image
+## Trino Image
 
 Use this image to test Trino.
 
@@ -448,7 +448,7 @@ Changelog
   - Expose ports:
     - `8080` Trino JDBC port
 
-## Apache Gravitino CI Doris Image
+## Doris Image
 
 Use this image to test Apache Doris.
 
@@ -482,7 +482,7 @@ Changelog
     - `8030` Doris FE HTTP port
     - `9030` Doris FE MySQL server port
 
-## Apache Gravitino CI Apache Ranger Image
+## Ranger Image
 
 Use this image to control Trino's permissions.
 
