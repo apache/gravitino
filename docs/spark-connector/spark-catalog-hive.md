@@ -5,6 +5,8 @@ keyword: "spark connector hive catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 With the Apache Gravitino Spark connector, accessing data or managing metadata in Hive catalogs becomes straightforward, enabling seamless federation queries across different Hive catalogs.
 
 ## Capabilities

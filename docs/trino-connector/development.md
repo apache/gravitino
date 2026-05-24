@@ -5,6 +5,8 @@ keyword: "gravitino connector development"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 This document guides you through developing the Apache Gravitino Trino connector locally.
 
 ## Multi-version Architecture

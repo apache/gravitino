@@ -5,6 +5,8 @@ keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 | Property                                    | Type    | Default Value         | Description                                                                                                                                                                                                                                                                                                         | Required | Since Version |
 |---------------------------------------------|---------|-----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------------|
 | connector.name                              | string  | (none)                | The `connector.name` defines the type of Trino connector, this value is always 'gravitino'.                                                                                                                                                                                                                         | Yes      | 0.2.0         |

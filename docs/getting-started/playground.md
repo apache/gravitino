@@ -4,6 +4,8 @@ slug: "/getting-started/playground"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 Gravitino provides a bundle of Docker images to launch a Gravitino playground,
 which includes Apache Hive, Apache Hadoop, Trino, MySQL, PostgreSQL, and Gravitino.
 Use Docker Compose to start them all.

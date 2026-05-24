@@ -5,6 +5,8 @@ keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 The Hive catalog allows Trino querying data stored in an Apache Hive data warehouse.
 
 ## Requirements

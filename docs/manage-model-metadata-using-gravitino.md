@@ -9,6 +9,8 @@ license: "This software is licensed under the Apache License version 2."
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+## Introduction
+
 This page introduces how to manage model metadata in Apache Gravitino. Gravitino model catalog
 is a kind of model registry, which provides the ability to manage machine learning models'
 versioned metadata. It follows the typical Gravitino 3-level namespace (catalog, schema, and

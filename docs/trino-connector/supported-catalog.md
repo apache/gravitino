@@ -5,6 +5,8 @@ keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 The catalogs currently supported by the Apache Gravitino Trino connector are as follows:
 
 - [Hive](catalog-hive.md)

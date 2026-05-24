@@ -4,6 +4,8 @@ slug: "/how-to-test"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 Apache Gravitino has two types of tests:
 
   - Unit tests, focus on the functionalities of the specific class, module, or component.

@@ -5,6 +5,8 @@ keyword: "table maintenance, optimizer, extension, provider, ServiceLoader"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 Use this guide when built-in optimizer components do not match your environment and you need custom implementations.
 
 ## Extension Model

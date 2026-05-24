@@ -9,6 +9,8 @@ license: "This software is licensed under the Apache License version 2."
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+## Introduction
+
 This page introduces how to manage messaging metadata using Apache Gravitino. Messaging metadata refers to 
 the topic metadata of the messaging system such as Apache Kafka, Apache Pulsar, Apache RocketMQ, etc.
 Through Gravitino, you can create, update, delete, and list topics via unified RESTful APIs or Java client.

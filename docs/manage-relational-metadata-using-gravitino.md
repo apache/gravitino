@@ -9,6 +9,8 @@ license: "This software is licensed under the Apache License version 2."
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
+## Introduction
+
 This page introduces how to manage relational metadata by Apache Gravitino, relational metadata refers
 to relational catalog, schema, table, partitions, and views. Through Gravitino, you can create, edit, and
 delete relational metadata via unified REST APIs or Java client.

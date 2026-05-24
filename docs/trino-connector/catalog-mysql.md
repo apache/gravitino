@@ -5,6 +5,8 @@ keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 The MySQL catalog allows querying and creating tables in an external MySQL instance. 
 Join data between different systems like MySQL and Hive, or between two different MySQL instances by this.
 

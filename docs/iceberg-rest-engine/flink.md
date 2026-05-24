@@ -3,6 +3,8 @@ title: "Connect Flink via Iceberg REST"
 sidebar_label: "Flink"
 ---
 
+## Introduction
+
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible engine can connect to directly — without installing a Gravitino-specific
 connector plugin. This page describes how to configure Apache Flink to use Gravitino's Iceberg REST

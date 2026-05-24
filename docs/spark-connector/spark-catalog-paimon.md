@@ -5,6 +5,8 @@ keyword: "spark connector paimon catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 The Apache Gravitino Spark connector offers the capability to read and write Paimon tables, with the metadata managed by the Gravitino server.
 
 ## Preparation
