@@ -70,7 +70,7 @@ The goal of Gravitino is to unify the data management in both data and AI assets
 
 ## Terminology
 
-### The Metadata Object of Apache Gravitino
+### The Metadata Object
 
 * **Metalake**: The container/tenant for metadata. Typically, one group has one metalake
   to manage all the metadata in it. Each metalake exposes a three-level namespace (catalog.schema.

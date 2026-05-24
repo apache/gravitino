@@ -15,7 +15,7 @@ First of all, you must have a Gravitino server set up and run, you can refer doc
 [how to install Gravitino](./how-to-install.md) to build Gravitino server from source code and 
 install it in your local.
 
-## Gravitino Java Client
+## Java Client
 
 Customize the Gravitino Java client by using `withClientConfig` like this:
 
@@ -37,7 +37,7 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http:/
 // ...
 ```
 
-### Gravitino Java Client Configuration
+### Java Client Configuration
 
 | Configuration item                     | Description                                          | Default value       | Required | Since version |
 |----------------------------------------|------------------------------------------------------|---------------------|----------|---------------|
@@ -46,7 +46,7 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http:/
 
 **Note:** Invalid configuration properties will result in exceptions.
 
-## Gravitino Python Client
+## Python Client
 
 Customize the Gravitino Python client with config properties like this:
 
@@ -65,7 +65,7 @@ gravitino_client = GravitinoClient(
 # ...
 ```
 
-### Gravitino Python Client Configuration
+### Python Client Configuration
 
 | Configuration item                 | Description                            | Default value | Required | Since version |
 |------------------------------------|----------------------------------------|---------------|----------|---------------|
