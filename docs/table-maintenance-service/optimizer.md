@@ -82,19 +82,19 @@ Use CLI local calculator when you want to feed JSONL input directly.
 
 ## Lifecycle
 
-### 1. Collect
+### Step 1: Collect
 
 Generate or ingest table and partition statistics/metrics.
 
-### 2. Evaluate
+### Step 2: Evaluate
 
 Apply policies and rules to decide whether maintenance should run.
 
-### 3. Submit
+### Step 3: Submit
 
 Pick a job template and submit job with concrete `jobConf`.
 
-### 4. Observe
+### Step 4: Observe
 
 Check REST job status and validate resulting statistics, metrics, or rewritten data files.
 
