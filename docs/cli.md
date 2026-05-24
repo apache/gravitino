@@ -183,7 +183,7 @@ To display the server version:
 gcli.sh --server
 ```
 
-### Client/server Version Mismatch
+### Client/Server Version Mismatch
 
 If the client and server are running different versions of the Gravitino software then you may need to ignore the client/server version check for the command to run. This can be done in several ways:
 
