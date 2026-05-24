@@ -81,7 +81,7 @@ gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","
 
 `--strategy-name` must be the policy name, for example `iceberg_compaction_default`.
 
-## Local Filesystem Note
+## Local Filesystem
 
 If your environment is local and not HDFS-based, set:
 
@@ -91,7 +91,7 @@ spark.hadoop.fs.defaultFS=file:///
 
 Without this, Spark jobs may try `hdfs://localhost:9000` and fail.
 
-## Recommended Validation Checklist
+## Validation Checklist
 
 - Job templates exist: `builtin-iceberg-update-stats`, `builtin-iceberg-rewrite-data-files`.
 - Policies are attached to target tables.
