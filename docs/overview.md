@@ -49,10 +49,7 @@ The changes in Gravitino directly reflect in the underlying systems, and vice ve
 
 ### Geo-Distribution Support
 
-Gravitino supports geo-distribution deployment, which means different instances of Gravitino
-can deploy in different regions or clouds, and they can connect to get
-the metadata from each other. With this, users can get a global view of metadata across the
-regions or clouds.
+Gravitino supports geo-distributed deployment of Iceberg REST (IRC) catalogs. Different instances of Gravitino can run in different regions or clouds, with a local IRC catalog proxying requests to a remote IRC catalog so users get a global view of metadata across regions or clouds.
 
 ### Multi-Engine Support
 
