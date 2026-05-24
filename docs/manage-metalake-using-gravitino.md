@@ -242,7 +242,7 @@ This operation does nothing if the metalake is already disabled.
 
 ## Drop a Metalake
 
-Deleting a metalake by "force" is not a default behavior, so please make sure:
+Deleting a metalake by "force" is not a default behavior, so make sure:
 
 - There are no catalogs under the metalake. Otherwise, you will get an error.
 - The metalake is [disabled](#disable-a-metalake). Otherwise, you will get an error.

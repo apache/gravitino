@@ -13,7 +13,7 @@ This page introduces how to manage messaging metadata using Apache Gravitino. Me
 the topic metadata of the messaging system such as Apache Kafka, Apache Pulsar, Apache RocketMQ, etc.
 Through Gravitino, you can create, update, delete, and list topics via unified RESTful APIs or Java client.
 
-To use messaging catalog, please make sure that:
+To use the messaging catalog, make sure that:
 
  - Gravitino server has started, and the host and port is [http://localhost:8090](http://localhost:8090).
  - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).

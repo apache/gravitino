@@ -33,7 +33,7 @@ same definition. To replace an existing implementation, use `updateImpl` instead
 | Java     | `className`            | Fully qualified Java class name.                     |
 | Python   | `handler`, `codeBlock` | Python handler entry point and optional inline code. |
 
-To use function management, please make sure that:
+To use function management, make sure that:
 
  - The Gravitino server has started and is serving at, e.g. [http://localhost:8090](http://localhost:8090).
  - A metalake has been created.

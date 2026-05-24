@@ -15,7 +15,7 @@ Although many catalogs inherently manage partitions automatically, there are sce
 
 ### Requirements and Limitations
 
-- Partition management is based on the partitioned table, so please ensure that you are operating on a partitioned table.
+- Partition management is based on the partitioned table, so ensure you are operating on a partitioned table.
 
 The following table shows the partition operations supported across various catalogs in Gravitino:
 
@@ -28,7 +28,7 @@ The following table shows the partition operations supported across various cata
 | Drop Partition        | &#10004;     | &#10008;        | &#10008;           | &#10008;                | &#10004;           | 
 
 :::tip[WELCOME FEEDBACK]
-If you need additional partition management support for a specific catalog, please feel free to [create an issue](https://github.com/apache/gravitino/issues/new/choose) on the [Gravitino repository](https://github.com/apache/gravitino).
+If you need additional partition management support for a specific catalog, [create an issue](https://github.com/apache/gravitino/issues/new/choose) on the [Gravitino repository](https://github.com/apache/gravitino).
 :::
 
 ## Partition Operations

@@ -26,7 +26,7 @@ Unlike tables, views define query output and one or more representations, but do
 partitions, sort orders, indexes, or physical storage locations. The representation model is
 extensible, but only SQL representations are supported.
 
-To use view management, please make sure that:
+To use view management, make sure that:
 
  - Gravitino server has started, and the host and port are [http://localhost:8090](http://localhost:8090).
  - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake).

@@ -16,7 +16,7 @@ model) and supports managing the versions for each model.
 
 It supports model and model version registering, listing, loading, and deleting.
 
-To use the model catalog, please make sure that:
+To use the model catalog, make sure that:
 
  - The Gravitino server has started, and is serving at, e.g. [http://localhost:8090](http://localhost:8090).
  - A metalake has been created and [enabled](./manage-metalake-using-gravitino.md#enable-a-metalake)

@@ -38,7 +38,7 @@ The Daft connector enables seamless integration between Daft and Apache Gravitin
 
 ## Documentation
 
-For complete documentation on installation, configuration, usage examples, and API reference, please visit:
+For complete documentation on installation, configuration, usage examples, and API reference, visit:
 
 **[Daft Gravitino Connector Documentation](https://docs.daft.ai/en/latest/connectors/gravitino/)**
 

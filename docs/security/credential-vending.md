@@ -24,7 +24,7 @@ Gravitino credential vending is used to generate temporary or static credentials
 
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations           | Description                                                                                | Default value | Required | Since Version    |
 |-------------------------------------|--------------------------------------------------------|--------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `credential-provider-type`          | `gravitino.iceberg-rest.credential-provider-type`      | Deprecated, please use `credential-providers` instead.                                     | (none)        | Yes      | 0.7.0-incubating |
+| `credential-provider-type`          | `gravitino.iceberg-rest.credential-provider-type`      | Deprecated; use `credential-providers` instead.                                     | (none)        | Yes      | 0.7.0-incubating |
 | `credential-providers`              | `gravitino.iceberg-rest.credential-providers`          | The credential provider types, separated by comma.                                         | (none)        | Yes      | 0.8.0-incubating |
 | `credential-cache-expire-ratio`     | `gravitino.iceberg-rest.credential-cache-expire-ratio` | Ratio of the credential's expiration time when Gravitino remove credential from the cache. | 0.15          | No       | 0.8.0-incubating |
 | `credential-cache-max-size`         | `gravitino.iceberg-rest.cache-max-size`                | Max size for the credential cache.                                                         | 10000         | No       | 0.8.0-incubating |
@@ -146,11 +146,11 @@ An GCS token is a token credential with scoped privileges, by leveraging GCS [Cr
 | Gravitino server catalog properties | Gravitino Iceberg REST server configurations      | Description                                                | Default value                       | Required | Since Version    |
 |-------------------------------------|---------------------------------------------------|------------------------------------------------------------|-------------------------------------|----------|------------------|
 | `credential-providers`              | `gravitino.iceberg-rest.credential-providers`     | `gcs-token` for GCS token credential.                      | (none)                              | Yes      | 0.8.0-incubating |
-| `gcs-credential-file-path`          | `gravitino.iceberg-rest.gcs-credential-file-path` | Deprecated, please use `gcs-service-account-file` instead. | GCS Application default credential. | No       | 0.7.0-incubating |
+| `gcs-credential-file-path`          | `gravitino.iceberg-rest.gcs-credential-file-path` | Deprecated; use `gcs-service-account-file` instead. | GCS Application default credential. | No       | 0.7.0-incubating |
 | `gcs-service-account-file`          | `gravitino.iceberg-rest.gcs-service-account-file` | The location of GCS credential file.                       | GCS Application default credential. | No       | 0.8.0-incubating |
 
 :::note
-For Gravitino Iceberg REST server, please ensure that the credential file can be accessed by the server. For example, if the server is running on a GCE machine, or you can set the environment variable as `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, even when the `gcs-service-account-file` has already been configured.
+For the Gravitino Iceberg REST server, ensure that the credential file is accessible by the server. For example, the server may be running on a GCE machine, or you may set the environment variable `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json` even when `gcs-service-account-file` is already configured.
 :::
 
 ## Custom Credentials
@@ -159,16 +159,16 @@ Gravitino supports custom credentials, you can implement the `org.apache.graviti
 
 ## Deployment
 
-Besides setting credentials related configuration, please download the related cloud bundle jar and place it in the classpath of Iceberg REST server or Fileset catalog.
+Besides setting credentials-related configuration, download the related cloud bundle jar and place it in the classpath of the Iceberg REST server or Fileset catalog.
 
-For Fileset catalog, please use Gravitino cloud bundle jar with Hadoop and cloud packages:
+For the Fileset catalog, use the Gravitino cloud bundle jar with Hadoop and cloud packages:
 
 - [Gravitino AWS bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle)
 - [Gravitino Aliyun bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle)
 - [Gravitino GCP bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle)
 - [Gravitino Azure bundle jar with Hadoop and cloud packages](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle)
 
-For Iceberg REST catalog server, please download the corresponding Gravitino cloud packages.
+For the Iceberg REST catalog server, download the corresponding Gravitino cloud packages.
 
 - [Gravitino Iceberg AWS bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle)
 - [Gravitino Iceberg GCP bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aliyun-bundle)

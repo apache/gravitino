@@ -433,7 +433,7 @@ Gravitino leverages the job executor to run the job, so you need to specify the 
 through configuration `gravitino.job.executor`. By default, it is set to "local", which means
 the job will be launched as a process within the same machine that runs the Gravitino server. Note
 that the local job executor is only for testing. If you want to run the job in a distributed environment,
-you need to implement your own `JobExecutor` and set the configuration, please see
+you need to implement your own `JobExecutor` and set the configuration; see
 [Implement a custom job executor](#implement-a-custom-job-executor) section below.
 
 When running a Spark job template with the local executor, configure one of:

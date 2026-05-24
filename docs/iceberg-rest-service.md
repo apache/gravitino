@@ -272,7 +272,7 @@ In the Spark SQL side, you could use `default_rest_catalog` to access the defaul
 
 Refer to [OAuth2 Configuration](./security/how-to-authenticate#server-configuration) for how to enable OAuth2.
 
-When enabling OAuth2 and leveraging a dynamic configuration provider to retrieve catalog information from the Gravitino server, please use the following configuration parameters to establish OAuth2 authentication for secure communication with the Gravitino server:
+When enabling OAuth2 and leveraging a dynamic configuration provider to retrieve catalog information from the Gravitino server, use the following configuration parameters to establish OAuth2 authentication for secure communication with the Gravitino server:
 
 | Configuration item                                   | Description                                                                         | Default value         | Required          | Since Version |
 |------------------------------------------------------|-------------------------------------------------------------------------------------|-----------------------|-------------------|---------------|
@@ -503,7 +503,7 @@ For storages not managed by Gravitino directly, configure them through custom ca
 
 | Configuration item               | Description                                                                             | Default value | Required | Since Version    |
 |----------------------------------|-----------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg, please use the full qualified classname. | (none)        | No       | 0.6.0-incubating |
+| `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg; use the fully qualified classname. | (none)        | No       | 0.6.0-incubating |
 
 To pass custom properties such as `security-token` to your custom `FileIO`, configure them via `gravitino.iceberg-rest.security-token`. The `security-token` is included in the properties when the `FileIO` initialize method is invoked.
 
@@ -716,7 +716,7 @@ Gravitino Iceberg REST server in the Docker image could access local storage by 
 | `GRAVITINO_OSS_EXTERNAL_ID`            | `gravitino.iceberg-rest.oss-external-id`            | 0.8.0-incubating |
 | `GRAVITINO_ICEBERG_REST_HTTP_PORT`     | `gravitino.iceberg-rest.httpPort`                   | 1.1.0            |
 
-The below environment is deprecated, please use the corresponding configuration items instead.
+The below environment is deprecated; use the corresponding configuration items instead.
 
 | Deprecated Environment variables     | New environment variables            | Since version    | Deprecated version |
 |--------------------------------------|--------------------------------------|------------------|--------------------|

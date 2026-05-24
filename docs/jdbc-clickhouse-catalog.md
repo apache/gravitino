@@ -28,7 +28,7 @@ ClickHouse catalog is not included in the standard Gravitino server distribution
 | Scope             | One catalog maps to one ClickHouse instance                                                                                                                                                                   |
 | Metadata/DDL      | Supports JDBC-based metadata management and DDL                                                                                                                                                               |
 | Column defaults   | Supports column default values                                                                                                                                                                                |
-| Drivers           | Requires user-provided ClickHouse JDBC driver in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`, please download the jar from [link](https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/) |
+| Drivers           | Requires user-provided ClickHouse JDBC driver in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`, download the jar from [link](https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/) |
 | Supported version | All the codes are tested by ClickHouse `24.8.14`, newer versions like `25.x` may also work but we did not conduct thorough tests. Report to the community if something does not work as expected.             |                                                
 
 ### ClickHouse Server and JDBC Driver Compatibility Matrix

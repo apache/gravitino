@@ -14,7 +14,7 @@ The CLI allows users to view, create and update metadata information for metalak
 
 ## Run the CLI
 
-To run the Gravitino CLI, please use the `gcli.sh` script located in Gravitino's bin directory. If you define the `GRAVITINO_HOME` environment variable, you can run the script from any location using `$GRAVITINO_HOME/bin/gcli.sh`.
+To run the Gravitino CLI, use the `gcli.sh` script in Gravitino's bin directory. If you define the `GRAVITINO_HOME` environment variable, you can run the script from any location using `$GRAVITINO_HOME/bin/gcli.sh`.
 
 ## Usage
 

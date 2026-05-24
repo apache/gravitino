@@ -59,13 +59,13 @@ The Gravitino binary distribution package contains the following files:
 
 :::note
 Catalogs `OceanBase` and `ClickHouse` are not included in the Gravitino binary distribution package (see above) by default due to package size limitations and License compatibility issues since 1.2.0.
-If you want to use these two catalogs, please build the Gravitino binary distribution package by yourself and use tarball `gravitino-<version>-bin-all.tar.gz`, which contains all catalogs including those in the `catalogs-contrib` module.
+If you want to use these two catalogs, build the Gravitino binary distribution package yourself and use tarball `gravitino-<version>-bin-all.tar.gz`, which contains all catalogs including those in the `catalogs-contrib` module.
 For more details about it, refer to [Reorg catalogs structure](https://github.com/apache/gravitino/pull/9781)
 :::
 
 #### Initialize the RDBMS (Optional)
 
-If you want to use the relational backend storage, you need to initialize the RDBMS first. For the details on initializing the RDBMS, please check [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
+If you want to use the relational backend storage, you need to initialize the RDBMS first. For the details on initializing the RDBMS, see [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
 
 #### Configure the Apache Gravitino Server
 
@@ -106,7 +106,7 @@ After configuring the Gravitino server, start the Gravitino server by running:
 ./bin/gravitino.sh start
 ```
 
-Alternatively, to start the Gravitino server Web UI, please run:
+Alternatively, to start the Gravitino server Web UI, run:
 
 ```shell
 ./bin/gravitino.sh run

@@ -17,7 +17,7 @@ Apache Gravitino provides the ability to manage [StarRocks](https://www.starrock
 
 :::caution
 Gravitino saves some system information in table comments, like
-`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+`(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
 :::
 
 ## Catalog

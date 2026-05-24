@@ -32,7 +32,7 @@ license: "This software is licensed under the Apache License version 2."
 
 1. Clone the Gravitino project.
 
-   If you want to contribute to this open-source project, please fork the project on GitHub first. After forking, clone the forked project to your local environment, make your changes, and submit a pull request (PR).
+   If you want to contribute to this open-source project, fork the project on GitHub first. After forking, clone the forked project to your local environment, make your changes, and submit a pull request (PR).
 
    ```shell
    git clone git@github.com:apache/gravitino.git
@@ -47,7 +47,7 @@ license: "This software is licensed under the Apache License version 2."
 
   The `./gradlew build` command builds all the Gravitino components, including the Gravitino server, Java and Python clients, Trino and Spark connectors, and more.
 
-  For the Python client, the `./gradlew build` command builds the Python client with Python 3.12 by default. If you want to use Python 3.10 or 3.11 to build, please modify the property `pythonVersion` to 3.10 or 3.11 in the `gradle.properties` file, or specify the version with `-P` like:
+  For the Python client, the `./gradlew build` command builds the Python client with Python 3.12 by default. If you want to use Python 3.10 or 3.11 to build, modify the property `pythonVersion` to 3.10 or 3.11 in the `gradle.properties` file, or specify the version with `-P` like:
 
    ```shell
    ./gradlew build -PpythonVersion=3.10

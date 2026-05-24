@@ -299,7 +299,7 @@ Changelog
 
 - datastrato/gravitino-ci-kerberos-hive:0.1.0
     - Set up a Hive cluster with kerberos enabled.
-    - Install a KDC server and create a principal for Hive. For more please see [kerberos-hive](../dev/docker/kerberos-hive)
+    - Install a KDC server and create a principal for Hive. For more, see [kerberos-hive](../dev/docker/kerberos-hive)
 
 ## Apache Gravitino CI Apache Hive Image
 
@@ -316,7 +316,7 @@ Changelog
  
 - apache/gravitino-ci:hive-0.1.18
   - Support UTF-8 encoding for the `hive-site.xml` file and Hive Metastore. 
-    For more information, please see [PR](https://github.com/apache/gravitino/pull/6625)
+    For more information, see [PR](https://github.com/apache/gravitino/pull/6625)
   - Change ranger-hive-plugin and ranger-hdfs-plugin download URL. 
 
 - apache/gravitino-ci:hive-0.1.17
@@ -509,7 +509,6 @@ Changelog
 - datastrato/gravitino-ci-ranger:0.1.0
   - Docker image `datastrato/gravitino-ci-ranger:0.1.0`
   - Support Apache Ranger 2.4.0
-  - Use environment variable `RANGER_PASSWORD` to set up Apache Ranger admin password, please 
-    notice Apache Ranger Password should be minimum 8 characters with min one alphabet and one numeric.
+  - Use the environment variable `RANGER_PASSWORD` to set the Apache Ranger admin password. The password must be at least 8 characters and include at least one letter and one digit.
   - Expose ports:
     - `6080` Apache Ranger admin port
