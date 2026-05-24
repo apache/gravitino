@@ -11,18 +11,18 @@ This document provides a comprehensive guide on configuring and using Apache Gra
 
 ## Capabilities
 
-### Supported Paimon Table Types
+### Paimon Table Types
 
 * AppendOnly Table
 * Primary Key Table (with bucket distribution)
 
-### Supported Distribution
+### Distribution
 
 * HASH distribution via `bucket-key` and `bucket` table properties.
 * Only HASH strategy is supported. Range or other strategies are not applicable.
 * When `bucket-key` is specified without `bucket`, the bucket number defaults to auto.
 
-### Supported Operation Types
+### Operation Types
 
 Supports most DDL and DML operations in Flink SQL, except such operations:
 

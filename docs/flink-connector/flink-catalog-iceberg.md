@@ -12,7 +12,7 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 
 ## Capabilities
 
-### Supported DML and DDL Operations
+### DML and DDL Operations
 
 - `CREATE CATALOG`
 - `CREATE DATABASE`

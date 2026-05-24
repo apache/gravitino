@@ -16,7 +16,7 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 
 ## Capabilities
 
-### Supported DDL and DML Operations
+### DDL and DML Operations
 
 - `CREATE NAMESPACE`
 - `DROP NAMESPACE`

@@ -11,7 +11,7 @@ This document provides a comprehensive guide on configuring and using Apache Gra
 
 ## Capabilities
 
-### Supported JDBC Types
+### JDBC Types
 
 * MYSQL
 

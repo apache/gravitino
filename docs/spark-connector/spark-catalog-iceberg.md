@@ -16,7 +16,7 @@ The Apache Gravitino Spark connector offers the capability to read and write Ice
 
 ## Capabilities
 
-### Supported DML and DDL Operations
+### DML and DDL Operations
 
 - `CREATE TABLE`
 
