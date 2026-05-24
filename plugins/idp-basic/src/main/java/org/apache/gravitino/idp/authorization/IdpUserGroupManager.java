@@ -152,7 +152,7 @@ public class IdpUserGroupManager {
           IdpGroupEntity.builder()
               .withId(idGenerator.nextId())
               .withName(groupName)
-              .withUserNames(Collections.emptyList())
+              .withUsernames(Collections.emptyList())
               .build();
       store.put(groupEntity, false);
       return groupEntity;
@@ -177,7 +177,7 @@ public class IdpUserGroupManager {
       if (!store.exists(groupName, IdpEntityType.IDP_GROUP)) {
         return false;
       }
-      if (!force && !getGroup(groupName).userNames().isEmpty()) {
+      if (!force && !getGroup(groupName).usernames().isEmpty()) {
         throw new IllegalStateException(
             String.format("IdP group %s is not empty, use force=true to delete it", groupName));
       }

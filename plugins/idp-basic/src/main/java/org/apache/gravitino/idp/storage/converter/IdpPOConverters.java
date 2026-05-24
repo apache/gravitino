@@ -87,14 +87,14 @@ public final class IdpPOConverters {
    * Converts an {@link IdpGroupPO} to a built-in IdP group entity.
    *
    * @param groupPO The persistence object.
-   * @param userNames The user names of the group.
+   * @param usernames The usernames of the group.
    * @return The built-in IdP group entity.
    */
-  public static IdpGroupEntity fromIdpGroupPO(IdpGroupPO groupPO, List<String> userNames) {
+  public static IdpGroupEntity fromIdpGroupPO(IdpGroupPO groupPO, List<String> usernames) {
     IdpGroupEntity.Builder builder =
         IdpGroupEntity.builder().withId(groupPO.getGroupId()).withName(groupPO.getGroupName());
-    if (userNames != null && !userNames.isEmpty()) {
-      builder.withUserNames(userNames);
+    if (usernames != null && !usernames.isEmpty()) {
+      builder.withUsernames(usernames);
     }
     return builder.build();
   }

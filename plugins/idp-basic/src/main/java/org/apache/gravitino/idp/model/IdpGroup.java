@@ -35,5 +35,5 @@ public interface IdpGroup {
    *
    * @return The usernames of the built-in IdP group.
    */
-  List<String> userNames();
+  List<String> usernames();
 }

@@ -38,12 +38,12 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity {
   public static final Field NAME =
       Field.required("name", String.class, "The name of the built-in IdP group entity.");
 
-  public static final Field USER_NAMES =
-      Field.optional("user_names", List.class, "The user names of the built-in IdP group.");
+  public static final Field USERNAMES =
+      Field.optional("usernames", List.class, "The usernames of the built-in IdP group.");
 
   private Long id;
   private String name;
-  private List<String> userNames;
+  private List<String> usernames;
 
   private IdpGroupEntity() {}
 
@@ -52,7 +52,7 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity {
     Map<Field, Object> fields = Maps.newHashMap();
     fields.put(ID, id);
     fields.put(NAME, name);
-    fields.put(USER_NAMES, userNames);
+    fields.put(USERNAMES, usernames);
     return Collections.unmodifiableMap(fields);
   }
 
@@ -72,8 +72,8 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity {
   }
 
   @Override
-  public List<String> userNames() {
-    return userNames;
+  public List<String> usernames() {
+    return usernames;
   }
 
   @Override
@@ -88,12 +88,12 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity {
     IdpGroupEntity that = (IdpGroupEntity) o;
     return Objects.equals(id, that.id)
         && Objects.equals(name, that.name)
-        && CollectionUtils.isEqualCollection(userNames, that.userNames);
+        && CollectionUtils.isEqualCollection(usernames, that.usernames);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, userNames);
+    return Objects.hash(id, name, usernames);
   }
 
   public static Builder builder() {
@@ -131,13 +131,13 @@ public class IdpGroupEntity implements IdpGroup, IdpEntity {
     }
 
     /**
-     * Sets the user names of the built-in IdP group entity.
+     * Sets the usernames of the built-in IdP group entity.
      *
-     * @param userNames The user names of the built-in IdP group entity.
+     * @param usernames The usernames of the built-in IdP group entity.
      * @return The builder instance.
      */
-    public Builder withUserNames(List<String> userNames) {
-      groupEntity.userNames = userNames;
+    public Builder withUsernames(List<String> usernames) {
+      groupEntity.usernames = usernames;
       return this;
     }
 

@@ -57,7 +57,7 @@ public class TestIdpUserGroupManager extends AbstractIdpMetaStorageTest {
     IdpGroup group = manager.addGroup("dev");
     assertEquals("dev", group.name());
     manager.addUsersToGroup("dev", Lists.newArrayList("alice"));
-    assertTrue(manager.getGroup("dev").userNames().contains("alice"));
+    assertTrue(manager.getGroup("dev").usernames().contains("alice"));
 
     manager.changePassword("alice", "new-password");
     assertEquals("alice", manager.getUser("alice").name());

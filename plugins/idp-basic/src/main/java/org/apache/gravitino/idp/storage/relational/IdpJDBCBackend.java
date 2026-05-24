@@ -20,10 +20,13 @@ package org.apache.gravitino.idp.storage.relational;
 
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.idp.exception.AlreadyExistsException;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.meta.IdpEntity;
@@ -35,14 +38,25 @@ import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.JDBCDatabase;
+import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
+import org.apache.gravitino.storage.relational.database.H2Database;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 
 /** JDBC backend for built-in IdP entities. */
 public class IdpJDBCBackend implements Closeable {
 
-  private final IdpJdbcSessionSupport sessionSupport = new IdpJdbcSessionSupport();
+  private static final Map<JDBCBackendType, String> EMBEDDED_JDBC_DATABASE_MAP =
+      ImmutableMap.of(JDBCBackendType.H2, H2Database.class.getCanonicalName());
 
+  private JDBCDatabase jdbcDatabase;
+
+  /** Initializes the JDBC backend and MyBatis session factory. */
   public void initialize(Config config) {
-    sessionSupport.initialize(config);
+    jdbcDatabase = startEmbeddedDatabaseIfNecessary(config);
+    SqlSessionFactoryHelper.getInstance().init(config);
+    SQLExceptionConverterFactory.initConverter(config);
   }
 
   public boolean exists(String name, IdpEntityType entityType) throws IOException {
@@ -121,7 +135,31 @@ public class IdpJDBCBackend implements Closeable {
 
   @Override
   public void close() throws IOException {
-    sessionSupport.close();
+    SqlSessionFactoryHelper.getInstance().close();
+    SQLExceptionConverterFactory.close();
+    if (jdbcDatabase != null) {
+      jdbcDatabase.close();
+    }
+  }
+
+  private static JDBCDatabase startEmbeddedDatabaseIfNecessary(Config config) {
+    String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
+    JDBCBackendType jdbcBackendType = JDBCBackendType.fromURI(jdbcUrl);
+    if (jdbcBackendType != JDBCBackendType.H2) {
+      return null;
+    }
+
+    try {
+      JDBCDatabase database =
+          (JDBCDatabase)
+              Class.forName(EMBEDDED_JDBC_DATABASE_MAP.get(jdbcBackendType))
+                  .getDeclaredConstructor()
+                  .newInstance();
+      database.initialize(config);
+      return database;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create and initialize IdP JDBC backend.", e);
+    }
   }
 
   private static IdpUserEntity getIdpUser(String username) {
@@ -137,9 +175,9 @@ public class IdpJDBCBackend implements Closeable {
   private static IdpGroupEntity getIdpGroup(String groupName) {
     try {
       IdpGroupPO groupPO = IdpGroupMetaService.getInstance().getIdpGroupByName(groupName);
-      List<String> userNames =
+      List<String> usernames =
           IdpGroupMetaService.getInstance().listUsernamesByGroupName(groupName);
-      return IdpPOConverters.fromIdpGroupPO(groupPO, userNames);
+      return IdpPOConverters.fromIdpGroupPO(groupPO, usernames);
     } catch (NotFoundException e) {
       throw new NotFoundException("IdP group %s does not exist", groupName);
     }
