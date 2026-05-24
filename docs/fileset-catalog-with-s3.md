@@ -24,7 +24,7 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 ## Configurations for Creating a Fileset Catalog with S3
 
-### Configurations for S3 Fileset Catalog
+### Configuration for an S3 Fileset Catalog
 
 In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are necessary to configure a Fileset catalog with S3:
 

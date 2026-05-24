@@ -23,7 +23,7 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 ## Configurations for Creating a Fileset Catalog with GCS
 
-### Configurations for a GCS Fileset Catalog
+### Configuration for a GCS Fileset Catalog
 
 Apart from configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with GCS:
 
