@@ -1,5 +1,5 @@
 ---
-title: "Connect Ray via Iceberg REST"
+title: "Connect Ray to Iceberg REST"
 sidebar_label: "Ray"
 ---
 

@@ -1,5 +1,5 @@
 ---
-title: "Connect PyIceberg via Iceberg REST"
+title: "Connect PyIceberg to Iceberg REST"
 sidebar_label: "PyIceberg"
 ---
 

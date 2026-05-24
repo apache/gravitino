@@ -1,5 +1,5 @@
 ---
-title: "Connect Flink via Iceberg REST"
+title: "Connect Flink to Iceberg REST"
 sidebar_label: "Flink"
 ---
 

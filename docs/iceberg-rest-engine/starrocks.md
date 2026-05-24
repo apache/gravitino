@@ -1,5 +1,5 @@
 ---
-title: "Connect StarRocks via Iceberg REST"
+title: "Connect StarRocks to Iceberg REST"
 sidebar_label: "StarRocks"
 ---
 
