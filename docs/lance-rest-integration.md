@@ -228,7 +228,7 @@ pip install lance-ray
 - Ensure Ray version compatibility in your environment before deployment
 :::
 
-### Usage Example
+### Example
 
 The following example demonstrates reading and writing Lance datasets through the Lance REST namespace using Ray:
 

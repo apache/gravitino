@@ -166,7 +166,7 @@ Configure these properties in two ways:
       </property>
     ```
 
-### Usage Examples
+### Examples
 
 First make sure to obtain the Gravitino Virtual File System runtime jar, which you can get in
 two ways:
@@ -484,7 +484,7 @@ and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-
 Gravitino python client does not support [customized file systems](fileset-catalog.md#how-to-custom-your-own-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library.
 :::
 
-### Usage Examples
+### Examples
 
 :::note
 For fileset with multiple locations, you can specify which location to access using one of these methods (in priority order):

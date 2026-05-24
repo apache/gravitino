@@ -184,7 +184,7 @@ The classpath of the server:
 - Iceberg REST server: the classpath differs in different deploy mode, refer to [Server management](../iceberg-rest-service.md#server-management) part.
 - Fileset catalog: `catalogs/fileset/libs/`
 
-## Usage Example
+## Example
 
 ### Credential Vending for Iceberg REST Server
 

@@ -37,7 +37,7 @@ PROPERTIES
 `client.factory` must be set explicitly for StarRocks to correctly initialize the Iceberg AWS client.
 :::
 
-## Usage Examples
+## Examples
 
 ```sql
 SET CATALOG iceberg;

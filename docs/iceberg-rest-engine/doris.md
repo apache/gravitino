@@ -29,7 +29,7 @@ CREATE CATALOG iceberg PROPERTIES (
 );
 ```
 
-## Usage Examples
+## Examples
 
 ```sql
 SWITCH iceberg;
