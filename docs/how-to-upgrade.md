@@ -1,6 +1,6 @@
 ---
-title: Upgrade Apache Gravitino
-slug: /how-to-upgrade
+title: "Upgrade Apache Gravitino"
+slug: "/how-to-upgrade"
 license: "This software is licensed under the Apache License version 2."
 ---
 

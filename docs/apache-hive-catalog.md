@@ -1,8 +1,8 @@
 ---
 title: "Apache Hive Catalog"
-slug: /apache-hive-catalog
+slug: "/apache-hive-catalog"
 date: 2023-12-10
-keyword: hive catalog
+keyword: "hive catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 

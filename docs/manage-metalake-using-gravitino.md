@@ -1,9 +1,9 @@
 ---
 title: "Manage Metalakes with Gravitino"
-slug: /manage-metalake-using-gravitino
+slug: "/manage-metalake-using-gravitino"
 date: 2023-12-10
-keyword: Gravitino metalake manage
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino metalake manage"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';

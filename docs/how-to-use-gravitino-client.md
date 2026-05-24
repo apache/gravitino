@@ -1,9 +1,9 @@
 ---
 title: "Use the Apache Gravitino Client"
-slug: /how-to-use-gravitino-client
+slug: "/how-to-use-gravitino-client"
 date: 2025-07-09
-keyword: Gravitino client
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino client"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction

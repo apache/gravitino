@@ -1,9 +1,9 @@
 ---
-title: Manage Model Metadata with Gravitino
-slug: /manage-model-metadata-using-gravitino
+title: "Manage Model Metadata with Gravitino"
+slug: "/manage-model-metadata-using-gravitino"
 date: 2024-12-26
-keyword: Gravitino model metadata manage
-license: This software is licensed under the Apache License version 2.
+keyword: "Gravitino model metadata manage"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';

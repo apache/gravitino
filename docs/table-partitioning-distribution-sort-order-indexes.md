@@ -1,9 +1,9 @@
 ---
 title: "Table Partitioning, Distribution, Sort Ordering, and Indexes"
-slug: /table-partitioning-distribution-sort-order-indexes
+slug: "/table-partitioning-distribution-sort-order-indexes"
 date: 2023-12-25
-keyword: Table Partition Bucket Distribute Sort By
-license: This software is licensed under the Apache License version 2.
+keyword: "Table Partition Bucket Distribute Sort By"
+license: "This software is licensed under the Apache License version 2."
 last_update:
   date: 2024-02-02
   author: Clearvive

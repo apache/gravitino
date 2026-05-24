@@ -1,7 +1,7 @@
 ---
 title: "Flink Authentication with Gravitino"
-slug: /flink-connector/flink-authentication
-keyword: flink connector authentication oauth2 kerberos
+slug: "/flink-connector/flink-authentication"
+keyword: "flink connector authentication oauth2 kerberos"
 license: "This software is licensed under the Apache License version 2."
 ---
 

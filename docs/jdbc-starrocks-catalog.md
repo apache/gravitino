@@ -1,6 +1,6 @@
 ---
 title: "StarRocks Catalog"
-slug: /jdbc-starrocks-catalog
+slug: "/jdbc-starrocks-catalog"
 keywords:
 - jdbc
 - starrocks

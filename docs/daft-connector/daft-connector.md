@@ -1,7 +1,7 @@
 ---
 title: "Daft Connector"
-slug: /daft-connector
-keyword: daft connector
+slug: "/daft-connector"
+keyword: "daft connector"
 license: "This software is licensed under the Apache License version 2."
 ---
 

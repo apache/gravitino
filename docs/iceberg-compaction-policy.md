@@ -1,9 +1,9 @@
 ---
 title: "Iceberg Compaction Policy"
-slug: /iceberg-compaction-policy
+slug: "/iceberg-compaction-policy"
 date: 2026-03-05
-keyword: iceberg, compaction, policy, optimizer, Gravitino
-license: This software is licensed under the Apache License version 2.
+keyword: "iceberg, compaction, policy, optimizer, Gravitino"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';

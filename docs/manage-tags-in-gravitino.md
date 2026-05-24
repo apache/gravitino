@@ -1,9 +1,9 @@
 ---
 title: "Manage Tags with Gravitino"
-slug: /manage-tags-in-gravitino
+slug: "/manage-tags-in-gravitino"
 date: 2024-07-24
-keyword: tag management, tag, tags, Gravitino
-license: This software is licensed under the Apache License version 2.
+keyword: "tag management, tag, tags, Gravitino"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';

@@ -1,7 +1,7 @@
 ---
 title: "Flink Connector: Hive Catalog"
-slug: /flink-connector/flink-catalog-hive
-keyword: flink connector hive catalog
+slug: "/flink-connector/flink-catalog-hive"
+keyword: "flink connector hive catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 

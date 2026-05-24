@@ -1,6 +1,6 @@
 ---
-title: Connect Ray via Iceberg REST
-sidebar_label: Ray
+title: "Connect Ray via Iceberg REST"
+sidebar_label: "Ray"
 ---
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any

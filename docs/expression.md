@@ -1,9 +1,9 @@
 ---
 title: "Apache Gravitino Expression System"
-slug: /expression
+slug: "/expression"
 date: 2024-02-02
-keyword: expression function field literal reference
-license: This software is licensed under the Apache License version 2.
+keyword: "expression function field literal reference"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';

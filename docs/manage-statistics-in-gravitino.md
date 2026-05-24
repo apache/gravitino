@@ -1,9 +1,9 @@
 ---
 title: "Manage Statistics with Gravitino"
-slug: /manage-statistics-in-gravitino
+slug: "/manage-statistics-in-gravitino"
 date: 2025-08-21
-keyword: statistics management, statistics, statistic, Gravitino
-license: This software is licensed under the Apache License version 2.
+keyword: "statistics management, statistics, statistic, Gravitino"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';

@@ -1,6 +1,6 @@
 ---
-title: Connect Flink via Iceberg REST
-sidebar_label: Flink
+title: "Connect Flink via Iceberg REST"
+sidebar_label: "Flink"
 ---
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any

@@ -1,8 +1,8 @@
 ---
 title: "Optimizer Troubleshooting"
-slug: /table-maintenance-service/troubleshooting
-keyword: table maintenance, optimizer, troubleshooting, spark, strategy
-license: This software is licensed under the Apache License version 2.
+slug: "/table-maintenance-service/troubleshooting"
+keyword: "table maintenance, optimizer, troubleshooting, spark, strategy"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## `Invalid --type`

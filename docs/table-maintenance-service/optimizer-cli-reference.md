@@ -1,8 +1,8 @@
 ---
 title: "Optimizer CLI Reference"
-slug: /table-maintenance-service/optimizer-cli-reference
-keyword: table maintenance, optimizer, cli, commands, metrics, statistics
-license: This software is licensed under the Apache License version 2.
+slug: "/table-maintenance-service/optimizer-cli-reference"
+keyword: "table maintenance, optimizer, cli, commands, metrics, statistics"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 Use `--help` to list all commands, or `--help --type <command>` for command-specific help.

@@ -1,6 +1,6 @@
 ---
-title: Sign and Verify Releases
-slug: /how-to-sign-releases
+title: "Sign and Verify Releases"
+slug: "/how-to-sign-releases"
 license: "This software is licensed under the Apache License version 2."
 ---
 

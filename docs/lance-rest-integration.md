@@ -1,6 +1,6 @@
 ---
 title: "Lance REST Integration"
-slug: /lance-rest-integration
+slug: "/lance-rest-integration"
 keywords:
   - lance
   - lance-rest

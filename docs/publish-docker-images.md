@@ -1,7 +1,7 @@
 ---
 title: "Publish Docker Images"
-slug: /publish-docker-images
-keyword: docker
+slug: "/publish-docker-images"
+keyword: "docker"
 license: "This software is licensed under the Apache License version 2."
 ---
 

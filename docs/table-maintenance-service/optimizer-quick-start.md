@@ -1,8 +1,8 @@
 ---
 title: "Optimizer Quick Start and Verification"
-slug: /table-maintenance-service/quick-start
-keyword: table maintenance, optimizer, quick start, compaction, update stats
-license: This software is licensed under the Apache License version 2.
+slug: "/table-maintenance-service/quick-start"
+keyword: "table maintenance, optimizer, quick start, compaction, update stats"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Before Running Quick Start

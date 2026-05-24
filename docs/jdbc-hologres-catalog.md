@@ -1,6 +1,6 @@
 ---
 title: "Hologres Catalog"
-slug: /jdbc-hologres-catalog
+slug: "/jdbc-hologres-catalog"
 keywords:
 - jdbc
 - Hologres

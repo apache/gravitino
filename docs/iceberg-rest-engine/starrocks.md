@@ -1,6 +1,6 @@
 ---
-title: Connect StarRocks via Iceberg REST
-sidebar_label: StarRocks
+title: "Connect StarRocks via Iceberg REST"
+sidebar_label: "StarRocks"
 ---
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any

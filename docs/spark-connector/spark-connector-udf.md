@@ -1,7 +1,7 @@
 ---
 title: "Spark Connector: User-Defined Functions"
-slug: /spark-connector/spark-connector-udf
-keyword: spark connector UDF user-defined function
+slug: "/spark-connector/spark-connector-udf"
+keyword: "spark connector UDF user-defined function"
 license: "This software is licensed under the Apache License version 2."
 ---
 

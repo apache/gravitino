@@ -1,9 +1,9 @@
 ---
 title: "Manage Policies with Gravitino"
-slug: /manage-policies-in-gravitino
+slug: "/manage-policies-in-gravitino"
 date: 2025-08-04
-keyword: policy management, policy, policies, Gravitino, data governance
-license: This software is licensed under the Apache License version 2.
+keyword: "policy management, policy, policies, Gravitino, data governance"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';

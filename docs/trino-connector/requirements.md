@@ -1,7 +1,7 @@
 ---
 title: "Trino Connector Requirements"
-slug: /trino-connector/requirements
-keyword: gravitino connector trino
+slug: "/trino-connector/requirements"
+keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 

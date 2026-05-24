@@ -1,6 +1,6 @@
 ---
-title: Apache Gravitino Configuration
-slug: /gravitino-server-config
+title: "Apache Gravitino Configuration"
+slug: "/gravitino-server-config"
 keywords:
   - configuration
 license: "This software is licensed under the Apache License version 2."

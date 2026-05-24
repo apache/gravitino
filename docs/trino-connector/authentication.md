@@ -1,7 +1,7 @@
 ---
 title: "Trino Connector Authentication"
-slug: /trino-connector/authentication
-keyword: gravitino connector trino authentication
+slug: "/trino-connector/authentication"
+keyword: "gravitino connector trino authentication"
 license: "This software is licensed under the Apache License version 2."
 ---
 

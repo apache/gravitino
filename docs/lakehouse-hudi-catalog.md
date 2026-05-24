@@ -1,6 +1,6 @@
 ---
 title: "Hudi Catalog"
-slug: /lakehouse-hudi-catalog
+slug: "/lakehouse-hudi-catalog"
 keywords:
   - lakehouse
   - hudi

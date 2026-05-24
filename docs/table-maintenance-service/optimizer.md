@@ -1,8 +1,8 @@
 ---
 title: "Table Maintenance Service (Optimizer)"
-slug: /table-maintenance-service/optimizer
-keyword: table maintenance, optimizer, statistics, metrics, monitor
-license: This software is licensed under the Apache License version 2.
+slug: "/table-maintenance-service/optimizer"
+keyword: "table maintenance, optimizer, statistics, metrics, monitor"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Overview

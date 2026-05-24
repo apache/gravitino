@@ -1,8 +1,8 @@
 ---
 title: "Fileset Catalog Index"
-slug: /fileset-catalog-index
+slug: "/fileset-catalog-index"
 date: 2025-01-13
-keyword: Fileset catalog index S3 GCS ADLS OSS
+keyword: "Fileset catalog index S3 GCS ADLS OSS"
 license: "This software is licensed under the Apache License version 2."
 ---
 

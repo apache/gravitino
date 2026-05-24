@@ -1,9 +1,9 @@
 ---
 title: "Manage Table Partitions with Gravitino"
-slug: /manage-table-partition-using-gravitino
+slug: "/manage-table-partition-using-gravitino"
 date: 2024-02-03
-keyword: table partition management
-license: This software is licensed under the Apache License version 2.
+keyword: "table partition management"
+license: "This software is licensed under the Apache License version 2."
 ---
 
 import Tabs from '@theme/Tabs';

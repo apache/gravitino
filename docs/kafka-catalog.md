@@ -1,8 +1,8 @@
 ---
 title: "Kafka Catalog"
-slug: /kafka-catalog
+slug: "/kafka-catalog"
 date: 2024-4-22
-keyword: kafka catalog
+keyword: "kafka catalog"
 license: "This software is licensed under the Apache License version 2."
 ---
 

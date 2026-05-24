@@ -1,8 +1,8 @@
 ---
 title: "Fileset Catalog with OSS"
-slug: /fileset-catalog-with-oss
+slug: "/fileset-catalog-with-oss"
 date: 2025-01-03
-keyword: Fileset catalog OSS
+keyword: "Fileset catalog OSS"
 license: "This software is licensed under the Apache License version 2."
 ---
 

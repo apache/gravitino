@@ -1,6 +1,6 @@
 ---
 title: "Apache Doris Catalog"
-slug: /jdbc-doris-catalog
+slug: "/jdbc-doris-catalog"
 keywords:
 - jdbc
 - Apache Doris

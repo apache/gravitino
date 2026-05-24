@@ -1,7 +1,7 @@
 ---
 title: "Install Lance REST Server on Kubernetes"
-slug: /lance-rest-server-chart
-keyword: 
+slug: "/lance-rest-server-chart"
+keyword: " "
   - Lance REST Server Helm Chart
 license: "This software is licensed under the Apache License version 2."
 ---

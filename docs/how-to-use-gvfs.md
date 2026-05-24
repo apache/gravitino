@@ -1,6 +1,6 @@
 ---
-title: Use GVFS with Filesets
-slug: /how-to-use-gvfs
+title: "Use GVFS with Filesets"
+slug: "/how-to-use-gvfs"
 license: "This software is licensed under the Apache License version 2."
 ---
 

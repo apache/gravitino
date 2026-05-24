@@ -1,8 +1,8 @@
 ---
 title: "Hive Catalog with S3, ADLS, and GCS"
-slug: /hive-catalog
+slug: "/hive-catalog"
 date: 2024-9-24
-keyword: Hive catalog cloud storage S3 ADLS GCS
+keyword: "Hive catalog cloud storage S3 ADLS GCS"
 license: "This software is licensed under the Apache License version 2."
 ---
 

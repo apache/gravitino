@@ -1,7 +1,7 @@
 ---
 title: "Apache Gravitino Spark Connector"
-slug: /spark-connector/spark-connector
-keyword: spark connector federation query 
+slug: "/spark-connector/spark-connector"
+keyword: "spark connector federation query"
 license: "This software is licensed under the Apache License version 2."
 ---
 

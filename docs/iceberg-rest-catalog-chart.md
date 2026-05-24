@@ -1,6 +1,6 @@
 ---
 title: "Install Iceberg REST Catalog Server on Kubernetes"
-slug: /iceberg-rest-catalog-chart
+slug: "/iceberg-rest-catalog-chart"
 keyword:
   - Iceberg REST Helm Chart
 license: "This software is licensed under the Apache License version 2."
