@@ -18,7 +18,7 @@ This capability allows users to perform federation queries, accessing data from 
 4. Supports [Jdbc catalog](flink-catalog-jdbc.md)
 5. Supports most DDL and DML SQLs.
 
-## Requirement
+## Prerequisites
 
 * Flink 1.18
 * Scala 2.12

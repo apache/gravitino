@@ -36,7 +36,7 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 - `DELETE` clause
 - `CALL` clause
 
-## Requirement
+## Prerequisites
 
 * Paimon 0.8
 
