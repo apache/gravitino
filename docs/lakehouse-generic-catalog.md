@@ -19,7 +19,7 @@ The Generic Lakehouse Catalog is a Gravitino catalog implementation designed to 
 
 Gravitino fully supports the **Lance** lakehouse format, with plans to extend support to additional formats in the future.
 
-### Why Use Generic Lakehouse Catalog?
+### Benefits
 
 1. **Unified Metadata Management**: Single source of truth for table metadata across multiple storage backends
 2. **Multi-Format Support**: Extensible architecture to support various lakehouse table formats such as Lance, Iceberg, Hudi, etc.
