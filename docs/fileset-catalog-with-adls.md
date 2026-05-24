@@ -24,7 +24,7 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 ## Configurations for Creating a Fileset Catalog with ADLS
 
-### Configuration for a ADLS Fileset Catalog
+### Configuration for an ADLS Fileset Catalog
 
 Apart from configurations mentioned in [fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with ADLS:
 
