@@ -106,6 +106,10 @@ Apply these rules when reviewing or writing messages:
 - Numbers: spell out one through nine, use digits for 10 and above. Exception: numbers paired with units (5 GB, 3 ms) always digits.
 - Time: "5 ms", "30 s", "2 min", "1 hour" with a space.
 
+## Page structure
+
+Page title convention: every doc uses the frontmatter `title:` field as its page title. Docusaurus renders this as the rendered page H1. Body markdown must not contain any `# H1` headings — they create duplicate page titles. All section headings in the body start at H2 (`##`).
+
 ## What to leave alone
 
 These are out of scope for prose review. Do not edit without explicit approval:
