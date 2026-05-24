@@ -32,7 +32,7 @@ This workflow uses:
 - Built-in update stats job template: `builtin-iceberg-update-stats`
 - Built-in rewrite data files job template: `builtin-iceberg-rewrite-data-files`
 
-### 1. Preflight Checks
+### Step 1: Preflight Checks
 
 ```bash
 # Check metalake
@@ -49,7 +49,7 @@ Expected names include:
 
 If missing, verify `gravitino-jobs` JAR in `auxlib`, then restart Gravitino.
 
-### 2. Prepare Demo Metadata Objects
+### Step 2: Prepare Demo Metadata Objects
 
 Create a REST Iceberg catalog, schema, and table:
 
@@ -94,7 +94,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/metalakes/test/catalogs/rest_catalog/schemas/db/tables
 ```
 
-### 3. Seed Demo Data (Recommended)
+### Step 3: Seed Demo Data (Recommended)
 
 Use Spark SQL to create enough small files so compaction has visible effect:
 
@@ -110,7 +110,7 @@ ${SPARK_HOME}/bin/spark-sql \
       SELECT id, concat('name_', CAST(id AS STRING)) FROM range(0, 100000);"
 ```
 
-### 4. Create and Attach Built-in Compaction Policy
+### Step 4: Create and Attach Built-In Compaction Policy
 
 ```bash
 # Create policy
@@ -140,7 +140,7 @@ Verify association:
 curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies?details=true" | jq
 ```
 
-### 5. Submit Built-in Update Stats Job
+### Step 5: Submit Built-In Update Stats Job
 
 ```bash
 update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -168,7 +168,7 @@ update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+
 echo "update-stats job id: ${update_stats_job_id}"
 ```
 
-### 6. Trigger Rewrite Submission with `submit-strategy-jobs`
+### Step 6: Trigger Rewrite Submission with `submit-strategy-jobs`
 
 ```bash
 # Required optimizer CLI config for strategy submission.
@@ -218,7 +218,7 @@ strategy_job_id=$(echo "${submit_output}" | sed -n 's/.*jobId=\([^[:space:]]*\).
 echo "strategy rewrite job id: ${strategy_job_id}"
 ```
 
-### 7. Track Status and Verify Results
+### Step 7: Track Status and Verify Results
 
 ```bash
 # Check job status by id

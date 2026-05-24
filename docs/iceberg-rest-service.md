@@ -735,7 +735,7 @@ You could try Spark with Gravitino REST catalog service in our [playground](./ho
 
 To enable access control for the Iceberg REST server using Gravitino's dynamic configuration provider, follow these steps:
 
-### 1. Enable Authorization and Dynamic Config Provider
+### Step 1: Enable Authorization and Dynamic Config Provider
 
 Add the following to your Gravitino server configuration file (`gravitino.conf`). 
 Note that access control is only supported when running the Iceberg REST server as an auxiliary service within the Gravitino server:
@@ -754,7 +754,7 @@ Restart the Iceberg REST server after updating the configuration.
 
 ---
 
-### 2. Create a Metalake
+### Step 2: Create a Metalake
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -765,7 +765,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ---
 
-### 3. Create a Catalog
+### Step 3: Create a Catalog
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -779,7 +779,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ---
 
-### 4. Create a Role and Grant Privileges
+### Step 4: Create a Role and Grant Privileges
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
