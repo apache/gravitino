@@ -1,5 +1,5 @@
 ---
-title: "ClickHouse catalog"
+title: "ClickHouse Catalog"
 slug: /jdbc-clickhouse-catalog
 keywords:
 - jdbc

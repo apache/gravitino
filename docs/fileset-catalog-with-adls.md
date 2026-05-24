@@ -1,5 +1,5 @@
 ---
-title: "Fileset catalog with ADLS"
+title: "Fileset Catalog with ADLS"
 slug: /fileset-catalog-with-adls
 date: 2025-01-03
 keyword: Fileset catalog ADLS

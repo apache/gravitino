@@ -1,5 +1,5 @@
 ---
-title: "Lance table support"
+title: "Lance Table Support"
 slug: /lance-table-support
 keywords:
 - lakehouse

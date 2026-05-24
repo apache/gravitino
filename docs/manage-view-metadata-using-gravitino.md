@@ -1,5 +1,5 @@
 ---
-title: "Manage view metadata using Apache Gravitino"
+title: "Manage View Metadata with Gravitino"
 slug: /manage-view-metadata-using-gravitino
 date: 2026-5-17
 keyword: Gravitino view metadata manage

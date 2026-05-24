@@ -1,5 +1,5 @@
 ---
-title: "Manage statistics in Gravitino"
+title: "Manage Statistics with Gravitino"
 slug: /manage-statistics-in-gravitino
 date: 2025-08-21
 keyword: statistics management, statistics, statistic, Gravitino

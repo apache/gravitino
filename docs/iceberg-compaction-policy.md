@@ -1,5 +1,5 @@
 ---
-title: "Iceberg compaction policy"
+title: "Iceberg Compaction Policy"
 slug: /iceberg-compaction-policy
 date: 2026-03-05
 keyword: iceberg, compaction, policy, optimizer, Gravitino

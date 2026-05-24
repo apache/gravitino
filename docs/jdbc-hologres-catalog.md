@@ -1,5 +1,5 @@
 ---
-title: "Hologres catalog"
+title: "Hologres Catalog"
 slug: /jdbc-hologres-catalog
 keywords:
 - jdbc

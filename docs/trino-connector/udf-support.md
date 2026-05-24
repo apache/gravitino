@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Trino connector UDF support"
+title: "Trino Connector UDF Support"
 slug: /trino-connector/udf-support
 keyword: gravitino connector trino udf function
 license: "This software is licensed under the Apache License version 2."

@@ -1,5 +1,5 @@
 ---
-title: "Gravitino credential vending"
+title: "Gravitino Credential Vending"
 slug: /security/credential-vending
 keyword: security credential vending
 license: "This software is licensed under the Apache License version 2."

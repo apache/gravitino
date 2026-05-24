@@ -1,5 +1,5 @@
 ---
-title: Apache Gravitino configuration
+title: Apache Gravitino Configuration
 slug: /gravitino-server-config
 keywords:
   - configuration

@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino connector Trino cascading query"
+title: "Trino Cascading Queries"
 slug: /trino-connector/trino-cascading-query
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."

@@ -1,5 +1,5 @@
 ---
-title: "Hudi catalog"
+title: "Hudi Catalog"
 slug: /lakehouse-hudi-catalog
 keywords:
   - lakehouse

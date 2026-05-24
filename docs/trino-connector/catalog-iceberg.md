@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Trino connector - Iceberg catalog"
+title: "Trino Connector: Iceberg Catalog"
 slug: /trino-connector/catalog-iceberg
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."

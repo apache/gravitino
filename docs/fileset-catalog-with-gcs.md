@@ -1,5 +1,5 @@
 ---
-title: "Fileset catalog with GCS"
+title: "Fileset Catalog with GCS"
 slug: /fileset-catalog-with-gcs
 date: 2024-01-03
 keyword: Fileset catalog GCS

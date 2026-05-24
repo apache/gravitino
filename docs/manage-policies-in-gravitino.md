@@ -1,5 +1,5 @@
 ---
-title: "Manage policies in Gravitino"
+title: "Manage Policies with Gravitino"
 slug: /manage-policies-in-gravitino
 date: 2025-08-04
 keyword: policy management, policy, policies, Gravitino, data governance

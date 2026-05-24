@@ -1,5 +1,5 @@
 ---
-title: "Fileset catalog index"
+title: "Fileset Catalog Index"
 slug: /fileset-catalog-index
 date: 2025-01-13
 keyword: Fileset catalog index S3 GCS ADLS OSS

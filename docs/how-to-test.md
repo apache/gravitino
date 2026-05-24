@@ -1,5 +1,5 @@
 ---
-title: How to test Apache Gravitino
+title: Test Apache Gravitino
 slug: /how-to-test
 license: "This software is licensed under the Apache License version 2."
 ---

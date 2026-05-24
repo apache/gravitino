@@ -1,5 +1,5 @@
 ---
-title: "PostgreSQL catalog"
+title: "PostgreSQL Catalog"
 slug: /jdbc-postgresql-catalog
 keywords:
 - jdbc

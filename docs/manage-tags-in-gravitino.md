@@ -1,5 +1,5 @@
 ---
-title: "Manage tags in Gravitino"
+title: "Manage Tags with Gravitino"
 slug: /manage-tags-in-gravitino
 date: 2024-07-24
 keyword: tag management, tag, tags, Gravitino

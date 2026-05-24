@@ -1,5 +1,5 @@
 ---
-title: "Docker image details"
+title: "Docker Image Details"
 slug: /docker-image-details
 keyword: docker
 license: "This software is licensed under the Apache License version 2."

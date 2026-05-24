@@ -1,5 +1,5 @@
 ---
-title: "Spark connector Paimon catalog"
+title: "Spark Connector: Paimon Catalog"
 slug: /spark-connector/spark-catalog-paimon
 keyword: spark connector paimon catalog
 license: "This software is licensed under the Apache License version 2."

@@ -1,5 +1,5 @@
 ---
-title: "Manage metalake using Apache Gravitino"
+title: "Manage Metalakes with Gravitino"
 slug: /manage-metalake-using-gravitino
 date: 2023-12-10
 keyword: Gravitino metalake manage

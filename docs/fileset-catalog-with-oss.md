@@ -1,5 +1,5 @@
 ---
-title: "Fileset catalog with OSS"
+title: "Fileset Catalog with OSS"
 slug: /fileset-catalog-with-oss
 date: 2025-01-03
 keyword: Fileset catalog OSS

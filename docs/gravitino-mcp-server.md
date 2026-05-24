@@ -1,5 +1,5 @@
 ---
-title: "Gravitino MCP server"
+title: "Apache Gravitino MCP Server"
 slug: /gravitino-mcp-server
 keyword: Gravitino MCP metadata
 license: "This software is licensed under the Apache License version 2."

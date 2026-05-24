@@ -1,5 +1,5 @@
 ---
-title: "Fileset catalog"
+title: "Fileset Catalog"
 slug: /fileset-catalog
 date: 2024-4-2
 keyword: fileset catalog

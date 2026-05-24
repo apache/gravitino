@@ -1,5 +1,5 @@
 ---
-title: "Iceberg catalog"
+title: "Iceberg Catalog"
 slug: /lakehouse-iceberg-catalog
 keywords:
   - lakehouse
