@@ -14,13 +14,13 @@ The Apache Gravitino Spark connector offers the capability to read and write Pai
 
 ## Capabilities
 
-### Support DDL and DML Operations
+### Supported DDL and DML Operations
 
 - `CREATE NAMESPACE`
 - `DROP NAMESPACE`
 - `LIST NAMESPACE`
 - `LOAD NAMESPACE`
-  - It cannot return any user-specified configs now, as we only support FilesystemCatalog in spark-connector now.
+  - Returning user-specified configs is not supported; the spark-connector currently only supports FilesystemCatalog.
 - `CREATE TABLE`
   - Doesn't support distribution and sort orders.
 - `DROP TABLE`
