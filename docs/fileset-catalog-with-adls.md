@@ -26,7 +26,7 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 ## ADLS Catalog Configuration
 
-### Configuration for an ADLS Fileset Catalog
+### ADLS Fileset Catalog Configuration
 
 Apart from configurations mentioned in [fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with ADLS:
 
@@ -42,11 +42,11 @@ Apart from configurations mentioned in [fileset-catalog-catalog-configuration](.
 `default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-azure-bundle`).
 :::
 
-### Configurations for a Schema
+### Schema Configuration
 
 Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.
 
-### Configurations for a Fileset
+### Fileset Configuration
 
 Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
@@ -494,7 +494,7 @@ Since 0.8.0-incubating, Gravitino supports credential vending for ADLS fileset. 
 
 ### Create an ADLS Fileset Catalog with Credential Vending
 
-Apart from configuration method in [create-adls-fileset-catalog](#configuration-for-an-adls-fileset-catalog),
+Apart from configuration method in [create-adls-fileset-catalog](#adls-fileset-catalog-configuration),
 properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should
 also be set to enable credential vending for ADLS fileset. Take `adls-token` credential provider for example:
 

@@ -26,7 +26,7 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 ## GCS Catalog Configuration
 
-### Configuration for a GCS Fileset Catalog
+### GCS Fileset Catalog Configuration
 
 Apart from configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with GCS:
 
@@ -41,11 +41,11 @@ Apart from configurations mentioned in [Fileset-catalog-catalog-configuration](.
 `default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-gcp-bundle`).
 :::
 
-### Configurations for a Schema
+### Schema Configuration
 
 Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.
 
-### Configurations for a Fileset
+### Fileset Configuration
 
 Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
@@ -478,7 +478,7 @@ Since 0.8.0-incubating, Gravitino supports credential vending for GCS fileset. I
 
 ### Create a GCS Fileset Catalog with Credential Vending
 
-Apart from configuration method in [create-gcs-fileset-catalog](#configuration-for-a-gcs-fileset-catalog),
+Apart from configuration method in [create-gcs-fileset-catalog](#gcs-fileset-catalog-configuration),
 properties needed by [gcs-credential](./security/credential-vending.md#gcs-credentials) should also
 be set to enable credential vending for GCS fileset. Take `gcs-token` credential provider for example:
 
