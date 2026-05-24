@@ -131,6 +131,8 @@ First body H2 must not duplicate the frontmatter title. The title renders as the
 
 Every doc page opens with an H2 heading after the frontmatter. Prose, admonitions, or code blocks before the first H2 read as orphan content and look inconsistent against pages that open with a section heading. The default opening heading is `## Introduction`. Use `## Overview` or `## Background` when the existing content has clearly moved past introductory framing. MDX imports/exports and license HTML comments between the frontmatter and the first H2 are not orphan content and stay above the heading. Run `scripts/intro_audit.py` to find candidates.
 
+Every Markdown heading takes one blank line before and one blank line after. Compressed spacing (a paragraph or list ending directly above a heading, or a heading directly above content with no separator) breaks rendering in some Markdown parsers and reads as visually tight in all of them. Run `scripts/heading_spacing_audit.py` to catch violations before commit.
+
 ## What to leave alone
 
 These are out of scope for prose review. Do not edit without explicit approval:
