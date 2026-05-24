@@ -1,5 +1,5 @@
 ---
-title: How to sign and verify Gravitino releases
+title: Sign and Verify Releases
 slug: /how-to-sign-releases
 license: "This software is licensed under the Apache License version 2."
 ---

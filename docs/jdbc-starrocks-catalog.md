@@ -1,5 +1,5 @@
 ---
-title: "StarRocks catalog"
+title: "StarRocks Catalog"
 slug: /jdbc-starrocks-catalog
 keywords:
 - jdbc

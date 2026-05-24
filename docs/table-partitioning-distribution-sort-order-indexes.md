@@ -1,5 +1,5 @@
 ---
-title: "Table partitioning, distribution and sort ordering and indexes"
+title: "Table Partitioning, Distribution, Sort Ordering, and Indexes"
 slug: /table-partitioning-distribution-sort-order-indexes
 date: 2023-12-25
 keyword: Table Partition Bucket Distribute Sort By

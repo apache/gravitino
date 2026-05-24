@@ -1,5 +1,5 @@
 ---
-title: "Installing Apache Gravitino Playground"
+title: "Install the Apache Gravitino Playground"
 slug: /getting-started/playground
 license: "This software is licensed under the Apache License version 2."
 ---

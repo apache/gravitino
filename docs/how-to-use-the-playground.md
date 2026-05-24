@@ -1,5 +1,5 @@
 ---
-title: "How to use the playground"
+title: "Use the Playground"
 slug: /how-to-use-the-playground
 keyword: playground
 license: "This software is licensed under the Apache License version 2."

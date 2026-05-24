@@ -1,5 +1,5 @@
 ---
-title: "Iceberg REST catalog service"
+title: "Iceberg REST Catalog Service"
 slug: /iceberg-rest-service
 keywords:
   - Iceberg REST catalog

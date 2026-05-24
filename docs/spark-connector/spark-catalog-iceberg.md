@@ -1,5 +1,5 @@
 ---
-title: "Spark connector Iceberg catalog"
+title: "Spark Connector: Iceberg Catalog"
 slug: /spark-connector/spark-catalog-iceberg
 keyword: spark connector iceberg catalog
 license: "This software is licensed under the Apache License version 2."

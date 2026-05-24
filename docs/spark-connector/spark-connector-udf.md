@@ -1,5 +1,5 @@
 ---
-title: "Spark connector - User-defined functions"
+title: "Spark Connector: User-Defined Functions"
 slug: /spark-connector/spark-connector-udf
 keyword: spark connector UDF user-defined function
 license: "This software is licensed under the Apache License version 2."

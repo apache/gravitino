@@ -1,5 +1,5 @@
 ---
-title: "Install Iceberg Rest catalog server on Kubernetes"
+title: "Install Iceberg REST Catalog Server on Kubernetes"
 slug: /iceberg-rest-catalog-chart
 keyword:
   - Iceberg REST Helm Chart

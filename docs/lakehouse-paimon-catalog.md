@@ -1,5 +1,5 @@
 ---
-title: "Paimon catalog"
+title: "Paimon Catalog"
 slug: /lakehouse-paimon-catalog
 keywords:
   - lakehouse

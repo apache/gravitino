@@ -1,5 +1,5 @@
 ---
-title: "Flink connector paimon catalog"
+title: "Flink Connector: Paimon Catalog"
 slug: /flink-connector/flink-catalog-paimon
 keyword: flink connector paimon catalog
 license: "This software is licensed under the Apache License version 2."

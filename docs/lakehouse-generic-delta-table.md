@@ -1,5 +1,5 @@
 ---
-title: "Delta Lake table support"
+title: "Delta Lake Table Support"
 slug: /delta-table-support
 keywords:
 - lakehouse

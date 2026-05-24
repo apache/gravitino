@@ -1,5 +1,5 @@
 ---
-title: Manage model metadata using Gravitino
+title: Manage Model Metadata with Gravitino
 slug: /manage-model-metadata-using-gravitino
 date: 2024-12-26
 keyword: Gravitino model metadata manage

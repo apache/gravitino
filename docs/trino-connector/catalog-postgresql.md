@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Trino connector - PostgreSQL catalog"
+title: "Trino Connector: PostgreSQL Catalog"
 slug: /trino-connector/catalog-postgresql
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."

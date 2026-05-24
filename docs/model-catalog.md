@@ -1,5 +1,5 @@
 ---
-title: "Model catalog"
+title: "Model Catalog"
 slug: /model-catalog
 date: 2024-12-26
 keyword: model catalog

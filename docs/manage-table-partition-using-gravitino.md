@@ -1,5 +1,5 @@
 ---
-title: "Manage table partition using Apache Gravitino"
+title: "Manage Table Partitions with Gravitino"
 slug: /manage-table-partition-using-gravitino
 date: 2024-02-03
 keyword: table partition management

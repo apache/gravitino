@@ -1,5 +1,5 @@
 ---
-title: "Apache Doris catalog"
+title: "Apache Doris Catalog"
 slug: /jdbc-doris-catalog
 keywords:
 - jdbc

@@ -1,5 +1,5 @@
 ---
-title: "Apache Gravitino Trino connector - Hive catalog"
+title: "Trino Connector: Hive Catalog"
 slug: /trino-connector/catalog-hive
 keyword: gravitino connector trino
 license: "This software is licensed under the Apache License version 2."

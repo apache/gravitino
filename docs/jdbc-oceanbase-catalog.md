@@ -1,5 +1,5 @@
 ---
-title: "OceanBase catalog"
+title: "OceanBase Catalog"
 slug: /jdbc-oceanbase-catalog
 keywords:
 - jdbc

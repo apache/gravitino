@@ -1,5 +1,5 @@
 ---
-title: "Kafka catalog"
+title: "Kafka Catalog"
 slug: /kafka-catalog
 date: 2024-4-22
 keyword: kafka catalog
