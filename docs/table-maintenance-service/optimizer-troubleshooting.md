@@ -117,6 +117,7 @@ Example in `--spark-conf`:
 Check your `--conf-path` and file permissions.
 
 ## Related
+
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer Quick Start and Verification](./optimizer-quick-start.md)

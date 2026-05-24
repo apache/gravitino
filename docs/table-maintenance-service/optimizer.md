@@ -122,6 +122,7 @@ Quick start prerequisites and success checks are documented in
 [Optimizer Quick Start and Verification](./optimizer-quick-start.md).
 
 ## Related
+
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer Extension Guide](./optimizer-extension-guide.md)
 - [Optimizer Quick Start and Verification](./optimizer-quick-start.md)

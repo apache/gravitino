@@ -230,6 +230,7 @@ EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<
 ```
 
 ## Related
+
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer Extension Guide](./optimizer-extension-guide.md)

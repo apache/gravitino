@@ -123,6 +123,7 @@ If you need more information about catalog, refer to:
 [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog).
 
 ## Pass Trino Connector Configuration
+
 A Gravitino catalog is implemented by the Trino connector, so you can pass the Trino connector configuration to the Gravitino catalog.
 For example, you want to set the `hive.config.resources` configuration for the Hive catalog, you can pass the configuration to the
 Gravitino catalog like this:

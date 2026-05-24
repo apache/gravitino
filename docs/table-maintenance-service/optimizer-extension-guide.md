@@ -123,6 +123,7 @@ If you also extend Gravitino server job execution, see [Manage jobs in Gravitino
 4. Dry-run (`submit-strategy-jobs --dry-run`) prints expected recommendations.
 
 ## Related
+
 - [Table Maintenance Service (Optimizer)](./optimizer.md)
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer CLI Reference](./optimizer-cli-reference.md)

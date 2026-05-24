@@ -386,6 +386,7 @@ The privileges `CREATE_MODEL` and `CREATE_MODEL_VERSION` are deprecated and will
 | USE_JOB_TEMPLATE      | Metalake, JobTemplate     | Use a job template when running the job |
 
 ### Job Privileges
+
 | Name    | Supports Securable Object | Operation |
 |---------|---------------------------|-----------|
 | RUN_JOB | Metalake                  | Run a job |

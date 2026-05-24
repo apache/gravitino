@@ -168,6 +168,7 @@ Gravitino provides governance features to manage metadata in a unified way. See:
   as an Apache Iceberg REST catalog service.
 
 ### Gravitino Lance REST Catalog Service
+
 * [Lance REST catalog service](./lance-rest-service.md): a guide to using Gravitino
   as a Lance REST catalog service.
 

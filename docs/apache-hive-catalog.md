@@ -77,6 +77,7 @@ When using Gravitino with Trino, pass the Trino Hive connector configuration usi
 When using Gravitino with Spark, pass the Spark Hive connector configuration using the `spark.bypass.` prefix. For example, using `spark.bypass.hive.exec.dynamic.partition.mode` to pass the `hive.exec.dynamic.partition.mode` to the Spark Hive connector in Spark runtime.
 
 When using Gravitino authorization for Hive with Apache Ranger, see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#configure-the-ranger-hadoop-sql-plugin)
+
 ### Catalog Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.

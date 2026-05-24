@@ -11,6 +11,7 @@ license: "This software is licensed under the Apache License version 2."
 This document describes how to configure a Fileset catalog with GCS.
 
 ## Prerequisites
+
 To set up a Fileset catalog with OSS, follow these steps:
 
 1. Download the [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) file.
