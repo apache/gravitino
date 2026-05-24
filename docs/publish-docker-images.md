@@ -35,6 +35,6 @@ Use GitHub actions to publish Docker images to the Docker Hub repository.
 
 ![Publish Docker image](assets/publish-docker-image.png)
 
-## More Details of Apache Gravitino Docker Images
+## More Details of Docker Images
 
 + [Gravitino Docker images](docker-image-details.md)
