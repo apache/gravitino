@@ -158,7 +158,7 @@ WITH (
 
 ## Known Issues
 
-### `TIMESTAMP with TIME ZONE` Values Are Not Adjusted to the Client Session Time Zone
+### `TIMESTAMP WITH TIME ZONE` Values Are Not Adjusted to the Client Session Time Zone
 
 For `TIMESTAMP WITH TIME ZONE` values, Trino does not adjust query results according to the client
 session time zone. Unlike Spark and Flink, Trino displays these values based on the stored
