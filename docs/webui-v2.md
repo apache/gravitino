@@ -34,7 +34,7 @@ The Web V2 introduces additional modules (such as Jobs, Job Templates, Data Comp
 
 Data Compliance includes **Tags** and **Policies**. The **Access** module is visible only when `gravitino.authorization.enable=true` and includes **Users**, **User Groups**, and **Roles**.
 
-### Initial Page (Web V2)
+### Initial Page
 
 The Web V2 landing page depends on both the authentication mode and whether authorization is enabled in `<path-to-gravitino>/conf/gravitino.conf`.
 
@@ -50,13 +50,13 @@ The Web V2 landing page depends on both the authentication mode and whether auth
 
   ![oauth-login](./assets/webui-v2/oauth-login.png)
 
-### Metalakes (Web V2)
+### Metalakes
 
 Overview for Metalake in the Web V2.
 
 ![metalakes-list](./assets/webui-v2/metalakes-list.png)
 
-#### Create Metalake (Web V2)
+#### Create Metalake
 
 Click the `CREATE METALAKE` button to open the create dialog. Fill in the form fields and submit to create the metalake.
 
@@ -64,13 +64,13 @@ Click the `CREATE METALAKE` button to open the create dialog. Fill in the form f
 
 After creation, the basic information is visible in the metalake list.
 
-#### Properties Popover (Web V2)
+#### Properties Popover
 
 Hover over the number in the **Properties** column to view the properties popover.
 
 ![metalake-properties-popover](./assets/webui-v2/metalake-properties-popover.png)
 
-#### Actions (Web V2)
+#### Actions
 
 In the **Actions** column, you can edit or delete the metalake. The settings dropdown includes:
 
@@ -79,40 +79,40 @@ In the **Actions** column, you can edit or delete the metalake. The settings dro
 
 ![metalake-actions](./assets/webui-v2/metalake-actions.png)
 
-#### Delete Metalake (Web V2)
+#### Delete Metalake
 
 To delete a metalake, the metalake must be **not in-use** (set it in the [Actions (Web V2)](#actions-web-v2) settings dropdown), and all sub-entities must be deleted first. The delete dialog requires entering the metalake name for confirmation before deletion.
 
 ![metalake-delete-confirm](./assets/webui-v2/metalake-delete-confirm.png)
 
-### Catalogs (Web V2)
+### Catalogs
 
 Overview for Catalog in the Web V2.
 
-#### Catalog Type Filter (Web V2)
+#### Catalog Type Filter
 
 On the catalogs page, use the catalog type selector at the top-left to switch between `relational`, `messaging`, `fileset`, and `model`. The list updates to show catalogs of the selected type.
 
 
-#### Tags and Policies Association (Web V2)
+#### Tags and Policies Association
 
 The catalog list shows basic catalog information along with associated **Tags** and **Policies**. Use **Associate Tag** and **Associate Policy** in the list to add associations. Click the **X** on a tag to remove it.
 
 ![catalogs-list](./assets/webui-v2/catalogs-list.png)
 
-#### Disable Catalog (Web V2)
+#### Disable Catalog
 
 From the **Actions** settings dropdown, switch a catalog to **not in-use**. A disabled icon appears next to the catalog name, and the catalog name becomes non-clickable (you cannot enter the catalog details page).
 
 ![catalog-actions](./assets/webui-v2/catalog-actions.png)
 
-#### Provider Filter (Web V2)
+#### Provider Filter
 
 Use the filter on the **Provider** table header to narrow the catalogs list by provider.
 
 ![catalogs-disabled-icon-and-filter-catalogs](./assets/webui-v2/catalogs-disabled-icon-and-filter-catalogs.png)
 
-#### Create Catalog (Web V2)
+#### Create Catalog
 
 Click **Create Catalog** to open the creation form for the selected catalog type. In step 1, choose the provider for the selected type. Click **Next** to go to step 2, fill in the required properties, and submit to create the catalog. Some providers support **Test Connection** so you can validate connectivity before submitting.
 
@@ -120,7 +120,7 @@ Click **Create Catalog** to open the creation form for the selected catalog type
 
 ![catalogs-create-step2](./assets/webui-v2/create-catalog-step2.png)
 
-#### Delete Catalog (Web V2)
+#### Delete Catalog
 
 If the catalog is still in-use, the UI shows the **Delete** entry as shown in **Figure 1 below**. After switching the catalog to **not in-use** (see [Disable catalog (Web V2)](#disable-catalog-web-v2)), the **Delete** entry changes to **Figure 2 below**. Enter the catalog name for the second confirmation, then you can delete it.
 
@@ -128,7 +128,7 @@ If the catalog is still in-use, the UI shows the **Delete** entry as shown in **
 
 ![catalog-delete-figure-2](./assets/webui-v2/catalog-delete-figure-2.png)
 
-#### Navbar (Web V2)
+#### Navbar
 
 The navbar provides the following shortcuts:
 
@@ -139,19 +139,19 @@ The navbar provides the following shortcuts:
 ![navbar-system-mode](./assets/webui-v2/navbar-system-mode.png)
 ![navbar-user-dropdown](./assets/webui-v2/navbar-user-dropdown.png)
 
-### Catalog Details & Schemas (Web V2)
+### Catalog Details & Schemas
 
 Enter the catalog details page by clicking the catalog name either from the left tree or from the catalog name in the right list. The catalog name shows basic catalog information underneath it. Hover over the highlighted numbers to open a popover with more details.
 
 Below the catalog information, the page shows the **Schemas** list and the catalog's **Associated Roles**. The **Associated Roles** section is visible only when `gravitino.authorization.enable=true`, and it lists the role name and its privileges.
 
-#### Schemas List (Web V2)
+#### Schemas List
 
 Overview for Schemas in the Web V2.
 
 ![schemas-list](./assets/webui-v2/schemas-list.png)
 
-#### Associated Roles (Web V2)
+#### Associated Roles
 
 Overview for Associated Roles in the Web V2. (visible only when `gravitino.authorization.enable=true`)
 
@@ -170,13 +170,13 @@ function definition.
 
 ![function-details](./assets/webui-v2/function-details.png)
 
-### Tables (Web V2)
+### Tables
 
 Overview for Table in the Web V2.
 
 ![tables-list](./assets/webui-v2/tables-list.png)
 
-#### Create Table (Web V2)
+#### Create Table
 
 In the **Schema details** page, the list shows all tables under the selected schema. Click **Create Table** to open the table creation form.
 
@@ -195,7 +195,7 @@ In **Properties**, default values are prefilled and can be changed. Reselect and
 
 Submit the form to create a complex table.
 
-### Filesets (Web V2)
+### Filesets
 
 Overview for Fileset in the Web V2.
 
@@ -205,31 +205,31 @@ Overview for files under fileset in the Web V2.
 
 ![files-list](./assets/webui-v2/files-list.png)
 
-### Topics (Web V2)
+### Topics
 
 Overview for Topic in the Web V2.
 
 ![topics-list](./assets/webui-v2/topics-list.png)
 
-### Models (Web V2)
+### Models
 
 Overview for Model in the Web V2.
 
 ![models-list](./assets/webui-v2/models-list.png)
 
-### Versions (Web V2)
+### Versions
 
 Overview for Version in the Web V2.
 
 ![versions-list](./assets/webui-v2/versions-list.png)
 
-### Job (Web V2)
+### Jobs
 
 Overview for Job in the Web V2.
 
 ![jobs-list](./assets/webui-v2/jobs-list.png)
 
-#### Run Job (Web V2)
+#### Run Job
 
 Click **Run Job**, select a job template, and review the template parameters on the left. On the right, use **Job Configuration** to replace the template placeholders defined with `{{}}`. After the replacements, the final job script is generated and executed.
 
@@ -239,50 +239,50 @@ In the job template select dropdown, you can choose **Register Job Template** to
 
 ![run-job](./assets/webui-v2/run-job2.png)
 
-### Job Template (Web V2)
+### Job Templates
 
 Overview for Job Template in the Web V2.
 
 ![jobTemplates-list](./assets/webui-v2/jobTemplates-list.png)
 
-#### Register Job Template (Web V2)
+#### Register Job Template
 
 Click **Register Job Template** to open the create template form. Choose a job type, fill in the required fields, and submit to register the template.
 
 ![job-template-register](./assets/webui-v2/job-template-register.png)
 
 
-### Data Compliance - Tags (Web V2)
+### Data Compliance: Tags
 
 Overview for Data Compliance Tags in the Web V2.
 
 ![tags-list](./assets/webui-v2/tags-list.png)
 
-#### Create Tag (Web V2)
+#### Create Tag
 
 Click **Create Tag** to open the create form. Fill in the required fields and submit to create a tag.
 
 ![tags-create](./assets/webui-v2/tags-create.png)
 
-#### Tag Metadata Objects (Web V2)
+#### Tag Metadata Objects
 
 Click a tag to navigate to the **Metadata Objects** page, which lists all metadata objects associated with the selected tag.
 
 ![tag-metadata-objects](./assets/webui-v2/tag-metadata-objects.png)
 
-### Data Compliance - Policies (Web V2)
+### Data Compliance: Policies
 
 Overview for Data Compliance Policies in the Web V2.
 
 ![policies-list](./assets/webui-v2/policies-list.png)
 
-#### Create Policy (Web V2)
+#### Create Policy
 
 Click **Create Policy** to open the create form. Fill in the required fields and submit to create a policy.
 
 ![policies-create](./assets/webui-v2/policies-create.png)
 
-#### Policy Metadata Objects (Web V2)
+#### Policy Metadata Objects
 
 Click a policy tag to navigate to the **Metadata Objects** page, which lists all metadata objects associated with the selected policy.
 
@@ -292,49 +292,49 @@ Click a policy tag to navigate to the **Metadata Objects** page, which lists all
 
 The Access module is visible only when `gravitino.authorization.enable=true`.
 
-### Access - Users (Web V2)
+### Access: Users
 
 Overview for Access Users in the Web V2.
 
 ![users-list](./assets/webui-v2/users-list.png)
 
-#### Add User (Web V2)
+#### Add User
 
 Click **Add User** to open the create form. Fill in the required fields and submit to create a user.
 
 ![users-add](./assets/webui-v2/users-add.png)
 
-#### Grant Role (Web V2)
+#### Grant Role
 
 From the **Actions**, click **Grant Role** icon to assign roles to the selected user.
 
 ![users-grant-role](./assets/webui-v2/users-grant-role.png)
 
-### Access - User Groups (Web V2)
+### Access: User Groups
 
 Overview for Access User Groups in the Web V2.
 
 ![userGroups-list](./assets/webui-v2/userGroups-list.png)
 
-#### Add User Group (Web V2)
+#### Add User Group
 
 Click **Add User Group** to open the create form. Fill in the required fields and submit to create a user group.
 
 ![userGroups-add](./assets/webui-v2/userGroups-add.png)
 
-#### Grant Role (Web V2)
+#### Grant Role
 
 From the **Actions**, click **Grant Role** icon to assign roles to the selected user group.
 
 ![userGroups-grant-role](./assets/webui-v2/userGroups-grant-role.png)
 
-### Access - Roles (Web V2)
+### Access: Roles
 
 Overview for Access Roles in the Web V2.
 
 ![roles-list](./assets/webui-v2/roles-list.png)
 
-#### Create Role (Web V2)
+#### Create Role
 
 Click **Create Role** to open the create form. A role can include multiple securable objects. Different securable object types have different available privileges. For details, see [Securable Objects](security/access-control.md#securable-objects) and [Privilege Types](security/access-control.md#privilege-types).
 
