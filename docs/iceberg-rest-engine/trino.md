@@ -174,7 +174,7 @@ SELECT
 FROM <catalog>.<namespace>.<table>;
 ```
 
-## Gravitino Connector Vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

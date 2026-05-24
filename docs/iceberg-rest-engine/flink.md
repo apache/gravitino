@@ -152,7 +152,7 @@ CREATE TABLE gravitino_irc.<namespace>.new_table (
 INSERT INTO gravitino_irc.<namespace>.new_table VALUES (1, 'example', CURRENT_TIMESTAMP);
 ```
 
-## Gravitino Connector Vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

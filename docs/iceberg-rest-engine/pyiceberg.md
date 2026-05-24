@@ -94,7 +94,7 @@ schema = Schema(
 catalog.create_table("db.new_table", schema=schema)
 ```
 
-## Gravitino Connector Vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|
