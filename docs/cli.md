@@ -361,13 +361,13 @@ gcli.sh catalog create --name doris --provider doris --properties jdbc-url=jdbc:
 gcli.sh catalog create --name paimon --provider paimon --properties catalog-backend=jdbc,uri=jdbc:mysql://127.0.0.1:3306/metastore_db,authentication.type=simple
 ```
 
-#### Create a Hudi Catalog
+##### Create a Hudi catalog
 
 ```bash
 gcli.sh catalog create --name hudi --provider hudi --properties catalog-backend=hms,uri=thrift://127.0.0.1:9083
 ```
 
-#### Create an OceanBase Catalog
+##### Create an OceanBase catalog
 
 ```bash
 gcli.sh catalog create --name oceanbase --provider oceanbase --properties jdbc-url=jdbc:mysql://localhost:2881,jdbc-driver=com.mysql.jdbc.Driver,jdbc-user=admin,jdbc-password=password
@@ -480,31 +480,31 @@ location,String,city they work in,false,false,Sydney,String
 gcli.sh table list --name catalog_postgres.hr
 ```
 
-#### Tables Details
+#### Table Details
 
 ```bash
 gcli.sh table details --name catalog_postgres.hr.departments
 ```
 
-#### Tables Audit Information
+#### Table Audit Information
 
 ```bash
 gcli.sh table details --name catalog_postgres.hr.departments --audit
 ```
 
-#### Tables Distribution Information
+#### Table Distribution Information
 
 ```bash
 gcli.sh table details --name catalog_postgres.hr.departments --distribution
 ```
 
-#### Tables Partition Information
+#### Table Partition Information
 
 ```bash
 gcli.sh table details --name catalog_postgres.hr.departments --partition
 ```
 
-#### Tables Sort Order Information
+#### Table Sort Order Information
 
 ```bash
 gcli.sh table details --name catalog_postgres.hr.departments --sortorder
@@ -666,7 +666,7 @@ gcli.sh tag list --name catalog_postgres.hr
 gcli.sh tag properties --tag tagA
 ```
 
-#### Set a Properties of a Tag
+#### Set a Property of a Tag
 
 ```bash
 gcli.sh tag set --tag tagA --property test --value value
@@ -784,19 +784,21 @@ gcli.sh group revoke --group groupA --role admin
 gcli.sh group revoke --group groupA --all
 ```
 
-### Grant a Privilege
+### Privilege Commands
+
+#### Grant a Privilege
 
 ```bash
 gcli.sh role grant --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
-### Revoke a Privilege
+#### Revoke a Privilege
 
 ```bash
 gcli.sh role revoke --metalake metalake_demo --name catalog_postgres --role admin --privilege create_table modify_table
 ```
 
-### Revoke All Privileges
+#### Revoke All Privileges
 
 ```bash
 gcli.sh role revoke --metalake metalake_demo --name catalog_postgres --role admin --all
