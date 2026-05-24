@@ -22,7 +22,7 @@ $ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
 
 Once the server is up and running, you can proceed to configure the Fileset catalog with OSS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, replace with your actual server URL.
 
-## Configurations for Creating a Fileset Catalog with OSS
+## OSS Catalog Configuration
 
 ### Configuration for an OSS Fileset Catalog
 
@@ -49,7 +49,7 @@ To create a schema, refer to [Schema configurations](./fileset-catalog.md#schema
 
 For instructions on how to create a fileset, refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
-## Create a Fileset Catalog, Schema, and Fileset with OSS
+## Create the Catalog, Schema, and Fileset
 
 This section will show you how to use the Fileset catalog with OSS in Gravitino, including detailed examples.
 
