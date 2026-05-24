@@ -268,7 +268,7 @@ result = ray_dataset.filter(lambda row: row["value"] < 100).count()
 print(f"Filtered row count: {result}")
 ```
 
-## Additional Engine Support
+## Additional Engines
 
 The Lance REST service is compatible with other data processing engines that support the Lance format, including:
 

@@ -76,7 +76,7 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Interval_day`                   | `Duration(Microsecond)`                 |
 | `External(arrow_field_json_str)` | Any Arrow Field                         |
 
-### External Type Support
+### External Types
 
 For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_json_str)` type, which accepts a JSON string representation of an Arrow `Field`.
 

@@ -23,7 +23,7 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 - `DELETE` clause
 - `CALL` clause
 
-## Generic Table Support
+## Generic Tables
 
 Flink generic tables are non-Hive tables. Their schema and partition keys are stored in table
 properties in Hive metastore. Gravitino Flink connector follows the Flink Hive catalog behavior:
