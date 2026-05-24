@@ -45,7 +45,7 @@ To get started with Gravitino, see [Getting started](./getting-started/index.md)
 * [Running on Google Cloud Platform](./getting-started/index.md#gcp):
   a quick guide to starting and using Gravitino on GCP.
 
-## How to Use Apache Gravitino
+## Manage Metadata with Gravitino
 
 Gravitino provides two SDKs to manage metadata from different catalogs in a unified way:
 the REST API and the Java SDK.
