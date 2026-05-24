@@ -5,7 +5,7 @@ keyword: "gravitino connector trino authentication"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Authentication
+## Introduction
 
 The Gravitino Trino connector supports authenticating to the Gravitino server using the same authentication mechanisms as the Gravitino Java client: Simple, OAuth2, and Kerberos. Authentication is configured through the Trino connector properties file using the `gravitino.client.*` prefix.
 

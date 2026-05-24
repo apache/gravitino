@@ -5,7 +5,7 @@ keyword: "security authentication oauth kerberos"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Authentication
+## Introduction
 
 Apache Gravitino supports four kinds of authentication mechanisms: simple, Basic, OAuth and Kerberos.
 If you don't enable authentication for your client and server explicitly, the user `anonymous` will be used to access the server.

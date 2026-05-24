@@ -5,7 +5,7 @@ keyword: "security"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Authorization Pushdown
+## Introduction
 
 ![authorization pushdown](../assets/security/authorization-pushdown.png)
 
