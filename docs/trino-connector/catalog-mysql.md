@@ -89,7 +89,7 @@ The following are Trino type which support configuration of default values:
 
 ## Examples
 
-Do the following steps before you can use the MySQL catalog in Trino through Gravitino:
+Complete the following steps before you can use the MySQL catalog in Trino through Gravitino:
 
 - Create a metalake and catalog in Gravitino. Assuming that the metalake name is `test` and the catalog name is `mysql_test`,
 then you can use the following code to create them in Gravitino:

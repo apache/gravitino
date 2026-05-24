@@ -154,7 +154,7 @@ Reserved properties: A reserved property is one can't be set by users but can be
 
 ## Examples
 
-Do the following steps before you can use the Iceberg catalog in Trino through Apache Gravitino:
+Complete the following steps before you can use the Iceberg catalog in Trino through Apache Gravitino:
 
 - Create a metalake and catalog in Apache Gravitino. Assuming that the metalake name is `test` and the catalog name is `iceberg_test`,
 then you can use the following code to create them in Apache Gravitino:
