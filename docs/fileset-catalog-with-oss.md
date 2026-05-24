@@ -26,7 +26,7 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 ## OSS Catalog Configuration
 
-### Configuration for an OSS Fileset Catalog
+### OSS Fileset Catalog Configuration
 
 In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with OSS:
 
@@ -43,11 +43,11 @@ In addition to the basic configurations mentioned in [Fileset-catalog-catalog-co
 `default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aliyun-bundle`).
 :::
 
-### Configurations for a Schema
+### Schema Configuration
 
 To create a schema, refer to [Schema configurations](./fileset-catalog.md#schema-properties).
 
-### Configurations for a Fileset
+### Fileset Configuration
 
 For instructions on how to create a fileset, refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
 
@@ -503,7 +503,7 @@ Since 0.8.0-incubating, Gravitino supports credential vending for OSS fileset. I
 
 ### Create an OSS Fileset Catalog with Credential Vending
 
-Apart from configuration method in [create-oss-fileset-catalog](#configuration-for-an-oss-fileset-catalog),
+Apart from configuration method in [create-oss-fileset-catalog](#oss-fileset-catalog-configuration),
 properties needed by [oss-credential](./security/credential-vending.md#oss-credentials)
 should also be set to enable credential vending for OSS fileset. Take `oss-token` credential provider for example:
 
