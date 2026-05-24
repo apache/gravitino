@@ -729,7 +729,7 @@ Or build it manually to add custom configuration or logics:
 sh ./dev/docker/build-docker.sh --platform linux/arm64 --type iceberg-rest-server --image apache/gravitino-iceberg-rest --tag $tag
 ```
 
-You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#use-apache-iceberg-rest-service).
+You could try Spark with Gravitino REST catalog service in our [playground](./how-to-use-the-playground.md#apache-iceberg-rest-service).
 
 ## Quick Start: Enable Access Control for Iceberg REST Server
 

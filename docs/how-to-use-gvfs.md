@@ -112,10 +112,10 @@ The plain `fs.path.config.<name>` entry specifies the base path of the filesyste
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](./how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
 
 Apart from the above properties, to access fileset like S3, GCS, OSS and custom fileset, extra properties are needed; see
-[S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#use-the-gvfs-java-client-to-access-the-fileset),
-[GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#use-the-gvfs-java-client-to-access-the-fileset),
-[OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#use-the-gvfs-java-client-to-access-the-fileset)
-and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#use-the-gvfs-java-client-to-access-the-fileset) for more details.
+[S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#access-the-fileset-with-the-gvfs-java-client),
+[GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#access-the-fileset-with-the-gvfs-java-client),
+[OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#access-the-fileset-with-the-gvfs-java-client)
+and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#access-the-fileset-with-the-gvfs-java-client) for more details.
 
 #### Custom Fileset
 
@@ -321,7 +321,7 @@ Gravitino Virtual File System supports two kinds of authentication types to acce
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System.
 
-#### Use `simple` Authentication
+#### `simple` Authentication
 
 First, make sure that your Gravitino server is also configured to use the `simple` authentication mode.
 
@@ -345,7 +345,7 @@ Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_filese
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
 
-#### Use `OAuth` Authentication
+#### `OAuth` Authentication
 
 If you want to use `oauth2` authentication for the Gravitino client in the Gravitino Virtual File System,
 refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](security/security.md).
@@ -369,7 +369,7 @@ Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_filese
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
 
-#### Use `Kerberos` Authentication
+#### `Kerberos` Authentication
 
 If you want to use `kerberos` authentication for the Gravitino client in the Gravitino Virtual File System,
 refer to this document to complete the configuration of the Gravitino server: [Security](security/security.md).
@@ -472,10 +472,10 @@ The plain `fs_path_config_<name>` entry specifies the base path of the filesyste
 
 #### Configurations for S3, GCS, OSS and Azure Blob Storage Fileset
 
-Please see the cloud-storage-specific configurations [GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#use-the-gvfs-python-client-to-access-a-fileset),
-[S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#use-the-gvfs-python-client-to-access-a-fileset),
-[OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#use-the-gvfs-python-client-to-access-a-fileset)
-and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#use-the-gvfs-python-client-to-access-a-fileset) for more details.
+Please see the cloud-storage-specific configurations [GCS GVFS Python client configurations](./fileset-catalog-with-gcs.md#access-the-fileset-with-the-gvfs-python-client),
+[S3 GVFS Python client configurations](./fileset-catalog-with-s3.md#access-the-fileset-with-the-gvfs-python-client),
+[OSS GVFS Python client configurations](./fileset-catalog-with-oss.md#access-the-fileset-with-the-gvfs-python-client)
+and [Azure Blob Storage GVFS Python client configurations](./fileset-catalog-with-adls.md#access-the-fileset-with-the-gvfs-python-client) for more details.
 
 :::note
 Gravitino python client does not support [customized file systems](fileset-catalog.md#implement-a-custom-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library.
@@ -696,7 +696,7 @@ Gravitino Virtual File System in Python supports three kinds of authentication t
 
 The type of `simple` is the default authentication type in Gravitino Virtual File System in Python.
 
-#### Use `simple` Authentication
+#### `simple` Authentication
 
 First, make sure that your Gravitino server is also configured to use the `simple` authentication mode.
 
@@ -710,7 +710,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 print(fs.ls("gvfs://fileset/fileset_catalog/tmp/test_fileset"))
 ```
 
-#### Use `basic` Authentication
+#### `basic` Authentication
 
 First, make sure that your Gravitino server is also configured to use the `basic` authentication mode.
 See [How to authenticate](security/how-to-authenticate.md#basic-mode) for server-side setup.
@@ -730,7 +730,7 @@ fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalak
 print(fs.ls("gvfs://fileset/fileset_catalog/tmp/test_fileset"))
 ```
 
-#### Use `OAuth` Authentication
+#### `OAuth` Authentication
 
 First, make sure that your Gravitino server is also configured to use the `oauth2` authentication mode,
 and you have an OAuth server to fetch the token: [Security](security/security.md).
