@@ -22,7 +22,8 @@ package org.apache.gravitino.audit.v2;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.LinkedHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
@@ -103,21 +104,17 @@ public class SimpleAuditLogV2 implements AuditLog {
   @Override
   public String toString() {
     Map<String, String> info = customInfo();
-    String customInfoStr;
+    List<String> parts = new ArrayList<>();
+    if (info != null) {
+      info.forEach((k, v) -> parts.add(k + "=" + v));
+    }
     if (event instanceof ListEvent) {
       int count = ((ListEvent) event).resultCount();
-      Map<String, String> merged = new LinkedHashMap<>();
-      if (info != null) {
-        merged.putAll(info);
-      }
       if (count >= 0) {
-        merged.put("count", String.valueOf(count));
+        parts.add("count=" + count);
       }
-
-      customInfoStr = merged.isEmpty() ? "" : merged.toString();
-    } else {
-      customInfoStr = info != null && !info.isEmpty() ? info.toString() : "";
     }
+    String customInfoStr = parts.isEmpty() ? "" : "{" + String.join(", ", parts) + "}";
     return String.format(
         "[%s]\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
         TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(timestamp())),

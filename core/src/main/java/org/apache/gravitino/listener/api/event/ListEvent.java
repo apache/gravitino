@@ -22,10 +22,10 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
- * Marker interface for events that represent a list operation. All list-operation success event
- * classes implement this interface to expose the number of items returned.
+ * Interface for events that represent a list operation. All list-operation success event classes
+ * implement this interface to expose the number of items returned.
  *
- * @since 0.8.0
+ * @since 1.3.0
  */
 @DeveloperApi
 public interface ListEvent {

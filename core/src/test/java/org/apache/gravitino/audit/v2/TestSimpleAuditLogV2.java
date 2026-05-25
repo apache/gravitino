@@ -173,13 +173,31 @@ public class TestSimpleAuditLogV2 {
         new SimpleAuditLogV2(base) {
           @Override
           public java.util.Map<String, String> customInfo() {
-            return com.google.common.collect.ImmutableMap.of("env", "prod");
+            return ImmutableMap.of("env", "prod");
           }
         };
 
     String[] fields = log.toString().split("\t", -1);
     Assertions.assertTrue(fields[7].contains("count=9"));
     Assertions.assertTrue(fields[7].contains("env=prod"));
+  }
+
+  @Test
+  public void testListEventCountKeyCollisionPreservesBothValues() {
+    // When customInfo also contains a "count" key, both values must appear in the output.
+    ListTableEvent base = new ListTableEvent("grace", Namespace.of("m", "c", "s"), 9);
+    SimpleAuditLogV2 log =
+        new SimpleAuditLogV2(base) {
+          @Override
+          public java.util.Map<String, String> customInfo() {
+            return ImmutableMap.of("count", "user-value");
+          }
+        };
+
+    String lastField = log.toString().split("\t", -1)[7];
+    // Both the user-supplied value and the event-derived count must be present.
+    Assertions.assertTrue(lastField.contains("count=user-value"), lastField);
+    Assertions.assertTrue(lastField.contains("count=9"), lastField);
   }
 
   @Test

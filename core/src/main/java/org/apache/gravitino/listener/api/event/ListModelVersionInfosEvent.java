@@ -38,7 +38,7 @@ public class ListModelVersionInfosEvent extends ModelEvent implements ListEvent 
       String user, NameIdentifier identifier, ModelVersionInfo[] versions) {
     super(user, identifier);
 
-    this.versions = versions;
+    this.versions = versions != null ? versions : new ModelVersionInfo[0];
   }
 
   /**
