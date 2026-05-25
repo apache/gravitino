@@ -102,6 +102,7 @@ public class GravitinoServer extends ResourceConfig {
 
   public void initialize() {
     gravitinoEnv.initializeFullComponents(serverConfig);
+    BuiltInIdpPluginLauncher.initializeOnceIfPresent();
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);

@@ -33,6 +33,7 @@ dependencies {
 
   implementation(libs.bcprov.jdk18on)
   implementation(libs.commons.lang3)
+  implementation(libs.jackson.databind)
   implementation(libs.guava)
   implementation(libs.mybatis)
 

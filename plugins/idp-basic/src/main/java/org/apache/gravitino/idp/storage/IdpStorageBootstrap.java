@@ -20,7 +20,10 @@
 package org.apache.gravitino.idp.storage;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.idp.auth.IdpServiceAdminManager;
+import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
 import org.apache.gravitino.idp.storage.gc.IdpLegacyGarbageCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,17 +44,25 @@ public final class IdpStorageBootstrap {
 
   private IdpStorageBootstrap() {}
 
-  /** Initializes IdP storage background tasks once per JVM. */
+  /** Initializes IdP storage background tasks and service admins once per JVM. */
   public static void initializeOnce() {
     if (!INITIALIZED.compareAndSet(false, true)) {
       return;
     }
 
+    Config config = GravitinoEnv.getInstance().config();
     try {
-      IdpLegacyGarbageCollector.startScheduledCollector(GravitinoEnv.getInstance().config());
+      ServiceAdminInitializer.getInstance()
+          .initialize(config, IdpServiceAdminManager.fromEnvironment());
+      IdpLegacyGarbageCollector.startScheduledCollector(config);
+    } catch (RuntimeException e) {
+      INITIALIZED.set(false);
+      LOG.error("Failed to initialize built-in IdP storage", e);
+      throw e;
     } catch (Exception e) {
       INITIALIZED.set(false);
-      LOG.warn("Failed to initialize built-in IdP storage", e);
+      LOG.error("Failed to initialize built-in IdP storage", e);
+      throw new IllegalStateException("Failed to initialize built-in IdP storage", e);
     }
   }
 }
