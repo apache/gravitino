@@ -12,7 +12,7 @@ Refer to the [Deploying Trino documentation](https://trino.io/docs/current/insta
 
 The examples in this document use Trino `469` by default.
 
-## Get the Connector Package
+## Download
 
 Gravitino provides different Trino connector packages for different Trino version segments.
 Choose the package by your Trino server version first.
@@ -59,7 +59,7 @@ After unpacking, you can see the connector directory:
 
 `gravitino-trino-connector-469-472-<version>`
 
-## Install the Connector Package
+## Installation
 
 1. Download and unpack the correct Gravitino Trino connector tarball for your Trino version.
 2. Rename the unpacked connector directory to `gravitino`, and then copy it to the Trino plugin directory.
