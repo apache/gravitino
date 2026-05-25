@@ -517,11 +517,17 @@ is deleted — and we add **no** non-standard fields to load/list responses.
 `idx_object` index makes the per-identifier lookup cheap):
 
 - **Management endpoint** (Gravitino admin plane, *not* the Iceberg REST
-  path):
-  - `GET …/purge-jobs?state=&namespace=&object=&page…` — list / filter.
-  - `GET …/purge-jobs?namespace={ns}&object={t}` — answers "is this object
-    being purged right now?" (an active row) or "did its cleanup fail?"
-    (`DEAD_LETTER`).
+  path) — modeled on the existing `metalakes/{metalake}/jobs/runs`
+  convention (hierarchical, metalake/catalog-scoped, job id as a path
+  segment, filters as query params):
+  - `GET /metalakes/{metalake}/catalogs/{catalog}/cleanups?state=&schema=&table=&page…`
+    — list / filter. The object identifier (catalog + schema + table), **not**
+    an opaque job id, is the lookup key — nobody outside the server holds a
+    job id, so there is no by-id fetch.
+  - The per-object question "is this table being purged right now?" (an
+    active row — §5.13 guarantees at most one) or "did its cleanup fail?"
+    (`DEAD_LETTER`) is answered by the filtered list
+    `…/cleanups?schema={schema}&table={table}`.
 
   Each row reports `state`, `attempts` / `max_attempts`, `last_error`,
   `lease_owner`, `created_by`, and timestamps. **Read-only in v1** — there
@@ -559,7 +565,7 @@ synchronous path remains only as a rollback flag.
 - [ ] Implement the worker pool: leasing via `FOR UPDATE SKIP LOCKED`, lease renewal, file deletion, retry/backoff state machine
 - [ ] Add the `async-purge.enabled` feature flag and wire both paths into `IcebergTableOperationExecutor.dropTable` (async default, synchronous rollback)
 - [ ] Add purge events: `IcebergPurgeStartedEvent`, `IcebergPurgeCompletedEvent`, `IcebergPurgeFailedEvent`
-- [ ] Add purge observability (§5.14): read-only `purge-jobs` management endpoint (list + per-identifier lookup) and metrics (`purge.jobs.{pending,running,dead_letter}`, `purge.oldest_pending_age_ms`, `purge.{completed,failed}`); informative `ErrorResponse` message on the §5.13 `409`
+- [ ] Add purge observability (§5.14): read-only `metalakes/{metalake}/catalogs/{catalog}/cleanups` management endpoint (filtered list keyed by object identifier) and metrics (`purge.jobs.{pending,running,dead_letter}`, `purge.oldest_pending_age_ms`, `purge.{completed,failed}`); informative `ErrorResponse` message on the §5.13 `409`
 - [ ] Extend coverage to views (`object_type='VIEW'`, metadata-only cleanup) and namespace-drop cascade (one job per contained object)
 - [ ] Enforce tombstone semantics (§5.13): on `createTable`/`createView`/`registerTable`, reject with `409` when an active job exists for the identifier (`idx_object` lookup on the request thread)
 - [ ] Add register-table recovery support (§5.7): atomically CAS the matching active job to `CANCELLED` and restore the catalog entry; documentation
