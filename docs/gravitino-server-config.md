@@ -14,6 +14,79 @@ Apache Gravitino supports several configurations:
 2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
 3. **Some other configurations**: Includes HDFS and other configurations.
 
+## Example Configurations
+
+The examples below show typical contents of `${GRAVITINO_HOME}/conf/gravitino.conf` for two common scenarios. Each property is documented in detail in the sections that follow.
+
+### Development
+
+Minimal configuration for local development using the embedded H2 backend. Most defaults are appropriate.
+
+```properties
+# HTTP server (defaults shown for clarity)
+gravitino.server.webserver.host=0.0.0.0
+gravitino.server.webserver.httpPort=8090
+
+# Storage backend (H2 embedded, no setup required)
+gravitino.entity.store=relational
+gravitino.entity.store.relational=JDBCBackend
+gravitino.entity.store.relational.jdbcUrl=jdbc:h2
+gravitino.entity.store.relational.jdbcDriver=org.h2.Driver
+gravitino.entity.store.relational.jdbcUser=gravitino
+gravitino.entity.store.relational.jdbcPassword=gravitino
+
+# Iceberg REST server, useful for local query-engine testing (optional)
+gravitino.auxService.names=iceberg-rest
+gravitino.iceberg-rest.httpPort=9001
+gravitino.iceberg-rest.catalog-backend=memory
+gravitino.iceberg-rest.warehouse=/tmp/gravitino-iceberg-warehouse
+```
+
+### Production
+
+Configuration tuned for production load with an externally managed MySQL backend, larger thread pools, and observability features enabled.
+
+```properties
+# HTTP server (tuned for production load)
+gravitino.server.webserver.host=0.0.0.0
+gravitino.server.webserver.httpPort=8090
+gravitino.server.webserver.minThreads=32
+gravitino.server.webserver.maxThreads=400
+gravitino.server.webserver.threadPoolWorkQueueSize=200
+
+# Storage backend (externally managed MySQL)
+gravitino.entity.store=relational
+gravitino.entity.store.relational=JDBCBackend
+gravitino.entity.store.relational.jdbcUrl=jdbc:mysql://gravitino-db.example.com:3306/gravitino
+gravitino.entity.store.relational.jdbcDriver=com.mysql.cj.jdbc.Driver
+gravitino.entity.store.relational.jdbcUser=gravitino
+gravitino.entity.store.relational.jdbcPassword=<set-via-secret-management>
+gravitino.entity.store.relational.maxConnections=200
+gravitino.entity.store.relational.storagePath=/opt/gravitino/data/jdbc
+
+# Tree lock limits sized for a larger metadata graph
+gravitino.lock.maxNodes=500000
+gravitino.lock.minNodes=5000
+
+# Cache with stats enabled for observability
+gravitino.cache.enabled=true
+gravitino.cache.enableStats=true
+gravitino.cache.maxEntries=100000
+
+# Audit logging
+gravitino.audit.enabled=true
+
+# Iceberg REST server (using JDBC catalog backend in production)
+gravitino.auxService.names=iceberg-rest
+gravitino.iceberg-rest.httpPort=9001
+gravitino.iceberg-rest.catalog-backend=jdbc
+gravitino.iceberg-rest.warehouse=s3://your-warehouse-bucket/
+
+# See security/security.md for HTTPS and authentication configuration
+```
+
+Initialize the MySQL backend before starting the server. See [Storage Backend](#storage-backend) for the schema setup commands.
+
 ## Server Properties
 
 Customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases. Changes to `gravitino.conf` take effect after restarting the Gravitino server.
@@ -73,19 +146,6 @@ We strongly recommend that you change the default value of `gravitino.entity.sto
 For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up. For MySQL, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
 
 ### Storage Cache
-
-To enable storage caching, modify the following settings in the `${GRAVITINO_HOME}/conf/gravitino.conf` file:
-
-```
-# Whether to enable the cache
-gravitino.cache.enabled=true
-
-# Specify the cache implementation (no need to use the fully qualified class name)
-gravitino.cache.implementation=caffeine
-
-# Number of lock segments for cache concurrency optimization
-gravitino.cache.lockSegments=16
-```
 
 | Configuration Key                | Description                                | Default Value          | Required | Since Version |
 |----------------------------------|--------------------------------------------|------------------------|----------|---------------|
@@ -350,7 +410,7 @@ The properties below apply to all Gravitino catalogs regardless of provider. Lik
 
 You could put HDFS configuration file to the catalog properties configuration dir, like `catalogs/lakehouse-iceberg/conf/`.
 
-## Docker Instructions
+## Docker Deployment
 
 Run the Gravitino server in a Docker container:
 
@@ -428,17 +488,18 @@ docker exec -it <container_id> cat /root/gravitino/conf/gravitino.conf
 If both `gravitino.conf` and environment variable exist, the container’s startup script will overwrite the config file value with the environment variable.
 :::
 
+:::note Hadoop access
+Due to the absence of a comprehensive user permission system, Gravitino can only use a single username for Apache Hadoop access. Ensure that the user running the container has Hadoop (HDFS, YARN) access permissions, or set the `HADOOP_USER_NAME` environment variable to a username authorized for Hadoop access.
+:::
 
-## Runtime Environment Variables
+## Kubernetes Deployment
 
-The Gravitino server supports configuring runtime environment variables in two ways:
+To deploy Gravitino on Kubernetes, use the official Helm chart. See [Install Gravitino with Helm](chart.md) for installation steps. The `gravitino.conf` properties documented on this page can be set through the Helm chart’s `values.yaml` file or via `--set` flags at install time.
 
-1. **Local deployment:** Modify `gravitino-env.sh` located in the `conf` directory.
-2. **Docker container deployment:** Use environment variable injection during container startup. *(Since 1.0.0)*
+## Binary Deployment Notes
 
-Due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
-Apache Hadoop access. Ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
-permissions; otherwise, you may encounter a `Permission denied` error. There are two ways to resolve this error:
+For binary deployments, set JVM and shell environment variables in `${GRAVITINO_HOME}/conf/gravitino-env.sh`. Common uses include setting `HADOOP_USER_NAME` for Hadoop access (when the deploying user lacks Hadoop permissions) and adjusting `GRAVITINO_MEM` for heap sizing. See [Memory Settings](#memory-settings) for heap size guidance.
 
-* Grant Gravitino startup user permissions in Hadoop
-* Specify the authorized Hadoop username in the environment variables `HADOOP_USER_NAME` before starting the Gravitino server.
+:::note Hadoop access
+Due to the absence of a comprehensive user permission system, Gravitino can only use a single username for Apache Hadoop access. Ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN) access permissions, or set `HADOOP_USER_NAME` in `gravitino-env.sh` to a username authorized for Hadoop access.
+:::

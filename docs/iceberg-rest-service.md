@@ -485,7 +485,7 @@ Please set `gravitino.iceberg-rest.warehouse` to `abfs[s]://{container-name}@{st
 
 #### HDFS
 
-Place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [Access Apache Hadoop](gravitino-server-config.md#runtime-environment-variables) for more details.
+Place HDFS configuration file to the classpath of the Iceberg REST server, `iceberg-rest-server/conf` for Gravitino server package, `conf` for standalone Gravitino Iceberg REST server package. When writing to HDFS, the Gravitino Iceberg REST catalog service can only operate as the specified HDFS user and doesn't support proxying to other HDFS users. See [Binary Deployment Notes](gravitino-server-config.md#binary-deployment-notes) for more details.
 
 :::info
 Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hadoop 3.x clusters.
