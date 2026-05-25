@@ -221,7 +221,7 @@ CREATE TABLE IF NOT EXISTS `iceberg_purge_job` (
   `metadata_location` VARCHAR(1024) NOT NULL,
   `file_io_impl`      VARCHAR(256)  NOT NULL,
   `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON',
-  `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|SUCCEEDED|FAILED|CANCELLED; being-worked = PENDING with a fresh heartbeat_at',
+  `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|FAILED|CANCELLED; a RUNNING row is being deleted while its heartbeat_at stays fresh',
   `attempts`          INT(10)       NOT NULL DEFAULT 0,
   `max_attempts`      INT(10)       NOT NULL,
   `last_error`        TEXT          NULL,
@@ -249,18 +249,21 @@ Each tick:
 
 ```sql
 SELECT * FROM iceberg_purge_job
- WHERE state = 'PENDING'
-   AND next_attempt_at <= :now
-   AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)
+ WHERE next_attempt_at <= :now
+   AND ( state = 'PENDING'
+      OR (state = 'RUNNING'
+          AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)) )
  ORDER BY next_attempt_at LIMIT :batch
  FOR UPDATE SKIP LOCKED;
 ```
 
-then stamps `heartbeat_at=:now` to mark the row claimed. The row stays
-`PENDING` — there is no separate `RUNNING` state; "being worked" is simply a
-`PENDING` row with a fresh heartbeat. `SKIP LOCKED` is a performance
-optimization (it avoids lock waiting between replicas), not the correctness
-guarantee — see the ownership model below.
+then claims each candidate by moving it to `state='RUNNING'` with
+`heartbeat_at=:now`. A job is `PENDING` while it waits (just enqueued, or
+backing off for a retry); a `RUNNING` row with a fresh heartbeat is being
+actively deleted; and a `RUNNING` row whose heartbeat has gone stale was
+abandoned by a dead or stalled worker and is reclaimable. `SKIP LOCKED` is a
+performance optimization (it avoids lock waiting between replicas), not the
+correctness guarantee — see the ownership model below.
 
 #### Multi-replica ownership model
 
@@ -289,17 +292,19 @@ works on **every** SQL backend, not just those with `SKIP LOCKED`:
 ```sql
 -- read candidates (no lock required)
 SELECT id FROM iceberg_purge_job
- WHERE state = 'PENDING'
-   AND next_attempt_at <= :now
-   AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)
+ WHERE next_attempt_at <= :now
+   AND ( state = 'PENDING'
+      OR (state = 'RUNNING'
+          AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)) )
  ORDER BY next_attempt_at LIMIT :batch;
 
 -- claim each candidate; the row is ours only if affected_rows = 1
 UPDATE iceberg_purge_job
-   SET heartbeat_at=:now
+   SET state='RUNNING', heartbeat_at=:now
  WHERE id=:id
-   AND state='PENDING'
-   AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout);
+   AND ( state='PENDING'
+      OR (state='RUNNING'
+          AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)) );
 ```
 
 A loser sees `affected_rows = 0` and moves to the next candidate. Where
@@ -341,9 +346,9 @@ the **metadata phase** fails.
 | Outcome                            | Action                                                              |
 | ---------------------------------- | ------------------------------------------------------------------- |
 | All files deleted (or already gone) | `state='SUCCEEDED'`                                                |
-| Metadata load failed, transient    | `attempts++`, `next_attempt_at = now + backoff(attempts)`           |
+| Metadata load failed, transient    | back to `state='PENDING'`, `attempts++`, `next_attempt_at = now + backoff(attempts)`, `heartbeat_at=NULL` |
 | Metadata load failed, terminal     | `attempts++`; if `attempts >= max_attempts` → `state='FAILED'`      |
-| Worker killed mid-job              | Heartbeat goes stale; another worker picks it up; deletes are idempotent (restart story in §5.15) |
+| Worker killed mid-job              | `RUNNING` row's heartbeat goes stale; another worker reclaims it; deletes are idempotent (restart story in §5.15) |
 | Recovered via re-register (§5.13)  | Job CAS'd to `state='CANCELLED'`; the worker only claims non-terminal rows, so files are left intact |
 
 `NotFoundException` from `deleteFile` counts as success. Backoff:
@@ -478,10 +483,9 @@ End-to-end flow with async purge (the 1.3 default):
 
 ### 5.13 Name reuse during purge (tombstone semantics)
 
-This resolves the §8.1 open question. While a purge job for an identifier
-is still `PENDING` (whether or not a worker is actively beating on it), that
-identifier is treated as **still occupied** even though its catalog entry is
-already gone. The
+This resolves the §8.1 open question. While a purge job for an identifier is
+non-terminal (`PENDING` or `RUNNING`), that identifier is treated as **still
+occupied** even though its catalog entry is already gone. The
 active `iceberg_purge_job` row *is* the tombstone — no second table is
 needed. This is the §8.4 / Q4 "fold the lifecycle onto an existing row"
 idea, scoped to the job row rather than a catalog-backing table (which
@@ -497,8 +501,9 @@ The REST server consults the purge job store **on the request thread**
 | `createTable` (same identifier) | **`409 Conflict`** — table is being purged | succeeds (brand-new table) |
 | `registerTable` (same identifier) | **`409 Conflict`**, except the recovery path below | succeeds |
 
-"Active" means `state='PENDING'`. A job in `SUCCEEDED` (even before its row
-is pruned per `completed-retention-hours`) no longer blocks reuse — the files
+"Active" means `state IN ('PENDING','RUNNING')` (terminal states are
+`SUCCEEDED` / `FAILED` / `CANCELLED`). A job in `SUCCEEDED` (even before its
+row is pruned per `completed-retention-hours`) no longer blocks reuse — the files
 are gone, so a recreate is safe. A `FAILED` job also stops blocking, so a
 failed cleanup never permanently wedges the namespace; operators see the
 failed row and reclaim leaked files out of band.
@@ -524,16 +529,15 @@ non-terminal rows. This is **recovery-scoped** cancellation only; a
 general user-facing "cancel my purge" API stays out of scope (§3.2).
 
 **Concurrency.** The create/register conflict check, the worker's claim, and
-recovery's cancel all serialize on the same `state='PENDING'` +
-fresh-heartbeat predicate (the §5.4 ownership CAS). A `createTable` that
-observes a terminal state (`SUCCEEDED` / `FAILED` / `CANCELLED`) proceeds;
-one that observes `PENDING` gets `409`. Recovery's CAS to `CANCELLED` is
-guarded by `state='PENDING' AND heartbeat stale`, the same guard a worker
-uses to claim — so if a worker currently holds a fresh heartbeat, recovery's
-CAS matches no row and returns `409` (retry once the heartbeat goes stale or
-the job terminates); and if recovery wins, the worker's next heartbeat /
-completion CAS (also guarded on `state='PENDING'`) matches no row, so it
-abandons the job without touching files.
+recovery's cancel all serialize on the job row's `state`. A `createTable`
+that observes a terminal state (`SUCCEEDED` / `FAILED` / `CANCELLED`)
+proceeds; one that observes `PENDING` or `RUNNING` gets `409`. Recovery's CAS
+to `CANCELLED` is guarded by `state='PENDING'`, and the worker's claim CAS
+moves `PENDING → RUNNING` — they target the same `PENDING` row, so at most
+one wins. A job that has already started running therefore cannot be
+silently cancelled out from under the worker: recovery's CAS matches no row,
+it sees `RUNNING`, and returns `409` (the caller retries once the heartbeat
+goes stale or the job terminates).
 
 ### 5.14 Observing in-flight and failed purges
 
@@ -547,8 +551,8 @@ Iceberg REST wire contract (Goal #4).
 the table is dropped: `loadTable` / `HEAD` → `404`, `LIST` omits it. The
 single purge-specific signal is the §5.13 `409` on a same-identifier
 `createTable` / `register`, whose Iceberg `ErrorResponse.message` names the
-blocking job (e.g. *"table `db.t` is being purged (cleanup job 123 still
-pending)"*). A standard client needs nothing more — semantically the table
+blocking job (e.g. *"table `db.t` is being purged (cleanup job 123 still in
+progress)"*). A standard client needs nothing more — semantically the table
 is deleted — and we add **no** non-standard fields to load/list responses.
 
 **Operators.** In 1.3 the read path is **direct DB query** of
@@ -578,8 +582,7 @@ register-as-recovery flow (§5.13).
 
 - **Events** (§5.8): `IcebergPurge{Started,Completed,Failed}Event` for
   streaming consumers.
-- **Metrics**: gauges `purge.jobs.{pending,running,failed}` (where `running`
-  counts `PENDING` rows with a fresh heartbeat) and
+- **Metrics**: gauges `purge.jobs.{pending,running,failed}` and
   `purge.oldest_pending_age_ms`; counters `purge.{completed,failed}`. These
   let operators alert on a growing backlog ("silently still deleting") or any
   `FAILED` job ("silently failed to delete") — the two conditions that would
@@ -598,11 +601,11 @@ across a process restart or crash:
 
 1. **Nothing in-flight is lost.** The job is committed to
    `iceberg_purge_job` *before* the `DELETE` returns (§5.2); there is no
-   in-memory queue, so a restart cannot drop pending work. `PENDING` jobs
+   in-memory queue, so a restart cannot drop queued work. `PENDING` jobs
    are picked up on the first worker tick after boot.
 2. **In-flight jobs orphaned by the crash are reclaimed.** A process that
-   died mid-purge leaves a still-`PENDING` row with a stale `heartbeat_at`.
-   The worker poll already selects `PENDING` rows whose heartbeat has gone
+   died mid-purge leaves a still-`RUNNING` row with a stale `heartbeat_at`.
+   The worker poll already selects `RUNNING` rows whose heartbeat has gone
    stale, so once it does the restarted node — or any peer — reclaims the row
    via the CAS. This is the "worker killed mid-job" row in §5.5.
 3. **Re-running a half-finished job is safe.** The worker rebuilds the file
@@ -659,8 +662,8 @@ synchronous path remains only as a rollback flag.
 
 - Unit (`./gradlew :iceberg:iceberg-rest-server:test -PskipITs`):
   - `TestIcebergPurgeJobStore` — enqueue and row contents.
-  - `TestIcebergPurgeStateMachine` — PENDING → SUCCEEDED;
-    failure → retry → FAILED.
+  - `TestIcebergPurgeStateMachine` — PENDING → RUNNING → SUCCEEDED;
+    failure → retry (back to PENDING) → FAILED.
   - `TestIcebergPurgeWorker` — claiming, heartbeat renewal, contention (H2
     backend).
   - `TestIcebergTableOperationExecutorAsyncPurge` — async default enqueues
