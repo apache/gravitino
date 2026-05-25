@@ -19,7 +19,9 @@
 package org.apache.gravitino.catalog.lakehouse.generic;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
 import org.apache.gravitino.connector.PropertyEntry;
@@ -57,4 +59,19 @@ public interface LakehouseTableDelegator {
    */
   ManagedTableOperations createTableOps(
       EntityStore store, ManagedSchemaOperations schemaOps, IdGenerator idGenerator);
+
+  /**
+   * Merge format-specific properties from catalog config, schema, and table levels. Override this
+   * to implement format-specific property inheritance (e.g., storage credentials). Table-level
+   * properties have the highest priority, then schema, then catalog.
+   *
+   * @param catalogConf the catalog configuration properties
+   * @param schema the parent schema
+   * @param tableProperties the table-level properties
+   * @return additional properties to add to the table properties (does not modify inputs)
+   */
+  default Map<String, String> inheritProperties(
+      Map<String, String> catalogConf, Schema schema, Map<String, String> tableProperties) {
+    return Map.of();
+  }
 }

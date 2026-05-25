@@ -25,8 +25,11 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
 import com.google.common.collect.ImmutableList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
 import org.apache.gravitino.catalog.lakehouse.generic.LakehouseTableDelegator;
@@ -81,5 +84,32 @@ public class LanceTableDelegator implements LakehouseTableDelegator {
   public ManagedTableOperations createTableOps(
       EntityStore store, ManagedSchemaOperations schemaOps, IdGenerator idGenerator) {
     return new LanceTableOperations(store, schemaOps, idGenerator);
+  }
+
+  @Override
+  public Map<String, String> inheritProperties(
+      Map<String, String> catalogConf, Schema schema, Map<String, String> tableProperties) {
+    Map<String, String> merged = new HashMap<>();
+
+    // 1. Catalog-level lance.storage.* properties (lowest priority)
+    if (catalogConf != null) {
+      catalogConf.entrySet().stream()
+          .filter(e -> e.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
+          .forEach(e -> merged.put(e.getKey(), e.getValue()));
+    }
+
+    // 2. Schema-level lance.storage.* properties (overrides catalog)
+    if (schema.properties() != null) {
+      schema.properties().entrySet().stream()
+          .filter(e -> e.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
+          .forEach(e -> merged.put(e.getKey(), e.getValue()));
+    }
+
+    // 3. Table-level lance.storage.* properties (highest priority, overrides all)
+    tableProperties.entrySet().stream()
+        .filter(e -> e.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
+        .forEach(e -> merged.put(e.getKey(), e.getValue()));
+
+    return merged;
   }
 }

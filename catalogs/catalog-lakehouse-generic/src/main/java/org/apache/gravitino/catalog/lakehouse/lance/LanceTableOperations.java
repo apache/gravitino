@@ -405,15 +405,19 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   Dataset openDataset(String location) {
-    return openDataset(location, Map.of());
+    return Dataset.open().allocator(new RootAllocator()).uri(location).build();
   }
 
   Dataset openDataset(String location, Map<String, String> storageOptions) {
-    return Dataset.open()
-        .allocator(new RootAllocator())
-        .uri(location)
-        .readOptions(new ReadOptions.Builder().setStorageOptions(storageOptions).build())
-        .build();
+    if (storageOptions != null && !storageOptions.isEmpty()) {
+      ReadOptions readOptions = new ReadOptions.Builder().setStorageOptions(storageOptions).build();
+      return Dataset.open()
+          .allocator(new RootAllocator())
+          .uri(location)
+          .readOptions(readOptions)
+          .build();
+    }
+    return Dataset.open().allocator(new RootAllocator()).uri(location).build();
   }
 
   private IndexParams getIndexParamsByIndexType(IndexType indexType) {

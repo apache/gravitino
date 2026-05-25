@@ -76,6 +76,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
   private final Map<String, Supplier<ManagedTableOperations>> tableOpsCache;
 
+  private final Map<String, LakehouseTableDelegator> delegators;
+
   private Optional<String> catalogLocation;
 
   private Map<String, String> catalogProperties = Map.of();
@@ -107,6 +109,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     // Initialize all the table operations for different table formats.
     Map<String, LakehouseTableDelegator> tableDelegators =
         LakehouseTableDelegatorFactory.tableDelegators();
+    this.delegators = tableDelegators;
     tableOpsCache =
         Collections.unmodifiableMap(
             tableDelegators.entrySet().stream()
@@ -246,6 +249,13 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     Map<String, String> newProperties = Maps.newHashMap(properties);
     newProperties.put(Table.PROPERTY_LOCATION, tableLocation);
     newProperties.put(Table.PROPERTY_TABLE_FORMAT, format);
+
+    // Merge format-specific properties from catalog and schema levels
+    LakehouseTableDelegator delegator = delegators.get(format);
+    Preconditions.checkArgument(delegator != null, "Unsupported table format: %s", format);
+    Map<String, String> inheritedProps =
+        delegator.inheritProperties(catalogProperties, schema, newProperties);
+    newProperties.putAll(inheritedProps);
 
     // Get the table operations for the specified table format.
     Supplier<ManagedTableOperations> tableOpsSupplier = tableOpsCache.get(format);

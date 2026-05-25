@@ -46,10 +46,10 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* hidden */),
             stringOptionalPropertyPrefixEntry(
                 LANCE_STORAGE_OPTIONS_PREFIX,
-                "The Lance storage options managed by the catalog.",
+                "Storage options for Lance tables at catalog level, inherited by schemas and tables.",
                 false /* immutable */,
-                null, /* defaultValue */
-                false /* hidden */,
+                null /* defaultValue */,
+                true /* hidden — credentials should not be exposed in API responses */,
                 false /* reserved */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);

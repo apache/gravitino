@@ -22,6 +22,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
@@ -109,7 +110,7 @@ public class TestLanceTableOperations {
     Version version = mock(Version.class);
     when(dataset.getVersion()).thenReturn(version);
     when(version.getId()).thenReturn(7L);
-    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location", Map.of());
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(eq("location"), any(Map.class));
 
     TableChange[] changes =
         new TableChange[] {
