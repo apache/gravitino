@@ -14,7 +14,7 @@ This Helm chart deploys Apache Gravitino on Kubernetes with customizable configu
 - Kubernetes 1.29+
 - Helm 3+
 
-## Installation
+## Sources
 
 ### Install from OCI Registry (Recommended for Released Versions)
 
@@ -51,7 +51,7 @@ Install the chart:
 helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace
 ```
 
-## View Chart Values
+## Chart Values
 
 Override chart defaults by customizing parameters in `values.yaml`. Gravitino configuration in `gravitino.conf` can also be modified through Helm `values.yaml`.
 
@@ -61,7 +61,7 @@ To display the default values for the Gravitino chart, run:
 helm show values oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION>
 ```
 
-## Install Helm Chart
+## Deployment
 
 ```console
 helm upgrade --install [RELEASE_NAME] oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> [flags]
@@ -141,7 +141,7 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
 Replace `database-1.***.***.rds.amazonaws.com` with your actual MySQL host. Change `admin` and `admin123` to your actual MySQL username and password. Ensure the target MySQL database (for example, `gravitino`) exists before deployment.
 :::
 
-## Uninstall Helm Chart
+## Uninstall
 
 ```console
 helm uninstall [RELEASE_NAME] -n [NAMESPACE]
