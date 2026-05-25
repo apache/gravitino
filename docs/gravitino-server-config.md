@@ -424,8 +424,6 @@ The Gravitino server supports configuring runtime environment variables in two w
 1. **Local deployment:** Modify `gravitino-env.sh` located in the `conf` directory.
 2. **Docker container deployment:** Use environment variable injection during container startup. *(Since 1.0.0)*
 
-### Access Apache Hadoop
-
 Due to the absence of a comprehensive user permission system, Gravitino can only use a single username for
 Apache Hadoop access. Ensure that the user starting the Gravitino server has Hadoop (HDFS, YARN, etc.) access
 permissions; otherwise, you may encounter a `Permission denied` error. There are two ways to resolve this error:
