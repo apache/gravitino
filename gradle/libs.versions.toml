@@ -117,6 +117,7 @@ flinkjdbc = "3.2.0-1.18"
 flinkjdbc18 = "3.2.0-1.18"
 flinkjdbc119 = "3.3.0-1.19"
 flinkjdbc120 = "3.3.0-1.20"
+fluss = "0.9.1-incubating"
 iceberg4flink18 = "1.9.2"
 iceberg4flink119 = "1.10.2"
 iceberg4flink120 = "1.11.0"
@@ -324,6 +325,7 @@ commons-cli-new = { group = "commons-cli", name = "commons-cli", version.ref = "
 sun-activation = { group = "com.sun.activation", name = "javax.activation", version.ref = "sun-activation-version" }
 kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.ref = "kafka" }
 kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }
+fluss-client = { group = "org.apache.fluss", name = "fluss-client", version.ref = "fluss" }
 curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
 cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
 asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm"}
