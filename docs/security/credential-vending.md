@@ -12,13 +12,15 @@ Gravitino credential vending is used to generate temporary or static credentials
 ### Capabilities
 
 - Supports Gravitino Iceberg REST server.
-- Supports Gravitino server, only support Hadoop catalog.
+- Supports Gravitino server with the following catalog types:
+  - Hadoop catalog
+  - JDBC catalogs (MySQL, PostgreSQL, etc.) — Spark, Flink, and Trino JDBC connectors transparently receive database credentials without storing them in connector configuration.
 - Supports pluggable credentials with build-in credentials:
   - S3: `S3TokenCredential`, `S3SecretKeyCredential`, `AwsIrsaCredential`
   - GCS: `GCSTokenCredential`
   - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
   - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
-- No support for Spark/Trino/Flink connector yet.
+  - JDBC: `JdbcCredential`
 
 ## General configurations
 
@@ -151,6 +153,24 @@ An GCS token is a token credential with scoped privileges, by leveraging GCS [Cr
 
 :::note
 For Gravitino Iceberg REST server, please ensure that the credential file can be accessed by the server. For example, if the server is running on a GCE machine, or you can set the environment variable as `export GOOGLE_APPLICATION_CREDENTIALS=/xx/application_default_credentials.json`, even when the `gcs-service-account-file` has already been configured.
+:::
+
+### JDBC credentials
+
+#### JDBC user/password credential
+
+A static credential containing the JDBC database username and password. It is used by the Gravitino Spark, Flink, and Trino JDBC connectors to obtain database credentials at runtime via credential vending, so the credentials do not need to be stored in the connector configuration.
+
+The JDBC credential provider is **automatically enabled** when both `jdbc-user` and `jdbc-password` are configured in the catalog. No explicit `credential-providers` setting is required.
+
+| Gravitino server catalog property | Description                                                            | Default value | Required | Since Version |
+|-----------------------------------|------------------------------------------------------------------------|---------------|----------|---------------|
+| `credential-providers`            | `jdbc-user-password` for JDBC credential provider. Auto-configured when `jdbc-user` and `jdbc-password` are both set. | (none) | No | 1.3.0 |
+| `jdbc-user`                       | The JDBC username. Used by the credential provider to generate credentials. | (none)    | Yes      | 0.3.0-incubating |
+| `jdbc-password`                   | The JDBC password. Used by the credential provider to generate credentials. | (none)   | Yes      | 0.3.0-incubating |
+
+:::note
+`jdbc-user` and `jdbc-password` are hidden catalog properties — they are not returned by the catalog properties API. Connectors that support credential vending (Spark, Flink, and Trino) receive them transparently via the credential API. For connectors that do not yet support credential vending, the server-level configuration `gravitino.catalog.credential.backfillToProperties` can temporarily re-expose them (see [catalog configuration](../gravitino-server-config.md#catalog-configuration)).
 :::
 
 ## Custom credentials
