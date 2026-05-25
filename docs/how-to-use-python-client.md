@@ -123,8 +123,6 @@ Use any IDE to develop Gravitino Python Client. Directly open the client-python 
    
 ### IDE Specific Settings
 
-#### JetBrains IntelliJ IDEA
-
 We use Conda Environment to manage Python Environment, to configure Python
 SDK, you need to:
 
@@ -162,7 +160,7 @@ And you will see a new Python SDK is added, and it has several packages installe
 
 9. Done! Now, open any python files and start developing Gravitino Python Client.
 
-##### Running Integration Tests in IntelliJ IDEA
+#### Running Integration Tests in IntelliJ IDEA
 
 Since integration tests require Gravitino Java distribution, so you cannot run tests with IntelliJ
 [Run tests button](https://www.jetbrains.com/help/idea/performing-tests.html),
