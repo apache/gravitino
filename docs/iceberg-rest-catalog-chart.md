@@ -15,7 +15,7 @@ This Helm chart deploys the Apache Gravitino Iceberg REST catalog server on Kube
 - Kubernetes 1.29+
 - Helm 3+
 
-## Installation
+## Sources
 
 ### Install from OCI Registry (Recommended for Released Versions)
 
@@ -52,7 +52,7 @@ Install the chart:
 helm upgrade --install gravitino-iceberg ./gravitino-iceberg-rest-server -n gravitino --create-namespace
 ```
 
-## View Chart Values
+## Chart Values
 
 Override chart defaults by customizing parameters in `values.yaml`. Configuration in [gravitino-iceberg-rest-server.conf](../dev/charts/gravitino-iceberg-rest-server/resources/gravitino-iceberg-rest-server.conf) can also be modified through Helm `values.yaml`.
 
@@ -62,7 +62,7 @@ To display the default values for the chart, run:
 helm show values oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION>
 ```
 
-## Install Helm Chart
+## Deployment
 
 ```console
 helm upgrade --install [RELEASE_NAME] oci://registry-1.docker.io/apache/gravitino-iceberg-rest-server-helm --version <VERSION> [flags]
@@ -101,7 +101,7 @@ helm upgrade --install gravitino-iceberg oci://registry-1.docker.io/apache/gravi
   -f /path/to/values.yaml
 ```
 
-## Uninstall Helm Chart
+## Uninstall
 
 ```console
 helm uninstall [RELEASE_NAME] -n [NAMESPACE]
