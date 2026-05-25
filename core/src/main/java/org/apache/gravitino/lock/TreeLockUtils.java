@@ -21,10 +21,23 @@ package org.apache.gravitino.lock;
 
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.OptimisticLockException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.utils.Executable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Utility class for tree locks. */
 public class TreeLockUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TreeLockUtils.class);
+
+  /**
+   * Maximum number of retry attempts when an {@link OptimisticLockException} is detected on a WRITE
+   * operation. Each retry re-reads the entity and reapplies the change, then issues a fresh {@code
+   * UPDATE ... WHERE current_version = N} to the entity store.
+   */
+  static final int OCC_MAX_RETRIES = 3;
 
   private TreeLockUtils() {
     // Prevent instantiation.
@@ -32,6 +45,11 @@ public class TreeLockUtils {
 
   /**
    * Execute the given executable with the given tree lock.
+   *
+   * <p>For WRITE operations, if the entity store detects a concurrent modification via a {@code
+   * current_version} mismatch and throws {@link OptimisticLockException}, the executable is retried
+   * up to {@value #OCC_MAX_RETRIES} times with exponential backoff before the exception is
+   * re-thrown. READ operations are not retried.
    *
    * @param identifier The identifier of resource path that the lock attempts to lock.
    * @param lockType The type of lock to use.
@@ -46,7 +64,30 @@ public class TreeLockUtils {
     TreeLock lock = GravitinoEnv.getInstance().lockManager().createTreeLock(identifier);
     try {
       lock.lock(lockType);
-      return executable.execute();
+      if (lockType == LockType.READ) {
+        return executable.execute();
+      }
+      for (int attempt = 0; ; attempt++) {
+        try {
+          return executable.execute();
+        } catch (OptimisticLockException e) {
+          if (attempt >= OCC_MAX_RETRIES) {
+            throw e;
+          }
+          LOG.warn(
+              "Optimistic lock conflict on {}, attempt {}/{}, retrying",
+              identifier,
+              attempt + 1,
+              OCC_MAX_RETRIES);
+          try {
+            Thread.sleep(10L << attempt); // 10 ms, 20 ms, 40 ms
+          } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new GravitinoRuntimeException(
+                ie, "Interrupted during OCC retry backoff on %s", identifier);
+          }
+        }
+      }
     } finally {
       lock.unlock();
     }
