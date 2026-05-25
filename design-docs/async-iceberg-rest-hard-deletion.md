@@ -21,7 +21,7 @@
 
 | Field    | Value                                                   |
 | -------- | ------------------------------------------------------- |
-| Status   | Draft                                                   |
+| Status   | Complete                                                |
 | Authors  | @roryqi                                                 |
 | Created  | 2026-05-19                                              |
 | Module   | `iceberg/iceberg-rest-server`, `iceberg/iceberg-common` |
