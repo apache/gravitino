@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.utils.RequestContext;
@@ -38,7 +39,7 @@ public abstract class Event extends BaseEvent {
   protected Event(String user, NameIdentifier identifier) {
     super(user, identifier);
     String addr = RequestContext.getRemoteAddress();
-    this.remoteAddress = addr != null ? addr : "unknown";
+    this.remoteAddress = StringUtils.isNoneBlank(addr) ? addr : "unknown";
   }
 
   /**

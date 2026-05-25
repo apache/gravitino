@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.web.filter;
+package org.apache.gravitino.server.web;
 
 import java.io.IOException;
 import javax.servlet.Filter;
