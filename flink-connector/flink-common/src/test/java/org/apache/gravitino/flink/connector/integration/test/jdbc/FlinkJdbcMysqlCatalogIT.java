@@ -26,6 +26,8 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.flink.connector.integration.test.FlinkCommonIT;
 import org.apache.gravitino.flink.connector.jdbc.JdbcPropertiesConstants;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
@@ -104,17 +106,14 @@ public abstract class FlinkJdbcMysqlCatalogIT extends FlinkCommonIT {
             org.apache.gravitino.Catalog.Type.RELATIONAL,
             getProvider(),
             null,
-            ImmutableMap.of(
-                JdbcPropertiesConstants.GRAVITINO_JDBC_USER,
-                mysqlUsername,
-                JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD,
-                mysqlPassword,
-                JdbcPropertiesConstants.GRAVITINO_JDBC_URL,
-                mysqlUrl,
-                JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER,
-                mysqlDriver,
-                FLINK_BYPASS_DEFAULT_DATABASE,
-                mysqlDefaultDatabase));
+            ImmutableMap.<String, String>builder()
+                .put(JdbcPropertiesConstants.GRAVITINO_JDBC_USER, mysqlUsername)
+                .put(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD, mysqlPassword)
+                .put(JdbcPropertiesConstants.GRAVITINO_JDBC_URL, mysqlUrl)
+                .put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, mysqlDriver)
+                .put(FLINK_BYPASS_DEFAULT_DATABASE, mysqlDefaultDatabase)
+                .put(CredentialConstants.CREDENTIAL_PROVIDERS, JdbcCredential.JDBC_CREDENTIAL_TYPE)
+                .build());
   }
 
   @Override
