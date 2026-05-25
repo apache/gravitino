@@ -284,6 +284,9 @@ public class SchemaMetaService {
       // single batch UPDATE per child table so the total SQL cost stays bounded regardless of
       // how many descendants exist.
       List<Long> schemaIds = listSchemaIdsForCascade(schemaPO);
+      if (schemaIds.isEmpty()) {
+          return false;
+      }
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
