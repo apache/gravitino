@@ -131,39 +131,39 @@ Configure these properties in two ways:
 
 1. Before obtaining the `FileSystem` in the code, construct a `Configuration` object and set its properties:
 
-    ```java
-    Configuration conf = new Configuration();
-    conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
-    conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
-    conf.set("fs.gravitino.server.uri","http://localhost:8090");
-    conf.set("fs.gravitino.client.metalake","test_metalake");
-    Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
-    FileSystem fs = filesetPath.getFileSystem(conf);
-    ```
+   ```java
+   Configuration conf = new Configuration();
+   conf.set("fs.AbstractFileSystem.gvfs.impl","org.apache.gravitino.filesystem.hadoop.Gvfs");
+   conf.set("fs.gvfs.impl","org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+   conf.set("fs.gravitino.server.uri","http://localhost:8090");
+   conf.set("fs.gravitino.client.metalake","test_metalake");
+   Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset_1");
+   FileSystem fs = filesetPath.getFileSystem(conf);
+   ```
 
 2. Configure the properties in the `core-site.xml` file of the Hadoop environment:
 
-    ```xml
-      <property>
-        <name>fs.AbstractFileSystem.gvfs.impl</name>
-        <value>org.apache.gravitino.filesystem.hadoop.Gvfs</value>
-      </property>
+   ```xml
+     <property>
+       <name>fs.AbstractFileSystem.gvfs.impl</name>
+       <value>org.apache.gravitino.filesystem.hadoop.Gvfs</value>
+     </property>
 
-      <property>
-        <name>fs.gvfs.impl</name>
-        <value>org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
-      </property>
+     <property>
+       <name>fs.gvfs.impl</name>
+       <value>org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
+     </property>
 
-      <property>
-        <name>fs.gravitino.server.uri</name>
-        <value>http://localhost:8090</value>
-      </property>
+     <property>
+       <name>fs.gravitino.server.uri</name>
+       <value>http://localhost:8090</value>
+     </property>
 
-      <property>
-        <name>fs.gravitino.client.metalake</name>
-        <value>test_metalake</value>
-      </property>
-    ```
+     <property>
+       <name>fs.gravitino.client.metalake</name>
+       <value>test_metalake</value>
+     </property>
+   ```
 
 ### Examples
 
@@ -240,9 +240,9 @@ fs.getFileStatus(filesetPath);
    You can use `--packages` or `--jars` in the Spark submit shell to include the Gravitino Virtual
    File System runtime jar, like so:
 
-    ```shell
-    ./${SPARK_HOME}/bin/spark-submit --packages org.apache.gravitino:gravitino-filesystem-hadoop3-runtime:${version}
-    ```
+   ```shell
+   ./${SPARK_HOME}/bin/spark-submit --packages org.apache.gravitino:gravitino-filesystem-hadoop3-runtime:${version}
+   ```
 
    If you want to include the Gravitino Virtual File System runtime jar in your Spark installation, add it to the `${SPARK_HOME}/jars/` folder.
 
@@ -250,29 +250,29 @@ fs.getFileStatus(filesetPath);
 
    You can configure in the shell command in this way:
 
-    ```shell
-    --conf spark.hadoop.fs.AbstractFileSystem.gvfs.impl=org.apache.gravitino.filesystem.hadoop.Gvfs
-    --conf spark.hadoop.fs.gvfs.impl=org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem
-    --conf spark.hadoop.fs.gravitino.server.uri=${your_gravitino_server_uri}
-    --conf spark.hadoop.fs.gravitino.client.metalake=${your_gravitino_metalake}
-    # set the location name if you want to access a specific location
-    # --conf spark.hadoop.fs.gravitino.current.location.name=${the_fileset_location_name}
-    ```
+   ```shell
+   --conf spark.hadoop.fs.AbstractFileSystem.gvfs.impl=org.apache.gravitino.filesystem.hadoop.Gvfs
+   --conf spark.hadoop.fs.gvfs.impl=org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem
+   --conf spark.hadoop.fs.gravitino.server.uri=${your_gravitino_server_uri}
+   --conf spark.hadoop.fs.gravitino.client.metalake=${your_gravitino_metalake}
+   # set the location name if you want to access a specific location
+   # --conf spark.hadoop.fs.gravitino.current.location.name=${the_fileset_location_name}
+   ```
 
 3. Perform operations on the fileset storage in your code.
 
    Finally, you can access the fileset storage in your Spark program:
 
-    ```scala
-    // Scala code
-    val spark = SparkSession.builder()
-          .appName("Gvfs Example")
-          .getOrCreate()
+   ```scala
+   // Scala code
+   val spark = SparkSession.builder()
+         .appName("Gvfs Example")
+         .getOrCreate()
 
-    val rdd = spark.sparkContext.textFile("gvfs://fileset/test_catalog/test_schema/test_fileset_1")
+   val rdd = spark.sparkContext.textFile("gvfs://fileset/test_catalog/test_schema/test_fileset_1")
 
-    rdd.foreach(println)
-    ```
+   rdd.foreach(println)
+   ```
 
 #### Via TensorFlow
 
@@ -491,44 +491,44 @@ For fileset with multiple locations, you can specify which location to access us
 1. Make sure to obtain the Gravitino library.
    You can get it by [pip](https://pip.pypa.io/en/stable/installation/):
 
-    ```shell
-    pip install apache-gravitino
-    ```
+   ```shell
+   pip install apache-gravitino
+   ```
 
 2. Configuring the Hadoop environment.
    You should ensure that the Python client has Kerberos authentication information and
    configure Hadoop environments in the system environment:
 
-    ```shell
-    # kinit kerberos
-    kinit -kt /tmp/xxx.keytab xxx@HADOOP.COM
-    # Or you can configure kerberos information in the Hadoop `core-site.xml` file
-    <property>
-      <name>hadoop.security.authentication</name>
-      <value>kerberos</value>
-    </property>
+   ```shell
+   # kinit kerberos
+   kinit -kt /tmp/xxx.keytab xxx@HADOOP.COM
+   # Or you can configure kerberos information in the Hadoop `core-site.xml` file
+   <property>
+     <name>hadoop.security.authentication</name>
+     <value>kerberos</value>
+   </property>
 
-    <property>
-      <name>hadoop.client.kerberos.principal</name>
-      <value>xxx@HADOOP.COM</value>
-    </property>
+   <property>
+     <name>hadoop.client.kerberos.principal</name>
+     <value>xxx@HADOOP.COM</value>
+   </property>
 
-    <property>
-      <name>hadoop.client.keytab.file</name>
-      <value>/tmp/xxx.keytab</value>
-    </property>
+   <property>
+     <name>hadoop.client.keytab.file</name>
+     <value>/tmp/xxx.keytab</value>
+   </property>
 
    <!-- Optional, if you want to access a specific location -->
    <property>
-      <name>fs.gravitino.current.location.name</name>
-      <value>location-name</value>
+     <name>fs.gravitino.current.location.name</name>
+     <value>location-name</value>
    </property>
 
-    # Configure Hadoop env in Linux
-    export HADOOP_HOME=${YOUR_HADOOP_PATH}
-    export HADOOP_CONF_DIR=${YOUR_HADOOP_PATH}/etc/hadoop
-    export CLASSPATH=`$HADOOP_HOME/bin/hdfs classpath --glob`
-    ```
+   # Configure Hadoop env in Linux
+   export HADOOP_HOME=${YOUR_HADOOP_PATH}
+   export HADOOP_CONF_DIR=${YOUR_HADOOP_PATH}/etc/hadoop
+   export CLASSPATH=`$HADOOP_HOME/bin/hdfs classpath --glob`
+   ```
 
 #### Via Fsspec-style Interface
 

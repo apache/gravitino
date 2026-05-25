@@ -469,7 +469,7 @@ docker run -dti -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRA
    * Click *Manage realms* in the left-hand menu.
    * Click *Create realm* button
 
-    ![create-realm.png](../assets/security/create-realm.png)
+   ![create-realm.png](../assets/security/create-realm.png)
 
 4. Get the `gravitinorealm` public key, which is the `<the default signing key>` in gravitino.conf
    Access `http://localhost:8080/realms/gravitinorealm` in browser
@@ -478,16 +478,16 @@ docker run -dti -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRA
 
 5. Add users
 
-    Initially, the realm has no users. Use these steps to create a user:
+   Initially, the realm has no users. Use these steps to create a user:
    * Verify that you are still in the gravitinorealm realm, which is next to *Current realm*.
    * Click Users in the left-hand menu.
    * Click *Create new user*.
-   * Fill in the form with the following values:  
+   * Fill in the form with the following values:
    *Username*: usera, *First name*: any first name, *Last name*: any last name, *Email*: any email
    * Click *credentials*, fill in the *Set password form* with a password.
    * Toggle Temporary to Off so that the user does not need to update this password at the first login.
 
-    You can now log in to the [Account Console(gravitinorealm)](http://localhost:8080/realms/gravitinorealm/account) to verify this user is configured correctly.
+   You can now log in to the [Account Console(gravitinorealm)](http://localhost:8080/realms/gravitinorealm/account) to verify this user is configured correctly.
 
 6. Register Gravitino in Keycloak
 

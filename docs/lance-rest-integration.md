@@ -46,20 +46,20 @@ The Lance ecosystem is under active development, with frequent updates to APIs a
 Before proceeding, ensure the following requirements are met:
 
 1. **Gravitino Server**: A running Gravitino server instance with the Lance REST service enabled
-    - Default endpoint: `http://localhost:9101/lance`
+   - Default endpoint: `http://localhost:9101/lance`
 
 2. **Lance Catalog**: A Lance catalog created in Gravitino using either:
-    - Lance REST namespace API (`CreateNamespace` operation - see [Lance REST Service documentation](./lance-rest-service.md)
-    - Gravitino REST API, for more, refer to [lakehouse-generic-catalog](./lakehouse-generic-catalog.md)
-    - Example catalog name: `lance_catalog`
+   - Lance REST namespace API (`CreateNamespace` operation - see [Lance REST Service documentation](./lance-rest-service.md)
+   - Gravitino REST API, for more, refer to [lakehouse-generic-catalog](./lakehouse-generic-catalog.md)
+   - Example catalog name: `lance_catalog`
 
 3. **Lance Spark Bundle** (for Spark integration):
-    - Downloaded `lance-spark` bundle JAR matching your Apache Spark version
-    - Note the absolute file path for configuration
+   - Downloaded `lance-spark` bundle JAR matching your Apache Spark version
+   - Note the absolute file path for configuration
 
 4. **Python Dependencies**:
-    - For Spark integration: `pyspark`
-    - For Ray integration: `ray`, `lance-namespace`, `lance-ray`
+   - For Spark integration: `pyspark`
+   - For Ray integration: `ray`, `lance-namespace`, `lance-ray`
 
 ## Spark Integration
 

@@ -77,25 +77,25 @@ Use any IDE to develop Gravitino Python Client. Directly open the client-python 
 
 1. Clone the Gravitino project.
 
-    ```shell
-    git clone git@github.com:apache/gravitino.git
-    ```
+   ```shell
+   git clone git@github.com:apache/gravitino.git
+   ```
 
 2. Build the Gravitino Python client module
 
-    ```shell
-    # Default Python version is 3.12
-    ./gradlew :clients:client-python:build
-    # If you want to build Python client with specific Python version,
-    # add `-PpythonVersion` with version number:
-    ./gradlew :clients:client-python:build -PpythonVersion=3.11
-    ```
- 
+   ```shell
+   # Default Python version is 3.12
+   ./gradlew :clients:client-python:build
+   # If you want to build Python client with specific Python version,
+   # add `-PpythonVersion` with version number:
+   ./gradlew :clients:client-python:build -PpythonVersion=3.11
+   ```
+
 3. Run unit tests
 
-    ```shell
-    ./gradlew :clients:client-python:test -PskipITs
-    ```
+   ```shell
+   ./gradlew :clients:client-python:test -PskipITs
+   ```
 
 4. Run integration tests
 
@@ -105,21 +105,21 @@ Use any IDE to develop Gravitino Python Client. Directly open the client-python 
    command or IDE, Gravitino integration test framework (`integration_test_env.py`)
    will start and stop Gravitino server automatically.
 
-    ```shell
-    ./gradlew :clients:client-python:test
-    ```
+   ```shell
+   ./gradlew :clients:client-python:test
+   ```
 
 5. Distribute the Gravitino Python client module
 
-    ```shell
-    ./gradlew :clients:client-python:distribution
-    ```
+   ```shell
+   ./gradlew :clients:client-python:distribution
+   ```
 
 6. Deploy the Gravitino Python client to https://pypi.org/project/apache-gravitino/
 
-    ```shell
-    ./gradlew :clients:client-python:deploy
-    ```
+   ```shell
+   ./gradlew :clients:client-python:deploy
+   ```
    
 ### IDE Specific Settings
 

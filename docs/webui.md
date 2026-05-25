@@ -166,10 +166,10 @@ Creating a catalog requires these fields:
 1. **Catalog name**(**_required_**): the name of the catalog
 2. **Type**(**_required_**): `relational`/`fileset`/`messaging`/`model`, the default value is `relational`
 3. **Provider**(**_required_**):
-    1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`/`paimon`/`hudi`/`oceanbase`/`hologres`
-    2. Type `fileset` has no provider
-    3. Type `messaging` - `kafka`
-    4. Type `model` has no provider
+   1. Type `relational` - `hive`/`iceberg`/`mysql`/`postgresql`/`doris`/`paimon`/`hudi`/`oceanbase`/`hologres`
+   2. Type `fileset` has no provider
+   3. Type `messaging` - `kafka`
+   4. Type `model` has no provider
 4. **Comment**(_optional_): the comment of this catalog
 5. **Properties**(**each `provider` must fill in the required property fields specifically**)
 
@@ -498,9 +498,9 @@ Click on the `CREATE TABLE` button displays the dialog to create a table.
 Creating a table needs these fields:
 
 1. **Name**(**_required_**): the name of the table.
-2. **columns**(**_required_**): 
-    1. The name and type of each column are required.
-    2. Only suppport simple types, cannot support complex types by ui, you can create complex types by api.
+2. **columns**(**_required_**):
+   1. The name and type of each column are required.
+   2. Only suppport simple types, cannot support complex types by ui, you can create complex types by api.
 3. **Comment**(_optional_): the comment of the table.
 4. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 
@@ -553,9 +553,9 @@ Creating a fileset needs these fields:
 
 1. **Name**(**_required_**): the name of the fileset.
 2. **Type**(**_required_**): `managed`/`external`, the default value is `managed`.
-3. **Storage Location**(_optional_): 
-    1. It is optional if the fileset is 'Managed' type and a storage location is already specified at the parent catalog or schema level.
-    2. It becomes mandatory if the fileset type is 'External' or no storage location is defined at the parent level.
+3. **Storage Location**(_optional_):
+   1. It is optional if the fileset is 'Managed' type and a storage location is already specified at the parent catalog or schema level.
+   2. It becomes mandatory if the fileset type is 'External' or no storage location is defined at the parent level.
 4. **Comment**(_optional_): the comment of the fileset.
 5. **Properties**(_optional_): Click on the `ADD PROPERTY` button to add custom properties.
 

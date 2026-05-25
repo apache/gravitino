@@ -45,53 +45,53 @@ Gravitino builds from source on Linux and macOS natively, and on Windows through
    ./gradlew build
    ```
 
-  The `./gradlew build` command builds all the Gravitino components, including the Gravitino server, Java and Python clients, Trino and Spark connectors, and more.
+   The `./gradlew build` command builds all the Gravitino components, including the Gravitino server, Java and Python clients, Trino and Spark connectors, and more.
 
-  For the Python client, the `./gradlew build` command builds the Python client with Python 3.12 by default. If you want to use Python 3.10 or 3.11 to build, modify the property `pythonVersion` to 3.10 or 3.11 in the `gradle.properties` file, or specify the version with `-P` like:
+   For the Python client, the `./gradlew build` command builds the Python client with Python 3.12 by default. If you want to use Python 3.10 or 3.11 to build, modify the property `pythonVersion` to 3.10 or 3.11 in the `gradle.properties` file, or specify the version with `-P` like:
 
    ```shell
    ./gradlew build -PpythonVersion=3.10
    ```
 
-  Or:
+   Or:
 
    ```shell
    ./gradlew build -PpythonVersion=3.11
    ```
 
-  Or:
-    
+   Or:
+
    ```shell
    ./gradlew build -PpythonVersion=3.12
    ```
 
-  If you don't need to build the Trino connector (for example, when building on a machine without JDK 24), you can skip it with:
+   If you don't need to build the Trino connector (for example, when building on a machine without JDK 24), you can skip it with:
 
    ```shell
    ./gradlew build -PskipTrinoConnector=true
    ```
 
-  If you want to build a module on its own, like the Spark connector, you can use Gradle to build a module with a specific name, like so:
+   If you want to build a module on its own, like the Spark connector, you can use Gradle to build a module with a specific name, like so:
 
    ```shell
    ./gradlew spark-connector:spark-runtime-3.4:build -PscalaVersion=2.12
    ```
 
-  This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` under the `spark-connector/v3.4/spark-runtime/build/libs` directory. You could replace `3.4` with  `3.3` or `3.5` to specify different Spark versions and replace `2.12` with `2.13` for different Scala versions. The default Scala version is `2.12` if `-PscalaVersion` is not specified.
+   This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` under the `spark-connector/v3.4/spark-runtime/build/libs` directory. You could replace `3.4` with  `3.3` or `3.5` to specify different Spark versions and replace `2.12` with `2.13` for different Scala versions. The default Scala version is `2.12` if `-PscalaVersion` is not specified.
 
-  :::info
-  Gravitino Spark connector doesn't support Scala 2.13 for Spark 3.3.
-  :::
+   :::info
+   Gravitino Spark connector doesn't support Scala 2.13 for Spark 3.3.
+   :::
 
-  :::note
-  The first time you build the project, downloading the dependencies may take a while.
- 
-  You can add `-x test` to skip the tests using `./gradlew build -x test`.
+   :::note
+   The first time you build the project, downloading the dependencies may take a while.
 
-  The built Gravitino libraries are Java 17 compatible and verified under 17 environments. Use Java 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
+   You can add `-x test` to skip the tests using `./gradlew build -x test`.
 
-  The built jars are under the modules `build/libs` directory. Publish them in your Maven repository for use in your project.
-  :::
+   The built Gravitino libraries are Java 17 compatible and verified under 17 environments. Use Java 17 runtimes to run the Gravitino server, no matter which JDK version was used to build the project.
+
+   The built jars are under the modules `build/libs` directory. Publish them in your Maven repository for use in your project.
+   :::
 
 3. Get the Gravitino server binary package.
 
@@ -105,12 +105,12 @@ Gravitino builds from source on Linux and macOS natively, and on Windows through
    ./gradlew compileDistribution -PskipWebBuild=true
    ```
 
-  The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory. It contains two subdirectories: `package` and `package-all`. The difference between these two subdirectories is that `package` is the **Gravitino server distribution package**, while `package-all` contains extra catalogs in `catalogs-contrib` and all contents in `package`.
-  So, if you want to use catalogs in `catalogs-contrib`, you should use the distribution package in `package-all`. 
+   The `compileDistribution` command creates a `distribution` directory in the Gravitino root directory. It contains two subdirectories: `package` and `package-all`. The difference between these two subdirectories is that `package` is the **Gravitino server distribution package**, while `package-all` contains extra catalogs in `catalogs-contrib` and all contents in `package`.
+   So, if you want to use catalogs in `catalogs-contrib`, you should use the distribution package in `package-all`.
 
-  :::note
-  The `./gradlew clean` command deletes the `distribution` directory.
-  :::
+   :::note
+   The `./gradlew clean` command deletes the `distribution` directory.
+   :::
 
 4. Assemble the Gravitino server distribution package.
 
@@ -118,38 +118,38 @@ Gravitino builds from source on Linux and macOS natively, and on Windows through
    ./gradlew assembleDistribution
    ```
 
-  The `assembleDistribution` command creates `gravitino-{version}-bin.tar.gz`, `gravitino-{version}-bin.tar.gz.sha256`, `gravitino-{version}-bin-all.tar.gz`, `gravitino-{version}-bin-all.tar.gz.sha256` under the `distribution` directory.
-  
-  `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin-all.tar.gz` follow the same distinction as `package` and `package-all` from the previous step.  
+   The `assembleDistribution` command creates `gravitino-{version}-bin.tar.gz`, `gravitino-{version}-bin.tar.gz.sha256`, `gravitino-{version}-bin-all.tar.gz`, `gravitino-{version}-bin-all.tar.gz.sha256` under the `distribution` directory.
 
-  Deploy these to your production environment.
+   `gravitino-{version}-bin.tar.gz` and `gravitino-{version}-bin-all.tar.gz` follow the same distinction as `package` and `package-all` from the previous step.
 
-  :::note
-  The `gravitino-{version}-bin.tar.gz` file is the Gravitino **server** distribution package, and the `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino server distribution package.
-  :::
+   Deploy these to your production environment.
+
+   :::note
+   The `gravitino-{version}-bin.tar.gz` file is the Gravitino **server** distribution package, and the `gravitino-{version}-bin.tar.gz.sha256` file is the sha256 checksum file for the Gravitino server distribution package.
+   :::
 
 5. Assemble the Gravitino Trino connector package
 
-  ```shell
+   ```shell
    ./gradlew assembleTrinoConnector
    ```
 
-  or
+   or
 
    ```shell
    ./gradlew assembleDistribution
    ```
 
-  This creates `gravitino-trino-connector-{version}.tar.gz` and
-  `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory. You can uncompress and deploy it to Trino to use the Gravitino Trino connector.
+   This creates `gravitino-trino-connector-{version}.tar.gz` and
+   `gravitino-trino-connector-{version}.tar.gz.sha256` under the `distribution` directory. You can uncompress and deploy it to Trino to use the Gravitino Trino connector.
 
 6. Assemble the Gravitino Iceberg REST server package
 
-  ```shell
+   ```shell
    ./gradlew assembleIcebergRESTServer
    ```
 
-  This creates `gravitino-iceberg-rest-server-{version}.tar.gz` and `gravitino-iceberg-rest-server-{version}.tar.gz.sha256` under the `distribution` directory. You can uncompress and deploy it to use the Gravitino Iceberg REST server.
+   This creates `gravitino-iceberg-rest-server-{version}.tar.gz` and `gravitino-iceberg-rest-server-{version}.tar.gz.sha256` under the `distribution` directory. You can uncompress and deploy it to use the Gravitino Iceberg REST server.
 
 ## Windows Subsystem for Linux (Ubuntu)
 
