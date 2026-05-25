@@ -58,13 +58,9 @@ public class IdpUserGroupManager implements Closeable {
    * @param idGenerator The id generator.
    */
   public IdpUserGroupManager(Config config, IdGenerator idGenerator) {
-    this(config, idGenerator, PasswordHasherFactory.create());
-  }
-
-  IdpUserGroupManager(Config config, IdGenerator idGenerator, PasswordHasher passwordHasher) {
     this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
-    this.passwordHasher = passwordHasher;
+    this.passwordHasher = PasswordHasherFactory.create();
     this.garbageCollector = new IdpGarbageCollector(config);
     garbageCollector.start();
   }
