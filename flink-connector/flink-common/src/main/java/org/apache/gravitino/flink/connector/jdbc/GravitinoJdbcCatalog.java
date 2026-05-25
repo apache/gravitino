@@ -44,6 +44,9 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   private final CatalogFactory.Context context;
   private AbstractCatalog jdbcCatalog;
+  // Mutable copy shared with BaseCatalog.catalogOptions so credential injection in open() is
+  // visible to toFlinkTable() and to the inner JdbcCatalogFactory context.
+  private final Map<String, String> mutableOptions;
 
   protected GravitinoJdbcCatalog(
       CatalogFactory.Context context,
@@ -59,22 +62,38 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       AbstractCatalog jdbcCatalog) {
+    this(
+        context,
+        defaultDatabase,
+        schemaAndTablePropertiesConverter,
+        partitionConverter,
+        jdbcCatalog,
+        new HashMap<>(context.getOptions()));
+  }
+
+  private GravitinoJdbcCatalog(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter,
+      AbstractCatalog jdbcCatalog,
+      Map<String, String> mutableOptions) {
     super(
         context.getName(),
-        context.getOptions(),
+        mutableOptions,
         defaultDatabase,
         schemaAndTablePropertiesConverter,
         partitionConverter);
     this.context = context;
     this.jdbcCatalog = jdbcCatalog;
+    this.mutableOptions = mutableOptions;
   }
 
   @Override
   public void open() throws CatalogException {
     if (jdbcCatalog == null) {
-      Map<String, String> options = new HashMap<>(context.getOptions());
       try {
-        applyJdbcCredential(catalog(), options);
+        applyJdbcCredential(catalog(), mutableOptions);
       } catch (NoSuchCatalogException ignored) {
         // During CREATE CATALOG, open() is called before the catalog is stored in Gravitino.
         // In this case credentials are already present in the user-provided options.
@@ -88,7 +107,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
             @Override
             public Map<String, String> getOptions() {
-              return options;
+              return mutableOptions;
             }
 
             @Override
