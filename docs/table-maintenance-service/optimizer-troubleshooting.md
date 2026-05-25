@@ -34,7 +34,7 @@ Check `gravitino.job.statusPullIntervalInMs` and local staging logs under:
 For local verification, reduce `gravitino.job.statusPullIntervalInMs` (for example `10000`) and
 restart Gravitino so REST status can refresh faster.
 
-## `No Identifiers Matched Strategy Name ...`
+## `No identifiers matched strategy name ...`
 
 `--strategy-name` must be the policy name (for example `iceberg_compaction_default`), not the policy type (`system_iceberg_compaction`) and not the strategy type (`iceberg-data-compaction`).
 
@@ -53,7 +53,7 @@ Check both rule names and metric samples:
    `gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules`.
 3. Ensure `--action-time` is inside the range where both before and after samples exist.
 
-## `No StrategyHandler Class Configured for Strategy Type ...`
+## `No StrategyHandler class configured for strategy type ...`
 
 Add strategy handler mapping to optimizer config, for example:
 
@@ -112,7 +112,7 @@ Example in `--spark-conf`:
 }
 ```
 
-## `Specified Optimizer Config File Does Not exist`
+## `Specified optimizer config file does not exist`
 
 Check your `--conf-path` and file permissions.
 
