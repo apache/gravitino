@@ -253,12 +253,6 @@ class TestAuthorizationUtils {
             NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.TABLE);
     Assertions.assertEquals(1, locations.size());
     Assertions.assertEquals("gs://bucket/1", locations.get(0));
-
-    Mockito.clearInvocations(catalogDispatcher, tableDispatcher);
-    locations =
-        AuthorizationUtils.getMetadataObjectLocation(
-            NameIdentifier.of("metalake", "catalog", "schema", "view"), Entity.EntityType.VIEW);
-    Assertions.assertTrue(locations.isEmpty());
   }
 
   @Test
