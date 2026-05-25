@@ -83,14 +83,10 @@ class TestBasicAuthenticator {
     when(userMetaService.listGroupNamesByUsername("alice"))
         .thenReturn(Arrays.asList("group-a", "group-b"));
     BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
-    String authHeader =
-        AuthConstants.AUTHORIZATION_BASIC_HEADER
-            + Base64.getEncoder()
-                .encodeToString("alice:Passw0rd-For-Alice".getBytes(StandardCharsets.UTF_8));
+    String authHeader = basicAuthHeader("alice", "Passw0rd-For-Alice");
 
     UserPrincipal principal =
-        (UserPrincipal)
-            authenticator.authenticateToken(authHeader.getBytes(StandardCharsets.UTF_8));
+        (UserPrincipal) authenticator.authenticateToken(basicAuthBytes(authHeader));
 
     Assertions.assertEquals("alice", principal.getName());
     Assertions.assertEquals(authHeader, principal.getAccessToken().orElse(null));
@@ -106,15 +102,13 @@ class TestBasicAuthenticator {
     when(userMetaService.getIdpUserByUsername("alice"))
         .thenThrow(new NotFoundException("IdP user not found: %s", "alice"));
     BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
-    String authHeader =
-        AuthConstants.AUTHORIZATION_BASIC_HEADER
-            + Base64.getEncoder()
-                .encodeToString("alice:Passw0rd-For-Alice".getBytes(StandardCharsets.UTF_8));
 
     UnauthorizedException exception =
         Assertions.assertThrows(
             UnauthorizedException.class,
-            () -> authenticator.authenticateToken(authHeader.getBytes(StandardCharsets.UTF_8)));
+            () ->
+                authenticator.authenticateToken(
+                    basicAuthBytes(basicAuthHeader("alice", "Passw0rd-For-Alice"))));
 
     Assertions.assertEquals("Invalid username or password", exception.getMessage());
     Assertions.assertEquals("Basic", exception.getChallenges().get(0));
@@ -129,18 +123,26 @@ class TestBasicAuthenticator {
     when(userPO.getPasswordHash()).thenReturn("hash-1");
     when(passwordHasher.verify("Passw0rd-For-Alice", "hash-1")).thenReturn(false);
     BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
-    String authHeader =
-        AuthConstants.AUTHORIZATION_BASIC_HEADER
-            + Base64.getEncoder()
-                .encodeToString("alice:Passw0rd-For-Alice".getBytes(StandardCharsets.UTF_8));
 
     UnauthorizedException exception =
         Assertions.assertThrows(
             UnauthorizedException.class,
-            () -> authenticator.authenticateToken(authHeader.getBytes(StandardCharsets.UTF_8)));
+            () ->
+                authenticator.authenticateToken(
+                    basicAuthBytes(basicAuthHeader("alice", "Passw0rd-For-Alice"))));
 
     Assertions.assertEquals("Invalid username or password", exception.getMessage());
     Assertions.assertEquals("Basic", exception.getChallenges().get(0));
+  }
+
+  private static String basicAuthHeader(String username, String password) {
+    return AuthConstants.AUTHORIZATION_BASIC_HEADER
+        + Base64.getEncoder()
+            .encodeToString((username + ":" + password).getBytes(StandardCharsets.UTF_8));
+  }
+
+  private static byte[] basicAuthBytes(String authHeader) {
+    return authHeader.getBytes(StandardCharsets.UTF_8);
   }
 
   private BasicAuthenticator authenticator() {

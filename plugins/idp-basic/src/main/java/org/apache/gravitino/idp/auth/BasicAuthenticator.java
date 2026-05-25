@@ -42,7 +42,7 @@ import org.apache.gravitino.server.authentication.Authenticator;
 /** Authenticates HTTP Basic credentials against built-in IdP user metadata. */
 public class BasicAuthenticator implements Authenticator {
 
-  private static final String BASIC_AUTH_CHALLENGE = "Basic";
+  private static final String BASIC_CHALLENGE = AuthConstants.AUTHORIZATION_BASIC_HEADER.trim();
 
   private IdpUserMetaService userMetaService;
   private PasswordHasher passwordHasher;
@@ -65,19 +65,40 @@ public class BasicAuthenticator implements Authenticator {
     Preconditions.checkState(
         userMetaService != null && passwordHasher != null,
         "Basic authenticator has not been initialized");
+    String authData = requireBasicAuthHeader(tokenData);
+    BasicCredentials credentials = parseBasicCredentials(authData);
+    return authenticate(credentials, authData);
+  }
+
+  @Override
+  public void initialize(Config config) {
+    this.userMetaService = IdpUserMetaService.getInstance();
+    this.passwordHasher = PasswordHasherFactory.create();
+  }
+
+  @Override
+  public boolean supportsToken(byte[] tokenData) {
+    return tokenData != null
+        && new String(tokenData, StandardCharsets.UTF_8)
+            .startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER);
+  }
+
+  private String requireBasicAuthHeader(byte[] tokenData) {
     if (tokenData == null) {
-      throw new UnauthorizedException("Empty token authorization header", BASIC_AUTH_CHALLENGE);
+      throw unauthorized("Empty token authorization header");
     }
 
     String authData = new String(tokenData, StandardCharsets.UTF_8);
     if (authData.trim().isEmpty()) {
-      throw new UnauthorizedException("Empty token authorization header", BASIC_AUTH_CHALLENGE);
+      throw unauthorized("Empty token authorization header");
     }
-
     if (!authData.startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER)) {
-      throw new UnauthorizedException("Invalid token authorization header", BASIC_AUTH_CHALLENGE);
+      throw unauthorized("Invalid token authorization header");
     }
+    return authData;
+  }
 
+  private BasicCredentials parseBasicCredentials(String authData) {
     String credential = authData.substring(AuthConstants.AUTHORIZATION_BASIC_HEADER.length());
     if (credential.trim().isEmpty()) {
       throw new BadRequestException("Malformed Basic authorization header: missing credentials");
@@ -100,42 +121,58 @@ public class BasicAuthenticator implements Authenticator {
 
       String password = decodedCredential.substring(separatorIndex + 1);
       if (password.isEmpty()) {
-        throw new UnauthorizedException("Invalid username or password", BASIC_AUTH_CHALLENGE);
+        throw invalidCredentials();
       }
-
-      IdpUserPO userPO = loadUser(userName);
-      if (!passwordHasher.verify(password, userPO.getPasswordHash())) {
-        throw new UnauthorizedException("Invalid username or password", BASIC_AUTH_CHALLENGE);
-      }
-
-      List<UserGroup> groups =
-          userMetaService.listGroupNamesByUsername(userName).stream()
-              .map(groupName -> new UserGroup(Optional.empty(), groupName))
-              .collect(Collectors.toList());
-      return new UserPrincipal(userName, groups, authData);
+      return new BasicCredentials(userName, password);
     } catch (IllegalArgumentException e) {
       throw new BadRequestException(e, "Malformed Basic authorization header: invalid base64");
     }
   }
 
-  @Override
-  public void initialize(Config config) {
-    this.userMetaService = IdpUserMetaService.getInstance();
-    this.passwordHasher = PasswordHasherFactory.create();
-  }
+  private UserPrincipal authenticate(BasicCredentials credentials, String authData) {
+    IdpUserPO userPO = loadUser(credentials.userName());
+    if (!passwordHasher.verify(credentials.password(), userPO.getPasswordHash())) {
+      throw invalidCredentials();
+    }
 
-  @Override
-  public boolean supportsToken(byte[] tokenData) {
-    return tokenData != null
-        && new String(tokenData, StandardCharsets.UTF_8)
-            .startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER);
+    List<UserGroup> groups =
+        userMetaService.listGroupNamesByUsername(credentials.userName()).stream()
+            .map(groupName -> new UserGroup(Optional.empty(), groupName))
+            .collect(Collectors.toList());
+    return new UserPrincipal(credentials.userName(), groups, authData);
   }
 
   private IdpUserPO loadUser(String userName) {
     try {
       return userMetaService.getIdpUserByUsername(userName);
     } catch (NotFoundException e) {
-      throw new UnauthorizedException("Invalid username or password", BASIC_AUTH_CHALLENGE);
+      throw invalidCredentials();
+    }
+  }
+
+  private static UnauthorizedException unauthorized(String message) {
+    return new UnauthorizedException(message, BASIC_CHALLENGE);
+  }
+
+  private static UnauthorizedException invalidCredentials() {
+    return unauthorized("Invalid username or password");
+  }
+
+  private static final class BasicCredentials {
+    private final String userName;
+    private final String password;
+
+    private BasicCredentials(String userName, String password) {
+      this.userName = userName;
+      this.password = password;
+    }
+
+    private String userName() {
+      return userName;
+    }
+
+    private String password() {
+      return password;
     }
   }
 }
