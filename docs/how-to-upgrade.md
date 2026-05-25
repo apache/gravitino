@@ -14,7 +14,7 @@ Gravitino 0.7.0 schema. Before attempting this project we
 strongly recommend that you read through all of the steps in this
 document and familiarize yourself with the required tools.
 
-## Upgrade Steps
+## Steps
 
 ### Step 1: Shut Down the Gravitino Instance
 
