@@ -20,15 +20,20 @@ package org.apache.gravitino.idp.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
-import org.apache.gravitino.idp.storage.utils.IdpSQLExceptionUtils;
+import org.apache.gravitino.idp.storage.relational.utils.IdpExceptionUtils;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -70,11 +75,11 @@ public class IdpGroupMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertIdpGroup")
-  public void insertIdpGroup(IdpGroupPO groupPO) {
+  public void insertIdpGroup(IdpGroupPO groupPO) throws IOException {
     try {
       SessionUtils.doWithCommit(IdpGroupMetaMapper.class, mapper -> mapper.insertIdpGroup(groupPO));
     } catch (RuntimeException re) {
-      IdpSQLExceptionUtils.checkDuplicateEntry(re, "group", groupPO.getGroupName());
+      IdpExceptionUtils.checkSQLException(re, "group", groupPO.getGroupName());
       throw re;
     }
   }
@@ -114,28 +119,60 @@ public class IdpGroupMetaService {
     return deletedCount[0] > 0;
   }
 
+  /**
+   * Changes built-in IdP group membership in a single transaction.
+   *
+   * @param groupName The group name.
+   * @param additions The usernames to add, or null if none.
+   * @param removals The usernames to remove, or null if none.
+   */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "addUsersToGroup")
-  public void addUsersToGroup(String groupName, List<String> usernames) {
-    IdpGroupPO group = getIdpGroupByName(groupName);
-    Map<String, Long> userIds =
-        IdpUserMetaService.getInstance().resolveUserIdsByUsernames(usernames);
-    List<IdpUserGroupRelPO> relations = new ArrayList<>(usernames.size());
-    for (String username : usernames) {
-      relations.add(newUserGroupRelation(group.getGroupId(), userIds.get(username)));
+      baseMetricName = "changeGroupMembership")
+  public void changeGroupMembership(
+      String groupName, @Nullable List<String> additions, @Nullable List<String> removals) {
+    Set<String> oldUsernames = Sets.newHashSet(listUsernamesByGroupName(groupName));
+    Set<String> newUsernames = Sets.newHashSet(oldUsernames);
+    if (additions != null) {
+      newUsernames.addAll(additions);
+    }
+    if (removals != null) {
+      newUsernames.removeAll(removals);
     }
 
-    SessionUtils.doWithCommit(
-        IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
-  }
+    Set<String> insertUsernames = Sets.difference(newUsernames, oldUsernames);
+    Set<String> deleteUsernames = Sets.difference(oldUsernames, newUsernames);
 
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "removeUsersFromGroup")
-  public int removeUsersFromGroup(String groupName, List<String> usernames) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        IdpUserGroupRelMapper.class, mapper -> mapper.softDeleteRelations(groupName, usernames));
+    if (insertUsernames.isEmpty() && deleteUsernames.isEmpty()) {
+      return;
+    }
+
+    IdpGroupPO group = getIdpGroupByName(groupName);
+    List<String> insertList = Lists.newArrayList(insertUsernames);
+    List<String> deleteList = Lists.newArrayList(deleteUsernames);
+
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          if (insertList.isEmpty()) {
+            return;
+          }
+          Map<String, Long> userIds =
+              IdpUserMetaService.getInstance().resolveUserIdsByUsernames(insertList);
+          List<IdpUserGroupRelPO> relations = new ArrayList<>(insertList.size());
+          for (String username : insertList) {
+            relations.add(newUserGroupRelation(group.getGroupId(), userIds.get(username)));
+          }
+          SessionUtils.doWithoutCommit(
+              IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
+        },
+        () -> {
+          if (deleteList.isEmpty()) {
+            return;
+          }
+          SessionUtils.doWithoutCommit(
+              IdpUserGroupRelMapper.class,
+              mapper -> mapper.softDeleteRelations(groupName, deleteList));
+        });
   }
 
   @Monitored(

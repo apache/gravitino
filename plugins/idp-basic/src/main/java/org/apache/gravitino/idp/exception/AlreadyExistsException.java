@@ -34,4 +34,16 @@ public class AlreadyExistsException extends RuntimeException {
   public AlreadyExistsException(@FormatString String message, Object... args) {
     super(String.format(message, args));
   }
+
+  /**
+   * Constructs a new exception with the specified detail message and cause.
+   *
+   * @param cause The cause.
+   * @param message The detail message.
+   * @param args The arguments to the message.
+   */
+  @FormatMethod
+  public AlreadyExistsException(Throwable cause, @FormatString String message, Object... args) {
+    super(String.format(message, args), cause);
+  }
 }

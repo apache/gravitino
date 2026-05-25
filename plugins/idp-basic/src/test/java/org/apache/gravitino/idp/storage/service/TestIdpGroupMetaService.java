@@ -65,7 +65,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("group1"));
     runServiceCall(() -> groupMetaService.insertIdpGroup(group1));
-    runServiceCall(() -> groupMetaService.addUsersToGroup("group1", List.of("user1")));
+    runServiceCall(() -> groupMetaService.changeGroupMembership("group1", List.of("user1"), null));
     assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
     assertIterableEquals(List.of("user1"), groupMetaService.listUsernamesByGroupName("group1"));
 
@@ -119,21 +119,20 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
     runServiceCall(() -> groupMetaService.insertIdpGroup(group1));
 
     runServiceCall(
-        () -> groupMetaService.addUsersToGroup("engineering", List.of("user1", "user2")));
+        () ->
+            groupMetaService.changeGroupMembership("engineering", List.of("user1", "user2"), null));
     assertIterableEquals(
         List.of("user1", "user2"), groupMetaService.listUsernamesByGroupName("engineering"));
 
     runServiceCall(
-        () ->
-            assertEquals(
-                1, groupMetaService.removeUsersFromGroup("engineering", List.of("user1"))));
+        () -> groupMetaService.changeGroupMembership("engineering", null, List.of("user1")));
     assertIterableEquals(
         List.of("user2"), groupMetaService.listUsernamesByGroupName("engineering"));
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testAddUsersToGroupThrowsWhenUserMissing(String type) throws IOException {
+  void testChangeGroupMembershipThrowsWhenUserMissing(String type) throws IOException {
     init(type);
     insertUsers(1);
     IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
@@ -152,7 +151,9 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
         NotFoundException.class,
         () ->
             runServiceCall(
-                () -> groupMetaService.addUsersToGroup("engineering", List.of("missing-user"))));
+                () ->
+                    groupMetaService.changeGroupMembership(
+                        "engineering", List.of("missing-user"), null)));
   }
 
   @ParameterizedTest

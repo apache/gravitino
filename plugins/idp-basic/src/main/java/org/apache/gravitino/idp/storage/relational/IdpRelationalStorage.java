@@ -24,9 +24,9 @@ import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.idp.storage.relational.converters.IdpSQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.JDBCDatabase;
-import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 
@@ -46,13 +46,13 @@ public final class IdpRelationalStorage implements Closeable {
   public IdpRelationalStorage(Config config) {
     jdbcDatabase = startEmbeddedDatabaseIfNecessary(config);
     SqlSessionFactoryHelper.getInstance().init(config);
-    SQLExceptionConverterFactory.initConverter(config);
+    IdpSQLExceptionConverterFactory.initConverter(config);
   }
 
   @Override
   public void close() throws IOException {
     SqlSessionFactoryHelper.getInstance().close();
-    SQLExceptionConverterFactory.close();
+    IdpSQLExceptionConverterFactory.close();
     if (jdbcDatabase != null) {
       jdbcDatabase.close();
       jdbcDatabase = null;

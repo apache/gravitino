@@ -18,10 +18,12 @@
  */
 package org.apache.gravitino.idp;
 
+import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
@@ -71,7 +73,7 @@ public class IdpUserGroupManager implements Closeable {
    * @param password The plaintext password.
    * @return The created built-in IdP user.
    */
-  public IdpUser addUser(String username, String password) {
+  public IdpUser addUser(String username, String password) throws IOException {
     USER_SERVICE.insertIdpUser(newUserPO(username, passwordHasher.hash(password)));
     return new IdpUser(username, Collections.emptyList());
   }
@@ -114,7 +116,7 @@ public class IdpUserGroupManager implements Closeable {
    * @param groupName The group name.
    * @return The created built-in IdP group.
    */
-  public IdpGroup addGroup(String groupName) {
+  public IdpGroup addGroup(String groupName) throws IOException {
     GROUP_SERVICE.insertIdpGroup(newGroupPO(groupName));
     return new IdpGroup(groupName, Collections.emptyList());
   }
@@ -142,26 +144,18 @@ public class IdpUserGroupManager implements Closeable {
   }
 
   /**
-   * Adds users to a built-in IdP group.
+   * Changes built-in IdP group membership.
    *
    * @param groupName The group name.
-   * @param usernames The usernames to add.
+   * @param additions The usernames to add, or null if none.
+   * @param removals The usernames to remove, or null if none.
    * @return The updated built-in IdP group.
    */
-  public IdpGroup addUsersToGroup(String groupName, List<String> usernames) {
-    GROUP_SERVICE.addUsersToGroup(groupName, usernames);
-    return getGroup(groupName);
-  }
-
-  /**
-   * Removes users from a built-in IdP group.
-   *
-   * @param groupName The group name.
-   * @param usernames The usernames to remove.
-   * @return The updated built-in IdP group.
-   */
-  public IdpGroup removeUsersFromGroup(String groupName, List<String> usernames) {
-    GROUP_SERVICE.removeUsersFromGroup(groupName, usernames);
+  public IdpGroup changeGroupMembership(
+      String groupName, @Nullable List<String> additions, @Nullable List<String> removals) {
+    Preconditions.checkArgument(
+        additions != null || removals != null, "additions and removals cannot both be null");
+    GROUP_SERVICE.changeGroupMembership(groupName, additions, removals);
     return getGroup(groupName);
   }
 

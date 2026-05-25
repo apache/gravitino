@@ -20,6 +20,7 @@ package org.apache.gravitino.idp.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,7 +28,7 @@ import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.idp.storage.utils.IdpSQLExceptionUtils;
+import org.apache.gravitino.idp.storage.relational.utils.IdpExceptionUtils;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -68,11 +69,11 @@ public class IdpUserMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertIdpUser")
-  public void insertIdpUser(IdpUserPO userPO) {
+  public void insertIdpUser(IdpUserPO userPO) throws IOException {
     try {
       SessionUtils.doWithCommit(IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO));
     } catch (RuntimeException re) {
-      IdpSQLExceptionUtils.checkDuplicateEntry(re, "user", userPO.getUsername());
+      IdpExceptionUtils.checkSQLException(re, "user", userPO.getUsername());
       throw re;
     }
   }

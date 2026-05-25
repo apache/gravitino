@@ -34,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigConstants;
+import org.apache.gravitino.idp.storage.relational.converters.IdpSQLExceptionConverterFactory;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
@@ -73,6 +74,7 @@ public abstract class AbstractIdpMetaStorageTest {
     }
 
     SqlSessionFactoryHelper.getInstance().close();
+    IdpSQLExceptionConverterFactory.close();
     ContainerSuite.getInstance().close();
 
     if (h2Path != null && Files.exists(h2Path)) {
@@ -85,6 +87,7 @@ public abstract class AbstractIdpMetaStorageTest {
     config = createBackendConfig(type);
     backend = new JDBCBackend();
     backend.initialize(config);
+    IdpSQLExceptionConverterFactory.initConverter(config);
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
     initializeMappers();
   }
@@ -105,6 +108,7 @@ public abstract class AbstractIdpMetaStorageTest {
     }
     backend = new JDBCBackend();
     backend.initialize(config);
+    IdpSQLExceptionConverterFactory.initConverter(config);
   }
 
   protected void reopenSession() {

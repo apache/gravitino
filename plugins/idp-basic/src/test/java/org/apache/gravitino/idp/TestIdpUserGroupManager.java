@@ -85,7 +85,7 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testAddUser() {
+  public void testAddUser() throws IOException {
     IdpUser user = manager.addUser("testAdd", "password123");
     Assertions.assertEquals("testAdd", user.name());
     Assertions.assertTrue(user.groupNames().isEmpty());
@@ -95,7 +95,7 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testGetUser() {
+  public void testGetUser() throws IOException {
     manager.addUser("testGet", "password123");
 
     IdpUser user = manager.getUser("testGet");
@@ -107,7 +107,7 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testRemoveUser() {
+  public void testRemoveUser() throws IOException {
     manager.addUser("testRemove", "password123");
 
     Assertions.assertTrue(manager.removeUser("testRemove"));
@@ -115,7 +115,7 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testChangePassword() {
+  public void testChangePassword() throws IOException {
     manager.addUser("testChangePassword", "password123");
 
     Assertions.assertTrue(manager.changePassword("testChangePassword", "new-password"));
@@ -125,7 +125,7 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testAddGroup() {
+  public void testAddGroup() throws IOException {
     IdpGroup group = manager.addGroup("testAddGroup");
     Assertions.assertEquals("testAddGroup", group.name());
     Assertions.assertTrue(group.usernames().isEmpty());
@@ -134,7 +134,7 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testGetGroup() {
+  public void testGetGroup() throws IOException {
     manager.addGroup("testGetGroup");
 
     IdpGroup group = manager.getGroup("testGetGroup");
@@ -146,39 +146,53 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testAddAndRemoveUsersFromGroup() {
+  public void testChangeGroupMembership() throws IOException {
     manager.addUser("groupUser1", "password123");
     manager.addUser("groupUser2", "password123");
+    manager.addUser("groupUser3", "password123");
     manager.addGroup("testMembershipGroup");
 
     IdpGroup group =
-        manager.addUsersToGroup(
-            "testMembershipGroup", Lists.newArrayList("groupUser1", "groupUser2"));
+        manager.changeGroupMembership(
+            "testMembershipGroup", Lists.newArrayList("groupUser1", "groupUser2"), null);
     Assertions.assertTrue(group.usernames().contains("groupUser1"));
     Assertions.assertTrue(group.usernames().contains("groupUser2"));
 
     group =
-        manager.removeUsersFromGroup(
-            "testMembershipGroup", Lists.newArrayList("groupUser1", "groupUser2"));
+        manager.changeGroupMembership(
+            "testMembershipGroup",
+            Lists.newArrayList("groupUser3"),
+            Lists.newArrayList("groupUser1"));
+    Assertions.assertFalse(group.usernames().contains("groupUser1"));
+    Assertions.assertTrue(group.usernames().contains("groupUser2"));
+    Assertions.assertTrue(group.usernames().contains("groupUser3"));
+
+    group =
+        manager.changeGroupMembership(
+            "testMembershipGroup", null, Lists.newArrayList("groupUser2", "groupUser3"));
     Assertions.assertTrue(group.usernames().isEmpty());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> manager.changeGroupMembership("testMembershipGroup", null, null));
   }
 
   @Test
-  public void testRemoveGroup() {
+  public void testRemoveGroup() throws IOException {
     manager.addUser("groupMember", "password123");
     manager.addGroup("testRemoveGroup");
-    manager.addUsersToGroup("testRemoveGroup", Lists.newArrayList("groupMember"));
+    manager.changeGroupMembership("testRemoveGroup", Lists.newArrayList("groupMember"), null);
 
     Assertions.assertThrows(
         IllegalStateException.class, () -> manager.removeGroup("testRemoveGroup", false));
 
-    manager.removeUsersFromGroup("testRemoveGroup", Lists.newArrayList("groupMember"));
+    manager.changeGroupMembership("testRemoveGroup", null, Lists.newArrayList("groupMember"));
     Assertions.assertTrue(manager.removeGroup("testRemoveGroup", false));
     Assertions.assertFalse(manager.removeGroup("no-exist", false));
 
     manager.addUser("forceMember", "password123");
     manager.addGroup("testForceRemoveGroup");
-    manager.addUsersToGroup("testForceRemoveGroup", Lists.newArrayList("forceMember"));
+    manager.changeGroupMembership("testForceRemoveGroup", Lists.newArrayList("forceMember"), null);
     Assertions.assertTrue(manager.removeGroup("testForceRemoveGroup", true));
   }
 
