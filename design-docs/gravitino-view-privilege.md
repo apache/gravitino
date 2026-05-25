@@ -88,7 +88,7 @@ The result is a privilege model where granting `SELECT_VIEW` to a user has visib
 
 1. **Data-Level Access Control**: View privileges in Gravitino govern metadata access only. Whether the user can read the underlying tables referenced by the view SQL is enforced by the compute engine and the underlying catalog's permission system. The parent design doc commits to this scope split explicitly.
 
-2. **DEFINER / INVOKER Enforcement**: `securityConfig.securityMode` is stored by Gravitino as a metadata annotation and passed through to the engine. Gravitino does not enforce DEFINER/INVOKER semantics. This is the parent design doc's position and is unchanged here.
+2. **Per-User Identity Propagation in Spark and Flink Connectors**: Today's Gravitino Spark and Flink connectors authenticate to Gravitino using a singleton service identity established at catalog initialization. Consequently, we only have session context-level identity and, unlike Trino, lack per-user caller identity.
 
 3. **Unifying the Iceberg-REST and Generic View Auth Paths**: `IcebergViewOperations` will continue to use `ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION` independently of the generic path. The two paths serve different protocols (Iceberg REST spec vs. Gravitino REST); unifying them risks breaking Iceberg-REST clients and is a substantial refactor out of scope for this design.
 
@@ -200,6 +200,104 @@ This authorizes drop for the view owner, the schema owner (with `USE_CATALOG`), 
 A new `ViewHookDispatcher` is added under `core/src/main/java/org/apache/gravitino/hook/`, modeled on `TableHookDispatcher`. It sets the creator as the view owner on `createView` (mirroring `TableHookDispatcher:83-93`), which unblocks the `VIEW::OWNER` clause already present in `LOAD_VIEW_AUTHORIZATION_EXPRESSION` and used by the new `ALTER_VIEW_AUTHORIZATION_EXPRESSION`.
 
 The Iceberg-REST view authorization path (`IcebergViewOperations.java`) is unchanged — it continues to use `ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION` independently to preserve Iceberg REST spec compliance.
+
+---
+
+### View Security Mode
+
+The parent View Management design introduces `securityConfig.securityMode` (`DEFINER` | `INVOKER`) on the `View` interface and persists it in `view_version_info.security_mode`. In this section, we will discuss the application of the security mode on Data Engines (Iceberg, Paimon, MySQL, etc.) and Connectors (Trino/Spark/Flink).
+
+**Default**: `DEFINER` (matches the parent doc's `view_version_info.security_mode DEFAULT 'DEFINER'`).
+
+**Mutability**: `securityMode` is **mutable post-creation**. A new `ViewChange.updateSecurityMode(newMode)` is added alongside the existing alter operations (`rename`, `updateComment`, `setProperty`, etc.). Gating follows the standard `alterView` rule — the caller needs `ALTER_VIEW` on the view, or ownership at the view, schema, catalog, or metalake level. Each mutation creates a new view version per the parent doc's existing versioning behavior. In pass-through mode (see below), the change is propagated to the data engine via its native `ALTER VIEW … SQL SECURITY …` DDL; in Gravitino-managed mode it is a metadata-only update.
+
+This diverges from the parent doc's V1 schema comment marking `security_mode` as `immutable in V1`. The column itself is retained; the mutability constraint is lifted by this design. Rationale: an immutable security mode would force users to drop and recreate views (losing version history and dependent grants) just to change DEFINER↔INVOKER, which is operationally worse than allowing the alter.
+
+---
+
+#### Storage Strategy Alignment: Pass-through vs Gravitino-managed
+
+The enforcement mode is determined by the storage path the query takes through the parent doc's storage strategy. The mapping below covers the parent doc's three tiers (complete delegation, delegation + extension, fully Gravitino-managed) and resolves the non-dialect / non-supporting-data-engine cases the parent doc identifies:
+
+| Parent doc storage strategy                       | Data engine                          | Dialect path                                   | Enforcement mode      |
+|---------------------------------------------------|--------------------------------------|------------------------------------------------|-----------------------|
+| Complete delegation                               | Iceberg, Paimon                      | Any dialect                                    | **Gravitino-managed** |
+| Delegation + extension                            | HMS, MySQL, Postgres, Doris, …       | Native dialect (stored in data engine)         | **Pass-through**      |
+| Delegation + extension                            | HMS, MySQL, Postgres, Doris, …       | Non-native dialect (Gravitino DB only)         | **Gravitino-managed** |
+| Fully Gravitino-managed                           | Hudi, Delta, Lance, Generic          | Any dialect                                    | **Gravitino-managed** |
+
+**Pass-through mode** applies only when the query traverses the data engine's native view machinery — specifically, the native-dialect path against HMS or a JDBC data engine that itself supports a security mode (MySQL `SQL SECURITY`, Postgres `security_invoker`, etc.):
+
+- Gravitino translates `createView` / `alterView` to the data engine's native DDL with the appropriate security clause (e.g., `CREATE DEFINER='<mapped>'@'%' VIEW … SQL SECURITY DEFINER` for MySQL; `ALTER VIEW … SQL SECURITY INVOKER` for an alter that toggles the mode).
+- The data engine enforces `securityMode` natively at query execution time.
+- Gravitino stores `securityMode` as metadata for visibility/audit but is **not** in the SELECT execution path.
+- Identity mapping (Gravitino principal ↔ data engine user) is operator-configured per catalog (see Identity Mapping below).
+
+**Gravitino-managed mode** applies in every other case, which covers the two distinct scenarios the parent doc surfaces:
+
+1. **Data lakes without a native view-security concept** — Iceberg, Paimon, Hudi, Delta, Lance, … The data engine has no notion of view-bound security; if Gravitino doesn't enforce, nobody does. This is the parent doc's "complete delegation" and "fully Gravitino-managed" tiers.
+2. **Non-native dialect against a view-security-supporting data engine** — the view is stored in MySQL/Postgres/HMS in its native dialect, but the connector is asking for a different dialect (e.g., the Trino-dialect representation of a MySQL-stored view). Per the parent doc, non-native dialects live only in Gravitino DB; the data engine never sees them. The data engine therefore cannot enforce on this path even though it natively supports security mode for its own dialect. This resolves the parent doc's "non-dialect" question explicitly.
+
+In Gravitino-managed mode:
+
+- Gravitino owns the enforcement decision at query time using the single-branch model defined below.
+- For storage access, Gravitino vends scoped credentials via existing credential-vending infrastructure (Iceberg REST `config.s3.*` keys, fileset credential APIs).
+- For the Iceberg REST flow, integration with the merged Iceberg `referenced-by` parameter ([PR #13810](https://github.com/apache/iceberg/pull/13810)) is required to discriminate view-mediated reads from direct reads. The Spark + REST reference implementation ([PR #13979](https://github.com/apache/iceberg/pull/13979)) is in progress upstream; Gravitino's Iceberg REST endpoint will adopt it as a follow-up.
+
+The enforcement is a single branch on `securityMode`:
+
+```
+principal = (securityMode == DEFINER) ? view.owner() : session.user();
+require(principal has SELECT_TABLE on each underlying table);
+vendCredentials(principal, underlyingTable);
+```
+
+- **DEFINER (default)**: the authorizing principal is the **view owner**, read from `owner_meta` (managed via the `ViewHookDispatcher` introduced in Authorization Enforcement above). Independent of the calling connection.
+- **INVOKER**: the authorizing principal is the **session identity** of the caller — whatever the connector authenticated to Gravitino's REST API as. The connector-specific semantics are detailed in the next section.
+
+---
+
+#### Connector Identity Model
+
+Gravitino's three connectors differ in whether they propagate the real end-user identity or only a session-level service identity when calling Gravitino's REST API. This design's approach embraces both models:
+
+- **Trino — per-user identity**. Trino's connector uses per-session user forwarding when `gravitino.client.session.forwardUser=true` is set (`trino-connector/.../GravitinoConnector.java:88-89` and `GravitinoAuthProvider.buildForSession()`). Built on Trino's `ConnectorSession.getUser()` SPI primitive, which is the only Trino-native input — the surrounding cache and per-user `GravitinoAdminClient` construction is Gravitino-implemented. With this enabled, Gravitino sees Alice's query as Alice.
+
+- **Spark and Flink — session identity (service identity today)**. Today's Spark and Flink connectors authenticate to Gravitino with a singleton `GravitinoAdminClient` configured at catalog initialization (`flink-connector/.../GravitinoCatalogManager.java:307`; equivalent in Spark). Every call from Spark or Flink to Gravitino's REST API authenticates as that service account, regardless of which end-user originated the query. Replicating Trino's `forwardUser` is non-trivial in these engines because their catalog SPIs (`TableCatalog.loadTable(Identifier)`, `Catalog.getTable(ObjectPath)`) do not carry a user parameter. In this case, we will currently use the session context as the "user" identity.
+
+These identity models interact with the two enforcement modes and the underlying data engine type:
+
+| Connector + identity model            | Data lake (Iceberg, Paimon, …)<br>**Gravitino-managed**  | View-security data engine (MySQL, Postgres, HMS, …)<br>**Pass-through** (native dialect) | View-security data engine, **non-native dialect**<br>**Gravitino-managed**  |
+|---------------------------------------|----------------------------------------------------------|------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
+| **Trino** with `forwardUser=true`     | DEFINER ✅ owner / INVOKER ✅ real user                  | DEFINER ✅ / INVOKER ✅ (data engine enforces)                                            | DEFINER ✅ owner / INVOKER ✅ real user                                       |
+| **Trino** without `forwardUser`       | DEFINER ✅ owner / INVOKER ⚠️ service                     | DEFINER ✅ / INVOKER ✅ (data engine enforces)                                            | DEFINER ✅ owner / INVOKER ⚠️ service                                          |
+| **Spark** (singleton service id)      | DEFINER ✅ owner / INVOKER ⚠️ service                     | DEFINER ✅ / INVOKER ✅ (data engine enforces)                                            | DEFINER ✅ owner / INVOKER ⚠️ service                                          |
+| **Flink** (singleton service id)      | DEFINER ✅ owner / INVOKER ⚠️ service                     | DEFINER ✅ / INVOKER ✅ (data engine enforces)                                            | DEFINER ✅ owner / INVOKER ⚠️ service                                          |
+
+Two consequences of this design:
+
+1. **DEFINER (the default) is fully enforced in every cell from V1.** Whether the data engine has a native view-security concept (MySQL/Postgres/HMS) or not (data lakes), and whether the connector forwards real-user identity (Trino with `forwardUser`) or only a session/service identity (Spark/Flink), Gravitino's lookup of `view.owner()` from `owner_meta` and subsequent authorization is independent of the calling connection. DEFINER is the default precisely because it is comprehensively enforceable today.
+
+2. **INVOKER's accuracy depends on the cell**:
+   - **Pass-through cells** (native-dialect path to MySQL/Postgres/HMS): the data engine enforces with whatever identity the connector's JDBC/Thrift connection uses. Identity propagation between connector and data engine is a connector / deployment concern outside this design — typically per-user JDBC credentials, proxy authentication, or Kerberos delegation.
+   - **Gravitino-managed cells** (data lakes, or non-native dialect on a JDBC data engine): Gravitino enforces using session identity. Accurate per-user on Trino with `forwardUser`; degraded to service-identity enforcement on Spark/Flink today. The degradation is principled — INVOKER means "whoever Gravitino sees as the caller" — and matches deployment reality, since operators today grant `spark_svc` / `flink_svc` the privileges they want Spark/Flink jobs to have. When per-session forwarding lands in those connectors, INVOKER becomes per-user automatically with no design changes here.
+
+---
+
+#### Identity Mapping (Pass-through Mode Only)
+
+Pass-through mode bridges two identity namespaces:
+
+- **Gravitino**: the view owner is a Gravitino principal (e.g., `bob@corp`).
+- **Data engine**: the DEFINER user is a backend-native principal (e.g., MySQL's `bob_mysql@%`, HMS's Kerberos principal).
+
+Operators configure a mapping per catalog via catalog properties:
+
+```
+gravitino.identity-mapping.<gravitino-principal> = <data-engine-user>
+```
+
+When Gravitino's catalog plugin issues data-engine DDL that embeds an identity (e.g., `CREATE DEFINER='bob_mysql'@'%' VIEW … SQL SECURITY DEFINER`), it consults this mapping. In Gravitino-managed mode no mapping is needed; the Gravitino principal is the authority.
 
 ---
 
