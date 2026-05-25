@@ -28,7 +28,9 @@ import java.util.HashMap;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -143,8 +145,8 @@ class TestGlueIcebergTableHelper {
 
     Table mockIcebergTable = mock(Table.class);
     when(mockIcebergTable.schema()).thenReturn(icebergSchema);
-    when(mockIcebergTable.spec()).thenReturn(org.apache.iceberg.PartitionSpec.unpartitioned());
-    when(mockIcebergTable.sortOrder()).thenReturn(org.apache.iceberg.SortOrder.unsorted());
+    when(mockIcebergTable.spec()).thenReturn(PartitionSpec.unpartitioned());
+    when(mockIcebergTable.sortOrder()).thenReturn(SortOrder.unsorted());
     when(mockIcebergTable.properties()).thenReturn(new HashMap<>());
 
     Catalog mockCatalog = mock(Catalog.class);
