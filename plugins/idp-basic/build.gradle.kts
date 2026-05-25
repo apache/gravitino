@@ -26,6 +26,8 @@ plugins {
 dependencies {
   annotationProcessor(libs.lombok)
 
+  compileOnly(project(":api"))
+  compileOnly(project(":server-common"))
   implementation(project(":common"))
   implementation(project(":core"))
 
@@ -37,11 +39,14 @@ dependencies {
   compileOnly(libs.lombok)
   compileOnly(libs.slf4j.api)
 
+  testImplementation(project(":api"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
+  testImplementation(project(":server-common"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.commons.io)
