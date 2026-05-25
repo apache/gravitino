@@ -16,7 +16,7 @@ import TabItem from '@theme/TabItem';
 
 Tables in Gravitino have four configurable structural properties that affect how data is laid out and accessed: partitioning, distribution, sort ordering, and indexing. The sections below cover the syntax for each and how compute engines use them at query time.
 
-## Table Partitioning
+## Partitioning
 
 To create a partitioned table, you should provide the following two components to construct a valid partitioned table:
 
@@ -49,7 +49,7 @@ For function partitioning, you should provide the function name and the function
 
 Once a partitioned table is created, you can [manage its partitions using Gravitino](./manage-table-partition-using-gravitino.md).
 
-## Table Distribution
+## Distribution
 
 To create a distribution(bucketed) table, you should use the following three components to construct a valid bucketed table:
 
