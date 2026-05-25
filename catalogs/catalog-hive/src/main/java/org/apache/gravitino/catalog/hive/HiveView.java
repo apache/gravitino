@@ -55,6 +55,7 @@ public class HiveView implements View {
   private static final String SPARK_VERSION_KEY = "spark.sql.create.version";
   private static final String TRINO_VIEW_MARKER_KEY = "presto_view";
   private static final String TRINO_VIEW_PREFIX = "/* Presto View:";
+  static final String GRAVITINO_VIEW_DIALECT_KEY = "gravitino.view.dialect";
 
   private String name;
   private String comment;
@@ -123,6 +124,9 @@ public class HiveView implements View {
     }
     if (parameters != null && parameters.containsKey(SPARK_VERSION_KEY)) {
       return Dialects.SPARK;
+    }
+    if (parameters != null && parameters.containsKey(GRAVITINO_VIEW_DIALECT_KEY)) {
+      return parameters.get(GRAVITINO_VIEW_DIALECT_KEY);
     }
     return Dialects.HIVE;
   }

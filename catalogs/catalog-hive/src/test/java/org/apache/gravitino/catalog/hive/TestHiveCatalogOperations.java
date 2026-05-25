@@ -245,7 +245,7 @@ class TestHiveCatalogOperations {
                     null,
                     null,
                     Maps.newHashMap()));
-    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+    Assertions.assertTrue(exception.getMessage().contains("supports only"));
   }
 
   @Test
@@ -403,7 +403,7 @@ class TestHiveCatalogOperations {
                     null,
                     null,
                     Maps.newHashMap()));
-    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+    Assertions.assertTrue(exception.getMessage().contains("supports only"));
   }
 
   @Test
@@ -510,7 +510,7 @@ class TestHiveCatalogOperations {
         Assertions.assertThrows(
             UnsupportedOperationException.class,
             () -> op.loadView(NameIdentifier.of("db", "v_trino")));
-    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+    Assertions.assertTrue(exception.getMessage().contains("supports only"));
   }
 
   @Test
@@ -628,7 +628,7 @@ class TestHiveCatalogOperations {
                         null,
                         null,
                         null)));
-    Assertions.assertTrue(exception.getMessage().contains("supports only 'hive'"));
+    Assertions.assertTrue(exception.getMessage().contains("supports only"));
   }
 
   @Test

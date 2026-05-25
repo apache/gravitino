@@ -119,6 +119,9 @@ class HiveViewCatalogOperations implements ViewCatalog {
       Map<String, String> params =
           Maps.newHashMap(properties == null ? ImmutableMap.of() : properties);
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
+      if (!Dialects.HIVE.equalsIgnoreCase(sqlRepresentation.dialect())) {
+        params.put(HiveView.GRAVITINO_VIEW_DIALECT_KEY, sqlRepresentation.dialect());
+      }
       String viewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
 
       HiveTable hiveTable =
@@ -363,18 +366,19 @@ class HiveViewCatalogOperations implements ViewCatalog {
         Maps.newHashMap(properties != null ? properties : ImmutableMap.of());
     String representationSql = viewOriginalText;
     String detectedDialect = HiveView.detectDialect(representationSql, params);
-    if (!Dialects.HIVE.equalsIgnoreCase(detectedDialect)) {
+    if (!Dialects.HIVE.equalsIgnoreCase(detectedDialect)
+        && !Dialects.FLINK.equalsIgnoreCase(detectedDialect)) {
       // TODO(design-docs/gravitino-logical-view-management.md): support loading trino/spark HMS
       // views.
       throw new UnsupportedOperationException(
           String.format(
-              "Hive catalog currently supports only '%s' view dialect, but found '%s' for view %s",
-              Dialects.HIVE, detectedDialect, ident));
+              "Hive catalog currently supports only '%s' and '%s' view dialects, but found '%s' for view %s",
+              Dialects.HIVE, Dialects.FLINK, detectedDialect, ident));
     }
 
     SQLRepresentation rep =
         SQLRepresentation.builder()
-            .withDialect(Dialects.HIVE)
+            .withDialect(detectedDialect)
             .withSql(StringUtils.defaultString(representationSql))
             .build();
 
