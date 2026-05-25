@@ -151,7 +151,7 @@ Gravitino builds from source on Linux and macOS natively, and on Windows through
 
   This creates `gravitino-iceberg-rest-server-{version}.tar.gz` and `gravitino-iceberg-rest-server-{version}.tar.gz.sha256` under the `distribution` directory. You can uncompress and deploy it to use the Gravitino Iceberg REST server.
 
-## Build on Windows (Using WSL)
+## Windows Subsystem for Linux
 
 ### Download WSL (Ubuntu)
 
