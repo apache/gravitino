@@ -82,8 +82,6 @@ To deploy the Gravitino server locally to run the integration tests, follow thes
 
 ## Configure Parameters for Integration Tests
 
-### `DISPLAY_WEBPAGE_IN_TESTING`
-
 By default, the Gravitino web frontend page will not pop up when running integration tests. 
 If you wish to display the web frontend page during integrations test, you can set the `DISPLAY_WEBPAGE_IN_TESTING` environment variable in `setIntegrationTestEnvironment` in file build.gradle.kts. 
 For example:
