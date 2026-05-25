@@ -20,20 +20,5 @@ package org.apache.gravitino.idp.model;
 
 import java.util.List;
 
-/** The interface of a built-in IdP group exposed by local authentication management APIs. */
-public interface IdpGroup {
-
-  /**
-   * The name of the built-in IdP group.
-   *
-   * @return The name of the built-in IdP group.
-   */
-  String name();
-
-  /**
-   * The usernames that belong to the built-in IdP group.
-   *
-   * @return The usernames of the built-in IdP group.
-   */
-  List<String> usernames();
-}
+/** Immutable built-in IdP group. */
+public record IdpGroup(String name, List<String> usernames) {}

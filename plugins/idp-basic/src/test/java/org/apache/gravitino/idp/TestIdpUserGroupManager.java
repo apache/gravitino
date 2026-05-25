@@ -103,7 +103,7 @@ public class TestIdpUserGroupManager {
 
     Throwable exception =
         Assertions.assertThrows(NotFoundException.class, () -> manager.getUser("not-exist"));
-    Assertions.assertTrue(exception.getMessage().contains("IdP user not-exist does not exist"));
+    Assertions.assertTrue(exception.getMessage().contains("IdP user not found: not-exist"));
   }
 
   @Test
@@ -143,7 +143,7 @@ public class TestIdpUserGroupManager {
 
     Throwable exception =
         Assertions.assertThrows(NotFoundException.class, () -> manager.getGroup("not-exist"));
-    Assertions.assertTrue(exception.getMessage().contains("IdP group not-exist does not exist"));
+    Assertions.assertTrue(exception.getMessage().contains("IdP group not found: not-exist"));
   }
 
   @Test

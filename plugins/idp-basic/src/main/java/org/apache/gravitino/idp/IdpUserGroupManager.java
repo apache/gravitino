@@ -27,9 +27,7 @@ import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
 import org.apache.gravitino.idp.exception.AlreadyExistsException;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
-import org.apache.gravitino.idp.model.IdpGroupInfo;
 import org.apache.gravitino.idp.model.IdpUser;
-import org.apache.gravitino.idp.model.IdpUserInfo;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.idp.storage.relational.IdpGarbageCollector;
@@ -48,9 +46,6 @@ import org.slf4j.LoggerFactory;
 public class IdpUserGroupManager implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpUserGroupManager.class);
-
-  private static final String IDP_USER_DOES_NOT_EXIST_MSG = "IdP user %s does not exist";
-  private static final String IDP_GROUP_DOES_NOT_EXIST_MSG = "IdP group %s does not exist";
 
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
@@ -116,13 +111,8 @@ public class IdpUserGroupManager implements Closeable {
    * @return The built-in IdP user.
    */
   public IdpUser getUser(String username) {
-    try {
-      IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
-      return new IdpUserInfo(userPO.getUsername(), USER_SERVICE.listGroupNamesByUsername(username));
-    } catch (NotFoundException e) {
-      LOG.warn("IdP user {} does not exist", username, e);
-      throw new NotFoundException(IDP_USER_DOES_NOT_EXIST_MSG, username);
-    }
+    IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
+    return new IdpUser(userPO.getUsername(), USER_SERVICE.listGroupNamesByUsername(username));
   }
 
   /**
@@ -134,7 +124,7 @@ public class IdpUserGroupManager implements Closeable {
    */
   public IdpUser changePassword(String username, String password) {
     if (!USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password))) {
-      throw new NotFoundException(IDP_USER_DOES_NOT_EXIST_MSG, username);
+      throw new NotFoundException("IdP user not found: %s", username);
     }
     return getUser(username);
   }
@@ -178,14 +168,8 @@ public class IdpUserGroupManager implements Closeable {
    * @return The built-in IdP group.
    */
   public IdpGroup getGroup(String groupName) {
-    try {
-      IdpGroupPO groupPO = GROUP_SERVICE.getIdpGroupByName(groupName);
-      return new IdpGroupInfo(
-          groupPO.getGroupName(), GROUP_SERVICE.listUsernamesByGroupName(groupName));
-    } catch (NotFoundException e) {
-      LOG.warn("IdP group {} does not exist", groupName, e);
-      throw new NotFoundException(IDP_GROUP_DOES_NOT_EXIST_MSG, groupName);
-    }
+    IdpGroupPO groupPO = GROUP_SERVICE.getIdpGroupByName(groupName);
+    return new IdpGroup(groupPO.getGroupName(), GROUP_SERVICE.listUsernamesByGroupName(groupName));
   }
 
   /**
