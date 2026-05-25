@@ -6,9 +6,7 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Before the version `0.6.0-incubating`, Apache Gravitino supports KV and Relational backend storage to store metadata.
-Since 0.6.0-incubating, Gravitino only supports using RDBMS as relational backend storage to store metadata. This doc will guide you on how to use the
-relational backend storage in Gravitino.
+Apache Gravitino uses a relational database (RDBMS) as its backend storage for metadata. The sections below explain how to configure and operate this backend.
 
 Relational backend storage mainly aims to the users who are accustomed to using RDBMS to
 store data or lack available a KV storage, and want to use Gravitino.
