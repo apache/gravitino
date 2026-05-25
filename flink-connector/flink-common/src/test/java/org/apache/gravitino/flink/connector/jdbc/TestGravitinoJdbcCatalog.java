@@ -78,6 +78,11 @@ public class TestGravitinoJdbcCatalog {
     public Credential[] getCredentials() {
       return credentials;
     }
+
+    @Override
+    public SupportsCredentials supportsCredentials() {
+      return this;
+    }
   }
 
   @Test
