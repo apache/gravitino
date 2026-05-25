@@ -86,14 +86,12 @@ The Lance REST service provides comprehensive support for namespace management, 
 
 More details, refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
 
-### Operation Details
-
 Some operations have specific behaviors and modes. Below are important details to consider:
 
 Mode values are parsed case-insensitively. The examples below use lowercase values as the
 REST-style canonical form.
 
-#### Namespace Operations
+### Namespace Operations
 
 **CreateNamespace** supports three modes:
 - `create`: Fails if namespace already exists
@@ -105,7 +103,7 @@ REST-style canonical form.
 - Deletes both metadata and Lance data files
 - Operation is irreversible
 
-#### Table Operations
+### Table Operations
 
 **RegisterTable vs CreateTable**:
 - **RegisterTable**: Links existing Lance datasets into Gravitino catalog without data movement
