@@ -24,7 +24,7 @@ A model catalog manages the path (URI) of each model. Instead of tracking storag
 
 ### Catalog Properties
 
-The model catalog has no catalog-specific properties; it uses the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration).
+The model catalog has no catalog-specific properties; it uses the [common catalog properties](./gravitino-server-config.md#catalog-properties).
 
 ### Catalog Operations
 

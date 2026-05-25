@@ -109,7 +109,7 @@ The plain `fs.path.config.<name>` entry specifies the base path of the filesyste
 
 **Example:** Setting `fs.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
 
-**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](./how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
+**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](./how-to-use-gravitino-client.md#java-client) for more support client configuration.
 
 Apart from the above properties, to access fileset like S3, GCS, OSS and custom fileset, extra properties are needed; see
 [S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#access-the-fileset-with-the-gvfs-java-client),
@@ -120,7 +120,7 @@ and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-
 #### Custom Fileset
 
 Since 0.7.0-incubating, users can define their own fileset type and configure the corresponding
-properties, for more, refer to [Custom Fileset](./fileset-catalog.md#implement-a-custom-hcfs-file-system-fileset).
+properties, for more, refer to [Custom Fileset](./fileset-catalog.md#plug-in-a-custom-hcfs-filesystem).
 So, if you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
 
 | Configuration item             | Description                                                                                             | Default value | Required | Since version    |
@@ -432,7 +432,7 @@ To configure the Gravitino client, use properties prefixed with `gvfs_gravitino_
 
 **Example:** Setting `gvfs_gravitino_client_request_timeout` is equivalent to setting `gravitino_client_request_timeout` for the Gravitino client.
 
-**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Python client configurations](./how-to-use-gravitino-client.md#python-client-configuration) for more support client configuration.
+**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Python client configurations](./how-to-use-gravitino-client.md#python-client) for more support client configuration.
 
 :::note
 When users work with a multi-cluster fileset catalog, they can configure separate sets of properties for the base paths
@@ -476,7 +476,7 @@ Please see the cloud-storage-specific configurations [GCS GVFS Python client con
 and [Azure Blob Storage GVFS Python client configurations](./fileset-catalog-with-adls.md#access-the-fileset-with-the-gvfs-python-client) for more details.
 
 :::note
-Gravitino python client does not support [customized file systems](fileset-catalog.md#implement-a-custom-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library.
+Gravitino python client does not support [customized file systems](fileset-catalog.md#plug-in-a-custom-hcfs-filesystem) defined by users due to the limit of `fsspec` library.
 :::
 
 ### Examples

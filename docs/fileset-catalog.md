@@ -18,7 +18,7 @@ Gravitino builds the fileset catalog against Hadoop 3 dependencies. It should be
 
 ### Catalog Properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration),
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties),
 the Fileset catalog has the following properties:
 
 | Property Name                        | Description                                                                                                                                                                                                                                                                                                                     | Default Value   | Required | Since Version    |

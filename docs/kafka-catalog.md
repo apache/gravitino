@@ -14,7 +14,7 @@ The Kafka catalog is a messaging catalog for managing Apache Kafka topic metadat
 
 ### Catalog Properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Kafka catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties), the Kafka catalog has the following properties:
 
 | Property Name       | Description                                                                                                                                                                                                   | Default Value | Required | Since Version |
 |---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|

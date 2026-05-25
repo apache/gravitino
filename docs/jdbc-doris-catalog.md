@@ -40,7 +40,7 @@ Check the relevant data source configuration in
 [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html) for
 more details.
 
-Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Doris catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties), the Doris catalog has the following properties:
 
 | Configuration item      | Description                                                                                                                                                                                                                                                                                                                                                                                                      | Default value | Required | Since Version    |
 |-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
@@ -197,7 +197,7 @@ Users can also specify the distribution strategy when creating tables in the Dor
 - `HASH`
 - `RANDOM`
 
-For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it. More information about the distribution strategy defined in Gravitino can be found [here](./table-partitioning-distribution-sort-order-indexes.md#table-distribution).
+For the `RANDOM` distribution strategy, Gravitino uses the `EVEN` to represent it. More information about the distribution strategy defined in Gravitino can be found [here](./table-partitioning-distribution-sort-order-indexes.md#distribution).
 
 
 ### Table Operations
