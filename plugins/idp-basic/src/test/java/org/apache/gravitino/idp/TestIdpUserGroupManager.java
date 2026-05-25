@@ -118,11 +118,10 @@ public class TestIdpUserGroupManager {
   public void testChangePassword() {
     manager.addUser("testChangePassword", "password123");
 
-    IdpUser user = manager.changePassword("testChangePassword", "new-password");
-    Assertions.assertEquals("testChangePassword", user.name());
+    Assertions.assertTrue(manager.changePassword("testChangePassword", "new-password"));
+    Assertions.assertEquals("testChangePassword", manager.getUser("testChangePassword").name());
 
-    Assertions.assertThrows(
-        NotFoundException.class, () -> manager.changePassword("not-exist", "password123"));
+    Assertions.assertFalse(manager.changePassword("not-exist", "password123"));
   }
 
   @Test

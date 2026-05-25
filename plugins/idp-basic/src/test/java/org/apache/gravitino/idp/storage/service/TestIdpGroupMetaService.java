@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.gravitino.idp.exception.AlreadyExistsException;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.junit.jupiter.api.Tag;
@@ -76,7 +77,8 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
-    assertThrowsRuntimeException(() -> groupMetaService.insertIdpGroup(duplicateGroup));
+    assertThrows(
+        AlreadyExistsException.class, () -> groupMetaService.insertIdpGroup(duplicateGroup));
   }
 
   @ParameterizedTest

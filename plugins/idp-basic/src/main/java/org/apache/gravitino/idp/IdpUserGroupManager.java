@@ -20,12 +20,11 @@ package org.apache.gravitino.idp;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
-import org.apache.gravitino.idp.exception.AlreadyExistsException;
-import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
@@ -73,12 +72,8 @@ public class IdpUserGroupManager implements Closeable {
    * @return The created built-in IdP user.
    */
   public IdpUser addUser(String username, String password) {
-    if (userExists(username)) {
-      throw new AlreadyExistsException("IdP user %s already exists", username);
-    }
-
     USER_SERVICE.insertIdpUser(newUserPO(username, passwordHasher.hash(password)));
-    return getUser(username);
+    return new IdpUser(username, Collections.emptyList());
   }
 
   /**
@@ -88,9 +83,6 @@ public class IdpUserGroupManager implements Closeable {
    * @return True if the user was removed, false if it did not exist.
    */
   public boolean removeUser(String username) {
-    if (!userExists(username)) {
-      return false;
-    }
     return USER_SERVICE.deleteIdpUser(username);
   }
 
@@ -110,13 +102,10 @@ public class IdpUserGroupManager implements Closeable {
    *
    * @param username The username.
    * @param password The new plaintext password.
-   * @return The updated built-in IdP user.
+   * @return True if the password was updated, false if the user did not exist.
    */
-  public IdpUser changePassword(String username, String password) {
-    if (!USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password))) {
-      throw new NotFoundException("IdP user not found: %s", username);
-    }
-    return getUser(username);
+  public boolean changePassword(String username, String password) {
+    return USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password));
   }
 
   /**
@@ -126,12 +115,8 @@ public class IdpUserGroupManager implements Closeable {
    * @return The created built-in IdP group.
    */
   public IdpGroup addGroup(String groupName) {
-    if (groupExists(groupName)) {
-      throw new AlreadyExistsException("IdP group %s already exists", groupName);
-    }
-
     GROUP_SERVICE.insertIdpGroup(newGroupPO(groupName));
-    return getGroup(groupName);
+    return new IdpGroup(groupName, Collections.emptyList());
   }
 
   /**
@@ -142,9 +127,6 @@ public class IdpUserGroupManager implements Closeable {
    * @return True if the group was removed, false if it did not exist.
    */
   public boolean removeGroup(String groupName, boolean force) {
-    if (!groupExists(groupName)) {
-      return false;
-    }
     return GROUP_SERVICE.deleteIdpGroup(groupName, force);
   }
 
@@ -208,23 +190,5 @@ public class IdpUserGroupManager implements Closeable {
         .withLastVersion(POConverters.INIT_VERSION)
         .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
         .build();
-  }
-
-  private static boolean userExists(String username) {
-    try {
-      USER_SERVICE.getIdpUserByUsername(username);
-      return true;
-    } catch (NotFoundException e) {
-      return false;
-    }
-  }
-
-  private static boolean groupExists(String groupName) {
-    try {
-      GROUP_SERVICE.getIdpGroupByName(groupName);
-      return true;
-    } catch (NotFoundException e) {
-      return false;
-    }
   }
 }

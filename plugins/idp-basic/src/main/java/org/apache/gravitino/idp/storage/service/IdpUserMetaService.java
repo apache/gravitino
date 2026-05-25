@@ -27,6 +27,7 @@ import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.utils.IdpSQLExceptionUtils;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -47,7 +48,13 @@ public class IdpUserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getIdpUserByUsername")
   public IdpUserPO getIdpUserByUsername(String username) {
-    return getIdpUserPOByUsername(username);
+    IdpUserPO userPO =
+        SessionUtils.getWithoutCommit(
+            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
+    if (userPO == null) {
+      throw new NotFoundException("IdP user not found: %s", username);
+    }
+    return userPO;
   }
 
   @Monitored(
@@ -62,22 +69,34 @@ public class IdpUserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertIdpUser")
   public void insertIdpUser(IdpUserPO userPO) {
-    SessionUtils.doWithCommit(IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO));
+    try {
+      SessionUtils.doWithCommit(IdpUserMetaMapper.class, mapper -> mapper.insertIdpUser(userPO));
+    } catch (RuntimeException re) {
+      IdpSQLExceptionUtils.checkDuplicateEntry(re, "user", userPO.getUsername());
+      throw re;
+    }
   }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteIdpUser")
   public boolean deleteIdpUser(String username) {
+    int[] deletedCount = new int[] {0};
     SessionUtils.doMultipleWithCommit(
-        () ->
+        () -> {
+          Integer deleted =
+              SessionUtils.getWithoutCommit(
+                  IdpUserMetaMapper.class, mapper -> mapper.softDeleteIdpUser(username));
+          deletedCount[0] = deleted == null ? 0 : deleted;
+        },
+        () -> {
+          if (deletedCount[0] > 0) {
             SessionUtils.doWithoutCommit(
                 IdpUserGroupRelMapper.class,
-                mapper -> mapper.softDeleteRelationsByUsername(username)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                IdpUserMetaMapper.class, mapper -> mapper.softDeleteIdpUser(username)));
-    return true;
+                mapper -> mapper.softDeleteRelationsByUsername(username));
+          }
+        });
+    return deletedCount[0] > 0;
   }
 
   /**
@@ -143,15 +162,5 @@ public class IdpUserMetaService {
       }
     }
     return userIds;
-  }
-
-  private IdpUserPO getIdpUserPOByUsername(String username) {
-    IdpUserPO userPO =
-        SessionUtils.getWithoutCommit(
-            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
-    if (userPO == null) {
-      throw new NotFoundException("IdP user not found: %s", username);
-    }
-    return userPO;
   }
 }
