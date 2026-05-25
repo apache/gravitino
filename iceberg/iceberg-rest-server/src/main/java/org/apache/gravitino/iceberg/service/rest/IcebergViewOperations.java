@@ -97,7 +97,7 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
     LOG.info("List Iceberg views, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -137,7 +137,7 @@ public class IcebergViewOperations {
           String namespace,
       CreateViewRequest createViewRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
     LOG.info(
         "Create Iceberg view, catalog: {}, namespace: {}, createViewRequest: {}",
         catalogName,
@@ -172,7 +172,7 @@ public class IcebergViewOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
     String viewName = RESTUtil.decodeString(view);
     LOG.info(
         "Load Iceberg view, catalog: {}, namespace: {}, view: {}",
@@ -213,7 +213,7 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view,
       UpdateTableRequest replaceViewRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
     String viewName = RESTUtil.decodeString(view);
     LOG.info(
         "Replace Iceberg view, catalog: {}, namespace: {}, view: {}, replaceViewRequest: {}",
@@ -254,7 +254,7 @@ public class IcebergViewOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
     String viewName = RESTUtil.decodeString(view);
     LOG.info(
         "Drop Iceberg view, catalog: {}, namespace: {}, view: {}",
@@ -290,7 +290,7 @@ public class IcebergViewOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = RESTUtil.decodeNamespace(namespace);
+    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
     String viewName = RESTUtil.decodeString(view);
     LOG.info(
         "Check Iceberg view exists, catalog: {}, namespace: {}, view: {}",

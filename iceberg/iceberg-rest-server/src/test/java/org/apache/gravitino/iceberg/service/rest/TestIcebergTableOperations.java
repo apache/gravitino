@@ -36,6 +36,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
@@ -488,7 +489,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private Response doLoadTableWithSnapshots(Namespace ns, String name, String snapshots) {
     String path =
-        IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(ns) + "/tables/" + name;
+        IcebergRestTestUtil.NAMESPACE_PATH
+            + "/"
+            + IcebergRESTUtils.encodeNamespace(ns)
+            + "/tables/"
+            + name;
     Map<String, String> queryParams = ImmutableMap.of("snapshots", snapshots);
     return getIcebergClientBuilder(path, Optional.of(queryParams)).get();
   }

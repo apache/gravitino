@@ -36,6 +36,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
@@ -54,7 +55,6 @@ import org.apache.gravitino.iceberg.service.provider.StaticIcebergConfigProvider
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.iceberg.catalog.Namespace;
-import org.apache.iceberg.rest.RESTUtil;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.logging.LoggingFeature;
@@ -74,7 +74,7 @@ public class IcebergRestTestUtil {
       Namespace.of("gravitino-test-2", "nested");
 
   public static final String VIEW_PATH =
-      NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(TEST_NAMESPACE_NAME) + "/views";
+      NAMESPACE_PATH + "/" + IcebergRESTUtils.encodeNamespace(TEST_NAMESPACE_NAME) + "/views";
   public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";
 
   public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";

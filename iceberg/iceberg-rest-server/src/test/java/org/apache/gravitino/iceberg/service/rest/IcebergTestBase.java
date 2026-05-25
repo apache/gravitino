@@ -29,8 +29,8 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.iceberg.catalog.Namespace;
-import org.apache.iceberg.rest.RESTUtil;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.junit.jupiter.api.Assertions;
@@ -56,7 +56,10 @@ public class IcebergTestBase extends JerseyTest {
         Joiner.on("/")
             .skipNulls()
             .join(
-                IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(ns) + "/tables",
+                IcebergRestTestUtil.NAMESPACE_PATH
+                    + "/"
+                    + IcebergRESTUtils.encodeNamespace(ns)
+                    + "/tables",
                 name.orElseGet(() -> null));
     return getIcebergClientBuilder(path, Optional.empty());
   }
@@ -70,7 +73,10 @@ public class IcebergTestBase extends JerseyTest {
         Joiner.on("/")
             .skipNulls()
             .join(
-                IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(ns) + "/views",
+                IcebergRestTestUtil.NAMESPACE_PATH
+                    + "/"
+                    + IcebergRESTUtils.encodeNamespace(ns)
+                    + "/views",
                 name.orElseGet(() -> null));
     return getIcebergClientBuilder(path, Optional.empty());
   }
@@ -80,7 +86,10 @@ public class IcebergTestBase extends JerseyTest {
         Joiner.on("/")
             .skipNulls()
             .join(
-                IcebergRestTestUtil.NAMESPACE_PATH + "/" + RESTUtil.encodeNamespace(ns) + "/tables",
+                IcebergRestTestUtil.NAMESPACE_PATH
+                    + "/"
+                    + IcebergRESTUtils.encodeNamespace(ns)
+                    + "/tables",
                 name,
                 IcebergRestTestUtil.REPORT_METRICS_POSTFIX);
     return getIcebergClientBuilder(path, Optional.empty());
@@ -103,7 +112,7 @@ public class IcebergTestBase extends JerseyTest {
             .skipNulls()
             .join(
                 IcebergRestTestUtil.NAMESPACE_PATH,
-                namespace.map(RESTUtil::encodeNamespace).orElseGet(() -> null),
+                namespace.map(IcebergRESTUtils::encodeNamespace).orElseGet(() -> null),
                 extraPath.orElseGet(() -> null));
     return getIcebergClientBuilder(path, queryParams);
   }
@@ -114,7 +123,7 @@ public class IcebergTestBase extends JerseyTest {
             .skipNulls()
             .join(
                 IcebergRestTestUtil.NAMESPACE_PATH,
-                RESTUtil.encodeNamespace(namespace),
+                IcebergRESTUtils.encodeNamespace(namespace),
                 IcebergRestTestUtil.UPDATE_NAMESPACE_POSTFIX);
     return getIcebergClientBuilder(path, Optional.empty());
   }

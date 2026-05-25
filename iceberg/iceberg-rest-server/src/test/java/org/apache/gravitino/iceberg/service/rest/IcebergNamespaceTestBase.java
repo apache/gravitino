@@ -28,8 +28,8 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.iceberg.catalog.Namespace;
-import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
@@ -74,7 +74,7 @@ public class IcebergNamespaceTestBase extends IcebergTestBase {
   private Response doListNamespace(Optional<Namespace> parent) {
     Optional<Map<String, String>> queryParam =
         parent.isPresent()
-            ? Optional.of(ImmutableMap.of("parent", RESTUtil.encodeNamespace(parent.get())))
+            ? Optional.of(ImmutableMap.of("parent", IcebergRESTUtils.encodeNamespace(parent.get())))
             : Optional.empty();
     return getNamespaceClientBuilder(Optional.empty(), Optional.empty(), queryParam).get();
   }

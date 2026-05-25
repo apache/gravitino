@@ -70,7 +70,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
                 Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalog));
             break;
           case SCHEMA:
-            rawNamespace = RESTUtil.decodeNamespace(value);
+            rawNamespace = IcebergRESTUtils.decodeNamespace(value);
             schema = String.join(separator, rawNamespace.levels());
             nameIdentifierMap.put(
                 Entity.EntityType.SCHEMA,

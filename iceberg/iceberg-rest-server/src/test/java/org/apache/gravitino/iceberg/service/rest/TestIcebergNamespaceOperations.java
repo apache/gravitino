@@ -159,11 +159,13 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2", "a"));
     verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "b"));
 
-    verifyDropNamespaceSucc(Namespace.of("exists_foo2"));
-    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2"));
+    verifyDropNamespaceFail(409, Namespace.of("exists_foo2"));
+    verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2"));
     verifyNamespaceExistsStatusCode(204, Namespace.of("exists_foo2", "a"));
 
     verifyDropNamespaceSucc(Namespace.of("exists_foo2", "a"));
+    verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "a"));
+    verifyDropNamespaceSucc(Namespace.of("exists_foo2"));
     verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2"));
     verifyNamespaceExistsStatusCode(404, Namespace.of("exists_foo2", "a"));
   }

@@ -43,6 +43,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.slf4j.Logger;
@@ -51,6 +52,9 @@ import org.slf4j.LoggerFactory;
 public class IcebergRESTUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
+
+  /** UTF-8 URL-encoded namespace separator used by the Iceberg REST catalog spec. */
+  private static final String NAMESPACE_SEPARATOR_URLENCODED_UTF_8 = "%1F";
 
   public static final String SNAPSHOT_ALL = "all";
 
@@ -73,6 +77,26 @@ public class IcebergRESTUtils {
   }
 
   private IcebergRESTUtils() {}
+
+  /**
+   * Decodes a URL path or query parameter into an Iceberg {@link Namespace}.
+   *
+   * @param encodedNamespace the encoded namespace from the REST request
+   * @return the decoded namespace
+   */
+  public static Namespace decodeNamespace(String encodedNamespace) {
+    return RESTUtil.decodeNamespace(encodedNamespace, NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+  }
+
+  /**
+   * Encodes a namespace for use as a URL path or query parameter per the Iceberg REST catalog spec.
+   *
+   * @param namespace the namespace to encode
+   * @return the encoded namespace string
+   */
+  public static String encodeNamespace(Namespace namespace) {
+    return RESTUtil.encodeNamespace(namespace, NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+  }
 
   public static <T> Response ok(T t) {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();

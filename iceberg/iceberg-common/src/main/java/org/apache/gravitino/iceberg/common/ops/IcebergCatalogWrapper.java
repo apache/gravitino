@@ -47,6 +47,7 @@ import org.apache.iceberg.catalog.ViewCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.RESTCatalog;
+import org.apache.iceberg.rest.RESTCatalogProperties.SnapshotMode;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -246,7 +247,8 @@ public class IcebergCatalogWrapper implements AutoCloseable {
       return LoadTableResponse.builder().withTableMetadata(tableMetadataOptional.get()).build();
     }
 
-    LoadTableResponse loadTableResponse = CatalogHandlers.loadTable(getCatalog(), tableIdentifier);
+    LoadTableResponse loadTableResponse =
+        CatalogHandlers.loadTable(getCatalog(), tableIdentifier, SnapshotMode.ALL);
     if (loadTableResponse != null) {
       getMetadataCache().updateTableMetadata(tableIdentifier, loadTableResponse.tableMetadata());
     }
