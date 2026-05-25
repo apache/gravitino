@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.idp.storage.mapper;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -29,26 +31,34 @@ import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigConstants;
-import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
+import org.apache.gravitino.integration.test.container.PGImageName;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.storage.relational.JDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 
 public abstract class AbstractIdpMetaStorageTest {
   private static final String H2_BACKEND = "h2";
   private static final String MYSQL_BACKEND = "mysql";
   private static final String POSTGRESQL_BACKEND = "postgresql";
+  private static final String LOCALHOST = "127.0.0.1";
   private static final TestDatabaseName MYSQL_TEST_DATABASE = TestDatabaseName.MYSQL_JDBC_BACKEND;
   private static final TestDatabaseName POSTGRESQL_TEST_DATABASE = TestDatabaseName.PG_JDBC_BACKEND;
+
+  private static MySQLContainer mySQLContainer;
+  private static PostgreSQLContainer postgreSQLContainer;
+  private static boolean dockerShutdownHookRegistered;
 
   protected JDBCBackend backend;
   public SqlSession sharedSession;
@@ -73,7 +83,6 @@ public abstract class AbstractIdpMetaStorageTest {
     }
 
     SqlSessionFactoryHelper.getInstance().close();
-    ContainerSuite.getInstance().close();
 
     if (h2Path != null && Files.exists(h2Path)) {
       deleteDirectory(h2Path);
@@ -140,22 +149,17 @@ public abstract class AbstractIdpMetaStorageTest {
   }
 
   private void initializeMySQLBackend(Config backendConfig) throws IOException {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startMySQLContainer(MYSQL_TEST_DATABASE);
-    MySQLContainer mySQLContainer = containerSuite.getMySQLContainer();
-    String jdbcUrl = mySQLContainer.getJdbcUrl(MYSQL_TEST_DATABASE);
+    startMySQLContainer();
+    String jdbcUrl = getMySQLJdbcUrl(MYSQL_TEST_DATABASE);
 
     backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, jdbcUrl);
-    backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, mySQLContainer.getUsername());
-    backendConfig.set(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, mySQLContainer.getPassword());
+    backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, MySQLContainer.USER_NAME);
+    backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, MySQLContainer.PASSWORD);
     backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "com.mysql.cj.jdbc.Driver");
 
     try (Connection connection =
-            DriverManager.getConnection(
-                StringUtils.substringBeforeLast(jdbcUrl, "/"),
-                mySQLContainer.getUsername(),
-                mySQLContainer.getPassword());
+            openConnectionWithRetry(
+                getMySQLServerJdbcUrl(), MySQLContainer.USER_NAME, MySQLContainer.PASSWORD);
         Statement statement = connection.createStatement()) {
       statement.execute("DROP DATABASE IF EXISTS " + MYSQL_TEST_DATABASE);
       statement.execute("CREATE DATABASE " + MYSQL_TEST_DATABASE);
@@ -167,23 +171,23 @@ public abstract class AbstractIdpMetaStorageTest {
   }
 
   private void initializePostgreSQLBackend(Config backendConfig) throws IOException {
-    ContainerSuite containerSuite = ContainerSuite.getInstance();
-    containerSuite.startPostgreSQLContainer(POSTGRESQL_TEST_DATABASE);
-    PostgreSQLContainer postgreSQLContainer = containerSuite.getPostgreSQLContainer();
+    startPostgreSQLContainer();
+    createPostgreSQLDatabase(POSTGRESQL_TEST_DATABASE);
     String schemaName = "idp_user_" + UUID.randomUUID().toString().replace("-", "");
-    String jdbcUrl = postgreSQLContainer.getJdbcUrl(POSTGRESQL_TEST_DATABASE);
+    String jdbcUrl =
+        getPostgreSQLJdbcUrl(POSTGRESQL_TEST_DATABASE) + "&currentSchema=" + schemaName;
 
+    backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, jdbcUrl);
+    backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, PostgreSQLContainer.USER_NAME);
     backendConfig.set(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, jdbcUrl + "?currentSchema=" + schemaName);
-    backendConfig.set(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, postgreSQLContainer.getUsername());
-    backendConfig.set(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, postgreSQLContainer.getPassword());
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, PostgreSQLContainer.PASSWORD);
     backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.postgresql.Driver");
 
     try (Connection connection =
-            DriverManager.getConnection(
-                jdbcUrl, postgreSQLContainer.getUsername(), postgreSQLContainer.getPassword());
+            openConnectionWithRetry(
+                getPostgreSQLJdbcUrl(POSTGRESQL_TEST_DATABASE),
+                PostgreSQLContainer.USER_NAME,
+                PostgreSQLContainer.PASSWORD);
         Statement statement = connection.createStatement()) {
       statement.execute("DROP SCHEMA IF EXISTS " + schemaName + " CASCADE");
       statement.execute("CREATE SCHEMA " + schemaName);
@@ -202,6 +206,128 @@ public abstract class AbstractIdpMetaStorageTest {
     backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER, "root");
     backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD, "123456");
     backendConfig.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
+  }
+
+  private static synchronized void startMySQLContainer() {
+    ITUtils.cleanDisk();
+    if (mySQLContainer == null) {
+      mySQLContainer =
+          MySQLContainer.builder()
+              .withHostName("gravitino-idp-mysql")
+              .withEnvVars(ImmutableMap.of("MYSQL_ROOT_PASSWORD", "root"))
+              .withExposePorts(ImmutableSet.of(MySQLContainer.MYSQL_PORT))
+              .build();
+      mySQLContainer.start();
+      registerDockerShutdownHook();
+    }
+  }
+
+  private static synchronized void startPostgreSQLContainer() {
+    ITUtils.cleanDisk();
+    if (postgreSQLContainer == null) {
+      postgreSQLContainer =
+          PostgreSQLContainer.builder()
+              .withImage(PGImageName.VERSION_13.toString())
+              .withHostName("gravitino-idp-pg")
+              .withEnvVars(
+                  ImmutableMap.of(
+                      "POSTGRES_USER", PostgreSQLContainer.USER_NAME,
+                      "POSTGRES_PASSWORD", PostgreSQLContainer.PASSWORD))
+              .withExposePorts(ImmutableSet.of(PostgreSQLContainer.PG_PORT))
+              .build();
+      postgreSQLContainer.start();
+      registerDockerShutdownHook();
+    }
+  }
+
+  private static String getMySQLJdbcUrl(TestDatabaseName databaseName) {
+    startMySQLContainer();
+    return String.format(
+        "jdbc:mysql://%s:%d/%s",
+        LOCALHOST, mySQLContainer.getMappedPort(MySQLContainer.MYSQL_PORT), databaseName);
+  }
+
+  private static String getMySQLServerJdbcUrl() {
+    startMySQLContainer();
+    return String.format(
+        "jdbc:mysql://%s:%d/", LOCALHOST, mySQLContainer.getMappedPort(MySQLContainer.MYSQL_PORT));
+  }
+
+  private static String getPostgreSQLJdbcUrl(TestDatabaseName databaseName) {
+    startPostgreSQLContainer();
+    return String.format(
+        "jdbc:postgresql://%s:%d/%s?sslmode=disable",
+        LOCALHOST, postgreSQLContainer.getMappedPort(PostgreSQLContainer.PG_PORT), databaseName);
+  }
+
+  private static String getPostgreSQLServerJdbcUrl() {
+    startPostgreSQLContainer();
+    return String.format(
+        "jdbc:postgresql://%s:%d/?sslmode=disable",
+        LOCALHOST, postgreSQLContainer.getMappedPort(PostgreSQLContainer.PG_PORT));
+  }
+
+  private static void createPostgreSQLDatabase(TestDatabaseName databaseName) {
+    try (Connection connection =
+            openConnectionWithRetry(
+                getPostgreSQLServerJdbcUrl(),
+                PostgreSQLContainer.USER_NAME,
+                PostgreSQLContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.execute(String.format("CREATE DATABASE \"%s\"", databaseName));
+    } catch (SQLException e) {
+      if (e.getMessage() != null
+          && e.getMessage()
+              .contains(String.format("database \"%s\" already exists", databaseName))) {
+        return;
+      }
+      throw new RuntimeException("Failed to create PostgreSQL database: " + databaseName, e);
+    }
+  }
+
+  private static Connection openConnectionWithRetry(String jdbcUrl, String user, String password)
+      throws SQLException {
+    try {
+      return Awaitility.await()
+          .atMost(60, TimeUnit.SECONDS)
+          .pollInterval(500, TimeUnit.MILLISECONDS)
+          .ignoreExceptions()
+          .until(
+              () -> {
+                try {
+                  return DriverManager.getConnection(jdbcUrl, user, password);
+                } catch (SQLException e) {
+                  throw new RuntimeException(e);
+                }
+              },
+              connection -> connection != null);
+    } catch (RuntimeException e) {
+      if (e.getCause() instanceof SQLException) {
+        throw (SQLException) e.getCause();
+      }
+      throw new SQLException("Failed to open JDBC connection to " + jdbcUrl, e);
+    }
+  }
+
+  private static synchronized void registerDockerShutdownHook() {
+    if (dockerShutdownHookRegistered) {
+      return;
+    }
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  if (mySQLContainer != null) {
+                    mySQLContainer.close();
+                    mySQLContainer = null;
+                  }
+                  if (postgreSQLContainer != null) {
+                    postgreSQLContainer.close();
+                    postgreSQLContainer = null;
+                  }
+                },
+                "idp-basic-docker-shutdown"));
+    dockerShutdownHookRegistered = true;
   }
 
   private String[] loadSchemaStatements(String databaseType) throws IOException {

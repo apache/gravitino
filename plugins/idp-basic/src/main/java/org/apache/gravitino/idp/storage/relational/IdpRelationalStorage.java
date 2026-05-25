@@ -19,6 +19,7 @@
 package org.apache.gravitino.idp.storage.relational;
 
 import com.google.common.collect.ImmutableMap;
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.Config;
@@ -30,28 +31,26 @@ import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 
 /** JDBC bootstrap for built-in IdP relational storage. */
-public final class IdpRelationalStorage {
+public final class IdpRelationalStorage implements Closeable {
 
   private static final Map<JDBCBackendType, String> EMBEDDED_JDBC_DATABASE_MAP =
       ImmutableMap.of(JDBCBackendType.H2, H2Database.class.getCanonicalName());
 
-  private static JDBCDatabase jdbcDatabase;
-
-  private IdpRelationalStorage() {}
+  private JDBCDatabase jdbcDatabase;
 
   /**
    * Initializes the JDBC session factory and optional embedded database.
    *
    * @param config The server configuration.
    */
-  public static void initialize(Config config) {
+  public IdpRelationalStorage(Config config) {
     jdbcDatabase = startEmbeddedDatabaseIfNecessary(config);
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
   }
 
-  /** Closes JDBC resources opened by {@link #initialize(Config)}. */
-  public static void close() throws IOException {
+  @Override
+  public void close() throws IOException {
     SqlSessionFactoryHelper.getInstance().close();
     SQLExceptionConverterFactory.close();
     if (jdbcDatabase != null) {
@@ -60,7 +59,7 @@ public final class IdpRelationalStorage {
     }
   }
 
-  private static JDBCDatabase startEmbeddedDatabaseIfNecessary(Config config) {
+  private JDBCDatabase startEmbeddedDatabaseIfNecessary(Config config) {
     String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     JDBCBackendType jdbcBackendType = JDBCBackendType.fromURI(jdbcUrl);
     if (jdbcBackendType != JDBCBackendType.H2) {

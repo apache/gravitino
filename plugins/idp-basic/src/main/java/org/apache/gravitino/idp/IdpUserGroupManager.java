@@ -36,8 +36,6 @@ import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.POConverters;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Manager for built-in IdP users and groups. It mirrors {@link
@@ -45,11 +43,10 @@ import org.slf4j.LoggerFactory;
  */
 public class IdpUserGroupManager implements Closeable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(IdpUserGroupManager.class);
-
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
 
+  private final IdpRelationalStorage relationalStorage;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
   private final IdpGarbageCollector garbageCollector;
@@ -65,7 +62,7 @@ public class IdpUserGroupManager implements Closeable {
   }
 
   IdpUserGroupManager(Config config, IdGenerator idGenerator, PasswordHasher passwordHasher) {
-    IdpRelationalStorage.initialize(config);
+    this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
     this.passwordHasher = passwordHasher;
     this.garbageCollector = new IdpGarbageCollector(config);
@@ -81,10 +78,7 @@ public class IdpUserGroupManager implements Closeable {
    */
   public IdpUser addUser(String username, String password) {
     if (userExists(username)) {
-      AlreadyExistsException exception =
-          new AlreadyExistsException("IdP user %s already exists", username);
-      LOG.warn("IdP user {} already exists", username, exception);
-      throw exception;
+      throw new AlreadyExistsException("IdP user %s already exists", username);
     }
 
     USER_SERVICE.insertIdpUser(newUserPO(username, passwordHasher.hash(password)));
@@ -137,10 +131,7 @@ public class IdpUserGroupManager implements Closeable {
    */
   public IdpGroup addGroup(String groupName) {
     if (groupExists(groupName)) {
-      AlreadyExistsException exception =
-          new AlreadyExistsException("IdP group %s already exists", groupName);
-      LOG.warn("IdP group {} already exists", groupName, exception);
-      throw exception;
+      throw new AlreadyExistsException("IdP group %s already exists", groupName);
     }
 
     GROUP_SERVICE.insertIdpGroup(newGroupPO(groupName));
@@ -199,7 +190,7 @@ public class IdpUserGroupManager implements Closeable {
   @Override
   public void close() throws IOException {
     garbageCollector.close();
-    IdpRelationalStorage.close();
+    relationalStorage.close();
   }
 
   private IdpUserPO newUserPO(String username, String passwordHash) {
