@@ -120,10 +120,20 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
               return context.getClassLoader();
             }
           };
-      this.jdbcCatalog =
-          (AbstractCatalog) new JdbcCatalogFactory().createCatalog(contextWithCredentials);
+      this.jdbcCatalog = createInnerCatalog(contextWithCredentials);
     }
     super.open();
+  }
+
+  /**
+   * Creates the inner Flink JDBC catalog from the given context. Subclasses for different Flink
+   * versions override this to use the version-specific {@code JdbcCatalogFactory}.
+   *
+   * @param context the catalog factory context with credentials already injected
+   * @return the created inner catalog
+   */
+  protected AbstractCatalog createInnerCatalog(CatalogFactory.Context context) {
+    return (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context);
   }
 
   @Override

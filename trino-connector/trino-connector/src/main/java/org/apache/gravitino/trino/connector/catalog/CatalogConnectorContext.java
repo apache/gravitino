@@ -261,7 +261,7 @@ public class CatalogConnectorContext {
       Credential[] credentials;
       try {
         credentials = liveCatalog.supportsCredentials().getCredentials();
-      } catch (UnsupportedOperationException e) {
+      } catch (Exception e) {
         credentials = new Credential[0];
       }
       Map<String, String> connectorConfig =
