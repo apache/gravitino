@@ -409,25 +409,26 @@ class HiveViewCatalogOperations implements ViewCatalog {
         firstRepresentation == null ? "null" : firstRepresentation.getClass().getSimpleName());
 
     SQLRepresentation selected = (SQLRepresentation) firstRepresentation;
-    boolean isHiveDialect = Dialects.HIVE.equalsIgnoreCase(selected.dialect());
-    boolean isFlinkDialect = Dialects.FLINK.equalsIgnoreCase(selected.dialect());
-    if (isHiveDialect || isFlinkDialect) {
-      Preconditions.checkArgument(
-          defaultCatalog == null && defaultSchema == null,
-          "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
-              + "defaultCatalog=%s, defaultSchema=%s for view %s",
-          selected.dialect(),
-          defaultCatalog,
-          defaultSchema,
-          ident);
-      return selected;
+    switch (selected.dialect().toLowerCase(java.util.Locale.ROOT)) {
+      case Dialects.HIVE:
+      case Dialects.FLINK:
+        Preconditions.checkArgument(
+            defaultCatalog == null && defaultSchema == null,
+            "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
+                + "defaultCatalog=%s, defaultSchema=%s for view %s",
+            selected.dialect(),
+            defaultCatalog,
+            defaultSchema,
+            ident);
+        return selected;
+      default:
+        // TODO(design-docs/gravitino-logical-view-management.md): support creating trino/spark HMS
+        // views.
+        throw new UnsupportedOperationException(
+            String.format(
+                "Hive catalog currently supports only '%s' and '%s' view dialects, but got '%s' for view %s",
+                Dialects.HIVE, Dialects.FLINK, selected.dialect(), ident));
     }
-    // TODO(design-docs/gravitino-logical-view-management.md): support creating trino/spark HMS
-    // views.
-    throw new UnsupportedOperationException(
-        String.format(
-            "Hive catalog currently supports only '%s' and '%s' view dialects, but got '%s' for view %s",
-            Dialects.HIVE, Dialects.FLINK, selected.dialect(), ident));
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {

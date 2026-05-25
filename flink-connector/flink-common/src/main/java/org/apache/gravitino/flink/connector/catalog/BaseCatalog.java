@@ -226,6 +226,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throws DatabaseNotExistException, CatalogException {
     try {
       ViewCatalog viewCatalog = catalog().asViewCatalog();
+      // TODO: Currently returns all VIRTUAL_VIEW entries from the underlying catalog regardless of
+      // dialect. Views created by other engines (e.g. Trino, Spark) may appear here but will fail
+      // when Flink attempts to load them. Consider filtering to only dialects that Flink can handle
+      // (hive, flink), but this requires per-view property inspection which is expensive.
       return Arrays.stream(viewCatalog.listViews(Namespace.of(databaseName)))
           .map(NameIdentifier::name)
           .collect(Collectors.toList());
