@@ -373,8 +373,9 @@ The async purger additionally emits, via the event listener manager:
 - `IcebergPurgeCompletedEvent` — files deleted, with elapsed time.
 - `IcebergPurgeFailedEvent` — dead-lettered job.
 
-These events are one of the three observability surfaces; the queryable
-status endpoint and metrics are covered in §5.14.
+These events are one observability surface; the metrics and operator read
+paths (direct DB query in 1.3, management endpoint later) are covered in
+§5.14.
 
 ### 5.9 Configuration
 
@@ -513,29 +514,28 @@ blocking job (e.g. *"table `db.t` is being purged (job 123, state
 RUNNING)"*). A standard client needs nothing more — semantically the table
 is deleted — and we add **no** non-standard fields to load/list responses.
 
-**Operators.** Two read paths, both backed by the existing job table (the
-`idx_object` index makes the per-identifier lookup cheap):
+**Operators.** In 1.3 the read path is **direct DB query** of
+`iceberg_purge_job` (the `idx_object` index makes the per-identifier lookup
+cheap), plus the metrics below — both come essentially for free once the
+job table and worker exist. This is enough to answer "is this table still
+being purged / did it fail?" and to triage dead letters (§4) without
+building new HTTP surface under deadline pressure.
 
-- **Management endpoint** (Gravitino admin plane, *not* the Iceberg REST
-  path) — modeled on the existing `metalakes/{metalake}/jobs/runs`
-  convention (hierarchical, metalake/catalog-scoped, job id as a path
-  segment, filters as query params):
-  - `GET /metalakes/{metalake}/catalogs/{catalog}/cleanups?state=&schema=&table=&page…`
-    — list / filter. The object identifier (catalog + schema + table), **not**
-    an opaque job id, is the lookup key — nobody outside the server holds a
-    job id, so there is no by-id fetch.
-  - The per-object question "is this table being purged right now?" (an
-    active row — §5.13 guarantees at most one) or "did its cleanup fail?"
-    (`DEAD_LETTER`) is answered by the filtered list
-    `…/cleanups?schema={schema}&table={table}`.
+A dedicated **management endpoint** (Gravitino admin plane, *not* the
+Iceberg REST path) is **deferred to a later release** — see Phase 2 in §6.
+When added it would follow the `metalakes/{metalake}/jobs/runs` convention
+(hierarchical, metalake/catalog-scoped, filters as query params):
 
-  Each row reports `state`, `attempts` / `max_attempts`, `last_error`,
-  `lease_owner`, `created_by`, and timestamps. **Read-only in v1** — there
-  is no cancel verb (§3.2); the only operator-triggered transition is the
-  register-as-recovery flow (§5.13), which terminates the job as a side
-  effect.
-- **Direct DB query** of `iceberg_purge_job` stays available for ad-hoc
-  inspection and dead-letter triage (§4).
+- `GET /metalakes/{metalake}/catalogs/{catalog}/cleanups?state=&schema=&table=&page…`
+  — list / filter, keyed by object identifier (catalog + schema + table),
+  not an opaque job id (no caller holds one, so there is no by-id fetch).
+  The per-object question is answered by `…/cleanups?schema={s}&table={t}`,
+  with §5.13 guaranteeing at most one active row.
+
+Each row would report `state`, `attempts` / `max_attempts`, `last_error`,
+`lease_owner`, `created_by`, and timestamps. Read-only — there is no cancel
+verb (§3.2); the only operator-triggered transition is the
+register-as-recovery flow (§5.13).
 
 **Automation / monitoring.**
 
@@ -547,9 +547,10 @@ is deleted — and we add **no** non-standard fields to load/list responses.
   any dead-letter ("silently failed to delete") — the two states that would
   otherwise go unnoticed.
 
-`DEAD_LETTER` is the operationally critical state: queryable (endpoint +
-DB), counted (metric), and emitted (event), so a cleanup that exhausts
-retries is always discoverable rather than a silent file leak.
+`DEAD_LETTER` is the operationally critical state: in 1.3 it is queryable
+(DB), counted (metric), and emitted (event) — so a cleanup that exhausts
+retries is always discoverable rather than a silent file leak, even before
+the management endpoint lands.
 
 ---
 
@@ -565,7 +566,7 @@ synchronous path remains only as a rollback flag.
 - [ ] Implement the worker pool: leasing via `FOR UPDATE SKIP LOCKED`, lease renewal, file deletion, retry/backoff state machine
 - [ ] Add the `async-purge.enabled` feature flag and wire both paths into `IcebergTableOperationExecutor.dropTable` (async default, synchronous rollback)
 - [ ] Add purge events: `IcebergPurgeStartedEvent`, `IcebergPurgeCompletedEvent`, `IcebergPurgeFailedEvent`
-- [ ] Add purge observability (§5.14): read-only `metalakes/{metalake}/catalogs/{catalog}/cleanups` management endpoint (filtered list keyed by object identifier) and metrics (`purge.jobs.{pending,running,dead_letter}`, `purge.oldest_pending_age_ms`, `purge.{completed,failed}`); informative `ErrorResponse` message on the §5.13 `409`
+- [ ] Add purge observability (§5.14), low-cost signals only: metrics (`purge.jobs.{pending,running,dead_letter}`, `purge.oldest_pending_age_ms`, `purge.{completed,failed}`) and the informative `ErrorResponse` message on the §5.13 `409`. Operator read path in 1.3 is direct DB query of `iceberg_purge_job`
 - [ ] Extend coverage to views (`object_type='VIEW'`, metadata-only cleanup) and namespace-drop cascade (one job per contained object)
 - [ ] Enforce tombstone semantics (§5.13): on `createTable`/`createView`/`registerTable`, reject with `409` when an active job exists for the identifier (`idx_object` lookup on the request thread)
 - [ ] Add register-table recovery support (§5.7): atomically CAS the matching active job to `CANCELLED` and restore the catalog entry; documentation
@@ -577,6 +578,9 @@ synchronous path remains only as a rollback flag.
 
 ### Phase 1 (1.3): Documentation
 - [ ] Update user-facing documentation in `docs/` (async semantics, config, rollback flag, release notes)
+
+### Phase 2 (post-1.3): Management endpoint
+- [ ] Add the read-only `metalakes/{metalake}/catalogs/{catalog}/cleanups` management endpoint (§5.14): REST resource, DTOs, authorization, client support, docs, and tests. Filtered list keyed by object identifier; no by-id fetch
 
 ---
 
