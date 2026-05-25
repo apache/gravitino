@@ -9,15 +9,15 @@ license: "This software is licensed under the Apache License version 2."
 
 Use kebab-case values such as `update-statistics`, not `update_statistics`.
 
-## `--statistics-payload and --file-path Cannot Be Used together`
+## `--statistics-payload and --file-path cannot be used together`
 
 For `local-stats-calculator`, use exactly one of them.
 
-## `requires One of --statistics-payload or --file-path`
+## `requires one of --statistics-payload or --file-path`
 
 When `--calculator-name local-stats-calculator` is used, one input source is required.
 
-## `--partition-path Must Be a JSON array`
+## `--partition-path must be a JSON array`
 
 Use a JSON array format, for example:
 
