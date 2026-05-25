@@ -63,4 +63,35 @@ public class TestMysqlViewOperations {
     Assertions.assertTrue(
         sql.toLowerCase().contains("view_definition"), "SQL should select VIEW_DEFINITION");
   }
+
+  @Test
+  public void testGenerateCreateViewSql() {
+    String sql = ops.generateCreateViewSql("my_view", "SELECT 1");
+    Assertions.assertTrue(sql.contains("CREATE VIEW"), "Should contain CREATE VIEW");
+    Assertions.assertTrue(sql.contains("`my_view`"), "Should quote view name with backticks");
+    Assertions.assertTrue(sql.contains("SELECT 1"), "Should contain the view definition");
+  }
+
+  @Test
+  public void testGenerateReplaceViewSql() {
+    String sql = ops.generateReplaceViewSql("my_view", "SELECT 2");
+    Assertions.assertTrue(
+        sql.contains("CREATE OR REPLACE VIEW"), "Should contain CREATE OR REPLACE VIEW");
+    Assertions.assertTrue(sql.contains("`my_view`"), "Should quote view name");
+  }
+
+  @Test
+  public void testGenerateRenameViewSql() {
+    String sql = ops.generateRenameViewSql("old_view", "new_view");
+    Assertions.assertTrue(sql.contains("RENAME TABLE"), "MySQL uses RENAME TABLE for views");
+    Assertions.assertTrue(sql.contains("`old_view`"), "Should quote old name");
+    Assertions.assertTrue(sql.contains("`new_view`"), "Should quote new name");
+  }
+
+  @Test
+  public void testGenerateDropViewSql() {
+    String sql = ops.generateDropViewSql("my_view");
+    Assertions.assertTrue(sql.contains("DROP VIEW"), "Should contain DROP VIEW");
+    Assertions.assertTrue(sql.contains("`my_view`"), "Should quote view name");
+  }
 }

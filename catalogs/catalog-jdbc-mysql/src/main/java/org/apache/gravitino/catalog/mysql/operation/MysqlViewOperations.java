@@ -44,4 +44,24 @@ public class MysqlViewOperations extends JdbcViewOperations {
     return "SELECT VIEW_DEFINITION FROM information_schema.VIEWS"
         + " WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
   }
+
+  @Override
+  protected String generateCreateViewSql(String viewName, String sql) {
+    return "CREATE VIEW " + quoteIdentifier(viewName) + " AS " + sql;
+  }
+
+  @Override
+  protected String generateReplaceViewSql(String viewName, String sql) {
+    return "CREATE OR REPLACE VIEW " + quoteIdentifier(viewName) + " AS " + sql;
+  }
+
+  @Override
+  protected String generateRenameViewSql(String oldName, String newName) {
+    return "RENAME TABLE " + quoteIdentifier(oldName) + " TO " + quoteIdentifier(newName);
+  }
+
+  @Override
+  protected String generateDropViewSql(String viewName) {
+    return "DROP VIEW " + quoteIdentifier(viewName);
+  }
 }

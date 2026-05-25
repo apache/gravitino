@@ -34,12 +34,20 @@ import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcView;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Abstract base class for database-specific JDBC view operations. */
 public abstract class JdbcViewOperations {
+
+  protected static final Logger LOG = LoggerFactory.getLogger(JdbcViewOperations.class);
 
   protected DataSource dataSource;
   protected JdbcExceptionConverter exceptionMapper;
@@ -171,6 +179,161 @@ public abstract class JdbcViewOperations {
   }
 
   /**
+   * Creates a view in the database.
+   *
+   * @param databaseName The database or schema name.
+   * @param viewName The view name.
+   * @param comment The optional view comment.
+   * @param sql The view definition SQL.
+   * @throws ViewAlreadyExistsException If the view already exists.
+   */
+  public void create(String databaseName, String viewName, String comment, String sql)
+      throws ViewAlreadyExistsException {
+    try (Connection connection = getConnection(databaseName);
+        Statement stmt = connection.createStatement()) {
+      stmt.execute(generateCreateViewSql(viewName, sql));
+      setComment(connection, viewName, comment);
+      LOG.info("Created JDBC view {}.{}", databaseName, viewName);
+    } catch (SQLException e) {
+      GravitinoRuntimeException ge = exceptionMapper.toGravitinoException(e);
+      // The exception converter is table-oriented; remap to the view-specific exception.
+      if (ge instanceof TableAlreadyExistsException) {
+        throw new ViewAlreadyExistsException(
+            e, "View %s already exists in %s", viewName, databaseName);
+      }
+      throw ge;
+    }
+  }
+
+  /**
+   * Replaces the definition of an existing view.
+   *
+   * @param databaseName The database or schema name.
+   * @param viewName The view name.
+   * @param comment The optional view comment.
+   * @param sql The new view definition SQL.
+   * @throws NoSuchViewException If the view does not exist.
+   */
+  public void replaceDefinition(String databaseName, String viewName, String comment, String sql)
+      throws NoSuchViewException {
+    try (Connection connection = getConnection(databaseName)) {
+      if (!viewExists(connection, databaseName, viewName)) {
+        throw new NoSuchViewException("View %s does not exist in %s", viewName, databaseName);
+      }
+      try (Statement stmt = connection.createStatement()) {
+        stmt.execute(generateReplaceViewSql(viewName, sql));
+        setComment(connection, viewName, comment);
+        LOG.info("Replaced definition of JDBC view {}.{}", databaseName, viewName);
+      }
+    } catch (NoSuchViewException e) {
+      throw e;
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
+  }
+
+  /**
+   * Renames a view.
+   *
+   * @param databaseName The database or schema name.
+   * @param oldName The current view name.
+   * @param newName The new view name.
+   * @throws NoSuchViewException If the view does not exist.
+   */
+  public void rename(String databaseName, String oldName, String newName)
+      throws NoSuchViewException {
+    try (Connection connection = getConnection(databaseName);
+        Statement stmt = connection.createStatement()) {
+      stmt.execute(generateRenameViewSql(oldName, newName));
+      LOG.info("Renamed JDBC view {}.{} to {}", databaseName, oldName, newName);
+    } catch (SQLException e) {
+      GravitinoRuntimeException ge = exceptionMapper.toGravitinoException(e);
+      // The exception converter is table-oriented; remap to the view-specific exception.
+      if (ge instanceof NoSuchTableException) {
+        throw new NoSuchViewException("View %s does not exist in %s", oldName, databaseName);
+      }
+      throw ge;
+    }
+  }
+
+  /**
+   * Drops a view from the database.
+   *
+   * @param databaseName The database or schema name.
+   * @param viewName The view name.
+   * @return {@code true} if the view was dropped, {@code false} if it did not exist.
+   */
+  public boolean drop(String databaseName, String viewName) {
+    try (Connection connection = getConnection(databaseName);
+        Statement stmt = connection.createStatement()) {
+      stmt.execute(generateDropViewSql(viewName));
+      LOG.info("Dropped JDBC view {}.{}", databaseName, viewName);
+      return true;
+    } catch (SQLException e) {
+      GravitinoRuntimeException ge = exceptionMapper.toGravitinoException(e);
+      // The exception converter is table-oriented; treat "no such table" as "view did not exist".
+      if (ge instanceof NoSuchTableException) {
+        return false;
+      }
+      throw ge;
+    }
+  }
+
+  /**
+   * Generates a CREATE VIEW SQL statement.
+   *
+   * @param viewName The view name (will be quoted by the implementation).
+   * @param sql The view definition SQL.
+   * @return The CREATE VIEW DDL string.
+   */
+  protected abstract String generateCreateViewSql(String viewName, String sql);
+
+  /**
+   * Generates a CREATE OR REPLACE VIEW SQL statement.
+   *
+   * @param viewName The view name.
+   * @param sql The new view definition SQL.
+   * @return The DDL string.
+   */
+  protected abstract String generateReplaceViewSql(String viewName, String sql);
+
+  /**
+   * Generates a rename view SQL statement.
+   *
+   * @param oldName The current view name.
+   * @param newName The new view name.
+   * @return The DDL string.
+   */
+  protected abstract String generateRenameViewSql(String oldName, String newName);
+
+  /**
+   * Generates a DROP VIEW SQL statement.
+   *
+   * @param viewName The view name.
+   * @return The DDL string.
+   */
+  protected abstract String generateDropViewSql(String viewName);
+
+  /**
+   * Sets a comment on the view if the database supports it. The default implementation is a no-op
+   * -- comments are silently discarded for databases that do not override this method (e.g., MySQL
+   * does not support standalone view comments via DDL).
+   *
+   * @param connection The JDBC connection.
+   * @param viewName The view name.
+   * @param comment The comment text, may be {@code null}.
+   * @throws SQLException If the comment cannot be set.
+   */
+  protected void setComment(Connection connection, String viewName, String comment)
+      throws SQLException {
+    if (comment != null) {
+      LOG.warn(
+          "View comments are not supported by {} dialect; comment will be discarded",
+          dialectName());
+    }
+  }
+
+  /**
    * Obtains a JDBC connection routed to the given database/schema.
    *
    * @param databaseName The target database or schema.
@@ -217,6 +380,17 @@ public abstract class JdbcViewOperations {
           return rs.getString(1);
         }
         throw new NoSuchViewException("View %s does not exist in %s", viewName, databaseName);
+      }
+    }
+  }
+
+  private boolean viewExists(Connection connection, String databaseName, String viewName)
+      throws SQLException {
+    String sql = generateLoadViewSql();
+    try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      bindLoadViewParameters(stmt, databaseName, viewName);
+      try (ResultSet rs = stmt.executeQuery()) {
+        return rs.next();
       }
     }
   }

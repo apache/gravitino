@@ -58,6 +58,26 @@ public class SqliteViewOperations extends JdbcViewOperations {
   }
 
   @Override
+  protected String generateCreateViewSql(String viewName, String sql) {
+    return "CREATE VIEW " + quoteIdentifier(viewName) + " AS " + sql;
+  }
+
+  @Override
+  protected String generateReplaceViewSql(String viewName, String sql) {
+    return "CREATE VIEW " + quoteIdentifier(viewName) + " AS " + sql;
+  }
+
+  @Override
+  protected String generateRenameViewSql(String oldName, String newName) {
+    return "ALTER TABLE " + quoteIdentifier(oldName) + " RENAME TO " + quoteIdentifier(newName);
+  }
+
+  @Override
+  protected String generateDropViewSql(String viewName) {
+    return "DROP VIEW " + quoteIdentifier(viewName);
+  }
+
+  @Override
   protected Connection getConnection(String databaseName) throws SQLException {
     return dataSource.getConnection();
   }

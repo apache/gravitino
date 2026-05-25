@@ -36,8 +36,12 @@ import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 
 /** PostgreSQL-specific catalog operations with view support. */
 public class PostgreSQLCatalogOperations extends JdbcCatalogOperations implements ViewCatalog {
@@ -94,5 +98,30 @@ public class PostgreSQLCatalogOperations extends JdbcCatalogOperations implement
   @Override
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
     return viewCatalogOps.loadView(ident);
+  }
+
+  @Override
+  public View createView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties)
+      throws NoSuchSchemaException, ViewAlreadyExistsException {
+    return viewCatalogOps.createView(
+        ident, comment, columns, representations, defaultCatalog, defaultSchema, properties);
+  }
+
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes)
+      throws NoSuchViewException, IllegalArgumentException {
+    return viewCatalogOps.alterView(ident, changes);
+  }
+
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    return viewCatalogOps.dropView(ident);
   }
 }

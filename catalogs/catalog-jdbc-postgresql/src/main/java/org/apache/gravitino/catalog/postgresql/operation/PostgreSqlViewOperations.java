@@ -108,6 +108,39 @@ public class PostgreSqlViewOperations extends JdbcViewOperations {
   }
 
   @Override
+  protected String generateCreateViewSql(String viewName, String sql) {
+    return "CREATE VIEW " + quoteIdentifier(viewName) + " AS " + sql;
+  }
+
+  @Override
+  protected String generateReplaceViewSql(String viewName, String sql) {
+    return "CREATE OR REPLACE VIEW " + quoteIdentifier(viewName) + " AS " + sql;
+  }
+
+  @Override
+  protected String generateRenameViewSql(String oldName, String newName) {
+    return "ALTER VIEW " + quoteIdentifier(oldName) + " RENAME TO " + quoteIdentifier(newName);
+  }
+
+  @Override
+  protected String generateDropViewSql(String viewName) {
+    return "DROP VIEW " + quoteIdentifier(viewName);
+  }
+
+  @Override
+  protected void setComment(Connection connection, String viewName, String comment)
+      throws SQLException {
+    if (comment == null) {
+      return;
+    }
+    String sql = "COMMENT ON VIEW " + quoteIdentifier(viewName) + " IS ?";
+    try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      stmt.setString(1, comment);
+      stmt.execute();
+    }
+  }
+
+  @Override
   protected Connection getConnection(String schema) throws SQLException {
     Connection connection = dataSource.getConnection();
     connection.setCatalog(database);

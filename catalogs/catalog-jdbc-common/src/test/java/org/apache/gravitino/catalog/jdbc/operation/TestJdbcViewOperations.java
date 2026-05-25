@@ -77,6 +77,7 @@ public class TestJdbcViewOperations {
       stmt.execute("DROP VIEW IF EXISTS \"test_view\"");
       stmt.execute("DROP VIEW IF EXISTS \"view_a\"");
       stmt.execute("DROP VIEW IF EXISTS \"view_b\"");
+      stmt.execute("DROP VIEW IF EXISTS \"created_view\"");
       stmt.execute("DROP TABLE IF EXISTS \"base_table\"");
       stmt.execute("CREATE TABLE base_table (id INTEGER, name TEXT)");
     }
@@ -130,6 +131,28 @@ public class TestJdbcViewOperations {
     for (Column col : view.columns()) {
       Assertions.assertNotNull(col.dataType());
     }
+  }
+
+  @Test
+  public void testCreateAndLoad() {
+    viewOps.create("main", "created_view", null, "SELECT id FROM base_table");
+
+    JdbcView view = viewOps.load("main", "created_view");
+    Assertions.assertEquals("created_view", view.name());
+    Assertions.assertEquals(1, view.columns().length);
+    Assertions.assertEquals("id", view.columns()[0].name());
+  }
+
+  @Test
+  public void testDropExistingViewReturnsTrue() throws SQLException {
+    createRawView("test_view", "SELECT 1");
+    Assertions.assertTrue(viewOps.drop("main", "test_view"));
+    Assertions.assertThrows(NoSuchViewException.class, () -> viewOps.load("main", "test_view"));
+  }
+
+  @Test
+  public void testDropNonExistentViewReturnsFalse() {
+    Assertions.assertFalse(viewOps.drop("main", "no_such_view"));
   }
 
   private void createRawView(String name, String sql) throws SQLException {
