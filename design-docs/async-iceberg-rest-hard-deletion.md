@@ -137,9 +137,9 @@ net complexity for Gravitino rather than lowering it:
   would *remove* a uniform, strongly-consistent coordination primitive and
   replace it with an eventually-consistent, per-bucket one we maintain
   ourselves. It would only pay off in a deployment with no relational backend,
-  which is not Gravitino's case. The lower-complexity way to drop the table, if
-  desired, is §8.4 (fold lease/retry fields onto a catalog tombstone row), not
-  a move to object-store markers.
+  which is not Gravitino's case. If the goal is fewer moving parts, the lever is
+  to keep the single job table doing double duty — it already serves as the
+  name-reuse tombstone (§5.13) — not a move to object-store markers.
 
 ---
 
@@ -203,6 +203,9 @@ already gone from the catalog. `fileIoProperties` is captured at enqueue
 time so the worker can reconstruct `FileIO` even if the catalog is later
 reconfigured.
 
+The enqueued job row also serves as the **tombstone** that blocks name
+reuse while the files still exist — see §5.13.
+
 ### 5.3 Schema — `iceberg_purge_job`
 
 ```sql
@@ -216,7 +219,7 @@ CREATE TABLE IF NOT EXISTS `iceberg_purge_job` (
   `metadata_location` VARCHAR(1024) NOT NULL,
   `file_io_impl`      VARCHAR(256)  NOT NULL,
   `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON',
-  `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|DEAD_LETTER',
+  `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|DEAD_LETTER|CANCELLED',
   `attempts`          INT(10)       NOT NULL DEFAULT 0,
   `max_attempts`      INT(10)       NOT NULL,
   `last_error`        TEXT          NULL,
@@ -227,7 +230,8 @@ CREATE TABLE IF NOT EXISTS `iceberg_purge_job` (
   `created_by`        VARCHAR(128)  NOT NULL,
   `updated_at`        BIGINT(20)    NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `idx_state_next_attempt` (`state`, `next_attempt_at`)
+  KEY `idx_state_next_attempt` (`state`, `next_attempt_at`),
+  KEY `idx_object` (`catalog_name`, `namespace`, `object_name`, `state`)
 ) ENGINE=InnoDB;
 ```
 
@@ -323,6 +327,7 @@ the **metadata phase** fails.
 | Metadata load failed, transient    | `attempts++`, `next_attempt_at = now + backoff(attempts)`           |
 | Metadata load failed, terminal     | `attempts++`; if `attempts >= max_attempts` → `state='DEAD_LETTER'` |
 | Worker killed mid-job              | Lease expires; another worker picks it up; deletes are idempotent   |
+| Recovered via re-register (§5.13)  | Job CAS'd to `state='CANCELLED'`; the worker only leases non-terminal rows, so files are left intact |
 
 `NotFoundException` from `deleteFile` counts as success. Backoff:
 `min(maxBackoff, base * 2^attempts)` with jitter.
@@ -368,6 +373,9 @@ The async purger additionally emits, via the event listener manager:
 - `IcebergPurgeCompletedEvent` — files deleted, with elapsed time.
 - `IcebergPurgeFailedEvent` — dead-lettered job.
 
+These events are one of the three observability surfaces; the queryable
+status endpoint and metrics are covered in §5.14.
+
 ### 5.9 Configuration
 
 | Key                                                  | Default   | Description                                                                              |
@@ -388,11 +396,10 @@ The async purger additionally emits, via the event listener manager:
 The Iceberg REST spec does not require file deletion to be complete
 before the response. With this design:
 
-- The catalog entry is removed before `204`, so `HEAD` returns `404`,
-  `LIST` no longer includes the table, and **`CREATE` at the same
-  identifier currently succeeds immediately** (today's drop semantics).
-  Whether this should instead be blocked until cleanup completes is an
-  open design question — see §8.1.
+- The catalog entry is removed before `204`, so `HEAD` returns `404` and
+  `LIST` no longer includes the table. `CREATE` / `register` at the same
+  identifier is **rejected with `409 Conflict` until the purge job
+  completes** (§5.13), which closes the PRD §2.2 same-name recreate attack.
 - Object-store files may linger until the worker drains. Documented in
   release notes.
 
@@ -431,7 +438,112 @@ End-to-end flow with async purge enabled (the 1.3 default):
    `IcebergPurge{Started,Completed,Failed}Event` throughout.
 7. *(Recovery)* If the drop was a mistake, the table can be re-registered
    at the stored metadata location any time before the worker deletes the
-   files (§5.7).
+   files (§5.7). Re-registering also cancels the matching purge job so the
+   worker never deletes the recovered table's files (§5.13).
+
+### 5.13 Name reuse during purge (tombstone semantics)
+
+This resolves the §8.1 open question. While a purge job for an identifier
+is non-terminal (`PENDING` / `RUNNING`), that identifier is treated as
+**still occupied** even though its catalog entry is already gone. The
+active `iceberg_purge_job` row *is* the tombstone — no second table is
+needed. This is the §8.4 / Q4 "fold the lifecycle onto an existing row"
+idea, scoped to the job row rather than a catalog-backing table (which
+Gravitino does not have for the Iceberg REST surface).
+
+The REST server consults the purge job store **on the request thread**
+(one indexed lookup via `idx_object`) and returns:
+
+| Operation | Active purge job exists for the identifier | No active job (`SUCCEEDED` / `DEAD_LETTER` / none) |
+|-----------|---------------------------------------------|-----------------------------------------------------|
+| `loadTable` / `HEAD` | `404 NoSuchTableException` (catalog entry already dropped) | `404` |
+| `alterTable` / `updateTable` / commit | `404 NoSuchTableException` | `404` |
+| `createTable` (same identifier) | **`409 Conflict`** — table is being purged | succeeds (brand-new table) |
+| `registerTable` (same identifier) | **`409 Conflict`**, except the recovery path below | succeeds |
+
+"Active" means `state IN ('PENDING','RUNNING')`. A job in `SUCCEEDED`
+(even before its row is pruned per `completed-retention-hours`) no longer
+blocks reuse — the files are gone, so a recreate is safe. A `DEAD_LETTER`
+job also stops blocking, so a failed cleanup never permanently wedges the
+namespace; operators see the dead-lettered row and reclaim leaked files
+out of band.
+
+This closes the PRD §2.2 attack directly: a same-name / same-location
+recreate can no longer expose the dropped table's data, because the
+recreate is refused until the data files are deleted. Telling *whether* a
+given identifier is mid-purge, done, or dead-lettered is the read-side
+concern handled in §5.14.
+
+The same rule applies to **views** (`createView` / `replaceView` → `409`
+while a `VIEW` job is active). A **namespace** carries no data, so it can
+be recreated freely; any table or view created inside it is still guarded
+individually by its own job row.
+
+**Recovery under the tombstone.** Because the identifier is now blocked,
+register-as-recovery (§5.7) first lifts the tombstone: re-registering at
+the stored `metadata_location` atomically CAS's the matching active job to
+a terminal `CANCELLED` state and restores the catalog entry in the same
+transaction. Cancelling the job is also what removes the
+worker-deletes-the-recovered-table race — the worker only ever leases
+non-terminal rows. This is **recovery-scoped** cancellation only; a
+general user-facing "cancel my purge" API stays out of scope (§3.2).
+
+**Concurrency.** The create/register conflict check and the worker's
+state transitions serialize on the job row, exactly like the §5.4 leasing
+CAS. A `createTable` that observes `SUCCEEDED` proceeds; one that observes
+`PENDING` / `RUNNING` gets `409`; and recovery's CAS to `CANCELLED`
+competes with the worker's CAS to `RUNNING` — at most one wins, so a job
+that has already started running cannot be silently cancelled out from
+under the worker (recovery then sees `RUNNING` and returns `409`, and the
+caller retries once the lease frees or the job terminates).
+
+### 5.14 Observing in-flight and failed purges
+
+§5.13 keeps the *name* reserved; this section answers the read-side
+question: "the table is gone from the catalog — is it **still being
+purged**, already done, or **dead-lettered**?" The source of truth is the
+`iceberg_purge_job` row, exposed to three audiences without touching the
+Iceberg REST wire contract (Goal #4).
+
+**Iceberg REST clients (table owner).** By design they observe only that
+the table is dropped: `loadTable` / `HEAD` → `404`, `LIST` omits it. The
+single purge-specific signal is the §5.13 `409` on a same-identifier
+`createTable` / `register`, whose Iceberg `ErrorResponse.message` names the
+blocking job (e.g. *"table `db.t` is being purged (job 123, state
+RUNNING)"*). A standard client needs nothing more — semantically the table
+is deleted — and we add **no** non-standard fields to load/list responses.
+
+**Operators.** Two read paths, both backed by the existing job table (the
+`idx_object` index makes the per-identifier lookup cheap):
+
+- **Management endpoint** (Gravitino admin plane, *not* the Iceberg REST
+  path):
+  - `GET …/purge-jobs?state=&namespace=&object=&page…` — list / filter.
+  - `GET …/purge-jobs?namespace={ns}&object={t}` — answers "is this object
+    being purged right now?" (an active row) or "did its cleanup fail?"
+    (`DEAD_LETTER`).
+
+  Each row reports `state`, `attempts` / `max_attempts`, `last_error`,
+  `lease_owner`, `created_by`, and timestamps. **Read-only in v1** — there
+  is no cancel verb (§3.2); the only operator-triggered transition is the
+  register-as-recovery flow (§5.13), which terminates the job as a side
+  effect.
+- **Direct DB query** of `iceberg_purge_job` stays available for ad-hoc
+  inspection and dead-letter triage (§4).
+
+**Automation / monitoring.**
+
+- **Events** (§5.8): `IcebergPurge{Started,Completed,Failed}Event` for
+  streaming consumers.
+- **Metrics**: gauges `purge.jobs.{pending,running,dead_letter}` and
+  `purge.oldest_pending_age_ms`; counters `purge.{completed,failed}`. These
+  let operators alert on a growing backlog ("silently still deleting") or
+  any dead-letter ("silently failed to delete") — the two states that would
+  otherwise go unnoticed.
+
+`DEAD_LETTER` is the operationally critical state: queryable (endpoint +
+DB), counted (metric), and emitted (event), so a cleanup that exhausts
+retries is always discoverable rather than a silent file leak.
 
 ---
 
@@ -447,8 +559,10 @@ synchronous path remains only as a rollback flag.
 - [ ] Implement the worker pool: leasing via `FOR UPDATE SKIP LOCKED`, lease renewal, file deletion, retry/backoff state machine
 - [ ] Add the `async-purge.enabled` feature flag and wire both paths into `IcebergTableOperationExecutor.dropTable` (async default, synchronous rollback)
 - [ ] Add purge events: `IcebergPurgeStartedEvent`, `IcebergPurgeCompletedEvent`, `IcebergPurgeFailedEvent`
+- [ ] Add purge observability (§5.14): read-only `purge-jobs` management endpoint (list + per-identifier lookup) and metrics (`purge.jobs.{pending,running,dead_letter}`, `purge.oldest_pending_age_ms`, `purge.{completed,failed}`); informative `ErrorResponse` message on the §5.13 `409`
 - [ ] Extend coverage to views (`object_type='VIEW'`, metadata-only cleanup) and namespace-drop cascade (one job per contained object)
-- [ ] Add register-table recovery support / documentation (§5.7)
+- [ ] Enforce tombstone semantics (§5.13): on `createTable`/`createView`/`registerTable`, reject with `409` when an active job exists for the identifier (`idx_object` lookup on the request thread)
+- [ ] Add register-table recovery support (§5.7): atomically CAS the matching active job to `CANCELLED` and restore the catalog entry; documentation
 
 ### Phase 1 (1.3): Testing
 - [ ] Unit tests: enqueue, state machine, worker leasing/renewal/contention (H2)
@@ -470,6 +584,11 @@ synchronous path remains only as a rollback flag.
   - `TestIcebergTableOperationExecutorAsyncPurge` — async default enqueues
     exactly one job; `async-purge.enabled=false` falls back to synchronous
     purge; thrown errors surface as 5xx.
+  - `TestIcebergPurgeTombstone` (§5.13) — `createTable`/`register` at an
+    identifier with an active job returns `409`; succeeds once the job is
+    `SUCCEEDED`/`DEAD_LETTER`; `loadTable`/`alterTable` return `404`;
+    re-register CAS's the job to `CANCELLED` and the worker then skips it;
+    the recovery-vs-worker CAS race resolves to a single winner.
 - Integration (`gravitino-docker-test`):
   - Drop a table; REST returns < 500 ms; worker eventually clears every file.
   - Restart REST mid-purge (kill -9); purge resumes.
@@ -488,12 +607,13 @@ synchronous path remains only as a rollback flag.
 
 ## 8. Open questions
 
-1. **Name reuse after drop** — should `CREATE` at the same identifier be
-   blocked (e.g. tombstone row → `409`) until cleanup completes? PRD §2.2
-   argues an attacker could otherwise read the original table's data via a
-   same-name/same-location recreate. Current design keeps today's drop
-   semantics (recreate allowed immediately); changing this alters drop
-   behavior. **Pending decision with @jerryshao.**
+1. ~~**Name reuse after drop**~~ — **Resolved (§5.13).** We adopt the
+   tombstone approach (Option A): the active `iceberg_purge_job` row keeps
+   the identifier occupied, so `CREATE` / `register` at the same identifier
+   returns `409 Conflict` until the job reaches `SUCCEEDED`. This closes the
+   PRD §2.2 same-name/same-location recreate attack raised with @jerryshao.
+   It does change today's drop semantics (recreate is no longer immediate);
+   that behavior change is called out in the release notes (§5.10).
 2. **Credential refresh** — refresh FileIO credentials from the catalog at
    lease-renewal time, or require static credentials for catalogs that
    opt into async purge? Leaning toward refresh so long-retention soft
@@ -502,9 +622,10 @@ synchronous path remains only as a rollback flag.
    an optimistic compare-and-swap `UPDATE` that works on every SQL backend;
    `SKIP LOCKED` is used as an optimization where available and the CAS form is
    the fallback elsewhere. No advisory locks.
-4. **Job row vs. catalog row** — if name-reuse (Q1) is resolved by keeping
-   a tombstone on the catalog's table row, could the lease/retry fields
-   live on that row instead of a separate `iceberg_purge_job` table
-   (smaller migration)? Note Gravitino has no `iceberg_tables` table; this
-   would apply to the JDBC catalog's backing table, so scope/portability
-   across catalog types needs confirmation.
+4. ~~**Job row vs. catalog row**~~ — **Resolved (§5.13).** Name reuse (Q1)
+   is resolved by treating the active `iceberg_purge_job` row itself as the
+   tombstone, so there is no separate catalog tombstone row to fold fields
+   onto. The Iceberg REST server fronts arbitrary catalogs and has no
+   uniform table-backing row to extend (Gravitino has no `iceberg_tables`
+   table), which is precisely why the job row — not a catalog row — carries
+   the lifecycle.
