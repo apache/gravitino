@@ -165,7 +165,7 @@ net complexity for Gravitino rather than lowering it:
    claims job via FOR UPDATE SKIP LOCKED (heartbeat ownership)
    → rebuild snapshot graph from metadata_location
    → stream + delete every reachable file, retry w/ backoff
-   → SUCCEEDED | DEAD_LETTER
+   → SUCCEEDED | FAILED
 ```
 
 Async is the default deletion path. The synchronous path is retained only
@@ -221,7 +221,7 @@ CREATE TABLE IF NOT EXISTS `iceberg_purge_job` (
   `metadata_location` VARCHAR(1024) NOT NULL,
   `file_io_impl`      VARCHAR(256)  NOT NULL,
   `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON',
-  `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|DEAD_LETTER|CANCELLED',
+  `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|SUCCEEDED|FAILED|CANCELLED; being-worked = PENDING with a fresh heartbeat_at',
   `attempts`          INT(10)       NOT NULL DEFAULT 0,
   `max_attempts`      INT(10)       NOT NULL,
   `last_error`        TEXT          NULL,
@@ -249,16 +249,18 @@ Each tick:
 
 ```sql
 SELECT * FROM iceberg_purge_job
- WHERE state IN ('PENDING','RUNNING')
+ WHERE state = 'PENDING'
    AND next_attempt_at <= :now
    AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)
  ORDER BY next_attempt_at LIMIT :batch
  FOR UPDATE SKIP LOCKED;
 ```
 
-then updates the row to `RUNNING` with `heartbeat_at=:now`. `SKIP LOCKED` is
-a performance optimization (it avoids lock waiting between replicas), not the
-correctness guarantee — see the ownership model below.
+then stamps `heartbeat_at=:now` to mark the row claimed. The row stays
+`PENDING` — there is no separate `RUNNING` state; "being worked" is simply a
+`PENDING` row with a fresh heartbeat. `SKIP LOCKED` is a performance
+optimization (it avoids lock waiting between replicas), not the correctness
+guarantee — see the ownership model below.
 
 #### Multi-replica ownership model
 
@@ -287,15 +289,16 @@ works on **every** SQL backend, not just those with `SKIP LOCKED`:
 ```sql
 -- read candidates (no lock required)
 SELECT id FROM iceberg_purge_job
- WHERE state IN ('PENDING','RUNNING')
+ WHERE state = 'PENDING'
    AND next_attempt_at <= :now
    AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)
  ORDER BY next_attempt_at LIMIT :batch;
 
 -- claim each candidate; the row is ours only if affected_rows = 1
 UPDATE iceberg_purge_job
-   SET state='RUNNING', heartbeat_at=:now
+   SET heartbeat_at=:now
  WHERE id=:id
+   AND state='PENDING'
    AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout);
 ```
 
@@ -339,7 +342,7 @@ the **metadata phase** fails.
 | ---------------------------------- | ------------------------------------------------------------------- |
 | All files deleted (or already gone) | `state='SUCCEEDED'`                                                |
 | Metadata load failed, transient    | `attempts++`, `next_attempt_at = now + backoff(attempts)`           |
-| Metadata load failed, terminal     | `attempts++`; if `attempts >= max_attempts` → `state='DEAD_LETTER'` |
+| Metadata load failed, terminal     | `attempts++`; if `attempts >= max_attempts` → `state='FAILED'`      |
 | Worker killed mid-job              | Heartbeat goes stale; another worker picks it up; deletes are idempotent (restart story in §5.15) |
 | Recovered via re-register (§5.13)  | Job CAS'd to `state='CANCELLED'`; the worker only claims non-terminal rows, so files are left intact |
 
@@ -389,7 +392,7 @@ The async purger additionally emits, via the event listener manager:
 
 - `IcebergPurgeStartedEvent` — work begins on a job.
 - `IcebergPurgeCompletedEvent` — files deleted, with elapsed time.
-- `IcebergPurgeFailedEvent` — dead-lettered job.
+- `IcebergPurgeFailedEvent` — job that exhausted retries (`FAILED`).
 
 These events are one observability surface; the metrics and operator read
 paths (direct DB query in 1.3, management endpoint later) are covered in
@@ -413,7 +416,7 @@ The remaining server-side keys only tune the worker pool and retry behavior
 | `gravitino.iceberg-rest.async-purge.poll-interval-ms`         | `5000`    | Worker poll interval. |
 | `gravitino.iceberg-rest.async-purge.batch-size`               | `16`      | Jobs claimed per tick. |
 | `gravitino.iceberg-rest.async-purge.heartbeat-timeout-ms`     | `300000`  | Age after which a job with no heartbeat is reclaimable. |
-| `gravitino.iceberg-rest.async-purge.max-attempts`             | `5`       | Attempts before `DEAD_LETTER`. |
+| `gravitino.iceberg-rest.async-purge.max-attempts`             | `5`       | Attempts before `FAILED`. |
 | `gravitino.iceberg-rest.async-purge.backoff-base-ms`          | `30000`   | Exponential backoff base. |
 | `gravitino.iceberg-rest.async-purge.backoff-max-ms`           | `3600000` | Exponential backoff ceiling. |
 | `gravitino.iceberg-rest.async-purge.completed-retention-hours`| `168`     | How long `SUCCEEDED` rows are retained before pruning. |
@@ -466,7 +469,7 @@ End-to-end flow with async purge (the 1.3 default):
    reachable file deleting it, retrying transient failures with exponential
    backoff.
 6. On success the job is marked `SUCCEEDED`; on terminal failure it lands
-   in `DEAD_LETTER` for operator inspection. Listeners observe
+   in `FAILED` for operator inspection. Listeners observe
    `IcebergPurge{Started,Completed,Failed}Event` throughout.
 7. *(Recovery)* If the drop was a mistake, the table can be re-registered
    at the stored metadata location any time before the worker deletes the
@@ -476,8 +479,9 @@ End-to-end flow with async purge (the 1.3 default):
 ### 5.13 Name reuse during purge (tombstone semantics)
 
 This resolves the §8.1 open question. While a purge job for an identifier
-is non-terminal (`PENDING` / `RUNNING`), that identifier is treated as
-**still occupied** even though its catalog entry is already gone. The
+is still `PENDING` (whether or not a worker is actively beating on it), that
+identifier is treated as **still occupied** even though its catalog entry is
+already gone. The
 active `iceberg_purge_job` row *is* the tombstone — no second table is
 needed. This is the §8.4 / Q4 "fold the lifecycle onto an existing row"
 idea, scoped to the job row rather than a catalog-backing table (which
@@ -486,24 +490,23 @@ Gravitino does not have for the Iceberg REST surface).
 The REST server consults the purge job store **on the request thread**
 (one indexed lookup via `idx_object`) and returns:
 
-| Operation | Active purge job exists for the identifier | No active job (`SUCCEEDED` / `DEAD_LETTER` / none) |
+| Operation | Active purge job exists for the identifier | No active job (`SUCCEEDED` / `FAILED` / `CANCELLED` / none) |
 |-----------|---------------------------------------------|-----------------------------------------------------|
 | `loadTable` / `HEAD` | `404 NoSuchTableException` (catalog entry already dropped) | `404` |
 | `alterTable` / `updateTable` / commit | `404 NoSuchTableException` | `404` |
 | `createTable` (same identifier) | **`409 Conflict`** — table is being purged | succeeds (brand-new table) |
 | `registerTable` (same identifier) | **`409 Conflict`**, except the recovery path below | succeeds |
 
-"Active" means `state IN ('PENDING','RUNNING')`. A job in `SUCCEEDED`
-(even before its row is pruned per `completed-retention-hours`) no longer
-blocks reuse — the files are gone, so a recreate is safe. A `DEAD_LETTER`
-job also stops blocking, so a failed cleanup never permanently wedges the
-namespace; operators see the dead-lettered row and reclaim leaked files
-out of band.
+"Active" means `state='PENDING'`. A job in `SUCCEEDED` (even before its row
+is pruned per `completed-retention-hours`) no longer blocks reuse — the files
+are gone, so a recreate is safe. A `FAILED` job also stops blocking, so a
+failed cleanup never permanently wedges the namespace; operators see the
+failed row and reclaim leaked files out of band.
 
 This closes the PRD §2.2 attack directly: a same-name / same-location
 recreate can no longer expose the dropped table's data, because the
 recreate is refused until the data files are deleted. Telling *whether* a
-given identifier is mid-purge, done, or dead-lettered is the read-side
+given identifier is mid-purge, done, or failed is the read-side
 concern handled in §5.14.
 
 The same rule will apply to **views** (`createView` / `replaceView` → `409`
@@ -520,20 +523,23 @@ worker-deletes-the-recovered-table race — the worker only ever claims
 non-terminal rows. This is **recovery-scoped** cancellation only; a
 general user-facing "cancel my purge" API stays out of scope (§3.2).
 
-**Concurrency.** The create/register conflict check and the worker's
-state transitions serialize on the job row, exactly like the §5.4 ownership
-CAS. A `createTable` that observes `SUCCEEDED` proceeds; one that observes
-`PENDING` / `RUNNING` gets `409`; and recovery's CAS to `CANCELLED`
-competes with the worker's CAS to `RUNNING` — at most one wins, so a job
-that has already started running cannot be silently cancelled out from
-under the worker (recovery then sees `RUNNING` and returns `409`, and the
-caller retries once the heartbeat goes stale or the job terminates).
+**Concurrency.** The create/register conflict check, the worker's claim, and
+recovery's cancel all serialize on the same `state='PENDING'` +
+fresh-heartbeat predicate (the §5.4 ownership CAS). A `createTable` that
+observes a terminal state (`SUCCEEDED` / `FAILED` / `CANCELLED`) proceeds;
+one that observes `PENDING` gets `409`. Recovery's CAS to `CANCELLED` is
+guarded by `state='PENDING' AND heartbeat stale`, the same guard a worker
+uses to claim — so if a worker currently holds a fresh heartbeat, recovery's
+CAS matches no row and returns `409` (retry once the heartbeat goes stale or
+the job terminates); and if recovery wins, the worker's next heartbeat /
+completion CAS (also guarded on `state='PENDING'`) matches no row, so it
+abandons the job without touching files.
 
 ### 5.14 Observing in-flight and failed purges
 
 §5.13 keeps the *name* reserved; this section answers the read-side
 question: "the table is gone from the catalog — is it **still being
-purged**, already done, or **dead-lettered**?" The source of truth is the
+purged**, already done, or **failed**?" The source of truth is the
 `iceberg_purge_job` row, exposed to three audiences without touching the
 Iceberg REST wire contract (Goal #4).
 
@@ -541,8 +547,8 @@ Iceberg REST wire contract (Goal #4).
 the table is dropped: `loadTable` / `HEAD` → `404`, `LIST` omits it. The
 single purge-specific signal is the §5.13 `409` on a same-identifier
 `createTable` / `register`, whose Iceberg `ErrorResponse.message` names the
-blocking job (e.g. *"table `db.t` is being purged (job 123, state
-RUNNING)"*). A standard client needs nothing more — semantically the table
+blocking job (e.g. *"table `db.t` is being purged (cleanup job 123 still
+pending)"*). A standard client needs nothing more — semantically the table
 is deleted — and we add **no** non-standard fields to load/list responses.
 
 **Operators.** In 1.3 the read path is **direct DB query** of
@@ -572,13 +578,14 @@ register-as-recovery flow (§5.13).
 
 - **Events** (§5.8): `IcebergPurge{Started,Completed,Failed}Event` for
   streaming consumers.
-- **Metrics**: gauges `purge.jobs.{pending,running,dead_letter}` and
+- **Metrics**: gauges `purge.jobs.{pending,running,failed}` (where `running`
+  counts `PENDING` rows with a fresh heartbeat) and
   `purge.oldest_pending_age_ms`; counters `purge.{completed,failed}`. These
-  let operators alert on a growing backlog ("silently still deleting") or
-  any dead-letter ("silently failed to delete") — the two states that would
+  let operators alert on a growing backlog ("silently still deleting") or any
+  `FAILED` job ("silently failed to delete") — the two conditions that would
   otherwise go unnoticed.
 
-`DEAD_LETTER` is the operationally critical state: in 1.3 it is queryable
+`FAILED` is the operationally critical state: in 1.3 it is queryable
 (DB), counted (metric), and emitted (event) — so a cleanup that exhausts
 retries is always discoverable rather than a silent file leak, even before
 the management endpoint lands.
@@ -593,11 +600,11 @@ across a process restart or crash:
    `iceberg_purge_job` *before* the `DELETE` returns (§5.2); there is no
    in-memory queue, so a restart cannot drop pending work. `PENDING` jobs
    are picked up on the first worker tick after boot.
-2. **`RUNNING` jobs orphaned by the crash are reclaimed.** A process that
-   died mid-purge leaves a row in `state='RUNNING'` with a stale
-   `heartbeat_at`. The worker poll already selects rows whose heartbeat has
-   gone stale, so once it does the restarted node — or any peer — reclaims
-   the row via the CAS. This is the "worker killed mid-job" row in §5.5.
+2. **In-flight jobs orphaned by the crash are reclaimed.** A process that
+   died mid-purge leaves a still-`PENDING` row with a stale `heartbeat_at`.
+   The worker poll already selects `PENDING` rows whose heartbeat has gone
+   stale, so once it does the restarted node — or any peer — reclaims the row
+   via the CAS. This is the "worker killed mid-job" row in §5.5.
 3. **Re-running a half-finished job is safe.** The worker rebuilds the file
    set from `metadata_location` and re-deletes; already-gone files raise
    `NotFoundException`, which counts as success (§5.5). A crash anywhere in
@@ -607,8 +614,8 @@ In a **multi-replica** deployment this is seamless: surviving replicas
 reclaim a dead node's jobs once the heartbeat goes stale, with no
 coordinator.
 
-The one rough edge is a **single-replica** restart: the crashed node's own
-`RUNNING` jobs sit idle until their `heartbeat_at` ages past
+The one rough edge is a **single-replica** restart: the jobs the crashed
+node was processing sit idle until their `heartbeat_at` ages past
 `heartbeatTimeout` — up to one `heartbeatTimeout` of dead time — before the
 rebooted process reclaims them. We simply rely on heartbeat staleness
 (correct, bounded, zero extra code) and keep `heartbeatTimeout` modest so the
@@ -629,7 +636,7 @@ synchronous path remains only as a rollback flag.
 - [ ] Implement the worker pool: claiming via `FOR UPDATE SKIP LOCKED` (heartbeat ownership), heartbeat renewal, streaming file deletion, retry/backoff state machine
 - [ ] Honor the `X-Gravitino-Async-Purge` request header (default async; `false` selects synchronous deletion) and wire both paths into `IcebergTableOperationExecutor.dropTable`
 - [ ] Add purge events: `IcebergPurgeStartedEvent`, `IcebergPurgeCompletedEvent`, `IcebergPurgeFailedEvent`
-- [ ] Add purge observability (§5.14), low-cost signals only: metrics (`purge.jobs.{pending,running,dead_letter}`, `purge.oldest_pending_age_ms`, `purge.{completed,failed}`) and the informative `ErrorResponse` message on the §5.13 `409`. Operator read path in 1.3 is direct DB query of `iceberg_purge_job`
+- [ ] Add purge observability (§5.14), low-cost signals only: metrics (`purge.jobs.{pending,running,failed}`, `purge.oldest_pending_age_ms`, `purge.{completed,failed}`) and the informative `ErrorResponse` message on the §5.13 `409`. Operator read path in 1.3 is direct DB query of `iceberg_purge_job`
 - [ ] Namespace-drop cascade for tables (one job per contained table)
 - [ ] Enforce tombstone semantics (§5.13): on `createTable`/`registerTable`, reject with `409` when an active job exists for the identifier (`idx_object` lookup on the request thread)
 - [ ] Add register-table recovery support (§5.7): atomically CAS the matching active job to `CANCELLED` and restore the catalog entry; documentation
@@ -652,8 +659,8 @@ synchronous path remains only as a rollback flag.
 
 - Unit (`./gradlew :iceberg:iceberg-rest-server:test -PskipITs`):
   - `TestIcebergPurgeJobStore` — enqueue and row contents.
-  - `TestIcebergPurgeStateMachine` — PENDING → RUNNING → SUCCEEDED;
-    failure → retry → DEAD_LETTER.
+  - `TestIcebergPurgeStateMachine` — PENDING → SUCCEEDED;
+    failure → retry → FAILED.
   - `TestIcebergPurgeWorker` — claiming, heartbeat renewal, contention (H2
     backend).
   - `TestIcebergTableOperationExecutorAsyncPurge` — async default enqueues
@@ -661,7 +668,7 @@ synchronous path remains only as a rollback flag.
     synchronous purge; thrown errors surface as 5xx.
   - `TestIcebergPurgeTombstone` (§5.13) — `createTable`/`register` at an
     identifier with an active job returns `409`; succeeds once the job is
-    `SUCCEEDED`/`DEAD_LETTER`; `loadTable`/`alterTable` return `404`;
+    `SUCCEEDED`/`FAILED`; `loadTable`/`alterTable` return `404`;
     re-register CAS's the job to `CANCELLED` and the worker then skips it;
     the recovery-vs-worker CAS race resolves to a single winner.
 - Integration (`gravitino-docker-test`):
