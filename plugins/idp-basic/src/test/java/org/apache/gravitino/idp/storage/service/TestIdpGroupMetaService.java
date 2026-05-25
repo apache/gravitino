@@ -81,7 +81,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testDeleteIdpGroupCascadesMemberships(String type) throws IOException {
+  void testDeleteIdpGroupForceRemovesMemberships(String type) throws IOException {
     init(type);
     insertUsers(4);
     insertGroups(4);
