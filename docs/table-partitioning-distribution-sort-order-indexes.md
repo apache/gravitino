@@ -1,5 +1,5 @@
 ---
-title: "Table Partitioning, Distribution, Sort Ordering, and Indexes"
+title: "Table Structure"
 slug: "/table-partitioning-distribution-sort-order-indexes"
 date: 2023-12-25
 keyword: "Table Partition Bucket Distribute Sort By"
@@ -11,6 +11,10 @@ last_update:
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+
+## Introduction
+
+Tables in Gravitino have four configurable structural properties that affect how data is laid out and accessed: partitioning, distribution, sort ordering, and indexing. The sections below cover the syntax for each and how compute engines use them at query time.
 
 ## Table Partitioning
 
