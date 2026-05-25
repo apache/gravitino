@@ -28,7 +28,7 @@ license: "This software is licensed under the Apache License version 2."
 
 [Daft](https://docs.daft.ai/) is a distributed dataframe library for Python, designed for complex data workflows on large datasets. It provides a familiar DataFrame API while offering powerful distributed computing capabilities for processing data at scale.
 
-## Daft Connector for Gravitino
+## Gravitino Integration
 
 The Daft connector enables seamless integration between Daft and Apache Gravitino's unified metadata management system. This connector allows Daft users to:
 
