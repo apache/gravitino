@@ -286,44 +286,57 @@ Typical values:
 
 ## Catalog Properties
 
-Catalog properties configure a catalog at creation time. Supply them as the `properties` map when calling the catalog creation API via REST, CLI, or one of the language SDKs.
+Catalog properties configure a catalog. They come from three sources, with higher-priority sources overriding lower ones:
 
-Gravitino interprets catalog properties in three ways depending on the property name:
+1. **Per-catalog properties** supplied as the `properties` map when calling the catalog creation API via REST, CLI, or one of the language SDKs. Highest priority.
+2. **Provider-wide defaults** in the catalog's configuration file at `<GRAVITINO_HOME>/catalogs/<provider>/conf/<provider>.conf`. Operators edit this file to set defaults that apply to every catalog of a given provider type.
+3. **Implementation defaults** coded into the catalog itself. Used when neither of the above supplies a value.
 
-- **Implementation-defined properties** (for example, `jdbc-url`, `jdbc-driver`): defined by the catalog implementation. Each catalog's reference page documents which properties are required and which are optional with defaults.
-- **Bypass properties** (any name prefixed with `gravitino.bypass.`): passed unchanged to the underlying data source. Use these to set source-specific options that Gravitino does not interpret. For example, `gravitino.bypass.maxWaitMillis` is forwarded to the underlying JDBC connection pool as `maxWaitMillis`.
-- **Custom properties** (any other name not recognized by Gravitino and not prefixed with `gravitino.bypass.`): stored alongside the catalog but not used by Gravitino. Available for the user's own tooling.
+When the same property is set in both the API call and the configuration file, the API value wins.
 
-Default values for optional catalog properties are coded into the catalog implementation. Properties you supply at creation override these defaults. See each catalog's reference page for the documented defaults.
+### Property categories
 
-The properties below are common to all Gravitino catalogs:
+Gravitino interprets property names in three ways:
 
-| Configuration item  | Description                                                                                                                                                                                                                                                | Default value | Required | Since version    |
-|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `package`           | The path of the catalog package, Gravitino leverages this path to load the related catalog libs and configurations. The package should consist two folders, `conf` (for catalog related configurations) and `libs` (for catalog related dependencies/jars) | (none)        | No       | 0.5.0            |
-| `cloud.name`        | The property to specify the cloud that the catalog is running on. The valid values are `aws`, `azure`, `gcp`, `on_premise` and `other`.                                                                                                                    | (none)        | No       | 0.6.0-incubating |
-| `cloud.region-code` | The property to specify the region code of the cloud that the catalog is running on.                                                                                                                                                                       | (none)        | No       | 0.6.0-incubating |
+- **Implementation-defined properties** (for example, `jdbc-url`, `jdbc-driver`): defined by the catalog implementation. Each catalog's reference page documents required and optional properties along with their defaults.
+- **Bypass properties** (any name prefixed with `gravitino.bypass.`): passed unchanged to the underlying data source. For example, `gravitino.bypass.maxWaitMillis` is forwarded to the JDBC connection pool as `maxWaitMillis`. Use these to set source-specific options Gravitino does not interpret.
+- **Custom properties** (any other name): stored alongside the catalog but unused by Gravitino. Available for the user's own tooling.
 
+### Configuration file format
 
-The following table lists the catalog specific properties and their default paths:
+The provider configuration file uses standard `java.util.Properties` format: one `key=value` per line, `#` for comments. Most catalogs ship with the file present but with all entries commented out, so out of the box the file contributes no defaults. The Hive catalog is an exception that ships with a single non-commented default.
 
-| catalog provider    | catalog properties                                                                      | catalog properties configuration file path               |
-|---------------------|-----------------------------------------------------------------------------------------|----------------------------------------------------------|
-| `hive`              | [Hive catalog properties](apache-hive-catalog.md#catalog-properties)                    | `catalogs/hive/conf/hive.conf`                           |
-| `lakehouse-iceberg` | [Lakehouse Iceberg catalog properties](lakehouse-iceberg-catalog.md#catalog-properties) | `catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
-| `lakehouse-paimon`  | [Lakehouse Paimon catalog properties](lakehouse-paimon-catalog.md#catalog-properties)   | `catalogs/lakehouse-paimon/conf/lakehouse-paimon.conf`   |
-| `lakehouse-hudi`    | [Lakehouse Hudi catalog properties](lakehouse-hudi-catalog.md#catalog-properties)       | `catalogs/lakehouse-hudi/conf/lakehouse-hudi.conf`       |
-| `jdbc-mysql`        | [MySQL catalog properties](jdbc-mysql-catalog.md#catalog-properties)                    | `catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
-| `jdbc-postgresql`   | [PostgreSQL catalog properties](jdbc-postgresql-catalog.md#catalog-properties)          | `catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
-| `jdbc-doris`        | [Doris catalog properties](jdbc-doris-catalog.md#catalog-properties)                    | `catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
-| `jdbc-oceanbase`    | [OceanBase catalog properties](jdbc-oceanbase-catalog.md#catalog-properties)            | `catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
-| `kafka`             | [Kafka catalog properties](kafka-catalog.md#catalog-properties)                         | `catalogs/kafka/conf/kafka.conf`                         |
-| `fileset`           | [Fileset catalog properties](fileset-catalog#catalog-properties)                        | `catalogs/fileset/conf/fileset.conf`                     |
-| `model`             | [Fileset catalog properties](model-catalog#catalog-properties)                          | `catalogs/model/conf/model.conf`                         |
+If the file is missing or unreadable, catalog creation still succeeds. Gravitino logs a warning and treats the file as empty.
 
-:::info
-The Gravitino server automatically adds the catalog properties configuration directory to classpath.
-:::
+### Configuration file paths by provider
+
+The catalogs below read from these paths in a default Gravitino installation:
+
+| catalog provider    | configuration file path                                                  |
+|---------------------|--------------------------------------------------------------------------|
+| `hive`              | `<GRAVITINO_HOME>/catalogs/hive/conf/hive.conf`                           |
+| `lakehouse-iceberg` | `<GRAVITINO_HOME>/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
+| `lakehouse-paimon`  | `<GRAVITINO_HOME>/catalogs/lakehouse-paimon/conf/lakehouse-paimon.conf`   |
+| `lakehouse-hudi`    | `<GRAVITINO_HOME>/catalogs/lakehouse-hudi/conf/lakehouse-hudi.conf`       |
+| `jdbc-mysql`        | `<GRAVITINO_HOME>/catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
+| `jdbc-postgresql`   | `<GRAVITINO_HOME>/catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
+| `jdbc-doris`        | `<GRAVITINO_HOME>/catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
+| `jdbc-oceanbase`    | `<GRAVITINO_HOME>/catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
+| `kafka`             | `<GRAVITINO_HOME>/catalogs/kafka/conf/kafka.conf`                         |
+| `fileset`           | `<GRAVITINO_HOME>/catalogs/fileset/conf/fileset.conf`                     |
+| `model`             | `<GRAVITINO_HOME>/catalogs/model/conf/model.conf`                         |
+
+For catalogs whose implementation lives outside Gravitino's built-in directory, set the `package` property on the catalog. The configuration file location becomes `<package>/conf/<provider>.conf`.
+
+### Common properties
+
+The properties below apply to all Gravitino catalogs regardless of provider:
+
+| Configuration item  | Description                                                                                                                                                                                                                                                  | Default value | Required | Since version    |
+|---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
+| `package`           | Path to the catalog package directory for catalogs not shipped with Gravitino. The package directory must contain a `conf` subdirectory (for the catalog's configuration file) and a `libs` subdirectory (for the catalog's JAR dependencies).                | (none)        | No       | 0.5.0            |
+| `cloud.name`        | The cloud the catalog runs on. Valid values: `aws`, `azure`, `gcp`, `on_premise`, `other`.                                                                                                                                                                    | (none)        | No       | 0.6.0-incubating |
+| `cloud.region-code` | The region code of the cloud the catalog runs on.                                                                                                                                                                                                             | (none)        | No       | 0.6.0-incubating |
 
 ## Other Properties
 
