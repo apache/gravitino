@@ -494,7 +494,7 @@ final class GlueIcebergTableHelper {
     return spec.fields().stream()
         .map(
             field -> {
-              String colName = requireColumnName(schema, field.sourceId());
+              String colName = resolveColumnName(schema, field.sourceId());
               String transformStr = field.transform().toString().toLowerCase(Locale.ROOT);
               if (transformStr.startsWith("identity")) {
                 return Transforms.identity(colName);
@@ -529,7 +529,7 @@ final class GlueIcebergTableHelper {
     return iceSortOrder.fields().stream()
         .map(
             field -> {
-              String colName = requireColumnName(schema, field.sourceId());
+              String colName = resolveColumnName(schema, field.sourceId());
               SortDirection direction =
                   field.direction() == org.apache.iceberg.SortDirection.ASC
                       ? SortDirection.ASCENDING
@@ -787,7 +787,7 @@ final class GlueIcebergTableHelper {
    * Returns the column name for the given Iceberg field ID, throwing if the field is not found in
    * the schema.
    */
-  private static String requireColumnName(Schema schema, int sourceId) {
+  private static String resolveColumnName(Schema schema, int sourceId) {
     String colName = schema.findColumnName(sourceId);
     Preconditions.checkState(
         colName != null,
