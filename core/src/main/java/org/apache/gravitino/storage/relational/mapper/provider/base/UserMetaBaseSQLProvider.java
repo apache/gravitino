@@ -259,7 +259,7 @@ public class UserMetaBaseSQLProvider {
     // USER row.
     String userBranch =
         "SELECT 'USER' AS subjectType, um.user_id AS id, um.user_name AS name,"
-            + " um.updated_at AS updatedAt, CAST(NULL AS SIGNED) AS parentId"
+            + " um.updated_at AS updatedAt, CAST(NULL AS BIGINT) AS parentId"
             + " FROM "
             + USER_TABLE_NAME
             + " um"
@@ -298,7 +298,7 @@ public class UserMetaBaseSQLProvider {
     String groupBranch =
         " UNION ALL "
             + "SELECT 'GROUP' AS subjectType, gm.group_id AS id, gm.group_name AS name,"
-            + " gm.updated_at AS updatedAt, CAST(NULL AS SIGNED) AS parentId"
+            + " gm.updated_at AS updatedAt, CAST(NULL AS BIGINT) AS parentId"
             + " FROM "
             + GROUP_TABLE_NAME
             + " gm"
