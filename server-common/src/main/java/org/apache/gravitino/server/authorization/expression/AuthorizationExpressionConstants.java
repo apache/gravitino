@@ -35,24 +35,24 @@ public class AuthorizationExpressionConstants {
 
   public static final String LOAD_TABLE_AUTHORIZATION_EXPRESSION =
       """
-                  ANY(OWNER, METALAKE, CATALOG) ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (ANY_SELECT_TABLE || ANY_MODIFY_TABLE || TABLE::OWNER) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
-                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)
+                  ANY(OWNER, METALAKE, CATALOG)
                   """;
 
   //  Adding ANY_CREATE_TABLE here as Spark calls tableExists before creating a table.
   public static final String ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION =
       """
-                  ANY(OWNER, METALAKE, CATALOG) ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE || TABLE::OWNER) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
-                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
+                  ANY(OWNER, METALAKE, CATALOG)
                   """;
 
   public static final String MODIFY_TABLE_AUTHORIZATION_EXPRESSION =
       """
-                  ANY(OWNER, METALAKE, CATALOG) ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (ANY_MODIFY_TABLE || TABLE::OWNER) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
-                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)
+                  ANY(OWNER, METALAKE, CATALOG)
                   """;
 
   public static final String LOAD_TOPICS_AUTHORIZATION_EXPRESSION =

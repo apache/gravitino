@@ -632,6 +632,30 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testPrefetchRunsAfterOwnerUserInfoLookup() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(allowRole);
+
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(USER_ID + 1L, "USER"));
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+
+    assertFalse(jcasbinAuthorizer.isOwner(currentPrincipal, METALAKE, catalog, requestContext));
+    Mockito.clearInvocations(userMetaMapper, roleMetaMapper);
+
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal, METALAKE, catalog, USE_CATALOG, requestContext));
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
+    verify(roleMetaMapper, Mockito.never()).batchGetRoleUpdatedAt(any());
+  }
+
+  @Test
   public void testAuthorizeByGroupOwner() throws Exception {
     // Set up a UserPrincipal whose groups include GROUP_NAME
     UserPrincipal groupPrincipal =

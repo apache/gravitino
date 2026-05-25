@@ -758,10 +758,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    *       consumed by {@link #versionCheckAndLoadRoles} to skip its dedicated probe.
    * </ul>
    *
-   * <p>The SQL itself is wrapped in {@link AuthorizationRequestContext#computeUserInfoIfAbsent} so
-   * concurrent fan-out callers (e.g. the 200 parallel auth tasks from MetadataAuthzHelper.doFilter
-   * on a listCatalogs request) funnel through ConcurrentHashMap's per-bucket lock and only one
-   * issues the SQL; the rest block briefly on the user key and return the cached snapshot.
+   * <p>The SQL is guarded by {@code prefetchedRoleVersions}, not only by the user-info cache. OWNER
+   * checks can legitimately populate {@link #loadUserInfo} before the first privilege check in the
+   * same request; the fat prefetch must still run once so the role-relation and role-version probes
+   * are collapsed into this query.
    */
   private Optional<UserUpdatedAt> prefetchUserAndGroupInfo(
       String metalake,
@@ -770,84 +770,92 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       AuthorizationRequestContext requestContext) {
 
     String userKey = JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username);
-    return requestContext.computeUserInfoIfAbsent(
-        userKey,
-        k -> {
-          List<AuthSubjectVersion> rows =
-              SessionUtils.getWithoutCommit(
-                  UserMetaMapper.class,
-                  m -> m.batchGetAuthSubjectsForUser(metalake, username, groupNames));
+    if (requestContext.getPrefetchedRoleVersions() != null) {
+      return loadUserInfo(metalake, username, requestContext);
+    }
 
-          // Pivot the flat result into per-subject buckets.
-          UserUpdatedAt foundUser = null;
-          long userUpdatedAtForRoles = 0L;
-          Map<String, GroupUpdatedAt> foundGroups = new HashMap<>();
-          // roleId -> RoleUpdatedAt (carries roleName too, needed by the policy reload path).
-          Map<Long, RoleUpdatedAt> roleVersions = new HashMap<>();
-          // Direct user role ids (ordered + de-duped).
-          LinkedHashSet<Long> userRoleIds = new LinkedHashSet<>();
-          // Group-inherited role ids, bucketed by parent group id.
-          Map<Long, LinkedHashSet<Long>> groupRoleIdsByGroupId = new HashMap<>();
+    synchronized (requestContext) {
+      if (requestContext.getPrefetchedRoleVersions() != null) {
+        return loadUserInfo(metalake, username, requestContext);
+      }
 
-          for (AuthSubjectVersion row : rows) {
-            String t = row.getSubjectType();
-            if (SUBJECT_TYPE_USER.equals(t)) {
-              foundUser = new UserUpdatedAt(row.getId(), row.getUpdatedAt());
-              userUpdatedAtForRoles = row.getUpdatedAt();
-            } else if (SUBJECT_TYPE_GROUP.equals(t)) {
-              foundGroups.put(row.getName(), new GroupUpdatedAt(row.getId(), row.getUpdatedAt()));
-            } else if (SUBJECT_TYPE_USER_ROLE.equals(t)) {
-              userRoleIds.add(row.getId());
-              roleVersions.put(
-                  row.getId(), new RoleUpdatedAt(row.getId(), row.getName(), row.getUpdatedAt()));
-            } else if (SUBJECT_TYPE_GROUP_ROLE.equals(t)) {
-              Long parentGroupId = row.getParentId();
-              if (parentGroupId != null) {
-                groupRoleIdsByGroupId
-                    .computeIfAbsent(parentGroupId, p -> new LinkedHashSet<>())
-                    .add(row.getId());
-              }
-              roleVersions.put(
-                  row.getId(), new RoleUpdatedAt(row.getId(), row.getName(), row.getUpdatedAt()));
-            }
+      List<AuthSubjectVersion> rows =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class,
+              m -> m.batchGetAuthSubjectsForUser(metalake, username, groupNames));
+
+      // Pivot the flat result into per-subject buckets.
+      UserUpdatedAt foundUser = null;
+      long userUpdatedAtForRoles = 0L;
+      Map<String, GroupUpdatedAt> foundGroups = new HashMap<>();
+      // roleId -> RoleUpdatedAt (carries roleName too, needed by the policy reload path).
+      Map<Long, RoleUpdatedAt> roleVersions = new HashMap<>();
+      // Direct user role ids (ordered + de-duped).
+      LinkedHashSet<Long> userRoleIds = new LinkedHashSet<>();
+      // Group-inherited role ids, bucketed by parent group id.
+      Map<Long, LinkedHashSet<Long>> groupRoleIdsByGroupId = new HashMap<>();
+
+      for (AuthSubjectVersion row : rows) {
+        String t = row.getSubjectType();
+        if (SUBJECT_TYPE_USER.equals(t)) {
+          foundUser = new UserUpdatedAt(row.getId(), row.getUpdatedAt());
+          userUpdatedAtForRoles = row.getUpdatedAt();
+        } else if (SUBJECT_TYPE_GROUP.equals(t)) {
+          foundGroups.put(row.getName(), new GroupUpdatedAt(row.getId(), row.getUpdatedAt()));
+        } else if (SUBJECT_TYPE_USER_ROLE.equals(t)) {
+          userRoleIds.add(row.getId());
+          roleVersions.put(
+              row.getId(), new RoleUpdatedAt(row.getId(), row.getName(), row.getUpdatedAt()));
+        } else if (SUBJECT_TYPE_GROUP_ROLE.equals(t)) {
+          Long parentGroupId = row.getParentId();
+          if (parentGroupId != null) {
+            groupRoleIdsByGroupId
+                .computeIfAbsent(parentGroupId, p -> new LinkedHashSet<>())
+                .add(row.getId());
           }
+          roleVersions.put(
+              row.getId(), new RoleUpdatedAt(row.getId(), row.getName(), row.getUpdatedAt()));
+        }
+      }
 
-          // Prime the per-request groupInfoCache (negative-cache absent groups too).
-          for (String groupName : groupNames) {
-            String groupKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupName);
-            final Optional<GroupUpdatedAt> groupValue =
-                Optional.ofNullable(foundGroups.get(groupName));
-            requestContext.computeGroupInfoIfAbsent(groupKey, gk -> groupValue);
-          }
+      Optional<UserUpdatedAt> foundUserOpt = Optional.ofNullable(foundUser);
+      requestContext.computeUserInfoIfAbsent(userKey, k -> foundUserOpt);
 
-          // Prime the process-wide userRoleCache with the fresh role id list at the current
-          // user version. The next loadUserRoles call will observe a version-validated cache hit
-          // and skip its listRolesByUserId DB fallback. Skipped when the user row is absent
-          // (no user means no role binding possible).
-          if (foundUser != null) {
-            userRoleCache.put(
-                JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username),
-                new CachedUserRoleRels(
-                    foundUser.getUserId(), userUpdatedAtForRoles, new ArrayList<>(userRoleIds)));
-          }
+      // Prime the per-request groupInfoCache (negative-cache absent groups too).
+      for (String groupName : groupNames) {
+        String groupKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupName);
+        final Optional<GroupUpdatedAt> groupValue = Optional.ofNullable(foundGroups.get(groupName));
+        requestContext.computeGroupInfoIfAbsent(groupKey, gk -> groupValue);
+      }
 
-          // Prime the process-wide groupRoleCache per present group.
-          for (Map.Entry<String, GroupUpdatedAt> e : foundGroups.entrySet()) {
-            String gname = e.getKey();
-            GroupUpdatedAt ginfo = e.getValue();
-            LinkedHashSet<Long> ridSet =
-                groupRoleIdsByGroupId.getOrDefault(ginfo.getGroupId(), new LinkedHashSet<>());
-            groupRoleCache.put(
-                JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, gname),
-                new CachedGroupRoleRels(
-                    ginfo.getGroupId(), ginfo.getUpdatedAt(), new ArrayList<>(ridSet)));
-          }
+      // Prime the process-wide userRoleCache with the fresh role id list at the current
+      // user version. The next loadUserRoles call will observe a version-validated cache hit
+      // and skip its listRolesByUserId DB fallback. Skipped when the user row is absent
+      // (no user means no role binding possible).
+      if (foundUser != null) {
+        userRoleCache.put(
+            JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username),
+            new CachedUserRoleRels(
+                foundUser.getUserId(), userUpdatedAtForRoles, new ArrayList<>(userRoleIds)));
+      }
 
-          // Stash role versions for versionCheckAndLoadRoles to short-circuit its probe.
-          requestContext.setPrefetchedRoleVersions(roleVersions);
+      // Prime the process-wide groupRoleCache per present group.
+      for (Map.Entry<String, GroupUpdatedAt> e : foundGroups.entrySet()) {
+        String gname = e.getKey();
+        GroupUpdatedAt ginfo = e.getValue();
+        LinkedHashSet<Long> ridSet =
+            groupRoleIdsByGroupId.getOrDefault(ginfo.getGroupId(), new LinkedHashSet<>());
+        groupRoleCache.put(
+            JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, gname),
+            new CachedGroupRoleRels(
+                ginfo.getGroupId(), ginfo.getUpdatedAt(), new ArrayList<>(ridSet)));
+      }
 
-          return Optional.ofNullable(foundUser);
-        });
+      // Stash role versions for versionCheckAndLoadRoles to short-circuit its probe.
+      requestContext.setPrefetchedRoleVersions(roleVersions);
+
+      return foundUserOpt;
+    }
   }
 
   /**
