@@ -32,8 +32,6 @@ The following table outlines the tested compatibility between Gravitino versions
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
 
-### Rationale
-
 The Lance ecosystem is under active development, with frequent updates to APIs and features. Gravitino's Lance REST service depends on specific connector behaviors to ensure reliable operation. Using incompatible versions may result in:
 
 - Runtime errors or exceptions
@@ -230,8 +228,6 @@ The Lance REST service is compatible with other data processing engines that sup
 Note: These three engines do not support Lance REST natively yet, but can still interact with Lance datasets through table location paths retrieved from the Lance REST service.
 
 For engine-specific integration instructions, consult the [Lance Integration Documentation](https://lance.org/integrations).
-
-### General Integration Pattern
 
 Most Lance-compatible engines follow this general pattern:
 
