@@ -11,13 +11,15 @@ Use these layers together:
 
 | Layer | Scope | Typical keys |
 | --- | --- | --- |
-| Gravitino server config | Runtime for job manager and executor | `gravitino.job.executor`, `gravitino.job.statusPullIntervalInMs`, `gravitino.jobExecutor.local.sparkHome` |
+| Gravitino server config | Runtime for job manager and executor. See [Job System](../gravitino-server-config.md#job-system). | `gravitino.job.*`, `gravitino.jobExecutor.local.*` |
 | Job submission `jobConf` | Per job run | `catalog_name`, `table_identifier`, `spark_*`, template-specific args |
 | Optimizer CLI config | CLI commands | `gravitino.optimizer.*` in `conf/gravitino-optimizer.conf` |
 
 ## Server-side Configuration
 
-Set server-level runtime behavior in `gravitino.conf`.
+The optimizer relies on Gravitino's job system, configured in `gravitino.conf`. See [Job System](../gravitino-server-config.md#job-system) for the authoritative property reference.
+
+Minimum settings for a working optimizer environment:
 
 ```properties
 gravitino.job.executor=local
@@ -25,8 +27,7 @@ gravitino.job.statusPullIntervalInMs=300000
 gravitino.jobExecutor.local.sparkHome=/path/to/spark
 ```
 
-For local demo environments, you can reduce `gravitino.job.statusPullIntervalInMs` (for example
-`10000`) to get faster status updates. Restart Gravitino after changing this value.
+For local demo environments, reduce `gravitino.job.statusPullIntervalInMs` (for example `10000`) to get faster status updates. Restart Gravitino after changing any of these values.
 
 ## Built-In Update Stats `jobConf`
 

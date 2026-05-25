@@ -209,6 +209,30 @@ The auxiliary service framework lets Gravitino host additional servers in the sa
 
 Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configuration details.
 
+### Job System
+
+The job system runs maintenance and optimizer jobs on behalf of Gravitino services such as the Table Maintenance Service. Properties below control where jobs run, how their staging files are managed, and how Gravitino polls executors for status.
+
+| Configuration item                       | Description                                                                                                                                | Default value                  | Required | Since Version |
+|------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|----------|---------------|
+| `gravitino.job.stagingDir`               | Directory for managing staging files when running jobs.                                                                                    | `/tmp/gravitino/jobs/staging`  | No       | 1.0.0         |
+| `gravitino.job.executor`                 | The executor to run jobs. The built-in option is `local`; custom executors can be implemented and set here.                                | `local`                        | No       | 1.0.0         |
+| `gravitino.job.stagingDirKeepTimeInMs`   | Time in milliseconds to keep staging files of finished jobs. Minimum recommended value is 10 minutes outside test environments.            | `604800000` (7 days)           | No       | 1.0.0         |
+| `gravitino.job.statusPullIntervalInMs`   | Interval in milliseconds to pull job status from the executor. Minimum recommended value is 1 minute outside test environments.            | `300000` (5 minutes)           | No       | 1.0.0         |
+
+#### Local Executor
+
+When `gravitino.job.executor=local` (the default), the following properties further configure the local executor:
+
+| Configuration item                                  | Description                                                                                                                  | Default value                                  | Required    | Since Version |
+|-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|-------------|---------------|
+| `gravitino.jobExecutor.local.waitingQueueSize`      | Maximum number of jobs queued for execution.                                                                                 | `100`                                          | No          | 1.0.0         |
+| `gravitino.jobExecutor.local.maxRunningJobs`        | Maximum number of jobs running concurrently.                                                                                 | `max(1, min(availableProcessors / 2, 10))`     | No          | 1.0.0         |
+| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | Time in milliseconds to keep job status in memory after completion.                                                          | `3600000` (1 hour)                             | No          | 1.0.0         |
+| `gravitino.jobExecutor.local.sparkHome`             | Path to a Spark installation. Required for Spark-based job templates if the `SPARK_HOME` environment variable is not set.    | (none)                                         | Conditional | 1.0.0         |
+
+See [Table Maintenance Service](table-maintenance-service/optimizer.md) for usage examples.
+
 ### Event Listener
 
 Gravitino provides event listener mechanism to allow users to capture the events which are provided by Gravitino server to integrate some custom operations.
