@@ -1,5 +1,5 @@
 ---
-title: "Install Gravitino with Helm"
+title: "Install Gravitino on Kubernetes"
 slug: "/chart"
 keyword: "chart"
 license: "This software is licensed under the Apache License version 2."
