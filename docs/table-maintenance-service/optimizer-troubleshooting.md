@@ -5,19 +5,27 @@ keyword: "table maintenance, optimizer, troubleshooting, spark, strategy"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## `Invalid --type`
+## Invalid `--type` value
+
+Error: `Invalid --type`
 
 Use kebab-case values such as `update-statistics`, not `update_statistics`.
 
-## `--statistics-payload and --file-path cannot be used together`
+## Conflicting `--statistics-payload` and `--file-path`
+
+Error: `--statistics-payload and --file-path cannot be used together`
 
 For `local-stats-calculator`, use exactly one of them.
 
-## `requires one of --statistics-payload or --file-path`
+## Missing required input source
+
+Error: `requires one of --statistics-payload or --file-path`
 
 When `--calculator-name local-stats-calculator` is used, one input source is required.
 
-## `--partition-path must be a JSON array`
+## Invalid `--partition-path` format
+
+Error: `--partition-path must be a JSON array`
 
 Use a JSON array format, for example:
 
@@ -34,7 +42,9 @@ Check `gravitino.job.statusPullIntervalInMs` and local staging logs under:
 For local verification, reduce `gravitino.job.statusPullIntervalInMs` (for example `10000`) and
 restart Gravitino so REST status can refresh faster.
 
-## `No Identifiers Matched Strategy Name ...`
+## No identifiers match the strategy name
+
+Error: `No identifiers matched strategy name ...`
 
 `--strategy-name` must be the policy name (for example `iceberg_compaction_default`), not the policy type (`system_iceberg_compaction`) and not the strategy type (`iceberg-data-compaction`).
 
@@ -53,7 +63,9 @@ Check both rule names and metric samples:
    `gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules`.
 3. Ensure `--action-time` is inside the range where both before and after samples exist.
 
-## `No StrategyHandler Class Configured for Strategy Type ...`
+## Missing `StrategyHandler` for strategy type
+
+Error: `No StrategyHandler class configured for strategy type ...`
 
 Add strategy handler mapping to optimizer config, for example:
 
@@ -112,7 +124,9 @@ Example in `--spark-conf`:
 }
 ```
 
-## `Specified Optimizer Config File Does Not exist`
+## Optimizer config file not found
+
+Error: `Specified optimizer config file does not exist`
 
 Check your `--conf-path` and file permissions.
 
