@@ -286,26 +286,17 @@ Typical values:
 
 ## Catalog Properties
 
-There are three types of catalog properties:
+Catalog properties configure a catalog at creation time. Supply them as the `properties` map when calling the catalog creation API via REST, CLI, or one of the language SDKs.
 
-1. **Gravitino defined properties**: Gravitino defines these properties as the necessary
-   configurations for the catalog to work properly.
-2. **Properties with the `gravitino.bypass.` prefix**: These properties are not managed by
-   Gravitino and pass directly to the underlying system for advanced usage.
-3. **Other properties**: Gravitino doesn't leverage these properties, just store them. Users
-   can use them for their own purposes.
+Gravitino interprets catalog properties in three ways depending on the property name:
 
-Catalog properties are either defined in catalog configuration files as default values or
-specified as `properties` explicitly when creating a catalog.
+- **Implementation-defined properties** (for example, `jdbc-url`, `jdbc-driver`): defined by the catalog implementation. Each catalog's reference page documents which properties are required and which are optional with defaults.
+- **Bypass properties** (any name prefixed with `gravitino.bypass.`): passed unchanged to the underlying data source. Use these to set source-specific options that Gravitino does not interpret. For example, `gravitino.bypass.maxWaitMillis` is forwarded to the underlying JDBC connection pool as `maxWaitMillis`.
+- **Custom properties** (any other name not recognized by Gravitino and not prefixed with `gravitino.bypass.`): stored alongside the catalog but not used by Gravitino. Available for the user's own tooling.
 
-:::info
-The catalog properties explicitly specified in the `properties` field take precedence over the
-default values in the catalog configuration file.
+Default values for optional catalog properties are coded into the catalog implementation. Properties you supply at creation override these defaults. See each catalog's reference page for the documented defaults.
 
-These rules only apply to the catalog properties and don't affect the schema or table properties.
-:::
-
-Below is a list of catalog properties that will be used by all Gravitino catalogs:
+The properties below are common to all Gravitino catalogs:
 
 | Configuration item  | Description                                                                                                                                                                                                                                                | Default value | Required | Since version    |
 |---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
