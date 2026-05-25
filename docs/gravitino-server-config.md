@@ -14,7 +14,7 @@ Apache Gravitino supports several configurations:
 2. **Gravitino catalog properties configuration**: Used to make default values for different catalogs.
 3. **Some other configurations**: Includes HDFS and other configurations.
 
-## Gravitino Server Configurations
+## Server Properties
 
 Customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
 We strongly recommend that you read the following sections to understand the configuration file, so you can change the default values to suit your specific situation and usage scenario.
@@ -284,7 +284,7 @@ Typical values:
 - Moderate production: `-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g`
 - Larger deployments: `-Xms8g -Xmx8g -XX:MaxMetaspaceSize=1g` or higher depending on catalog count, plugins, and query concurrency
 
-## Catalog Properties Configuration
+## Catalog Properties
 
 There are three types of catalog properties:
 
@@ -334,7 +334,7 @@ The following table lists the catalog specific properties and their default path
 The Gravitino server automatically adds the catalog properties configuration directory to classpath.
 :::
 
-## Some Other Configurations
+## Other Properties
 
 You could put HDFS configuration file to the catalog properties configuration dir, like `catalogs/lakehouse-iceberg/conf/`.
 
@@ -417,7 +417,7 @@ If both `gravitino.conf` and environment variable exist, the container’s start
 :::
 
 
-## Set Up Runtime Environment Variables
+## Runtime Environment Variables
 
 The Gravitino server supports configuring runtime environment variables in two ways:
 
