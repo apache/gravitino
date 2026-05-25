@@ -72,17 +72,18 @@ different failure model — kept separate.
 4. **Wire compatibility**: No change to the Iceberg REST wire protocol.
 5. **Request-thread authorization**: Authorization runs on the request
    thread, never deferred.
-6. **Uniform object coverage**: Tables, views, and namespace (schema)
-   drops all flow through the same async cleanup mechanism (PRD §2.2).
+6. **Uniform object coverage**: Tables and namespace (schema) drops flow
+   through the same async cleanup mechanism. Views reuse the same mechanism
+   but are a planned follow-up, not part of the initial scope (§5.6).
 
 ---
 
 ## 3. Non-Goals
 
-1. **Native soft-delete semantics (R2)**: This design only delivers async
-   *hard* deletion (R1). Full soft-delete / undrop semantics are a
-   follow-up requirement; §5.7 records the seam they build on so R2 stays
-   a small extension rather than a separate V2 mechanism.
+1. **Native soft-delete / undrop semantics**: This design only delivers
+   async *hard* deletion. Full soft-delete / undrop semantics are a
+   follow-up requirement; §5.7 records the seam they build on so that work
+   stays a small extension rather than a separate V2 mechanism.
 2. **Purge cancellation (v1)**: User-initiated cancellation of in-flight
    purges is out of scope for v1; it needs a control API and lifecycle
    states we can add later without breaking the design.
@@ -152,23 +153,24 @@ net complexity for Gravitino rather than lowering it:
             │
             ▼
   IcebergTableOperationExecutor.dropTable
-            │  async-purge.enabled ?
+            │  X-Gravitino-Async-Purge header (default: async)
       ┌─────┴───────────────┐
-      │ true (default 1.3)  │ false (rollback)
+      │ async (default)     │ X-Gravitino-Async-Purge: false
       ▼                     ▼
  persist iceberg_purge_job   CatalogUtil.dropTableData
  row, return 204             (synchronous, on request thread)
       │
       ▼
  worker pool (any replica)
-   leases job via FOR UPDATE SKIP LOCKED
+   claims job via FOR UPDATE SKIP LOCKED (heartbeat ownership)
    → rebuild snapshot graph from metadata_location
-   → delete every reachable file, retry w/ backoff
+   → stream + delete every reachable file, retry w/ backoff
    → SUCCEEDED | DEAD_LETTER
 ```
 
-There is one async deletion path. The synchronous path is retained only
-as a feature-flag rollback (`async-purge.enabled = false`).
+Async is the default deletion path. The synchronous path is retained only
+as a per-request fallback that a client opts into with
+`X-Gravitino-Async-Purge: false`.
 
 ### 5.2 Request-path interaction
 
@@ -223,8 +225,7 @@ CREATE TABLE IF NOT EXISTS `iceberg_purge_job` (
   `attempts`          INT(10)       NOT NULL DEFAULT 0,
   `max_attempts`      INT(10)       NOT NULL,
   `last_error`        TEXT          NULL,
-  `lease_owner`       VARCHAR(128)  NULL,
-  `lease_expires_at`  BIGINT(20)    NULL,
+  `heartbeat_at`      BIGINT(20)    NULL COMMENT 'last heartbeat from the processing worker; NULL when unclaimed',
   `next_attempt_at`   BIGINT(20)    NOT NULL,
   `created_at`        BIGINT(20)    NOT NULL,
   `created_by`        VARCHAR(128)  NOT NULL,
@@ -250,31 +251,35 @@ Each tick:
 SELECT * FROM iceberg_purge_job
  WHERE state IN ('PENDING','RUNNING')
    AND next_attempt_at <= :now
-   AND (lease_expires_at IS NULL OR lease_expires_at < :now)
+   AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)
  ORDER BY next_attempt_at LIMIT :batch
  FOR UPDATE SKIP LOCKED;
 ```
 
-then updates the row to `RUNNING` with `lease_owner=:me`,
-`lease_expires_at=:now+leaseTimeout`. `SKIP LOCKED` is a performance
-optimization (it avoids lock waiting between replicas), not the correctness
-guarantee — see the leasing model below.
+then updates the row to `RUNNING` with `heartbeat_at=:now`. `SKIP LOCKED` is
+a performance optimization (it avoids lock waiting between replicas), not the
+correctness guarantee — see the ownership model below.
 
-#### Multi-replica leasing model
+#### Multi-replica ownership model
 
-Three distinct races, handled deliberately:
+Ownership is tracked by a **heartbeat** alone: the worker that claims a job
+keeps refreshing `heartbeat_at` while it runs, and remembers the ids it is
+processing in memory (no owner column — a stale row is reclaimable by anyone,
+which is exactly the failover behavior we want). A job is considered
+abandoned — and becomes reclaimable — once its heartbeat is older than
+`heartbeatTimeout`. Three distinct races, handled deliberately:
 
 1. **Two replicas claim the same job.** The claiming `UPDATE` is the
    serialization point, so this cannot happen — see the CAS rule below. Any
    number of replicas can run the worker with no external coordinator.
-2. **A held lease expires while its owner is still alive** (long GC, network
-   partition). The lease expires, another replica reclaims, and both may
-   delete the same files concurrently. We *accept* this race rather than
-   eliminate it: deletes are idempotent and `NotFoundException` counts as
-   success (§5.5), so the only cost is duplicated work, never incorrect
-   results. This is what lets failover stay coordinator-free.
+2. **A worker stalls while still alive** (long GC, network partition) and
+   its heartbeat goes stale. Another replica reclaims, and both may delete
+   the same files concurrently. We *accept* this race rather than eliminate
+   it: deletes are idempotent and `NotFoundException` counts as success
+   (§5.5), so the only cost is duplicated work, never incorrect results.
+   This is what lets failover stay coordinator-free.
 3. **A replica dies mid-job.** Identical to case 2 from the survivors' point
-   of view — the lease expires and the job is reclaimed.
+   of view — the heartbeat stops, goes stale, and the job is reclaimed.
 
 To stay portable, claiming is expressed as an optimistic compare-and-swap that
 works on **every** SQL backend, not just those with `SKIP LOCKED`:
@@ -284,14 +289,14 @@ works on **every** SQL backend, not just those with `SKIP LOCKED`:
 SELECT id FROM iceberg_purge_job
  WHERE state IN ('PENDING','RUNNING')
    AND next_attempt_at <= :now
-   AND (lease_expires_at IS NULL OR lease_expires_at < :now)
+   AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)
  ORDER BY next_attempt_at LIMIT :batch;
 
 -- claim each candidate; the row is ours only if affected_rows = 1
 UPDATE iceberg_purge_job
-   SET state='RUNNING', lease_owner=:me, lease_expires_at=:now+:leaseTimeout
+   SET state='RUNNING', heartbeat_at=:now
  WHERE id=:id
-   AND (lease_expires_at IS NULL OR lease_expires_at < :now);
+   AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout);
 ```
 
 A loser sees `affected_rows = 0` and moves to the next candidate. Where
@@ -301,19 +306,28 @@ cut contention; where it is not (H2, older MySQL), it falls back to the CAS
 form. Both are correct; `SKIP LOCKED` is purely an optimization. We do not use
 DB-specific advisory locks, whose semantics differ across engines.
 
-Execution mirrors `CatalogHandlers.purgeTable`:
+Execution mirrors `CatalogHandlers.purgeTable`, but **streams** the
+reachable files instead of materializing them. A large table can reference
+millions of data files, so the worker walks the snapshot graph lazily
+(manifest list → manifests → data files) and deletes in bounded batches,
+never holding the full file set in memory:
 
 ```java
 TableMetadata meta = TableMetadataParser.read(io, job.metadataLocation());
-Tasks.foreach(collectAllReachableFiles(meta))
-     .executeWith(deleteExecutor)
-     .retry(perFileRetries)
-     .suppressFailureWhenFinished()
-     .run(io::deleteFile);
+// reachableFiles returns a lazy CloseableIterable, not a materialized List
+try (CloseableIterable<String> files = reachableFiles(meta)) {
+  Tasks.foreach(files)
+       .executeWith(deleteExecutor)
+       .retry(perFileRetries)
+       .suppressFailureWhenFinished()
+       .run(io::deleteFile);
+}
 ```
 
-A separate task renews the lease every `leaseTimeout / 3`. If the host
-dies, the lease expires and another replica reclaims the job.
+A separate task sends a **heartbeat** every `heartbeatTimeout / 3` by
+updating `heartbeat_at=:now` on the job ids this worker is processing. If
+the host dies the heartbeat stops; once a row ages past `heartbeatTimeout`
+another replica reclaims it.
 
 ### 5.5 Failure model
 
@@ -326,25 +340,28 @@ the **metadata phase** fails.
 | All files deleted (or already gone) | `state='SUCCEEDED'`                                                |
 | Metadata load failed, transient    | `attempts++`, `next_attempt_at = now + backoff(attempts)`           |
 | Metadata load failed, terminal     | `attempts++`; if `attempts >= max_attempts` → `state='DEAD_LETTER'` |
-| Worker killed mid-job              | Lease expires; another worker picks it up; deletes are idempotent (restart story in §5.15) |
-| Recovered via re-register (§5.13)  | Job CAS'd to `state='CANCELLED'`; the worker only leases non-terminal rows, so files are left intact |
+| Worker killed mid-job              | Heartbeat goes stale; another worker picks it up; deletes are idempotent (restart story in §5.15) |
+| Recovered via re-register (§5.13)  | Job CAS'd to `state='CANCELLED'`; the worker only claims non-terminal rows, so files are left intact |
 
 `NotFoundException` from `deleteFile` counts as success. Backoff:
 `min(maxBackoff, base * 2^attempts)` with jitter.
 
-### 5.6 Views and namespace (schema) drops
+### 5.6 Object coverage: tables now, views later
 
-The same async mechanism covers all object types (PRD §2.2):
+The job table is object-type aware (the `object_type` column), but the
+initial scope is **tables only**:
 
-- **Views** carry no data files — the worker cleanup just removes the
-  view's `metadata.json`. The job row uses `object_type = 'VIEW'`.
-- **Namespace (schema) drops** cascade: the server enqueues an
-  independent purge job for each contained table and view. Failures and
-  retries are tracked per object, so a re-run never re-deletes an
-  already-cleaned object, and one object's failure does not block the
-  others.
+- **Namespace (schema) drops** cascade: the server enqueues an independent
+  purge job for each contained table. Failures and retries are tracked per
+  object, so a re-run never re-deletes an already-cleaned table, and one
+  table's failure does not block the others.
+- **Views** are a planned follow-up, not part of the initial scope. A view
+  carries no data files — its cleanup only removes the view's
+  `metadata.json` — so it slots into the same job table with
+  `object_type='VIEW'` when added; the worker, tombstone (§5.13), and
+  cascade paths ship for tables first.
 
-### 5.7 Recovery and the soft-delete (R2) seam
+### 5.7 Recovery and the soft-delete seam
 
 Because the job stores `metadata_location` and the underlying data /
 metadata files are not touched until the worker runs, a table dropped by
@@ -357,11 +374,12 @@ POST /v1/{prefix}/namespaces/{ns}/register
 ```
 
 Once the worker deletes the files the table is unrecoverable — which is
-the intended semantics of *hard* delete. Soft delete (R2) layers on top
-by deferring file deletion for a retention window (delaying
-`next_attempt_at`) on the **same** job row, executor, and scheduler, so
-register-table recovery succeeds throughout the window. This keeps R2 a
-small extension on R1 rather than a separate V2 mechanism.
+the intended semantics of *hard* delete. A future soft-delete / undrop
+feature layers on top by deferring file deletion for a retention window
+(delaying `next_attempt_at`) on the **same** job row, executor, and
+scheduler, so register-table recovery succeeds throughout the window. This
+keeps that future work a small extension rather than a separate V2
+mechanism.
 
 ### 5.8 Events
 
@@ -379,14 +397,22 @@ paths (direct DB query in 1.3, management endpoint later) are covered in
 
 ### 5.9 Configuration
 
+Whether a given `DELETE …?purgeRequested=true` runs asynchronously is **not**
+a server config — it is a per-request **client** choice via the
+`X-Gravitino-Async-Purge` request header (§5.10): async is the default, and a
+client that needs strict synchronous deletion sends
+`X-Gravitino-Async-Purge: false`.
+
+The remaining server-side keys only tune the worker pool and retry behavior
+— operational concerns a client cannot set:
+
 | Key                                                  | Default   | Description                                                                              |
 | ---------------------------------------------------- | --------- | ---------------------------------------------------------------------------------------- |
-| `gravitino.iceberg-rest.async-purge.enabled`         | `true`    | When `true`, `purgeRequested=true` deletes files asynchronously. Set `false` to roll back to synchronous deletion on the request thread. |
 | `gravitino.iceberg-rest.async-purge.worker-threads`           | `4`       | Worker pool size per server. |
 | `gravitino.iceberg-rest.async-purge.delete-threads-per-job`   | `8`       | Parallelism of file deletes within a single job. |
 | `gravitino.iceberg-rest.async-purge.poll-interval-ms`         | `5000`    | Worker poll interval. |
-| `gravitino.iceberg-rest.async-purge.batch-size`               | `16`      | Jobs leased per tick. |
-| `gravitino.iceberg-rest.async-purge.lease-timeout-ms`         | `300000`  | Lease duration before a job is reclaimable. |
+| `gravitino.iceberg-rest.async-purge.batch-size`               | `16`      | Jobs claimed per tick. |
+| `gravitino.iceberg-rest.async-purge.heartbeat-timeout-ms`     | `300000`  | Age after which a job with no heartbeat is reclaimable. |
 | `gravitino.iceberg-rest.async-purge.max-attempts`             | `5`       | Attempts before `DEAD_LETTER`. |
 | `gravitino.iceberg-rest.async-purge.backoff-base-ms`          | `30000`   | Exponential backoff base. |
 | `gravitino.iceberg-rest.async-purge.backoff-max-ms`           | `3600000` | Exponential backoff ceiling. |
@@ -404,8 +430,11 @@ before the response. With this design:
 - Object-store files may linger until the worker drains. Documented in
   release notes.
 
-Operators needing strict synchronous deletion set
-`gravitino.iceberg-rest.async-purge.enabled = false`.
+The async-vs-synchronous choice rides on the optional `X-Gravitino-Async-Purge`
+request header. It is a Gravitino extension header, not part of the Iceberg
+REST spec: a standard Iceberg client never sends it and simply gets the async
+default, so the protocol is unchanged. A client needing strict synchronous
+deletion sends `X-Gravitino-Async-Purge: false`.
 
 ### 5.11 Security
 
@@ -419,10 +448,11 @@ Operators needing strict synchronous deletion set
 
 ### 5.12 User process
 
-End-to-end flow with async purge enabled (the 1.3 default):
+End-to-end flow with async purge (the 1.3 default):
 
-1. Operator runs with `gravitino.iceberg-rest.async-purge.enabled = true`
-   (the default). No client-side change is required.
+1. Async is the default; no client change is needed to get it. A client that
+   needs strict synchronous deletion adds `X-Gravitino-Async-Purge: false`
+   to the request.
 2. A client issues
    `DELETE /v1/{prefix}/namespaces/{ns}/tables/{t}?purgeRequested=true`.
 3. The server runs authorization on the request thread, loads the table
@@ -431,9 +461,10 @@ End-to-end flow with async purge enabled (the 1.3 default):
 4. The server responds `204 No Content` within typical request latency
    (target p99 < 500 ms, < 5 s for the largest tables). The table is
    immediately absent from `LIST` and `HEAD` returns `404`.
-5. In the background, a worker on any replica leases the job, rebuilds
-   the snapshot graph from `metadata_location`, and deletes every
-   reachable file, retrying transient failures with exponential backoff.
+5. In the background, a worker on any replica claims the job, rebuilds
+   the snapshot graph from `metadata_location`, and streams through every
+   reachable file deleting it, retrying transient failures with exponential
+   backoff.
 6. On success the job is marked `SUCCEEDED`; on terminal failure it lands
    in `DEAD_LETTER` for operator inspection. Listeners observe
    `IcebergPurge{Started,Completed,Failed}Event` throughout.
@@ -475,28 +506,28 @@ recreate is refused until the data files are deleted. Telling *whether* a
 given identifier is mid-purge, done, or dead-lettered is the read-side
 concern handled in §5.14.
 
-The same rule applies to **views** (`createView` / `replaceView` → `409`
-while a `VIEW` job is active). A **namespace** carries no data, so it can
-be recreated freely; any table or view created inside it is still guarded
-individually by its own job row.
+The same rule will apply to **views** (`createView` / `replaceView` → `409`
+while a `VIEW` job is active) once view cleanup ships (§5.6). A **namespace**
+carries no data, so it can be recreated freely; any table created inside it
+is still guarded individually by its own job row.
 
 **Recovery under the tombstone.** Because the identifier is now blocked,
 register-as-recovery (§5.7) first lifts the tombstone: re-registering at
 the stored `metadata_location` atomically CAS's the matching active job to
 a terminal `CANCELLED` state and restores the catalog entry in the same
 transaction. Cancelling the job is also what removes the
-worker-deletes-the-recovered-table race — the worker only ever leases
+worker-deletes-the-recovered-table race — the worker only ever claims
 non-terminal rows. This is **recovery-scoped** cancellation only; a
 general user-facing "cancel my purge" API stays out of scope (§3.2).
 
 **Concurrency.** The create/register conflict check and the worker's
-state transitions serialize on the job row, exactly like the §5.4 leasing
+state transitions serialize on the job row, exactly like the §5.4 ownership
 CAS. A `createTable` that observes `SUCCEEDED` proceeds; one that observes
 `PENDING` / `RUNNING` gets `409`; and recovery's CAS to `CANCELLED`
 competes with the worker's CAS to `RUNNING` — at most one wins, so a job
 that has already started running cannot be silently cancelled out from
 under the worker (recovery then sees `RUNNING` and returns `409`, and the
-caller retries once the lease frees or the job terminates).
+caller retries once the heartbeat goes stale or the job terminates).
 
 ### 5.14 Observing in-flight and failed purges
 
@@ -533,7 +564,7 @@ When added it would follow the `metalakes/{metalake}/jobs/runs` convention
   with §5.13 guaranteeing at most one active row.
 
 Each row would report `state`, `attempts` / `max_attempts`, `last_error`,
-`lease_owner`, `created_by`, and timestamps. Read-only — there is no cancel
+`heartbeat_at`, `created_by`, and timestamps. Read-only — there is no cancel
 verb (§3.2); the only operator-triggered transition is the
 register-as-recovery flow (§5.13).
 
@@ -555,8 +586,8 @@ the management endpoint lands.
 ### 5.15 Restart and crash recovery
 
 Restart handling is not a separate mechanism — it falls out of the durable
-job table (§5.3) plus the lease model (§5.4). Three guarantees hold across
-a process restart or crash:
+job table (§5.3) plus the heartbeat model (§5.4). Three guarantees hold
+across a process restart or crash:
 
 1. **Nothing in-flight is lost.** The job is committed to
    `iceberg_purge_job` *before* the `DELETE` returns (§5.2); there is no
@@ -564,26 +595,25 @@ a process restart or crash:
    are picked up on the first worker tick after boot.
 2. **`RUNNING` jobs orphaned by the crash are reclaimed.** A process that
    died mid-purge leaves a row in `state='RUNNING'` with a stale
-   `lease_owner` / `lease_expires_at`. The worker poll already selects rows
-   whose lease has expired, so once it does the restarted node — or any peer
-   — reclaims the row via the CAS. This is the "worker killed mid-job" row
-   in §5.5.
+   `heartbeat_at`. The worker poll already selects rows whose heartbeat has
+   gone stale, so once it does the restarted node — or any peer — reclaims
+   the row via the CAS. This is the "worker killed mid-job" row in §5.5.
 3. **Re-running a half-finished job is safe.** The worker rebuilds the file
    set from `metadata_location` and re-deletes; already-gone files raise
    `NotFoundException`, which counts as success (§5.5). A crash anywhere in
    the delete loop costs only duplicated work, never corruption.
 
 In a **multi-replica** deployment this is seamless: surviving replicas
-reclaim a dead node's jobs on lease expiry with no coordinator.
+reclaim a dead node's jobs once the heartbeat goes stale, with no
+coordinator.
 
 The one rough edge is a **single-replica** restart: the crashed node's own
-`RUNNING` jobs sit idle until `lease_expires_at` passes — up to one
-`leaseTimeout` of dead time — before the rebooted process reclaims them.
-**v1 behavior:** rely on lease expiry (correct, bounded, zero extra code);
-keep `leaseTimeout` modest so the resume delay is small. **Future
-optimization:** a startup lease sweep that resets `RUNNING` rows whose
-`lease_owner` matches this node's stable identity back to `PENDING`, so they
-resume immediately instead of waiting out the lease.
+`RUNNING` jobs sit idle until their `heartbeat_at` ages past
+`heartbeatTimeout` — up to one `heartbeatTimeout` of dead time — before the
+rebooted process reclaims them. We simply rely on heartbeat staleness
+(correct, bounded, zero extra code) and keep `heartbeatTimeout` modest so the
+resume delay is small. With no owner column there is nothing extra to sweep
+on boot — a stale row is reclaimable by definition.
 
 ---
 
@@ -596,25 +626,25 @@ synchronous path remains only as a rollback flag.
 ### Phase 1 (1.3): Async purge core
 - [ ] Add the `iceberg_purge_job` schema and migrations (MySQL, H2, PostgreSQL)
 - [ ] Implement `IcebergPurgeJobStore` enqueue path (persist job, return)
-- [ ] Implement the worker pool: leasing via `FOR UPDATE SKIP LOCKED`, lease renewal, file deletion, retry/backoff state machine
-- [ ] Add the `async-purge.enabled` feature flag and wire both paths into `IcebergTableOperationExecutor.dropTable` (async default, synchronous rollback)
+- [ ] Implement the worker pool: claiming via `FOR UPDATE SKIP LOCKED` (heartbeat ownership), heartbeat renewal, streaming file deletion, retry/backoff state machine
+- [ ] Honor the `X-Gravitino-Async-Purge` request header (default async; `false` selects synchronous deletion) and wire both paths into `IcebergTableOperationExecutor.dropTable`
 - [ ] Add purge events: `IcebergPurgeStartedEvent`, `IcebergPurgeCompletedEvent`, `IcebergPurgeFailedEvent`
 - [ ] Add purge observability (§5.14), low-cost signals only: metrics (`purge.jobs.{pending,running,dead_letter}`, `purge.oldest_pending_age_ms`, `purge.{completed,failed}`) and the informative `ErrorResponse` message on the §5.13 `409`. Operator read path in 1.3 is direct DB query of `iceberg_purge_job`
-- [ ] Extend coverage to views (`object_type='VIEW'`, metadata-only cleanup) and namespace-drop cascade (one job per contained object)
-- [ ] Enforce tombstone semantics (§5.13): on `createTable`/`createView`/`registerTable`, reject with `409` when an active job exists for the identifier (`idx_object` lookup on the request thread)
+- [ ] Namespace-drop cascade for tables (one job per contained table)
+- [ ] Enforce tombstone semantics (§5.13): on `createTable`/`registerTable`, reject with `409` when an active job exists for the identifier (`idx_object` lookup on the request thread)
 - [ ] Add register-table recovery support (§5.7): atomically CAS the matching active job to `CANCELLED` and restore the catalog entry; documentation
 
 ### Phase 1 (1.3): Testing
-- [ ] Unit tests: enqueue, state machine, worker leasing/renewal/contention (H2)
+- [ ] Unit tests: enqueue, state machine, worker claiming/heartbeat/contention (H2)
 - [ ] Docker integration tests: latency, restart-resume (`kill -9` mid-purge), two-replica no-duplicate-deletes
-- [ ] Scale & concurrency tests (PRD §4 / R3) — see §7
+- [ ] Scale & concurrency tests (PRD §4) — see §7
 
 ### Phase 1 (1.3): Documentation
-- [ ] Update user-facing documentation in `docs/` (async semantics, config, rollback flag, release notes)
+- [ ] Update user-facing documentation in `docs/` (async semantics, the `X-Gravitino-Async-Purge` header, config, release notes)
 
-### Phase 2 (post-1.3): Management endpoint
+### Phase 2 (post-1.3)
+- [ ] View support (§5.6): `object_type='VIEW'` cleanup (metadata-only), the view tombstone rule (`createView`/`replaceView` → `409`), and namespace cascade over views
 - [ ] Add the read-only `metalakes/{metalake}/catalogs/{catalog}/cleanups` management endpoint (§5.14): REST resource, DTOs, authorization, client support, docs, and tests. Filtered list keyed by object identifier; no by-id fetch
-- [ ] Startup lease-sweep optimization (§5.15): on boot reset `RUNNING` rows owned by this node's stable identity back to `PENDING` so single-replica restarts resume without waiting out `leaseTimeout`
 
 ---
 
@@ -624,10 +654,11 @@ synchronous path remains only as a rollback flag.
   - `TestIcebergPurgeJobStore` — enqueue and row contents.
   - `TestIcebergPurgeStateMachine` — PENDING → RUNNING → SUCCEEDED;
     failure → retry → DEAD_LETTER.
-  - `TestIcebergPurgeWorker` — leasing, renewal, contention (H2 backend).
+  - `TestIcebergPurgeWorker` — claiming, heartbeat renewal, contention (H2
+    backend).
   - `TestIcebergTableOperationExecutorAsyncPurge` — async default enqueues
-    exactly one job; `async-purge.enabled=false` falls back to synchronous
-    purge; thrown errors surface as 5xx.
+    exactly one job; `X-Gravitino-Async-Purge: false` falls back to
+    synchronous purge; thrown errors surface as 5xx.
   - `TestIcebergPurgeTombstone` (§5.13) — `createTable`/`register` at an
     identifier with an active job returns `409`; succeeds once the job is
     `SUCCEEDED`/`DEAD_LETTER`; `loadTable`/`alterTable` return `404`;
@@ -637,9 +668,9 @@ synchronous path remains only as a rollback flag.
   - Drop a table; REST returns < 500 ms; worker eventually clears every file.
   - Restart REST mid-purge (kill -9); purge resumes.
   - Two replicas on one DB; no duplicate deletions or orphans.
-  - Rollback flag: existing `IcebergRESTServiceIT` reruns unchanged with
-    `async-purge.enabled=false`.
-- Scale & concurrency (PRD §4 / R3):
+  - Synchronous fallback: existing `IcebergRESTServiceIT` reruns unchanged
+    with `X-Gravitino-Async-Purge: false`.
+- Scale & concurrency (PRD §4):
   - Locust scenarios under `gravitino-test/cloud/scale-test/`.
   - High-file-count fixtures: medium (~50K files), large (~500K files).
   - Concurrent-drop tier.
@@ -658,10 +689,10 @@ synchronous path remains only as a rollback flag.
    PRD §2.2 same-name/same-location recreate attack raised with @jerryshao.
    It does change today's drop semantics (recreate is no longer immediate);
    that behavior change is called out in the release notes (§5.10).
-2. **Credential refresh** — refresh FileIO credentials from the catalog at
-   lease-renewal time, or require static credentials for catalogs that
-   opt into async purge? Leaning toward refresh so long-retention soft
-   delete (R2) keeps working; cost/complexity trade-off still open.
+2. **Credential refresh** — refresh FileIO credentials from the catalog on
+   each heartbeat, or require static credentials for catalogs that opt into
+   async purge? Leaning toward refresh so long-retention soft delete keeps
+   working; cost/complexity trade-off still open.
 3. ~~**Multi-server coordination on H2**~~ — **Resolved (§5.4).** Claiming is
    an optimistic compare-and-swap `UPDATE` that works on every SQL backend;
    `SKIP LOCKED` is used as an optimization where available and the CAS form is
