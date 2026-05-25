@@ -53,7 +53,7 @@ For detailed instructions on how to build and install the Gravitino server packa
     |── logs/                                   # Gravitino Iceberg REST server logs. Automatically created after the server starts.
 ```
 
-## Iceberg REST Server Configuration
+## Configuration
 
 There are distinct configuration files for standalone and auxiliary server: `gravitino-iceberg-rest-server.conf` is used for the standalone server, while `gravitino.conf` is for the auxiliary server. Although the configuration files differ, the configuration items remain the same.
 
@@ -595,7 +595,7 @@ Example tuning:
 - Medium workloads: `GRAVITINO_MEM="-Xms4g -Xmx4g -XX:MaxMetaspaceSize=1g"`
 - Higher concurrency or catalog counts: increase heap and metaspace accordingly.
 
-## Start the Iceberg REST Server
+## Startup
 
 To start as an auxiliary service with Gravitino server:
 
