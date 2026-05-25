@@ -75,12 +75,11 @@ public final class IdpPOConverters {
    * @return The built-in IdP user entity.
    */
   public static IdpUserEntity fromIdpUserPO(IdpUserPO userPO, List<String> groupNames) {
-    IdpUserEntity.Builder builder =
-        IdpUserEntity.builder().withId(userPO.getUserId()).withName(userPO.getUsername());
-    if (groupNames != null && !groupNames.isEmpty()) {
-      builder.withGroupNames(groupNames);
-    }
-    return builder.build();
+    return IdpUserEntity.builder()
+        .withId(userPO.getUserId())
+        .withName(userPO.getUsername())
+        .withGroupNames(groupNames != null ? groupNames : Collections.emptyList())
+        .build();
   }
 
   /**
@@ -91,12 +90,11 @@ public final class IdpPOConverters {
    * @return The built-in IdP group entity.
    */
   public static IdpGroupEntity fromIdpGroupPO(IdpGroupPO groupPO, List<String> usernames) {
-    IdpGroupEntity.Builder builder =
-        IdpGroupEntity.builder().withId(groupPO.getGroupId()).withName(groupPO.getGroupName());
-    if (usernames != null && !usernames.isEmpty()) {
-      builder.withUsernames(usernames);
-    }
-    return builder.build();
+    return IdpGroupEntity.builder()
+        .withId(groupPO.getGroupId())
+        .withName(groupPO.getGroupName())
+        .withUsernames(usernames != null ? usernames : Collections.emptyList())
+        .build();
   }
 
   /**
