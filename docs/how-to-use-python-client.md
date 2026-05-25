@@ -63,7 +63,7 @@ contains the following code snippets:
 11. Drop this `Fileset.Type.EXTERNAL` type fileset and check if the fileset location was
     not deleted in HDFS.
 
-## Python Client Development
+## Development
 
 Use any IDE to develop Gravitino Python Client. Directly open the client-python module project in the IDE.
 
