@@ -38,7 +38,7 @@ name to the virtual path.
 The usage pattern for GVFS is the same as HDFS or S3. GVFS internally manages
 the path mapping and convert automatically.
 
-## Manage Files with Java GVFS
+## Java
 
 ### Prerequisites
 
@@ -392,7 +392,7 @@ Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_filese
 FileSystem fs = filesetPath.getFileSystem(conf);
 ```
 
-## Manage Files with Python GVFS
+## Python
 
 ### Prerequisites
 
