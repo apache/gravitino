@@ -96,24 +96,4 @@ public final class IdpPOConverters {
         .withUsernames(usernames != null ? usernames : Collections.emptyList())
         .build();
   }
-
-  /**
-   * Converts an {@link IdpUserPO} to a built-in IdP user entity without membership fields.
-   *
-   * @param userPO The persistence object.
-   * @return The built-in IdP user entity.
-   */
-  public static IdpUserEntity fromIdpUserPO(IdpUserPO userPO) {
-    return fromIdpUserPO(userPO, Collections.emptyList());
-  }
-
-  /**
-   * Converts an {@link IdpGroupPO} to a built-in IdP group entity without membership fields.
-   *
-   * @param groupPO The persistence object.
-   * @return The built-in IdP group entity.
-   */
-  public static IdpGroupEntity fromIdpGroupPO(IdpGroupPO groupPO) {
-    return fromIdpGroupPO(groupPO, Collections.emptyList());
-  }
 }
