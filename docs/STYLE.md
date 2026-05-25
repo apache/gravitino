@@ -85,7 +85,7 @@ Inside code samples and config keys, follow the literal source.
 - Avoid gerund-led headings. Rare exceptions are acceptable for well-established phrases like "Getting started" that have no clean noun-phrase equivalent. When in doubt, use a noun phrase.
 - Parallel structure: when a heading pairs two or more verbs with "and", use the same verb form for both. Prefer the imperative ("Build and Test", not "Build and Testing").
 - Avoid second-person possessives ("your X") in headings, consistent with the broader rule against second-person scaffolding. Use "the X" or drop the determiner.
-- Avoid "Example of <gerund-ing> X" headings. When the section walks the reader through doing something, use a specific-imperative heading instead ("Configure X", "Create X", "Connect X").
+- Avoid "Example of `<gerund-ing>` X" headings. When the section walks the reader through doing something, use a specific-imperative heading instead ("Configure X", "Create X", "Connect X").
 - Avoid "X of (the) Y" prepositional-phrase headings. Use the attributive form "Y X" instead ("Job System Configuration", not "Configurations of the Job System"). Prefer singular over plural for the X noun unless the section enumerates multiple distinct instances.
 - Headings should not use the possessive (singular `'s` or plural `s'`). Use an attributive noun ("Service Configuration", "Catalog Information") or a prepositional phrase ("Configuration of the Service") instead.
 - No terminal punctuation in headings. Headings do not end with a period, colon, exclamation mark, or other terminal punctuation. The content below the heading speaks for itself.
