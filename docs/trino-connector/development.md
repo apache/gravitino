@@ -60,8 +60,6 @@ Change `localhost`, `port`, and the names of metalake and catalogs to match your
 
 ## Development Environment
 
-### IDEA
-
 1. Clone the Trino repository from [GitHub](https://github.com/trinodb/trino). This document uses Trino `469` by default. Check out the tag matching your target Trino version (e.g., `git checkout 469`).
 2. Open the Trino project in IDEA.
 3. Create a new module named `trino-gravitino` in the Trino project as shown below:
