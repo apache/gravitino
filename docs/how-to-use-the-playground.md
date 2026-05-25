@@ -34,7 +34,7 @@ The playground runs several services. The TCP ports used may clash with existing
 | playground-prometheus | 19090                  |
 | playground-grafana    | 13000                  |
 
-## Playground Usage
+## Usage
 
 ### Curl Command to Launch the Playground
 
