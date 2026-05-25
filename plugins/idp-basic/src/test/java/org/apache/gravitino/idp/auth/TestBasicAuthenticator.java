@@ -39,7 +39,7 @@ import org.junit.jupiter.api.Test;
 class TestBasicAuthenticator {
 
   @Test
-  void testAuthenticateTokenThrowsWhenAuthenticatorNotInitialized() {
+  void testNotInitialized() {
     IllegalStateException exception =
         Assertions.assertThrows(
             IllegalStateException.class, () -> new BasicAuthenticator().authenticateToken(null));
@@ -48,7 +48,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testAuthenticateTokenThrowsUnauthorizedWhenHeaderMissing() {
+  void testEmptyHeader() {
     BasicAuthenticator authenticator = authenticator();
     UnauthorizedException exception =
         Assertions.assertThrows(
@@ -59,7 +59,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testAuthenticateTokenThrowsBadRequestWhenBasicCredentialMissing() {
+  void testMissingCredentials() {
     BasicAuthenticator authenticator = authenticator();
     BadRequestException exception =
         Assertions.assertThrows(
@@ -73,7 +73,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testAuthenticateTokenReturnsPrincipalWhenCredentialsValid() {
+  void testValidCredentials() {
     IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
     PasswordHasher passwordHasher = mock(PasswordHasher.class);
     IdpUserPO userPO = mock(IdpUserPO.class);
@@ -96,7 +96,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testAuthenticateTokenThrowsUnauthorizedWhenUserMissing() {
+  void testUserNotFound() {
     IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
     PasswordHasher passwordHasher = mock(PasswordHasher.class);
     when(userMetaService.getIdpUserByUsername("alice"))
@@ -115,7 +115,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testAuthenticateTokenThrowsUnauthorizedWhenPasswordMismatch() {
+  void testWrongPassword() {
     IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
     PasswordHasher passwordHasher = mock(PasswordHasher.class);
     IdpUserPO userPO = mock(IdpUserPO.class);
