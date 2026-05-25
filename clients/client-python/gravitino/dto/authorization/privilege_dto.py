@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config, dataclass_json
 
-from gravitino.api.authorization.privileges import Privilege
+from gravitino.api.authorization.privileges import Privilege, Privileges
 from gravitino.api.metadata_object import MetadataObject
 
 
@@ -71,7 +71,9 @@ class PrivilegeDTO(Privilege):
         return self._condition
 
     def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return True
+        if self._condition == Privilege.Condition.ALLOW:
+            return Privileges.allow(self._name.name).can_bind_to(obj_type)
+        return Privileges.deny(self._name.name).can_bind_to(obj_type)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Privilege):

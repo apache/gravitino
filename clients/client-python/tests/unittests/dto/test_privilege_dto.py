@@ -20,6 +20,7 @@ import unittest
 
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.authorization.privileges import Privileges
+from gravitino.api.metadata_object import MetadataObject
 from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
 
 
@@ -35,7 +36,9 @@ class TestPrivilegeDTO(unittest.TestCase):
 
     def test_can_bind_to(self):
         dto = PrivilegeDTO(Privilege.Name.CREATE_FILESET, Privilege.Condition.ALLOW)
-        self.assertTrue(dto.can_bind_to(None))
+        self.assertTrue(dto.can_bind_to(MetadataObject.Type.METALAKE))
+        self.assertTrue(dto.can_bind_to(MetadataObject.Type.CATALOG))
+        self.assertFalse(dto.can_bind_to(MetadataObject.Type.TABLE))
 
     def test_equality_and_hash(self):
         dto1 = PrivilegeDTO(Privilege.Name.CREATE_FILESET, Privilege.Condition.ALLOW)
