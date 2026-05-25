@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -54,6 +55,8 @@ import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.TestCatalogOperations;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -65,6 +68,7 @@ import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.storage.IdGenerator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -817,6 +821,32 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     boolean dropped = tableOperationDispatcher.dropTable(tableIdent);
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(entityStore.exists(tableIdent, TABLE));
+  }
+
+  @Test
+  public void testPurgeUnmanagedTableWithMissingStoreEntityShouldUseCatalogResult()
+      throws Exception {
+    CatalogManager mockedCatalogManager = mock(CatalogManager.class);
+    EntityStore mockedStore = mock(EntityStore.class);
+    IdGenerator mockedIdGenerator = mock(IdGenerator.class);
+    CatalogManager.CatalogWrapper mockedCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
+    Capability mockedCapability = mock(Capability.class);
+    TableOperationDispatcher dispatcherUnderTest =
+        new TableOperationDispatcher(mockedCatalogManager, mockedStore, mockedIdGenerator);
+
+    NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, "schema72", "table32");
+    NameIdentifier catalogIdent = NameIdentifier.of(metalake, catalog);
+    doReturn(mockedCatalogWrapper).when(mockedCatalogManager).loadCatalogAndWrap(catalogIdent);
+    doReturn(mockedCapability).when(mockedCatalogWrapper).capabilities();
+    doReturn(CapabilityResult.unsupported("unmanaged table"))
+        .when(mockedCapability)
+        .managedStorage(Capability.Scope.TABLE);
+    doReturn(true).when(mockedCatalogWrapper).doWithTableOps(any());
+    doThrow(new NoSuchEntityException("missing store entity"))
+        .when(mockedStore)
+        .delete(tableIdent, TABLE);
+
+    Assertions.assertTrue(dispatcherUnderTest.purgeTable(tableIdent));
   }
 
   private static void testColumns(Column[] expectedColumns, Column[] actualColumns) {
