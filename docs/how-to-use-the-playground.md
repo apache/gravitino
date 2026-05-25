@@ -69,8 +69,6 @@ cd gravitino-playground
 
 ## Experience Apache Gravitino with Trino SQL
 
-### Trino CLI in Docker Container
-
 1. Login to the Gravitino playground Trino Docker container using the following command:
 
 ```shell
