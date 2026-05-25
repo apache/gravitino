@@ -326,7 +326,7 @@ the **metadata phase** fails.
 | All files deleted (or already gone) | `state='SUCCEEDED'`                                                |
 | Metadata load failed, transient    | `attempts++`, `next_attempt_at = now + backoff(attempts)`           |
 | Metadata load failed, terminal     | `attempts++`; if `attempts >= max_attempts` → `state='DEAD_LETTER'` |
-| Worker killed mid-job              | Lease expires; another worker picks it up; deletes are idempotent   |
+| Worker killed mid-job              | Lease expires; another worker picks it up; deletes are idempotent (restart story in §5.15) |
 | Recovered via re-register (§5.13)  | Job CAS'd to `state='CANCELLED'`; the worker only leases non-terminal rows, so files are left intact |
 
 `NotFoundException` from `deleteFile` counts as success. Backoff:
@@ -552,6 +552,39 @@ register-as-recovery flow (§5.13).
 retries is always discoverable rather than a silent file leak, even before
 the management endpoint lands.
 
+### 5.15 Restart and crash recovery
+
+Restart handling is not a separate mechanism — it falls out of the durable
+job table (§5.3) plus the lease model (§5.4). Three guarantees hold across
+a process restart or crash:
+
+1. **Nothing in-flight is lost.** The job is committed to
+   `iceberg_purge_job` *before* the `DELETE` returns (§5.2); there is no
+   in-memory queue, so a restart cannot drop pending work. `PENDING` jobs
+   are picked up on the first worker tick after boot.
+2. **`RUNNING` jobs orphaned by the crash are reclaimed.** A process that
+   died mid-purge leaves a row in `state='RUNNING'` with a stale
+   `lease_owner` / `lease_expires_at`. The worker poll already selects rows
+   whose lease has expired, so once it does the restarted node — or any peer
+   — reclaims the row via the CAS. This is the "worker killed mid-job" row
+   in §5.5.
+3. **Re-running a half-finished job is safe.** The worker rebuilds the file
+   set from `metadata_location` and re-deletes; already-gone files raise
+   `NotFoundException`, which counts as success (§5.5). A crash anywhere in
+   the delete loop costs only duplicated work, never corruption.
+
+In a **multi-replica** deployment this is seamless: surviving replicas
+reclaim a dead node's jobs on lease expiry with no coordinator.
+
+The one rough edge is a **single-replica** restart: the crashed node's own
+`RUNNING` jobs sit idle until `lease_expires_at` passes — up to one
+`leaseTimeout` of dead time — before the rebooted process reclaims them.
+**v1 behavior:** rely on lease expiry (correct, bounded, zero extra code);
+keep `leaseTimeout` modest so the resume delay is small. **Future
+optimization:** a startup lease sweep that resets `RUNNING` rows whose
+`lease_owner` matches this node's stable identity back to `PENDING`, so they
+resume immediately instead of waiting out the lease.
+
 ---
 
 ## 6. Task Breakdown
@@ -581,6 +614,7 @@ synchronous path remains only as a rollback flag.
 
 ### Phase 2 (post-1.3): Management endpoint
 - [ ] Add the read-only `metalakes/{metalake}/catalogs/{catalog}/cleanups` management endpoint (§5.14): REST resource, DTOs, authorization, client support, docs, and tests. Filtered list keyed by object identifier; no by-id fetch
+- [ ] Startup lease-sweep optimization (§5.15): on boot reset `RUNNING` rows owned by this node's stable identity back to `PENDING` so single-replica restarts resume without waiting out `leaseTimeout`
 
 ---
 
