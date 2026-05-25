@@ -37,8 +37,6 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http:/
 // ...
 ```
 
-### Java Client Configuration
-
 | Configuration item                     | Description                                          | Default value       | Required | Since version |
 |----------------------------------------|------------------------------------------------------|---------------------|----------|---------------|
 | `gravitino.client.connectionTimeoutMs` | An optional http connection timeout in milliseconds. | `180000`(3 minutes) | No       | 1.0.0         |
@@ -64,8 +62,6 @@ gravitino_client = GravitinoClient(
 )
 # ...
 ```
-
-### Python Client Configuration
 
 | Configuration item                 | Description                            | Default value | Required | Since version |
 |------------------------------------|----------------------------------------|---------------|----------|---------------|
