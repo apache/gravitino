@@ -502,7 +502,7 @@ public class SchemaMetaService {
             mapper ->
                 ops.listPOsByNamePrefix(mapper, schemaPO.getCatalogId(), schemaPO.getSchemaName()));
     if (matched == null || matched.isEmpty()) {
-      return Collections.singletonList(schemaPO.getSchemaId());
+      return Collections.emptyList();
     }
     return matched.stream().map(SchemaPO::getSchemaId).collect(Collectors.toList());
   }
