@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -271,7 +272,7 @@ public class TestIcebergNamespaceHookDispatcher {
     // The leaf and both phantom ancestors are stale, so a single cascade delete of the outermost
     // empty ancestor (A) removes the whole stale chain in one batched operation.
     ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
-    verify(mockEntityStore, org.mockito.Mockito.times(1))
+    verify(mockEntityStore, times(1))
         .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
     Assertions.assertEquals("A", captor.getValue().name());
   }
@@ -294,7 +295,7 @@ public class TestIcebergNamespaceHookDispatcher {
 
     // The parent still exists, so only the leaf is stale; it is cascade-deleted on its own.
     ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
-    verify(mockEntityStore, org.mockito.Mockito.times(1))
+    verify(mockEntityStore, times(1))
         .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
     Assertions.assertEquals("A:B:C", captor.getValue().name());
   }

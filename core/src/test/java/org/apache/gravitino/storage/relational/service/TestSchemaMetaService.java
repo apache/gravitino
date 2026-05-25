@@ -324,6 +324,53 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDeleteHierarchicalSchemaCascadeEscapesLikeMetacharacters() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+
+    // Deleted subtree under ancestor "pa_b". The '_' is a LIKE wildcard, so without escaping the
+    // cascade prefix "pa_b<sep>%" would also match the unrelated "paxb<sep>..." subtree below.
+    String targetLeaf = "pa_b:leaf";
+    schemaMetaService.insertSchema(
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            targetLeaf,
+            AUDIT_INFO),
+        false);
+
+    // Decoy subtree that the unescaped '_' wildcard would falsely match ('x' in place of '_').
+    String decoyLeaf = "paxb:leaf";
+    schemaMetaService.insertSchema(
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            decoyLeaf,
+            AUDIT_INFO),
+        false);
+
+    // Cascade-delete the literal "pa_b" ancestor.
+    schemaMetaService.deleteSchema(NameIdentifier.of(metalakeName, catalogName, "pa_b"), true);
+
+    Assertions.assertFalse(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, "pa_b"), Entity.EntityType.SCHEMA));
+    Assertions.assertFalse(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, targetLeaf), Entity.EntityType.SCHEMA));
+
+    // The decoy subtree must survive: literal-prefix matching only escapes the deleted subtree.
+    Assertions.assertTrue(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, "paxb"), Entity.EntityType.SCHEMA));
+    Assertions.assertTrue(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, decoyLeaf), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
   public void testInsertHierarchicalSecondLeafReusesAncestorsWithoutUpsert() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);

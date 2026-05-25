@@ -147,10 +147,12 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         () -> {
           dispatcher.dropNamespace(context, namespace);
 
-          // Only the leaf namespace is dropped from the Iceberg catalog above. Walk its
-          // ancestors outermost-to-leaf to find the outermost ancestor whose Iceberg namespace
-          // no longer exists, stopping at the first ancestor that still exists. Everything from
-          // that outermost empty namespace down to the leaf is now stale in Gravitino.
+          // Only the leaf namespace is dropped from the Iceberg catalog above. getAncestorNames
+          // returns ancestors outermost-to-innermost, so we walk it in reverse (innermost outward),
+          // advancing outermostStale past every ancestor whose Iceberg namespace no longer exists
+          // and stopping at the first ancestor that still exists. outermostStale therefore ends up
+          // as the outermost missing ancestor; everything from there down to the leaf is now stale
+          // in Gravitino.
           //
           // An inner Iceberg namespace cannot exist unless all of its outer ancestors do, so an
           // ancestor missing from the catalog implies none of its descendants exist there

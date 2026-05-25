@@ -98,7 +98,11 @@ public class SchemaMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE catalog_id = #{catalogId}"
-        + " AND (schema_name = #{schemaName} OR schema_name LIKE CONCAT(#{descendantPrefix}, '%'))"
+        // The descendantPrefix has its LIKE metacharacters escaped with '!' by the caller
+        // (SchemaPOStorageOps#escapeLikeMetacharacters), so '!' is declared as the ESCAPE
+        // character to keep the prefix match literal across MySQL, H2, and PostgreSQL.
+        + " AND (schema_name = #{schemaName}"
+        + " OR schema_name LIKE CONCAT(#{descendantPrefix}, '%') ESCAPE '!')"
         + " AND deleted_at = 0";
   }
 
