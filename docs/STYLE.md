@@ -19,7 +19,7 @@
 
 # Documentation Style Guide for Apache Gravitino
 
-Style and review guidance for human and AI contributors editing Gravitino documentation, log messages, exception messages, and configuration descriptions. When reviewing existing text, propose edits one at a time, tag each with a category, and make no changes without explicit approval.
+Style and review guidance for human and AI contributors editing Gravitino documentation. When reviewing existing text, propose edits one at a time, tag each with a category, and make no changes without explicit approval.
 
 ## Project names and capitalization
 
@@ -64,19 +64,6 @@ Always uppercase when used as identifiers in prose:
 - **MCP** (Model Context Protocol)
 
 Inside code samples and config keys, follow the literal source.
-
-## Log, exception, and error message style
-
-Apply these rules when reviewing or writing messages:
-
-- "Can not" / "can not" → "Cannot" / "cannot"
-- "Fail to X" → "Failed to X" (past-tense participle when describing a completed failure)
-- Drop trailing periods from log and exception message strings. Single-sentence messages do not need terminal punctuation.
-- Capitalize the first word of the message.
-- Use SLF4J `{}` parameters over string concatenation. When the last argument is an exception, SLF4J auto-formats it. Avoid patterns like `LOG.warn("error: {}", roleName, e)` where `e` is appended as a parameter.
-- Avoid "the" before bare proper nouns. "in Ranger" not "in the Ranger".
-- Avoid the "operate object [%s] operation [%s]" pattern. Prefer "perform [%s] on [%s]" or similar.
-- Be specific about what failed. "Failed to connect to Hive metastore at {}" beats "Connection error".
 
 ## Documentation prose style
 
