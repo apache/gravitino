@@ -185,8 +185,6 @@ FROM <catalog>.<namespace>.<table>;
 | Supported engines        | Trino, Spark, Flink, Daft   | Any Iceberg-compatible engine |
 | Credential vending       | Varies                      | Yes (S3, GCS, OSS, ADLS)      |
 
-## Known Issues
-
 ### Trino Identifiers Are Not Treated as Case Sensitive
 
 Trino identifiers are not treated as case sensitive. As a result, metadata names that differ
@@ -202,6 +200,6 @@ For the best compatibility with Trino:
 ## Related
 
 - [Iceberg REST catalog service](../iceberg-rest-service.md)
-- [Connect Spark via Iceberg REST](./spark.md)
-- [Connect Flink via Iceberg REST](./flink.md)
+- [Connect Spark to Iceberg REST](./spark.md)
+- [Connect Flink to Iceberg REST](./flink.md)
 - [Trino Gravitino connector](../trino-connector/trino-connector.md)
