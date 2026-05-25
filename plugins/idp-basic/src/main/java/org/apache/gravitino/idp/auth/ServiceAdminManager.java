@@ -19,8 +19,40 @@
 
 package org.apache.gravitino.idp.auth;
 
-/** The manager used by the service admin initializer. */
-public interface ServiceAdminManager {
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.idp.basic.password.PasswordHasher;
+import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
+import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
+import org.apache.gravitino.storage.IdGenerator;
+
+/** Manages service admin accounts in the built-in IdP user store. */
+public class ServiceAdminManager {
+
+  private static final long INITIAL_VERSION = 1L;
+
+  private final IdpUserMetaService userMetaService;
+  private final PasswordHasher passwordHasher;
+  private final IdGenerator idGenerator;
+
+  /**
+   * Create a service admin manager from the current environment.
+   *
+   * @return The service admin manager.
+   */
+  public static ServiceAdminManager fromEnvironment() {
+    return new ServiceAdminManager(
+        IdpUserMetaService.getInstance(),
+        PasswordHasherFactory.create(),
+        GravitinoEnv.getInstance().idGenerator());
+  }
+
+  ServiceAdminManager(
+      IdpUserMetaService userMetaService, PasswordHasher passwordHasher, IdGenerator idGenerator) {
+    this.userMetaService = userMetaService;
+    this.passwordHasher = passwordHasher;
+    this.idGenerator = idGenerator;
+  }
 
   /**
    * Check whether the service admin already exists.
@@ -28,7 +60,9 @@ public interface ServiceAdminManager {
    * @param userName The service admin name.
    * @return True if the service admin exists, otherwise false.
    */
-  boolean serviceAdminExists(String userName);
+  public boolean serviceAdminExists(String userName) {
+    return userMetaService.idpUserExists(userName);
+  }
 
   /**
    * Initialize the service admin with the specified password.
@@ -36,5 +70,20 @@ public interface ServiceAdminManager {
    * @param userName The service admin name.
    * @param password The plain text password.
    */
-  void initializeServiceAdmin(String userName, String password);
+  public void initializeServiceAdmin(String userName, String password) {
+    if (userMetaService.idpUserExists(userName)) {
+      return;
+    }
+
+    IdpUserPO userPO =
+        IdpUserPO.builder()
+            .withUserId(idGenerator.nextId())
+            .withUsername(userName)
+            .withPasswordHash(passwordHasher.hash(password))
+            .withCurrentVersion(INITIAL_VERSION)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    userMetaService.insertIdpUser(userPO);
+  }
 }

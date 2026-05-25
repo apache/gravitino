@@ -22,8 +22,8 @@ package org.apache.gravitino.idp.storage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.idp.auth.IdpServiceAdminManager;
 import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
+import org.apache.gravitino.idp.auth.ServiceAdminManager;
 import org.apache.gravitino.idp.storage.gc.IdpLegacyGarbageCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +53,7 @@ public final class IdpStorageBootstrap {
     Config config = GravitinoEnv.getInstance().config();
     try {
       ServiceAdminInitializer.getInstance()
-          .initialize(config, IdpServiceAdminManager.fromEnvironment());
+          .initialize(config, ServiceAdminManager.fromEnvironment());
       IdpLegacyGarbageCollector.startScheduledCollector(config);
     } catch (RuntimeException e) {
       INITIALIZED.set(false);
