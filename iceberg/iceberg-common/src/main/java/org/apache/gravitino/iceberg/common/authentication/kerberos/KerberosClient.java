@@ -84,7 +84,7 @@ public class KerberosClient implements Closeable {
           try {
             loginUser.checkTGTAndReloginFromKeytab();
           } catch (Exception e) {
-            LOG.error("Fail to refresh ugi token: ", e);
+            LOG.error("Failed to refresh UGI token: ", e);
           }
         },
         checkInterval,
@@ -115,7 +115,7 @@ public class KerberosClient implements Closeable {
     keytabFile.deleteOnExit();
     if (keytabFile.exists() && !keytabFile.delete()) {
       throw new IllegalStateException(
-          String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
+          String.format("Failed to delete keytab file %s", keytabFile.getAbsolutePath()));
     }
 
     // TODO: Make the configuration

@@ -148,7 +148,7 @@ public class KerberosClient implements java.io.Closeable {
             try {
               loginUgi.checkTGTAndReloginFromKeytab();
             } catch (Exception e) {
-              LOG.error("Fail to refresh ugi token: ", e);
+              LOG.error("Failed to refresh UGI token: ", e);
             }
           },
           checkInterval,

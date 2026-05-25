@@ -69,8 +69,7 @@ public class FileAuditWriter implements AuditLogWriter {
       OutputStream outputStream = new FileOutputStream(fileName, append);
       this.outWriter = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
     } catch (Exception e) {
-      throw new GravitinoRuntimeException(
-          e, "Init audit log writer fail, filename is %s", fileName);
+      throw new GravitinoRuntimeException(e, "Failed to initialize audit log writer: %s", fileName);
     }
   }
 
@@ -114,7 +113,7 @@ public class FileAuditWriter implements AuditLogWriter {
       try {
         outWriter.flush();
       } catch (Exception e) {
-        Log.warn("Flush audit log failed,", e);
+        Log.warn("Failed to flush audit log", e);
       }
     }
   }
