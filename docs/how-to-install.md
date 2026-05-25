@@ -4,7 +4,7 @@ slug: "/how-to-install"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Install from a Binary Release
+## Binary
 
 :::note
 Apache Gravitino supports running on Java 17, and higher versions should also work but not fully tested. Make sure you have Java installed and
@@ -130,7 +130,7 @@ Run the Iceberg REST server as either a standalone server or as an auxiliary ser
 
 For more detailed information about the Gravitino Iceberg REST server, refer to [Iceberg REST server document](./iceberg-rest-service.md).
 
-## Install Using Docker
+## Docker
 
 ### Get the Docker Image
 
@@ -150,7 +150,7 @@ curl -v -X GET -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: 
 
 to make sure Gravitino is running.
 
-## Install Using Docker Compose
+## Docker Compose
 
 The published Gravitino Docker image only contains the Gravitino server with a basic configuration. If you want to experience the whole Gravitino system with other components, use the Docker `compose` file.
 
@@ -160,7 +160,7 @@ For the details, review the
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=HowToInstall" alt="" />
 
-## Deploy on Kubernetes Using Helm Chart
+## Kubernetes
 
 The Apache Gravitino Helm chart provides a way to deploy Gravitino on Kubernetes with fully customizable configurations. 
 For detailed installation instructions and configuration options, refer to the [Apache Gravitino Helm Chart](./chart.md).
