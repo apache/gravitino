@@ -39,7 +39,6 @@ import org.apache.gravitino.idp.exception.AlreadyExistsException;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
-import org.apache.gravitino.idp.storage.relational.IdpEntityStore;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -50,7 +49,6 @@ import org.junit.jupiter.api.Test;
 public class TestIdpUserGroupManager {
 
   private static IdpUserGroupManager manager;
-  private static IdpEntityStore entityStore;
   private static Path h2Path;
 
   @BeforeAll
@@ -69,16 +67,14 @@ public class TestIdpUserGroupManager {
     config.set(STORE_DELETE_AFTER_TIME, 20 * 60 * 1000L);
     config.set(CACHE_ENABLED, false);
 
-    entityStore = new IdpEntityStore();
-    entityStore.initialize(config);
-    manager = new IdpUserGroupManager(entityStore, RandomIdGenerator.INSTANCE);
+    manager = new IdpUserGroupManager(config, RandomIdGenerator.INSTANCE);
   }
 
   @AfterAll
   public static void tearDown() throws IOException {
-    if (entityStore != null) {
-      entityStore.close();
-      entityStore = null;
+    if (manager != null) {
+      manager.close();
+      manager = null;
     }
 
     if (h2Path != null && Files.exists(h2Path)) {

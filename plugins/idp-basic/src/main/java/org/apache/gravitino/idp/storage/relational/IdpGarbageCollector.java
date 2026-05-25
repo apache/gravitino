@@ -18,31 +18,30 @@
  */
 package org.apache.gravitino.idp.storage.relational;
 
+import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
 import java.io.Closeable;
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.idp.meta.IdpEntityType;
+import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
+import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Garbage collector for built-in IdP entities. */
+/** Garbage collector for built-in IdP metadata. */
 public final class IdpGarbageCollector implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpGarbageCollector.class);
 
-  private static final List<IdpEntityType> IDP_ENTITY_TYPES =
-      ImmutableList.of(IdpEntityType.IDP_USER, IdpEntityType.IDP_GROUP);
+  private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
+  private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
 
-  private final IdpJDBCBackend backend;
   private final long storeDeleteAfterTimeMillis;
 
   @VisibleForTesting
@@ -50,20 +49,18 @@ public final class IdpGarbageCollector implements Closeable {
       new ScheduledThreadPoolExecutor(
           2,
           r -> {
-            Thread t = new Thread(r, "IdpJDBCBackend-Garbage-Collector");
+            Thread t = new Thread(r, "Idp-Garbage-Collector");
             t.setDaemon(true);
             return t;
           },
           new ThreadPoolExecutor.AbortPolicy());
 
   /**
-   * Creates a garbage collector for built-in IdP entities.
+   * Creates a garbage collector for built-in IdP metadata.
    *
-   * @param backend The relational backend.
    * @param config The server configuration.
    */
-  public IdpGarbageCollector(IdpJDBCBackend backend, Config config) {
-    this.backend = backend;
+  public IdpGarbageCollector(Config config) {
     storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
   }
 
@@ -81,16 +78,10 @@ public final class IdpGarbageCollector implements Closeable {
 
     try {
       long legacyTimeline = System.currentTimeMillis() - storeDeleteAfterTimeMillis;
-      for (IdpEntityType entityType : IDP_ENTITY_TYPES) {
-        long deletedCount = Long.MAX_VALUE;
-        try {
-          while (deletedCount > 0) {
-            deletedCount = backend.hardDeleteLegacyData(entityType, legacyTimeline);
-          }
-        } catch (RuntimeException e) {
-          LOG.error("Failed to physically delete {} legacy data: ", entityType, e);
-        }
-      }
+      purgeLegacyData(
+          () -> USER_SERVICE.deleteUserMetasByLegacyTimeline(legacyTimeline, deletionLimit()));
+      purgeLegacyData(
+          () -> GROUP_SERVICE.deleteGroupMetasByLegacyTimeline(legacyTimeline, deletionLimit()));
     } catch (Exception e) {
       LOG.error("Thread {} failed to collect and clean built-in IdP garbage.", threadId, e);
     } finally {
@@ -109,5 +100,25 @@ public final class IdpGarbageCollector implements Closeable {
       garbageCollectorPool.shutdownNow();
       Thread.currentThread().interrupt();
     }
+  }
+
+  private static int deletionLimit() {
+    return GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
+  }
+
+  private static void purgeLegacyData(LegacyDataDeleter deleter) {
+    long deletedCount = Long.MAX_VALUE;
+    try {
+      while (deletedCount > 0) {
+        deletedCount = deleter.delete();
+      }
+    } catch (RuntimeException e) {
+      LOG.error("Failed to physically delete built-in IdP legacy data", e);
+    }
+  }
+
+  @FunctionalInterface
+  private interface LegacyDataDeleter {
+    int delete();
   }
 }

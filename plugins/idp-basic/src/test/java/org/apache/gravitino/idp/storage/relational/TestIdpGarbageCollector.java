@@ -72,14 +72,11 @@ class TestIdpGarbageCollector extends AbstractIdpMetaStorageTest {
     getConfig().set(STORE_DELETE_AFTER_TIME, 600000L);
 
     closeSession();
-    IdpJDBCBackend idpBackend = new IdpJDBCBackend();
-    idpBackend.initialize(getConfig());
-    IdpGarbageCollector garbageCollector = new IdpGarbageCollector(idpBackend, getConfig());
+    IdpGarbageCollector garbageCollector = new IdpGarbageCollector(getConfig());
     try {
       garbageCollector.collectAndClean();
     } finally {
       garbageCollector.close();
-      idpBackend.close();
     }
     reinitializeBackend();
     reopenSession();

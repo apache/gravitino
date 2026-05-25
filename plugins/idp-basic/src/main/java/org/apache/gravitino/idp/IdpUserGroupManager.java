@@ -9,8 +9,8 @@
  *
  *  http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
  * KIND, either express or implied.  See the License for the
  * specific language governing permissions and limitations
@@ -18,53 +18,63 @@
  */
 package org.apache.gravitino.idp;
 
-import com.google.common.collect.Lists;
+import java.io.Closeable;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
 import org.apache.gravitino.idp.exception.AlreadyExistsException;
 import org.apache.gravitino.idp.exception.NotFoundException;
-import org.apache.gravitino.idp.meta.IdpEntityType;
-import org.apache.gravitino.idp.meta.IdpGroupEntity;
-import org.apache.gravitino.idp.meta.IdpUserEntity;
 import org.apache.gravitino.idp.model.IdpGroup;
+import org.apache.gravitino.idp.model.IdpGroupInfo;
 import org.apache.gravitino.idp.model.IdpUser;
-import org.apache.gravitino.idp.storage.relational.IdpStore;
+import org.apache.gravitino.idp.model.IdpUserInfo;
+import org.apache.gravitino.idp.storage.po.IdpGroupPO;
+import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.relational.IdpGarbageCollector;
+import org.apache.gravitino.idp.storage.relational.IdpRelationalStorage;
+import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
+import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Manager for built-in IdP users and groups. It mirrors {@link
- * org.apache.gravitino.authorization.UserGroupManager} but operates on global IdP entities.
+ * org.apache.gravitino.authorization.UserGroupManager} but operates on global IdP metadata.
  */
-public class IdpUserGroupManager {
+public class IdpUserGroupManager implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpUserGroupManager.class);
 
   private static final String IDP_USER_DOES_NOT_EXIST_MSG = "IdP user %s does not exist";
   private static final String IDP_GROUP_DOES_NOT_EXIST_MSG = "IdP group %s does not exist";
 
-  private final IdpStore store;
+  private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
+  private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
+
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
+  private final IdpGarbageCollector garbageCollector;
 
   /**
    * Creates a built-in IdP user and group manager.
    *
-   * @param store The entity store for built-in IdP entities.
+   * @param config The server configuration.
    * @param idGenerator The id generator.
    */
-  public IdpUserGroupManager(IdpStore store, IdGenerator idGenerator) {
-    this(store, idGenerator, PasswordHasherFactory.create());
+  public IdpUserGroupManager(Config config, IdGenerator idGenerator) {
+    this(config, idGenerator, PasswordHasherFactory.create());
   }
 
-  IdpUserGroupManager(IdpStore store, IdGenerator idGenerator, PasswordHasher passwordHasher) {
-    this.store = store;
+  IdpUserGroupManager(Config config, IdGenerator idGenerator, PasswordHasher passwordHasher) {
+    IdpRelationalStorage.initialize(config);
     this.idGenerator = idGenerator;
     this.passwordHasher = passwordHasher;
+    this.garbageCollector = new IdpGarbageCollector(config);
+    garbageCollector.start();
   }
 
   /**
@@ -75,23 +85,15 @@ public class IdpUserGroupManager {
    * @return The created built-in IdP user.
    */
   public IdpUser addUser(String username, String password) {
-    try {
-      IdpUserEntity userEntity =
-          IdpUserEntity.builder()
-              .withId(idGenerator.nextId())
-              .withName(username)
-              .withGroupNames(Lists.newArrayList())
-              .withPasswordHash(passwordHasher.hash(password))
-              .build();
-      store.put(userEntity, false);
-      return userEntity;
-    } catch (AlreadyExistsException e) {
-      LOG.warn("IdP user {} already exists", username, e);
-      throw e;
-    } catch (IOException ioe) {
-      LOG.error("Adding IdP user {} failed due to storage issues", username, ioe);
-      throw new RuntimeException(ioe);
+    if (userExists(username)) {
+      AlreadyExistsException exception =
+          new AlreadyExistsException("IdP user %s already exists", username);
+      LOG.warn("IdP user {} already exists", username, exception);
+      throw exception;
     }
+
+    USER_SERVICE.insertIdpUser(newUserPO(username, passwordHasher.hash(password)));
+    return getUser(username);
   }
 
   /**
@@ -101,12 +103,10 @@ public class IdpUserGroupManager {
    * @return True if the user was removed, false if it did not exist.
    */
   public boolean removeUser(String username) {
-    try {
-      return store.delete(username, IdpEntityType.IDP_USER);
-    } catch (IOException ioe) {
-      LOG.error("Removing IdP user {} failed due to storage issues", username, ioe);
-      throw new RuntimeException(ioe);
+    if (!userExists(username)) {
+      return false;
     }
+    return USER_SERVICE.deleteIdpUser(username);
   }
 
   /**
@@ -117,13 +117,11 @@ public class IdpUserGroupManager {
    */
   public IdpUser getUser(String username) {
     try {
-      return store.get(username, IdpEntityType.IDP_USER, IdpUserEntity.class);
+      IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
+      return new IdpUserInfo(userPO.getUsername(), USER_SERVICE.listGroupNamesByUsername(username));
     } catch (NotFoundException e) {
       LOG.warn("IdP user {} does not exist", username, e);
       throw new NotFoundException(IDP_USER_DOES_NOT_EXIST_MSG, username);
-    } catch (IOException ioe) {
-      LOG.error("Getting IdP user {} failed due to storage issues", username, ioe);
-      throw new RuntimeException(ioe);
     }
   }
 
@@ -135,7 +133,9 @@ public class IdpUserGroupManager {
    * @return The updated built-in IdP user.
    */
   public IdpUser changePassword(String username, String password) {
-    store.changePassword(username, passwordHasher.hash(password));
+    if (!USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password))) {
+      throw new NotFoundException(IDP_USER_DOES_NOT_EXIST_MSG, username);
+    }
     return getUser(username);
   }
 
@@ -146,22 +146,15 @@ public class IdpUserGroupManager {
    * @return The created built-in IdP group.
    */
   public IdpGroup addGroup(String groupName) {
-    try {
-      IdpGroupEntity groupEntity =
-          IdpGroupEntity.builder()
-              .withId(idGenerator.nextId())
-              .withName(groupName)
-              .withUsernames(Collections.emptyList())
-              .build();
-      store.put(groupEntity, false);
-      return groupEntity;
-    } catch (AlreadyExistsException e) {
-      LOG.warn("IdP group {} already exists", groupName, e);
-      throw e;
-    } catch (IOException ioe) {
-      LOG.error("Adding IdP group {} failed due to storage issues", groupName, ioe);
-      throw new RuntimeException(ioe);
+    if (groupExists(groupName)) {
+      AlreadyExistsException exception =
+          new AlreadyExistsException("IdP group %s already exists", groupName);
+      LOG.warn("IdP group {} already exists", groupName, exception);
+      throw exception;
     }
+
+    GROUP_SERVICE.insertIdpGroup(newGroupPO(groupName));
+    return getGroup(groupName);
   }
 
   /**
@@ -172,12 +165,10 @@ public class IdpUserGroupManager {
    * @return True if the group was removed, false if it did not exist.
    */
   public boolean removeGroup(String groupName, boolean force) {
-    try {
-      return store.delete(groupName, IdpEntityType.IDP_GROUP, force);
-    } catch (IOException ioe) {
-      LOG.error("Removing IdP group {} failed due to storage issues", groupName, ioe);
-      throw new RuntimeException(ioe);
+    if (!groupExists(groupName)) {
+      return false;
     }
+    return GROUP_SERVICE.deleteIdpGroup(groupName, force);
   }
 
   /**
@@ -188,13 +179,12 @@ public class IdpUserGroupManager {
    */
   public IdpGroup getGroup(String groupName) {
     try {
-      return store.get(groupName, IdpEntityType.IDP_GROUP, IdpGroupEntity.class);
+      IdpGroupPO groupPO = GROUP_SERVICE.getIdpGroupByName(groupName);
+      return new IdpGroupInfo(
+          groupPO.getGroupName(), GROUP_SERVICE.listUsernamesByGroupName(groupName));
     } catch (NotFoundException e) {
       LOG.warn("IdP group {} does not exist", groupName, e);
       throw new NotFoundException(IDP_GROUP_DOES_NOT_EXIST_MSG, groupName);
-    } catch (IOException ioe) {
-      LOG.error("Getting IdP group {} failed due to storage issues", groupName, ioe);
-      throw new RuntimeException(ioe);
     }
   }
 
@@ -206,7 +196,7 @@ public class IdpUserGroupManager {
    * @return The updated built-in IdP group.
    */
   public IdpGroup addUsersToGroup(String groupName, List<String> usernames) {
-    store.addUsersToGroup(groupName, usernames);
+    GROUP_SERVICE.addUsersToGroup(groupName, usernames);
     return getGroup(groupName);
   }
 
@@ -218,7 +208,52 @@ public class IdpUserGroupManager {
    * @return The updated built-in IdP group.
    */
   public IdpGroup removeUsersFromGroup(String groupName, List<String> usernames) {
-    store.removeUsersFromGroup(groupName, usernames);
+    GROUP_SERVICE.removeUsersFromGroup(groupName, usernames);
     return getGroup(groupName);
+  }
+
+  @Override
+  public void close() throws IOException {
+    garbageCollector.close();
+    IdpRelationalStorage.close();
+  }
+
+  private IdpUserPO newUserPO(String username, String passwordHash) {
+    return IdpUserPO.builder()
+        .withUserId(idGenerator.nextId())
+        .withUsername(username)
+        .withPasswordHash(passwordHash)
+        .withCurrentVersion(POConverters.INIT_VERSION)
+        .withLastVersion(POConverters.INIT_VERSION)
+        .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
+        .build();
+  }
+
+  private IdpGroupPO newGroupPO(String groupName) {
+    return IdpGroupPO.builder()
+        .withGroupId(idGenerator.nextId())
+        .withGroupName(groupName)
+        .withCurrentVersion(POConverters.INIT_VERSION)
+        .withLastVersion(POConverters.INIT_VERSION)
+        .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
+        .build();
+  }
+
+  private static boolean userExists(String username) {
+    try {
+      USER_SERVICE.getIdpUserByUsername(username);
+      return true;
+    } catch (NotFoundException e) {
+      return false;
+    }
+  }
+
+  private static boolean groupExists(String groupName) {
+    try {
+      GROUP_SERVICE.getIdpGroupByName(groupName);
+      return true;
+    } catch (NotFoundException e) {
+      return false;
+    }
   }
 }

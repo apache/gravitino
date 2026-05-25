@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.meta;
+package org.apache.gravitino.idp.model;
 
-/** Built-in IdP entity types managed by the idp-basic plugin. */
-public enum IdpEntityType {
-  IDP_USER,
-  IDP_GROUP
-}
+import java.util.List;
+
+/** Immutable built-in IdP group. */
+public record IdpGroupInfo(String name, List<String> usernames) implements IdpGroup {}
