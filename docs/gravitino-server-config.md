@@ -147,10 +147,10 @@ For H2 database, All tables needed by Gravitino are created automatically when t
 
 ### Storage Cache
 
-| Configuration Key                | Description                                | Default Value          | Required | Since Version |
+| Configuration item               | Description                                | Default Value          | Required | Since Version |
 |----------------------------------|--------------------------------------------|------------------------|----------|---------------|
-| `gravitino.cache.enabled`        | Whether to enable caching                  | `true`                 | Yes      | 1.0.0         |
-| `gravitino.cache.implementation` | Specifies the cache implementation         | `caffeine`             | Yes      | 1.0.0         |
+| `gravitino.cache.enabled`        | Whether to enable caching                  | `true`                 | No       | 1.0.0         |
+| `gravitino.cache.implementation` | Specifies the cache implementation         | `caffeine`             | No       | 1.0.0         |
 | `gravitino.cache.maxEntries`     | Maximum number of entries allowed in cache | `10000`                | No       | 1.0.0         |
 | `gravitino.cache.expireTimeInMs` | Cache expiration time (in milliseconds)    | `3600000` (about 1 hr) | No       | 1.0.0         |
 | `gravitino.cache.enableStats`    | Whether to enable cache statistics logging. When `true`, Gravitino logs hit count, miss count, and load failures every 5 minutes at INFO level. | `false`                | No       | 1.0.0         |
@@ -199,9 +199,9 @@ The Gravitino server uses a tree lock to ensure data consistency. The tree lock 
 | `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache; default 3600000ms(1h).                                                                                                                     | `3600000`     | No       | 0.1.0         |
 | `gravitino.catalog.classloader.isolated`     | Whether to use an isolated classloader for catalog. If `true`, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`. | `true`        | No       | 0.1.0         |
 
-### Auxiliary Services
+### Iceberg REST Server
 
-The auxiliary service framework lets Gravitino host additional servers in the same JVM. The most common use is the embedded [Iceberg REST server](iceberg-rest-service.md), configured via the properties below.
+Gravitino can host an [Iceberg REST server](iceberg-rest-service.md) in the same JVM as the metadata service. The properties below configure that embedded REST server. (Iceberg REST is hosted via Gravitino's auxiliary service framework; if other services use this framework in the future, the property prefix scheme `gravitino.auxService.*` may apply to them.)
 
 | Configuration item            | Description                                                                                                                    | Default value | Since Version |
 |-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
@@ -239,7 +239,7 @@ Gravitino provides event listener mechanism to allow users to capture the events
 
 To leverage the event listener, you must implement the `EventListenerPlugin` interface and place the JAR file in the classpath of the Gravitino server. Then, add configurations to gravitino.conf to enable the event listener.
 
-| Property name                          | Description                                                                                            | Default value | Required | Since Version |
+| Configuration item                     | Description                                                                                            | Default value | Required | Since Version |
 |----------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.eventListener.names`        | The name of the event listener, For multiple listeners, separate names with a comma, like "audit,sync" | (none)        | Yes      | 0.5.0         |
 | `gravitino.eventListener.{name}.class` | The class name of the event listener, replace `{name}` with the actual listener name.                  | (none)        | Yes      | 0.5.0         | 
@@ -320,7 +320,7 @@ The audit log framework defines how audit logs are formatted and written to vari
 
 Gravitino provides a default implement to log basic audit information to a file, you could extend the audit system by implementation corresponding interfaces.
 
-| Property name                         | Description                            | Default value                               | Required | Since Version              |
+| Configuration item                    | Description                            | Default value                               | Required | Since Version              |
 |---------------------------------------|----------------------------------------|---------------------------------------------|----------|----------------------------|
 | `gravitino.audit.enabled`             | The audit log enable flag.             | false                                       | NO       | 0.7.0-incubating           |
 | `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter  | NO       | 0.7.0-incubating           | 
@@ -336,7 +336,7 @@ The `AuditLogWriter` defines an interface that enables the writing of metadata a
 
 Writer configuration begins with `gravitino.audit.writer.${name}`, where `${name}` is replaced with the actual writer name defined in method `name()`. `FileAuditWriter` is a default implement to log audit information, whose name is `file`.
 
-| Property name                                   | Description                                                                   | Default value       | Required | Since Version    |
+| Configuration item                              | Description                                                                   | Default value       | Required | Since Version    |
 |-------------------------------------------------|-------------------------------------------------------------------------------|---------------------|----------|------------------|
 | `gravitino.audit.writer.file.fileName`          | The audit log file name, the path is `${sys:gravitino.log.path}/${fileName}`. | gravitino_audit.log | NO       | 0.7.0-incubating |
 | `gravitino.audit.writer.file.flushIntervalSecs` | The flush interval time of the audit file in seconds.                         | 10                  | NO       | 0.7.0-incubating |
@@ -348,7 +348,7 @@ Refer to [security](security/security.md) for HTTPS and authentication configura
 
 ### Metrics
 
-| Property name                             | Description                                          | Default value | Required | Since Version |
+| Configuration item                        | Description                                          | Default value | Required | Since Version |
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
 
@@ -404,19 +404,19 @@ If the file is missing or unreadable, catalog creation still succeeds. Gravitino
 
 The catalogs below read from these paths in a default Gravitino installation:
 
-| catalog provider    | configuration file path                                                  |
-|---------------------|--------------------------------------------------------------------------|
-| `hive`              | `<GRAVITINO_HOME>/catalogs/hive/conf/hive.conf`                           |
-| `lakehouse-iceberg` | `<GRAVITINO_HOME>/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
-| `lakehouse-paimon`  | `<GRAVITINO_HOME>/catalogs/lakehouse-paimon/conf/lakehouse-paimon.conf`   |
-| `lakehouse-hudi`    | `<GRAVITINO_HOME>/catalogs/lakehouse-hudi/conf/lakehouse-hudi.conf`       |
-| `jdbc-mysql`        | `<GRAVITINO_HOME>/catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
-| `jdbc-postgresql`   | `<GRAVITINO_HOME>/catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
-| `jdbc-doris`        | `<GRAVITINO_HOME>/catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
-| `jdbc-oceanbase`    | `<GRAVITINO_HOME>/catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
-| `kafka`             | `<GRAVITINO_HOME>/catalogs/kafka/conf/kafka.conf`                         |
-| `fileset`           | `<GRAVITINO_HOME>/catalogs/fileset/conf/fileset.conf`                     |
-| `model`             | `<GRAVITINO_HOME>/catalogs/model/conf/model.conf`                         |
+| catalog provider    | catalog reference                                                                       | configuration file path                                                  |
+|---------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| `hive`              | [Hive catalog](apache-hive-catalog.md)                                                  | `<GRAVITINO_HOME>/catalogs/hive/conf/hive.conf`                           |
+| `lakehouse-iceberg` | [Lakehouse Iceberg catalog](lakehouse-iceberg-catalog.md)                               | `<GRAVITINO_HOME>/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` |
+| `lakehouse-paimon`  | [Lakehouse Paimon catalog](lakehouse-paimon-catalog.md)                                 | `<GRAVITINO_HOME>/catalogs/lakehouse-paimon/conf/lakehouse-paimon.conf`   |
+| `lakehouse-hudi`    | [Lakehouse Hudi catalog](lakehouse-hudi-catalog.md)                                     | `<GRAVITINO_HOME>/catalogs/lakehouse-hudi/conf/lakehouse-hudi.conf`       |
+| `jdbc-mysql`        | [MySQL catalog](jdbc-mysql-catalog.md)                                                  | `<GRAVITINO_HOME>/catalogs/jdbc-mysql/conf/jdbc-mysql.conf`               |
+| `jdbc-postgresql`   | [PostgreSQL catalog](jdbc-postgresql-catalog.md)                                        | `<GRAVITINO_HOME>/catalogs/jdbc-postgresql/conf/jdbc-postgresql.conf`     |
+| `jdbc-doris`        | [Doris catalog](jdbc-doris-catalog.md)                                                  | `<GRAVITINO_HOME>/catalogs/jdbc-doris/conf/jdbc-doris.conf`               |
+| `jdbc-oceanbase`    | [OceanBase catalog](jdbc-oceanbase-catalog.md)                                          | `<GRAVITINO_HOME>/catalogs/jdbc-oceanbase/conf/jdbc-oceanbase.conf`       |
+| `kafka`             | [Kafka catalog](kafka-catalog.md)                                                       | `<GRAVITINO_HOME>/catalogs/kafka/conf/kafka.conf`                         |
+| `fileset`           | [Fileset catalog](fileset-catalog.md)                                                   | `<GRAVITINO_HOME>/catalogs/fileset/conf/fileset.conf`                     |
+| `model`             | [Model catalog](model-catalog.md)                                                       | `<GRAVITINO_HOME>/catalogs/model/conf/model.conf`                         |
 
 For catalogs whose implementation lives outside Gravitino's built-in directory, set the `package` property on the catalog. The configuration file location becomes `<package>/conf/<provider>.conf`.
 
