@@ -406,12 +406,13 @@ class HiveViewCatalogOperations implements ViewCatalog {
 
     SQLRepresentation selected = (SQLRepresentation) firstRepresentation;
     boolean isHiveDialect = Dialects.HIVE.equalsIgnoreCase(selected.dialect());
-    if (isHiveDialect) {
+    boolean isFlinkDialect = Dialects.FLINK.equalsIgnoreCase(selected.dialect());
+    if (isHiveDialect || isFlinkDialect) {
       Preconditions.checkArgument(
           defaultCatalog == null && defaultSchema == null,
-          "Hive dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
+          "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
               + "defaultCatalog=%s, defaultSchema=%s for view %s",
-          Dialects.HIVE,
+          selected.dialect(),
           defaultCatalog,
           defaultSchema,
           ident);
@@ -421,18 +422,19 @@ class HiveViewCatalogOperations implements ViewCatalog {
     // views.
     throw new UnsupportedOperationException(
         String.format(
-            "Hive catalog currently supports only '%s' view dialect, but got '%s' for view %s",
-            Dialects.HIVE, selected.dialect(), ident));
+            "Hive catalog currently supports only '%s' and '%s' view dialects, but got '%s' for view %s",
+            Dialects.HIVE, Dialects.FLINK, selected.dialect(), ident));
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
-    if (!Dialects.HIVE.equalsIgnoreCase(representation.dialect())) {
+    if (!Dialects.HIVE.equalsIgnoreCase(representation.dialect())
+        && !Dialects.FLINK.equalsIgnoreCase(representation.dialect())) {
       // TODO(design-docs/gravitino-logical-view-management.md): support serializing trino/spark HMS
       // view definitions.
       throw new UnsupportedOperationException(
           String.format(
-              "Hive catalog currently supports only '%s' view dialect, but got '%s' for view %s",
-              Dialects.HIVE, representation.dialect(), ident));
+              "Hive catalog currently supports only '%s' and '%s' view dialects, but got '%s' for view %s",
+              Dialects.HIVE, Dialects.FLINK, representation.dialect(), ident));
     }
     return representation.sql();
   }
