@@ -73,13 +73,17 @@ public class IdpEntityStore implements IdpStore {
   }
 
   @Override
-  public boolean delete(String name, IdpEntityType entityType) throws IOException {
-    return backend.delete(name, entityType, false);
+  public boolean delete(String name, IdpEntityType entityType, boolean cascade) throws IOException {
+    return backend.delete(name, entityType, cascade);
   }
 
   @Override
   public void close() throws IOException {
-    garbageCollector.close();
-    backend.close();
+    if (garbageCollector != null) {
+      garbageCollector.close();
+    }
+    if (backend != null) {
+      backend.close();
+    }
   }
 }

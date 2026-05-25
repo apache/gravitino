@@ -88,7 +88,10 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
     insertGroupUserGroupRelations();
     IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
 
-    runServiceCall(() -> assertTrue(groupMetaService.deleteIdpGroup("group1")));
+    assertThrows(
+        IllegalStateException.class, () -> groupMetaService.deleteIdpGroup("group1", false));
+
+    runServiceCall(() -> assertTrue(groupMetaService.deleteIdpGroup("group1", true)));
     assertNull(idpGroupMetaMapper.selectIdpGroup("group1"));
     assertEquals(4, countGroups());
     assertEquals(8, countUserGroupRels());

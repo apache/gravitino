@@ -70,7 +70,12 @@ public class IdpGroupMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteIdpGroup")
-  public boolean deleteIdpGroup(String groupName) {
+  public boolean deleteIdpGroup(String groupName, boolean cascade) {
+    if (!cascade && !listUsernamesByGroupName(groupName).isEmpty()) {
+      throw new IllegalStateException(
+          String.format("IdP group %s is not empty, use cascade=true to delete it", groupName));
+    }
+
     SessionUtils.doMultipleWithCommit(
         () ->
             SessionUtils.doWithoutCommit(

@@ -109,7 +109,7 @@ public class IdpJDBCBackend implements Closeable {
       case IDP_USER:
         return IdpUserMetaService.getInstance().deleteIdpUser(name);
       case IDP_GROUP:
-        return IdpGroupMetaService.getInstance().deleteIdpGroup(name);
+        return IdpGroupMetaService.getInstance().deleteIdpGroup(name, cascade);
       default:
         throw new IllegalArgumentException(
             String.format("Unsupported entity type: %s for delete operation", entityType));

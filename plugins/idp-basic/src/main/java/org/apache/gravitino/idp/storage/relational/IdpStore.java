@@ -107,5 +107,18 @@ public interface IdpStore extends Closeable {
    * @return True if the entity existed and was deleted, false otherwise.
    * @throws IOException If the delete operation fails.
    */
-  boolean delete(String name, IdpEntityType entityType) throws IOException;
+  default boolean delete(String name, IdpEntityType entityType) throws IOException {
+    return delete(name, entityType, false);
+  }
+
+  /**
+   * Deletes the entity.
+   *
+   * @param name The name of the entity.
+   * @param entityType The built-in IdP entity type.
+   * @param cascade Whether to cascade delete related entities.
+   * @return True if the entity existed and was deleted, false otherwise.
+   * @throws IOException If the delete operation fails.
+   */
+  boolean delete(String name, IdpEntityType entityType, boolean cascade) throws IOException;
 }

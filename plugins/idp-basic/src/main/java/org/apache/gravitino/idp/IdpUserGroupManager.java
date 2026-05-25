@@ -173,14 +173,7 @@ public class IdpUserGroupManager {
    */
   public boolean removeGroup(String groupName, boolean force) {
     try {
-      if (!store.exists(groupName, IdpEntityType.IDP_GROUP)) {
-        return false;
-      }
-      if (!force && !getGroup(groupName).usernames().isEmpty()) {
-        throw new IllegalStateException(
-            String.format("IdP group %s is not empty, use force=true to delete it", groupName));
-      }
-      return store.delete(groupName, IdpEntityType.IDP_GROUP);
+      return store.delete(groupName, IdpEntityType.IDP_GROUP, force);
     } catch (IOException ioe) {
       LOG.error("Removing IdP group {} failed due to storage issues", groupName, ioe);
       throw new RuntimeException(ioe);
