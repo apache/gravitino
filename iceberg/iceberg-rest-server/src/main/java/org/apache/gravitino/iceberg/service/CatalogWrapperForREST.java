@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.iceberg.service;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -57,7 +60,6 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
-import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.MetadataUpdate;
@@ -93,6 +95,7 @@ import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.rest.responses.PlanTableScanResponseParser;
 
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
@@ -455,24 +458,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       }
 
       List<String> planTasks = new ArrayList<>();
-      Map<Integer, PartitionSpec> specsById = new HashMap<>();
-      List<DeleteFile> deleteFiles = new ArrayList<>();
 
       try (CloseableIterable<FileScanTask> fileScanTasks =
           createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
         for (FileScanTask fileScanTask : fileScanTasks) {
           try {
-            String taskString = ScanTaskParser.toJson(fileScanTask);
-            planTasks.add(taskString);
-
-            int specId = fileScanTask.spec().specId();
-            if (!specsById.containsKey(specId)) {
-              specsById.put(specId, fileScanTask.spec());
-            }
-
-            if (!fileScanTask.deletes().isEmpty()) {
-              deleteFiles.addAll(fileScanTask.deletes());
-            }
+            planTasks.add(ScanTaskParser.toJson(fileScanTask));
           } catch (Exception e) {
             throw new RuntimeException(
                 String.format(
@@ -486,24 +477,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
       }
 
-      List<DeleteFile> uniqueDeleteFiles =
-          deleteFiles.stream().distinct().collect(Collectors.toList());
-
       if (planTasks.isEmpty()) {
         LOG.info(
             "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
             tableIdentifier);
       }
 
-      if (!uniqueDeleteFiles.isEmpty()) {
-        LOG.debug(
-            "Included {} delete files in scan plan for table: {}",
-            uniqueDeleteFiles.size(),
-            tableIdentifier);
-      }
-
       PlanTableScanResponse response =
-          buildCompletedPlanTableScanResponse(planTasks, specsById, uniqueDeleteFiles);
+          buildCompletedPlanTableScanResponse(planTasks, table.specs());
 
       // Cache the scan plan response
       scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
@@ -524,16 +505,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
-      List<String> planTasks, Map<Integer, PartitionSpec> specsById, List<DeleteFile> deleteFiles) {
-    PlanTableScanResponse.Builder responseBuilder =
-        PlanTableScanResponse.builder()
-            .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(planTasks)
-            .withSpecsById(specsById);
-    if (!deleteFiles.isEmpty()) {
-      responseBuilder.withDeleteFiles(deleteFiles);
+      List<String> planTasks, Map<Integer, PartitionSpec> specsById) {
+    ObjectNode responseJson = JsonNodeFactory.instance.objectNode();
+    responseJson.put("status", PlanStatus.COMPLETED.status());
+    ArrayNode planTasksNode = responseJson.putArray("plan-tasks");
+    for (String planTask : planTasks) {
+      planTasksNode.add(planTask);
     }
-    return responseBuilder.build();
+    return PlanTableScanResponseParser.fromJson(responseJson, specsById, false);
   }
 
   /**
