@@ -122,7 +122,7 @@ public class RangerFilesetIT extends BaseIT {
           .filter(schema -> !schema.equals("default"))
           .forEach(
               (schema -> {
-                catalog.asSchemas().dropSchema(schema, true);
+                catalog.asSchemas().dropSchema(schema, false);
               }));
       Arrays.stream(metalake.listCatalogs())
           .forEach((catalogName -> metalake.dropCatalog(catalogName, true)));
@@ -489,11 +489,10 @@ public class RangerFilesetIT extends BaseIT {
                   return null;
                 });
 
-    String renamedFilesetName = "new_name";
     catalog
         .asFilesetCatalog()
         .alterFileset(
-            NameIdentifier.of(schemaName, filenameRole), FilesetChange.rename(renamedFilesetName));
+            NameIdentifier.of(schemaName, filenameRole), FilesetChange.rename("new_name"));
     UserGroupInformation.createProxyUser(userName, UserGroupInformation.getCurrentUser())
         .doAs(
             (PrivilegedExceptionAction<Void>)
@@ -507,21 +506,19 @@ public class RangerFilesetIT extends BaseIT {
                           });
                   Assertions.assertDoesNotThrow(
                       () ->
-                          userFileSystem.listFiles(
-                              new Path(storageLocation(renamedFilesetName)), false));
+                          userFileSystem.listFiles(new Path(storageLocation(filenameRole)), false));
                   Assertions.assertDoesNotThrow(
                       () ->
                           userFileSystem.mkdirs(
                               new Path(
-                                  String.format(
-                                      "%s/%s", storageLocation(renamedFilesetName), "test3"))));
+                                  String.format("%s/%s", storageLocation(filenameRole), "test3"))));
                   userFileSystem.close();
                   return null;
                 });
     MetadataObject renamedFilesetObject =
         MetadataObjects.of(
             String.format("%s.%s", catalogName, schemaName),
-            renamedFilesetName,
+            "new_name",
             MetadataObject.Type.FILESET);
 
     metalake.revokePrivilegesFromRole(
@@ -543,20 +540,18 @@ public class RangerFilesetIT extends BaseIT {
                   Assertions.assertThrows(
                       Exception.class,
                       () ->
-                          userFileSystem.listFiles(
-                              new Path(storageLocation(renamedFilesetName)), false));
+                          userFileSystem.listFiles(new Path(storageLocation(filenameRole)), false));
                   Assertions.assertThrows(
                       Exception.class,
                       () ->
                           userFileSystem.mkdirs(
                               new Path(
-                                  String.format(
-                                      "%s/%s", storageLocation(renamedFilesetName), "test4"))));
+                                  String.format("%s/%s", storageLocation(filenameRole), "test4"))));
                   userFileSystem.close();
                   return null;
                 });
 
-    catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, renamedFilesetName));
+    catalog.asFilesetCatalog().dropFileset(NameIdentifier.of(schemaName, "new_name"));
   }
 
   private void createCatalogAndSchema() {
