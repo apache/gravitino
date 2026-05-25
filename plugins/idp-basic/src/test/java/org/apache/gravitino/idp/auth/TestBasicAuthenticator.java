@@ -19,6 +19,10 @@
 
 package org.apache.gravitino.idp.auth;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -33,7 +37,6 @@ import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestBasicAuthenticator {
@@ -41,34 +44,42 @@ class TestBasicAuthenticator {
   @Test
   void testNotInitialized() {
     IllegalStateException exception =
-        Assertions.assertThrows(
+        assertThrows(
             IllegalStateException.class, () -> new BasicAuthenticator().authenticateToken(null));
 
-    Assertions.assertEquals("Basic authenticator has not been initialized", exception.getMessage());
+    assertEquals("Basic authenticator has not been initialized", exception.getMessage());
+  }
+
+  @Test
+  void testSupportsBasic() {
+    BasicAuthenticator authenticator = authenticator();
+
+    assertTrue(authenticator.supportsToken(basicAuthBytes(basicAuthHeader("alice", "secret"))));
+    assertFalse(authenticator.supportsToken("Bearer token".getBytes(StandardCharsets.UTF_8)));
+    assertFalse(authenticator.supportsToken(null));
   }
 
   @Test
   void testEmptyHeader() {
     BasicAuthenticator authenticator = authenticator();
     UnauthorizedException exception =
-        Assertions.assertThrows(
-            UnauthorizedException.class, () -> authenticator.authenticateToken(null));
+        assertThrows(UnauthorizedException.class, () -> authenticator.authenticateToken(null));
 
-    Assertions.assertEquals("Empty token authorization header", exception.getMessage());
-    Assertions.assertEquals("Basic", exception.getChallenges().get(0));
+    assertEquals("Empty token authorization header", exception.getMessage());
+    assertEquals("Basic", exception.getChallenges().get(0));
   }
 
   @Test
   void testMissingCredentials() {
     BasicAuthenticator authenticator = authenticator();
     BadRequestException exception =
-        Assertions.assertThrows(
+        assertThrows(
             BadRequestException.class,
             () ->
                 authenticator.authenticateToken(
                     AuthConstants.AUTHORIZATION_BASIC_HEADER.getBytes(StandardCharsets.UTF_8)));
 
-    Assertions.assertEquals(
+    assertEquals(
         "Malformed Basic authorization header: missing credentials", exception.getMessage());
   }
 
@@ -88,11 +99,11 @@ class TestBasicAuthenticator {
     UserPrincipal principal =
         (UserPrincipal) authenticator.authenticateToken(basicAuthBytes(authHeader));
 
-    Assertions.assertEquals("alice", principal.getName());
-    Assertions.assertEquals(authHeader, principal.getAccessToken().orElse(null));
-    Assertions.assertEquals(2, principal.getGroups().size());
-    Assertions.assertEquals("group-a", principal.getGroups().get(0).getGroupname());
-    Assertions.assertEquals("group-b", principal.getGroups().get(1).getGroupname());
+    assertEquals("alice", principal.getName());
+    assertEquals(authHeader, principal.getAccessToken().orElse(null));
+    assertEquals(2, principal.getGroups().size());
+    assertEquals("group-a", principal.getGroups().get(0).getGroupname());
+    assertEquals("group-b", principal.getGroups().get(1).getGroupname());
   }
 
   @Test
@@ -104,14 +115,13 @@ class TestBasicAuthenticator {
     BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
 
     UnauthorizedException exception =
-        Assertions.assertThrows(
+        assertThrows(
             UnauthorizedException.class,
             () ->
                 authenticator.authenticateToken(
                     basicAuthBytes(basicAuthHeader("alice", "Passw0rd-For-Alice"))));
 
-    Assertions.assertEquals("Invalid username or password", exception.getMessage());
-    Assertions.assertEquals("Basic", exception.getChallenges().get(0));
+    assertUnauthorized(exception);
   }
 
   @Test
@@ -119,12 +129,11 @@ class TestBasicAuthenticator {
     BasicAuthenticator authenticator = authenticator();
 
     BadRequestException exception =
-        Assertions.assertThrows(
+        assertThrows(
             BadRequestException.class,
             () -> authenticator.authenticateToken(basicAuthBytesWithCredential("not-valid!!!")));
 
-    Assertions.assertEquals(
-        "Malformed Basic authorization header: invalid base64", exception.getMessage());
+    assertEquals("Malformed Basic authorization header: invalid base64", exception.getMessage());
   }
 
   @Test
@@ -134,11 +143,11 @@ class TestBasicAuthenticator {
         Base64.getEncoder().encodeToString("aliceonly".getBytes(StandardCharsets.UTF_8));
 
     BadRequestException exception =
-        Assertions.assertThrows(
+        assertThrows(
             BadRequestException.class,
             () -> authenticator.authenticateToken(basicAuthBytesWithCredential(credential)));
 
-    Assertions.assertEquals(
+    assertEquals(
         "Malformed Basic authorization header: credentials must be in username:password format",
         exception.getMessage());
   }
@@ -150,11 +159,11 @@ class TestBasicAuthenticator {
         Base64.getEncoder().encodeToString(":password".getBytes(StandardCharsets.UTF_8));
 
     BadRequestException exception =
-        Assertions.assertThrows(
+        assertThrows(
             BadRequestException.class,
             () -> authenticator.authenticateToken(basicAuthBytesWithCredential(credential)));
 
-    Assertions.assertEquals(
+    assertEquals(
         "Malformed Basic authorization header: username must not be empty", exception.getMessage());
   }
 
@@ -177,7 +186,7 @@ class TestBasicAuthenticator {
     UserPrincipal principal =
         (UserPrincipal) authenticator.authenticateToken(basicAuthBytesWithCredential(credential));
 
-    Assertions.assertEquals("alice", principal.getName());
+    assertEquals("alice", principal.getName());
   }
 
   @Test
@@ -190,12 +199,11 @@ class TestBasicAuthenticator {
     BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
 
     UnauthorizedException exception =
-        Assertions.assertThrows(
+        assertThrows(
             UnauthorizedException.class,
             () -> authenticator.authenticateToken(basicAuthBytes(basicAuthHeader("alice", " "))));
 
-    Assertions.assertEquals("Invalid username or password", exception.getMessage());
-    Assertions.assertEquals("Basic", exception.getChallenges().get(0));
+    assertUnauthorized(exception);
   }
 
   @Test
@@ -209,14 +217,18 @@ class TestBasicAuthenticator {
     BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
 
     UnauthorizedException exception =
-        Assertions.assertThrows(
+        assertThrows(
             UnauthorizedException.class,
             () ->
                 authenticator.authenticateToken(
                     basicAuthBytes(basicAuthHeader("alice", "Passw0rd-For-Alice"))));
 
-    Assertions.assertEquals("Invalid username or password", exception.getMessage());
-    Assertions.assertEquals("Basic", exception.getChallenges().get(0));
+    assertUnauthorized(exception);
+  }
+
+  private static void assertUnauthorized(UnauthorizedException exception) {
+    assertEquals("Invalid username or password", exception.getMessage());
+    assertEquals("Basic", exception.getChallenges().get(0));
   }
 
   private static String basicAuthHeader(String username, String password) {
