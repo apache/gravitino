@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory;
@@ -71,13 +72,37 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   @Override
   public void open() throws CatalogException {
     if (jdbcCatalog == null) {
+      Map<String, String> options = new HashMap<>(context.getOptions());
       try {
-        applyJdbcCredential(catalog(), context.getOptions());
+        applyJdbcCredential(catalog(), options);
       } catch (NoSuchCatalogException ignored) {
         // During CREATE CATALOG, open() is called before the catalog is stored in Gravitino.
         // In this case credentials are already present in the user-provided options.
       }
-      this.jdbcCatalog = (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context);
+      CatalogFactory.Context contextWithCredentials =
+          new CatalogFactory.Context() {
+            @Override
+            public String getName() {
+              return context.getName();
+            }
+
+            @Override
+            public Map<String, String> getOptions() {
+              return options;
+            }
+
+            @Override
+            public org.apache.flink.configuration.ReadableConfig getConfiguration() {
+              return context.getConfiguration();
+            }
+
+            @Override
+            public ClassLoader getClassLoader() {
+              return context.getClassLoader();
+            }
+          };
+      this.jdbcCatalog =
+          (AbstractCatalog) new JdbcCatalogFactory().createCatalog(contextWithCredentials);
     }
     super.open();
   }
