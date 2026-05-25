@@ -943,15 +943,16 @@ public abstract class BaseCatalog extends AbstractCatalog {
             .map(SQLRepresentation::sql)
             .orElseGet(
                 () -> {
-                  Representation[] reps = view.representations();
-                  if (reps.length > 0 && reps[0] instanceof SQLRepresentation) {
-                    SQLRepresentation fallback = (SQLRepresentation) reps[0];
-                    LOG.warn(
-                        "View {} has no SQL representation for dialect {}; falling back to dialect {}",
-                        view.name(),
-                        dialect,
-                        fallback.dialect());
-                    return fallback.sql();
+                  for (Representation rep : view.representations()) {
+                    if (rep instanceof SQLRepresentation) {
+                      SQLRepresentation fallback = (SQLRepresentation) rep;
+                      LOG.warn(
+                          "View {} has no SQL representation for dialect {}; falling back to dialect {}",
+                          view.name(),
+                          dialect,
+                          fallback.dialect());
+                      return fallback.sql();
+                    }
                   }
                   throw new CatalogException(
                       String.format(

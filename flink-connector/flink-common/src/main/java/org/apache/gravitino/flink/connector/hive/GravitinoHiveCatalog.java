@@ -48,7 +48,6 @@ import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
 import org.apache.gravitino.rel.Column;
-import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -100,12 +99,6 @@ public class GravitinoHiveCatalog extends BaseCatalog {
   @Override
   protected AbstractCatalog realCatalog() {
     return hiveCatalog;
-  }
-
-  /** {@inheritDoc} Returns {@link Dialects#HIVE} for Hive catalog views. */
-  @Override
-  protected String preferredDialect() {
-    return Dialects.HIVE;
   }
 
   @Override

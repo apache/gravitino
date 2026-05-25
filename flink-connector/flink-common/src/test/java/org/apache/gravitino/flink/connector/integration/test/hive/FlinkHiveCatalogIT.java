@@ -780,8 +780,7 @@ public abstract class FlinkHiveCatalogIT extends FlinkCommonIT {
           Assertions.assertTrue(flinkCatalog.isPresent());
           try {
             CatalogBaseTable flinkTable =
-                ((GravitinoHiveCatalog) flinkCatalog.get())
-                    .getTable(new ObjectPath(schemaName, viewName));
+                flinkCatalog.get().getTable(new ObjectPath(schemaName, viewName));
             Assertions.assertEquals(CatalogBaseTable.TableKind.VIEW, flinkTable.getTableKind());
           } catch (TableNotExistException e) {
             Assertions.fail("view should exist in Flink catalog: " + e.getMessage());
