@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
 from gravitino.api.authorization.user import User
 from gravitino.api.catalog import Catalog
@@ -438,3 +439,71 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().list_user_names()
+
+    # Group operations
+
+    def add_group(self, group: str) -> Group:
+        """Add a group to the metalake.
+
+        Args:
+            group: The name of the group.
+
+        Returns:
+            The added Group object.
+
+        Raises:
+            GroupAlreadyExistsException: If a group with the same name already exists.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().add_group(group)
+
+    def remove_group(self, group: str) -> bool:
+        """Remove a group from the metalake.
+
+        Args:
+            group: The name of the group.
+
+        Returns:
+            True if the group was removed, False if the group did not exist.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().remove_group(group)
+
+    def get_group(self, group: str) -> Group:
+        """Get a group by name from the metalake.
+
+        Args:
+            group: The name of the group.
+
+        Returns:
+            The Group object.
+
+        Raises:
+            NoSuchGroupException: If the group does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().get_group(group)
+
+    def list_groups(self) -> list[Group]:
+        """List all groups with details under the metalake.
+
+        Returns:
+            A list of Group objects.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_groups()
+
+    def list_group_names(self) -> list[str]:
+        """List all group names under the metalake.
+
+        Returns:
+            A list of group name strings.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_group_names()

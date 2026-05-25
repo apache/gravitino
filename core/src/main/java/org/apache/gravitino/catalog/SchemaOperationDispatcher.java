@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -43,6 +44,8 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -339,8 +342,46 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
+
+          cleanupOrphanedAncestors(catalogIdent, ident);
           return droppedFromCatalog;
         });
+  }
+
+  /**
+   * Reconciles auto-created ancestor entities after a hierarchical schema leaf is dropped. This
+   * mirrors {@code IcebergNamespaceHookDispatcher.dropNamespace}: walk the ancestors
+   * innermost-to-outermost and delete the orphaned Gravitino entity for each ancestor that no
+   * longer exists in the catalog, stopping at the first ancestor that still exists (its existence
+   * implies all of its outer ancestors exist). For a flat schema name this is a no-op.
+   *
+   * @param catalogIdent the identifier of the catalog the schema belongs to
+   * @param ident the identifier of the dropped (leaf) schema
+   */
+  private void cleanupOrphanedAncestors(NameIdentifier catalogIdent, NameIdentifier ident) {
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(ident.name(), separator);
+    String metalake = ident.namespace().level(0);
+    String catalog = ident.namespace().level(1);
+    for (int i = ancestorNames.size() - 1; i >= 0; i--) {
+      NameIdentifier ancestorIdent =
+          NameIdentifierUtil.ofSchema(metalake, catalog, ancestorNames.get(i));
+      boolean ancestorExistsInCatalog =
+          doWithCatalog(
+              catalogIdent,
+              c -> c.doWithSchemaOps(s -> s.schemaExists(ancestorIdent)),
+              RuntimeException.class);
+      if (ancestorExistsInCatalog) {
+        break;
+      }
+      try {
+        store.delete(ancestorIdent, SCHEMA, true);
+      } catch (NoSuchEntityException e) {
+        LOG.warn("The orphaned ancestor schema does not exist in the store: {}", ancestorIdent, e);
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   private void importSchema(NameIdentifier identifier) {

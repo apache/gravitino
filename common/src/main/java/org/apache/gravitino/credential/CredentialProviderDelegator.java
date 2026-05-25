@@ -21,6 +21,7 @@ package org.apache.gravitino.credential;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /**
  * An abstract base class for {@link CredentialProvider} implementations that delegate the actual
@@ -54,9 +55,10 @@ public abstract class CredentialProviderDelegator<T extends Credential>
    * Delegates the credential generation to the loaded {@link CredentialGenerator}.
    *
    * @param context The context containing information required for credential retrieval.
-   * @return A {@link Credential} object.
+   * @return The generated {@link Credential}, or {@code null} if no credential is available.
    * @throws RuntimeException if credential generation fails.
    */
+  @Nullable
   @Override
   public Credential getCredential(CredentialContext context) {
     try {

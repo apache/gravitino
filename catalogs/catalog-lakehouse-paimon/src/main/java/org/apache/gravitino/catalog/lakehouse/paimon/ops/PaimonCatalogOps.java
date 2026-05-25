@@ -32,11 +32,17 @@ import org.apache.paimon.catalog.Catalog.ColumnNotExistException;
 import org.apache.paimon.catalog.Catalog.DatabaseAlreadyExistException;
 import org.apache.paimon.catalog.Catalog.DatabaseNotEmptyException;
 import org.apache.paimon.catalog.Catalog.DatabaseNotExistException;
+import org.apache.paimon.catalog.Catalog.DialectAlreadyExistException;
+import org.apache.paimon.catalog.Catalog.DialectNotExistException;
 import org.apache.paimon.catalog.Catalog.TableAlreadyExistException;
 import org.apache.paimon.catalog.Catalog.TableNotExistException;
+import org.apache.paimon.catalog.Catalog.ViewAlreadyExistException;
+import org.apache.paimon.catalog.Catalog.ViewNotExistException;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.table.Table;
+import org.apache.paimon.view.View;
+import org.apache.paimon.view.ViewChange;
 
 /** Table operation proxy that handles table operations of an underlying Apache Paimon catalog. */
 public class PaimonCatalogOps implements AutoCloseable {
@@ -104,7 +110,42 @@ public class PaimonCatalogOps implements AutoCloseable {
     catalog.renameTable(tableIdentifier(fromTableName), tableIdentifier(toTableName), false);
   }
 
+  public List<String> listViews(String databaseName) throws DatabaseNotExistException {
+    return catalog.listViews(databaseName);
+  }
+
+  public View loadView(String viewName) throws ViewNotExistException {
+    return catalog.getView(viewIdentifier(viewName));
+  }
+
+  public void createView(String viewName, View view)
+      throws ViewAlreadyExistException, DatabaseNotExistException {
+    catalog.createView(viewIdentifier(viewName), view, false);
+  }
+
+  public void alterView(String viewName, List<ViewChange> changes) throws ViewNotExistException {
+    try {
+      catalog.alterView(viewIdentifier(viewName), changes, false);
+    } catch (DialectAlreadyExistException | DialectNotExistException e) {
+      throw new IllegalArgumentException(
+          String.format("Cannot alter view %s: %s", viewName, e.getMessage()), e);
+    }
+  }
+
+  public void renameView(String fromViewName, String toViewName)
+      throws ViewNotExistException, ViewAlreadyExistException {
+    catalog.renameView(viewIdentifier(fromViewName), viewIdentifier(toViewName), false);
+  }
+
+  public void dropView(String viewName) throws ViewNotExistException {
+    catalog.dropView(viewIdentifier(viewName), false);
+  }
+
   private Identifier tableIdentifier(String tableName) {
     return Identifier.fromString(tableName);
+  }
+
+  private Identifier viewIdentifier(String viewName) {
+    return Identifier.fromString(viewName);
   }
 }
