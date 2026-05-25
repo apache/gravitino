@@ -784,10 +784,8 @@ final class GlueIcebergTableHelper {
   }
 
   /**
-   * Extracts an integer parameter from an Iceberg transform string (e.g. "bucket[16]" or
-   * "truncate[8]").
-   *
-   * <p>Iceberg does not expose transform parameters through a typed API, so string parsing is used.
+   * Returns the column name for the given Iceberg field ID, throwing if the field is not found in
+   * the schema.
    */
   private static String requireColumnName(Schema schema, int sourceId) {
     String colName = schema.findColumnName(sourceId);
@@ -798,6 +796,12 @@ final class GlueIcebergTableHelper {
     return colName;
   }
 
+  /**
+   * Extracts an integer parameter from an Iceberg transform string (e.g. "bucket[16]" or
+   * "truncate[8]").
+   *
+   * <p>Iceberg does not expose transform parameters through a typed API, so string parsing is used.
+   */
   private static int extractTransformParam(String transformStr) {
     String param = TRANSFORM_PARAM_PATTERN.matcher(transformStr).replaceAll("$1");
     if (param.equals(transformStr)) {

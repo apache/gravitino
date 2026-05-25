@@ -746,12 +746,12 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     boolean needsFormatClasses =
         !isIceberg && (inputFormat == null || outputFormat == null || serdeLib == null);
     if (needsFormatClasses) {
-      StorageFormat sf;
-      try {
-        sf = StorageFormat.valueOf(format.toUpperCase(Locale.ROOT));
-      } catch (IllegalArgumentException e) {
-        throw new IllegalArgumentException("Unsupported table format: " + format);
-      }
+      String upperFormat = format.toUpperCase(Locale.ROOT);
+      Preconditions.checkArgument(
+          Arrays.stream(StorageFormat.values()).anyMatch(f -> f.name().equals(upperFormat)),
+          "Unsupported table format: %s",
+          format);
+      StorageFormat sf = StorageFormat.valueOf(upperFormat);
       if (inputFormat == null) inputFormat = sf.getInputFormat();
       if (outputFormat == null) outputFormat = sf.getOutputFormat();
       if (serdeLib == null) serdeLib = sf.getSerde();
