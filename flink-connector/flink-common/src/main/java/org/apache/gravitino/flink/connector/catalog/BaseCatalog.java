@@ -960,8 +960,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
                   }
                   throw new CatalogException(
                       String.format(
-                          "View '%s' in catalog '%s' has no SQL representation",
-                          view.name(), catalogName()));
+                          "View '%s' in catalog '%s' has no SQL representation for dialect '%s'",
+                          view.name(), catalogName(), dialect));
                 });
 
     Map<String, String> properties =
