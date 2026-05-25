@@ -23,6 +23,7 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
   - multi table transaction
   - pagination
   - register view
+- Supports hierarchical (multi-level) namespaces.
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
 - Supports credential vending for `S3`、`GCS`、`OSS` and `ADLS`.
 - Supports different storages like `S3`, `HDFS`, `OSS`, `GCS`, `ADLS` and provides the capability to support other storages.
