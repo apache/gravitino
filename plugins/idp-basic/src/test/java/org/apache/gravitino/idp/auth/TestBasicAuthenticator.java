@@ -115,6 +115,90 @@ class TestBasicAuthenticator {
   }
 
   @Test
+  void testInvalidBase64() {
+    BasicAuthenticator authenticator = authenticator();
+
+    BadRequestException exception =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> authenticator.authenticateToken(basicAuthBytesWithCredential("not-valid!!!")));
+
+    Assertions.assertEquals(
+        "Malformed Basic authorization header: invalid base64", exception.getMessage());
+  }
+
+  @Test
+  void testMissingSeparator() {
+    BasicAuthenticator authenticator = authenticator();
+    String credential =
+        Base64.getEncoder().encodeToString("aliceonly".getBytes(StandardCharsets.UTF_8));
+
+    BadRequestException exception =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> authenticator.authenticateToken(basicAuthBytesWithCredential(credential)));
+
+    Assertions.assertEquals(
+        "Malformed Basic authorization header: credentials must be in username:password format",
+        exception.getMessage());
+  }
+
+  @Test
+  void testEmptyUsername() {
+    BasicAuthenticator authenticator = authenticator();
+    String credential =
+        Base64.getEncoder().encodeToString(":password".getBytes(StandardCharsets.UTF_8));
+
+    BadRequestException exception =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> authenticator.authenticateToken(basicAuthBytesWithCredential(credential)));
+
+    Assertions.assertEquals(
+        "Malformed Basic authorization header: username must not be empty", exception.getMessage());
+  }
+
+  @Test
+  void testTrimmedCredential() {
+    IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
+    PasswordHasher passwordHasher = mock(PasswordHasher.class);
+    IdpUserPO userPO = mock(IdpUserPO.class);
+    when(userMetaService.getIdpUserByUsername("alice")).thenReturn(userPO);
+    when(userPO.getPasswordHash()).thenReturn("hash-1");
+    when(passwordHasher.verify("Passw0rd-For-Alice", "hash-1")).thenReturn(true);
+    when(userMetaService.listGroupNamesByUsername("alice")).thenReturn(Arrays.asList());
+    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
+    String credential =
+        "  "
+            + Base64.getEncoder()
+                .encodeToString("alice:Passw0rd-For-Alice".getBytes(StandardCharsets.UTF_8))
+            + "  ";
+
+    UserPrincipal principal =
+        (UserPrincipal) authenticator.authenticateToken(basicAuthBytesWithCredential(credential));
+
+    Assertions.assertEquals("alice", principal.getName());
+  }
+
+  @Test
+  void testBlankPassword() {
+    IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
+    PasswordHasher passwordHasher = mock(PasswordHasher.class);
+    IdpUserPO userPO = mock(IdpUserPO.class);
+    when(userMetaService.getIdpUserByUsername("alice")).thenReturn(userPO);
+    when(userPO.getPasswordHash()).thenReturn("hash-1");
+    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
+
+    UnauthorizedException exception =
+        Assertions.assertThrows(
+            UnauthorizedException.class,
+            () -> authenticator.authenticateToken(basicAuthBytes(basicAuthHeader("alice", " "))));
+
+    Assertions.assertEquals("Invalid username or password", exception.getMessage());
+    Assertions.assertEquals("Basic", exception.getChallenges().get(0));
+  }
+
+  @Test
   void testWrongPassword() {
     IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
     PasswordHasher passwordHasher = mock(PasswordHasher.class);
@@ -143,6 +227,10 @@ class TestBasicAuthenticator {
 
   private static byte[] basicAuthBytes(String authHeader) {
     return authHeader.getBytes(StandardCharsets.UTF_8);
+  }
+
+  private static byte[] basicAuthBytesWithCredential(String credential) {
+    return (AuthConstants.AUTHORIZATION_BASIC_HEADER + credential).getBytes(StandardCharsets.UTF_8);
   }
 
   private BasicAuthenticator authenticator() {

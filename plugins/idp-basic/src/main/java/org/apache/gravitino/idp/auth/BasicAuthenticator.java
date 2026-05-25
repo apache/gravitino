@@ -26,6 +26,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
@@ -100,7 +101,8 @@ public class BasicAuthenticator implements Authenticator {
 
   private BasicCredentials parseBasicCredentials(String authData) {
     String credential = authData.substring(AuthConstants.AUTHORIZATION_BASIC_HEADER.length());
-    if (credential.trim().isEmpty()) {
+    credential = credential.trim();
+    if (credential.isEmpty()) {
       throw new BadRequestException("Malformed Basic authorization header: missing credentials");
     }
 
@@ -120,7 +122,7 @@ public class BasicAuthenticator implements Authenticator {
       }
 
       String password = decodedCredential.substring(separatorIndex + 1);
-      if (password.isEmpty()) {
+      if (StringUtils.isBlank(password)) {
         throw invalidCredentials();
       }
       return new BasicCredentials(userName, password);
