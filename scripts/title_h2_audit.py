@@ -84,7 +84,7 @@ def main():
         print(f"  {md}")
         print(f"    title: {title!r}")
         print(f"    first H2: {h2!r}{flag}")
-    return 0
+    return 1
 
 
 if __name__ == '__main__':

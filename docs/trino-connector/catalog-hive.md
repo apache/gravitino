@@ -379,7 +379,7 @@ replacing hdfs_user with the appropriate username:
 ## S3
 
 When using AWS S3 within the Hive catalog, users need to configure the Trino Hive connector's
-AWS S3-related properties in the catalog's properteis. Refer to the documentation
+AWS S3-related properties in the catalog's properties. Refer to the documentation
 of [Hive connector with Amazon S3](https://trino.io/docs/current/connector/hive-s3.html).
 
 To create a Hive catalog with AWS S3 configuration in the Trino CLI, use the following command:

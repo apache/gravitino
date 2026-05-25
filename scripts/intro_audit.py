@@ -82,7 +82,7 @@ def main():
         preview = first_line[:80] + ('...' if len(first_line) > 80 else '')
         print(f"  {md}")
         print(f"    L{line_no} ({kind}): {preview}")
-    return 0
+    return 1
 
 
 if __name__ == '__main__':
