@@ -528,11 +528,11 @@ The `clients` property for example:
 
 ### Event Listener
 
-Gravitino generates pre-event and post-event for table operations and provide a pluggable event listener to allow you to inject custom logic. For more details, refer to [Event listener configuration](gravitino-server-config.md#event-listener-configuration).
+Gravitino generates pre-event and post-event for table operations and provide a pluggable event listener to allow you to inject custom logic. For more details, refer to [Event listener configuration](gravitino-server-config.md#event-listener).
 
 ### Audit Log
 
-Gravitino provides a pluggable audit log mechanism, refer to [Audit log configuration](gravitino-server-config.md#audit-log-configuration).
+Gravitino provides a pluggable audit log mechanism, refer to [Audit log configuration](gravitino-server-config.md#audit-log).
 
 ### Apache Iceberg Metrics Store Configuration
 

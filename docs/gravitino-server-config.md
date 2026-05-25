@@ -16,12 +16,9 @@ Apache Gravitino supports several configurations:
 
 ## Server Properties
 
-Customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases.
-We strongly recommend that you read the following sections to understand the configuration file, so you can change the default values to suit your specific situation and usage scenario.
+Customize the Gravitino server by editing the configuration file `gravitino.conf` in the `conf` directory. The default values are sufficient for most use cases. Changes to `gravitino.conf` take effect after restarting the Gravitino server.
 
-The `gravitino.conf` file lists the configuration items in the following table. It groups those items into the following categories:
-
-### HTTP Server Configuration
+### HTTP Server
 
 | Configuration item                                   | Description                                                                                                                                                                           | Default value                                                                | Required | Since version    |
 |------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|------------------|
@@ -42,9 +39,9 @@ The `gravitino.conf` file lists the configuration items in the following table. 
 The filter in the customFilters should be a standard javax servlet filter.
 Specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
 
-### Storage Configuration
+### Storage
 
-#### Storage Backend Configuration
+#### Storage Backend
 
 Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
 If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. It's highly recommended using MySQL as the backend database.  
@@ -75,7 +72,7 @@ We strongly recommend that you change the default value of `gravitino.entity.sto
 
 For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up. For MySQL, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
 
-### Storage Cache Configuration
+### Storage Cache
 
 To enable storage caching, modify the following settings in the `${GRAVITINO_HOME}/conf/gravitino.conf` file:
 
@@ -96,13 +93,9 @@ gravitino.cache.lockSegments=16
 | `gravitino.cache.implementation` | Specifies the cache implementation         | `caffeine`             | Yes      | 1.0.0         |
 | `gravitino.cache.maxEntries`     | Maximum number of entries allowed in cache | `10000`                | No       | 1.0.0         |
 | `gravitino.cache.expireTimeInMs` | Cache expiration time (in milliseconds)    | `3600000` (about 1 hr) | No       | 1.0.0         |
-| `gravitino.cache.enableStats`    | Whether to enable cache statistics logging | `false`                | No       | 1.0.0         |
-| `gravitino.cache.enableWeigher`  | Whether to enable weight-based eviction    | `true`                 | No       | 1.0.0         |
+| `gravitino.cache.enableStats`    | Whether to enable cache statistics logging. When `true`, Gravitino logs hit count, miss count, and load failures every 5 minutes at INFO level. | `false`                | No       | 1.0.0         |
+| `gravitino.cache.enableWeigher`  | Whether to enable weight-based eviction. When `true`, `maxEntries` is ignored. | `true`                 | No       | 1.0.0         |
 | `gravitino.cache.lockSegments`   | Number of lock segments.                   | `16`                   | No       | 1.0.0         |
-
-- `gravitino.cache.enableWeigher`: When enabled, eviction is based on weight and `maxEntries` will be ignored.
-- `gravitino.cache.expireTimeInMs`: Controls the cache TTL in milliseconds.
-- If `gravitino.cache.enableStats` is enabled, Gravitino will log cache statistics (hit count, miss count, load failures, etc.) every 5 minutes at the Info level.
 
 #### Eviction Strategies
 
@@ -129,7 +122,7 @@ All cache entries are subject to a TTL (Time-To-Live) expiration policy. By defa
 - TTL can work in conjunction with both capacity and weight-based eviction;
 - Expired entries will also trigger asynchronous cleanup mechanisms for resource release and logging.
 
-### Tree Lock Configuration
+### Tree Lock
 
 The Gravitino server uses a tree lock to ensure data consistency. The tree lock is an in-memory lock; Gravitino currently supports only in-memory locks. The configuration items are as follows:
 
@@ -139,14 +132,16 @@ The Gravitino server uses a tree lock to ensure data consistency. The tree lock 
 | `gravitino.lock.minNodes`            | The minimum number of tree lock nodes to keep in memory       | 1000          | No       | 0.5.0         |
 | `gravitino.lock.cleanIntervalInSecs` | The interval in seconds to clean up the stale tree lock nodes | 60            | No       | 0.5.0         |
 
-### Catalog Configuration
+### Catalog
 
 | Configuration item                           | Description                                                                                                                                                                                         | Default value | Required | Since version |
 |----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache; default 3600000ms(1h).                                                                                                                     | `3600000`     | No       | 0.1.0         |
 | `gravitino.catalog.classloader.isolated`     | Whether to use an isolated classloader for catalog. If `true`, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`. | `true`        | No       | 0.1.0         |
 
-### Auxiliary Service Configuration
+### Auxiliary Services
+
+The auxiliary service framework lets Gravitino host additional servers in the same JVM. The most common use is the embedded [Iceberg REST server](iceberg-rest-service.md), configured via the properties below.
 
 | Configuration item            | Description                                                                                                                    | Default value | Since Version |
 |-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
@@ -154,7 +149,7 @@ The Gravitino server uses a tree lock to ensure data consistency. The tree lock 
 
 Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configuration details.
 
-### Event Listener Configuration
+### Event Listener
 
 Gravitino provides event listener mechanism to allow users to capture the events which are provided by Gravitino server to integrate some custom operations.
 
@@ -235,7 +230,7 @@ The plugin provides several operational modes for how to process event, supporti
 
 When processing pre-event, you could throw a `ForbiddenException` to skip the following executions. For more details, refer to the definition of the plugin.
 
-### Audit Log Configuration
+### Audit Log
 
 The audit log framework defines how audit logs are formatted and written to various storages. The formatter defines an interface that transforms different `Event` types into a unified `AuditLog`. The writer defines an interface to writing AuditLog to different storages.
 
@@ -263,11 +258,11 @@ Writer configuration begins with `gravitino.audit.writer.${name}`, where `${name
 | `gravitino.audit.writer.file.flushIntervalSecs` | The flush interval time of the audit file in seconds.                         | 10                  | NO       | 0.7.0-incubating |
 | `gravitino.audit.writer.file.append`            | Whether the log will be written to the end or the beginning of the file.      | true                | NO       | 0.7.0-incubating |
 
-### Security Configuration
+### Security
 
 Refer to [security](security/security.md) for HTTPS and authentication configurations.
 
-### Metrics Configuration
+### Metrics
 
 | Property name                             | Description                                          | Default value | Required | Since Version |
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
@@ -293,6 +288,19 @@ Catalog properties configure a catalog. They come from three sources, with highe
 3. **Implementation defaults** coded into the catalog itself. Used when neither of the above supplies a value.
 
 When the same property is set in both the API call and the configuration file, the API value wins.
+
+The `properties` map is a set of key-value pairs supplied at catalog creation. For example, a REST request to create a PostgreSQL catalog might include:
+
+```json
+{
+  "jdbc-url": "jdbc:postgresql://localhost:5432/mydb",
+  "jdbc-user": "admin",
+  "jdbc-password": "secret",
+  "jdbc-driver": "org.postgresql.Driver"
+}
+```
+
+The CLI equivalent passes `--properties jdbc-url=...,jdbc-user=...`. The Java and Python SDKs accept a `Map<String, String>` or `dict`.
 
 ### Property categories
 
@@ -330,7 +338,7 @@ For catalogs whose implementation lives outside Gravitino's built-in directory, 
 
 ### Common properties
 
-The properties below apply to all Gravitino catalogs regardless of provider:
+The properties below apply to all Gravitino catalogs regardless of provider. Like provider-specific properties, they can be supplied via the API call or the catalog's configuration file (with API values winning on conflict).
 
 | Configuration item  | Description                                                                                                                                                                                                                                                  | Default value | Required | Since version    |
 |---------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
