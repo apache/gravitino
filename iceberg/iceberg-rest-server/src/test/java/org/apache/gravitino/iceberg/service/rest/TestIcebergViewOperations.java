@@ -29,6 +29,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateViewFailureEvent;
@@ -452,7 +453,7 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     IcebergListViewEvent event =
         new IcebergListViewEvent(
             Mockito.mock(IcebergRequestContext.class),
-            org.apache.gravitino.NameIdentifier.of("metalake", "catalog", "schema"));
+            NameIdentifier.of("metalake", "catalog", "schema"));
     Assertions.assertEquals(-1, event.resultCount());
   }
 }

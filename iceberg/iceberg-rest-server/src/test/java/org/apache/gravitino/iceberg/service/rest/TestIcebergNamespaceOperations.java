@@ -27,6 +27,7 @@ import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
@@ -308,8 +309,7 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
   void testIcebergListNamespacesEventDeprecatedConstructorReturnsNegativeCount() {
     IcebergListNamespacesEvent event =
         new IcebergListNamespacesEvent(
-            Mockito.mock(IcebergRequestContext.class),
-            org.apache.gravitino.NameIdentifier.of("metalake", "catalog"));
+            Mockito.mock(IcebergRequestContext.class), NameIdentifier.of("metalake", "catalog"));
     Assertions.assertEquals(-1, event.resultCount());
   }
 

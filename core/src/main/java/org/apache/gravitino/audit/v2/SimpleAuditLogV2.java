@@ -107,8 +107,13 @@ public class SimpleAuditLogV2 implements AuditLog {
     if (event instanceof ListEvent) {
       int count = ((ListEvent) event).resultCount();
       Map<String, String> merged = new LinkedHashMap<>();
-      if (count >= 0) merged.put("count", String.valueOf(count));
-      if (info != null) merged.putAll(info);
+      if (info != null) {
+        merged.putAll(info);
+      }
+      if (count >= 0) {
+        merged.put("count", String.valueOf(count));
+      }
+
       customInfoStr = merged.isEmpty() ? "" : merged.toString();
     } else {
       customInfoStr = info != null && !info.isEmpty() ? info.toString() : "";

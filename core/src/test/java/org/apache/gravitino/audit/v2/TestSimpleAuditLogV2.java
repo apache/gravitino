@@ -167,7 +167,7 @@ public class TestSimpleAuditLogV2 {
 
   @Test
   public void testListEventCountMergedWithExistingCustomInfo() {
-    // Verify count is prepended when the event also has user-defined customInfo.
+    // Verify count and user-defined customInfo both appear in the audit log field.
     ListTableEvent base = new ListTableEvent("grace", Namespace.of("m", "c", "s"), 9);
     SimpleAuditLogV2 log =
         new SimpleAuditLogV2(base) {
@@ -178,8 +178,7 @@ public class TestSimpleAuditLogV2 {
         };
 
     String[] fields = log.toString().split("\t", -1);
-    // count must come first, followed by the user-defined key.
-    Assertions.assertTrue(fields[7].startsWith("{count=9"));
+    Assertions.assertTrue(fields[7].contains("count=9"));
     Assertions.assertTrue(fields[7].contains("env=prod"));
   }
 
