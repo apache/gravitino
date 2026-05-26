@@ -29,6 +29,17 @@ public class CredentialConstants {
   public static final String CREDENTIAL_CACHE_EXPIRE_RATIO = "credential-cache-expire-ratio";
   public static final String CREDENTIAL_CACHE_MAX_SIZE = "credential-cache-max-size";
   public static final String S3_TOKEN_EXPIRE_IN_SECS = "s3-token-expire-in-secs";
+
+  /**
+   * Whether the vended {@code s3:ListBucket} statement also allows the bare location prefix. When
+   * {@code true}, a directory-root {@code getFileStatus} HEAD returns 404 instead of 403, at the
+   * cost of allowing enumeration of sibling keys that share the location's string prefix. Defaults
+   * to {@code false} (secure); fileset catalogs enable it because access goes through the Hadoop
+   * FileSystem API.
+   */
+  public static final String S3_CREDENTIAL_LIST_LOCATION_PREFIX =
+      "s3-credential-list-location-prefix";
+
   public static final String OSS_TOKEN_EXPIRE_IN_SECS = "oss-token-expire-in-secs";
   public static final String ADLS_TOKEN_EXPIRE_IN_SECS = "adls-token-expire-in-secs";
 
