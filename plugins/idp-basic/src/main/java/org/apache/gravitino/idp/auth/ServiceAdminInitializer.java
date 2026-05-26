@@ -96,20 +96,15 @@ public final class ServiceAdminInitializer {
           serviceAdmin,
           INITIAL_ADMIN_PASSWORD_ENV);
       userMetaService.insertIdpUser(
-          newUserPO(serviceAdmin, passwordHasher.hash(password), idGenerator));
+          IdpUserPO.builder()
+              .withUserId(idGenerator.nextId())
+              .withUsername(serviceAdmin)
+              .withPasswordHash(passwordHasher.hash(password))
+              .withCurrentVersion(POConverters.INIT_VERSION)
+              .withLastVersion(POConverters.INIT_VERSION)
+              .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
+              .build());
     }
-  }
-
-  private static IdpUserPO newUserPO(
-      String username, String passwordHash, IdGenerator idGenerator) {
-    return IdpUserPO.builder()
-        .withUserId(idGenerator.nextId())
-        .withUsername(username)
-        .withPasswordHash(passwordHash)
-        .withCurrentVersion(POConverters.INIT_VERSION)
-        .withLastVersion(POConverters.INIT_VERSION)
-        .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
-        .build();
   }
 
   private static boolean enabledBasicAuthenticator(Config config) {
