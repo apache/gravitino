@@ -140,6 +140,29 @@ jobs:
           cp distribution/package/libs/mysql-connector-java-8.0.14.jar \
              distribution/package-b/libs/
 
+          # bin/gravitino.sh's found_gravitino_server_pid() greps `ps` only by
+          # the "GravitinoServer" process name. When two installs share a host
+          # the second `start` invocation sees the first install's JVM and
+          # short-circuits with "Gravitino Server is already running" — B never
+          # actually starts. Add an install-path filter so each install only
+          # matches its own JVM.
+          patch_pid_grep() {
+            python3 - "$1" <<'PY'
+          import sys, pathlib
+          p = pathlib.Path(sys.argv[1])
+          src = p.read_text()
+          old = ("RUNNING_PIDS=$(ps x | grep ${process_name} | "
+                 "grep -v grep | awk '{print $1}');")
+          new = ("RUNNING_PIDS=$(ps x | grep ${process_name} | "
+                 'grep "${GRAVITINO_HOME}" | '
+                 "grep -v grep | awk '{print $1}');")
+          assert old in src, f"pid-grep line not found in {p}"
+          p.write_text(src.replace(old, new))
+          PY
+          }
+          patch_pid_grep distribution/package/bin/gravitino.sh
+          patch_pid_grep distribution/package-b/bin/gravitino.sh
+
       - name: Start both Gravitino instances
         run: |
           set -euo pipefail
