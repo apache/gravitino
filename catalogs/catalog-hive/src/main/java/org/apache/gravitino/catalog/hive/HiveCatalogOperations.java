@@ -456,7 +456,9 @@ public class HiveCatalogOperations
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
     HiveTableHandle hiveTable = loadHiveTable(tableIdent);
-
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(hiveTable.getTableType())) {
+      throw new NoSuchTableException("Table %s is a view, not a table", tableIdent);
+    }
     LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
     return hiveTable;
   }
