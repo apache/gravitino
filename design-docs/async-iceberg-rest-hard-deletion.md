@@ -303,13 +303,13 @@ synchronous purge has the same "best effort" stance. A job fails only if the
 **metadata phase** fails. `NotFoundException` from `deleteFile` counts as
 success. Backoff: `min(maxBackoff, base * 2^attempts)` with jitter.
 
-| Outcome                            | Action                                                              |
-| ---------------------------------- | ------------------------------------------------------------------- |
-| All files deleted (or already gone) | `state='SUCCEEDED'`                                                |
-| Metadata load failed, transient    | back to `PENDING`, `attempts++`, `next_attempt_at = now + backoff`, `heartbeat_at=NULL` |
-| Metadata load failed, terminal     | `attempts++`; if `attempts >= max-attempts` → `FAILED`              |
-| Worker killed mid-job              | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent |
-| Recovered via re-register (§5.7)   | Job CAS'd to `CANCELLED`; the worker only claims non-terminal rows, so files stay intact |
+| Outcome                             | Action                                                                                   |
+|-------------------------------------|------------------------------------------------------------------------------------------|
+| All files deleted (or already gone) | `state='SUCCEEDED'`                                                                       |
+| Metadata load failed, transient     | back to `PENDING`, `attempts++`, `next_attempt_at = now + backoff`, `heartbeat_at=NULL`   |
+| Metadata load failed, terminal      | `attempts++`; if `attempts >= max-attempts` → `FAILED`                                   |
+| Worker killed mid-job               | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent     |
+| Recovered via re-register (§5.7)    | Job CAS'd to `CANCELLED`; the worker only claims non-terminal rows, so files stay intact  |
 
 Restart handling falls out of the durable job table plus the heartbeat
 model — no separate mechanism:
@@ -338,11 +338,11 @@ catalog entry is already gone. The active `iceberg_purge_job` row *is* the
 tombstone — no second table is needed. The REST server consults the store on
 the request thread (one indexed lookup via `idx_object`):
 
-| Operation | Active job exists | No active job (`SUCCEEDED`/`FAILED`/`CANCELLED`/none) |
-|-----------|-------------------|------------------------------------------------------|
-| `loadTable` / `HEAD`, `alterTable` / commit | `404 NoSuchTableException` | `404` |
-| `createTable` (same identifier) | **`409 Conflict`** — being purged | succeeds |
-| `registerTable` (same identifier) | **`409 Conflict`**, except recovery below | succeeds |
+| Operation                                   | Active job exists                         | No active job (`SUCCEEDED`/`FAILED`/`CANCELLED`/none) |
+|---------------------------------------------|-------------------------------------------|-------------------------------------------------------|
+| `loadTable` / `HEAD`, `alterTable` / commit | `404 NoSuchTableException`                | `404`                                                 |
+| `createTable` (same identifier)             | **`409 Conflict`** — being purged         | succeeds                                              |
+| `registerTable` (same identifier)           | **`409 Conflict`**, except recovery below | succeeds                                              |
 
 A `SUCCEEDED` job (even before pruning) no longer blocks reuse — the files
 are gone. A `FAILED` job also stops blocking, so a failed cleanup never
@@ -433,13 +433,13 @@ per-request **client** choice via the `X-Gravitino-Async-Purge` header
 (default async; `false` selects synchronous deletion). The server-side keys
 only tune the worker pool and retries:
 
-| Key                                                       | Default   | Description                                            |
-| --------------------------------------------------------- | --------- | ------------------------------------------------------ |
-| `gravitino.iceberg-rest.async-purge.worker-threads`       | `4`       | Worker pool size per server. |
-| `gravitino.iceberg-rest.async-purge.poll-interval-ms`     | `5000`    | Worker poll interval. |
-| `gravitino.iceberg-rest.async-purge.heartbeat-timeout-ms` | `300000`  | Age after which a job with no heartbeat is reclaimable. |
-| `gravitino.iceberg-rest.async-purge.max-attempts`         | `5`       | Attempts before `FAILED`. |
-| `gravitino.iceberg-rest.async-purge.completed-retention-hours` | `168` | How long `SUCCEEDED` rows are retained before pruning. |
+| Key                                                            | Default  | Description                                             |
+|----------------------------------------------------------------|----------|---------------------------------------------------------|
+| `gravitino.iceberg-rest.async-purge.worker-threads`            | `4`      | Worker pool size per server.                            |
+| `gravitino.iceberg-rest.async-purge.poll-interval-ms`          | `5000`   | Worker poll interval.                                   |
+| `gravitino.iceberg-rest.async-purge.heartbeat-timeout-ms`      | `300000` | Age after which a job with no heartbeat is reclaimable. |
+| `gravitino.iceberg-rest.async-purge.max-attempts`              | `5`      | Attempts before `FAILED`.                               |
+| `gravitino.iceberg-rest.async-purge.completed-retention-hours` | `168`    | How long `SUCCEEDED` rows are retained before pruning.  |
 
 File-delete parallelism, claim batch size, and backoff base/ceiling are
 internal constants with sensible defaults; they become config keys only if a
