@@ -81,7 +81,7 @@ Customize the Gravitino server by editing the configuration file `gravitino.conf
 
 ### HTTP Server
 
-| Configuration item                                   | Description                                                                                                                                                                           | Default value                                                                | Required | Since version    |
+| gravitino.conf property                                   | Description                                                                                                                                                                           | Default value                                                                | Required | Since version    |
 |------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|------------------|
 | `gravitino.server.webserver.host`                    | The host of the Gravitino server.                                                                                                                                                     | `0.0.0.0`                                                                    | No       | 0.1.0            |
 | `gravitino.server.webserver.httpPort`                | The port on which the Gravitino server listens for incoming connections.                                                                                                              | `8090`                                                                       | No       | 0.1.0            |
@@ -111,7 +111,7 @@ For step-by-step setup of MySQL or PostgreSQL backends, including connector JARs
 
 The following table lists the storage configuration items:
 
-| Configuration item                                | Description                                                                                                                                                                                                                                             | Default value                     | Required                                        | Since version    |
+| gravitino.conf property                                | Description                                                                                                                                                                                                                                             | Default value                     | Required                                        | Since version    |
 |---------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|-------------------------------------------------|------------------|
 | `gravitino.entity.store`                          | Which entity storage implementation to use. Only`relational` storage is supported.                                                                                                                                                            | `relational`                      | No                                              | 0.1.0            |
 | `gravitino.entity.store.maxTransactionSkewTimeMs` | The maximum skew time of transactions in milliseconds.                                                                                                                                                                                                  | `2000`                            | No                                              | 0.3.0            |
@@ -137,7 +137,7 @@ For H2 database, All tables needed by Gravitino are created automatically when t
 
 ### Storage Cache
 
-| Configuration item               | Description                                | Default Value          | Required | Since Version |
+| gravitino.conf property               | Description                                | Default Value          | Required | Since Version |
 |----------------------------------|--------------------------------------------|------------------------|----------|---------------|
 | `gravitino.cache.enabled`        | Whether to enable caching                  | `true`                 | No       | 1.0.0         |
 | `gravitino.cache.implementation` | Specifies the cache implementation         | `caffeine`             | No       | 1.0.0         |
@@ -176,7 +176,7 @@ All cache entries are subject to a TTL (Time-To-Live) expiration policy. By defa
 
 The Gravitino server uses a tree lock to ensure data consistency. The tree lock is an in-memory lock; Gravitino currently supports only in-memory locks. The configuration items are as follows:
 
-| Configuration item                   | Description                                                   | Default value | Required | Since Version |
+| gravitino.conf property                   | Description                                                   | Default value | Required | Since Version |
 |--------------------------------------|---------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.lock.maxNodes`            | The maximum number of tree lock nodes to keep in memory       | 100000        | No       | 0.5.0         |
 | `gravitino.lock.minNodes`            | The minimum number of tree lock nodes to keep in memory       | 1000          | No       | 0.5.0         |
@@ -184,7 +184,7 @@ The Gravitino server uses a tree lock to ensure data consistency. The tree lock 
 
 ### Catalog
 
-| Configuration item                           | Description                                                                                                                                                                                         | Default value | Required | Since version |
+| gravitino.conf property                           | Description                                                                                                                                                                                         | Default value | Required | Since version |
 |----------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache; default 3600000ms(1h).                                                                                                                     | `3600000`     | No       | 0.1.0         |
 | `gravitino.catalog.classloader.isolated`     | Whether to use an isolated classloader for catalog. If `true`, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`. | `true`        | No       | 0.1.0         |
@@ -193,7 +193,7 @@ The Gravitino server uses a tree lock to ensure data consistency. The tree lock 
 
 Gravitino can host an [Iceberg REST server](iceberg-rest-service.md) in the same JVM as the metadata service. The properties below configure that embedded REST server. (Iceberg REST is hosted via Gravitino's auxiliary service framework; if other services use this framework in the future, the property prefix scheme `gravitino.auxService.*` may apply to them.)
 
-| Configuration item            | Description                                                                                                                    | Default value | Since Version |
+| gravitino.conf property            | Description                                                                                                                    | Default value | Since Version |
 |-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
 | `gravitino.auxService.names ` | The auxiliary service name of the Gravitino Iceberg REST server. Use **`iceberg-rest`** for the Gravitino Iceberg REST server. | (none)        | 0.2.0         |
 
@@ -203,7 +203,7 @@ Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configurati
 
 The job system runs maintenance and optimizer jobs on behalf of Gravitino services such as the Table Maintenance Service. Properties below control where jobs run, how their staging files are managed, and how Gravitino polls executors for status.
 
-| Configuration item                       | Description                                                                                                                                | Default value                  | Required | Since Version |
+| gravitino.conf property                       | Description                                                                                                                                | Default value                  | Required | Since Version |
 |------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------|----------|---------------|
 | `gravitino.job.stagingDir`               | Directory for managing staging files when running jobs.                                                                                    | `/tmp/gravitino/jobs/staging`  | No       | 1.0.0         |
 | `gravitino.job.executor`                 | The executor to run jobs. The built-in option is `local`; custom executors can be implemented and set here.                                | `local`                        | No       | 1.0.0         |
@@ -214,7 +214,7 @@ The job system runs maintenance and optimizer jobs on behalf of Gravitino servic
 
 When `gravitino.job.executor=local` (the default), the following properties further configure the local executor:
 
-| Configuration item                                  | Description                                                                                                                  | Default value                                  | Required    | Since Version |
+| gravitino.conf property                                  | Description                                                                                                                  | Default value                                  | Required    | Since Version |
 |-----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------|-------------|---------------|
 | `gravitino.jobExecutor.local.waitingQueueSize`      | Maximum number of jobs queued for execution.                                                                                 | `100`                                          | No          | 1.0.0         |
 | `gravitino.jobExecutor.local.maxRunningJobs`        | Maximum number of jobs running concurrently.                                                                                 | `max(1, min(availableProcessors / 2, 10))`     | No          | 1.0.0         |
@@ -229,7 +229,7 @@ Gravitino provides event listener mechanism to allow users to capture the events
 
 To leverage the event listener, you must implement the `EventListenerPlugin` interface and place the JAR file in the classpath of the Gravitino server. Then, add configurations to gravitino.conf to enable the event listener.
 
-| Configuration item                     | Description                                                                                            | Default value | Required | Since Version |
+| gravitino.conf property                     | Description                                                                                            | Default value | Required | Since Version |
 |----------------------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.eventListener.names`        | The name of the event listener, For multiple listeners, separate names with a comma, like "audit,sync" | (none)        | Yes      | 0.5.0         |
 | `gravitino.eventListener.{name}.class` | The class name of the event listener, replace `{name}` with the actual listener name.                  | (none)        | Yes      | 0.5.0         | 
@@ -310,7 +310,7 @@ The audit log framework defines how audit logs are formatted and written to vari
 
 Gravitino provides a default implement to log basic audit information to a file, you could extend the audit system by implementation corresponding interfaces.
 
-| Configuration item                    | Description                            | Default value                               | Required | Since Version              |
+| gravitino.conf property                    | Description                            | Default value                               | Required | Since Version              |
 |---------------------------------------|----------------------------------------|---------------------------------------------|----------|----------------------------|
 | `gravitino.audit.enabled`             | The audit log enable flag.             | false                                       | NO       | 0.7.0-incubating           |
 | `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter  | NO       | 0.7.0-incubating           | 
@@ -326,7 +326,7 @@ The `AuditLogWriter` defines an interface that enables the writing of metadata a
 
 Writer configuration begins with `gravitino.audit.writer.${name}`, where `${name}` is replaced with the actual writer name defined in method `name()`. `FileAuditWriter` is a default implement to log audit information, whose name is `file`.
 
-| Configuration item                              | Description                                                                   | Default value       | Required | Since Version    |
+| gravitino.conf property                              | Description                                                                   | Default value       | Required | Since Version    |
 |-------------------------------------------------|-------------------------------------------------------------------------------|---------------------|----------|------------------|
 | `gravitino.audit.writer.file.fileName`          | The audit log file name, the path is `${sys:gravitino.log.path}/${fileName}`. | gravitino_audit.log | NO       | 0.7.0-incubating |
 | `gravitino.audit.writer.file.flushIntervalSecs` | The flush interval time of the audit file in seconds.                         | 10                  | NO       | 0.7.0-incubating |
@@ -342,7 +342,7 @@ Gravitino supports three authentication modes: `simple` (the default), `oauth`, 
 
 #### General Properties
 
-| Configuration item          | Description                                                                                                                                                                                                | Default value | Required | Since Version    |
+| gravitino.conf property          | Description                                                                                                                                                                                                | Default value | Required | Since Version    |
 |-----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.authenticator`   | Deprecated since 0.6.0. Use `gravitino.authenticators` instead.                                                                                                                                            | `simple`      | No       | 0.3.0            |
 | `gravitino.authenticators`  | Authenticators to enable, set to `simple`, `oauth`, or `kerberos`. Multiple authenticators are comma-separated. When a request is supported by multiple authenticators simultaneously, the first one wins. | `simple`      | No       | 0.6.0-incubating |
@@ -351,7 +351,7 @@ Gravitino supports three authentication modes: `simple` (the default), `oauth`, 
 
 These properties apply when `gravitino.authenticators = oauth`. Configure either static-key validation (set `defaultSignKey`, `serverUri`, `tokenPath`) or JWKS-based validation (set `jwksUri` and `tokenValidatorClass`).
 
-| Configuration item                                            | Description                                                                                                                                                                                                                                              | Default value                                                       | Required                                                                                        | Since Version |
+| gravitino.conf property                                            | Description                                                                                                                                                                                                                                              | Default value                                                       | Required                                                                                        | Since Version |
 |---------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|---------------|
 | `gravitino.authenticator.oauth.serviceAudience`               | The audience name when Gravitino uses OAuth as the authenticator.                                                                                                                                                                                        | `GravitinoServer`                                                   | No                                                                                              | 0.3.0         |
 | `gravitino.authenticator.oauth.allowSkewSecs`                 | JWT allowed skew in seconds when Gravitino uses OAuth as the authenticator.                                                                                                                                                                              | `0`                                                                 | No                                                                                              | 0.3.0         |
@@ -376,7 +376,7 @@ These properties apply when `gravitino.authenticators = oauth`. Configure either
 
 These properties apply when `gravitino.authenticators = kerberos`. The Iceberg REST service does not support Kerberos.
 
-| Configuration item                                               | Description                                                                                                                                                        | Default value | Required                                       | Since Version |
+| gravitino.conf property                                               | Description                                                                                                                                                        | Default value | Required                                       | Since Version |
 |------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------------------------|---------------|
 | `gravitino.authenticator.kerberos.principal`                     | Kerberos principal used for the HTTP endpoint. The principal must start with `HTTP/`.                                                                              | (none)        | Yes when using `kerberos` as the authenticator | 0.4.0         |
 | `gravitino.authenticator.kerberos.keytab`                        | Location of the keytab file with credentials for the principal.                                                                                                    | (none)        | Yes when using `kerberos` as the authenticator | 0.4.0         |
@@ -406,7 +406,7 @@ Gravitino supports the following signature algorithms (used with `gravitino.auth
 
 Gravitino exposes runtime metrics via JMX and an HTTP endpoint. The property below tunes metrics collection. See [Metrics](metrics.md) for available metrics and how to retrieve them.
 
-| Configuration item                        | Description                                          | Default value | Required | Since Version |
+| gravitino.conf property                        | Description                                          | Default value | Required | Since Version |
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
 
