@@ -279,12 +279,16 @@ deletes in bounded batches:
 TableMetadata meta = TableMetadataParser.read(io, job.metadataLocation());
 try (CloseableIterable<String> files = reachableFiles(meta)) {  // lazy, not materialized
   Tasks.foreach(files)
-       .executeWith(deleteExecutor)
+       .executeWith(deleteExecutor)  // sized by delete-threads-per-job (§5.10)
        .retry(perFileRetries)
        .suppressFailureWhenFinished()
        .run(io::deleteFile);
 }
 ```
+
+`deleteExecutor` is per-job and its size is `delete-threads-per-job`
+(§5.10) — raise it to drain a very large table's files faster when purge
+throughput matters.
 
 A separate task sends a heartbeat every `heartbeatTimeout / 3` on the ids
 this worker owns. If the host dies the heartbeat stops; once a row ages past
@@ -414,14 +418,14 @@ only tune the worker pool and retries:
 | Key                                                           | Default  | Description                                                                  |
 |---------------------------------------------------------------|----------|------------------------------------------------------------------------------|
 | `gravitino.iceberg-rest.async-purge.worker-threads`           | `4`      | Worker pool size per server.                                                 |
+| `gravitino.iceberg-rest.async-purge.delete-threads-per-job`   | `8`      | Parallelism of file deletes within a single job.                             |
 | `gravitino.iceberg-rest.async-purge.poll-interval-ms`         | `5000`   | Worker poll interval.                                                        |
 | `gravitino.iceberg-rest.async-purge.heartbeat-timeout-ms`     | `300000` | Age after which a job with no heartbeat is reclaimable.                      |
 | `gravitino.iceberg-rest.async-purge.max-attempts`             | `5`      | Attempts before `FAILED`.                                                    |
 | `gravitino.iceberg-rest.async-purge.terminal-retention-hours` | `168`    | How long terminal (`SUCCEEDED` / `FAILED`) rows are retained before pruning. |
 
-File-delete parallelism and claim batch size are internal constants with
-sensible defaults; they become config keys only if a deployment demonstrates
-the need.
+The claim batch size is an internal constant with a sensible default; it
+becomes a config key only if a deployment demonstrates the need.
 
 ### 5.11 Security
 
