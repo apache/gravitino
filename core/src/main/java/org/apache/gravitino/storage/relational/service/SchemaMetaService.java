@@ -285,7 +285,7 @@ public class SchemaMetaService {
       // how many descendants exist.
       List<Long> schemaIds = listSchemaIdsForCascade(schemaPO);
       if (schemaIds.isEmpty()) {
-          return false;
+        return false;
       }
       SessionUtils.doMultipleWithCommit(
           () ->
