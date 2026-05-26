@@ -54,6 +54,19 @@ public final class IdpRestUtils {
         principal == null ? new UserPrincipal(AuthConstants.ANONYMOUS_USER) : principal, action);
   }
 
+  public static Response doAs(
+      HttpServletRequest httpRequest,
+      PrivilegedExceptionAction<Response> action,
+      String resourceType,
+      IdpOperationType op,
+      String resourceName) {
+    try {
+      return doAs(httpRequest, action);
+    } catch (Exception e) {
+      return handleException(resourceType, op, resourceName, e);
+    }
+  }
+
   public static Response handleException(
       String resourceType, IdpOperationType op, String name, Exception e) {
     String formatted = StringUtils.isBlank(name) ? "" : " [" + name + "]";

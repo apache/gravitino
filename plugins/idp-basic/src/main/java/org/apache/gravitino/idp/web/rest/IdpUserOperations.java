@@ -68,15 +68,14 @@ public class IdpUserOperations {
   @Timed(name = "get-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-idp-user", absolute = true)
   public Response getUser(@PathParam("user") String user) {
-    try {
-      return IdpRestUtils.doAs(
-          httpRequest,
-          () ->
-              IdpRestUtils.ok(
-                  new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user)))));
-    } catch (Exception e) {
-      return IdpRestUtils.handleException("user", IdpOperationType.GET, user, e);
-    }
+    return IdpRestUtils.doAs(
+        httpRequest,
+        () ->
+            IdpRestUtils.ok(
+                new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user)))),
+        "user",
+        IdpOperationType.GET,
+        user);
   }
 
   @POST
@@ -84,19 +83,18 @@ public class IdpUserOperations {
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-user", absolute = true)
   public Response addUser(AddUserRequest request) {
-    try {
-      return IdpRestUtils.doAs(
-          httpRequest,
-          () -> {
-            request.validate();
-            return IdpRestUtils.ok(
-                new IdpUserResponse(
-                    IdpDTOConverters.toDTO(
-                        userGroupManager.addUser(request.getUser(), request.getPassword()))));
-          });
-    } catch (Exception e) {
-      return IdpRestUtils.handleException("user", IdpOperationType.ADD, request.getUser(), e);
-    }
+    return IdpRestUtils.doAs(
+        httpRequest,
+        () -> {
+          request.validate();
+          return IdpRestUtils.ok(
+              new IdpUserResponse(
+                  IdpDTOConverters.toDTO(
+                      userGroupManager.addUser(request.getUser(), request.getPassword()))));
+        },
+        "user",
+        IdpOperationType.ADD,
+        request.getUser());
   }
 
   @PUT
@@ -105,20 +103,19 @@ public class IdpUserOperations {
   @Timed(name = "update-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-idp-user", absolute = true)
   public Response resetPassword(@PathParam("user") String user, ResetPasswordRequest request) {
-    try {
-      return IdpRestUtils.doAs(
-          httpRequest,
-          () -> {
-            request.validate();
-            if (!userGroupManager.changePassword(user, request.getPassword())) {
-              throw new NotFoundException("IdP user %s does not exist", user);
-            }
-            return IdpRestUtils.ok(
-                new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user))));
-          });
-    } catch (Exception e) {
-      return IdpRestUtils.handleException("user", IdpOperationType.UPDATE, user, e);
-    }
+    return IdpRestUtils.doAs(
+        httpRequest,
+        () -> {
+          request.validate();
+          if (!userGroupManager.changePassword(user, request.getPassword())) {
+            throw new NotFoundException("IdP user %s does not exist", user);
+          }
+          return IdpRestUtils.ok(
+              new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user))));
+        },
+        "user",
+        IdpOperationType.UPDATE,
+        user);
   }
 
   @DELETE
@@ -127,12 +124,11 @@ public class IdpUserOperations {
   @Timed(name = "remove-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-idp-user", absolute = true)
   public Response removeUser(@PathParam("user") String user) {
-    try {
-      return IdpRestUtils.doAs(
-          httpRequest,
-          () -> IdpRestUtils.ok(new RemoveResponse(userGroupManager.removeUser(user))));
-    } catch (Exception e) {
-      return IdpRestUtils.handleException("user", IdpOperationType.REMOVE, user, e);
-    }
+    return IdpRestUtils.doAs(
+        httpRequest,
+        () -> IdpRestUtils.ok(new RemoveResponse(userGroupManager.removeUser(user))),
+        "user",
+        IdpOperationType.REMOVE,
+        user);
   }
 }
