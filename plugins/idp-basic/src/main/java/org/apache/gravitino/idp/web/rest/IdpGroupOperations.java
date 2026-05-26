@@ -41,12 +41,14 @@ import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.util.IdpDTOConverters;
 import org.apache.gravitino.idp.model.IdpGroup;
+import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRestExceptionHandlers;
 import org.apache.gravitino.idp.web.IdpRestUtils;
 import org.apache.gravitino.metrics.MetricNames;
 
 /** REST resource for built-in IdP group management exposed by the {@code idp-basic} plugin. */
+@IdpManagement
 @Path("/idp/groups")
 public class IdpGroupOperations {
   private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";

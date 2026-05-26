@@ -28,6 +28,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpRestUtils;
 
 /**
@@ -37,9 +38,12 @@ import org.apache.gravitino.idp.web.IdpRestUtils;
  *   <li>Available only when {@code basic} is configured in {@link Configs#AUTHENTICATORS}
  *   <li>Caller must be a service admin via {@link GravitinoAuthorizer#isServiceAdmin()}
  * </ul>
+ *
+ * <p>Scoped to resources annotated with {@link IdpManagement} via Jersey name binding.
  */
 @Provider
-public class IdpServiceAdminAuthorizationFilter implements ContainerRequestFilter {
+@IdpManagement
+public class IdpAuthorizationFilter implements ContainerRequestFilter {
 
   /** Authenticator name that enables built-in IdP management APIs. */
   public static final String BASIC_AUTHENTICATOR = "basic";
@@ -56,13 +60,13 @@ public class IdpServiceAdminAuthorizationFilter implements ContainerRequestFilte
   private final Supplier<GravitinoAuthorizer> authorizerSupplier;
 
   /** Creates a filter backed by the running Gravitino server configuration and authorizer. */
-  public IdpServiceAdminAuthorizationFilter() {
+  public IdpAuthorizationFilter() {
     this(
         () -> GravitinoEnv.getInstance().config().get(Configs.AUTHENTICATORS),
         () -> GravitinoEnv.getInstance().gravitinoAuthorizer());
   }
 
-  IdpServiceAdminAuthorizationFilter(
+  IdpAuthorizationFilter(
       Supplier<List<String>> authenticatorsSupplier,
       Supplier<GravitinoAuthorizer> authorizerSupplier) {
     this.authenticatorsSupplier = authenticatorsSupplier;
@@ -71,11 +75,6 @@ public class IdpServiceAdminAuthorizationFilter implements ContainerRequestFilte
 
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
-    String path = requestContext.getUriInfo().getPath();
-    if (!isIdpManagementPath(path)) {
-      return;
-    }
-
     if (!isBasicAuthenticatorEnabled(authenticatorsSupplier.get())) {
       requestContext.abortWith(
           IdpRestUtils.notFound(
@@ -88,10 +87,6 @@ public class IdpServiceAdminAuthorizationFilter implements ContainerRequestFilte
     if (authorizer == null || !authorizer.isServiceAdmin()) {
       requestContext.abortWith(IdpRestUtils.forbidden(SERVICE_ADMIN_REQUIRED_MESSAGE, null));
     }
-  }
-
-  private static boolean isIdpManagementPath(String path) {
-    return path != null && (path.equals("idp") || path.startsWith("idp/"));
   }
 
   private static boolean isBasicAuthenticatorEnabled(List<String> authenticators) {

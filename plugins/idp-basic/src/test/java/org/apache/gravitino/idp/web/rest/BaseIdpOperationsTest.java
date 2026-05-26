@@ -18,7 +18,26 @@
  */
 package org.apache.gravitino.idp.web.rest;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 
 /** Base class for built-in IdP REST operation integration tests. */
-public abstract class BaseIdpOperationsTest extends JerseyTest {}
+public abstract class BaseIdpOperationsTest extends JerseyTest {
+
+  /**
+   * Registers {@link IdpAuthorizationFilter} with permissive settings so resource tests focus on
+   * request handling rather than authorization.
+   */
+  protected void registerPermissiveIdpAuthorizationFilter(ResourceConfig resourceConfig) {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    when(authorizer.isServiceAdmin()).thenReturn(true);
+    resourceConfig.register(
+        new IdpAuthorizationFilter(
+            () -> List.of(IdpAuthorizationFilter.BASIC_AUTHENTICATOR), () -> authorizer));
+  }
+}

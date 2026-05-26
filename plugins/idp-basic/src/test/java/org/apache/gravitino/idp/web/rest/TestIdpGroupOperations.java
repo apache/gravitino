@@ -73,6 +73,7 @@ class TestIdpGroupOperations extends BaseIdpOperationsTest {
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(new IdpGroupOperations(MANAGER));
+    registerPermissiveIdpAuthorizationFilter(resourceConfig);
     resourceConfig.register(
         new AbstractBinder() {
           @Override

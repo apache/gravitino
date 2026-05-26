@@ -33,16 +33,16 @@ import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestIdpServiceAdminAuthorizationFilter {
+class TestIdpAuthorizationFilter {
 
   @Test
   void testAllowsServiceAdminOnIdpPath() throws Exception {
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
     when(authorizer.isServiceAdmin()).thenReturn(true);
 
-    IdpServiceAdminAuthorizationFilter filter =
-        new IdpServiceAdminAuthorizationFilter(
-            () -> Collections.singletonList(IdpServiceAdminAuthorizationFilter.BASIC_AUTHENTICATOR),
+    IdpAuthorizationFilter filter =
+        new IdpAuthorizationFilter(
+            () -> Collections.singletonList(IdpAuthorizationFilter.BASIC_AUTHENTICATOR),
             () -> authorizer);
     ContainerRequestContext requestContext = mockRequestContext("idp/users/alice");
 
@@ -57,9 +57,9 @@ class TestIdpServiceAdminAuthorizationFilter {
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
     when(authorizer.isServiceAdmin()).thenReturn(false);
 
-    IdpServiceAdminAuthorizationFilter filter =
-        new IdpServiceAdminAuthorizationFilter(
-            () -> Collections.singletonList(IdpServiceAdminAuthorizationFilter.BASIC_AUTHENTICATOR),
+    IdpAuthorizationFilter filter =
+        new IdpAuthorizationFilter(
+            () -> Collections.singletonList(IdpAuthorizationFilter.BASIC_AUTHENTICATOR),
             () -> authorizer);
     ContainerRequestContext requestContext = mockRequestContext("idp/groups/engineering");
 
@@ -70,16 +70,15 @@ class TestIdpServiceAdminAuthorizationFilter {
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
     Assertions.assertEquals(ErrorConstants.FORBIDDEN_CODE, errorResponse.getCode());
     Assertions.assertEquals(
-        IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_REQUIRED_MESSAGE,
-        errorResponse.getMessage());
+        IdpAuthorizationFilter.SERVICE_ADMIN_REQUIRED_MESSAGE, errorResponse.getMessage());
   }
 
   @Test
   void testRejectsWhenBasicAuthenticatorDisabled() throws Exception {
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
 
-    IdpServiceAdminAuthorizationFilter filter =
-        new IdpServiceAdminAuthorizationFilter(Collections::emptyList, () -> authorizer);
+    IdpAuthorizationFilter filter =
+        new IdpAuthorizationFilter(Collections::emptyList, () -> authorizer);
     ContainerRequestContext requestContext = mockRequestContext("idp/users");
 
     filter.filter(requestContext);
@@ -89,24 +88,7 @@ class TestIdpServiceAdminAuthorizationFilter {
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
     Assertions.assertEquals(
-        IdpServiceAdminAuthorizationFilter.BASIC_AUTHENTICATOR_REQUIRED_MESSAGE,
-        errorResponse.getMessage());
-    verify(authorizer, never()).isServiceAdmin();
-  }
-
-  @Test
-  void testSkipsNonIdpPaths() throws Exception {
-    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
-
-    IdpServiceAdminAuthorizationFilter filter =
-        new IdpServiceAdminAuthorizationFilter(
-            () -> Collections.singletonList(IdpServiceAdminAuthorizationFilter.BASIC_AUTHENTICATOR),
-            () -> authorizer);
-    ContainerRequestContext requestContext = mockRequestContext("metalakes");
-
-    filter.filter(requestContext);
-
-    verify(requestContext, never()).abortWith(any(Response.class));
+        IdpAuthorizationFilter.BASIC_AUTHENTICATOR_REQUIRED_MESSAGE, errorResponse.getMessage());
     verify(authorizer, never()).isServiceAdmin();
   }
 

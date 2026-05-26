@@ -38,12 +38,14 @@ import org.apache.gravitino.idp.dto.requests.ResetPasswordRequest;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.dto.util.IdpDTOConverters;
 import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRestExceptionHandlers;
 import org.apache.gravitino.idp.web.IdpRestUtils;
 import org.apache.gravitino.metrics.MetricNames;
 
 /** REST resource for built-in IdP user management exposed by the {@code idp-basic} plugin. */
+@IdpManagement
 @Path("/idp/users")
 public class IdpUserOperations {
   private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";
