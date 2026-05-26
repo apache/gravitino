@@ -42,7 +42,7 @@ When you use Gravitino with Trino, pass Trino MySQL connector configuration thro
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties), the MySQL catalog has the following properties:
 
-| Configuration item      | Description                                                                                            | Default value | Required | Since Version |
+| Property      | Description                                                                                            | Default | Required | Since |
 |-------------------------|--------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:3306`                    | (none)        | Yes      | 0.3.0         |
 | `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver`. | (none)        | Yes      | 0.3.0         |
@@ -209,7 +209,7 @@ Although MySQL itself does not support table properties, Gravitino offers table 
 - Doesn't support remove table properties. You can only add or modify properties, not delete properties.
 :::
 
-| Property Name           | Description                                                                                                                                              | Default Value | Required  | Reserved   | Immutable | Since version |
+| Property           | Description                                                                                                                                              | Default | Required  | Reserved   | Immutable | Since |
 |-------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-----------|------------|-----------|---------------|
 | `engine`                | The engine used by the table. For example `MyISAM`, `MEMORY`, `CSV`, `ARCHIVE`, `BLACKHOLE`, `FEDERATED`, `ndbinfo`, `MRG_MYISAM`, `PERFORMANCE_SCHEMA`. | `InnoDB`      | No        | No         | Yes       | 0.4.0         |
 | `auto-increment-offset` | Used to specify the starting value of the auto-increment field.                                                                                          | (none)        | No        | No         | Yes       | 0.4.0         |

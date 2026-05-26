@@ -31,7 +31,7 @@ The Paimon catalog does not support `alterSchema`.
 
 ### Catalog Properties
 
-| Property name                                      | Description                                                                                                                                                                                                 | Default value                                                                  | Required                                                                                                                                                             | Since Version    |
+| Property name                                      | Description                                                                                                                                                                                                 | Default                                                                  | Required                                                                                                                                                             | Since    |
 |----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
 | `catalog-backend`                                  | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`, `jdbc`, `hive` and `rest`.                                                                                                              | (none)                                                                         | Yes                                                                                                                                                                  | 0.6.0-incubating |
 | `uri`                                              | The URI configuration of the Paimon catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db`. It is optional for `FilesystemCatalog`. | (none)                                                                         | required if the value of `catalog-backend` is not `filesystem`.                                                                                                      | 0.6.0-incubating |
@@ -85,7 +85,7 @@ Any properties not defined by Gravitino with `gravitino.bypass.` prefix will pas
 
 If you are using JDBC backend, you must specify the properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`.
 
-| Property name   | Description                                                                                               | Default value   | Required                                              | Since Version    |
+| Property name   | Description                                                                                               | Default   | Required                                              | Since    |
 |-----------------|-----------------------------------------------------------------------------------------------------------|-----------------|-------------------------------------------------------|------------------|
 | `jdbc-user`     | Jdbc user of Gravitino Paimon catalog for `jdbc` backend.                                                 | (none)          | required if the value of `catalog-backend` is `jdbc`. | 0.7.0-incubating |
 | `jdbc-password` | Jdbc password of Gravitino Paimon catalog for `jdbc` backend.                                             | (none)          | required if the value of `catalog-backend` is `jdbc`. | 0.7.0-incubating |
@@ -213,7 +213,7 @@ Pass [Paimon table properties](https://paimon.apache.org/docs/0.8/maintenance/co
 Bucket settings are defined via Gravitino table distribution (HASH strategy). The `bucket` and
 `bucket-key` options are reserved and derived from the distribution instead of being set directly.
 
-| Configuration item | Description               | Default Value | Required  | Reserved | Immutable | Since version     |
+| Property | Description               | Default | Required  | Reserved | Immutable | Since     |
 |--------------------|---------------------------|---------------|-----------|----------|-----------|-------------------|
 | `merge-engine`     | The table merge-engine.   | (none)        | No        | No       | Yes       | 0.6.0-incubating  |
 | `sequence.field`   | The table sequence.field. | (none)        | No        | No       | Yes       | 0.6.0-incubating  |

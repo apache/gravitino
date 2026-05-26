@@ -40,7 +40,7 @@ Check the relevant data source configuration in [data source properties](https:/
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties), the OceanBase catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                           | Default value | Required | Since Version    |
+| Property      | Description                                                                                                                           | Default | Required | Since    |
 |-------------------------|---------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:2881` or `jdbc:oceanbase://localhost:2881`              | (none)        | Yes      | 0.7.0-incubating |
 | `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` or `com.oceanbase.jdbc.Driver`. | (none)        | Yes      | 0.7.0-incubating |

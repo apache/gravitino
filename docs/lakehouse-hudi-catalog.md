@@ -33,7 +33,7 @@ The Hudi catalog:
 
 ### Catalog Properties
 
-| Property name                            | Description                                                                                                                                                                                                                            | Default value | Required | Since Version    |
+| Property name                            | Description                                                                                                                                                                                                                            | Default | Required | Since    |
 |------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `catalog-backend`                        | Catalog backend of Gravitino Hudi catalog. Only supports `hms` now.                                                                                                                                                                    | (none)        | Yes      | 0.7.0-incubating |
 | `uri`                                    | The URI associated with the backend. Such as `thrift://127.0.0.1:9083` for HMS backend.                                                                                                                                                | (none)        | Yes      | 0.7.0-incubating |
@@ -46,7 +46,7 @@ The Hudi catalog:
 
 Configure backend security with the following properties. For a Kerberos Hive backend, for example, set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
 
-| Property name                                      | Description                                                                                                                                                    | Default value | Required                                                    | Since Version     |
+| Property name                                      | Description                                                                                                                                                    | Default | Required                                                    | Since     |
 |----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------|-------------------|
 | `authentication.type`                              | Authentication type for the Hudi catalog backend. The HMS backend supports `kerberos` and `simple`.                                                            | `simple`      | No                                                          | 1.0.0 |
 | `authentication.impersonation-enable`              | Whether to enable impersonation for the hudi catalog                                                                                                           | `false`       | No                                                          | 1.0.0 |

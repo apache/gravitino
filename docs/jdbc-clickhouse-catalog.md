@@ -48,7 +48,7 @@ Pass any JDBC pool property that Gravitino does not define by adding the `gravit
 
 When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user`, and `jdbc-password`. Common catalog properties are listed [here](./gravitino-server-config.md#catalog-properties); ClickHouse adds no extra catalog-scoped keys.
 
-| Configuration item      | Description                                                                 | Default value | Required | Since Version |
+| Property      | Description                                                                 | Default | Required | Since |
 |-------------------------|-----------------------------------------------------------------------------|---------------|----------|---------------|
 | `jdbc-url`              | JDBC URL, for example `jdbc:clickhouse://localhost:8123`                    | (none)        | Yes      | 1.2.0         |
 | `jdbc-driver`           | JDBC driver class, for example `com.clickhouse.jdbc.ClickHouseDriver`       | (none)        | Yes      | 1.2.0         |
@@ -122,7 +122,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 ### Schema Properties
 
-| Property Name  | Description                                                                        | Default Value | Required | Immutable | Since version |
+| Property  | Description                                                                        | Default | Required | Immutable | Since |
 |----------------|------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
 | `on-cluster`   | Use `ON CLUSTER` when creating the database                                        | `false`       | No       | No        | 1.2.0         |
 | `cluster-name` | Cluster name used with `ON CLUSTER` (must align with table-level cluster settings) | (none)        | No       | No        | 1.2.0         |
@@ -223,7 +223,7 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 **Memory engine data volatility**: Tables created with `engine=Memory` store data in RAM only. After a ClickHouse server restart the table definition persists (Gravitino's `loadTable` succeeds), but all data is permanently lost. Gravitino metadata and ClickHouse remain consistent at the schema level, but users are responsible for repopulating data after restarts. Consider using `TinyLog`, `StripeLog`, or a MergeTree-family engine if data durability is required.
 :::
 
-| Property Name              | Description                                                                                              | Default Value | Required | Reserved | Immutable | Since version |
+| Property              | Description                                                                                              | Default | Required | Reserved | Immutable | Since |
 |----------------------------|----------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|---------------|
 | `engine`                   | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)              | `MergeTree`   | No       | No       | Yes       | 1.2.0         |
 | `cluster-name`             | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)        | No\*     | No       | No        | 1.2.0         |

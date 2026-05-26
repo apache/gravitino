@@ -39,7 +39,7 @@ When using Gravitino with Trino, pass the Trino PostgreSQL connector configurati
 If you use JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties), the PostgreSQL catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                                                       | Default value | Required | Since Version |
+| Property      | Description                                                                                                                                                       | Default | Required | Since |
 |-------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `jdbc-url`              | JDBC URL for connecting to the database. You need to specify the database in the URL. For example `jdbc:postgresql://localhost:3306/pg_database?sslmode=require`. | (none)        | Yes      | 0.3.0         |
 | `jdbc-driver`           | The driver of the JDBC connection. For example `org.postgresql.Driver`.                                                                                           | (none)        | Yes      | 0.3.0         |

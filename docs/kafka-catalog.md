@@ -16,7 +16,7 @@ The Kafka catalog is a messaging catalog for managing Apache Kafka topic metadat
 
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties), the Kafka catalog has the following properties:
 
-| Property Name       | Description                                                                                                                                                                                                   | Default Value | Required | Since Version |
+| Property       | Description                                                                                                                                                                                                   | Default | Required | Since |
 |---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `bootstrap.servers` | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      | 0.5.0         |
 | `gravitino.bypass.` | Properties with this prefix are passed down to the underlying Kafka Admin client. See [Kafka Admin configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for the supported keys.        | (none)        | No       | 0.5.0         |
@@ -49,7 +49,7 @@ The Kafka catalog supports creating, updating, deleting, and listing topics.
 
 ### Topic Properties
 
-| Property name        | Description                              | Default value                                                                       | Required | Since Version |
+| Property name        | Description                              | Default                                                                       | Required | Since |
 |----------------------|------------------------------------------|-------------------------------------------------------------------------------------|----------|---------------|
 | `partition-count`    | Number of partitions for the topic.      | Falls back to `num.partition` from the broker.                                      | No       | 0.5.0         |
 | `replication-factor` | Number of replications for the topic.    | Falls back to `default.replication.factor` from the broker.                         | No       | 0.5.0         |

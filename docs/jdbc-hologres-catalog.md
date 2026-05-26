@@ -45,7 +45,7 @@ Check the relevant data source configuration in [data source properties](https:/
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties), the Hologres catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                                                           | Default value | Required | Since Version    |
+| Property      | Description                                                                                                                                                           | Default | Required | Since    |
 |-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database`                                        | (none)        | Yes      | 1.3.0 |
 | `jdbc-driver`           | The driver of the JDBC connection. Must be `org.postgresql.Driver`.                                                                                                   | (none)        | Yes      | 1.3.0 |
@@ -95,7 +95,7 @@ The Hologres catalog does not support [auto-increment](./manage-relational-metad
 
 Hologres-specific table properties are set via the `WITH` clause during CREATE TABLE and read from the `hologres.hg_table_properties` system table. The following user-relevant properties are supported:
 
-| Property Key                        | Description                       | Example Value                  |
+| Property                        | Description                       | Example                  |
 |-------------------------------------|-----------------------------------|--------------------------------|
 | `orientation`                       | Storage format                    | `column`, `row`, `row,column`  |
 | `clustering_key`                    | Clustering key columns            | `id:asc`                       |

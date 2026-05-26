@@ -43,7 +43,7 @@ For detailed information on available operations, see [Manage Relational Metadat
 
 ### Catalog Properties
 
-| Property   | Description                                  | Example                 | Required | Since Version |
+| Property   | Description                                  | Example                 | Required | Since |
 |------------|----------------------------------------------|-------------------------|----------|---------------|
 | `provider` | Catalog provider type                        | `lakehouse-generic`     | Yes      | 1.1.0         |
 | `location` | Root storage path for all schemas and tables | `s3://bucket/lakehouse` | No       | 1.1.0         |
@@ -145,7 +145,7 @@ See [Schema Operations](./manage-relational-metadata-using-gravitino.md#schema-o
 
 Schemas inherit catalog properties and can override specific settings:
 
-| Property   | Description                                              | Example                      | Required | Since version | 
+| Property   | Description                                              | Example                      | Required | Since | 
 |------------|----------------------------------------------------------|------------------------------|----------|---------------|
 | `location` | Custom storage root path for all tables under the schema | 's3://bucket/path_to_schema' | No       | 1.1.0         |
 
