@@ -18,10 +18,7 @@
 from __future__ import annotations
 
 from gravitino.api.authorization.privileges import Privilege
-from gravitino.api.authorization.securable_objects import (
-    SecurableObject,
-    SecurableObjects,
-)
+from gravitino.api.authorization.securable_objects import SecurableObject
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_template import JobTemplate, JobType
@@ -338,14 +335,6 @@ class DTOConverters:
         return PrivilegeDTO(privilege.name(), privilege.condition())
 
     @staticmethod
-    def from_privilege_dto(dto: PrivilegeDTO) -> Privilege:
-        return dto
-
-    @staticmethod
     def to_securable_object_dto(obj: SecurableObject) -> SecurableObjectDTO:
         privilege_dtos = [DTOConverters.to_privilege_dto(p) for p in obj.privileges()]
         return SecurableObjectDTO(obj.full_name(), obj.type(), privilege_dtos)
-
-    @staticmethod
-    def from_securable_object_dto(dto: SecurableObjectDTO) -> SecurableObject:
-        return SecurableObjects.parse(dto.full_name(), dto.type(), dto.privileges())
