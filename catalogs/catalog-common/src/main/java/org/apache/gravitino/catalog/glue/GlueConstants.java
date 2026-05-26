@@ -16,43 +16,138 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.catalog.glue;
 
-/**
- * Re-exports of {@link org.apache.gravitino.catalog.glue.GlueConstants} for use by the Spark
- * connector.
- *
- * <p>The spark-connector module cannot depend on catalog-glue directly, so this class in
- * catalog-common re-exports the constants needed by the Spark side.
- */
+/** Constant keys for the AWS Glue Data Catalog connector configuration and table properties. */
 public final class GlueConstants {
 
   // -------------------------------------------------------------------------
   // Catalog-level connection properties
   // -------------------------------------------------------------------------
 
-  /** AWS region for the Glue Data Catalog. */
+  /** AWS region for the Glue Data Catalog (required). */
   public static final String AWS_REGION = "aws-region";
 
-  /** AWS access key ID. */
+  /**
+   * Glue catalog ID — the 12-digit AWS account ID (optional). When omitted, defaults to the
+   * caller's AWS account ID.
+   */
+  public static final String AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
+
+  /** AWS access key ID for static credential authentication (optional, sensitive). */
   public static final String AWS_ACCESS_KEY_ID = "aws-access-key-id";
 
-  /** AWS secret access key. */
+  /** AWS secret access key for static credential authentication (optional, sensitive). */
   public static final String AWS_SECRET_ACCESS_KEY = "aws-secret-access-key";
 
-  /** Custom Glue endpoint URL for VPC or testing. */
+  /**
+   * Custom Glue endpoint URL (optional). Used for VPC endpoints or LocalStack testing. Example:
+   * {@code http://localhost:4566}
+   */
   public static final String AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
 
+  /**
+   * Default table format used when creating tables via Gravitino's {@code createTable()} API
+   * (optional). Accepted values: {@code iceberg}, {@code hive}. Defaults to {@code hive}.
+   */
+  public static final String DEFAULT_TABLE_FORMAT = "default-table-format";
+
+  /** Default value for {@link #DEFAULT_TABLE_FORMAT}: {@code "hive"}. */
+  public static final String DEFAULT_TABLE_FORMAT_VALUE = "hive";
+
+  /**
+   * Comma-separated list of table formats exposed by {@code listTables()} and {@code loadTable()}
+   * (optional). Defaults to {@code all}.
+   */
+  public static final String TABLE_FORMAT_FILTER = "table-format-filter";
+
+  /** Default value for {@link #TABLE_FORMAT_FILTER}: expose all table formats. */
+  public static final String DEFAULT_TABLE_FORMAT_FILTER = "all";
+
+  /**
+   * Base storage path used as a warehouse when no explicit {@code location} is given at table
+   * creation time. The table location is derived as {@code warehouse/database/table}. Example:
+   * {@code s3://my-bucket/gravitino-warehouse}.
+   */
+  public static final String WAREHOUSE = "warehouse";
+
   // -------------------------------------------------------------------------
-  // Glue table format properties
+  // Glue Table.parameters() keys (passthrough properties)
   // -------------------------------------------------------------------------
 
-  /** Table-format property key for Glue tables. Same as {@code TABLE_FORMAT} in server-side. */
+  /**
+   * Glue table format parameter key stored in {@code Table.parameters()}. Common values: {@code
+   * ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET} (uppercase, as stored by Glue). Used
+   * internally to determine the table format when reading Glue tables.
+   */
   public static final String TABLE_FORMAT = "table-format";
 
-  /** Table-format value for Iceberg tables stored in Glue. */
+  /** Table-format value indicating an Iceberg table stored in Glue {@code Table.parameters()}. */
   public static final String TABLE_FORMAT_ICEBERG = "ICEBERG";
+
+  /**
+   * Table file format (lowercase, e.g. "parquet", "orc", "textfile") used when creating Hive-format
+   * tables via Trino. Maps to input-format/output-format/serde-lib.
+   */
+  public static final String FORMAT = "format";
+
+  /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
+  public static final String METADATA_LOCATION = "metadata_location";
+
+  /**
+   * Key of the {@code table_type} entry in {@code Table.parameters()} that identifies the table
+   * format (e.g., {@code "ICEBERG"}).
+   */
+  public static final String TABLE_TYPE_PARAM = "table_type";
+
+  /** Value of {@link #TABLE_TYPE_PARAM} that identifies an Iceberg table. */
+  public static final String ICEBERG_TABLE_TYPE_VALUE = "ICEBERG";
+
+  /** Default Iceberg spec version used when creating Iceberg tables via Glue. */
+  public static final String ICEBERG_FORMAT_VERSION = "2";
+
+  /**
+   * Key of the {@code current-schema-id} entry in {@code Table.parameters()} that holds the active
+   * Iceberg schema ID.
+   */
+  public static final String CURRENT_SCHEMA_ID_PARAM = "current-schema-id";
+
+  /** Glue column parameter key for the Iceberg field ID (assigned at table creation). */
+  public static final String ICEBERG_FIELD_ID = "iceberg.field.id";
+
+  /** Glue column parameter key indicating whether the Iceberg field is optional (nullable). */
+  public static final String ICEBERG_FIELD_OPTIONAL = "iceberg.field.optional";
+
+  // -------------------------------------------------------------------------
+  // StorageDescriptor-derived table properties (stored in Gravitino properties map)
+  // -------------------------------------------------------------------------
+
+  /** Table data location from {@code StorageDescriptor.location()}. */
+  public static final String LOCATION = "location";
+
+  /** InputFormat class name from {@code StorageDescriptor.inputFormat()}. */
+  public static final String INPUT_FORMAT_CLASS = "input-format";
+
+  /** OutputFormat class name from {@code StorageDescriptor.outputFormat()}. */
+  public static final String OUTPUT_FORMAT = "output-format";
+
+  /** SerDe library class name from {@code StorageDescriptor.serDeInfo().serializationLibrary()}. */
+  public static final String SERDE_LIB = "serde-lib";
+
+  /** SerDe name from {@code StorageDescriptor.serDeInfo().name()}. */
+  public static final String SERDE_NAME = "serde-name";
+
+  /**
+   * Prefix for SerDe parameters from {@code StorageDescriptor.serDeInfo().parameters()}. Each SerDe
+   * parameter key {@code k} is stored as {@code "serde.parameter." + k}.
+   */
+  public static final String SERDE_PARAMETER_PREFIX = "serde.parameter.";
+
+  /** Glue {@code tableType} value for external tables. */
+  public static final String EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
+
+  /** Default Glue {@code tableType} used when none is specified at table creation time. */
+  public static final String MANAGED_TABLE_TYPE = "MANAGED_TABLE";
 
   private GlueConstants() {}
 }
