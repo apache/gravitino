@@ -155,6 +155,8 @@ jobs:
               sleep 2
             done
             echo "$url did NOT become ready in time"
+            cat distribution/package/logs/*.log
+            cat distribution/package-b/logs/*.log 
             return 1
           }
           wait_ready http://localhost:8090
