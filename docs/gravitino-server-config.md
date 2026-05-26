@@ -191,13 +191,12 @@ The Gravitino server uses a tree lock to ensure data consistency. The tree lock 
 
 ### Iceberg REST Server
 
-Gravitino can host an [Iceberg REST server](iceberg-rest-service.md) in the same JVM as the metadata service. The properties below configure that embedded REST server. (Iceberg REST is hosted via Gravitino's auxiliary service framework; if other services use this framework in the future, the property prefix scheme `gravitino.auxService.*` may apply to them.)
+Gravitino can host an Iceberg REST server inside the Gravitino JVM as an auxiliary service. The properties below enable that hosting; the Iceberg REST server's own properties (HTTP config, catalog backends, security, etc.) are documented separately in [Iceberg REST Catalog Service](iceberg-rest-service.md).
 
-| gravitino.conf property            | Description                                                                                                                    | Default value | Since Version |
-|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|---------------|
-| `gravitino.auxService.names ` | The auxiliary service name of the Gravitino Iceberg REST server. Use **`iceberg-rest`** for the Gravitino Iceberg REST server. | (none)        | 0.2.0         |
-
-Refer to [Iceberg REST catalog service](iceberg-rest-service.md) for configuration details.
+| gravitino.conf property            | Description                                                                                                                                                          | Default value | Required | Since Version |
+|------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.auxService.names`       | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use `iceberg-rest`.                                                                        | (none)        | Yes      | 0.2.0         |
+| `gravitino.iceberg-rest.classpath` | The classpath of the Gravitino Iceberg REST catalog service. Supports both absolute and relative paths, for example, `iceberg-rest-server/libs, iceberg-rest-server/conf`. | (none)        | Yes      | 0.2.0         |
 
 ### Job System
 
