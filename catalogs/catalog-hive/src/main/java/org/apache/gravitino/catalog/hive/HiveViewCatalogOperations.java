@@ -119,9 +119,6 @@ class HiveViewCatalogOperations implements ViewCatalog {
       Map<String, String> params =
           Maps.newHashMap(properties == null ? ImmutableMap.of() : properties);
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
-      if (!Dialects.HIVE.equalsIgnoreCase(sqlRepresentation.dialect())) {
-        params.put(HiveView.GRAVITINO_VIEW_DIALECT_KEY, sqlRepresentation.dialect());
-      }
       String viewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
 
       HiveTable hiveTable =

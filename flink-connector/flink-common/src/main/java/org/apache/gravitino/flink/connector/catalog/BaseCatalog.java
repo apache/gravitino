@@ -106,6 +106,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class BaseCatalog extends AbstractCatalog {
   private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
+  private static final String FLINK_SCHEMA_NUM_COLUMNS_KEY = "flink.schema.num-columns";
 
   private final SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter;
   private final PartitionConverter partitionConverter;
@@ -432,17 +433,12 @@ public abstract class BaseCatalog extends AbstractCatalog {
     Column[] columns = toGravitinoColumns(view);
     Representation[] representations =
         buildSqlRepresentation(preferredDialect(), view.getExpandedQuery());
+    Map<String, String> options = new HashMap<>(view.getOptions());
+    options.put(FLINK_SCHEMA_NUM_COLUMNS_KEY, String.valueOf(columns.length));
     try {
       catalog()
           .asViewCatalog()
-          .createView(
-              identifier,
-              view.getComment(),
-              columns,
-              representations,
-              null,
-              null,
-              view.getOptions());
+          .createView(identifier, view.getComment(), columns, representations, null, null, options);
     } catch (NoSuchSchemaException e) {
       throw new DatabaseNotExistException(catalogName(), tablePath.getDatabaseName(), e);
     } catch (ViewAlreadyExistsException e) {
