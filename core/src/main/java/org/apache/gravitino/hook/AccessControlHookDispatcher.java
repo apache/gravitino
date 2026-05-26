@@ -122,6 +122,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     User grantedUser = dispatcher.grantRolesToUser(metalake, roles, user);
     notifyRoleUserRelChange(metalake, roles);
+    notifyUserRoleRelChange(metalake, user);
     return grantedUser;
   }
 
@@ -130,6 +131,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     Group grantedGroup = dispatcher.grantRolesToGroup(metalake, roles, group);
     notifyRoleGroupRelChange(metalake, roles);
+    notifyGroupRoleRelChange(metalake, group);
     return grantedGroup;
   }
 
@@ -138,6 +140,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     Group revokedGroup = dispatcher.revokeRolesFromGroup(metalake, roles, group);
     notifyRoleGroupRelChange(metalake, roles);
+    notifyGroupRoleRelChange(metalake, group);
     return revokedGroup;
   }
 
@@ -146,6 +149,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     User revokedUser = dispatcher.revokeRolesFromUser(metalake, roles, user);
     notifyRoleUserRelChange(metalake, roles);
+    notifyUserRoleRelChange(metalake, user);
     return revokedUser;
   }
 
@@ -265,6 +269,20 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
       for (String role : roles) {
         gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
       }
+    }
+  }
+
+  private static void notifyUserRoleRelChange(String metalake, String user) {
+    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (gravitinoAuthorizer != null) {
+      gravitinoAuthorizer.handleUserRoleRelChange(metalake, user);
+    }
+  }
+
+  private static void notifyGroupRoleRelChange(String metalake, String group) {
+    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (gravitinoAuthorizer != null) {
+      gravitinoAuthorizer.handleGroupRoleRelChange(metalake, group);
     }
   }
 }

@@ -532,6 +532,16 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
+  public void handleUserRoleRelChange(String metalake, String userName) {
+    userRoleCache.invalidate(JcasbinAuthorizationCacheKeys.userRoleKey(metalake, userName));
+  }
+
+  @Override
+  public void handleGroupRoleRelChange(String metalake, String groupName) {
+    groupRoleCache.invalidate(JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupName));
+  }
+
+  @Override
   public void handleMetadataOwnerChange(
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
@@ -1037,8 +1047,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /**
    * Resolves GroupEntity objects for the current principal's groups, skipping any that are stale or
-   * not found in the store. Used by {@link #isSelf} (ROLE branch) and owner checks that need full
-   * group entities instead of only group names.
+   * not found in the store. Used by owner checks that need full group entities instead of only
+   * group names.
    */
   private List<GroupEntity> resolveCurrentUserGroups(String metalake, EntityStore entityStore) {
     Principal principal = PrincipalUtils.getCurrentPrincipal();

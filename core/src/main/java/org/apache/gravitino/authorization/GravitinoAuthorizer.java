@@ -157,6 +157,26 @@ public interface GravitinoAuthorizer extends Closeable {
   }
 
   /**
+   * Called when the role assignments of a user change.
+   *
+   * @param metalake the metalake name
+   * @param userName the user name
+   */
+  default void handleUserRoleRelChange(String metalake, String userName) {
+    // default no-op for backward compatibility
+  }
+
+  /**
+   * Called when the role assignments of a group change.
+   *
+   * @param metalake the metalake name
+   * @param groupName the group name
+   */
+  default void handleGroupRoleRelChange(String metalake, String groupName) {
+    // default no-op for backward compatibility
+  }
+
+  /**
    * This method is called to clear the owner relationship in jcasbin when the owner of the metadata
    * changes.
    *

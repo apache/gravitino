@@ -1014,6 +1014,63 @@ public class TestJcasbinAuthorizer {
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
   }
 
+  @Test
+  public void testUserRoleRelChangeInvalidatesUserRoleCache() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal noGroupPrincipal = setCurrentPrincipalWithGroup(null);
+    long userVersion = nextUserVersion();
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, userVersion));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of());
+
+    assertFalse(doAuthorize(noGroupPrincipal));
+
+    Long grantedRoleId = 20L;
+    RoleEntity grantedRole =
+        mockRoleInStore(
+            grantedRoleId, "userRelGrantedRole", ImmutableList.of(getAllowSecurableObject()));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(grantedRoleId, grantedRole.name())));
+
+    jcasbinAuthorizer.handleUserRoleRelChange(METALAKE, USERNAME);
+
+    assertTrue(doAuthorize(noGroupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  @Test
+  public void testGroupRoleRelChangeInvalidatesGroupRoleCache() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+    mockNoDirectUserRoles();
+    long groupVersion = groupVersionCounter.incrementAndGet();
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
+        .thenReturn(new GroupUpdatedAt(GROUP_ID, groupVersion));
+    when(roleMetaMapper.listRolesByGroupId(eq(GROUP_ID))).thenReturn(ImmutableList.of());
+
+    assertFalse(doAuthorize(groupPrincipal));
+
+    Long grantedRoleId = 21L;
+    RoleEntity grantedRole =
+        mockRoleInStore(
+            grantedRoleId, "groupRelGrantedRole", ImmutableList.of(getAllowSecurableObject()));
+    when(roleMetaMapper.listRolesByGroupId(eq(GROUP_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(grantedRoleId, grantedRole.name())));
+
+    jcasbinAuthorizer.handleGroupRoleRelChange(METALAKE, GROUP_NAME);
+
+    assertTrue(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
   /**
    * When the user is removed from a group at the IdP level (e.g. Azure AD), the next JWT token
    * won't include that group. On the next request the group's roles should no longer be available.
