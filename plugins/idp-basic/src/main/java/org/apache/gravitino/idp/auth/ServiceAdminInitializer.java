@@ -36,6 +36,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.apache.gravitino.json.JsonUtils;
@@ -85,7 +86,7 @@ public final class ServiceAdminInitializer {
         parseInitialAdminPasswords(serviceAdmins, initialAdminPasswords);
     for (String serviceAdmin : serviceAdmins) {
       validateUserName(serviceAdmin);
-      if (userMetaService.idpUserExists(serviceAdmin)) {
+      if (idpUserExists(userMetaService, serviceAdmin)) {
         continue;
       }
 
@@ -104,6 +105,15 @@ public final class ServiceAdminInitializer {
               .withLastVersion(POConverters.INIT_VERSION)
               .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
               .build());
+    }
+  }
+
+  private static boolean idpUserExists(IdpUserMetaService userMetaService, String username) {
+    try {
+      userMetaService.getIdpUserByUsername(username);
+      return true;
+    } catch (NotFoundException e) {
+      return false;
     }
   }
 

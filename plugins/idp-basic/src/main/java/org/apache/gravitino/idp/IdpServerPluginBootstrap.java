@@ -46,7 +46,7 @@ public final class IdpServerPluginBootstrap implements ServerPluginBootstrap {
   }
 
   @Override
-  public void initializeOnce() throws Exception {
+  public void initialize() throws Exception {
     if (!INITIALIZED.compareAndSet(false, true)) {
       return;
     }

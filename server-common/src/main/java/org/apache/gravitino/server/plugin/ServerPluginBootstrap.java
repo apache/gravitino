@@ -39,5 +39,5 @@ public interface ServerPluginBootstrap {
    *
    * @throws Exception If initialization fails.
    */
-  void initializeOnce() throws Exception;
+  void initialize() throws Exception;
 }

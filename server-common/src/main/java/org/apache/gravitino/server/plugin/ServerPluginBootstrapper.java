@@ -36,7 +36,7 @@ public final class ServerPluginBootstrapper {
     for (ServerPluginBootstrap bootstrap : loader) {
       try {
         LOG.info("Initializing server plugin bootstrap: {}", bootstrap.name());
-        bootstrap.initializeOnce();
+        bootstrap.initialize();
       } catch (RuntimeException e) {
         throw e;
       } catch (Exception e) {

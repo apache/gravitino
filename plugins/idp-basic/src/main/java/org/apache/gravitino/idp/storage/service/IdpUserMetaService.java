@@ -58,19 +58,6 @@ public class IdpUserMetaService {
     return userPO;
   }
 
-  /**
-   * Returns whether an active IdP user exists for the given username.
-   *
-   * @param username username to check
-   * @return true if the user exists
-   */
-  public boolean idpUserExists(String username) {
-    IdpUserPO userPO =
-        SessionUtils.getWithoutCommit(
-            IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
-    return userPO != null;
-  }
-
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listGroupNamesByUsername")

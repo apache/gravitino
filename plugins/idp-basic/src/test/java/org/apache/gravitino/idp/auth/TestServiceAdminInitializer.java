@@ -33,6 +33,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.apache.gravitino.storage.IdGenerator;
@@ -62,8 +63,9 @@ class TestServiceAdminInitializer {
   @Test
   void testInitializeCreatesMissingServiceAdmin() throws IOException {
     loadConfig("basic", "admin1,admin2");
-    when(userMetaService.idpUserExists("admin1")).thenReturn(false);
-    when(userMetaService.idpUserExists("admin2")).thenReturn(true);
+    when(userMetaService.getIdpUserByUsername("admin1"))
+        .thenThrow(new NotFoundException("IdP user not found: %s", "admin1"));
+    when(userMetaService.getIdpUserByUsername("admin2")).thenReturn(existingUser("admin2"));
     when(passwordHasher.hash("Passw0rd-For-Admin1")).thenReturn("hashed-password");
     when(idGenerator.nextId()).thenReturn(42L);
 
@@ -96,13 +98,13 @@ class TestServiceAdminInitializer {
   @Test
   void testInitializeSkipsWhenAllServiceAdminsAlreadyExist() throws IOException {
     loadConfig("basic", "admin1,admin2");
-    when(userMetaService.idpUserExists("admin1")).thenReturn(true);
-    when(userMetaService.idpUserExists("admin2")).thenReturn(true);
+    when(userMetaService.getIdpUserByUsername("admin1")).thenReturn(existingUser("admin1"));
+    when(userMetaService.getIdpUserByUsername("admin2")).thenReturn(existingUser("admin2"));
 
     initialize(null);
 
-    verify(userMetaService).idpUserExists("admin1");
-    verify(userMetaService).idpUserExists("admin2");
+    verify(userMetaService).getIdpUserByUsername("admin1");
+    verify(userMetaService).getIdpUserByUsername("admin2");
     verify(userMetaService, never()).insertIdpUser(any());
     verifyNoInteractions(passwordHasher, idGenerator);
   }
@@ -110,7 +112,8 @@ class TestServiceAdminInitializer {
   @Test
   void testInitializeFailsWhenRequiredPasswordMissing() throws IOException {
     loadConfig("basic", "admin1");
-    when(userMetaService.idpUserExists("admin1")).thenReturn(false);
+    when(userMetaService.getIdpUserByUsername("admin1"))
+        .thenThrow(new NotFoundException("IdP user not found: %s", "admin1"));
 
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> initialize(null));
@@ -149,6 +152,17 @@ class TestServiceAdminInitializer {
             "[\"admin1:Passw0rd-For-Admin1\",\"admin1:Passw0rd-For-Admin1-Another\"]",
             "GRAVITINO_INITIAL_ADMIN_PASSWORD contains duplicate entries for service admin admin1"),
         Arguments.of("[\"admin1:short\"]", "Password length must be at least 12 characters"));
+  }
+
+  private static IdpUserPO existingUser(String username) {
+    return IdpUserPO.builder()
+        .withUserId(1L)
+        .withUsername(username)
+        .withPasswordHash("hash")
+        .withCurrentVersion(POConverters.INIT_VERSION)
+        .withLastVersion(POConverters.INIT_VERSION)
+        .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
+        .build();
   }
 
   private void loadConfig(String authenticators, String serviceAdmins) {
