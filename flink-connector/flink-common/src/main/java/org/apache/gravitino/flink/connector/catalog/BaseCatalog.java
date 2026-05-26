@@ -490,8 +490,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
             .asViewCatalog()
             .alterView(
                 identifier,
-                getGravitinoViewChanges(
-                    existingTable, (ResolvedCatalogView) newTable, Dialects.FLINK));
+                toReplaceViewChange(existingTable, (ResolvedCatalogView) newTable, Dialects.FLINK));
       } catch (NoSuchViewException e) {
         if (!ignoreIfNotExists) {
           throw new TableNotExistException(catalogName(), tablePath, e);
@@ -539,8 +538,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
             .asViewCatalog()
             .alterView(
                 identifier,
-                getGravitinoViewChanges(
-                    tableChanges, (ResolvedCatalogView) newTable, Dialects.FLINK));
+                toReplaceViewChange(tableChanges, (ResolvedCatalogView) newTable, Dialects.FLINK));
       } catch (NoSuchViewException e) {
         if (!ignoreIfNotExists) {
           throw new TableNotExistException(catalogName(), tablePath, e);
@@ -949,12 +947,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
         view.properties() != null
             ? Collections.unmodifiableMap(view.properties())
             : Collections.emptyMap();
-    String comment = view.comment() != null ? view.comment() : "";
-    return CatalogView.of(builder.build(), comment, sql, sql, properties);
+    return CatalogView.of(builder.build(), view.comment(), sql, sql, properties);
   }
 
   @VisibleForTesting
-  static ViewChange[] getGravitinoViewChanges(
+  static ViewChange[] toReplaceViewChange(
       CatalogBaseTable existingView, ResolvedCatalogView newView, String dialect) {
     return new ViewChange[] {
       ViewChange.replaceView(
@@ -967,7 +964,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @VisibleForTesting
-  static ViewChange[] getGravitinoViewChanges(
+  static ViewChange[] toReplaceViewChange(
       List<org.apache.flink.table.catalog.TableChange> tableChanges,
       ResolvedCatalogView newView,
       String dialect) {

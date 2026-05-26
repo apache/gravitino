@@ -185,7 +185,7 @@ public class TestBaseCatalog {
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
 
     ViewChange[] changes =
-        BaseCatalog.getGravitinoViewChanges(
+        BaseCatalog.toReplaceViewChange(
             tableChanges, resolveView(schema, "SELECT 1", "comment"), Dialects.FLINK);
 
     Assertions.assertEquals(2, changes.length);
@@ -206,7 +206,7 @@ public class TestBaseCatalog {
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
 
     ViewChange[] changes =
-        BaseCatalog.getGravitinoViewChanges(
+        BaseCatalog.toReplaceViewChange(
             tableChanges, resolveView(schema, "SELECT id FROM t", "new comment"), Dialects.FLINK);
 
     // Should have exactly one SetProperty and one ReplaceView (order may vary)
@@ -241,7 +241,7 @@ public class TestBaseCatalog {
         CatalogView.of(schema, "old comment", "SELECT 1", "SELECT 1", Collections.emptyMap());
 
     ViewChange[] changes =
-        BaseCatalog.getGravitinoViewChanges(
+        BaseCatalog.toReplaceViewChange(
             existing, resolveView(schema, "SELECT 2", "new comment"), Dialects.FLINK);
 
     Assertions.assertEquals(1, changes.length);
