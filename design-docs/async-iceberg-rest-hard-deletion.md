@@ -243,16 +243,24 @@ in memory (no owner column — a stale row is reclaimable by anyone, which is
 exactly the failover behavior we want). A job is abandoned, and reclaimable,
 once its heartbeat is older than `heartbeatTimeout`.
 
+**Claiming is gated by free worker capacity.** Each tick the worker first
+counts its idle threads and polls for *at most* that many candidates; when
+every thread is busy it polls for nothing. A worker therefore never claims a
+job it cannot run immediately, so a `RUNNING` row always maps to a thread
+actively deleting files — its heartbeat reflects real progress, never a job
+idling in an in-memory backlog. This also means the claim count is the idle
+thread count, not a separate tunable.
+
 Claiming is an optimistic compare-and-swap `UPDATE` that works on **every**
 SQL backend:
 
 ```sql
--- read candidates
+-- read up to :idleThreads candidates (0 when the pool is saturated)
 SELECT id FROM iceberg_purge_job
  WHERE state = 'PENDING'
     OR (state = 'RUNNING'
         AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout))
- ORDER BY updated_at LIMIT :batch;
+ ORDER BY updated_at LIMIT :idleThreads;
 
 -- claim each candidate; the row is ours only if affected_rows = 1
 UPDATE iceberg_purge_job
@@ -263,10 +271,11 @@ UPDATE iceberg_purge_job
           AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)) );
 ```
 
-A loser sees `affected_rows = 0` and moves on. Where `SELECT … FOR UPDATE
-SKIP LOCKED` is available (MySQL 8+, PostgreSQL) the worker uses it to cut
-contention up front; the CAS form is the portable fallback (H2, older
-MySQL). `SKIP LOCKED` is purely an optimization — the claiming `UPDATE` is
+A loser sees `affected_rows = 0` and moves to the next candidate (so a tick
+may end up running fewer jobs than it has idle threads). Where `SELECT …
+FOR UPDATE SKIP LOCKED` is available (MySQL 8+, PostgreSQL) the worker uses
+it to cut contention up front; the CAS form is the portable fallback (H2,
+older MySQL). `SKIP LOCKED` is purely an optimization — the claiming `UPDATE` is
 the serialization point, so two replicas can never claim the same job. We do
 not use DB-specific advisory locks.
 
@@ -426,8 +435,9 @@ only tune the worker pool and retries:
 | `gravitino.iceberg-rest.async-purge.max-attempts`             | `5`      | Attempts before `FAILED`.                                                    |
 | `gravitino.iceberg-rest.async-purge.terminal-retention-hours` | `168`    | How long terminal (`SUCCEEDED` / `FAILED`) rows are retained before pruning. |
 
-The claim batch size is an internal constant with a sensible default; it
-becomes a config key only if a deployment demonstrates the need.
+There is no separate claim-batch-size key: a tick claims at most as many
+jobs as the worker has idle threads (§5.5), so `worker-threads` already
+bounds it.
 
 ### 5.11 Security
 
