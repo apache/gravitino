@@ -41,7 +41,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
-import org.apache.gravitino.catalog.hive.HiveStorageConstants;
+import org.apache.gravitino.catalog.hive.StorageFormat;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -111,9 +111,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
           GlueConstants.SERDE_LIB,
           GlueConstants.SERDE_NAME);
 
-  /** Property keys that map to top-level TableInput fields, not to Table.parameters(). */
-  private static final Set<String> TABLE_LEVEL_KEYS = ImmutableSet.of(GlueConstants.TABLE_TYPE);
-
   @VisibleForTesting GlueClient glueClient;
 
   /** Nullable — when null, Glue uses the caller's AWS account ID. */
@@ -124,7 +121,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   @VisibleForTesting String defaultTableFormat;
 
-  /** Optional S3 warehouse prefix. Table location is derived as {@code warehouse/db/table}. */
+  /** Warehouse storage path. Table location is derived as {@code warehouse/db/table}. */
   @VisibleForTesting String warehouseLocation;
 
   /** Iceberg SDK Glue catalog used for creating Iceberg-format tables. */
@@ -376,7 +373,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       // Recover Iceberg-specific partitioning and sort orders from the Iceberg metadata.
       // AWS Glue Table.partitionKeys() is empty for Iceberg tables, so we load the Iceberg
       // Table to obtain the accurate partition spec and sort order.
-      if (GlueIcebergTableHelper.isIcebergTable(rawGlueTable) && icebergGlueCatalog != null) {
+      if (GlueIcebergTableHelper.isIcebergTable(rawGlueTable)) {
         try {
           GlueIcebergTableHelper.loadTable(icebergGlueCatalog, dbName, ident.name(), table);
         } catch (Exception e) {
@@ -621,12 +618,16 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private GlueTable alterIcebergTable(
       NameIdentifier ident, String dbName, Table rawGlueTable, TableChange... changes) {
-    // When the Iceberg GlueCatalog is available, use it for all Iceberg schema changes.
-    // Tables created via the Iceberg SDK have metadata_location set by Iceberg itself; tables
-    // explicitly registered by the user also have metadata_location. Both can be altered via the
-    // Iceberg SDK when icebergGlueCatalog is initialized.
-    // Fall back to the register-mode (property-only) path only when icebergGlueCatalog is absent.
-    if (icebergGlueCatalog == null) {
+    // Register-mode: has METADATA_LOCATION but was not created via the Gravitino Iceberg SDK
+    // (i.e., TABLE_TYPE_PARAM is absent). Fall back to the native Glue SDK update path.
+    boolean hasMetadataLocation =
+        rawGlueTable.hasParameters()
+            && rawGlueTable.parameters().containsKey(GlueConstants.METADATA_LOCATION);
+    boolean isSdkManaged =
+        rawGlueTable.hasParameters()
+            && GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equals(
+                rawGlueTable.parameters().get(GlueConstants.TABLE_TYPE_PARAM));
+    if (hasMetadataLocation && !isSdkManaged) {
       return alterRegisterModeIcebergTable(ident, dbName, rawGlueTable, changes);
     }
     GlueIcebergTableHelper.alterTable(icebergGlueCatalog, dbName, ident.name(), changes);
@@ -762,44 +763,29 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       if (key.startsWith(GlueConstants.SERDE_PARAMETER_PREFIX)) {
         serdeParams.put(
             key.substring(GlueConstants.SERDE_PARAMETER_PREFIX.length()), entry.getValue());
-      } else if (!SD_TABLE_PROPERTY_KEYS.contains(key) && !TABLE_LEVEL_KEYS.contains(key)) {
+      } else if (!SD_TABLE_PROPERTY_KEYS.contains(key)) {
         tableParams.put(key, entry.getValue());
       }
     }
 
     // Translate format name to input/output/serde class names if not explicitly set.
-    // Fall back to Spark's "provider" property (set by USING clause) if "format" is absent.
-    String format = properties.get(GlueConstants.FORMAT);
-    if (format == null) {
-      String provider = properties.get("provider");
-      if (provider != null) {
-        format = provider.toLowerCase(Locale.ROOT);
-      }
-    }
+    String format = properties.getOrDefault(GlueConstants.FORMAT, StorageFormat.PARQUET.name());
     String inputFormat = properties.get(GlueConstants.INPUT_FORMAT_CLASS);
     String outputFormat = properties.get(GlueConstants.OUTPUT_FORMAT);
     String serdeLib = properties.get(GlueConstants.SERDE_LIB);
 
-    String resolvedFormat = format != null ? format.toLowerCase(Locale.ROOT) : "parquet";
-    if (inputFormat == null) {
-      inputFormat = getInputFormatClass(resolvedFormat);
-    }
-    if (outputFormat == null) {
-      outputFormat = getOutputFormatClass(resolvedFormat);
-    }
-    if (serdeLib == null) {
-      serdeLib = getSerdeClass(resolvedFormat);
-    }
-
-    // Hive requires non-null StorageDescriptor fields; default to TextFile if still unset.
-    if (inputFormat == null) {
-      inputFormat = HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS;
-    }
-    if (outputFormat == null) {
-      outputFormat = HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS;
-    }
-    if (serdeLib == null) {
-      serdeLib = HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS;
+    boolean needsFormatClasses =
+        !isIceberg && (inputFormat == null || outputFormat == null || serdeLib == null);
+    if (needsFormatClasses) {
+      String upperFormat = format.toUpperCase(Locale.ROOT);
+      Preconditions.checkArgument(
+          Arrays.stream(StorageFormat.values()).anyMatch(f -> f.name().equals(upperFormat)),
+          "Unsupported table format: %s",
+          format);
+      StorageFormat sf = StorageFormat.valueOf(upperFormat);
+      if (inputFormat == null) inputFormat = sf.getInputFormat();
+      if (outputFormat == null) outputFormat = sf.getOutputFormat();
+      if (serdeLib == null) serdeLib = sf.getSerde();
     }
 
     SerDeInfo serDe =
@@ -848,8 +834,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         TableInput.builder()
             .name(name)
             .description(comment)
-            .tableType(
-                properties.getOrDefault(GlueConstants.TABLE_TYPE, GlueConstants.MANAGED_TABLE_TYPE))
+            .tableType(GlueConstants.EXTERNAL_TABLE_TYPE)
             .parameters(tableParams)
             .storageDescriptor(sd);
 
@@ -880,78 +865,12 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
               : warehouseLocation;
       return base + "/" + dbName + "/" + tableName;
     }
-    return null;
-  }
-
-  /** Translates a format name (e.g., "parquet", "orc") to the Hive input format class. */
-  private static String getInputFormatClass(String format) {
-    switch (format) {
-      case "parquet":
-        return HiveStorageConstants.PARQUET_INPUT_FORMAT_CLASS;
-      case "orc":
-        return HiveStorageConstants.ORC_INPUT_FORMAT_CLASS;
-      case "textfile":
-      case "csv":
-        return HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS;
-      case "rcfile":
-        return HiveStorageConstants.RCFILE_INPUT_FORMAT_CLASS;
-      case "avro":
-        return HiveStorageConstants.AVRO_INPUT_FORMAT_CLASS;
-      case "sequencefile":
-        return HiveStorageConstants.SEQUENCEFILE_INPUT_FORMAT_CLASS;
-      case "json":
-      case "regex":
-      default:
-        return HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS;
-    }
-  }
-
-  /** Translates a format name to the Hive output format class. */
-  private static String getOutputFormatClass(String format) {
-    switch (format) {
-      case "parquet":
-        return HiveStorageConstants.PARQUET_OUTPUT_FORMAT_CLASS;
-      case "orc":
-        return HiveStorageConstants.ORC_OUTPUT_FORMAT_CLASS;
-      case "textfile":
-      case "csv":
-        return HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS;
-      case "rcfile":
-        return HiveStorageConstants.RCFILE_OUTPUT_FORMAT_CLASS;
-      case "avro":
-        return HiveStorageConstants.AVRO_OUTPUT_FORMAT_CLASS;
-      case "sequencefile":
-        return HiveStorageConstants.SEQUENCEFILE_OUTPUT_FORMAT_CLASS;
-      case "json":
-      case "regex":
-      default:
-        return HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS;
-    }
-  }
-
-  /** Translates a format name to the Hive SerDe class. */
-  private static String getSerdeClass(String format) {
-    switch (format) {
-      case "parquet":
-        return HiveStorageConstants.PARQUET_SERDE_CLASS;
-      case "orc":
-        return HiveStorageConstants.ORC_SERDE_CLASS;
-      case "textfile":
-        return HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS;
-      case "csv":
-        return HiveStorageConstants.OPENCSV_SERDE_CLASS;
-      case "rcfile":
-        return HiveStorageConstants.COLUMNAR_SERDE_CLASS;
-      case "avro":
-        return HiveStorageConstants.AVRO_SERDE_CLASS;
-      case "json":
-        return HiveStorageConstants.JSON_SERDE_CLASS;
-      case "regex":
-        return HiveStorageConstants.REGEX_SERDE_CLASS;
-      case "sequencefile":
-      default:
-        return HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS;
-    }
+    throw new IllegalArgumentException(
+        "Table location is required: either set the '"
+            + GlueConstants.LOCATION
+            + "' property or configure '"
+            + GlueConstants.WAREHOUSE
+            + "' on the catalog.");
   }
 
   private static void applyColumnChange(

@@ -40,7 +40,9 @@ import {
   fetchModels,
   fetchModelVersions,
   fetchFunctions,
+  fetchViews,
   getFunctionDetails,
+  getViewDetails,
   getMetalakeDetails,
   getCatalogDetails,
   getSchemaDetails,
@@ -69,7 +71,18 @@ const CatalogsListPage = () => {
   const treeRef = useRef()
 
   const buildNodePath = routeParams => {
-    const keys = ['metalake', 'catalog', 'catalogType', 'schema', 'table', 'fileset', 'topic', 'model', 'function']
+    const keys = [
+      'metalake',
+      'catalog',
+      'catalogType',
+      'schema',
+      'table',
+      'fileset',
+      'topic',
+      'model',
+      'function',
+      'view'
+    ]
 
     return keys.map(key => (routeParams[key] ? `{{${routeParams[key]}}}` : '')).join('')
   }
@@ -85,6 +98,7 @@ const CatalogsListPage = () => {
       topic: searchParams.get('topic'),
       model: searchParams.get('model'),
       function: searchParams.get('function'),
+      view: searchParams.get('view'),
       version: searchParams.get('version')
     }
     async function fetchDependsData() {
@@ -99,6 +113,7 @@ const CatalogsListPage = () => {
           topic,
           model,
           function: func,
+          view,
           version
         } = routeParams
 
@@ -156,6 +171,7 @@ const CatalogsListPage = () => {
           switch (catalogType) {
             case 'relational':
               dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
+              dispatch(fetchViews({ init: true, metalake, catalog, schema }))
               break
             case 'fileset':
               dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema }))
@@ -308,6 +324,12 @@ const CatalogsListPage = () => {
             store.functions.length === 0 && (await dispatch(fetchFunctions({ init: true, metalake, catalog, schema })))
             await dispatch(setActivatedDetailsLoading(true))
             await dispatch(getFunctionDetails({ init: true, metalake, catalog, schema, functionName: func }))
+            await dispatch(setActivatedDetailsLoading(false))
+          }
+          if (view) {
+            store.views.length === 0 && (await dispatch(fetchViews({ init: true, metalake, catalog, schema })))
+            await dispatch(setActivatedDetailsLoading(true))
+            await dispatch(getViewDetails({ init: true, metalake, catalog, schema, view }))
             await dispatch(setActivatedDetailsLoading(false))
           }
         }

@@ -102,13 +102,12 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   false /* hidden */))
           .put(
               WAREHOUSE,
-              stringOptionalPropertyEntry(
+              stringRequiredPropertyEntry(
                   WAREHOUSE,
-                  "Base S3 path used as warehouse for Hive tables when no explicit location is"
-                      + " set at table creation time (e.g. s3://my-bucket/warehouse)."
+                  "Base storage path used as warehouse when no explicit location is set"
+                      + " at table creation time (e.g. s3://my-bucket/warehouse)."
                       + " Table location is derived as warehouse/database/table.",
                   false /* immutable */,
-                  null /* defaultValue */,
                   false /* hidden */))
           .build();
 

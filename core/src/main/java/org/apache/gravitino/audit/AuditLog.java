@@ -105,6 +105,16 @@ import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
+import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
+import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.CreateViewEvent;
+import org.apache.gravitino.listener.api.event.view.CreateViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.DropViewEvent;
+import org.apache.gravitino.listener.api.event.view.DropViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.ListViewEvent;
+import org.apache.gravitino.listener.api.event.view.ListViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.LoadViewEvent;
+import org.apache.gravitino.listener.api.event.view.LoadViewFailureEvent;
 
 /** The interface define unified audit log schema. */
 public interface AuditLog {
@@ -551,6 +561,16 @@ public interface AuditLog {
         return LOAD_TOPIC;
       } else if (event instanceof ListTopicEvent || event instanceof ListTopicFailureEvent) {
         return LIST_TOPIC;
+      } else if (event instanceof CreateViewEvent || event instanceof CreateViewFailureEvent) {
+        return CREATE_VIEW;
+      } else if (event instanceof AlterViewEvent || event instanceof AlterViewFailureEvent) {
+        return ALTER_VIEW;
+      } else if (event instanceof DropViewEvent || event instanceof DropViewFailureEvent) {
+        return DROP_VIEW;
+      } else if (event instanceof LoadViewEvent || event instanceof LoadViewFailureEvent) {
+        return LOAD_VIEW;
+      } else if (event instanceof ListViewEvent || event instanceof ListViewFailureEvent) {
+        return LIST_VIEW;
       } else if (event instanceof CreateFilesetEvent
           || event instanceof CreateFilesetFailureEvent) {
         return CREATE_FILESET;

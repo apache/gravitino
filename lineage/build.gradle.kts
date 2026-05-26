@@ -38,6 +38,10 @@ dependencies {
   implementation(libs.jackson.dataformat.yaml)
   implementation(libs.micrometer.core)
 
+  constraints {
+    implementation(libs.snakeyaml)
+  }
+
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)

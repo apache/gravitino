@@ -26,11 +26,6 @@ import org.apache.ibatis.annotations.Param;
 public class IdpGroupMetaPostgreSQLProvider extends IdpGroupMetaBaseSQLProvider {
 
   @Override
-  protected String currentTimeMillisExpression() {
-    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
-  }
-
-  @Override
   public String deleteIdpGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
@@ -38,5 +33,10 @@ public class IdpGroupMetaPostgreSQLProvider extends IdpGroupMetaBaseSQLProvider 
         + " WHERE group_id IN (SELECT group_id FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
+
+  @Override
+  protected String currentTimeMillisExpression() {
+    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
   }
 }

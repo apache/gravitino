@@ -47,6 +47,28 @@ public interface SupportsSchemas {
   String[] listSchemas() throws NoSuchCatalogException;
 
   /**
+   * List the schemas directly under the given parent schema.
+   *
+   * <p>This is only meaningful for catalogs that support hierarchical (multi-level) schemas, such
+   * as an Iceberg catalog accessed through the Gravitino REST server with a configured schema
+   * separator. For example, when the schemas {@code a}, {@code a:b} and {@code a:b:c} exist, this
+   * method invoked with parent {@code a:b} returns {@code [a:b:c]}. For a flat catalog, or a parent
+   * schema that has no children, an empty array is returned.
+   *
+   * @param parentSchema The parent (possibly hierarchical) schema name whose direct children are
+   *     listed, e.g. {@code "a"} or {@code "a:b"}. Must not be null or blank.
+   * @return An array of schema names directly under the given parent schema.
+   * @throws IllegalArgumentException If {@code parentSchema} is null or blank.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws NoSuchSchemaException If the parent schema does not exist.
+   */
+  default String[] listSchemas(String parentSchema)
+      throws NoSuchCatalogException, NoSuchSchemaException {
+    throw new UnsupportedOperationException(
+        "Listing schemas under a parent schema is not supported by this catalog");
+  }
+
+  /**
    * Check if a schema exists.
    *
    * <p>If an entity such as a table, view exists, its parent namespaces must also exist. For

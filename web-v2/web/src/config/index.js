@@ -270,6 +270,16 @@ export const distributionInfoMap = {
   }
 }
 
+export const sqlFormatterDialectMap = {
+  mysql: 'mysql',
+  postgresql: 'postgresql',
+  postgres: 'postgresql',
+  spark: 'spark',
+  trino: 'trino',
+  hive: 'spark',
+  sql: 'sql'
+}
+
 export const partitionInfoMap = {
   hive: ['identity'],
   'jdbc-doris': ['range', 'list'],

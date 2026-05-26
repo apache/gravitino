@@ -399,26 +399,7 @@ public class HiveCatalogOperations
       allTables.removeAll(views);
 
       if (!listAllTables) {
-        // The reason for using the listTableNamesByFilter function is that the
-        // getTableObjectiesByName function has poor performance. Currently, we focus on the
-        // Iceberg, Paimon and Hudi table. In the future, if necessary, we will need to filter out
-        // other tables.
-        String icebergAndPaimonFilter = getIcebergAndPaimonFilter();
-        List<String> icebergAndPaimonTables =
-            clientPool.run(
-                c ->
-                    c.listTableNamesByFilter(
-                        catalogName, schemaIdent.name(), icebergAndPaimonFilter, MAX_TABLES));
-        allTables.removeAll(icebergAndPaimonTables);
-
-        // filter out the Hudi tables
-        String hudiFilter = String.format("%sprovider like \"hudi\"", HIVE_FILTER_FIELD_PARAMS);
-        List<String> hudiTables =
-            clientPool.run(
-                c ->
-                    c.listTableNamesByFilter(
-                        catalogName, schemaIdent.name(), hudiFilter, MAX_TABLES));
-        removeHudiTables(allTables, hudiTables);
+        filterOutNonHiveTables(schemaIdent.name(), allTables);
       }
 
       return allTables.stream()
@@ -430,20 +411,59 @@ public class HiveCatalogOperations
     }
   }
 
-  private static String getIcebergAndPaimonFilter() {
+  /**
+   * Best-effort removal of non-Hive tables (Iceberg, Paimon, Hudi) from {@code allTables} via HMS
+   * server-side {@code listTableNamesByFilter}. HMS only supports exact lookups on dot-free
+   * property keys, so Spark-managed Hudi tables that only expose {@code
+   * spark.sql.sources.provider=hudi} cannot be filtered here. We keep this strategy because {@code
+   * getTableObjectsByName} materializes every table and is slow on large databases.
+   *
+   * @param database the database name
+   * @param allTables all table names fetched from HMS before non-Hive filtering
+   * @throws InterruptedException if the HMS client call is interrupted
+   */
+  private void filterOutNonHiveTables(String database, List<String> allTables)
+      throws InterruptedException {
+    List<String> icebergAndPaimonTables =
+        clientPool.run(
+            c ->
+                c.listTableNamesByFilter(
+                    catalogName, database, buildIcebergAndPaimonFilter(), MAX_TABLES));
+    allTables.removeAll(icebergAndPaimonTables);
+
+    // HoodieHiveSyncTool sets `provider=hudi` only on the base table; derived `_ro` / `_rt`
+    // tables carry only dotted keys, so we strip them by exact name match against the base list.
+    List<String> hudiBaseTables =
+        clientPool.run(
+            c ->
+                c.listTableNamesByFilter(
+                    catalogName, database, buildHudiBaseTableFilter(), MAX_TABLES));
+    removeHudiDerivedTables(allTables, hudiBaseTables);
+  }
+
+  private static String buildIcebergAndPaimonFilter() {
     String icebergFilter = String.format("%stable_type like \"ICEBERG\"", HIVE_FILTER_FIELD_PARAMS);
     String paimonFilter = String.format("%stable_type like \"PAIMON\"", HIVE_FILTER_FIELD_PARAMS);
     return String.format("%s or %s", icebergFilter, paimonFilter);
   }
 
-  private void removeHudiTables(List<String> allTables, List<String> hudiTables) {
-    for (String hudiTable : hudiTables) {
-      allTables.removeIf(
-          t ->
-              t.equals(hudiTable)
-                  || t.startsWith(hudiTable + "_ro")
-                  || t.startsWith(hudiTable + "_rt"));
+  private static String buildHudiBaseTableFilter() {
+    return String.format("%sprovider like \"hudi\"", HIVE_FILTER_FIELD_PARAMS);
+  }
+
+  /**
+   * Removes Hudi base tables together with their derived read-optimized ({@code _ro}) and real-time
+   * ({@code _rt}) tables. Exact name match is used because {@code startsWith} would incorrectly
+   * drop unrelated tables such as {@code <base>_root}.
+   */
+  private void removeHudiDerivedTables(List<String> allTables, List<String> hudiBaseTables) {
+    Set<String> hudiTablesToRemove = new HashSet<>();
+    for (String hudiBase : hudiBaseTables) {
+      hudiTablesToRemove.add(hudiBase);
+      hudiTablesToRemove.add(hudiBase + "_ro");
+      hudiTablesToRemove.add(hudiBase + "_rt");
     }
+    allTables.removeIf(hudiTablesToRemove::contains);
   }
 
   /**

@@ -29,6 +29,7 @@ import io.trino.spi.connector.ColumnMetadata;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.type.BigintType;
+import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.VarcharType;
 import java.time.Instant;
 import java.util.HashMap;
@@ -150,7 +151,7 @@ class TestGlueMetadataAdapter {
                 ColumnMetadata.builder().setName("id").setType(BigintType.BIGINT).build(),
                 ColumnMetadata.builder()
                     .setName("event_time")
-                    .setType(io.trino.spi.type.TimestampType.TIMESTAMP_MILLIS)
+                    .setType(TimestampType.TIMESTAMP_MILLIS)
                     .build()),
             properties);
 
@@ -204,7 +205,7 @@ class TestGlueMetadataAdapter {
                 ColumnMetadata.builder().setName("id").setType(BigintType.BIGINT).build(),
                 ColumnMetadata.builder()
                     .setName("event_time")
-                    .setType(io.trino.spi.type.TimestampType.TIMESTAMP_MILLIS)
+                    .setType(TimestampType.TIMESTAMP_MILLIS)
                     .build(),
                 ColumnMetadata.builder().setName("user_id").setType(VarcharType.VARCHAR).build(),
                 ColumnMetadata.builder().setName("category").setType(VarcharType.VARCHAR).build()),
