@@ -63,6 +63,7 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
     catalogProperties.put(GlueConstants.AWS_REGION, awsRegion);
     catalogProperties.put(GlueConstants.AWS_ACCESS_KEY_ID, awsAccessKeyId);
     catalogProperties.put(GlueConstants.AWS_SECRET_ACCESS_KEY, awsSecretAccessKey);
+    catalogProperties.put(GlueConstants.WAREHOUSE, warehouse);
     if (glueEndpoint != null) {
       catalogProperties.put(GlueConstants.AWS_GLUE_ENDPOINT, glueEndpoint);
     }
@@ -571,9 +572,11 @@ public abstract class SparkGlueCatalogIT extends SparkGlueEnvIT {
    * column comments to null, so this variant uses null instead of "" for the name column.
    */
   protected List<SparkColumnInfo> getSimpleIcebergTableColumn() {
+    // "name" is created with COMMENT '' (empty string) in getCreateSimpleTableString; Iceberg
+    // preserves the empty string rather than normalizing it to null.
     return Arrays.asList(
         SparkColumnInfo.of("id", DataTypes.IntegerType, "id comment"),
-        SparkColumnInfo.of("name", DataTypes.StringType, null),
+        SparkColumnInfo.of("name", DataTypes.StringType, ""),
         SparkColumnInfo.of("age", DataTypes.IntegerType, null));
   }
 }

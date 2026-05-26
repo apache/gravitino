@@ -140,6 +140,11 @@ public class GravitinoGlueCatalog extends BaseCatalog {
             getSparkTransformConverter(),
             getSparkTypeConverter());
       } catch (NoSuchTableException e) {
+        try {
+          icebergCatalog.dropTable(ident);
+        } catch (Exception rollbackEx) {
+          LOG.warn("Failed to rollback Iceberg table creation for {}", ident, rollbackEx);
+        }
         throw new RuntimeException("Failed to load Iceberg table after creation: " + ident, e);
       }
     }
@@ -200,7 +205,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     try {
       sparkCatalog.loadTable(ident);
     } catch (NoSuchTableException e) {
-      syncTableToDerby(ident);
+      syncTableToDerby(ident, gravitinoTable);
     }
     return super.loadTable(ident);
   }
@@ -247,15 +252,14 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   }
 
   /**
-   * Overrides renameTable to keep Derby in sync after the Gravitino rename. Gravitino/Glue is the
-   * source of truth; Derby is updated lazily (old entry dropped; new entry synced on next
-   * loadTable). Calling sparkCatalog.renameTable() before super.renameTable() can cause the old
-   * entry to disappear from Glue before Gravitino's alterTable runs.
+   * Overrides renameTable to keep Derby in sync after the Gravitino rename. The old Derby entry is
+   * dropped eagerly; the new entry is synced lazily on the next loadTable call.
    */
   @Override
   public void renameTable(Identifier oldIdent, Identifier newIdent)
       throws NoSuchTableException, TableAlreadyExistsException {
     super.renameTable(oldIdent, newIdent);
+    dropFromDerby(oldIdent);
   }
 
   @Override
@@ -270,7 +274,11 @@ public class GravitinoGlueCatalog extends BaseCatalog {
 
     if (isIcebergTable(gravitinoTable)) {
       SparkCatalog icebergCatalog = getOrCreateIcebergGlueCatalog();
-      Table icebergSparkTable = loadIcebergSparkTable(identifier, icebergCatalog);
+      // Reuse the already-loaded sparkTable when the caller has it; load only when missing.
+      Table icebergSparkTable =
+          (sparkTable instanceof SparkTable)
+              ? sparkTable
+              : loadIcebergSparkTable(identifier, icebergCatalog);
       return new SparkIcebergTable(
           identifier,
           gravitinoTable,
@@ -376,8 +384,7 @@ public class GravitinoGlueCatalog extends BaseCatalog {
           icebergProperties.put("warehouse", warehouseDir);
         }
       } catch (Exception e) {
-        LOG.warn(
-            "Could not read spark.sql.warehouse.dir for Iceberg Glue catalog: {}", e.getMessage());
+        LOG.warn("Could not read spark.sql.warehouse.dir for Iceberg Glue catalog", e);
       }
     }
 
@@ -423,13 +430,13 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   }
 
   /**
-   * Loads the table from Gravitino and creates a corresponding entry in Derby. Called when
-   * loadTable() detects the table is missing from Derby (e.g., after a JVM restart or when testing
-   * against a pre-populated Glue catalog).
+   * Creates a Derby entry from an already-loaded Gravitino table. Called when loadTable() detects
+   * the table is missing from Derby (e.g., after a JVM restart or against a pre-populated catalog).
+   * The caller supplies the Gravitino table to avoid a redundant load and eliminate the TOCTOU
+   * window that would exist if we re-fetched it here.
    */
-  private void syncTableToDerby(Identifier ident) {
+  private void syncTableToDerby(Identifier ident, org.apache.gravitino.rel.Table gravitinoTable) {
     try {
-      org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       SparkTypeConverter typeConverter = getSparkTypeConverter();
       SparkTransformConverter transformConverter = getSparkTransformConverter();
 
@@ -458,8 +465,6 @@ public class GravitinoGlueCatalog extends BaseCatalog {
 
       syncNamespaceToDerby(ident.namespace());
       sparkCatalog.createTable(ident, schema, sparkPartitions, props);
-    } catch (NoSuchTableException e) {
-      LOG.warn("Cannot sync to Derby: table not found in Gravitino: {}", ident);
     } catch (TableAlreadyExistsException e) {
       // Race: another thread created it first — OK.
     } catch (Exception e) {

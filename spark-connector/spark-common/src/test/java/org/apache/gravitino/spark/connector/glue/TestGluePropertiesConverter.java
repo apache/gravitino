@@ -61,11 +61,13 @@ public class TestGluePropertiesConverter {
     Assertions.assertEquals(
         "http://localhost:4566", icebergProps.get(GluePropertiesConverter.GLUE_ENDPOINT));
     Assertions.assertEquals(
-        "org.apache.iceberg.aws.static.SessionCredentialsProvider",
+        "org.apache.gravitino.spark.connector.glue.GravitinoGlueCredentialsProvider",
         icebergProps.get(GluePropertiesConverter.CLIENT_CREDENTIALS_PROVIDER));
-    Assertions.assertEquals("AKIAIOSFODNN7EXAMPLE", icebergProps.get("client.access-key-id"));
     Assertions.assertEquals(
-        "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", icebergProps.get("client.secret-key"));
+        "AKIAIOSFODNN7EXAMPLE", icebergProps.get("client.credentials-provider.access-key-id"));
+    Assertions.assertEquals(
+        "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        icebergProps.get("client.credentials-provider.secret-access-key"));
     Assertions.assertEquals(7, icebergProps.size());
   }
 
@@ -101,27 +103,24 @@ public class TestGluePropertiesConverter {
                 GluePropertiesConverter.AWS_ACCESS_KEY_ID, "access-key",
                 GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, "secret-key"));
     Assertions.assertEquals(
-        "org.apache.iceberg.aws.static.SessionCredentialsProvider",
+        "org.apache.gravitino.spark.connector.glue.GravitinoGlueCredentialsProvider",
         icebergProps.get(GluePropertiesConverter.CLIENT_CREDENTIALS_PROVIDER));
-    Assertions.assertEquals("access-key", icebergProps.get("client.access-key-id"));
-    Assertions.assertEquals("secret-key", icebergProps.get("client.secret-key"));
+    Assertions.assertEquals(
+        "access-key", icebergProps.get("client.credentials-provider.access-key-id"));
+    Assertions.assertEquals(
+        "secret-key", icebergProps.get("client.credentials-provider.secret-access-key"));
   }
 
   @Test
-  void testToIcebergCatalogPropertiesMissingRegionThrows() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> converter.toIcebergCatalogProperties(ImmutableMap.of()));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            converter.toIcebergCatalogProperties(
-                ImmutableMap.of(GluePropertiesConverter.AWS_REGION, "")));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            converter.toIcebergCatalogProperties(
-                ImmutableMap.of(GluePropertiesConverter.AWS_REGION, "  ")));
+  void testToIcebergCatalogPropertiesMissingRegionOmitsClientRegion() {
+    // Region is optional; when absent the AWS SDK default region chain is used.
+    Map<String, String> icebergProps = converter.toIcebergCatalogProperties(ImmutableMap.of());
+    Assertions.assertNull(icebergProps.get(GluePropertiesConverter.CLIENT_REGION));
+
+    Map<String, String> blankRegion =
+        converter.toIcebergCatalogProperties(
+            ImmutableMap.of(GluePropertiesConverter.AWS_REGION, ""));
+    Assertions.assertNull(blankRegion.get(GluePropertiesConverter.CLIENT_REGION));
   }
 
   @Test
@@ -179,14 +178,17 @@ public class TestGluePropertiesConverter {
 
   @Test
   void testToSparkCatalogPropertiesCredentialsNotMapped() {
-    // Credentials are handled by the AWS SDK credential chain at runtime.
+    // Credentials are handled by the AWS SDK credential chain at runtime and must not be forwarded
+    // as Hive catalog properties.
     Map<String, String> sparkProps =
         converter.toSparkCatalogProperties(
             ImmutableMap.of(
                 GluePropertiesConverter.AWS_ACCESS_KEY_ID, "my-access-key",
                 GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, "my-secret-key"));
-    Assertions.assertNull(sparkProps.get("client.access-key-id"));
-    Assertions.assertNull(sparkProps.get("client.secret-key"));
+    Assertions.assertNull(sparkProps.get(GluePropertiesConverter.AWS_ACCESS_KEY_ID));
+    Assertions.assertNull(sparkProps.get(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY));
+    Assertions.assertFalse(sparkProps.containsValue("my-access-key"));
+    Assertions.assertFalse(sparkProps.containsValue("my-secret-key"));
   }
 
   @Test

@@ -44,20 +44,27 @@ public class GluePropertiesConverter implements PropertiesConverter {
   public static final String GLUE_ENDPOINT = "glue.endpoint";
   public static final String CLIENT_REGION = "client.region";
   public static final String CLIENT_CREDENTIALS_PROVIDER = "client.credentials-provider";
-  public static final String STATIC_CREDENTIALS_PROVIDER =
-      "org.apache.iceberg.aws.static.SessionCredentialsProvider";
+  // GravitinoGlueCredentialsProvider implements AwsCredentialsProvider with create(Map) so that
+  // Iceberg's AwsClientProperties can instantiate it dynamically via client.credentials-provider.
+  public static final String GRAVITINO_GLUE_CREDENTIALS_PROVIDER =
+      "org.apache.gravitino.spark.connector.glue.GravitinoGlueCredentialsProvider";
   public static final String AWS_ACCESS_KEY_ID = "aws-access-key-id";
   public static final String AWS_SECRET_ACCESS_KEY = "aws-secret-access-key";
   public static final String AWS_REGION = "aws-region";
   public static final String AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
   public static final String AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
 
-  public static class GluePropertiesConverterHolder {
+  private static class GluePropertiesConverterHolder {
     private static final GluePropertiesConverter INSTANCE = new GluePropertiesConverter();
   }
 
   private GluePropertiesConverter() {}
 
+  /**
+   * Returns the singleton instance of {@link GluePropertiesConverter}.
+   *
+   * @return the singleton instance
+   */
   public static GluePropertiesConverter getInstance() {
     return GluePropertiesConverterHolder.INSTANCE;
   }
@@ -100,11 +107,12 @@ public class GluePropertiesConverter implements PropertiesConverter {
    * <p>This maps Gravitino's AWS Glue properties to Iceberg's GlueCatalog configuration:
    *
    * <ul>
-   *   <li>{@code aws-region} → {@code client.region}
+   *   <li>{@code aws-region} → {@code client.region} (optional; falls back to SDK default chain)
    *   <li>{@code aws-glue-catalog-id} → {@code glue.id}
    *   <li>{@code aws-glue-endpoint} → {@code glue.endpoint} (optional)
    *   <li>{@code aws-access-key-id} + {@code aws-secret-access-key} → {@code
-   *       client.credentials-provider=StaticCredentialsProvider}
+   *       client.credentials-provider=GravitinoGlueCredentialsProvider} with credentials passed via
+   *       {@code client.credentials-provider.*} properties
    * </ul>
    */
   @VisibleForTesting
@@ -113,9 +121,9 @@ public class GluePropertiesConverter implements PropertiesConverter {
     HashMap<String, String> all = new HashMap<>();
     all.put(CatalogProperties.CATALOG_IMPL, GLUE_CATALOG_IMPL);
     String region = properties.get(AWS_REGION);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(region), "AWS region must be specified for Glue Iceberg catalog");
-    all.put(CLIENT_REGION, region);
+    if (StringUtils.isNotBlank(region)) {
+      all.put(CLIENT_REGION, region);
+    }
     String catalogId = properties.get(AWS_GLUE_CATALOG_ID);
     if (StringUtils.isNotBlank(catalogId)) {
       all.put(GLUE_ID, catalogId);
@@ -127,9 +135,13 @@ public class GluePropertiesConverter implements PropertiesConverter {
     String accessKey = properties.get(AWS_ACCESS_KEY_ID);
     String secretKey = properties.get(AWS_SECRET_ACCESS_KEY);
     if (StringUtils.isNotBlank(accessKey) && StringUtils.isNotBlank(secretKey)) {
-      all.put(CLIENT_CREDENTIALS_PROVIDER, STATIC_CREDENTIALS_PROVIDER);
-      all.put("client.access-key-id", accessKey);
-      all.put("client.secret-key", secretKey);
+      // Iceberg 1.10+ reads credentials via client.credentials-provider (a class with create(Map)).
+      // The client.credentials-provider.* properties are stripped of their prefix and passed to
+      // GravitinoGlueCredentialsProvider.create(Map) as {"access-key-id": ..., "secret-access-key":
+      // ...}.
+      all.put(CLIENT_CREDENTIALS_PROVIDER, GRAVITINO_GLUE_CREDENTIALS_PROVIDER);
+      all.put("client.credentials-provider.access-key-id", accessKey);
+      all.put("client.credentials-provider.secret-access-key", secretKey);
     }
     return all;
   }

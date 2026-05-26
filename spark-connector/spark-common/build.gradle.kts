@@ -51,6 +51,7 @@ dependencies {
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  compileOnly(libs.aws.glue)
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion")
   compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
