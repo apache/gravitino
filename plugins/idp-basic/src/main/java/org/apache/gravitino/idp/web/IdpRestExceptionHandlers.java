@@ -33,42 +33,26 @@ public final class IdpRestExceptionHandlers {
   private IdpRestExceptionHandlers() {}
 
   /**
-   * Handles built-in IdP user operation exceptions.
+   * Handles built-in IdP REST operation exceptions.
    *
+   * @param resourceType The resource type, such as {@code user} or {@code group}.
    * @param op The operation type.
-   * @param user The user name.
+   * @param name The resource name.
    * @param e The exception.
    * @return The REST response.
    */
-  public static Response handleUserException(IdpOperationType op, String user, Exception e) {
-    String formatted = StringUtils.isBlank(user) ? "" : " [" + user + "]";
+  public static Response handleException(
+      String resourceType, IdpOperationType op, String name, Exception e) {
+    String formatted = StringUtils.isBlank(name) ? "" : " [" + name + "]";
     String errorMsg =
         String.format(
-            "Failed to operate built-in IdP user %s operation [%s], reason [%s]",
-            formatted, op.name(), e.getMessage());
+            "Failed to operate built-in IdP %s %s operation [%s], reason [%s]",
+            resourceType, formatted, op.name(), e.getMessage());
     LOG.warn(errorMsg, e);
-    return handleException(errorMsg, e);
+    return toResponse(errorMsg, e);
   }
 
-  /**
-   * Handles built-in IdP group operation exceptions.
-   *
-   * @param op The operation type.
-   * @param group The group name.
-   * @param e The exception.
-   * @return The REST response.
-   */
-  public static Response handleGroupException(IdpOperationType op, String group, Exception e) {
-    String formatted = StringUtils.isBlank(group) ? "" : " [" + group + "]";
-    String errorMsg =
-        String.format(
-            "Failed to operate built-in IdP group %s operation [%s], reason [%s]",
-            formatted, op.name(), e.getMessage());
-    LOG.warn(errorMsg, e);
-    return handleException(errorMsg, e);
-  }
-
-  private static Response handleException(String errorMsg, Exception e) {
+  private static Response toResponse(String errorMsg, Exception e) {
     if (e instanceof IllegalArgumentException) {
       return IdpRestUtils.illegalArguments(errorMsg, e);
     }

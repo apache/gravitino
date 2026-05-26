@@ -56,7 +56,6 @@ public class IdpGroupOperations {
 
   @Context private HttpServletRequest httpRequest;
 
-  /** Creates a REST resource backed by the built-in IdP manager from {@link GravitinoEnv}. */
   public IdpGroupOperations() {
     this(
         new IdpUserGroupManager(
@@ -67,12 +66,6 @@ public class IdpGroupOperations {
     this.userGroupManager = userGroupManager;
   }
 
-  /**
-   * Gets a built-in IdP group.
-   *
-   * @param group the group name
-   * @return the REST response
-   */
   @GET
   @Path("{group}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -86,16 +79,10 @@ public class IdpGroupOperations {
               IdpRestUtils.ok(
                   new IdpGroupResponse(IdpDTOConverters.toDTO(userGroupManager.getGroup(group)))));
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleGroupException(IdpOperationType.GET, group, e);
+      return IdpRestExceptionHandlers.handleException("group", IdpOperationType.GET, group, e);
     }
   }
 
-  /**
-   * Creates a built-in IdP group.
-   *
-   * @param request the request body
-   * @return the REST response
-   */
   @POST
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-idp-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -111,18 +98,11 @@ public class IdpGroupOperations {
                     IdpDTOConverters.toDTO(userGroupManager.addGroup(request.getGroup()))));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleGroupException(
-          IdpOperationType.ADD, request.getGroup(), e);
+      return IdpRestExceptionHandlers.handleException(
+          "group", IdpOperationType.ADD, request.getGroup(), e);
     }
   }
 
-  /**
-   * Removes a built-in IdP group.
-   *
-   * @param group the group name
-   * @param force whether to force deletion
-   * @return the REST response
-   */
   @DELETE
   @Path("{group}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -135,17 +115,10 @@ public class IdpGroupOperations {
           httpRequest,
           () -> IdpRestUtils.ok(new RemoveResponse(userGroupManager.removeGroup(group, force))));
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleGroupException(IdpOperationType.REMOVE, group, e);
+      return IdpRestExceptionHandlers.handleException("group", IdpOperationType.REMOVE, group, e);
     }
   }
 
-  /**
-   * Adds users to a built-in IdP group.
-   *
-   * @param group the group name
-   * @param request the request body
-   * @return the REST response
-   */
   @PUT
   @Path("{group}/add")
   @Produces("application/vnd.gravitino.v1+json")
@@ -165,17 +138,10 @@ public class IdpGroupOperations {
             return IdpRestUtils.ok(new IdpGroupResponse(IdpDTOConverters.toDTO(groupEntity)));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleGroupException(IdpOperationType.ADD, group, e);
+      return IdpRestExceptionHandlers.handleException("group", IdpOperationType.ADD, group, e);
     }
   }
 
-  /**
-   * Removes users from a built-in IdP group.
-   *
-   * @param group the group name
-   * @param request the request body
-   * @return the REST response
-   */
   @PUT
   @Path("{group}/remove")
   @Produces("application/vnd.gravitino.v1+json")
@@ -195,7 +161,7 @@ public class IdpGroupOperations {
             return IdpRestUtils.ok(new IdpGroupResponse(IdpDTOConverters.toDTO(groupEntity)));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleGroupException(IdpOperationType.REMOVE, group, e);
+      return IdpRestExceptionHandlers.handleException("group", IdpOperationType.REMOVE, group, e);
     }
   }
 }

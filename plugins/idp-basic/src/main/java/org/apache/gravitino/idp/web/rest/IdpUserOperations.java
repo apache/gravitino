@@ -53,7 +53,6 @@ public class IdpUserOperations {
 
   @Context private HttpServletRequest httpRequest;
 
-  /** Creates a REST resource backed by the built-in IdP manager from {@link GravitinoEnv}. */
   public IdpUserOperations() {
     this(
         new IdpUserGroupManager(
@@ -64,12 +63,6 @@ public class IdpUserOperations {
     this.userGroupManager = userGroupManager;
   }
 
-  /**
-   * Gets a built-in IdP user.
-   *
-   * @param user the user name
-   * @return the REST response
-   */
   @GET
   @Path("{user}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -83,16 +76,10 @@ public class IdpUserOperations {
               IdpRestUtils.ok(
                   new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user)))));
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleUserException(IdpOperationType.GET, user, e);
+      return IdpRestExceptionHandlers.handleException("user", IdpOperationType.GET, user, e);
     }
   }
 
-  /**
-   * Creates a built-in IdP user.
-   *
-   * @param request the request body
-   * @return the REST response
-   */
   @POST
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -109,18 +96,11 @@ public class IdpUserOperations {
                         userGroupManager.addUser(request.getUser(), request.getPassword()))));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleUserException(
-          IdpOperationType.ADD, request.getUser(), e);
+      return IdpRestExceptionHandlers.handleException(
+          "user", IdpOperationType.ADD, request.getUser(), e);
     }
   }
 
-  /**
-   * Resets a built-in IdP user password.
-   *
-   * @param user the user name
-   * @param request the request body
-   * @return the REST response
-   */
   @PUT
   @Path("{user}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -139,16 +119,10 @@ public class IdpUserOperations {
                 new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user))));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleUserException(IdpOperationType.UPDATE, user, e);
+      return IdpRestExceptionHandlers.handleException("user", IdpOperationType.UPDATE, user, e);
     }
   }
 
-  /**
-   * Removes a built-in IdP user.
-   *
-   * @param user the user name
-   * @return the REST response
-   */
   @DELETE
   @Path("{user}")
   @Produces("application/vnd.gravitino.v1+json")
@@ -160,7 +134,7 @@ public class IdpUserOperations {
           httpRequest,
           () -> IdpRestUtils.ok(new RemoveResponse(userGroupManager.removeUser(user))));
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleUserException(IdpOperationType.REMOVE, user, e);
+      return IdpRestExceptionHandlers.handleException("user", IdpOperationType.REMOVE, user, e);
     }
   }
 }

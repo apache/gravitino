@@ -30,132 +30,62 @@ import org.apache.gravitino.utils.PrincipalUtils;
 /** REST helpers for built-in IdP resources in the {@code idp-basic} plugin. */
 public final class IdpRestUtils {
 
+  private static final MediaType JSON = MediaType.APPLICATION_JSON_TYPE;
+
   private IdpRestUtils() {}
 
-  /**
-   * Builds a successful REST response.
-   *
-   * @param entity The response entity.
-   * @param <T> The entity type.
-   * @return The REST response.
-   */
   public static <T> Response ok(T entity) {
-    return Response.status(Response.Status.OK)
-        .entity(entity)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+    return json(Response.Status.OK, entity);
   }
 
-  /**
-   * Executes an action under the authenticated principal from the request.
-   *
-   * @param httpRequest The HTTP request.
-   * @param action The action to execute.
-   * @return The REST response.
-   * @throws Exception If the action fails.
-   */
   public static Response doAs(
       HttpServletRequest httpRequest, PrivilegedExceptionAction<Response> action) throws Exception {
     UserPrincipal principal =
         (UserPrincipal)
             httpRequest.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME);
-    if (principal == null) {
-      principal = new UserPrincipal(AuthConstants.ANONYMOUS_USER);
-    }
-    return PrincipalUtils.doAs(principal, action);
+    return PrincipalUtils.doAs(
+        principal == null ? new UserPrincipal(AuthConstants.ANONYMOUS_USER) : principal, action);
   }
 
-  /**
-   * Builds a bad request response.
-   *
-   * @param message The error message.
-   * @param throwable The cause.
-   * @return The REST response.
-   */
   public static Response illegalArguments(String message, Throwable throwable) {
-    return Response.status(Response.Status.BAD_REQUEST)
-        .entity(
-            ErrorResponse.illegalArguments(
-                throwable.getClass().getSimpleName(), message, throwable))
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+    return json(
+        Response.Status.BAD_REQUEST,
+        ErrorResponse.illegalArguments(
+            exceptionType(throwable, "IllegalArgumentException"), message, throwable));
   }
 
-  /**
-   * Builds a not found response.
-   *
-   * @param message The error message.
-   * @param throwable The cause.
-   * @return The REST response.
-   */
   public static Response notFound(String message, Throwable throwable) {
-    return Response.status(Response.Status.NOT_FOUND)
-        .entity(
-            ErrorResponse.notFound(
-                resolveThrowableType(throwable, "NotFoundException"), message, throwable))
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+    return json(
+        Response.Status.NOT_FOUND,
+        ErrorResponse.notFound(exceptionType(throwable, "NotFoundException"), message, throwable));
   }
 
-  /**
-   * Builds a conflict response.
-   *
-   * @param message The error message.
-   * @param throwable The cause.
-   * @return The REST response.
-   */
   public static Response alreadyExists(String message, Throwable throwable) {
-    return Response.status(Response.Status.CONFLICT)
-        .entity(
-            ErrorResponse.alreadyExists(
-                resolveThrowableType(throwable, "AlreadyExistsException"), message, throwable))
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+    return json(
+        Response.Status.CONFLICT,
+        ErrorResponse.alreadyExists(
+            exceptionType(throwable, "AlreadyExistsException"), message, throwable));
   }
 
-  /**
-   * Builds a forbidden response.
-   *
-   * @param message The error message.
-   * @param throwable The cause.
-   * @return The REST response.
-   */
   public static Response forbidden(String message, Throwable throwable) {
-    return Response.status(Response.Status.FORBIDDEN)
-        .entity(ErrorResponse.forbidden(message, throwable))
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+    return json(Response.Status.FORBIDDEN, ErrorResponse.forbidden(message, throwable));
   }
 
-  /**
-   * Builds a method not allowed response.
-   *
-   * @param message The error message.
-   * @param throwable The cause.
-   * @return The REST response.
-   */
   public static Response unsupportedOperation(String message, Throwable throwable) {
-    return Response.status(Response.Status.METHOD_NOT_ALLOWED)
-        .entity(ErrorResponse.unsupportedOperation(message, throwable))
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+    return json(
+        Response.Status.METHOD_NOT_ALLOWED, ErrorResponse.unsupportedOperation(message, throwable));
   }
 
-  /**
-   * Builds an internal error response.
-   *
-   * @param message The error message.
-   * @param throwable The cause.
-   * @return The REST response.
-   */
   public static Response internalError(String message, Throwable throwable) {
-    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-        .entity(ErrorResponse.internalError(message, throwable))
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+    return json(
+        Response.Status.INTERNAL_SERVER_ERROR, ErrorResponse.internalError(message, throwable));
   }
 
-  private static String resolveThrowableType(Throwable throwable, String defaultType) {
+  private static Response json(Response.Status status, Object entity) {
+    return Response.status(status).entity(entity).type(JSON).build();
+  }
+
+  private static String exceptionType(Throwable throwable, String defaultType) {
     return throwable == null ? defaultType : throwable.getClass().getSimpleName();
   }
 }
