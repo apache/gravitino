@@ -37,7 +37,6 @@ import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.ResetPasswordRequest;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.dto.util.IdpDTOConverters;
-import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRestUtils;
@@ -107,9 +106,7 @@ public class IdpUserOperations {
         httpRequest,
         () -> {
           request.validate();
-          if (!userGroupManager.changePassword(user, request.getPassword())) {
-            throw new NotFoundException("IdP user %s does not exist", user);
-          }
+          userGroupManager.changePassword(user, request.getPassword());
           return IdpRestUtils.ok(
               new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user))));
         },

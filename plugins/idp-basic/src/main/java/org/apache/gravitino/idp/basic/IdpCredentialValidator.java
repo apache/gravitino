@@ -25,9 +25,9 @@ import org.apache.commons.lang3.StringUtils;
 /** Validates built-in IdP username and password credentials. */
 public final class IdpCredentialValidator {
 
-  public static final int MIN_PASSWORD_LENGTH = 12;
+  private static final int MIN_PASSWORD_LENGTH = 12;
 
-  public static final int MAX_PASSWORD_LENGTH = 64;
+  private static final int MAX_PASSWORD_LENGTH = 64;
 
   private IdpCredentialValidator() {}
 

@@ -75,7 +75,7 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
 
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
-    if (!isBasicAuthenticatorEnabled(authenticatorsSupplier.get())) {
+    if (!basicAuthenticatorEnabled(authenticatorsSupplier.get())) {
       requestContext.abortWith(
           IdpRestUtils.notFound(
               BASIC_AUTHENTICATOR_REQUIRED_MESSAGE,
@@ -89,7 +89,7 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
     }
   }
 
-  private static boolean isBasicAuthenticatorEnabled(List<String> authenticators) {
+  private static boolean basicAuthenticatorEnabled(List<String> authenticators) {
     return authenticators != null && authenticators.contains(BASIC_AUTHENTICATOR);
   }
 }
