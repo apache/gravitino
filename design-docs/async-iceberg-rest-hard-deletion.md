@@ -310,14 +310,18 @@ this worker owns. If the host dies the heartbeat stops; once a row ages past
 Per-file failures are logged but do not fail the whole job — the
 synchronous purge has the same "best effort" stance. A job fails only if the
 **metadata phase** fails. `NotFoundException` from `deleteFile` counts as
-success. A failed job retries on the next poll tick (§5.5).
+success. A transient failure goes back to `PENDING` and is retried on a
+later poll tick (§5.5), incrementing `attempts` each time; when `attempts`
+reaches `max-attempts` the job goes to `FAILED` instead of `PENDING`. A
+clearly terminal failure skips the retries and goes straight to `FAILED`.
 
-| Outcome                             | Action                                                                                |
-|-------------------------------------|---------------------------------------------------------------------------------------|
-| All files deleted (or already gone) | `state='SUCCEEDED'`                                                                    |
-| Metadata load failed, transient     | back to `PENDING`, `attempts++`, `heartbeat_at=NULL`; re-claimed on a later poll tick  |
-| Metadata load failed, terminal      | `attempts++`; if `attempts >= max-attempts` → `FAILED`                                |
-| Worker killed mid-job               | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent  |
+| Outcome                                              | Action                                                                                |
+|------------------------------------------------------|---------------------------------------------------------------------------------------|
+| All files deleted (or already gone)                  | `state='SUCCEEDED'`                                                                    |
+| Transient failure, `attempts < max-attempts`         | `attempts++`, back to `PENDING`, `heartbeat_at=NULL`; re-claimed on a later poll tick  |
+| Transient failure, `attempts` reaches `max-attempts` | `attempts++` → `FAILED` (gave up retrying)                                             |
+| Terminal failure (e.g. metadata gone/corrupt)        | → `FAILED` immediately; retrying cannot help                                           |
+| Worker killed mid-job                                | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent  |
 
 Restart handling falls out of the durable job table plus the heartbeat
 model — no separate mechanism:
