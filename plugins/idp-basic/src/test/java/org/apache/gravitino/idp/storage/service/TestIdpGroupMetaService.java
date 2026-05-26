@@ -65,7 +65,8 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("group1"));
     runServiceCall(() -> groupMetaService.insertIdpGroup(group1));
-    runServiceCall(() -> groupMetaService.changeGroupMembership("group1", List.of("user1"), null));
+    runServiceCall(
+        () -> groupMetaService.changeGroupMembership("group1", List.of("user1"), List.of()));
     assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
     assertIterableEquals(List.of("user1"), groupMetaService.listUsernamesByGroupName("group1"));
 
@@ -120,12 +121,13 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
     runServiceCall(
         () ->
-            groupMetaService.changeGroupMembership("engineering", List.of("user1", "user2"), null));
+            groupMetaService.changeGroupMembership(
+                "engineering", List.of("user1", "user2"), List.of()));
     assertIterableEquals(
         List.of("user1", "user2"), groupMetaService.listUsernamesByGroupName("engineering"));
 
     runServiceCall(
-        () -> groupMetaService.changeGroupMembership("engineering", null, List.of("user1")));
+        () -> groupMetaService.changeGroupMembership("engineering", List.of(), List.of("user1")));
     assertIterableEquals(
         List.of("user2"), groupMetaService.listUsernamesByGroupName("engineering"));
   }
@@ -153,7 +155,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
             runServiceCall(
                 () ->
                     groupMetaService.changeGroupMembership(
-                        "engineering", List.of("missing-user"), null)));
+                        "engineering", List.of("missing-user"), List.of())));
   }
 
   @ParameterizedTest

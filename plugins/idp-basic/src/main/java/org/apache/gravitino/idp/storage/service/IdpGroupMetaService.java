@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
@@ -123,55 +122,60 @@ public class IdpGroupMetaService {
    * Changes built-in IdP group membership in a single transaction.
    *
    * @param groupName The group name.
-   * @param additions The usernames to add, or null if none.
-   * @param removals The usernames to remove, or null if none.
+   * @param additions The usernames to add.
+   * @param removals The usernames to remove.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "changeGroupMembership")
   public void changeGroupMembership(
-      String groupName, @Nullable List<String> additions, @Nullable List<String> removals) {
-    Set<String> oldUsernames = Sets.newHashSet(listUsernamesByGroupName(groupName));
-    Set<String> newUsernames = Sets.newHashSet(oldUsernames);
-    if (additions != null) {
-      newUsernames.addAll(additions);
-    }
-    if (removals != null) {
-      newUsernames.removeAll(removals);
-    }
-
-    Set<String> insertUsernames = Sets.difference(newUsernames, oldUsernames);
-    Set<String> deleteUsernames = Sets.difference(oldUsernames, newUsernames);
-
-    if (insertUsernames.isEmpty() && deleteUsernames.isEmpty()) {
-      return;
-    }
-
-    IdpGroupPO group = getIdpGroupByName(groupName);
-    List<String> insertList = Lists.newArrayList(insertUsernames);
-    List<String> deleteList = Lists.newArrayList(deleteUsernames);
-
+      String groupName, List<String> additions, List<String> removals) {
     SessionUtils.doMultipleWithCommit(
         () -> {
-          if (insertList.isEmpty()) {
+          IdpGroupPO group =
+              SessionUtils.getWithoutCommit(
+                  IdpGroupMetaMapper.class,
+                  mapper -> {
+                    IdpGroupPO groupPO = mapper.selectIdpGroup(groupName);
+                    if (groupPO == null) {
+                      throw new NotFoundException("IdP group not found: %s", groupName);
+                    }
+                    return groupPO;
+                  });
+
+          List<String> currentUsernames =
+              SessionUtils.getWithoutCommit(
+                  IdpUserGroupRelMapper.class,
+                  mapper -> mapper.selectUsernamesByGroupName(groupName));
+          Set<String> oldUsernames = Sets.newHashSet(currentUsernames);
+          Set<String> newUsernames = Sets.newHashSet(oldUsernames);
+          newUsernames.addAll(additions);
+          newUsernames.removeAll(removals);
+
+          Set<String> insertUsernames = Sets.difference(newUsernames, oldUsernames);
+          Set<String> deleteUsernames = Sets.difference(oldUsernames, newUsernames);
+          if (insertUsernames.isEmpty() && deleteUsernames.isEmpty()) {
             return;
           }
-          Map<String, Long> userIds =
-              IdpUserMetaService.getInstance().resolveUserIdsByUsernames(insertList);
-          List<IdpUserGroupRelPO> relations = new ArrayList<>(insertList.size());
-          for (String username : insertList) {
-            relations.add(newUserGroupRelation(group.getGroupId(), userIds.get(username)));
+
+          List<String> insertList = Lists.newArrayList(insertUsernames);
+          if (!insertList.isEmpty()) {
+            Map<String, Long> userIds =
+                IdpUserMetaService.getInstance().resolveUserIdsByUsernames(insertList);
+            List<IdpUserGroupRelPO> relations = new ArrayList<>(insertList.size());
+            for (String username : insertList) {
+              relations.add(newUserGroupRelation(group.getGroupId(), userIds.get(username)));
+            }
+            SessionUtils.doWithoutCommit(
+                IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
           }
-          SessionUtils.doWithoutCommit(
-              IdpUserGroupRelMapper.class, mapper -> mapper.batchInsertRelations(relations));
-        },
-        () -> {
-          if (deleteList.isEmpty()) {
-            return;
+
+          List<String> deleteList = Lists.newArrayList(deleteUsernames);
+          if (!deleteList.isEmpty()) {
+            SessionUtils.doWithoutCommit(
+                IdpUserGroupRelMapper.class,
+                mapper -> mapper.softDeleteRelations(groupName, deleteList));
           }
-          SessionUtils.doWithoutCommit(
-              IdpUserGroupRelMapper.class,
-              mapper -> mapper.softDeleteRelations(groupName, deleteList));
         });
   }
 

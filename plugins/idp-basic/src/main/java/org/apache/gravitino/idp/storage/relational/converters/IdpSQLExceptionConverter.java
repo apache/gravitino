@@ -75,6 +75,7 @@ public final class IdpSQLExceptionConverter {
       case MYSQL:
         return sqlException.getErrorCode() == MYSQL_DUPLICATE_ENTRY_ERROR_CODE;
       case H2:
+        // Same as core H2ExceptionConverter: H2 in MySQL mode may report 1062 or 23505.
         return sqlException.getErrorCode() == H2_DUPLICATE_ENTRY_ERROR_CODE
             || sqlException.getErrorCode() == MYSQL_DUPLICATE_ENTRY_ERROR_CODE;
       case POSTGRESQL:

@@ -153,9 +153,12 @@ public class IdpUserGroupManager implements Closeable {
    */
   public IdpGroup changeGroupMembership(
       String groupName, @Nullable List<String> additions, @Nullable List<String> removals) {
+    List<String> additionsList = additions == null ? Collections.emptyList() : additions;
+    List<String> removalsList = removals == null ? Collections.emptyList() : removals;
     Preconditions.checkArgument(
-        additions != null || removals != null, "additions and removals cannot both be null");
-    GROUP_SERVICE.changeGroupMembership(groupName, additions, removals);
+        !additionsList.isEmpty() || !removalsList.isEmpty(),
+        "additions and removals cannot both be empty");
+    GROUP_SERVICE.changeGroupMembership(groupName, additionsList, removalsList);
     return getGroup(groupName);
   }
 
