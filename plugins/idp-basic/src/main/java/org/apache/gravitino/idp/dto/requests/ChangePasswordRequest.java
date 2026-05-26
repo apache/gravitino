@@ -28,35 +28,35 @@ import lombok.extern.jackson.Jacksonized;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to reset a built-in IdP user password. */
+/** Represents a request to change a built-in IdP user password. */
 @Getter
 @EqualsAndHashCode
 @ToString
 @Builder
 @Jacksonized
-public class ResetPasswordRequest implements RESTRequest {
+public class ChangePasswordRequest implements RESTRequest {
 
   @JsonProperty("password")
   @ToString.Exclude
   private final String password;
 
-  /** Default constructor for ResetPasswordRequest. (Used for Jackson deserialization.) */
-  public ResetPasswordRequest() {
+  /** Default constructor for ChangePasswordRequest. (Used for Jackson deserialization.) */
+  public ChangePasswordRequest() {
     this(null);
   }
 
   /**
-   * Creates a new ResetPasswordRequest.
+   * Creates a new ChangePasswordRequest.
    *
    * @param password The new password of the built-in IdP user.
    */
-  public ResetPasswordRequest(String password) {
+  public ChangePasswordRequest(String password) {
     super();
     this.password = password;
   }
 
   /**
-   * Validates the {@link ResetPasswordRequest} request.
+   * Validates the {@link ChangePasswordRequest} request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
    */

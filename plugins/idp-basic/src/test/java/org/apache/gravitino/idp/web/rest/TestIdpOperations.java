@@ -40,8 +40,8 @@ import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
+import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
-import org.apache.gravitino.idp.dto.requests.ResetPasswordRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.exception.AlreadyExistsException;
@@ -161,8 +161,8 @@ class TestIdpOperations extends JerseyTest {
   }
 
   @Test
-  void testResetPasswordAndRemoveUser() {
-    ResetPasswordRequest req = new ResetPasswordRequest(VALID_PASSWORD);
+  void testChangePasswordAndRemoveUser() {
+    ChangePasswordRequest req = new ChangePasswordRequest(VALID_PASSWORD);
     when(MANAGER.changePassword("user1", VALID_PASSWORD)).thenReturn(true);
     when(MANAGER.getUser("user1")).thenReturn(buildUser("user1"));
     when(MANAGER.removeUser("user1")).thenReturn(true);

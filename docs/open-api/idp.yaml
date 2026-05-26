@@ -116,20 +116,20 @@ paths:
     put:
       tags:
         - authentication
-      summary: Reset built-in IdP user password
-      operationId: resetIdpUserPassword
+      summary: Change built-in IdP user password
+      operationId: changeIdpUserPassword
       description: |
-        Resets the password hash for an existing built-in IdP user. This is an
-        administrator-managed password reset API and does not accept `oldPassword`.
+        Changes the password hash for an existing built-in IdP user. This is an
+        administrator-managed password change API and does not accept `oldPassword`.
       requestBody:
         required: true
         content:
           application/vnd.gravitino.v1+json:
             schema:
-              $ref: "#/components/schemas/ResetPasswordRequest"
+              $ref: "#/components/schemas/ChangePasswordRequest"
             examples:
-              ResetPasswordRequest:
-                $ref: "#/components/examples/ResetPasswordRequest"
+              ChangePasswordRequest:
+                $ref: "#/components/examples/ChangePasswordRequest"
       responses:
         "200":
           description: Returns the updated built-in IdP user
@@ -143,7 +143,7 @@ paths:
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
-          description: Forbidden - Only service admins can reset built-in IdP user passwords
+          description: Forbidden - Only service admins can change built-in IdP user passwords
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -460,7 +460,7 @@ components:
           minLength: 12
           maxLength: 64
 
-    ResetPasswordRequest:
+    ChangePasswordRequest:
       type: object
       required:
         - password
@@ -525,7 +525,7 @@ components:
         "password": "Passw0rd-For-Gravitino-Alice"
       }
 
-    ResetPasswordRequest:
+    ChangePasswordRequest:
       value: {
         "password": "Passw0rd-For-Gravitino-Alice-V2"
       }

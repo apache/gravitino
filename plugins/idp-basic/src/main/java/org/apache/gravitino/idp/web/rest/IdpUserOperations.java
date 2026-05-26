@@ -34,7 +34,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
-import org.apache.gravitino.idp.dto.requests.ResetPasswordRequest;
+import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.dto.util.IdpDTOConverters;
 import org.apache.gravitino.idp.web.IdpManagement;
@@ -99,9 +99,9 @@ public class IdpUserOperations {
   @PUT
   @Path("{user}")
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "update-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "update-idp-user", absolute = true)
-  public Response resetPassword(@PathParam("user") String user, ResetPasswordRequest request) {
+  @Timed(name = "change-idp-user-password." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "change-idp-user-password", absolute = true)
+  public Response changePassword(@PathParam("user") String user, ChangePasswordRequest request) {
     return IdpRestUtils.doAs(
         httpRequest,
         () -> {
