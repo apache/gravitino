@@ -279,15 +279,17 @@ deletes in bounded batches:
 TableMetadata meta = TableMetadataParser.read(io, job.metadataLocation());
 try (CloseableIterable<String> files = reachableFiles(meta)) {  // lazy, not materialized
   Tasks.foreach(files)
-       .executeWith(deleteExecutor)  // sized by delete-threads-per-job (§5.10)
+       .executeWith(deleteExecutor)  // shared server-wide pool, §5.10
        .retry(perFileRetries)
        .suppressFailureWhenFinished()
        .run(io::deleteFile);
 }
 ```
 
-`deleteExecutor` is per-job and its size is `delete-threads-per-job`
-(§5.10) — raise it to drain a very large table's files faster when purge
+`deleteExecutor` is a single server-wide pool sized by `delete-threads`
+(§5.10), shared by all concurrent jobs rather than allocated per job. This
+bounds total file-delete concurrency on the server regardless of how many
+jobs run at once; raise it to drain large tables faster when purge
 throughput matters.
 
 A separate task sends a heartbeat every `heartbeatTimeout / 3` on the ids
@@ -417,8 +419,8 @@ only tune the worker pool and retries:
 
 | Key                                                           | Default  | Description                                                                  |
 |---------------------------------------------------------------|----------|------------------------------------------------------------------------------|
-| `gravitino.iceberg-rest.async-purge.worker-threads`           | `4`      | Worker pool size per server.                                                 |
-| `gravitino.iceberg-rest.async-purge.delete-threads-per-job`   | `8`      | Parallelism of file deletes within a single job.                             |
+| `gravitino.iceberg-rest.async-purge.worker-threads`           | `4`      | Worker pool size per server (concurrent jobs).                               |
+| `gravitino.iceberg-rest.async-purge.delete-threads`           | `16`     | Server-wide file-delete pool size, shared across all jobs.                   |
 | `gravitino.iceberg-rest.async-purge.poll-interval-ms`         | `5000`   | Worker poll interval.                                                        |
 | `gravitino.iceberg-rest.async-purge.heartbeat-timeout-ms`     | `300000` | Age after which a job with no heartbeat is reclaimable.                      |
 | `gravitino.iceberg-rest.async-purge.max-attempts`             | `5`      | Attempts before `FAILED`.                                                    |
