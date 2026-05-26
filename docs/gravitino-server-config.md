@@ -312,9 +312,9 @@ Gravitino provides a default implement to log basic audit information to a file,
 
 | gravitino.conf property                    | Description                            | Default value                               | Required | Since Version              |
 |---------------------------------------|----------------------------------------|---------------------------------------------|----------|----------------------------|
-| `gravitino.audit.enabled`             | The audit log enable flag.             | false                                       | NO       | 0.7.0-incubating           |
-| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter  | NO       | 0.7.0-incubating           | 
-| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.SimpleFormatter  | NO       | 0.7.0-incubating           | 
+| `gravitino.audit.enabled`             | The audit log enable flag.             | false                                       | No       | 0.7.0-incubating           |
+| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter  | No       | 0.7.0-incubating           | 
+| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.SimpleFormatter  | No       | 0.7.0-incubating           | 
 
 #### Audit Log Formatter
 
@@ -328,9 +328,9 @@ Writer configuration begins with `gravitino.audit.writer.${name}`, where `${name
 
 | gravitino.conf property                              | Description                                                                   | Default value       | Required | Since Version    |
 |-------------------------------------------------|-------------------------------------------------------------------------------|---------------------|----------|------------------|
-| `gravitino.audit.writer.file.fileName`          | The audit log file name, the path is `${sys:gravitino.log.path}/${fileName}`. | gravitino_audit.log | NO       | 0.7.0-incubating |
-| `gravitino.audit.writer.file.flushIntervalSecs` | The flush interval time of the audit file in seconds.                         | 10                  | NO       | 0.7.0-incubating |
-| `gravitino.audit.writer.file.append`            | Whether the log will be written to the end or the beginning of the file.      | true                | NO       | 0.7.0-incubating |
+| `gravitino.audit.writer.file.fileName`          | The audit log file name, the path is `${sys:gravitino.log.path}/${fileName}`. | gravitino_audit.log | No       | 0.7.0-incubating |
+| `gravitino.audit.writer.file.flushIntervalSecs` | The flush interval time of the audit file in seconds.                         | 10                  | No       | 0.7.0-incubating |
+| `gravitino.audit.writer.file.append`            | Whether the log will be written to the end or the beginning of the file.      | true                | No       | 0.7.0-incubating |
 
 ### Security
 
