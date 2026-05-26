@@ -30,7 +30,8 @@ repositories {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark33.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4connector.get()
+val connectorIcebergVersion: String = libs.versions.iceberg4connector.get()
+val gravitinoIcebergVersion: String = libs.versions.iceberg.get()
 val paimonVersion: String = libs.versions.paimon.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
@@ -58,7 +59,7 @@ dependencies {
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
     exclude("com.fasterxml.jackson")
   }
-  compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$connectorIcebergVersion")
   if (scalaVersion == "2.12") {
     compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
       exclude("org.apache.spark")
@@ -144,10 +145,11 @@ dependencies {
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 
-  // org.apache.iceberg.rest.RESTSerializers#registerAll(ObjectMapper) has different method signature for iceberg-core and iceberg-spark-runtime package, we must make sure iceberg-core is in front to start up MiniGravitino server.
-  testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
-  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
-  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
+  // RESTSerializers signatures differ between iceberg-core and iceberg-spark-runtime; use
+  // gravitinoIcebergVersion for core/hive-metastore (MiniGravitino) and connectorIcebergVersion for Spark.
+  testImplementation("org.apache.iceberg:iceberg-core:$gravitinoIcebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$connectorIcebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$gravitinoIcebergVersion")
   if (scalaVersion == "2.12") {
     testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
       exclude("org.apache.spark")

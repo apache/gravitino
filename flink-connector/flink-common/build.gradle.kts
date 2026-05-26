@@ -28,7 +28,8 @@ repositories {
 
 val flinkVersion: String = libs.versions.flink18.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4flink18.get()
+val connectorIcebergVersion: String = libs.versions.iceberg4flink18.get()
+val gravitinoIcebergVersion: String = libs.versions.iceberg.get()
 val paimonVersion: String = libs.versions.paimon4flink18.get()
 
 // The Flink only support scala 2.12, and all scala api will be removed in a future version.
@@ -47,7 +48,7 @@ dependencies {
   implementation(libs.commons.lang3)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
-  compileOnly("org.apache.iceberg:iceberg-flink-runtime-$flinkMajorVersion:$icebergVersion")
+  compileOnly("org.apache.iceberg:iceberg-flink-runtime-$flinkMajorVersion:$connectorIcebergVersion")
   compileOnly("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-common:$flinkVersion")
   compileOnly("org.apache.flink:flink-table-api-java:$flinkVersion")
@@ -98,9 +99,9 @@ dependencies {
   testImplementation(libs.flinkjdbc18)
   testImplementation(libs.minikdc)
 
-  testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
-  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
-  testImplementation("org.apache.iceberg:iceberg-flink-runtime-$flinkMajorVersion:$icebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-core:$gravitinoIcebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$gravitinoIcebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-flink-runtime-$flinkMajorVersion:$connectorIcebergVersion")
   testImplementation("org.apache.flink:flink-connector-hive_$scalaVersion:$flinkVersion")
   testImplementation("org.apache.flink:flink-table-common:$flinkVersion")
   testImplementation("org.apache.flink:flink-table-api-java:$flinkVersion")
