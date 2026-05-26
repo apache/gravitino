@@ -25,32 +25,18 @@ import org.apache.commons.lang3.StringUtils;
 /** Validates built-in IdP username and password credentials. */
 public final class IdpCredentialValidator {
 
-  /** Minimum length for a built-in IdP password. */
   public static final int MIN_PASSWORD_LENGTH = 12;
 
-  /** Maximum length for a built-in IdP password. */
   public static final int MAX_PASSWORD_LENGTH = 64;
 
   private IdpCredentialValidator() {}
 
-  /**
-   * Validates a built-in IdP username.
-   *
-   * @param username The username.
-   * @throws IllegalArgumentException If the username is invalid.
-   */
   public static void validateUsername(String username) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(username), "\"user\" field is required and cannot be empty");
     Preconditions.checkArgument(!username.contains(":"), "User name cannot contain a colon (:)");
   }
 
-  /**
-   * Validates a built-in IdP password.
-   *
-   * @param password The plaintext password.
-   * @throws IllegalArgumentException If the password is invalid.
-   */
   public static void validatePassword(String password) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(password), "\"password\" field is required and cannot be empty");
