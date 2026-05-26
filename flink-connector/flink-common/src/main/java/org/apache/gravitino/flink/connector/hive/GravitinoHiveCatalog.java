@@ -65,9 +65,6 @@ import org.slf4j.LoggerFactory;
 public class GravitinoHiveCatalog extends BaseCatalog {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoHiveCatalog.class);
 
-  private static final String HIVE_TABLE_TYPE_KEY = "table-type";
-  private static final String HIVE_VIRTUAL_VIEW_TYPE = "VIRTUAL_VIEW";
-
   private HiveCatalog hiveCatalog;
 
   GravitinoHiveCatalog(
@@ -157,10 +154,6 @@ public class GravitinoHiveCatalog extends BaseCatalog {
           catalog()
               .asTableCatalog()
               .loadTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
-      if (HIVE_VIRTUAL_VIEW_TYPE.equalsIgnoreCase(table.properties().get(HIVE_TABLE_TYPE_KEY))) {
-        // Hive HMS stores VIRTUAL_VIEW entries as table entries also returned by loadTable.
-        return loadViewOrThrow(tablePath);
-      }
       if (FlinkGenericTableUtil.isGenericTableWhenLoad(table.properties())) {
         return toFlinkGenericTable(table);
       }
