@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FunctionVersionMetaBaseSQLProvider;
@@ -61,8 +62,9 @@ public class FunctionVersionMetaSQLProviderFactory {
     return getProvider().insertFunctionVersionMetaOnDuplicateKeyUpdate(functionVersionPO);
   }
 
-  public static String softDeleteFunctionVersionMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteFunctionVersionMetasBySchemaId(schemaId);
+  public static String softDeleteFunctionVersionMetasBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteFunctionVersionMetasBySchemaIds(schemaIds);
   }
 
   public static String softDeleteFunctionVersionMetasByCatalogId(

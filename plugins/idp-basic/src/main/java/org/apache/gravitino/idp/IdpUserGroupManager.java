@@ -147,18 +147,19 @@ public class IdpUserGroupManager implements Closeable {
    * Changes built-in IdP group membership.
    *
    * @param groupName The group name.
-   * @param additions The usernames to add, or null if none.
-   * @param removals The usernames to remove, or null if none.
+   * @param usersToAdd The usernames to add, or null if none.
+   * @param usersToRemove The usernames to remove, or null if none.
    * @return The updated built-in IdP group.
    */
   public IdpGroup changeGroupMembership(
-      String groupName, @Nullable List<String> additions, @Nullable List<String> removals) {
-    List<String> additionsList = additions == null ? Collections.emptyList() : additions;
-    List<String> removalsList = removals == null ? Collections.emptyList() : removals;
+      String groupName, @Nullable List<String> usersToAdd, @Nullable List<String> usersToRemove) {
+    List<String> usersToAddList = usersToAdd == null ? Collections.emptyList() : usersToAdd;
+    List<String> usersToRemoveList =
+        usersToRemove == null ? Collections.emptyList() : usersToRemove;
     Preconditions.checkArgument(
-        !additionsList.isEmpty() || !removalsList.isEmpty(),
-        "additions and removals cannot both be empty");
-    GROUP_SERVICE.changeGroupMembership(groupName, additionsList, removalsList);
+        !usersToAddList.isEmpty() || !usersToRemoveList.isEmpty(),
+        "usersToAdd and usersToRemove cannot both be empty");
+    GROUP_SERVICE.changeGroupMembership(groupName, usersToAddList, usersToRemoveList);
     return getGroup(groupName);
   }
 

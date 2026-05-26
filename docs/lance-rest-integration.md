@@ -20,14 +20,19 @@ This documentation assumes familiarity with the Lance REST service setup as desc
 
 The following table outlines the tested compatibility between Gravitino versions and Lance connector versions:
 
-| Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions |
-|--------------------------------|--------------------------------|------------------------------|
-| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15               | 0.0.6 - 0.0.8                |
-| 1.3.0                          | 0.1.0 - 0.2.0                 | 0.0.6 - 0.2.0                |
+| Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions                  |
+|--------------------------------|--------------------------------|-----------------------------------------------|
+| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
+| 1.3.0                          | 0.1.0 - 0.4.0                  | 0.3.0 - 0.4.2, 0.2.0 supports with conditions |
 
 :::note
 - These version ranges show which versions are expected to work together.
-- Not all versions in these ranges have been tested. Only some versions were tested.
+- For Gravitino 1.3.0, the explicitly verified release versions are
+  `lance-spark` {0.1.0, 0.1.1, 0.2.0, 0.4.0} and `lance-ray`
+  {0.3.0, 0.4.2}. By default, lance-ray 0.2.0 and earlier are *not* supported on 1.3.0
+  because pip resolves them with an older `lance-namespace` whose request
+  schema is incompatible with the upgraded server-side `lance-namespace-core`
+  (0.7.5+). But if you can still use lance-ray 0.2.0 with Gravitino 1.3.0 by pining pylance to 3.x or 4.x; 
 - Before using in production, please test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
@@ -79,7 +84,7 @@ logging.basicConfig(level=logging.INFO)
 # Replace /path/to/lance-spark-bundle-3.5_2.12-X.X.XX.jar with your actual JAR path and version;
 # refer to the compatibility matrix for supported lance-spark versions.
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    "--jars /path/to/lance-spark-bundle-3.5_2.12-0.0.15.jar "
+    "--jars /path/to/lance-spark-bundle-3.5_2.12-0.4.0.jar "
     "--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" "
     "--master local[1] pyspark-shell"
@@ -175,7 +180,8 @@ pip install lance-ray
 
 :::info
 - Ray will be automatically installed if not already present
-- The lance-namespace version must be less than or equal to 0.4.5.
+- For Gravitino 1.3.0, use a `lance-namespace` client compatible with
+  server-side `lance-namespace-core` 0.7.5 or newer.
 - Ensure Ray version compatibility in your environment before deployment
 :::
 
