@@ -22,28 +22,32 @@ Gravitino credential vending is used to generate temporary or static credentials
 
 ## How Credential Vending Is Configured
 
-Gravitino supports credential vending in two deployment patterns. The columns in the tables below correspond to these two patterns. Exactly one column applies to any given deployment.
+Credential vending is configured in two places depending on your Iceberg REST server [deployment mode](../iceberg-rest-service.md#deployment-modes):
 
-### Pattern A: Auxiliary Iceberg REST server proxying Gravitino catalogs
+- **Auxiliary mode (recommended)**: Use the **Catalog property** form. Credentials are set on the Gravitino `lakehouse-iceberg` catalog: via the REST API at catalog creation, via the CLI, or as defaults in `${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf`. This is the common deployment for Gravitino users and the only one that supports authorization.
+- **Standalone mode**: Use the **Iceberg REST Server property** form. Credentials are set in `${GRAVITINO_HOME}/conf/gravitino-iceberg-rest-server.conf`.
 
-The Iceberg REST server runs as an auxiliary service inside the Gravitino JVM and serves Iceberg requests by proxying your Gravitino-managed `lakehouse-iceberg` catalogs. Credentials are configured as catalog properties on the Gravitino catalog. Use **column 1** (Catalog property) of each table below.
-
-Set catalog properties via:
-
-- The Gravitino REST API or CLI when creating or altering a `lakehouse-iceberg` catalog, or
-- `${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` as defaults.
+The tables below show both forms for each credential. Exactly one form applies to any given deployment.
 
 :::caution
-In this deployment, the `gravitino.iceberg-rest.*` versions of these properties (column 2) are NOT consulted for catalog-level settings. Setting credentials, cache parameters, or IO properties under `gravitino.iceberg-rest.*` in `gravitino.conf` will silently have no effect. Always configure these on the Gravitino catalog itself.
+In auxiliary mode, the **Iceberg REST Server property** form of these credentials (`gravitino.iceberg-rest.*`) is NOT consulted. Setting credentials, cache parameters, or IO properties under `gravitino.iceberg-rest.*` in `gravitino.conf` will silently have no effect. Always configure these on the Gravitino catalog itself.
 :::
 
-### Pattern B: Standalone Iceberg REST server
+### Example: Credential Vending Defaults
 
-The Iceberg REST server runs as a separate process with no Gravitino catalog system involvement. Credentials are configured as static properties in the IRC server's own config file. Use **column 2** (Iceberg REST Server property) of each table below.
+Credential-vending portion of `${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` for an auxiliary-mode production deployment with S3 storage:
 
-Set Iceberg REST Server properties in `${GRAVITINO_HOME}/conf/gravitino-iceberg-rest-server.conf`.
+```properties
+# S3 file IO and region, applied to every lakehouse-iceberg catalog
+io-impl=org.apache.iceberg.aws.s3.S3FileIO
+s3-region=us-west-2
 
-In this deployment, column 1 does not apply -- there are no Gravitino catalogs to attach properties to.
+# Credential vending: vend STS tokens to Iceberg clients
+credential-providers=s3-token
+s3-role-arn=<your-vending-role-arn>
+```
+
+See [Iceberg REST Catalog Service > Example Configurations](../iceberg-rest-service.md#example-configurations) for the complete auxiliary-mode setup including `gravitino.conf` and catalog creation API calls.
 
 ## General Configurations
 
