@@ -137,7 +137,7 @@ doubles as the name-reuse tombstone (§5.7).
  worker pool (any replica)
    claims job via CAS UPDATE (heartbeat ownership)
    → rebuild snapshot graph from metadata_location
-   → stream + delete every reachable file, retry on later poll ticks
+   → stream + delete every reachable file, retry on later polls
    → SUCCEEDED | FAILED
 ```
 
@@ -160,7 +160,7 @@ each word capitalized).
    table is immediately absent from `LIST` and `HEAD` returns `404`.
 4. A worker on any replica claims the job, rebuilds the snapshot graph from
    `metadata_location`, and streams through every reachable file deleting
-   it, retrying transient failures on later poll ticks.
+   it, retrying transient failures on later polls.
 5. On success the job is `SUCCEEDED`; on terminal failure it lands in
    `FAILED` for operator inspection (queryable in the job table, §5.9).
 
@@ -227,7 +227,7 @@ snapshot graph deterministically when the worker runs.
 
 A single column drives retries: `attempts` counts failures so the worker
 gives up at the retry ceiling. A failed job returns to `PENDING` and is
-re-claimed on a later poll tick, so the poll cadence (`poll-interval-ms`,
+re-claimed on a later poll, so the poll cadence (`poll-interval-ms`,
 §5.10) is the retry interval — no separate scheduling column is needed. The
 ceiling is a config (`max-attempts`, §5.10), not a per-row `max_attempts`
 column, since it is the same for every job.
@@ -284,6 +284,20 @@ fallback (H2, older MySQL). `SKIP LOCKED` is purely an optimization — the
 claiming `UPDATE` is the serialization point, so two replicas can never claim
 the same job. We do not use DB-specific advisory locks.
 
+**Worker loop (one free thread):**
+
+1. **Poll & claim.** Read the candidate window above and CAS the first
+   winnable row to `RUNNING` with a fresh `heartbeat_at`. If nothing is
+   claimable, wait `poll-interval-ms` and repeat.
+2. **Load metadata.** `TableMetadataParser.read(io, metadata_location)`. A
+   transient failure releases the job for retry; a terminal one fails it
+   (§5.6).
+3. **Stream & delete.** Walk the snapshot graph lazily and delete every
+   reachable file through the shared `deleteExecutor`; `NotFoundException`
+   counts as deleted. A background task keeps `heartbeat_at` fresh throughout.
+4. **Finish.** Once every reachable file is gone the job is `SUCCEEDED`
+   (§5.6). The thread then loops back to step 1.
+
 Execution mirrors `CatalogHandlers.purgeTable`, but **streams** the
 reachable files instead of materializing them. A large table can reference
 millions of data files, so the worker walks the snapshot graph lazily and
@@ -315,18 +329,34 @@ this worker owns. If the host dies the heartbeat stops; once a row ages past
 Per-file failures are logged but do not fail the whole job — the
 synchronous purge has the same "best effort" stance. A job fails only if the
 **metadata phase** fails. `NotFoundException` from `deleteFile` counts as
-success. A transient failure goes back to `PENDING` and is retried on a
-later poll tick (§5.5), incrementing `attempts` each time; when `attempts`
+success. A transient failure goes back to `PENDING` and is retried when a
+free thread next polls (§5.5), incrementing `attempts` each time; when `attempts`
 reaches `max-attempts` the job goes to `FAILED` instead of `PENDING`. A
 clearly terminal failure skips the retries and goes straight to `FAILED`.
 
 | Outcome                                              | Action                                                                                |
 |------------------------------------------------------|---------------------------------------------------------------------------------------|
 | All files deleted (or already gone)                  | `state='SUCCEEDED'`                                                                    |
-| Transient failure, `attempts < max-attempts`         | `attempts++`, back to `PENDING`, `heartbeat_at=NULL`; re-claimed on a later poll tick  |
+| Transient failure, `attempts < max-attempts`         | `attempts++`, back to `PENDING`, `heartbeat_at=NULL`; re-claimed on a later poll       |
 | Transient failure, `attempts` reaches `max-attempts` | `attempts++` → `FAILED` (gave up retrying)                                             |
 | Terminal failure (e.g. metadata gone/corrupt)        | → `FAILED` immediately; retrying cannot help                                           |
 | Worker killed mid-job                                | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent  |
+
+**After `SUCCEEDED`.** The files are gone, so the tombstone lifts at once:
+`createTable` / `register` at the identifier succeed again (§5.7). The
+`purge.completed` counter increments and the row is pruned
+`terminal-retention-hours` later (§5.10).
+
+**After `FAILED`.** `FAILED` is terminal — the poll never re-selects it, so
+the worker stops touching the job. The tombstone also lifts (§5.7), so a
+failed cleanup never permanently wedges the name; the cost is that any files
+the job did not delete are now an orphaned leak. The failure is therefore
+made loud rather than silent: it increments `purge.failed`, the row stays
+queryable (§5.9), and the reason is in the worker logs. An operator reclaims
+the leaked files out of band — a manual delete or a storage lifecycle rule on
+the table's prefix — and then drops the row, or lets it prune after
+`terminal-retention-hours`. There is no automatic re-drive in 1.3;
+re-enqueueing a `FAILED` cleanup is a manual operator action.
 
 Restart handling falls out of the durable job table plus the heartbeat
 model — no separate mechanism:
@@ -487,7 +517,7 @@ only as a rollback flag.
 ### Phase 1 (1.3): Async purge core
 - [ ] Add the `iceberg_purge_job` schema and migrations (MySQL, H2, PostgreSQL)
 - [ ] Implement `IcebergPurgeJobStore` enqueue path (persist job, return)
-- [ ] Implement the worker pool: CAS claiming with heartbeat ownership (`FOR UPDATE SKIP LOCKED` where available), heartbeat renewal, streaming file deletion, retry state machine (re-claim failed jobs on later poll ticks, give up at `max-attempts`)
+- [ ] Implement the worker pool: CAS claiming with heartbeat ownership (`FOR UPDATE SKIP LOCKED` where available), heartbeat renewal, streaming file deletion, retry state machine (re-claim failed jobs on later polls, give up at `max-attempts`)
 - [ ] Honor the `X-Gravitino-Async-Purge` request header and wire both paths into `IcebergTableOperationExecutor.dropTable`
 - [ ] Add observability (§5.9): metrics and the informative `ErrorResponse` message on the §5.7 `409`; operator read path in 1.3 is direct DB query
 - [ ] Enforce tombstone semantics (§5.7): on `createTable`/`registerTable`, reject with `409` when an active job exists (`idx_object` lookup on the request thread)
