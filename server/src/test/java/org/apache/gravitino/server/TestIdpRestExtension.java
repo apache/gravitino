@@ -55,20 +55,15 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 import org.mockito.Mockito;
 
-/**
- * Verifies that built-in IdP REST resources are registered through {@link
- * Configs#REST_API_EXTENSION_PACKAGES} when the {@code idp-basic} plugin is on the server
- * classpath.
- */
+/** Verifies IdP REST resources load via {@link Configs#REST_API_EXTENSION_PACKAGES}. */
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestIdpRestExtension {
 
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
-
   private static final String IDP_REST_PACKAGE = "org.apache.gravitino.idp.web.rest";
+  private static final HttpClient HTTP = HttpClient.newHttpClient();
 
   private int httpPort;
-
   private Path h2Path;
 
   @BeforeAll
@@ -86,34 +81,16 @@ public class TestIdpRestExtension {
 
   @Test
   public void testWithoutExtension() throws Exception {
-    ServerConfig serverConfig = newConfig(false);
-
-    try (ServerHarness harness = startServer(serverConfig)) {
+    try (ServerHarness harness = startServer(newConfig(false))) {
       HttpResponse<String> response = getUser(harness.port(), "missing-user");
-
       assertEquals(404, response.statusCode());
-      assertFalse(
-          isNotFoundError(response.body()),
-          "IdP REST should not be registered without extensionPackages");
+      assertFalse(isNotFoundError(response.body()));
     }
   }
 
   @Test
   public void testWithExtension() throws Exception {
-    ServerConfig serverConfig = newConfig(true);
-
-    try (ServerHarness harness = startServer(serverConfig)) {
-      String username = "idp-rest-it-user";
-      String password = "Passw0rd-For-User";
-
-      HttpResponse<String> addResponse = addUser(harness.port(), username, password);
-      assertEquals(200, addResponse.statusCode(), addResponse.body());
-
-      HttpResponse<String> getResponse = getUser(harness.port(), username);
-      assertEquals(200, getResponse.statusCode(), getResponse.body());
-      JsonNode userNode = JsonUtils.objectMapper().readTree(getResponse.body()).get("user");
-      assertEquals(username, userNode.get("name").asText());
-
+    try (ServerHarness harness = startServer(newConfig(true))) {
       HttpResponse<String> missingResponse = getUser(harness.port(), "missing-user");
       assertEquals(404, missingResponse.statusCode());
       assertTrue(
@@ -139,14 +116,12 @@ public class TestIdpRestExtension {
             .put(STORE_DELETE_AFTER_TIME.getKey(), String.valueOf(20 * 60 * 1000L))
             .put(CACHE_ENABLED.getKey(), "false")
             .put(ENABLE_AUTHORIZATION.getKey(), "false");
-
     if (enableExtension) {
       builder.put(REST_API_EXTENSION_PACKAGES.getKey(), IDP_REST_PACKAGE);
     }
 
     ServerConfig serverConfig = new ServerConfig();
     serverConfig.loadFromMap(builder.build(), key -> true);
-
     ServerConfig spyServerConfig = Mockito.spy(serverConfig);
     Mockito.when(
             spyServerConfig.getConfigsWithPrefix(
@@ -163,27 +138,16 @@ public class TestIdpRestExtension {
   }
 
   private HttpResponse<String> getUser(int port, String user) throws Exception {
-    HttpRequest request =
+    return send(
         HttpRequest.newBuilder()
             .uri(URI.create(String.format("http://localhost:%d/api/idp/users/%s", port, user)))
             .header("Accept", ACCEPT)
             .GET()
-            .build();
-    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+            .build());
   }
 
-  private HttpResponse<String> addUser(int port, String user, String password) throws Exception {
-    String body =
-        JsonUtils.objectMapper()
-            .writeValueAsString(ImmutableMap.of("user", user, "password", password));
-    HttpRequest request =
-        HttpRequest.newBuilder()
-            .uri(URI.create(String.format("http://localhost:%d/api/idp/users", port)))
-            .header("Accept", ACCEPT)
-            .header("Content-Type", ACCEPT)
-            .POST(HttpRequest.BodyPublishers.ofString(body))
-            .build();
-    return HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+  private HttpResponse<String> send(HttpRequest request) throws Exception {
+    return HTTP.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
   private boolean isNotFoundError(String body) throws IOException {

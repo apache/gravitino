@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
+import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
@@ -59,8 +60,8 @@ import org.junit.jupiter.api.Test;
 
 class TestIdpOperations extends JerseyTest {
 
+  private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String VALID_PASSWORD = "Passw0rd-For-User";
-
   private static final IdpUserGroupManager MANAGER = mock(IdpUserGroupManager.class);
 
   @BeforeEach
@@ -79,7 +80,6 @@ class TestIdpOperations extends JerseyTest {
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteUser()).thenReturn(null);
-
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
     when(authorizer.isServiceAdmin()).thenReturn(true);
 
@@ -104,60 +104,29 @@ class TestIdpOperations extends JerseyTest {
     AddUserRequest req = new AddUserRequest("user1", VALID_PASSWORD);
     doReturn(buildUser("user1")).when(MANAGER).addUser("user1", VALID_PASSWORD);
 
-    AddUserRequest illegalReq = new AddUserRequest("", VALID_PASSWORD);
-    Response illegalResp =
-        target("/idp/users")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(illegalReq, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
+    assertError(
+        Response.Status.BAD_REQUEST,
+        post("/idp/users", new AddUserRequest("", VALID_PASSWORD)),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
 
-    ErrorResponse illegalResponse = illegalResp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, illegalResponse.getCode());
-
-    Response resp =
-        target("/idp/users")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-
-    IdpUserResponse userResponse = resp.readEntity(IdpUserResponse.class);
-    Assertions.assertEquals("user1", userResponse.getUser().name());
+    Assertions.assertEquals(
+        "user1", post("/idp/users", req).readEntity(IdpUserResponse.class).getUser().name());
 
     doThrow(new AlreadyExistsException("mock error"))
         .when(MANAGER)
         .addUser("user1", VALID_PASSWORD);
-    Response conflictResp =
-        target("/idp/users")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), conflictResp.getStatus());
+    assertStatus(Response.Status.CONFLICT, post("/idp/users", req));
   }
 
   @Test
   void testGetUser() {
     when(MANAGER.getUser("user1")).thenReturn(buildUser("user1"));
-
-    Response resp =
-        target("/idp/users/user1")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-
-    IdpUserResponse userResponse = resp.readEntity(IdpUserResponse.class);
-    Assertions.assertEquals("user1", userResponse.getUser().name());
+    Assertions.assertEquals(
+        "user1", get("/idp/users/user1").readEntity(IdpUserResponse.class).getUser().name());
 
     reset(MANAGER);
     when(MANAGER.getUser("user1")).thenThrow(new NotFoundException("mock error"));
-    Response notFoundResp =
-        target("/idp/users/user1")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), notFoundResp.getStatus());
+    assertStatus(Response.Status.NOT_FOUND, get("/idp/users/user1"));
   }
 
   @Test
@@ -167,25 +136,9 @@ class TestIdpOperations extends JerseyTest {
     when(MANAGER.getUser("user1")).thenReturn(buildUser("user1"));
     when(MANAGER.removeUser("user1")).thenReturn(true);
 
-    Response changePasswordResp =
-        target("/idp/users/user1")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), changePasswordResp.getStatus());
-
-    IdpUserResponse userResponse = changePasswordResp.readEntity(IdpUserResponse.class);
-    Assertions.assertEquals("user1", userResponse.getUser().name());
-
-    Response removeResp =
-        target("/idp/users/user1")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .delete();
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), removeResp.getStatus());
-
-    RemoveResponse removeResponse = removeResp.readEntity(RemoveResponse.class);
-    Assertions.assertTrue(removeResponse.removed());
+    Assertions.assertEquals(
+        "user1", put("/idp/users/user1", req).readEntity(IdpUserResponse.class).getUser().name());
+    Assertions.assertTrue(delete("/idp/users/user1").readEntity(RemoveResponse.class).removed());
   }
 
   @Test
@@ -194,45 +147,19 @@ class TestIdpOperations extends JerseyTest {
     doReturn(buildGroup("group1")).when(MANAGER).addGroup("group1");
     when(MANAGER.getGroup("group1")).thenReturn(buildGroup("group1"));
 
-    Response addResp =
-        target("/idp/groups")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), addResp.getStatus());
-
-    Response getResp =
-        target("/idp/groups/group1")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), getResp.getStatus());
-
-    IdpGroupResponse groupResponse = getResp.readEntity(IdpGroupResponse.class);
-    Assertions.assertEquals("group1", groupResponse.getGroup().name());
+    assertStatus(Response.Status.OK, post("/idp/groups", req));
+    Assertions.assertEquals(
+        "group1", get("/idp/groups/group1").readEntity(IdpGroupResponse.class).getGroup().name());
 
     doThrow(new AlreadyExistsException("mock error")).when(MANAGER).addGroup("group1");
-    Response conflictResp =
-        target("/idp/groups")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), conflictResp.getStatus());
+    assertStatus(Response.Status.CONFLICT, post("/idp/groups", req));
   }
 
   @Test
   void testGetGroupNotFound() {
     when(MANAGER.getGroup("group1")).thenThrow(new NotFoundException("mock error"));
-
-    Response resp =
-        target("/idp/groups/group1")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), resp.getStatus());
-    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    assertError(
+        Response.Status.NOT_FOUND, get("/idp/groups/group1"), ErrorConstants.NOT_FOUND_CODE);
   }
 
   @Test
@@ -241,41 +168,55 @@ class TestIdpOperations extends JerseyTest {
         new GroupMembershipChangeRequest(new String[] {"user1", "user2"}, null);
     when(MANAGER.changeGroupMembership("group1", Arrays.asList("user1", "user2"), null))
         .thenReturn(buildGroup("group1", Arrays.asList("user1", "user2")));
-
-    Response addResp =
-        target("/idp/groups/group1/add")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .put(Entity.entity(addReq, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), addResp.getStatus());
+    assertStatus(Response.Status.OK, put("/idp/groups/group1/add", addReq));
 
     GroupMembershipChangeRequest removeReq =
         new GroupMembershipChangeRequest(null, new String[] {"user1", "user2"});
     when(MANAGER.changeGroupMembership("group1", null, Arrays.asList("user1", "user2")))
         .thenReturn(buildGroup("group1"));
-
-    Response removeResp =
-        target("/idp/groups/group1/remove")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .put(Entity.entity(removeReq, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), removeResp.getStatus());
+    assertStatus(Response.Status.OK, put("/idp/groups/group1/remove", removeReq));
   }
 
   @Test
   void testRemoveGroup() {
     when(MANAGER.removeGroup("group1", true)).thenReturn(true);
-
-    Response removeResp =
+    Assertions.assertTrue(
         target("/idp/groups/group1")
             .queryParam("force", true)
             .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .delete();
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), removeResp.getStatus());
+            .accept(ACCEPT)
+            .delete()
+            .readEntity(RemoveResponse.class)
+            .removed());
+  }
 
-    RemoveResponse removeResponse = removeResp.readEntity(RemoveResponse.class);
-    Assertions.assertTrue(removeResponse.removed());
+  private Invocation.Builder request(String path) {
+    return target(path).request(MediaType.APPLICATION_JSON_TYPE).accept(ACCEPT);
+  }
+
+  private Response get(String path) {
+    return request(path).get();
+  }
+
+  private Response post(String path, Object body) {
+    return request(path).post(Entity.entity(body, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response put(String path, Object body) {
+    return request(path).put(Entity.entity(body, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response delete(String path) {
+    return request(path).delete();
+  }
+
+  private void assertStatus(Response.Status expected, Response response) {
+    Assertions.assertEquals(expected.getStatusCode(), response.getStatus());
+  }
+
+  private void assertError(Response.Status expected, Response response, int code) {
+    assertStatus(expected, response);
+    Assertions.assertEquals(code, response.readEntity(ErrorResponse.class).getCode());
   }
 
   private IdpUser buildUser(String user) {
