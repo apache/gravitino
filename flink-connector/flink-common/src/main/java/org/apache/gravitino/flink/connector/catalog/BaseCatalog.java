@@ -235,6 +235,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
           .map(NameIdentifier::name)
           .collect(Collectors.toList());
     } catch (UnsupportedOperationException e) {
+      // Flink's listViews contract allows returning an empty list when views are not supported.
       LOG.debug("Catalog {} does not support views; returning empty view list", catalogName(), e);
       return Collections.emptyList();
     } catch (NoSuchSchemaException e) {
