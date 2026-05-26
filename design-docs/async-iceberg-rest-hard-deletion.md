@@ -211,11 +211,9 @@ CREATE TABLE IF NOT EXISTS `iceberg_purge_job` (
   `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON',
   `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|FAILED',
   `attempts`          INT(10)       NOT NULL DEFAULT 0,
-  `last_error`        TEXT          NULL,
   `heartbeat_at`      BIGINT(20)    NULL COMMENT 'last heartbeat from the worker; NULL when unclaimed',
-  `created_at`        BIGINT(20)    NOT NULL,
-  `created_by`        VARCHAR(128)  NOT NULL,
-  `updated_at`        BIGINT(20)    NOT NULL,
+  `created_by`        VARCHAR(128)  NOT NULL COMMENT 'principal that requested the drop (audit)',
+  `updated_at`        BIGINT(20)    NOT NULL COMMENT 'last state change; drives poll ordering and terminal-row pruning',
   PRIMARY KEY (`id`),
   KEY `idx_state_updated` (`state`, `updated_at`),
   KEY `idx_object` (`catalog_name`, `namespace`, `table_name`, `state`)
@@ -391,9 +389,10 @@ is the `iceberg_purge_job` row, exposed without touching the wire contract:
   §5.7 `409` on a same-identifier `createTable` / `register`, whose
   `ErrorResponse.message` names the blocking job.
 - **Operators** query `iceberg_purge_job` directly (the `idx_object` index
-  makes the per-identifier lookup cheap), plus the metrics below. This is
-  enough to answer "still purging / failed?" and triage dead letters without
-  new HTTP surface. A read-only management endpoint is deferred to Phase 2.
+  makes the per-identifier lookup cheap), plus the metrics below; the failure
+  reason for a `FAILED` job is in the worker's logs. This is enough to answer
+  "still purging / failed?" without new HTTP surface. A read-only management
+  endpoint is deferred to Phase 2.
 - **Metrics**: gauges `purge.jobs.{pending,running,failed}` and
   `purge.oldest_pending_age_ms`; counters `purge.{completed,failed}`. These
   let operators alert on a growing backlog or any `FAILED` job — the two
