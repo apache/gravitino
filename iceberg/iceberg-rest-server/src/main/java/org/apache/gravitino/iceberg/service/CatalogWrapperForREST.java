@@ -490,6 +490,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
   }
 
+  /**
+   * Builds a synchronous COMPLETED scan plan response.
+   *
+   * <p>{@code withSpecsById} is deprecated in Iceberg 1.11 but still used by {@link
+   * org.apache.iceberg.rest.CatalogHandlers#planTableScan}. Remove when upstream provides a
+   * non-deprecated replacement (visibility change planned in 1.12).
+   */
   @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
       List<FileScanTask> fileScanTasks, Map<Integer, PartitionSpec> specsById) {

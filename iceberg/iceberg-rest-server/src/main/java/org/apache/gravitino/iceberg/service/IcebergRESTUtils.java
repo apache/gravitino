@@ -53,7 +53,13 @@ public class IcebergRESTUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
 
-  /** UTF-8 URL-encoded namespace separator used by the Iceberg REST catalog spec. */
+  /**
+   * URL-encoded UTF-8 namespace separator ({@code 0x1F}) required by the Iceberg REST catalog spec.
+   *
+   * <p>Iceberg 1.11 allows a configurable separator in {@link RESTUtil#encodeNamespace} and {@link
+   * RESTUtil#decodeNamespace}; Gravitino passes this value explicitly so server-side decoding and
+   * client-side encoding stay aligned with the wire format used in existing deployments and tests.
+   */
   private static final String NAMESPACE_SEPARATOR_URLENCODED_UTF_8 = "%1F";
 
   public static final String SNAPSHOT_ALL = "all";
