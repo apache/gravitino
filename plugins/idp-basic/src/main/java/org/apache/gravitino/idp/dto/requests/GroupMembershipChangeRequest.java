@@ -33,21 +33,21 @@ import org.apache.gravitino.rest.RESTRequest;
 @ToString
 public class GroupMembershipChangeRequest implements RESTRequest {
 
-  @JsonProperty("additions")
-  private final String[] additions;
+  @JsonProperty("usersToAdd")
+  private final String[] usersToAdd;
 
-  @JsonProperty("removals")
-  private final String[] removals;
+  @JsonProperty("usersToRemove")
+  private final String[] usersToRemove;
 
   /**
    * Creates a new GroupMembershipChangeRequest.
    *
-   * @param additions The user names to add to the built-in IdP group.
-   * @param removals The user names to remove from the built-in IdP group.
+   * @param usersToAdd The user names to add to the built-in IdP group.
+   * @param usersToRemove The user names to remove from the built-in IdP group.
    */
-  public GroupMembershipChangeRequest(String[] additions, String[] removals) {
-    this.additions = additions;
-    this.removals = removals;
+  public GroupMembershipChangeRequest(String[] usersToAdd, String[] usersToRemove) {
+    this.usersToAdd = usersToAdd;
+    this.usersToRemove = usersToRemove;
   }
 
   /** Default constructor for GroupMembershipChangeRequest. (Used for Jackson deserialization.) */
@@ -63,19 +63,21 @@ public class GroupMembershipChangeRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        additions != null || removals != null, "additions and removals cannot both be null");
+        usersToAdd != null || usersToRemove != null,
+        "usersToAdd and usersToRemove cannot both be null");
 
-    if (additions != null) {
-      for (String user : additions) {
+    if (usersToAdd != null) {
+      for (String user : usersToAdd) {
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(user), "additions must not contain null or empty user names");
+            StringUtils.isNotBlank(user), "usersToAdd must not contain null or empty user names");
       }
     }
 
-    if (removals != null) {
-      for (String user : removals) {
+    if (usersToRemove != null) {
+      for (String user : usersToRemove) {
         Preconditions.checkArgument(
-            StringUtils.isNotBlank(user), "removals must not contain null or empty user names");
+            StringUtils.isNotBlank(user),
+            "usersToRemove must not contain null or empty user names");
       }
     }
   }

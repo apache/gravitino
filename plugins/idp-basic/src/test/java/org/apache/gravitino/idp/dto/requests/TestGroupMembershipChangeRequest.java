@@ -36,8 +36,8 @@ public class TestGroupMembershipChangeRequest {
         JsonUtils.objectMapper().readValue(serJson, GroupMembershipChangeRequest.class);
 
     Assertions.assertEquals(request, deserRequest);
-    Assertions.assertArrayEquals(new String[] {"user1", "user2"}, deserRequest.getAdditions());
-    Assertions.assertArrayEquals(new String[] {"user3"}, deserRequest.getRemovals());
+    Assertions.assertArrayEquals(new String[] {"user1", "user2"}, deserRequest.getUsersToAdd());
+    Assertions.assertArrayEquals(new String[] {"user3"}, deserRequest.getUsersToRemove());
 
     GroupMembershipChangeRequest request1 = new GroupMembershipChangeRequest();
 
@@ -46,8 +46,8 @@ public class TestGroupMembershipChangeRequest {
         JsonUtils.objectMapper().readValue(serJson1, GroupMembershipChangeRequest.class);
 
     Assertions.assertEquals(request1, deserRequest1);
-    Assertions.assertNull(deserRequest1.getAdditions());
-    Assertions.assertNull(deserRequest1.getRemovals());
+    Assertions.assertNull(deserRequest1.getUsersToAdd());
+    Assertions.assertNull(deserRequest1.getUsersToRemove());
   }
 
   @Test
@@ -72,24 +72,24 @@ public class TestGroupMembershipChangeRequest {
   }
 
   @Test
-  public void testGroupMembershipChangeRequestValidateNullUserInAdditions() {
+  public void testGroupMembershipChangeRequestValidateNullUserInUsersToAdd() {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> new GroupMembershipChangeRequest(new String[] {"user1", null}, null).validate());
 
     Assertions.assertEquals(
-        "additions must not contain null or empty user names", exception.getMessage());
+        "usersToAdd must not contain null or empty user names", exception.getMessage());
   }
 
   @Test
-  public void testGroupMembershipChangeRequestValidateNullUserInRemovals() {
+  public void testGroupMembershipChangeRequestValidateNullUserInUsersToRemove() {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> new GroupMembershipChangeRequest(null, new String[] {null}).validate());
 
     Assertions.assertEquals(
-        "removals must not contain null or empty user names", exception.getMessage());
+        "usersToRemove must not contain null or empty user names", exception.getMessage());
   }
 }
