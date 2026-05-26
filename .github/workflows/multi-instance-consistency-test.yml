@@ -92,8 +92,8 @@ jobs:
           # only under catalogs/jdbc-mysql/libs/ (which is for the JDBC catalog
           # backend, not the entity store).
           curl -fsSL \
-            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.33/mysql-connector-java-8.0.33.jar \
-            -o distribution/package/libs/mysql-connector-java-8.0.33.jar
+            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.14/mysql-connector-java-8.0.14.jar \
+            -o distribution/package/libs/mysql-connector-java-8.0.14.jar
 
           # Second instance is a full copy with its own conf/, logs/, data/.
           cp -a distribution/package distribution/package-b
