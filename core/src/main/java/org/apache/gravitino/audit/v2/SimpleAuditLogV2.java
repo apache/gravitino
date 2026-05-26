@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.audit.v2;
 
-import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
@@ -34,6 +36,9 @@ import org.apache.gravitino.listener.api.event.OperationType;
  * server, add eventSource and remoteAddress to audit log.
  */
 public class SimpleAuditLogV2 implements AuditLog {
+
+  private static final DateTimeFormatter TIMESTAMP_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneId.systemDefault());
 
   private final BaseEvent event;
 
@@ -95,14 +100,17 @@ public class SimpleAuditLogV2 implements AuditLog {
 
   @Override
   public String toString() {
+    Map<String, String> info = customInfo();
+    String customInfoStr = info != null && !info.isEmpty() ? info.toString() : "";
     return String.format(
-        "[%s]\t%s\t%s\t%s\t%s\t%s\t%s",
-        new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(timestamp()),
+        "[%s]\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
+        TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(timestamp())),
         user(),
         operationType(),
         identifier(),
         operationStatus(),
         eventSource(),
-        remoteAddress());
+        remoteAddress(),
+        customInfoStr);
   }
 }

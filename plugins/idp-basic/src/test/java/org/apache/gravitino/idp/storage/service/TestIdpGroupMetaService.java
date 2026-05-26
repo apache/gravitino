@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.gravitino.idp.exception.AlreadyExistsException;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.junit.jupiter.api.Tag;
@@ -64,7 +65,8 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("group1"));
     runServiceCall(() -> groupMetaService.insertIdpGroup(group1));
-    runServiceCall(() -> groupMetaService.addUsersToGroup("group1", List.of("user1")));
+    runServiceCall(
+        () -> groupMetaService.changeGroupMembership("group1", List.of("user1"), List.of()));
     assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
     assertIterableEquals(List.of("user1"), groupMetaService.listUsernamesByGroupName("group1"));
 
@@ -76,19 +78,23 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
-    assertThrowsRuntimeException(() -> groupMetaService.insertIdpGroup(duplicateGroup));
+    assertThrows(
+        AlreadyExistsException.class, () -> groupMetaService.insertIdpGroup(duplicateGroup));
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testDeleteIdpGroupCascadesMemberships(String type) throws IOException {
+  void testDeleteIdpGroupForceRemovesMemberships(String type) throws IOException {
     init(type);
     insertUsers(4);
     insertGroups(4);
     insertGroupUserGroupRelations();
     IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
 
-    runServiceCall(() -> assertTrue(groupMetaService.deleteIdpGroup("group1")));
+    assertThrows(
+        IllegalStateException.class, () -> groupMetaService.deleteIdpGroup("group1", false));
+
+    runServiceCall(() -> assertTrue(groupMetaService.deleteIdpGroup("group1", true)));
     assertNull(idpGroupMetaMapper.selectIdpGroup("group1"));
     assertEquals(4, countGroups());
     assertEquals(8, countUserGroupRels());
@@ -114,21 +120,21 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
     runServiceCall(() -> groupMetaService.insertIdpGroup(group1));
 
     runServiceCall(
-        () -> groupMetaService.addUsersToGroup("engineering", List.of("user1", "user2")));
+        () ->
+            groupMetaService.changeGroupMembership(
+                "engineering", List.of("user1", "user2"), List.of()));
     assertIterableEquals(
         List.of("user1", "user2"), groupMetaService.listUsernamesByGroupName("engineering"));
 
     runServiceCall(
-        () ->
-            assertEquals(
-                1, groupMetaService.removeUsersFromGroup("engineering", List.of("user1"))));
+        () -> groupMetaService.changeGroupMembership("engineering", List.of(), List.of("user1")));
     assertIterableEquals(
         List.of("user2"), groupMetaService.listUsernamesByGroupName("engineering"));
   }
 
   @ParameterizedTest
   @MethodSource("storageProvider")
-  void testAddUsersToGroupThrowsWhenUserMissing(String type) throws IOException {
+  void testChangeGroupMembershipThrowsWhenUserMissing(String type) throws IOException {
     init(type);
     insertUsers(1);
     IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
@@ -147,7 +153,9 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
         NotFoundException.class,
         () ->
             runServiceCall(
-                () -> groupMetaService.addUsersToGroup("engineering", List.of("missing-user"))));
+                () ->
+                    groupMetaService.changeGroupMembership(
+                        "engineering", List.of("missing-user"), List.of())));
   }
 
   @ParameterizedTest

@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -147,9 +148,7 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
                               .addAction("s3:ListBucket")
                               .addResource(key))
                   .addConditions(
-                      IamConditionOperator.STRING_LIKE,
-                      "s3:prefix",
-                      Arrays.asList(rawPath, addWildcardToPath(rawPath)));
+                      IamConditionOperator.STRING_LIKE, "s3:prefix", listPrefixes(rawPath));
 
               bucketGetLocationStatementBuilder.computeIfAbsent(
                   bucketArn,
@@ -201,6 +200,21 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
 
   private static String addWildcardToPath(String path) {
     return path.endsWith("/") ? path + "*" : path + "/*";
+  }
+
+  /**
+   * Builds the {@code s3:prefix} condition values for a {@code ListBucket} statement. The prefixes
+   * are restricted to the location and its descendants by requiring a trailing slash, so a vended
+   * credential cannot enumerate keys in adjacent locations (e.g. {@code path/to/table_new}) that
+   * merely share the location's string prefix. The empty path (bucket root) is preserved so listing
+   * the whole bucket still works.
+   *
+   * @param rawPath the object key prefix of the location, without a leading slash
+   * @return the allowed {@code s3:prefix} values
+   */
+  static List<String> listPrefixes(String rawPath) {
+    String dirPrefix = rawPath.isEmpty() || rawPath.endsWith("/") ? rawPath : rawPath + "/";
+    return Arrays.asList(dirPrefix, addWildcardToPath(rawPath));
   }
 
   private static String removeSchemaFromS3Uri(URI uri) {
