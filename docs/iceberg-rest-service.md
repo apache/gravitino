@@ -72,6 +72,8 @@ Minimal setup. Iceberg REST runs alongside Gravitino with the dynamic config pro
 `gravitino.conf`:
 
 ```properties
+# Sample gravitino.conf (development)
+
 gravitino.auxService.names=iceberg-rest
 gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider
 gravitino.iceberg-rest.gravitino-metalake=test
@@ -86,6 +88,8 @@ Iceberg REST runs alongside Gravitino with shared S3 storage defaults and creden
 `gravitino.conf`:
 
 ```properties
+# Sample gravitino.conf (production)
+
 gravitino.auxService.names=iceberg-rest
 gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider
 gravitino.iceberg-rest.gravitino-metalake=production
@@ -94,6 +98,9 @@ gravitino.iceberg-rest.gravitino-metalake=production
 `${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf`:
 
 ```properties
+# Sample lakehouse-iceberg.conf
+# Location: ${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf
+
 # S3 file IO and region, applied to every lakehouse-iceberg catalog
 io-impl=org.apache.iceberg.aws.s3.S3FileIO
 s3-region=us-west-2
