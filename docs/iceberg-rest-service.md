@@ -21,7 +21,7 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
 
 The Gravitino Iceberg REST server:
 
-- Acts as a catalog proxy backed by `Hive` or `JDBC`.
+- Acts as a catalog server backed by `Hive`, `JDBC`, or another Iceberg REST catalog.
 - Implements the Apache Iceberg REST API as defined in Iceberg 1.10, covering most namespace, table, and view interfaces. The following are not yet implemented: multi-table transactions, pagination, and register-view.
 - Vends credentials for S3, GCS, OSS, and ADLS.
 - Targets multiple storage backends (S3, HDFS, OSS, GCS, and ADLS), with hooks for adding more.
@@ -29,6 +29,92 @@ The Gravitino Iceberg REST server:
 - Supports OAuth2 and HTTPS.
 - Provides access control when running as an auxiliary service.
 - Caches table metadata and scan plans.
+
+## Deployment Modes
+
+Gravitino's Iceberg REST server runs in one of two modes.
+
+### Auxiliary Mode (recommended)
+
+The Iceberg REST server runs inside the Gravitino JVM as an auxiliary service. Iceberg clients connect to the IRC port (default 9001) and Gravitino-native clients connect to the Gravitino server port (default 8090); both see the same Iceberg catalogs managed in Gravitino's catalog system.
+
+This is the common deployment for Gravitino users:
+
+- Catalogs are created and managed through Gravitino's catalog system (REST API or CLI), and their properties (storage, credentials, cache, etc.) apply automatically when Iceberg REST clients access those catalogs.
+- Authorization is supported. The Iceberg REST server delegates authorization decisions to Gravitino's access control system.
+- Only one process to operate.
+
+Configuration files:
+
+- `${GRAVITINO_HOME}/conf/gravitino.conf` for server-level Iceberg REST properties (HTTP, security, the catalog config provider).
+- Per-catalog properties (storage, credentials, etc.) are set at catalog creation time via the REST API or CLI, or as shared defaults in `${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf`.
+
+This mode requires `gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider` so the Iceberg REST server reads catalog config from Gravitino. To enable the auxiliary service itself, see [Server Configuration > Iceberg REST Server](gravitino-server-config.md#iceberg-rest-server).
+
+### Standalone Mode
+
+The Iceberg REST server runs as a separate process with no Gravitino catalog system involvement. Use this when you want a vanilla Iceberg REST server without Gravitino's metadata management. Authorization is not supported.
+
+Configuration file: `${GRAVITINO_HOME}/conf/gravitino-iceberg-rest-server.conf`. Catalogs are configured statically in this file via `gravitino.iceberg-rest.catalog-backend` and related properties.
+
+---
+
+The `gravitino.iceberg-rest.*` properties documented in the rest of this page apply to both modes. The configuration file differs (gravitino.conf for auxiliary; gravitino-iceberg-rest-server.conf for standalone) but the property names and behavior are identical.
+
+## Example Configurations
+
+Examples below show auxiliary mode (the common deployment).
+
+### Development
+
+Minimal setup. Iceberg REST runs alongside Gravitino with the dynamic config provider; defaults work for everything else.
+
+`gravitino.conf`:
+
+```properties
+gravitino.auxService.names=iceberg-rest
+gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider
+gravitino.iceberg-rest.gravitino-metalake=test
+```
+
+`${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf`: empty for dev. Set catalog properties per-catalog when creating each catalog via the Gravitino REST API.
+
+### Production with S3 Credential Vending
+
+Iceberg REST runs alongside Gravitino with shared S3 storage defaults and credential vending. The defaults file sets storage-wide configuration; individual catalogs override warehouse paths and other per-catalog settings via the REST API.
+
+`gravitino.conf`:
+
+```properties
+gravitino.auxService.names=iceberg-rest
+gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider
+gravitino.iceberg-rest.gravitino-metalake=production
+```
+
+`${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf`:
+
+```properties
+# S3 file IO and region, applied to every lakehouse-iceberg catalog
+io-impl=org.apache.iceberg.aws.s3.S3FileIO
+s3-region=us-west-2
+
+# Credential vending: vend STS tokens to Iceberg clients
+credential-providers=s3-token
+s3-role-arn=<your-vending-role-arn>
+```
+
+Per-catalog properties (most importantly `warehouse`) are set at catalog creation:
+
+```shell
+curl -X POST -H "Content-Type: application/json" -d '{
+  "name": "analytics",
+  "type": "RELATIONAL",
+  "provider": "lakehouse-iceberg",
+  "properties": {
+    "warehouse": "s3://my-warehouse/analytics/"
+  }
+}' http://gravitino-server:8090/api/metalakes/production/catalogs
+```
 
 ## Server Management
 
@@ -59,18 +145,13 @@ There are distinct configuration files for standalone and auxiliary server: `gra
 
 Starting with version `0.6.0-incubating`, the prefix `gravitino.auxService.iceberg-rest.` for auxiliary server configurations has been deprecated. If both `gravitino.auxService.iceberg-rest.key` and `gravitino.iceberg-rest.key` are present, the latter will take precedence. The configurations listed below use the `gravitino.iceberg-rest.` prefix.
 
-### Enable Iceberg REST Service
+### Enable the Iceberg REST Auxiliary Service
 
-| Configuration item                 | Description                                                                                                                                                                                                                            | Default value | Required | Since Version |
-|------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.auxService.names`       | The auxiliary service name of the Gravitino Iceberg REST catalog service. Use **`iceberg-rest`**.                                                                                                                                      | (none)        | Yes      | 0.2.0         |
-| `gravitino.iceberg-rest.classpath` | The classpath of the Gravitino Iceberg REST catalog service; includes the directory containing jars and configuration. It supports both absolute and relative paths, for example, `iceberg-rest-server/libs, iceberg-rest-server/conf` | (none)        | Yes      | 0.2.0         |
-
-Please note that, it only takes affect in `gravitino.conf`, you don't need to specify the above configurations if start as a standalone server.
+To enable the Iceberg REST server as an auxiliary service inside Gravitino, set `gravitino.auxService.names=iceberg-rest` and `gravitino.iceberg-rest.classpath` in `gravitino.conf`. See [Server Configuration > Iceberg REST Server](gravitino-server-config.md#iceberg-rest-server) for these properties. The remaining configuration on this page applies regardless of which deployment mode you use.
 
 ### HTTP Server Configuration
 
-| Configuration item                               | Description                                                                                                                                                                                                                                          | Default value                                                                | Required | Since Version |
+| Iceberg REST Server property | Description                                                                                                                                                                                                                                          | Default value                                                                | Required | Since Version |
 |--------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|---------------|
 | `gravitino.iceberg-rest.host`                    | The host of the Gravitino Iceberg REST catalog service.                                                                                                                                                                                              | `0.0.0.0`                                                                    | No       | 0.2.0         |
 | `gravitino.iceberg-rest.httpPort`                | The port of the Gravitino Iceberg REST catalog service.                                                                                                                                                                                              | `9001`                                                                       | No       | 0.2.0         |
@@ -94,7 +175,7 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 
 #### Hive Backend Configuration
 
-| Configuration item                                                        | Description                                                                                                                                  | Default value                                                                  | Required | Since Version |
+| Iceberg REST Server property | Description                                                                                                                                  | Default value                                                                  | Required | Since Version |
 |---------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------|---------------|
 | `gravitino.iceberg-rest.catalog-backend`                                  | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`hive`** for the Hive catalog backend.                    | `memory`                                                                       | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.uri`                                              | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                                                                | (none)                                                                         | Yes      | 0.2.0         |
@@ -103,7 +184,7 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 
 #### JDBC Backend Configuration
 
-| Configuration item                            | Description                                                                                                                                                                                                                                            | Default value           | Required | Since Version |
+| Iceberg REST Server property | Description                                                                                                                                                                                                                                            | Default value           | Required | Since Version |
 |-----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
 | `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for the JDBC catalog backend.                                                                                                                              | `memory`                | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.uri`                  | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.                                                                                                                     | (none)                  | Yes      | 0.2.0         |
@@ -128,7 +209,7 @@ Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gr
 
 By default, when the backend catalog is a REST catalog, IRC1 skips authorization and behaves as a proxy. IRC2 handles authorization. If you want IRC1 to keep authorization checks, set `gravitino.iceberg-rest.disable-rest-authz=false`.
 
-| Configuration item                                                  | Description                                                                                                                                                    | Default value | Required | Since Version |
+| Iceberg REST Server property | Description                                                                                                                                                    | Default value | Required | Since Version |
 |---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.catalog-backend`                            | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.                                      | `memory`      | Yes      | 0.2.0         |
 | `gravitino.iceberg-rest.uri`                                        | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                                                  | (none)        | Yes      | 0.2.0         |
@@ -168,7 +249,7 @@ If IRC2 does not enforce authorization, keeping `gravitino.iceberg-rest.disable-
 
 #### Custom Backend Configuration
 
-| Configuration item                            | Description                                                                                                                   | Default value | Required | Since Version    |
+| Iceberg REST Server property | Description                                                                                                                   | Default value | Required | Since Version    |
 |-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`custom`** for the custom catalog backend. | `memory`      | Yes      | 0.2.0            |
 | `gravitino.iceberg-rest.catalog-backend-impl` | The fully-qualified class name of a custom catalog implementation, only worked if `catalog-backend` is `custom`.              | (none)        | No       | 0.7.0-incubating |
@@ -179,7 +260,7 @@ If you want to use a custom Iceberg Catalog as `catalog-backend`, you can add a 
 
 The Gravitino Iceberg REST server supports multiple catalog backend, and you could use `catalog-config-provider` to control the behavior about how to manage catalog backend configurations.
 
-| Configuration item                               | Description                                                                                                                                                                                                                                                                                                                                      | Default value            | Required | Since Version    |
+| Iceberg REST Server property | Description                                                                                                                                                                                                                                                                                                                                      | Default value            | Required | Since Version    |
 |--------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|----------|------------------|
 | `gravitino.iceberg-rest.catalog-config-provider` | The className of catalog configuration provider, Gravitino provides build-in `static-config-provider` and `dynamic-config-provider`, you could also develop a custom class that implements `apache.gravitino.iceberg.service.provider.IcebergConfigProvider` and add the corresponding jar file to the Iceberg REST service classpath directory. | `static-config-provider` | No       | 0.7.0-incubating |
 
@@ -211,7 +292,7 @@ gravitino.iceberg-rest.catalog.jdbc_backend.warehouse = hdfs://127.0.0.1:9000/us
 
 The dynamic catalog configuration provider retrieves the catalog configuration from the Gravitino server, and the catalog configuration could be updated dynamically.
 
-| Configuration item                                          | Description                                                                                                                                                                                         | Default value | Required                                                             | Since Version    |
+| Iceberg REST Server property | Description                                                                                                                                                                                         | Default value | Required                                                             | Since Version    |
 |-------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------|------------------|
 | `gravitino.iceberg-rest.gravitino-uri`                      | The uri of Gravitino server address, only worked if `catalog-config-provider` is `dynamic-config-provider`. Not required when running as an auxiliary service embedded in Gravitino server.         | (none)        | Yes, when using `dynamic-config-provider` in standalone mode         | 0.7.0-incubating |
 | `gravitino.iceberg-rest.gravitino-metalake`                 | The metalake name that `dynamic-config-provider` used to request to Gravitino, only worked if `catalog-config-provider` is `dynamic-config-provider`.                                               | (none)        | Yes, when using `dynamic-config-provider`                            | 0.7.0-incubating |
@@ -268,7 +349,7 @@ Refer to [OAuth2 Configuration](./security/how-to-authenticate#server-configurat
 
 When enabling OAuth2 and leveraging a dynamic configuration provider to retrieve catalog information from the Gravitino server, use the following configuration parameters to establish OAuth2 authentication for secure communication with the Gravitino server:
 
-| Configuration item                                   | Description                                                                         | Default value         | Required          | Since Version |
+| Iceberg REST Server property | Description                                                                         | Default value         | Required          | Since Version |
 |------------------------------------------------------|-------------------------------------------------------------------------------------|-----------------------|-------------------|---------------|
 | `gravitino.iceberg-rest.gravitino-auth-type`         | The auth type for communicating with the Gravitino server. Supported values: `simple`, `oauth2`. | `simple`              | No                | 1.0.0         |
 | `gravitino.iceberg-rest.gravitino-simple.user-name`  | The username when using `simple` auth type.                                         | `iceberg-rest-server` | No                | 1.0.0         |
@@ -366,7 +447,7 @@ Refer to [HTTPS Configuration](./security/how-to-use-https.md#apache-iceberg-res
 For JDBC backend, you can use the `gravitino.iceberg-rest.jdbc-user` and `gravitino.iceberg-rest.jdbc-password` to authenticate the JDBC connection. For Hive backend, you can use the `gravitino.iceberg-rest.authentication.type` to specify the authentication type, and use the `gravitino.iceberg-rest.authentication.kerberos.principal` and `gravitino.iceberg-rest.authentication.kerberos.keytab-uri` to authenticate the Kerberos connection.
 The detailed configuration items are as follows:
 
-| Configuration item                                                        | Description                                                                                                                                                                                                                                            | Default value | Required                                                                                                                                                             | Since Version    |
+| Iceberg REST Server property | Description                                                                                                                                                                                                                                            | Default value | Required                                                                                                                                                             | Since Version    |
 |---------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
 | `gravitino.iceberg-rest.authentication.type`                              | The type of authentication for Iceberg rest catalog backend. This configuration only applicable for for Hive backend, and only supports `Kerberos` and `simple`. As for JDBC backend, only username/password authentication was supported now.  | `simple`      | No                                                                                                                                                                   | 0.7.0-incubating |
 | `gravitino.iceberg-rest.authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                                                                                | `false`       | No                                                                                                                                                                   | 0.7.0-incubating |
@@ -414,7 +495,7 @@ Refer to [Access Control](./security/access-control.md) for the complete list of
 
 #### S3
 
-| Configuration item                            | Description                                                                                                                                                                                                         | Default value | Required                                       | Since Version    |
+| Iceberg REST Server property | Description                                                                                                                                                                                                         | Default value | Required                                       | Since Version    |
 |-----------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------------------------|------------------|
 | `gravitino.iceberg-rest.io-impl`              | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aws.s3.S3FileIO` for S3.                                                                                                                     | (none)        | No                                             | 0.6.0-incubating |
 | `gravitino.iceberg-rest.s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)        | No                                             | 0.6.0-incubating |
@@ -433,7 +514,7 @@ Refer to [S3 credentials](./security/credential-vending.md#s3-credentials) for c
 
 #### OSS
 
-| Configuration item                                | Description                                                                                                                                                                                           | Default value   | Required                                             | Since Version    |
+| Iceberg REST Server property | Description                                                                                                                                                                                           | Default value   | Required                                             | Since Version    |
 |---------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|------------------------------------------------------|------------------|
 | `gravitino.iceberg-rest.io-impl`                  | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.aliyun.oss.OSSFileIO` for OSS.                                                                                                 | (none)          | No                                                   | 0.6.0-incubating |
 | `gravitino.iceberg-rest.oss-endpoint`             | The endpoint of Aliyun OSS service.                                                                                                                                                                   | (none)          | No                                                   | 0.7.0-incubating |
@@ -453,7 +534,7 @@ Please set the `gravitino.iceberg-rest.warehouse` parameter to `oss://{bucket_na
 
 Supports using static GCS credential file or generating GCS token to access GCS data.
 
-| Configuration item                                | Description                                                                                        | Default value | Required | Since Version    |
+| Iceberg REST Server property | Description                                                                                        | Default value | Required | Since Version    |
 |---------------------------------------------------|----------------------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.io-impl`                  | The io implementation for `FileIO` in Iceberg, use `org.apache.iceberg.gcp.gcs.GCSFileIO` for GCS. | (none)        | No       | 0.6.0-incubating |
 
@@ -471,7 +552,7 @@ Please set `gravitino.iceberg-rest.warehouse` to `gs://{bucket_name}/${prefix_na
 
 #### ADLS
 
-| Configuration item                                  | Description                                                                                                                                                                                        | Default value | Required | Since Version    |
+| Iceberg REST Server property | Description                                                                                                                                                                                        | Default value | Required | Since Version    |
 |-----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.io-impl`                    | The IO implementation for `FileIO` in Iceberg, use `org.apache.iceberg.azure.adlsv2.ADLSFileIO` for ADLS.                                                                                          | (none)        | Yes      | 0.8.0-incubating |
 
@@ -495,7 +576,7 @@ Builds with Hadoop 2.10.x. There may be compatibility issues when accessing Hado
 
 For storages not managed by Gravitino directly, configure them through custom catalog properties.
 
-| Configuration item               | Description                                                                             | Default value | Required | Since Version    |
+| Iceberg REST Server property | Description                                                                             | Default value | Required | Since Version    |
 |----------------------------------|-----------------------------------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.io-impl` | The IO implementation for `FileIO` in Iceberg; use the fully qualified classname. | (none)        | No       | 0.6.0-incubating |
 
@@ -509,7 +590,7 @@ Please set the `gravitino.iceberg-rest.warehouse` parameter to `{storage_prefix}
 
 View operations are supported when using the JDBC catalog backend with schema version `V1`. The default schema version is now `V1`, so view support is enabled out of the box. Iceberg will automatically migrate the database schema on the first restart and detect the migration on all subsequent restarts.
 
-| Configuration item                           | Description                                                                                                          | Default value | Required | Since Version |
+| Iceberg REST Server property | Description                                                                                                          | Default value | Required | Since Version |
 |----------------------------------------------|----------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Defaults to `V1` to enable view operations. Set to `V0` to opt out.  | `V1`          | No       | 1.2.0         |
 
@@ -518,7 +599,7 @@ View operations are supported when using the JDBC catalog backend with schema ve
 Add other properties defined in [Iceberg catalog properties](https://iceberg.apache.org/docs/1.10.0/configuration/#catalog-properties).
 The `clients` property for example:
 
-| Configuration item               | Description                          | Default value | Required |
+| Iceberg REST Server property | Description                          | Default value | Required |
 |----------------------------------|--------------------------------------|---------------|----------|
 | `gravitino.iceberg-rest.clients` | The client pool size of the catalog. | `2`           | No       |
 
@@ -538,7 +619,7 @@ Gravitino provides a pluggable audit log mechanism, refer to [Audit log configur
 
 Gravitino provides a pluggable metrics store interface to store and delete Iceberg metrics. Develop a class that implements `org.apache.gravitino.iceberg.service.metrics.IcebergMetricsStore` and add the corresponding jar file to the Iceberg REST service classpath directory.
 
-| Configuration item                              | Description                                                                                                                         | Default value | Required | Since Version |
+| Iceberg REST Server property | Description                                                                                                                         | Default value | Required | Since Version |
 |-------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.metricsStore`           | The Iceberg metrics storage class name.                                                                                             | (none)        | No       | 0.4.0         |
 | `gravitino.iceberg-rest.metricsStoreRetainDays` | The days to retain Iceberg metrics in store, the value not greater than 0 means retain forever.                                     | -1            | No       | 0.4.0         |
@@ -548,7 +629,7 @@ If you want to use jdbc as metrics store, you can set the `gravitino.iceberg-res
 Initialize the database using the sql scripts in the directory `scripts`.
 Download the corresponding JDBC driver to the `iceberg-rest-server/libs` directory.
 
-| Configuration item                                  | Description                                                                                                                                         | Default value | Required | Since Version |
+| Iceberg REST Server property | Description                                                                                                                                         | Default value | Required | Since Version |
 |-----------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.jdbc-metrics.url`           | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432/database` for Postgres, or `jdbc:mysql://127.0.0.1:3306/database` for mysql. | (none)        | Yes      | 1.1.0         |
 | `gravitino.iceberg-rest.jdbc-metrics.jdbc-user`     | The username of the JDBC connection.                                                                                                                | (none)        | No       | 1.1.0         |
@@ -559,7 +640,7 @@ Download the corresponding JDBC driver to the `iceberg-rest-server/libs` directo
 
 Gravitino features a pluggable cache system for updating or retrieving table metadata in the cache. It validates the location of table metadata against the catalog backend to ensure the correctness of cached data.
 
-| Configuration item                                           | Description                                 | Default value | Required | Since Version |
+| Iceberg REST Server property | Description                                 | Default value | Required | Since Version |
 |--------------------------------------------------------------|---------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.table-metadata-cache-impl`           | The implement of the cache.                 | (none)        | No       | 1.1.0         |
 | `gravitino.iceberg-rest.table-metadata-cache-capacity`       | The capacity of table metadata cache.       | 200           | No       | 1.1.0         |
@@ -571,7 +652,7 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 
 Gravitino caches scan plan results to speed up repeated queries with identical parameters. The cache uses snapshot ID as part of the cache key, so queries against different snapshots will not use stale cached data.
 
-| Configuration item                                         | Description                                              | Default value | Required | Since Version |
+| Iceberg REST Server property | Description                                              | Default value | Required | Since Version |
 |------------------------------------------------------------|----------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.scan-plan-cache-impl`              | The implementation of the scan plan cache.               | (none)        | No       | 1.2.0         |
 | `gravitino.iceberg-rest.scan-plan-cache-capacity`          | The capacity of the scan plan cache.                     | 200           | No       | 1.2.0         |
@@ -583,7 +664,7 @@ Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.Loca
 
 ### Misc Configurations
 
-| Configuration item                          | Description                                                  | Default value | Required | Since Version    |
+| Iceberg REST Server property | Description                                                  | Default value | Required | Since Version    |
 |---------------------------------------------|--------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.extension-packages` | Comma-separated list of Iceberg REST API packages to expand. | (none)        | No       | 0.7.0-incubating |
 
