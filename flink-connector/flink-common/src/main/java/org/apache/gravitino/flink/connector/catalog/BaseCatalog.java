@@ -920,28 +920,22 @@ public abstract class BaseCatalog extends AbstractCatalog {
    */
   protected CatalogView toFlinkView(View view) {
     org.apache.flink.table.api.Schema.Builder builder = buildSchemaFromColumns(view.columns());
-    String dialect = Dialects.FLINK;
     String sql =
-        view.sqlFor(dialect)
+        view.sqlFor(Dialects.FLINK)
             .map(SQLRepresentation::sql)
             .orElseGet(
-                () -> {
-                  for (Representation rep : view.representations()) {
-                    if (rep instanceof SQLRepresentation) {
-                      SQLRepresentation fallback = (SQLRepresentation) rep;
-                      LOG.warn(
-                          "View {} has no SQL representation for dialect {}; falling back to dialect {}",
-                          view.name(),
-                          dialect,
-                          fallback.dialect());
-                      return fallback.sql();
-                    }
-                  }
-                  throw new CatalogException(
-                      String.format(
-                          "View '%s' in catalog '%s' has no SQL representation for dialect '%s'",
-                          view.name(), catalogName(), dialect));
-                });
+                () ->
+                    view.sqlFor(Dialects.HIVE)
+                        .map(SQLRepresentation::sql)
+                        .orElseThrow(
+                            () ->
+                                new CatalogException(
+                                    String.format(
+                                        "View '%s' in catalog '%s' has no SQL representation for dialect '%s' or '%s'",
+                                        view.name(),
+                                        catalogName(),
+                                        Dialects.FLINK,
+                                        Dialects.HIVE))));
 
     Map<String, String> properties =
         view.properties() != null
