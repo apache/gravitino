@@ -27,21 +27,21 @@ Builds with Apache Iceberg `1.10.0`. The Apache Iceberg table format version is 
 
 The Iceberg catalog:
 
-- Acts as a catalog proxy backed by `Hive`, `JDBC`, or `REST`.
+- Works as a catalog proxy, supporting `Hive`, `JDBC`, and `REST` as metadata backend options.
 - Supports DDL operations on Iceberg schemas and tables.
 - Does not support snapshot or table management operations.
-- Targets multiple storage backends, including S3, GCS, ADLS, OSS, and HDFS.
-- Supports Kerberos or simple authentication when using the Hive backend.
+- Supports multiple object storage providers (S3, GCS, ADLS, OSS, and HDFS).
+- Supports Kerberos or simple authentication when using Hive as the metadata backend.
 - Caches table metadata.
 
 ### Catalog Properties
 
 | Property name          | Description                                                                                                                                                                                             | Default value                                                                  | Required                                  | Since Version |
 |------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------------------------------|---------------|
-| `catalog-backend`      | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                                      | (none)                                                                         | Yes                                       | 0.2.0         |
+| `catalog-backend`      | Metadata backend type for the catalog. Supports `hive`, `jdbc`, or `rest`.                                                                                                                      | (none)                                                                         | Yes                                       | 0.2.0         |
 | `uri`                  | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001/iceberg`. | (none)                                                                         | Yes                                       | 0.2.0         |
-| `warehouse`            | Warehouse location of catalog. Use a physical S3 or HDFS location for `hive` or `jdbc` catalog backend, use catalog name for REST catalog backend.                                                      | (none)                                                                         | Yes for `hive` and `jdbc` catalog backend | 0.2.0         |
-| `catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                                    | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No                                        | 0.5.2         |
+| `warehouse`            | Object storage location for the catalog's data files. Use a physical S3 or HDFS location when `catalog-backend` is `hive` or `jdbc`; use a catalog name when `catalog-backend` is `rest`.                                                      | (none)                                                                         | Yes for `hive` and `jdbc` catalog backend | 0.2.0         |
+| `catalog-backend-name` | The name passed to the underlying metadata backend. In a JDBC store, this name isolates namespaces and tables.                                                                    | The property value of `catalog-backend` (e.g., `jdbc` when using JDBC). | No                                        | 0.5.2         |
 
 
 Any property not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
@@ -51,9 +51,9 @@ When using Gravitino with Trino, pass Trino Iceberg connector configuration thro
 When using Gravitino with Spark, pass Spark Iceberg connector configuration through the `spark.bypass.` prefix. For example, set `spark.bypass.io-impl` to forward `io-impl` to the Spark Iceberg connector at Spark runtime.
 
 
-#### JDBC Backend
+#### JDBC
 
-If you are using JDBC backend, you must provide properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`.
+When using JDBC as the metadata backend, you must provide properties like `jdbc-user`, `jdbc-password`, and `jdbc-driver`.
 
 | Property name     | Description                                                                                             | Default value | Required | Since Version |
 |-------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -62,27 +62,27 @@ If you are using JDBC backend, you must provide properties like `jdbc-user`, `jd
 | `jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | (none)        | Yes      | 0.3.0         |
 | `jdbc-initialize` | Whether to initialize meta tables when create JDBC catalog                                              | `true`        | No       | 0.2.0         |
 
-If you already have a JDBC Iceberg catalog, set `catalog-backend-name` to match its catalog name so that the existing namespaces and tables remain accessible.
+If you have an existing JDBC Iceberg catalog, set `catalog-backend-name` to match your existing catalog name so its prior namespaces and tables remain accessible.
 
 :::caution
-When using the JDBC backend, download the corresponding JDBC driver and place it in the `catalogs/lakehouse-iceberg/libs` directory.
-When using multiple JDBC catalog backends, setting `jdbc-initialize` to `true` may not take effect for RDBMS like MySQL; in that case, create the Iceberg meta tables explicitly.
+Download the corresponding JDBC driver and place it in `catalogs/lakehouse-iceberg/libs` when using JDBC as the metadata backend.
+If you have multiple JDBC metadata backends, setting `jdbc-initialize` to true may not take effect for RDBMS like `MySQL`; create Iceberg meta tables explicitly in that case.
 :::
 
-#### REST Catalog Backend
+#### REST
 
-For the REST catalog backend, `warehouse` identifies the catalog in the Iceberg REST spec. In the Gravitino Iceberg REST server, `warehouse` maps to the catalog name. An empty value means the default catalog.
+When using REST as the metadata backend, `warehouse` identifies the catalog in the Iceberg REST spec. In the Gravitino Iceberg REST server, `warehouse` maps to the catalog name; an empty value means the default catalog.
 
-`data-access` controls how the Iceberg REST client accesses table data when using a REST backend:
+`data-access` controls how the Iceberg REST client accesses table data when using REST as the metadata backend:
 
 | Property name  | Description                                                                                                             | Default value | Required | Since Version |
 |----------------|-------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `data-access`  | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`.              | (none)        | No       | 1.3.0         |
+| `data-access`  | Data access mode when using REST as the metadata backend. Supported values are `vended-credentials` and `remote-signing`.              | (none)        | No       | 1.3.0         |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
 - `remote-signing`: Gravitino doesn't support this mode yet.
 
-Example: create an Iceberg catalog with the REST backend. This targets the default catalog and uses a REST path like `http://127.0.0.1:9001/iceberg/v1/namespaces/db/tables/table`.
+Example: create an Iceberg catalog with REST as the metadata backend. This targets the default catalog and uses a REST path like `http://127.0.0.1:9001/iceberg/v1/namespaces/db/tables/table`.
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -99,7 +99,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-To access a non-default catalog, set `warehouse` to the catalog name. This uses a REST path like `http://127.0.0.1:9001/iceberg/v1/catalog/namespaces/db/tables/table`. See [Multi catalog](./iceberg-rest-service.md#multiple-catalog-backend-support) for details.
+To access a non-default catalog, set `warehouse` to the catalog name. This uses a REST path like `http://127.0.0.1:9001/iceberg/v1/catalog/namespaces/db/tables/table`. See [Multi catalog](./iceberg-rest-service.md#multiple-metadata-backends) for details.
 
 #### S3
 
@@ -118,8 +118,8 @@ The Iceberg catalog supports static `access-key-id` and `secret-access-key` for 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
 
 :::info
- - For the JDBC catalog backend, set the `warehouse` parameter to `s3://{bucket_name}/${prefix_name}`. 
- - For the Hive catalog backend, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. 
+ - When `catalog-backend` is `jdbc`, set `warehouse` to `s3://{bucket_name}/${prefix_name}`.
+ - When `catalog-backend` is `hive`, set `warehouse` to `s3a://{bucket_name}/${prefix_name}`. 
  - Additionally, download the [Gravitino Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle) and place it in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
@@ -202,13 +202,13 @@ To pass custom properties such as `security-token` to your custom `FileIO`, you 
 Set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${prefix_name}`, and place the corresponding JARs in the `catalogs/lakehouse-iceberg/libs/` directory.
 :::
 
-#### Catalog Backend Security
+#### Metadata Backend Security
 
-Configure backend security with the following properties. For a Kerberos Hive backend, for example, set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
+Use the following properties to configure metadata backend security as needed. For example, when using a Kerberos-protected Hive metadata backend, set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
 
 | Property name                                      | Description                                                                                                                                                                                                                                      | Default value | Required                                                                                                                                                             | Since Version    |
 |----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `authentication.type`                              | Authentication type for the Iceberg catalog backend. The Hive backend supports `Kerberos` and `simple`. The JDBC backend supports only username/password authentication.                                                                          | `simple`      | No                                                                                                                                                                   | 0.6.0-incubating |
+| `authentication.type`                              | The type of authentication for the metadata backend. Applies only to Hive and supports `Kerberos` and `simple`. For JDBC, only username/password authentication is supported.                                                                          | `simple`      | No                                                                                                                                                                   | 0.6.0-incubating |
 | `authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                                                                          | `false`       | No                                                                                                                                                                   | 0.6.0-incubating |
 | `hive.metastore.sasl.enabled`                      | Whether to enable SASL when connecting to a Kerberos Hive metastore. This is a raw Hive configuration.                                                                                                                                           | `false`       | Should be `true` for most Kerberos setups (SSL is the rarer alternative) when `gravitino.iceberg-rest.authentication.type` is `Kerberos`.                            | 0.6.0-incubating |
 | `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                                                     | (none)        | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
@@ -218,7 +218,7 @@ Configure backend security with the following properties. For a Kerberos Hive ba
 
 #### Table Metadata Cache
 
-Gravitino includes a pluggable cache system for table metadata. It validates the cached metadata location against the catalog backend before returning a hit, so cached data stays correct.
+Gravitino includes a pluggable cache system for table metadata. It validates the cached metadata location against the metadata backend before returning a hit, so cached data stays correct.
 
 | Configuration item                    | Description                                 | Default value | Required | Since Version |
 |---------------------------------------|---------------------------------------------|---------------|----------|---------------|
@@ -386,7 +386,7 @@ Changing a nullable column to non-nullable may cause compatibility issues with e
 
 ### View Capabilities
 
-- Supports list, create, load, alter, and drop for views managed by the underlying Iceberg REST, JDBC, or Hive backend.
+- Supports list, create, load, alter, and drop for views managed by the underlying Iceberg REST, JDBC, or Hive metadata backend.
 - Supports dialects such as `trino`, `spark`, and `hive`.
 - Can preserve multiple SQL representations for the same logical view.
 

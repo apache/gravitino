@@ -20,7 +20,7 @@ The examples below show typical contents of `${GRAVITINO_HOME}/conf/gravitino.co
 
 ### Development
 
-Defaults are appropriate for local development with the embedded H2 backend. Opt in to the Iceberg REST server for local query-engine testing.
+Defaults are appropriate for local development with the embedded H2 metadata backend. Opt in to the Iceberg REST server for local query-engine testing.
 
 ```properties
 # Sample gravitino.conf (development)
@@ -36,12 +36,12 @@ gravitino.iceberg-rest.gravitino-metalake=test
 
 ### Production
 
-Configuration for production load: externally managed MySQL backend, larger cache and lock limits, audit logging, and OAuth authentication. Properties matching their default values are omitted.
+Configuration for production load: externally managed MySQL metadata backend, larger cache and lock limits, audit logging, and OAuth authentication. Properties matching their default values are omitted.
 
 ```properties
 # Sample gravitino.conf (production)
 
-# Storage backend: externally managed MySQL (overrides default embedded H2)
+# Metadata backend: externally managed MySQL (overrides default embedded H2)
 gravitino.entity.store.relational.jdbcUrl=jdbc:mysql://gravitino-db.example.com:3306/gravitino
 gravitino.entity.store.relational.jdbcDriver=com.mysql.cj.jdbc.Driver
 gravitino.entity.store.relational.jdbcUser=<your-mysql-user>
@@ -78,7 +78,7 @@ gravitino.authenticator.oauth.scope=openid profile email
 gravitino.authenticator.oauth.principalFields=preferred_username,email,sub
 ```
 
-Initialize the MySQL backend before starting the server. See [Relational Backend Storage](how-to-use-relational-backend-storage.md) for setup steps and SQL scripts.
+Initialize the MySQL metadata backend before starting the server. See [Relational Backend Storage](how-to-use-relational-backend-storage.md) for setup steps and SQL scripts.
 
 ## Server Properties
 
@@ -105,14 +105,15 @@ Customize the Gravitino server by editing the configuration file `gravitino.conf
 The filter in the customFilters should be a standard javax servlet filter.
 Specify filter parameters by setting configuration entries of the form `gravitino.server.webserver.<class name of filter>.param.<param name>=<value>`.
 
-### Storage
+### Metadata Backend
 
-#### Storage Backend
+#### Metadata Backend Configuration
 
-Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
-If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. It's highly recommended using MySQL as the backend database.
+Gravitino stores its metadata (metalakes, catalogs, schemas, table references, permissions, etc.) in a JDBC database. The default implementation is H2, an embedded database with no external dependencies, suitable only for local development and testing.
 
-For step-by-step setup of MySQL or PostgreSQL backends, including connector JARs and schema initialization, see [Relational Backend Storage](how-to-use-relational-backend-storage.md).
+For production deployments, use MySQL or PostgreSQL as the metadata backend. H2 in production does not guarantee data consistency or durability.
+
+For step-by-step setup of MySQL or PostgreSQL as the metadata backend, including connector JARs and schema initialization, see [Relational Backend Storage](how-to-use-relational-backend-storage.md).
 
 The following table lists the storage configuration items:
 
@@ -136,7 +137,7 @@ The following table lists the storage configuration items:
 We strongly recommend that you change the default value of `gravitino.entity.store.relational.storagePath`, as it's under the deployment directory and future version upgrades may remove it.
 :::
 
-#### Create JDBC Backend Schema and Table
+#### Create Schema and Tables in the Metadata Backend
 
 For H2 database, All tables needed by Gravitino are created automatically when the Gravitino server starts up. For MySQL, you should firstly initialize the database tables yourself by executing the ddl scripts in the `${GRAVITINO_HOME}/scripts/mysql/` directory.
 
@@ -196,7 +197,7 @@ The Gravitino server uses a tree lock to ensure data consistency. The tree lock 
 
 ### Iceberg REST Server
 
-Gravitino can host an Iceberg REST server inside the Gravitino JVM as an auxiliary service. The properties below enable that hosting; the Iceberg REST server's own properties (HTTP config, catalog backends, security, etc.) are documented separately in [Iceberg REST Catalog Service](iceberg-rest-service.md).
+Gravitino can host an Iceberg REST server inside the Gravitino JVM as an auxiliary service. The properties below enable that hosting; the Iceberg REST server's own properties (HTTP config, metadata backend, security, etc.) are documented separately in [Iceberg REST Catalog Service](iceberg-rest-service.md).
 
 | gravitino.conf property            | Description                                                                                                                                                          | Default value | Required | Since Version |
 |------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
@@ -554,7 +555,7 @@ docker run --rm -d \
   apache/gravitino:<tag>
 ```
 
-To configure JDBC backend with PostgreSQL:
+To configure the metadata backend with PostgreSQL:
 
 ```shell
 docker run --rm -d \

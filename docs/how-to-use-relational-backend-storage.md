@@ -14,7 +14,7 @@ store data or lack available a KV storage, and want to use Gravitino.
 With relational backend storage, you can quickly deploy Gravitino in a production environment and
 take advantage of relational storage to manage metadata.
 
-For the complete list of storage properties including connection pool tuning, see [Server Configuration > Storage](gravitino-server-config.md#storage).
+For the complete list of storage properties including connection pool tuning, see [Server Configuration > Storage](gravitino-server-config.md#metadata-backend).
 
 ### What Kind of Backend Storage Is Supported
 
