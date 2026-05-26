@@ -1,13 +1,13 @@
 ---
 title: "How to authenticate"
 slug: /security/how-to-authenticate
-keyword: security authentication oauth kerberos
+keyword: security authentication basic oauth kerberos
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Authentication
 
-Apache Gravitino supports three kinds of authentication mechanisms: simple, OAuth and Kerberos.
+Apache Gravitino supports four kinds of authentication mechanisms: simple, basic, OAuth and Kerberos.
 If you don't enable authentication for your client and server explicitly, the user `anonymous` will be used to access the server.
 
 ### Simple mode
@@ -42,6 +42,37 @@ curl -v -X GET \
   -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
   http://localhost:8090/api/version
 ```
+
+### Basic mode
+
+In Basic mode, Gravitino verifies HTTP Basic credentials against built-in IdP user metadata stored
+in the relational entity store.
+
+To enable Basic mode:
+
+- Set `gravitino.entity.store` to `relational` and configure the relational JDBC backend.
+- Set `gravitino.authenticators` to `basic`.
+- Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
+  the built-in IdP.
+- On the first startup, if any configured service admin does not yet have a password, set the
+  `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable to a JSON array of `username:password`
+  strings before starting Gravitino. Each password must be 12 to 64 characters long, and usernames
+  must not contain `:`.
+
+When using curl or other HTTP clients, authenticate with the `Authorization` header:
+
+```shell
+curl -v -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:YourSecurePassword12' | base64)" \
+  http://localhost:8090/api/version
+```
+
+:::info
+Use Basic authentication over HTTPS in production. Credentials are sent on every request and are
+only Base64-encoded, not encrypted, when HTTP is used.
+:::
 
 ### OAuth mode
 
@@ -314,6 +345,48 @@ The signature algorithms that Gravitino supports follows:
 | PS256 | RSASSA-PSS using SHA-256 and MGF1 with SHA-256 |
 | PS384 | RSASSA-PSS using SHA-384 and MGF1 with SHA-384 |
 | PS512 | RSASSA-PSS using SHA-512 and MGF1 with SHA-512 |
+
+### Example: Basic authentication
+
+This example shows how to enable built-in Basic authentication with the relational entity store.
+
+**Prerequisites:**
+
+- Gravitino distribution package (includes the idp-basic plugin on the server classpath)
+- Relational entity store configured (H2, MySQL, or PostgreSQL)
+
+**Configuration:**
+
+Append the following to `conf/gravitino.conf`:
+
+```text
+gravitino.entity.store = relational
+gravitino.entity.store.relational = JDBCBackend
+gravitino.authenticators = basic
+gravitino.authorization.serviceAdmins = admin
+```
+
+On the first startup, if the `admin` service admin does not yet have a password in the store,
+set initial passwords before starting the server:
+
+```bash
+export GRAVITINO_INITIAL_ADMIN_PASSWORD='["admin:YourSecureGravitinoPassword"]'
+./bin/start-gravitino.sh
+```
+
+**Usage:**
+
+```shell
+curl -v -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:YourSecureGravitinoPassword' | base64)" \
+  http://localhost:8090/api/version
+```
+
+If the service admin already has a password, you do not need to set
+`GRAVITINO_INITIAL_ADMIN_PASSWORD` on restart. Gravitino does not change existing passwords
+when the server starts again.
 
 ### Example: Azure AD as OIDC Provider with JWKS Validation
 
