@@ -146,8 +146,5 @@ public final class GlueConstants {
   /** Glue {@code tableType} value for external tables. */
   public static final String EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
 
-  /** Default Glue {@code tableType} used when none is specified at table creation time. */
-  public static final String MANAGED_TABLE_TYPE = "MANAGED_TABLE";
-
   private GlueConstants() {}
 }
