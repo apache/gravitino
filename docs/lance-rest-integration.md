@@ -32,7 +32,7 @@ The following table outlines the tested compatibility between Gravitino versions
   {0.3.0, 0.4.2}. By default, lance-ray 0.2.0 and earlier are *not* supported on 1.3.0
   because pip resolves them with an older `lance-namespace` whose request
   schema is incompatible with the upgraded server-side `lance-namespace-core`
-  (0.7.5+). But if can still use lance-ray 0.2.0 with Gravitino 1.3.0 by pining pylance to 3.x or 4.x; 
+  (0.7.5+). But if you can still use lance-ray 0.2.0 with Gravitino 1.3.0 by pining pylance to 3.x or 4.x; 
 - Before using in production, please test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
