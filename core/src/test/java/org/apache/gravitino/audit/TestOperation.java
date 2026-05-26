@@ -471,7 +471,7 @@ public class TestOperation {
         AuditLog.Operation.LIST_TOPIC, AuditLog.Operation.fromEvent(listTopicFailureEvent));
 
     Namespace viewNamespace = Namespace.of("metalake", "catalog", "schema");
-    Event listViewEvent = new ListViewEvent(USER, viewNamespace);
+    Event listViewEvent = new ListViewEvent(USER, viewNamespace, 0);
     Assertions.assertEquals(
         AuditLog.Operation.LIST_VIEW, AuditLog.Operation.fromEvent(listViewEvent));
     Event listViewFailureEvent = new ListViewFailureEvent(USER, viewNamespace, new Exception());
