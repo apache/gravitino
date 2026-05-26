@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
 import org.apache.gravitino.idp.model.IdpGroup;
@@ -74,6 +75,8 @@ public class IdpUserGroupManager implements Closeable {
    * @return The created built-in IdP user.
    */
   public IdpUser addUser(String username, String password) throws IOException {
+    IdpCredentialValidator.validateUsername(username);
+    IdpCredentialValidator.validatePassword(password);
     USER_SERVICE.insertIdpUser(newUserPO(username, passwordHasher.hash(password)));
     return new IdpUser(username, Collections.emptyList());
   }
@@ -107,6 +110,7 @@ public class IdpUserGroupManager implements Closeable {
    * @return True if the password was updated, false if the user did not exist.
    */
   public boolean changePassword(String username, String password) {
+    IdpCredentialValidator.validatePassword(password);
     return USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password));
   }
 

@@ -26,16 +26,18 @@ import org.junit.jupiter.api.Test;
 
 public class TestResetPasswordRequest {
 
+  private static final String VALID_PASSWORD = "new_password12";
+
   @Test
   public void testResetPasswordRequestSerDe() throws JsonProcessingException {
-    ResetPasswordRequest request = new ResetPasswordRequest("new_password");
+    ResetPasswordRequest request = new ResetPasswordRequest(VALID_PASSWORD);
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
     ResetPasswordRequest deserRequest =
         JsonUtils.objectMapper().readValue(serJson, ResetPasswordRequest.class);
 
     Assertions.assertEquals(request, deserRequest);
-    Assertions.assertEquals("new_password", deserRequest.getPassword());
+    Assertions.assertEquals(VALID_PASSWORD, deserRequest.getPassword());
 
     // Test with null password
     ResetPasswordRequest request1 = new ResetPasswordRequest();
@@ -50,18 +52,20 @@ public class TestResetPasswordRequest {
 
   @Test
   public void testResetPasswordRequestValidate() {
-    Assertions.assertDoesNotThrow(() -> new ResetPasswordRequest("new_password").validate());
+    Assertions.assertDoesNotThrow(() -> new ResetPasswordRequest(VALID_PASSWORD).validate());
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new ResetPasswordRequest().validate());
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new ResetPasswordRequest(" ").validate());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new ResetPasswordRequest("short").validate());
   }
 
   @Test
   public void testResetPasswordRequestToStringDoesNotExposePassword() {
-    String requestString = new ResetPasswordRequest("new_password").toString();
+    String requestString = new ResetPasswordRequest(VALID_PASSWORD).toString();
 
-    Assertions.assertFalse(requestString.contains("new_password"));
+    Assertions.assertFalse(requestString.contains(VALID_PASSWORD));
     Assertions.assertFalse(requestString.contains("password="));
     Assertions.assertFalse(requestString.contains("\"password\""));
   }

@@ -48,6 +48,8 @@ import org.junit.jupiter.api.Test;
 /** Integration tests for {@link IdpUserGroupManager} backed by an embedded H2 store. */
 public class TestIdpUserGroupManager {
 
+  private static final String VALID_PASSWORD = "Passw0rd-1234";
+
   private static IdpUserGroupManager manager;
   private static Path h2Path;
 
@@ -86,17 +88,17 @@ public class TestIdpUserGroupManager {
 
   @Test
   public void testAddUser() throws IOException {
-    IdpUser user = manager.addUser("testAdd", "password123");
+    IdpUser user = manager.addUser("testAdd", VALID_PASSWORD);
     Assertions.assertEquals("testAdd", user.name());
     Assertions.assertTrue(user.groupNames().isEmpty());
 
     Assertions.assertThrows(
-        AlreadyExistsException.class, () -> manager.addUser("testAdd", "password456"));
+        AlreadyExistsException.class, () -> manager.addUser("testAdd", "AnotherPass1!"));
   }
 
   @Test
   public void testGetUser() throws IOException {
-    manager.addUser("testGet", "password123");
+    manager.addUser("testGet", VALID_PASSWORD);
 
     IdpUser user = manager.getUser("testGet");
     Assertions.assertEquals("testGet", user.name());
@@ -108,7 +110,7 @@ public class TestIdpUserGroupManager {
 
   @Test
   public void testRemoveUser() throws IOException {
-    manager.addUser("testRemove", "password123");
+    manager.addUser("testRemove", VALID_PASSWORD);
 
     Assertions.assertTrue(manager.removeUser("testRemove"));
     Assertions.assertFalse(manager.removeUser("no-exist"));
@@ -116,12 +118,12 @@ public class TestIdpUserGroupManager {
 
   @Test
   public void testChangePassword() throws IOException {
-    manager.addUser("testChangePassword", "password123");
+    manager.addUser("testChangePassword", VALID_PASSWORD);
 
-    Assertions.assertTrue(manager.changePassword("testChangePassword", "new-password"));
+    Assertions.assertTrue(manager.changePassword("testChangePassword", "New-Password1!"));
     Assertions.assertEquals("testChangePassword", manager.getUser("testChangePassword").name());
 
-    Assertions.assertFalse(manager.changePassword("not-exist", "password123"));
+    Assertions.assertFalse(manager.changePassword("not-exist", VALID_PASSWORD));
   }
 
   @Test
@@ -147,9 +149,9 @@ public class TestIdpUserGroupManager {
 
   @Test
   public void testChangeGroupMembership() throws IOException {
-    manager.addUser("groupUser1", "password123");
-    manager.addUser("groupUser2", "password123");
-    manager.addUser("groupUser3", "password123");
+    manager.addUser("groupUser1", VALID_PASSWORD);
+    manager.addUser("groupUser2", VALID_PASSWORD);
+    manager.addUser("groupUser3", VALID_PASSWORD);
     manager.addGroup("testMembershipGroup");
 
     IdpGroup group =
@@ -179,7 +181,7 @@ public class TestIdpUserGroupManager {
 
   @Test
   public void testRemoveGroup() throws IOException {
-    manager.addUser("groupMember", "password123");
+    manager.addUser("groupMember", VALID_PASSWORD);
     manager.addGroup("testRemoveGroup");
     manager.changeGroupMembership("testRemoveGroup", Lists.newArrayList("groupMember"), null);
 
@@ -190,10 +192,24 @@ public class TestIdpUserGroupManager {
     Assertions.assertTrue(manager.removeGroup("testRemoveGroup", false));
     Assertions.assertFalse(manager.removeGroup("no-exist", false));
 
-    manager.addUser("forceMember", "password123");
+    manager.addUser("forceMember", VALID_PASSWORD);
     manager.addGroup("testForceRemoveGroup");
     manager.changeGroupMembership("testForceRemoveGroup", Lists.newArrayList("forceMember"), null);
     Assertions.assertTrue(manager.removeGroup("testForceRemoveGroup", true));
+  }
+
+  @Test
+  public void testAddUserWithInvalidCredentials() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> manager.addUser("user:name", VALID_PASSWORD));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> manager.addUser("testInvalidPassword", "short"));
+  }
+
+  @Test
+  public void testChangePasswordWithInvalidPassword() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> manager.changePassword("not-exist", "short"));
   }
 
   private static void deletePath(Path path) {
