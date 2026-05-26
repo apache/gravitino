@@ -132,14 +132,14 @@ class TestIdpGroupOperations extends BaseIdpOperationsTest {
   }
 
   @Test
-  void testChangeMembership() {
+  void testAddAndRemoveGroupUsers() {
     GroupMembershipChangeRequest addReq =
         new GroupMembershipChangeRequest(new String[] {"user1", "user2"}, null);
     when(MANAGER.changeGroupMembership("group1", Arrays.asList("user1", "user2"), null))
         .thenReturn(buildGroup("group1", Arrays.asList("user1", "user2")));
 
     Response addResp =
-        target("/idp/groups/group1/membership")
+        target("/idp/groups/group1/add")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .put(Entity.entity(addReq, MediaType.APPLICATION_JSON_TYPE));
@@ -151,7 +151,7 @@ class TestIdpGroupOperations extends BaseIdpOperationsTest {
         .thenReturn(buildGroup("group1"));
 
     Response removeResp =
-        target("/idp/groups/group1/membership")
+        target("/idp/groups/group1/remove")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .put(Entity.entity(removeReq, MediaType.APPLICATION_JSON_TYPE));

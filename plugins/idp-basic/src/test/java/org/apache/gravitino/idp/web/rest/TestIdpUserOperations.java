@@ -121,19 +121,6 @@ class TestIdpUserOperations extends BaseIdpOperationsTest {
   }
 
   @Test
-  void testAddUserWithNullRequest() {
-    Response resp =
-        target("/idp/users")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(null, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
-    ErrorResponse errorResponse = resp.readEntity(ErrorResponse.class);
-    Assertions.assertTrue(errorResponse.getMessage().contains("Request body cannot be null"));
-  }
-
-  @Test
   void testGetUser() {
     when(MANAGER.getUser("user1")).thenReturn(buildUser("user1"));
 

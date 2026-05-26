@@ -48,7 +48,6 @@ import org.apache.gravitino.metrics.MetricNames;
 @IdpManagement
 @Path("/idp/users")
 public class IdpUserOperations {
-  private static final String NULL_REQUEST_BODY_ERROR = "Request body cannot be null";
 
   private final IdpUserGroupManager userGroupManager;
 
@@ -99,12 +98,6 @@ public class IdpUserOperations {
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-user", absolute = true)
   public Response addUser(AddUserRequest request) {
-    if (request == null) {
-      return IdpRestExceptionHandlers.handleUserException(
-          IdpOperationType.ADD, "", new IllegalArgumentException(NULL_REQUEST_BODY_ERROR));
-    }
-
-    String user = request.getUser();
     try {
       return IdpRestUtils.doAs(
           httpRequest,
@@ -116,7 +109,8 @@ public class IdpUserOperations {
                         userGroupManager.addUser(request.getUser(), request.getPassword()))));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleUserException(IdpOperationType.ADD, user, e);
+      return IdpRestExceptionHandlers.handleUserException(
+          IdpOperationType.ADD, request.getUser(), e);
     }
   }
 
@@ -133,11 +127,6 @@ public class IdpUserOperations {
   @Timed(name = "update-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-idp-user", absolute = true)
   public Response resetPassword(@PathParam("user") String user, ResetPasswordRequest request) {
-    if (request == null) {
-      return IdpRestExceptionHandlers.handleUserException(
-          IdpOperationType.UPDATE, user, new IllegalArgumentException(NULL_REQUEST_BODY_ERROR));
-    }
-
     try {
       return IdpRestUtils.doAs(
           httpRequest,
