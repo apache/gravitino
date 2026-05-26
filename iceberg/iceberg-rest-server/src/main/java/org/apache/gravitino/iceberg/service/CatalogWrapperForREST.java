@@ -19,9 +19,6 @@
 
 package org.apache.gravitino.iceberg.service;
 
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -65,7 +62,6 @@ import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Scan;
-import org.apache.iceberg.ScanTaskParser;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
@@ -95,7 +91,6 @@ import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
-import org.apache.iceberg.rest.responses.PlanTableScanResponseParser;
 
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
@@ -431,7 +426,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * @param tableIdentifier The table identifier.
    * @param scanRequest The scan request parameters including filters, projections, snapshot-id,
    *     etc.
-   * @return PlanTableScanResponse with status=COMPLETED and serialized planTasks.
+   * @return PlanTableScanResponse with status=COMPLETED and file scan tasks.
    * @throws IllegalArgumentException if scan request validation fails
    * @throws org.apache.gravitino.exceptions.NoSuchTableException if table doesn't exist
    * @throws RuntimeException for other scan planning failures
@@ -457,34 +452,26 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         return cachedResponse.get();
       }
 
-      List<String> planTasks = new ArrayList<>();
+      List<FileScanTask> fileScanTasksList = new ArrayList<>();
 
       try (CloseableIterable<FileScanTask> fileScanTasks =
           createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
         for (FileScanTask fileScanTask : fileScanTasks) {
-          try {
-            planTasks.add(ScanTaskParser.toJson(fileScanTask));
-          } catch (Exception e) {
-            throw new RuntimeException(
-                String.format(
-                    "Failed to serialize scan task for table: %s. Error: %s",
-                    tableIdentifier, e.getMessage()),
-                e);
-          }
+          fileScanTasksList.add(fileScanTask);
         }
       } catch (IOException e) {
         LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
         throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
       }
 
-      if (planTasks.isEmpty()) {
+      if (fileScanTasksList.isEmpty()) {
         LOG.info(
             "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
             tableIdentifier);
       }
 
       PlanTableScanResponse response =
-          buildCompletedPlanTableScanResponse(planTasks, table.specs());
+          buildCompletedPlanTableScanResponse(fileScanTasksList, table.specs());
 
       // Cache the scan plan response
       scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
@@ -505,14 +492,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
-      List<String> planTasks, Map<Integer, PartitionSpec> specsById) {
-    ObjectNode responseJson = JsonNodeFactory.instance.objectNode();
-    responseJson.put("status", PlanStatus.COMPLETED.status());
-    ArrayNode planTasksNode = responseJson.putArray("plan-tasks");
-    for (String planTask : planTasks) {
-      planTasksNode.add(planTask);
-    }
-    return PlanTableScanResponseParser.fromJson(responseJson, specsById, false);
+      List<FileScanTask> fileScanTasks, Map<Integer, PartitionSpec> specsById) {
+    return PlanTableScanResponse.builder()
+        .withPlanStatus(PlanStatus.COMPLETED)
+        .withFileScanTasks(fileScanTasks)
+        .withSpecsById(specsById)
+        .build();
   }
 
   /**
