@@ -92,7 +92,8 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
     IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
 
     closeSession();
-    assertThrows(NotFoundException.class, () -> userMetaService.updateIdpUserPassword("missing", "hash-2"));
+    assertThrows(
+        NotFoundException.class, () -> userMetaService.updateIdpUserPassword("missing", "hash-2"));
     refreshSession();
 
     runServiceCall(() -> assertTrue(userMetaService.updateIdpUserPassword("user1", "hash-2")));
