@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.fluss;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +35,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.fluss.client.admin.Admin;
+import org.apache.fluss.exception.PartitionNotExistException;
 import org.apache.fluss.metadata.PartitionInfo;
 import org.apache.fluss.metadata.PartitionSpec;
 import org.apache.fluss.metadata.ResolvedPartitionSpec;
@@ -101,6 +103,16 @@ class TestFlussTableOperations {
   }
 
   @Test
+  void testDropPartitionReturnsFalseWhenPartitionDoesNotExist() {
+    Admin admin = mock(Admin.class);
+    when(admin.dropPartition(eq(TABLE_PATH), any(PartitionSpec.class), eq(false)))
+        .thenReturn(failedFuture(new PartitionNotExistException("missing")));
+    FlussTableOperations operations = operations(admin);
+
+    assertFalse(operations.dropPartition(QUALIFIED_PARTITION_NAME));
+  }
+
+  @Test
   void testAddPartitionCreatesFlussSpecWithConfiguredPartitionKeys() {
     Admin admin = mock(Admin.class);
     when(admin.createPartition(eq(TABLE_PATH), any(PartitionSpec.class), eq(false)))
@@ -159,5 +171,11 @@ class TestFlussTableOperations {
     return Partitions.identity(
         new String[][] {{"event_day"}, {"region"}},
         new Literal<?>[] {Literals.stringLiteral("20250405"), Literals.stringLiteral("US")});
+  }
+
+  private static <T> CompletableFuture<T> failedFuture(Throwable e) {
+    CompletableFuture<T> future = new CompletableFuture<>();
+    future.completeExceptionally(e);
+    return future;
   }
 }

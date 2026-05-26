@@ -59,4 +59,19 @@ class TestFlussAdminOps {
                 Admin::listDatabases,
                 e -> new NoSuchSchemaException(e, "Failed to list databases")));
   }
+
+  @Test
+  void testDoAsAdminMapsSynchronousException() {
+    Admin admin = mock(Admin.class);
+    FlussAdminOps adminOps = new FlussAdminOps(admin);
+
+    assertThrows(
+        NoSuchSchemaException.class,
+        () ->
+            adminOps.doAsAdmin(
+                ignored -> {
+                  throw new DatabaseNotExistException("missing");
+                },
+                FlussExceptionConverter.forSchema("db", "Failed to load database")));
+  }
 }

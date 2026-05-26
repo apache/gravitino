@@ -37,11 +37,6 @@ import org.apache.fluss.client.ConnectionFactory;
 import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.config.ConfigOptions;
 import org.apache.fluss.config.Configuration;
-import org.apache.fluss.exception.DatabaseAlreadyExistException;
-import org.apache.fluss.exception.DatabaseNotEmptyException;
-import org.apache.fluss.exception.DatabaseNotExistException;
-import org.apache.fluss.exception.TableAlreadyExistException;
-import org.apache.fluss.exception.TableNotExistException;
 import org.apache.fluss.metadata.AggFunction;
 import org.apache.fluss.metadata.DatabaseDescriptor;
 import org.apache.fluss.metadata.DatabaseInfo;
@@ -59,7 +54,6 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -133,9 +127,7 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
     return ops
         .doAsAdmin(
             Admin::listDatabases,
-            e ->
-                new GravitinoRuntimeException(
-                    e, "Failed to list Fluss databases under %s", namespace))
+            FlussExceptionConverter.generic("Failed to list Fluss databases under " + namespace))
         .stream()
         .map(database -> NameIdentifier.of(namespace, database))
         .toArray(NameIdentifier[]::new);
@@ -147,12 +139,7 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
     DatabaseDescriptor descriptor = FlussSchema.toDatabaseDescriptor(comment, properties);
     ops.doAsAdmin(
         admin -> admin.createDatabase(ident.name(), descriptor, false),
-        e -> {
-          if (e instanceof DatabaseAlreadyExistException) {
-            return new SchemaAlreadyExistsException(e, "Schema %s already exists", ident);
-          }
-          return new GravitinoRuntimeException(e, "Failed to create Fluss database " + ident);
-        });
+        FlussExceptionConverter.forSchema(ident, "Failed to create Fluss database " + ident));
 
     return loadSchema(ident);
   }
@@ -161,9 +148,7 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
   public boolean schemaExists(NameIdentifier ident) {
     return ops.doAsAdmin(
         admin -> admin.databaseExists(ident.name()),
-        e ->
-            new GravitinoRuntimeException(
-                e, "Failed to check existence of Fluss database " + ident));
+        FlussExceptionConverter.generic("Failed to check existence of Fluss database " + ident));
   }
 
   @Override
@@ -171,12 +156,7 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
     DatabaseInfo dbInfo =
         ops.doAsAdmin(
             admin -> admin.getDatabaseInfo(ident.name()),
-            e -> {
-              if (e instanceof DatabaseNotExistException) {
-                return new NoSuchSchemaException(e, "Schema %s does not exist", ident);
-              }
-              return new GravitinoRuntimeException(e, "Failed to load Fluss database " + ident);
-            });
+            FlussExceptionConverter.forSchema(ident, "Failed to load Fluss database " + ident));
 
     return FlussSchema.fromDatabaseInfo(dbInfo);
   }
@@ -200,12 +180,7 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
 
     ops.doAsAdmin(
         admin -> admin.dropDatabase(ident.name(), false, cascade),
-        e -> {
-          if (e instanceof DatabaseNotEmptyException) {
-            throw new NonEmptySchemaException(e, "Schema %s does not exist", ident);
-          }
-          throw new GravitinoRuntimeException(e, "Failed to drop Fluss database " + ident);
-        });
+        FlussExceptionConverter.forSchema(ident, "Failed to drop Fluss database " + ident));
 
     return true;
   }
@@ -216,12 +191,8 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
     return ops
         .doAsAdmin(
             admin -> admin.listTables(database),
-            e -> {
-              if (e instanceof DatabaseNotExistException) {
-                return new NoSuchSchemaException(e, "Schema %s does not exist", namespace);
-              }
-              return new RuntimeException("Failed to list Fluss tables under " + namespace, e);
-            })
+            FlussExceptionConverter.forSchema(
+                namespace, "Failed to list Fluss tables under " + namespace))
         .stream()
         .map(table -> NameIdentifier.of(namespace, table))
         .toArray(NameIdentifier[]::new);
@@ -253,15 +224,7 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
     TablePath tablePath = toTablePath(ident);
     ops.doAsAdmin(
         admin -> admin.createTable(tablePath, descriptor, false),
-        e -> {
-          if (e instanceof DatabaseNotExistException) {
-            return new NoSuchSchemaException(e, "Schema %s does not exist", ident.namespace());
-          }
-          if (e instanceof TableAlreadyExistException) {
-            return new TableAlreadyExistsException(e, "Table %s already exists", ident);
-          }
-          return new RuntimeException("Failed to create Fluss table " + ident, e);
-        });
+        FlussExceptionConverter.forTable(ident, "Failed to create Fluss table " + ident));
     return loadTable(ident);
   }
 
@@ -287,14 +250,7 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
 
     ops.doAsAdmin(
         admin -> admin.alterTable(tablePath, flussChanges, false),
-        e -> {
-          if (e instanceof TableNotExistException) {
-            return new NoSuchTableException(e, "Table %s does not exist", ident);
-          } else if (e instanceof DatabaseNotExistException) {
-            return new NoSuchSchemaException(e, "Schema %s does not exist", ident.namespace());
-          }
-          return new RuntimeException("Failed to alter Fluss table " + ident, e);
-        });
+        FlussExceptionConverter.forTable(ident, "Failed to alter Fluss table " + ident));
     return loadTable(ident);
   }
 
@@ -302,14 +258,13 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
   public boolean dropTable(NameIdentifier ident) {
     TablePath tablePath = toTablePath(ident);
     try {
-      ops.doAsAdmin(admin -> admin.dropTable(tablePath, false));
+      ops.doAsAdmin(
+          admin -> admin.dropTable(tablePath, false),
+          FlussExceptionConverter.forTable(ident, "Failed to drop Fluss table " + ident));
       return true;
-    } catch (TableNotExistException e) {
+    } catch (NoSuchTableException e) {
       LOG.info("Fluss table {} does not exist", ident);
       return false;
-    } catch (RuntimeException e) {
-      LOG.warn("Failed to drop Fluss table {}", ident, e);
-      throw new RuntimeException("Failed to drop Fluss table " + ident, e);
     }
   }
 
@@ -373,12 +328,7 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
       throws NoSuchTableException {
     return ops.doAsAdmin(
         admin -> admin.getTableInfo(tablePath),
-        e -> {
-          if (e instanceof TableNotExistException) {
-            return new NoSuchTableException(e, "Table %s does not exist", ident);
-          }
-          return new RuntimeException("Failed to load Fluss table " + ident, e);
-        });
+        FlussExceptionConverter.forTable(ident, "Failed to load Fluss table " + ident));
   }
 
   private static void applyTableChange(FlussColumnChangeVisitor visitor, TableChange change) {
@@ -398,6 +348,14 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
     if (change instanceof TableChange.ColumnChange) {
       applyColumnChange(visitor, (TableChange.ColumnChange) change);
       return;
+    }
+
+    if (change instanceof TableChange.UpdateComment) {
+      throw new UnsupportedOperationException("Fluss does not support table comment changes");
+    }
+
+    if (change instanceof TableChange.RenameTable) {
+      throw new UnsupportedOperationException("Fluss does not support renaming tables");
     }
 
     throw new UnsupportedOperationException("Unsupported Fluss table change: " + change);

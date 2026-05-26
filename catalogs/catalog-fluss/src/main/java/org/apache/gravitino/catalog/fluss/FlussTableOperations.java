@@ -27,14 +27,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.fluss.exception.PartitionNotExistException;
-import org.apache.fluss.exception.TableNotExistException;
-import org.apache.fluss.exception.TableNotPartitionedException;
 import org.apache.fluss.metadata.PartitionInfo;
 import org.apache.fluss.metadata.PartitionSpec;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.gravitino.connector.TableOperations;
-import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
@@ -68,16 +64,8 @@ final class FlussTableOperations implements TableOperations, SupportsPartitions 
     List<PartitionInfo> partitions =
         ops.doAsAdmin(
             admin -> admin.listPartitionInfos(tablePath),
-            e -> {
-              if (e instanceof TableNotExistException) {
-                return new NoSuchTableException(e, "Table %s does not exist", tablePath);
-              } else if (e instanceof TableNotPartitionedException) {
-                return new UnsupportedOperationException(
-                    "Table is not partitioned: " + tablePath, e);
-              }
-              return new GravitinoRuntimeException(
-                  e, "Failed to list Fluss partitions for %s", tablePath);
-            });
+            FlussExceptionConverter.forPartition(
+                tablePath, "Failed to list Fluss partitions for " + tablePath));
     return partitions.stream()
         .map(FlussTableOperations::toGravitinoPartition)
         .toArray(Partition[]::new);
@@ -95,7 +83,9 @@ final class FlussTableOperations implements TableOperations, SupportsPartitions 
         .orElseThrow(
             () ->
                 new NoSuchPartitionException(
-                    "Partition %s does not exist in table %s", partitionName, tablePath));
+                    FlussExceptionConverter.PARTITION_DOES_NOT_EXIST_MESSAGE,
+                    partitionName,
+                    tablePath));
   }
 
   @Override
@@ -103,16 +93,8 @@ final class FlussTableOperations implements TableOperations, SupportsPartitions 
     PartitionSpec spec = toFlussPartitionSpec(partition);
     ops.doAsAdmin(
         admin -> admin.createPartition(tablePath, spec, false),
-        e -> {
-          if (e instanceof org.apache.fluss.exception.PartitionAlreadyExistsException) {
-            return new PartitionAlreadyExistsException(
-                e, "Partition %s already exists in table %s", partition.name(), tablePath);
-          }
-          if (e instanceof TableNotPartitionedException) {
-            return new UnsupportedOperationException("Table is not partitioned: " + tablePath, e);
-          }
-          return new RuntimeException("Failed to add Fluss partition to " + tablePath, e);
-        });
+        FlussExceptionConverter.forPartition(
+            tablePath, partition.name(), "Failed to add Fluss partition to " + tablePath));
     return toGravitinoPartition(toPartitionName(spec), spec);
   }
 
@@ -120,12 +102,14 @@ final class FlussTableOperations implements TableOperations, SupportsPartitions 
   public boolean dropPartition(String partitionName) {
     PartitionSpec spec = toFlussPartitionSpec(partitionName);
     try {
-      ops.doAsAdmin(admin -> admin.dropPartition(tablePath, spec, false));
-    } catch (TableNotExistException | PartitionNotExistException e) {
+      ops.doAsAdmin(
+          admin -> admin.dropPartition(tablePath, spec, false),
+          FlussExceptionConverter.forPartition(
+              tablePath,
+              partitionName,
+              "Failed to drop Fluss partition " + partitionName + " from table " + tablePath));
+    } catch (NoSuchTableException | NoSuchPartitionException e) {
       return false;
-    } catch (Exception e) {
-      throw new GravitinoRuntimeException(
-          e, "Failed to drop Fluss partition %s from table %s", partitionName, tablePath);
     }
     return true;
   }
@@ -136,16 +120,8 @@ final class FlussTableOperations implements TableOperations, SupportsPartitions 
   private List<PartitionInfo> listFlussPartitionInfos(PartitionSpec spec, String partitionName) {
     return ops.doAsAdmin(
         admin -> admin.listPartitionInfos(tablePath, spec),
-        e -> {
-          if (e instanceof PartitionNotExistException) {
-            return new NoSuchPartitionException(
-                e, "Partition %s does not exist in table %s", partitionName, tablePath);
-          }
-          if (e instanceof TableNotPartitionedException) {
-            return new UnsupportedOperationException("Table is not partitioned: " + tablePath, e);
-          }
-          return new RuntimeException("Failed to get Fluss partition " + partitionName, e);
-        });
+        FlussExceptionConverter.forPartition(
+            tablePath, partitionName, "Failed to get Fluss partition " + partitionName));
   }
 
   private PartitionSpec toFlussPartitionSpec(Partition partition) {
@@ -184,7 +160,8 @@ final class FlussTableOperations implements TableOperations, SupportsPartitions 
   private PartitionSpec toFlussPartitionSpec(String partitionName) {
     Map<String, String> specMap = new LinkedHashMap<>();
     if (partitionKeys.isEmpty()) {
-      throw new UnsupportedOperationException("Table is not partitioned: " + tablePath);
+      throw new UnsupportedOperationException(
+          String.format(FlussExceptionConverter.TABLE_IS_NOT_PARTITIONED_MESSAGE, tablePath));
     }
 
     String[] fields = partitionName.split("/", -1);

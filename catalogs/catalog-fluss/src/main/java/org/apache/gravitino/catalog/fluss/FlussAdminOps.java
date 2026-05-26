@@ -36,7 +36,8 @@ final class FlussAdminOps {
   }
 
   <T> T doAsAdmin(Function<Admin, CompletableFuture<T>> action) {
-    return doAsAdmin(action, null);
+    return doAsAdmin(
+        action, FlussExceptionConverter.generic("Failed to execute Fluss admin operation"));
   }
 
   <T> T doAsAdmin(
@@ -46,21 +47,21 @@ final class FlussAdminOps {
       CompletableFuture<T> cf = action.apply(admin);
       return cf.get();
     } catch (ExecutionException e) {
-      Throwable t = ExceptionUtils.stripExecutionException(e);
-      if (exceptionMapper != null) {
-        throw exceptionMapper.apply(t);
-      } else {
-        if (t instanceof RuntimeException) {
-          throw (RuntimeException) t;
-        } else {
-          throw new GravitinoRuntimeException(t, "Failed to execute Fluss admin operation");
-        }
-      }
+      throw mapException(ExceptionUtils.stripExecutionException(e), exceptionMapper);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new GravitinoRuntimeException(e, "Interrupted during Fluss admin operation");
-    } catch (Exception e) {
-      throw new GravitinoRuntimeException(e, "Failed to execute Fluss admin operation");
+    } catch (RuntimeException e) {
+      throw mapException(e, exceptionMapper);
     }
+  }
+
+  private static RuntimeException mapException(
+      Throwable e, Function<Throwable, RuntimeException> exceptionMapper) {
+    Function<Throwable, RuntimeException> mapper =
+        exceptionMapper == null
+            ? FlussExceptionConverter.generic("Failed to execute Fluss admin operation")
+            : exceptionMapper;
+    return mapper.apply(e);
   }
 }

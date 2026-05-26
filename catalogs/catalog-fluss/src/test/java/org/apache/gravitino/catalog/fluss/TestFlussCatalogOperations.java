@@ -25,8 +25,15 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import org.apache.fluss.client.Connection;
+import org.apache.fluss.client.admin.Admin;
+import org.apache.fluss.exception.TableNotExistException;
 import org.apache.fluss.metadata.Schema;
 import org.apache.fluss.metadata.TableChange.AddColumn;
 import org.apache.fluss.metadata.TableChange.After;
@@ -41,12 +48,29 @@ import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
 import org.apache.fluss.types.DataTypes;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Test;
 
 class TestFlussCatalogOperations {
+
+  @Test
+  void testDropTableReturnsFalseWhenTableDoesNotExist() {
+    Admin admin = mock(Admin.class);
+    Connection connection = mock(Connection.class);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "db", "orders");
+    TablePath tablePath = TablePath.of("db", "orders");
+    when(connection.getAdmin()).thenReturn(admin);
+    when(admin.dropTable(tablePath, false))
+        .thenReturn(failedFuture(new TableNotExistException("missing")));
+    FlussCatalogOperations operations = new FlussCatalogOperations(config -> connection);
+    operations.initialize(
+        Map.of(FlussCatalogPropertiesMetadata.BOOTSTRAP_SERVERS, "localhost:9092"), null, null);
+
+    assertFalse(operations.dropTable(ident));
+  }
 
   @Test
   void testToFlussTableChangesMapsSupportedChanges() {
@@ -215,5 +239,11 @@ class TestFlussCatalogOperations {
     TableDescriptor descriptor =
         TableDescriptor.builder().schema(schema).distributedBy(1, List.of()).build();
     return TableInfo.of(TablePath.of("db", "orders"), 1L, 1, descriptor, 10L, 20L);
+  }
+
+  private static <T> CompletableFuture<T> failedFuture(Throwable e) {
+    CompletableFuture<T> future = new CompletableFuture<>();
+    future.completeExceptionally(e);
+    return future;
   }
 }
