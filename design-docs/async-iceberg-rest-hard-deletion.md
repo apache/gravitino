@@ -236,33 +236,37 @@ Migration: `upgrade-1.2.0-to-1.3.0-mysql.sql` (and H2 / PostgreSQL).
 
 ### 5.5 Worker pool and multi-replica ownership
 
-A `ScheduledThreadPoolExecutor` modeled on `RelationalGarbageCollector`.
+The worker pool has `worker-threads` threads, modeled on the
+`RelationalGarbageCollector` scheduler. **A thread polls for work only when
+it is free**: a free thread claims a single job, runs it to completion or
+failure, then loops back to poll for the next; a thread busy on a job never
+polls. Capacity-gating is therefore by construction — no central scheduler
+claims jobs ahead of the threads, the pool never holds a claimed-but-unstarted
+job, and a `RUNNING` row always maps to a thread actively deleting files (its
+heartbeat reflects real progress, not a job idling in a queue). A poll that
+finds nothing claimable waits `poll-interval-ms` and retries. `worker-threads`
+thus bounds the concurrent jobs per server; there is no separate claim-batch
+size.
+
 Ownership is tracked by a **heartbeat** alone: the worker that claims a job
 keeps refreshing `heartbeat_at` while it runs and remembers the ids it owns
 in memory (no owner column — a stale row is reclaimable by anyone, which is
 exactly the failover behavior we want). A job is abandoned, and reclaimable,
 once its heartbeat is older than `heartbeatTimeout`.
 
-**Claiming is gated by free worker capacity.** Each tick the worker first
-counts its idle threads and polls for *at most* that many candidates; when
-every thread is busy it polls for nothing. A worker therefore never claims a
-job it cannot run immediately, so a `RUNNING` row always maps to a thread
-actively deleting files — its heartbeat reflects real progress, never a job
-idling in an in-memory backlog. This also means the claim count is the idle
-thread count, not a separate tunable.
-
 Claiming is an optimistic compare-and-swap `UPDATE` that works on **every**
-SQL backend:
+SQL backend. A free thread reads a small candidate window and claims the
+first row it wins:
 
 ```sql
--- read up to :idleThreads candidates (0 when the pool is saturated)
+-- a free thread reads a small candidate window
 SELECT id FROM iceberg_purge_job
  WHERE state = 'PENDING'
     OR (state = 'RUNNING'
         AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout))
- ORDER BY updated_at LIMIT :idleThreads;
+ ORDER BY updated_at LIMIT :window;
 
--- claim each candidate; the row is ours only if affected_rows = 1
+-- claim one candidate; the row is ours only if affected_rows = 1
 UPDATE iceberg_purge_job
    SET state='RUNNING', heartbeat_at=:now
  WHERE id=:id
@@ -271,13 +275,14 @@ UPDATE iceberg_purge_job
           AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)) );
 ```
 
-A loser sees `affected_rows = 0` and moves to the next candidate (so a tick
-may end up running fewer jobs than it has idle threads). Where `SELECT …
-FOR UPDATE SKIP LOCKED` is available (MySQL 8+, PostgreSQL) the worker uses
-it to cut contention up front; the CAS form is the portable fallback (H2,
-older MySQL). `SKIP LOCKED` is purely an optimization — the claiming `UPDATE` is
-the serialization point, so two replicas can never claim the same job. We do
-not use DB-specific advisory locks.
+A loser sees `affected_rows = 0` and tries the next id in its window. The
+window is a small constant that only gives a CAS loser alternatives — not a
+capacity control, since a free thread still claims exactly one job. Where
+`SELECT … FOR UPDATE SKIP LOCKED` is available (MySQL 8+, PostgreSQL) the
+worker uses it to cut contention up front; the CAS form is the portable
+fallback (H2, older MySQL). `SKIP LOCKED` is purely an optimization — the
+claiming `UPDATE` is the serialization point, so two replicas can never claim
+the same job. We do not use DB-specific advisory locks.
 
 Execution mirrors `CatalogHandlers.purgeTable`, but **streams** the
 reachable files instead of materializing them. A large table can reference
@@ -327,8 +332,8 @@ Restart handling falls out of the durable job table plus the heartbeat
 model — no separate mechanism:
 
 1. **Nothing in-flight is lost.** The job is committed before the `DELETE`
-   returns; there is no in-memory queue. `PENDING` jobs are picked up on the
-   first tick after boot.
+   returns; there is no in-memory queue. `PENDING` jobs are picked up as soon
+   as a thread polls after boot.
 2. **Orphaned in-flight jobs are reclaimed.** A crash leaves a `RUNNING` row
    with a stale heartbeat, which the poll already selects; the restarted node
    or any peer reclaims it via the CAS.
@@ -439,9 +444,9 @@ only tune the worker pool and retries:
 | `gravitino.iceberg-rest.async-purge.max-attempts`             | `5`      | Attempts before `FAILED`.                                                    |
 | `gravitino.iceberg-rest.async-purge.terminal-retention-hours` | `168`    | How long terminal (`SUCCEEDED` / `FAILED`) rows are retained before pruning. |
 
-There is no separate claim-batch-size key: a tick claims at most as many
-jobs as the worker has idle threads (§5.5), so `worker-threads` already
-bounds it.
+There is no separate claim-batch-size key: a free thread claims one job at a
+time and only when idle (§5.5), so `worker-threads` already bounds concurrent
+jobs.
 
 ### 5.11 Security
 
