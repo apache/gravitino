@@ -33,25 +33,34 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
+import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
+import org.apache.gravitino.idp.dto.requests.ResetPasswordRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
+import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.exception.AlreadyExistsException;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
+import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
+import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-class TestIdpGroupOperations extends BaseIdpOperationsTest {
+class TestIdpOperations extends JerseyTest {
+
+  private static final String VALID_PASSWORD = "Passw0rd-For-User";
+
   private static final IdpUserGroupManager MANAGER = mock(IdpUserGroupManager.class);
 
   @BeforeEach
@@ -63,7 +72,7 @@ class TestIdpGroupOperations extends BaseIdpOperationsTest {
   protected Application configure() {
     try {
       forceSet(
-          TestProperties.CONTAINER_PORT, String.valueOf(RESTUtils.findAvailablePort(3001, 4000)));
+          TestProperties.CONTAINER_PORT, String.valueOf(RESTUtils.findAvailablePort(2000, 4000)));
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -71,9 +80,15 @@ class TestIdpGroupOperations extends BaseIdpOperationsTest {
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteUser()).thenReturn(null);
 
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    when(authorizer.isServiceAdmin()).thenReturn(true);
+
     ResourceConfig resourceConfig = new ResourceConfig();
+    resourceConfig.register(new IdpUserOperations(MANAGER));
     resourceConfig.register(new IdpGroupOperations(MANAGER));
-    registerPermissiveIdpAuthorizationFilter(resourceConfig);
+    resourceConfig.register(
+        new IdpAuthorizationFilter(
+            () -> List.of(IdpAuthorizationFilter.BASIC_AUTHENTICATOR), () -> authorizer));
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -82,6 +97,92 @@ class TestIdpGroupOperations extends BaseIdpOperationsTest {
           }
         });
     return resourceConfig;
+  }
+
+  @Test
+  void testAddUser() throws Exception {
+    AddUserRequest req = new AddUserRequest("user1", VALID_PASSWORD);
+    doReturn(buildUser("user1")).when(MANAGER).addUser("user1", VALID_PASSWORD);
+
+    AddUserRequest illegalReq = new AddUserRequest("", VALID_PASSWORD);
+    Response illegalResp =
+        target("/idp/users")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(illegalReq, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), illegalResp.getStatus());
+
+    ErrorResponse illegalResponse = illegalResp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, illegalResponse.getCode());
+
+    Response resp =
+        target("/idp/users")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    IdpUserResponse userResponse = resp.readEntity(IdpUserResponse.class);
+    Assertions.assertEquals("user1", userResponse.getUser().name());
+
+    doThrow(new AlreadyExistsException("mock error"))
+        .when(MANAGER)
+        .addUser("user1", VALID_PASSWORD);
+    Response conflictResp =
+        target("/idp/users")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), conflictResp.getStatus());
+  }
+
+  @Test
+  void testGetUser() {
+    when(MANAGER.getUser("user1")).thenReturn(buildUser("user1"));
+
+    Response resp =
+        target("/idp/users/user1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    IdpUserResponse userResponse = resp.readEntity(IdpUserResponse.class);
+    Assertions.assertEquals("user1", userResponse.getUser().name());
+
+    reset(MANAGER);
+    when(MANAGER.getUser("user1")).thenThrow(new NotFoundException("mock error"));
+    Response notFoundResp =
+        target("/idp/users/user1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), notFoundResp.getStatus());
+  }
+
+  @Test
+  void testResetPasswordAndRemoveUser() {
+    ResetPasswordRequest req = new ResetPasswordRequest(VALID_PASSWORD);
+    when(MANAGER.changePassword("user1", VALID_PASSWORD)).thenReturn(true);
+    when(MANAGER.getUser("user1")).thenReturn(buildUser("user1"));
+    when(MANAGER.removeUser("user1")).thenReturn(true);
+
+    Response resetResp =
+        target("/idp/users/user1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resetResp.getStatus());
+
+    Response removeResp =
+        target("/idp/users/user1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), removeResp.getStatus());
+
+    RemoveResponse removeResponse = removeResp.readEntity(RemoveResponse.class);
+    Assertions.assertTrue(removeResponse.removed());
   }
 
   @Test
@@ -172,6 +273,10 @@ class TestIdpGroupOperations extends BaseIdpOperationsTest {
 
     RemoveResponse removeResponse = removeResp.readEntity(RemoveResponse.class);
     Assertions.assertTrue(removeResponse.removed());
+  }
+
+  private IdpUser buildUser(String user) {
+    return new IdpUser(user, Collections.emptyList());
   }
 
   private IdpGroup buildGroup(String group) {
