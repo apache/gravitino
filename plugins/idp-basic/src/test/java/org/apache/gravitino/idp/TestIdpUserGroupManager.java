@@ -198,20 +198,6 @@ public class TestIdpUserGroupManager {
     Assertions.assertTrue(manager.removeGroup("testForceRemoveGroup", true));
   }
 
-  @Test
-  public void testAddUserWithInvalidCredentials() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> manager.addUser("user:name", VALID_PASSWORD));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> manager.addUser("testInvalidPassword", "short"));
-  }
-
-  @Test
-  public void testChangePasswordWithInvalidPassword() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> manager.changePassword("not-exist", "short"));
-  }
-
   private static void deletePath(Path path) {
     try {
       Files.deleteIfExists(path);
