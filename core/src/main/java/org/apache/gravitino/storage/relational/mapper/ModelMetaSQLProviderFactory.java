@@ -110,8 +110,8 @@ public class ModelMetaSQLProviderFactory {
     return getProvider().softDeleteModelMetasByMetalakeId(metalakeId);
   }
 
-  public static String softDeleteModelMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteModelMetasBySchemaId(schemaId);
+  public static String softDeleteModelMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteModelMetasBySchemaIds(schemaIds);
   }
 
   public static String deleteModelMetasByLegacyTimeline(

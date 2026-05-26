@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.client;
 
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -143,16 +145,25 @@ abstract class BaseSchemaCatalog extends CatalogDTO
    */
   @Override
   public String[] listSchemas() throws NoSuchCatalogException {
+    return doListSchemas(Collections.emptyMap());
+  }
 
-    EntityListResponse resp =
-        restClient.get(
-            formatSchemaRequestPath(schemaNamespace()),
-            EntityListResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.schemaErrorHandler());
-    resp.validate();
-
-    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
+  /**
+   * List the schemas directly under the given parent schema.
+   *
+   * @param parentSchema The parent (possibly hierarchical) schema name whose direct children are
+   *     listed, e.g. {@code "a"} or {@code "a:b"}. Must not be null or blank.
+   * @return A list of schema names directly under the given parent schema.
+   * @throws IllegalArgumentException if {@code parentSchema} is null or blank.
+   * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
+   * @throws NoSuchSchemaException if the parent schema does not exist.
+   */
+  @Override
+  public String[] listSchemas(String parentSchema)
+      throws NoSuchCatalogException, NoSuchSchemaException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(parentSchema), "parentSchema must not be null or blank");
+    return doListSchemas(Collections.singletonMap("parentSchema", parentSchema));
   }
 
   /**
@@ -370,5 +381,18 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   @Override
   public boolean dropFunction(NameIdentifier ident) {
     return functionOperations.dropFunction(ident);
+  }
+
+  private String[] doListSchemas(Map<String, String> queryParams) {
+    EntityListResponse resp =
+        restClient.get(
+            formatSchemaRequestPath(schemaNamespace()),
+            queryParams,
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.schemaErrorHandler());
+    resp.validate();
+
+    return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 }

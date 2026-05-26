@@ -29,6 +29,7 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.exceptions.ForbiddenException;
@@ -80,7 +81,8 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
     // Extract source view information from the request and add to map
     // The source view is NOT extracted via standard @AuthorizationMetadata annotations
     // because it's embedded in the RenameTableRequest body
-    String sourceSchema = renameViewRequest.source().namespace().level(0);
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    String sourceSchema = String.join(separator, renameViewRequest.source().namespace().levels());
     String sourceView = renameViewRequest.source().name();
 
     nameIdentifierMap.put(
@@ -89,7 +91,8 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
         EntityType.VIEW,
         NameIdentifierUtil.ofView(metalakeName, catalog, sourceSchema, sourceView));
 
-    String destSchema = renameViewRequest.destination().namespace().level(0);
+    String destSchema =
+        String.join(separator, renameViewRequest.destination().namespace().levels());
     if (!sourceSchema.equals(destSchema)) {
       // Cross-namespace rename - perform complete authorization here
       crossNamespaceRename = true;

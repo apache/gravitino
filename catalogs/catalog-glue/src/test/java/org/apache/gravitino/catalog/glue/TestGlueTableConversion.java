@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.glue;
 
 import java.time.Instant;
 import java.util.Map;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import software.amazon.awssdk.services.glue.model.Column;
 import software.amazon.awssdk.services.glue.model.Order;
 import software.amazon.awssdk.services.glue.model.SerDeInfo;
@@ -32,10 +33,6 @@ import software.amazon.awssdk.services.glue.model.Table;
  */
 class TestGlueTableConversion extends GlueTableTestBase {
 
-  private static final String INPUT_FMT = "org.apache.hadoop.mapred.TextInputFormat";
-  private static final String OUTPUT_FMT =
-      "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat";
-  private static final String SERDE = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe";
   private static final String LOCATION = "s3://my-bucket/warehouse/";
 
   @Override
@@ -50,9 +47,12 @@ class TestGlueTableConversion extends GlueTableTestBase {
                     Column.builder().name("id").type("bigint").comment("primary key").build(),
                     Column.builder().name("name").type("string").build())
                 .location(LOCATION + tableName)
-                .inputFormat(INPUT_FMT)
-                .outputFormat(OUTPUT_FMT)
-                .serdeInfo(SerDeInfo.builder().serializationLibrary(SERDE).build())
+                .inputFormat(HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS)
+                .outputFormat(HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS)
+                .serdeInfo(
+                    SerDeInfo.builder()
+                        .serializationLibrary(HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS)
+                        .build())
                 .bucketColumns("id")
                 .numberOfBuckets(4)
                 .sortColumns(Order.builder().column("name").sortOrder(1).build())

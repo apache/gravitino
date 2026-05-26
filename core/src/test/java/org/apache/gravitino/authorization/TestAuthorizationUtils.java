@@ -31,8 +31,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -40,6 +42,7 @@ import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.rel.Table;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 class TestAuthorizationUtils {
@@ -288,5 +291,30 @@ class TestAuthorizationUtils {
             NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
     Assertions.assertEquals(1, locations.size());
     Assertions.assertEquals("schemaLocation", locations.get(0));
+  }
+
+  @Test
+  void testRenamePrivilegesNotifiesOldEntityNameIdMappingChange() {
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalogManager.loadCatalog(Mockito.any())).thenReturn(baseCatalog);
+
+    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(envMock.gravitinoAuthorizer()).thenReturn(authorizer);
+    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
+
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+      AuthorizationUtils.authorizationPluginRenamePrivileges(
+          ident, Entity.EntityType.TABLE, "new_table");
+
+      Mockito.verify(authorizer)
+          .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.TABLE);
+    }
   }
 }

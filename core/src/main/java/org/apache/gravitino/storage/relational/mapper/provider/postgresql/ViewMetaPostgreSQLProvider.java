@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.VERSION_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ViewMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.ViewPO;
 import org.apache.ibatis.annotations.Param;
@@ -117,11 +118,17 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteViewMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeleteViewMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   @Override

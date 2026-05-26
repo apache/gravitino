@@ -870,6 +870,66 @@ class TestHiveCatalogOperations {
   }
 
   @Test
+  void testListTablesRemovesOnlyHudiBaseAndDerivedTables() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(ImmutableMap.of(LIST_ALL_TABLES, "false"), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    when(hiveClient.getAllDatabases(anyString())).thenReturn(List.of("db"));
+    when(hiveClient.getAllTables(anyString(), anyString()))
+        .thenReturn(
+            new ArrayList<>(
+                List.of(
+                    "v1",
+                    "hive_tbl",
+                    "ice_tbl",
+                    "hudi_base",
+                    "hudi_base_ro",
+                    "hudi_base_rt",
+                    "hudi_base_root")));
+    when(hiveClient.listTablesByType(anyString(), anyString(), anyString(), anyString()))
+        .thenReturn(List.of("v1"));
+
+    String icebergAndPaimonFilter =
+        String.format(
+            "%stable_type like \"ICEBERG\" or %stable_type like \"PAIMON\"",
+            HiveConstants.HIVE_FILTER_FIELD_PARAMS, HiveConstants.HIVE_FILTER_FIELD_PARAMS);
+    String hudiBaseFilter =
+        String.format("%sprovider like \"hudi\"", HiveConstants.HIVE_FILTER_FIELD_PARAMS);
+    when(hiveClient.listTableNamesByFilter(anyString(), anyString(), anyString(), anyShort()))
+        .thenAnswer(
+            invocation -> {
+              String filter = invocation.getArgument(2);
+              if (icebergAndPaimonFilter.equals(filter)) {
+                return List.of("ice_tbl");
+              }
+
+              if (hudiBaseFilter.equals(filter)) {
+                return List.of("hudi_base");
+              }
+
+              return List.of();
+            });
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    NameIdentifier[] tables = op.listTables(Namespace.of("metalake", "hive", "db"));
+
+    Assertions.assertEquals(2, tables.length);
+    Assertions.assertEquals("hive_tbl", tables[0].name());
+    Assertions.assertEquals("hudi_base_root", tables[1].name());
+    verify(hiveClient)
+        .listTableNamesByFilter(eq("hive"), eq("db"), eq(icebergAndPaimonFilter), anyShort());
+    verify(hiveClient).listTableNamesByFilter(eq("hive"), eq("db"), eq(hudiBaseFilter), anyShort());
+  }
+
+  @Test
   void testListViewsUsesTypeListing() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(ImmutableMap.of(LIST_ALL_TABLES, "true"), null, HIVE_PROPERTIES_METADATA);

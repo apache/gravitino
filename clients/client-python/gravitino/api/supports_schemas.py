@@ -16,7 +16,7 @@
 # under the License.
 
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
@@ -30,15 +30,29 @@ class SupportsSchemas(ABC):
     """
 
     @abstractmethod
-    def list_schemas(self) -> List[str]:
+    def list_schemas(self, parent_schema: Optional[str] = None) -> List[str]:
         """List schemas under the entity.
 
         If an entity such as a table, view exists, its parent schemas must also exist and must be
         returned by this discovery method. For example, if table a.b.t exists, this method invoked as
         listSchemas(a) must return [b] in the result array
 
+        If ``parent_schema`` is provided, list the schemas directly under the given parent schema.
+        This is only meaningful for catalogs that support hierarchical (multi-level) schemas, such
+        as an Iceberg catalog accessed through the Gravitino REST server with a configured schema
+        separator. For example, when the schemas ``a``, ``a:b`` and ``a:b:c`` exist, this method
+        invoked with parent ``a:b`` returns ``[a:b:c]``. For a flat catalog, or a parent schema that
+        has no children, an empty list is returned.
+
+        Args:
+            parent_schema: The parent (possibly hierarchical) schema name whose direct children are
+                listed, e.g. ``"a"`` or ``"a:b"``. When ``None``, all schemas under the catalog are
+                listed. Must not be blank when provided.
+
         Raises:
+            IllegalArgumentException: If ``parent_schema`` is provided but blank.
             NoSuchCatalogException: If the catalog does not exist.
+            NoSuchSchemaException: If ``parent_schema`` is provided but does not exist.
 
         Returns:
             A list of schema names under the namespace.
