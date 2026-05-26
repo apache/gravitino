@@ -535,15 +535,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
     for (TableChange change : changes) {
       if (change instanceof TableChange.RenameTable) {
-        TableChange.RenameTable renameChange = (TableChange.RenameTable) change;
-        renameChange
-            .getNewSchemaName()
-            .ifPresent(
-                newSchema -> {
-                  throw new UnsupportedOperationException(
-                      "Glue does not support cross-schema table rename");
-                });
-        newName = renameChange.getNewName();
+        throw new UnsupportedOperationException("Glue does not support table rename");
       } else if (change instanceof TableChange.UpdateComment) {
         newComment = ((TableChange.UpdateComment) change).getNewComment();
       } else if (change instanceof TableChange.SetProperty) {
@@ -575,30 +567,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
             current.sortOrder(),
             false);
 
-    boolean isRename = !newName.equals(current.name());
-    if (isRename) {
-      executeCreateTable(
-          dbName,
-          NameIdentifier.of(ident.namespace(), newName),
-          CreateTableRequest.builder().databaseName(dbName).tableInput(input));
-      DeleteTableRequest.Builder delReq =
-          DeleteTableRequest.builder().databaseName(dbName).name(ident.name());
-      applyCatalogId(catalogId, delReq::catalogId);
-      try {
-        glueClient.deleteTable(delReq.build());
-      } catch (EntityNotFoundException e) {
-        // Old table already gone — rename is complete.
-      } catch (GlueException e) {
-        throw new RuntimeException(
-            String.format(
-                "Renamed Glue table %s.%s to %s but failed to delete old entry",
-                dbName, ident.name(), newName),
-            e);
-      }
-    } else {
-      executeUpdateTable(
-          ident, UpdateTableRequest.builder().databaseName(dbName).tableInput(input));
-    }
+    executeUpdateTable(ident, UpdateTableRequest.builder().databaseName(dbName).tableInput(input));
     LOG.info("Altered Glue table {}.{}", dbName, ident.name());
 
     GlueTable altered =
