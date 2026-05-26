@@ -300,28 +300,16 @@ public abstract class BaseCatalog extends AbstractCatalog {
     NameIdentifier ident =
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
 
-    // Determine kind before dropping to avoid a view being silently missed.
-    CatalogBaseTable existing;
     try {
-      existing = getTable(tablePath);
-    } catch (TableNotExistException e) {
-      if (!ignoreIfNotExists) {
-        throw e;
+      boolean tableDropped = catalog().asTableCatalog().dropTable(ident);
+      boolean viewDropped = false;
+      try {
+        viewDropped = catalog().asViewCatalog().dropView(ident);
+      } catch (UnsupportedOperationException ignored) {
+        // catalog does not support views
       }
-      return;
-    }
-
-    try {
-      if (existing.getTableKind() == CatalogBaseTable.TableKind.VIEW) {
-        boolean dropped = catalog().asViewCatalog().dropView(ident);
-        if (!dropped && !ignoreIfNotExists) {
-          throw new TableNotExistException(catalogName(), tablePath);
-        }
-      } else {
-        boolean dropped = catalog().asTableCatalog().dropTable(ident);
-        if (!dropped && !ignoreIfNotExists) {
-          throw new TableNotExistException(catalogName(), tablePath);
-        }
+      if (!tableDropped && !viewDropped && !ignoreIfNotExists) {
+        throw new TableNotExistException(catalogName(), tablePath);
       }
     } catch (TableNotExistException e) {
       throw e;
@@ -340,34 +328,30 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throw new TableAlreadyExistException(
           catalogName(), new ObjectPath(tablePath.getDatabaseName(), newTableName));
     }
+    ViewCatalog viewCatalog = null;
     try {
-      if (catalog().asViewCatalog().viewExists(identifier)) {
-        throw new TableAlreadyExistException(
-            catalogName(), new ObjectPath(tablePath.getDatabaseName(), newTableName));
-      }
+      viewCatalog = catalog().asViewCatalog();
     } catch (UnsupportedOperationException ignored) {
       // catalog does not support views
     }
 
-    CatalogBaseTable existing;
-    try {
-      existing = getTable(tablePath);
-    } catch (TableNotExistException e) {
-      if (!ignoreIfNotExists) {
-        throw e;
-      }
-      return;
-    }
-
     NameIdentifier srcIdent =
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
+    boolean isAlterView = false;
+    if (viewCatalog != null) {
+      if (viewCatalog.viewExists(identifier)) {
+        throw new TableAlreadyExistException(
+            catalogName(), new ObjectPath(tablePath.getDatabaseName(), newTableName));
+      }
+      isAlterView = viewCatalog.viewExists(srcIdent);
+    }
     try {
-      if (existing.getTableKind() == CatalogBaseTable.TableKind.VIEW) {
-        catalog().asViewCatalog().alterView(srcIdent, ViewChange.rename(newTableName));
+      if (isAlterView) {
+        viewCatalog.alterView(srcIdent, ViewChange.rename(newTableName));
       } else {
         catalog().asTableCatalog().alterTable(srcIdent, TableChange.rename(newTableName));
       }
-    } catch (NoSuchTableException | NoSuchViewException e) {
+    } catch (NoSuchViewException | NoSuchTableException e) {
       if (!ignoreIfNotExists) {
         throw new TableNotExistException(catalogName(), tablePath, e);
       }
@@ -432,7 +416,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
     Column[] columns = toGravitinoColumns(view);
     Representation[] representations =
-        buildSqlRepresentation(preferredDialect(), view.getExpandedQuery());
+        buildSqlRepresentation(Dialects.FLINK, view.getExpandedQuery());
     Map<String, String> options = new HashMap<>(view.getOptions());
     options.put(FLINK_SCHEMA_NUM_COLUMNS_KEY, String.valueOf(columns.length));
     try {
@@ -506,7 +490,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
             .alterView(
                 identifier,
                 getGravitinoViewChanges(
-                    existingTable, (ResolvedCatalogView) newTable, preferredDialect()));
+                    existingTable, (ResolvedCatalogView) newTable, Dialects.FLINK));
       } catch (NoSuchViewException e) {
         if (!ignoreIfNotExists) {
           throw new TableNotExistException(catalogName(), tablePath, e);
@@ -555,7 +539,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
             .alterView(
                 identifier,
                 getGravitinoViewChanges(
-                    tableChanges, (ResolvedCatalogView) newTable, preferredDialect()));
+                    tableChanges, (ResolvedCatalogView) newTable, Dialects.FLINK));
       } catch (NoSuchViewException e) {
         if (!ignoreIfNotExists) {
           throw new TableNotExistException(catalogName(), tablePath, e);
@@ -937,7 +921,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
    */
   protected CatalogView toFlinkView(View view) {
     org.apache.flink.table.api.Schema.Builder builder = buildSchemaFromColumns(view.columns());
-    String dialect = preferredDialect();
+    String dialect = Dialects.FLINK;
     String sql =
         view.sqlFor(dialect)
             .map(SQLRepresentation::sql)
@@ -966,16 +950,6 @@ public abstract class BaseCatalog extends AbstractCatalog {
             : Collections.emptyMap();
     String comment = view.comment() != null ? view.comment() : "";
     return CatalogView.of(builder.build(), comment, sql, sql, properties);
-  }
-
-  /**
-   * Returns the preferred SQL dialect for this catalog's provider. Used when storing view SQL in
-   * Gravitino.
-   *
-   * @return The dialect string, e.g. {@link Dialects#HIVE} or {@link Dialects#FLINK}.
-   */
-  protected String preferredDialect() {
-    return Dialects.FLINK;
   }
 
   @VisibleForTesting
