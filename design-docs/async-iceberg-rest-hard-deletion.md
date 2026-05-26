@@ -107,9 +107,9 @@ implementation with a synchronous rollback flag.
 
 **Why not an S3-only control plane?** Conditional writes (`If-None-Match`)
 let workers claim jobs without a relational backend, but it *raises* net
-complexity for Gravitino: a DB gives lease acquisition and indexed backoff
-scheduling (`next_attempt_at`) for free, whereas S3 forces hand-rolled
-leases discovered by slow, per-request `LIST`. One server fronts many
+complexity for Gravitino: a DB gives lease acquisition and an indexed
+candidate scan for free, whereas S3 forces hand-rolled leases discovered by
+slow, per-request `LIST`. One server fronts many
 catalogs across S3 / GCS / ADLS, so a single job table is a uniform control
 plane; object markers fragment per-bucket. Gravitino already runs a
 relational metastore, so one extra table is low marginal cost — and it
@@ -137,7 +137,7 @@ doubles as the name-reuse tombstone (§5.7).
  worker pool (any replica)
    claims job via CAS UPDATE (heartbeat ownership)
    → rebuild snapshot graph from metadata_location
-   → stream + delete every reachable file, retry w/ backoff
+   → stream + delete every reachable file, retry on later poll ticks
    → SUCCEEDED | FAILED
 ```
 
@@ -159,7 +159,7 @@ false`. The header name uses canonical HTTP casing (each word capitalized).
    table is immediately absent from `LIST` and `HEAD` returns `404`.
 4. A worker on any replica claims the job, rebuilds the snapshot graph from
    `metadata_location`, and streams through every reachable file deleting
-   it, retrying transient failures with backoff.
+   it, retrying transient failures on later poll ticks.
 5. On success the job is `SUCCEEDED`; on terminal failure it lands in
    `FAILED` for operator inspection (queryable in the job table, §5.9).
 
@@ -213,12 +213,11 @@ CREATE TABLE IF NOT EXISTS `iceberg_purge_job` (
   `attempts`          INT(10)       NOT NULL DEFAULT 0,
   `last_error`        TEXT          NULL,
   `heartbeat_at`      BIGINT(20)    NULL COMMENT 'last heartbeat from the worker; NULL when unclaimed',
-  `next_attempt_at`   BIGINT(20)    NOT NULL,
   `created_at`        BIGINT(20)    NOT NULL,
   `created_by`        VARCHAR(128)  NOT NULL,
   `updated_at`        BIGINT(20)    NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `idx_state_next_attempt` (`state`, `next_attempt_at`),
+  KEY `idx_state_updated` (`state`, `updated_at`),
   KEY `idx_object` (`catalog_name`, `namespace`, `table_name`, `state`)
 ) ENGINE=InnoDB;
 ```
@@ -227,12 +226,12 @@ We store only `metadata_location`, not the file list — enumeration is slow
 on large tables, and `TableMetadataParser.read(io, location)` rebuilds the
 snapshot graph deterministically when the worker runs.
 
-Only two columns drive the retry state machine, and both are needed:
-`next_attempt_at` gates when the poll picks a job up — the initial run and,
-after a transient failure, the backoff delay (`WHERE next_attempt_at <=
-:now`) — and `attempts` counts failures so the worker gives up at the retry
-ceiling. That ceiling is a config (`max-attempts`, §5.10), not a per-row
-`max_attempts` column, since it is the same for every job.
+A single column drives retries: `attempts` counts failures so the worker
+gives up at the retry ceiling. A failed job returns to `PENDING` and is
+re-claimed on a later poll tick, so the poll cadence (`poll-interval-ms`,
+§5.10) is the retry interval — no separate scheduling column is needed. The
+ceiling is a config (`max-attempts`, §5.10), not a per-row `max_attempts`
+column, since it is the same for every job.
 
 Migration: `upgrade-1.2.0-to-1.3.0-mysql.sql` (and H2 / PostgreSQL).
 
@@ -251,11 +250,10 @@ SQL backend:
 ```sql
 -- read candidates
 SELECT id FROM iceberg_purge_job
- WHERE next_attempt_at <= :now
-   AND ( state = 'PENDING'
-      OR (state = 'RUNNING'
-          AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout)) )
- ORDER BY next_attempt_at LIMIT :batch;
+ WHERE state = 'PENDING'
+    OR (state = 'RUNNING'
+        AND (heartbeat_at IS NULL OR heartbeat_at < :now - :heartbeatTimeout))
+ ORDER BY updated_at LIMIT :batch;
 
 -- claim each candidate; the row is ours only if affected_rows = 1
 UPDATE iceberg_purge_job
@@ -298,14 +296,14 @@ this worker owns. If the host dies the heartbeat stops; once a row ages past
 Per-file failures are logged but do not fail the whole job — the
 synchronous purge has the same "best effort" stance. A job fails only if the
 **metadata phase** fails. `NotFoundException` from `deleteFile` counts as
-success. Backoff: `min(maxBackoff, base * 2^attempts)` with jitter.
+success. A failed job retries on the next poll tick (§5.5).
 
-| Outcome                             | Action                                                                                   |
-|-------------------------------------|------------------------------------------------------------------------------------------|
-| All files deleted (or already gone) | `state='SUCCEEDED'`                                                                       |
-| Metadata load failed, transient     | back to `PENDING`, `attempts++`, `next_attempt_at = now + backoff`, `heartbeat_at=NULL`   |
-| Metadata load failed, terminal      | `attempts++`; if `attempts >= max-attempts` → `FAILED`                                   |
-| Worker killed mid-job               | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent     |
+| Outcome                             | Action                                                                                |
+|-------------------------------------|---------------------------------------------------------------------------------------|
+| All files deleted (or already gone) | `state='SUCCEEDED'`                                                                    |
+| Metadata load failed, transient     | back to `PENDING`, `attempts++`, `heartbeat_at=NULL`; re-claimed on a later poll tick  |
+| Metadata load failed, terminal      | `attempts++`; if `attempts >= max-attempts` → `FAILED`                                |
+| Worker killed mid-job               | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent  |
 
 Restart handling falls out of the durable job table plus the heartbeat
 model — no separate mechanism:
@@ -421,9 +419,9 @@ only tune the worker pool and retries:
 | `gravitino.iceberg-rest.async-purge.max-attempts`             | `5`      | Attempts before `FAILED`.                                                    |
 | `gravitino.iceberg-rest.async-purge.terminal-retention-hours` | `168`    | How long terminal (`SUCCEEDED` / `FAILED`) rows are retained before pruning. |
 
-File-delete parallelism, claim batch size, and backoff base/ceiling are
-internal constants with sensible defaults; they become config keys only if a
-deployment demonstrates the need.
+File-delete parallelism and claim batch size are internal constants with
+sensible defaults; they become config keys only if a deployment demonstrates
+the need.
 
 ### 5.11 Security
 
@@ -464,7 +462,7 @@ only as a rollback flag.
 ### Phase 1 (1.3): Async purge core
 - [ ] Add the `iceberg_purge_job` schema and migrations (MySQL, H2, PostgreSQL)
 - [ ] Implement `IcebergPurgeJobStore` enqueue path (persist job, return)
-- [ ] Implement the worker pool: CAS claiming with heartbeat ownership (`FOR UPDATE SKIP LOCKED` where available), heartbeat renewal, streaming file deletion, retry/backoff state machine
+- [ ] Implement the worker pool: CAS claiming with heartbeat ownership (`FOR UPDATE SKIP LOCKED` where available), heartbeat renewal, streaming file deletion, retry state machine (re-claim failed jobs on later poll ticks, give up at `max-attempts`)
 - [ ] Honor the `X-Gravitino-Async-Purge` request header and wire both paths into `IcebergTableOperationExecutor.dropTable`
 - [ ] Add observability (§5.9): metrics and the informative `ErrorResponse` message on the §5.7 `409`; operator read path in 1.3 is direct DB query
 - [ ] Namespace-drop cascade for tables (one job per contained table)
