@@ -73,7 +73,7 @@ gravitino.authenticator.oauth.scope=openid profile email
 gravitino.authenticator.oauth.principalFields=preferred_username,email,sub
 ```
 
-Initialize the MySQL backend before starting the server. See [Storage Backend](#storage-backend) for the schema setup commands.
+Initialize the MySQL backend before starting the server. See [Relational Backend Storage](how-to-use-relational-backend-storage.md) for setup steps and SQL scripts.
 
 ## Server Properties
 
@@ -105,7 +105,9 @@ Specify filter parameters by setting configuration entries of the form `gravitin
 #### Storage Backend
 
 Gravitino only supports JDBC database backend, and the default implementation is H2 database as it's an embedded database, has no external dependencies and is very suitable for local development or tests.
-If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. It's highly recommended using MySQL as the backend database.  
+If you are going to use H2 in the production environment, Gravitino will not guarantee the data consistency and durability. It's highly recommended using MySQL as the backend database.
+
+For step-by-step setup of MySQL or PostgreSQL backends, including connector JARs and schema initialization, see [Relational Backend Storage](how-to-use-relational-backend-storage.md).
 
 The following table lists the storage configuration items:
 

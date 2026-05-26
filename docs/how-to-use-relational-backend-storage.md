@@ -14,6 +14,8 @@ store data or lack available a KV storage, and want to use Gravitino.
 With relational backend storage, you can quickly deploy Gravitino in a production environment and
 take advantage of relational storage to manage metadata.
 
+For the complete list of storage properties including connection pool tuning, see [Server Configuration > Storage](gravitino-server-config.md#storage).
+
 ### What Kind of Backend Storage Is Supported
 
 Relational backend storage supports the `JDBCBackend`, and `H2`, `MySQL` and `PostgreSQL` are supported for `JDBCBackend`, `H2` is the
@@ -72,13 +74,11 @@ ${GRAVITINO_HOME}/conf/
 
 Then set up the following server configs:
 
-```text
-gravitino.entity.store = relational
-gravitino.entity.store.relational = JDBCBackend
-gravitino.entity.store.relational.jdbcUrl = ${your_jdbc_url}
-gravitino.entity.store.relational.jdbcDriver = ${your_driver_name}
-gravitino.entity.store.relational.jdbcUser = ${your_username}
-gravitino.entity.store.relational.jdbcPassword = ${your_password}
+```properties
+gravitino.entity.store.relational.jdbcUrl=jdbc:mysql://localhost:3306/gravitino
+gravitino.entity.store.relational.jdbcDriver=com.mysql.cj.jdbc.Driver
+gravitino.entity.store.relational.jdbcUser=<your-mysql-user>
+gravitino.entity.store.relational.jdbcPassword=<set-via-secret-management>
 ```
 
 ### Step 5: Start the Server
@@ -155,18 +155,11 @@ ${GRAVITINO_HOME}/conf/
 
 Then set up the following server configs:
 
-```text
-gravitino.entity.store = relational
-gravitino.entity.store.relational = JDBCBackend
-
-## JDBC URL such as: jdbc:postgresql://localhost:5432/your_database?currentSchema=your_schema
-gravitino.entity.store.relational.jdbcUrl = ${your_jdbc_url}
-
-## JDBC driver name such as: org.postgresql.Driver
-gravitino.entity.store.relational.jdbcDriver = ${your_driver_name}
-
-gravitino.entity.store.relational.jdbcUser = ${your_username}
-gravitino.entity.store.relational.jdbcPassword = ${your_password}
+```properties
+gravitino.entity.store.relational.jdbcUrl=jdbc:postgresql://localhost:5432/your_database?currentSchema=your_schema
+gravitino.entity.store.relational.jdbcDriver=org.postgresql.Driver
+gravitino.entity.store.relational.jdbcUser=<your-postgres-user>
+gravitino.entity.store.relational.jdbcPassword=<set-via-secret-management>
 ```
 
 ### Step 5: Start the Server
