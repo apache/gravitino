@@ -57,6 +57,14 @@ public class StarRocksUtils {
       Pattern.compile(
           "DISTRIBUTED BY\\s+(HASH|RANDOM)\\s*(\\(([^)]+)\\))?\\s*(BUCKETS\\s+(\\d+))?");
 
+  // Match only top-level DISTRIBUTED BY clause boundaries to avoid false positives
+  // from column comments. For strategy shape, RANDOM has no column list while
+  // others are expected to start with "strategy(".
+  private static final Pattern DISTRIBUTED_BY_CLAUSE_PATTERN =
+      Pattern.compile(
+          "(?:^|\\n|\\))\\s*DISTRIBUTED\\s+BY\\s+(?:RANDOM\\b|\\w+\\s*\\()",
+          Pattern.CASE_INSENSITIVE);
+
   private static final Pattern TABLE_COMMENT_PATTERN =
       Pattern.compile("COMMENT\\s*\"([^\\(]+?)\\s*\\(From Gravitino,.*\\)\"");
 
@@ -175,6 +183,10 @@ public class StarRocksUtils {
                   .map(col -> NamedReference.field(new String[] {col}))
                   .toArray(NamedReference[]::new))
           .build();
+    }
+
+    if (!DISTRIBUTED_BY_CLAUSE_PATTERN.matcher(createTableSql).find()) {
+      return Distributions.NONE;
     }
 
     throw new RuntimeException("Failed to extract distribution info in sql:" + createTableSql);
