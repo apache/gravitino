@@ -174,7 +174,7 @@ public void dropTable(IcebergRequestContext ctx, TableIdentifier id,
   IcebergCatalogWrapper w = catalogWrapperManager.getCatalogWrapper(ctx.catalogName());
   if (!purgeRequested) { w.dropTable(id); return; }
 
-  if (!asyncPurgeEnabled) {                 // rollback path
+  if (!asyncPurgeEnabled) {                 // fallback path
     w.purgeTable(id);                       // synchronous, today's behavior
     return;
   }
