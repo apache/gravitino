@@ -90,7 +90,9 @@ public final class IdpRestUtils {
    */
   public static Response notFound(String message, Throwable throwable) {
     return Response.status(Response.Status.NOT_FOUND)
-        .entity(ErrorResponse.notFound(throwable.getClass().getSimpleName(), message, throwable))
+        .entity(
+            ErrorResponse.notFound(
+                resolveThrowableType(throwable, "NotFoundException"), message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
@@ -105,7 +107,22 @@ public final class IdpRestUtils {
   public static Response alreadyExists(String message, Throwable throwable) {
     return Response.status(Response.Status.CONFLICT)
         .entity(
-            ErrorResponse.alreadyExists(throwable.getClass().getSimpleName(), message, throwable))
+            ErrorResponse.alreadyExists(
+                resolveThrowableType(throwable, "AlreadyExistsException"), message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  /**
+   * Builds a forbidden response.
+   *
+   * @param message The error message.
+   * @param throwable The cause.
+   * @return The REST response.
+   */
+  public static Response forbidden(String message, Throwable throwable) {
+    return Response.status(Response.Status.FORBIDDEN)
+        .entity(ErrorResponse.forbidden(message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
@@ -136,5 +153,9 @@ public final class IdpRestUtils {
         .entity(ErrorResponse.internalError(message, throwable))
         .type(MediaType.APPLICATION_JSON)
         .build();
+  }
+
+  private static String resolveThrowableType(Throwable throwable, String defaultType) {
+    return throwable == null ? defaultType : throwable.getClass().getSimpleName();
   }
 }

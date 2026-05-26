@@ -74,6 +74,9 @@ public class IdpUserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-idp-user", absolute = true)
+  @IdpAuthorizationExpression(
+      expression = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_AUTHORIZATION_EXPRESSION,
+      errorMessage = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_REQUIRED_MESSAGE)
   public Response getUser(@PathParam("user") String user) {
     try {
       return IdpRestUtils.doAs(
@@ -96,6 +99,9 @@ public class IdpUserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-user", absolute = true)
+  @IdpAuthorizationExpression(
+      expression = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_AUTHORIZATION_EXPRESSION,
+      errorMessage = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_REQUIRED_MESSAGE)
   public Response addUser(AddUserRequest request) {
     if (request == null) {
       return IdpRestExceptionHandlers.handleUserException(
@@ -130,6 +136,9 @@ public class IdpUserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "update-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-idp-user", absolute = true)
+  @IdpAuthorizationExpression(
+      expression = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_AUTHORIZATION_EXPRESSION,
+      errorMessage = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_REQUIRED_MESSAGE)
   public Response resetPassword(@PathParam("user") String user, ResetPasswordRequest request) {
     if (request == null) {
       return IdpRestExceptionHandlers.handleUserException(
@@ -163,6 +172,9 @@ public class IdpUserOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "remove-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-idp-user", absolute = true)
+  @IdpAuthorizationExpression(
+      expression = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_AUTHORIZATION_EXPRESSION,
+      errorMessage = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_REQUIRED_MESSAGE)
   public Response removeUser(@PathParam("user") String user) {
     try {
       return IdpRestUtils.doAs(
