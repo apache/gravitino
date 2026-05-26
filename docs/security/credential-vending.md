@@ -55,6 +55,22 @@ s3-role-arn=<your-vending-role-arn>
 
 See [Iceberg REST Catalog Service > Example Configurations](../iceberg-rest-service.md#example-configurations) for the complete auxiliary-mode setup including `gravitino.conf` and catalog creation API calls.
 
+## Configuring Credential Vending for Fileset Catalogs
+
+The same credential providers (S3, GCS, ADLS, OSS) and catalog properties documented below apply to Fileset catalogs accessed through the Gravitino native API. Configure them when creating the Fileset catalog (via the REST API or CLI), or as defaults in `${GRAVITINO_HOME}/catalogs/fileset/conf/fileset.conf`.
+
+Clients access vended credentials in one of two ways:
+
+- **Gravitino Virtual File System (GVFS)**: a Hadoop `FileSystem` implementation that transparently requests vended credentials from Gravitino when files are opened. GVFS is the typical path because it integrates with Spark, Flink, Trino, and any other Hadoop-compatible engine without engine-specific code changes. See [How to Use GVFS](../how-to-use-gvfs.md) for client setup.
+- **Java client `getCredentials()`**: applications using Gravitino's Java client call `fileset.getCredentials()` directly on a Fileset object and receive a `Credential[]` array. See [Fileset Catalog](../fileset-catalog.md) for the client API.
+
+For end-to-end setup with credential vending enabled on a Fileset catalog, see the storage-specific pages:
+
+- [Fileset Catalog with S3](../fileset-catalog-with-s3.md#fileset-with-credential-vending)
+- [Fileset Catalog with GCS](../fileset-catalog-with-gcs.md)
+- [Fileset Catalog with ADLS](../fileset-catalog-with-adls.md)
+- [Fileset Catalog with OSS](../fileset-catalog-with-oss.md)
+
 ## General Configurations
 
 | Catalog property                    | Iceberg REST Server property           | Description                                                                                | Default value | Required | Since Version    |
