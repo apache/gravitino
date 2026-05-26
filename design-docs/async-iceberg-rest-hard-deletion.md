@@ -362,14 +362,14 @@ claim never disagree about whether the identifier is still occupied.
 
 The initial scope is **tables only**.
 
-- **Namespace (schema) drops** cascade: the server enqueues an independent
-  purge job per contained table. Failures and retries are tracked per table,
-  so a re-run never re-deletes an already-cleaned table and one table's
-  failure does not block the others.
+- **Namespace (schema) drops** are *not* a cascade: the Iceberg REST spec
+  requires a namespace to be empty before it can be dropped, so the client
+  drops each table first. Every such `DELETE …?purgeRequested=true` enqueues
+  its own purge job, and the namespace drop itself touches no data files.
+  There is no namespace-level purge job.
 - **Views** are a planned follow-up. A view carries no data files — cleanup
   only removes its `metadata.json` — so it slots into the same job table
-  (adding an `object_type` column) with the same tombstone and cascade rules
-  when added.
+  (adding an `object_type` column) with the same tombstone rule when added.
 
 ### 5.9 Events and observability
 
@@ -465,7 +465,6 @@ only as a rollback flag.
 - [ ] Implement the worker pool: CAS claiming with heartbeat ownership (`FOR UPDATE SKIP LOCKED` where available), heartbeat renewal, streaming file deletion, retry state machine (re-claim failed jobs on later poll ticks, give up at `max-attempts`)
 - [ ] Honor the `X-Gravitino-Async-Purge` request header and wire both paths into `IcebergTableOperationExecutor.dropTable`
 - [ ] Add observability (§5.9): metrics and the informative `ErrorResponse` message on the §5.7 `409`; operator read path in 1.3 is direct DB query
-- [ ] Namespace-drop cascade for tables (one job per contained table)
 - [ ] Enforce tombstone semantics (§5.7): on `createTable`/`registerTable`, reject with `409` when an active job exists (`idx_object` lookup on the request thread)
 
 ### Phase 1 (1.3): Testing
@@ -478,7 +477,7 @@ only as a rollback flag.
 
 ### Phase 2 (post-1.3)
 - [ ] Add purge events (§5.9): `IcebergPurgeStartedEvent`, `IcebergPurgeCompletedEvent`, `IcebergPurgeFailedEvent`
-- [ ] View support (§5.8): `object_type='VIEW'` cleanup (metadata-only), the view tombstone rule, and namespace cascade over views
+- [ ] View support (§5.8): `object_type='VIEW'` cleanup (metadata-only) and the view tombstone rule
 - [ ] Read-only `metalakes/{metalake}/catalogs/{catalog}/cleanups` management endpoint (§5.9): REST resource, DTOs, authorization, client support, docs, tests. Filtered list keyed by object identifier; no by-id fetch
 
 ---
