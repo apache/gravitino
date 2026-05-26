@@ -11,14 +11,19 @@ Gravitino credential vending is used to generate temporary or static credentials
 
 ### Capabilities
 
-- Supports Gravitino Iceberg REST server.
-- Supports Gravitino server, only support Hadoop catalog.
-- Supports pluggable credentials with built-in credentials:
-  - S3: `S3TokenCredential`, `S3SecretKeyCredential`, `AwsIrsaCredential`
-  - GCS: `GCSTokenCredential`
-  - ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
-  - OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
-- No support for Spark/Trino/Flink connector yet.
+Credential vending is available in these contexts:
+
+- **Iceberg REST clients** accessing Gravitino's Iceberg REST server. The client sends the header `X-Iceberg-Access-Delegation: vended-credentials` and receives temporary credentials in the response.
+- **Gravitino native API** for Hadoop (fileset) catalogs.
+
+The [Spark connector](../spark-connector/spark-connector.md), [Trino connector](../trino-connector/trino-connector.md), and [Flink connector](../flink-connector/flink-connector.md) do not yet support credential vending. Iceberg clients using the Iceberg REST protocol (including Spark via `SparkCatalog` with `type=rest`) do support it.
+
+Gravitino supports pluggable credentials with built-in providers:
+
+- S3: `S3TokenCredential`, `S3SecretKeyCredential`, `AwsIrsaCredential`
+- GCS: `GCSTokenCredential`
+- ADLS: `ADLSTokenCredential`, `AzureAccountKeyCredential`
+- OSS: `OSSTokenCredential`, `OSSSecretKeyCredential`
 
 ## How Credential Vending Is Configured
 
@@ -29,8 +34,8 @@ Credential vending is configured in two places depending on your Iceberg REST se
 
 The tables below show both forms for each credential. Exactly one form applies to any given deployment.
 
-:::caution
-In auxiliary mode, the **Iceberg REST Server property** form of these credentials (`gravitino.iceberg-rest.*`) is NOT consulted. Setting credentials, cache parameters, or IO properties under `gravitino.iceberg-rest.*` in `gravitino.conf` will silently have no effect. Always configure these on the Gravitino catalog itself.
+:::info
+In auxiliary mode, the Iceberg REST server reads catalog configuration (including credentials) from Gravitino's catalog system, not from `gravitino.iceberg-rest.*` properties in `gravitino.conf`. The `gravitino.iceberg-rest.*` form is valid in standalone mode (where it lives in `gravitino-iceberg-rest-server.conf`) but has no effect in auxiliary mode. In auxiliary mode, set credentials only on the Gravitino catalog itself.
 :::
 
 ### Example: Credential Vending Defaults
@@ -38,6 +43,7 @@ In auxiliary mode, the **Iceberg REST Server property** form of these credential
 Credential-vending portion of `${GRAVITINO_HOME}/catalogs/lakehouse-iceberg/conf/lakehouse-iceberg.conf` for an auxiliary-mode production deployment with S3 storage:
 
 ```properties
+# Sample lakehouse-iceberg.conf
 # S3 file IO and region, applied to every lakehouse-iceberg catalog
 io-impl=org.apache.iceberg.aws.s3.S3FileIO
 s3-region=us-west-2
@@ -204,10 +210,6 @@ For the Iceberg REST catalog server, download the corresponding Gravitino cloud 
 - [Gravitino Iceberg Aliyun bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-gcp-bundle)
 - [Gravitino Iceberg Azure bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-azure-bundle)
 
-:::note
-Since Gravitino 1.1.0, the above Gravitino Iceberg cloud bundle jars have already included the Iceberg cloud bundle jars, no need to download and include them separately.
-:::
-
 The classpath of the server:
 
 - Iceberg REST server: the classpath differs in different deploy mode, refer to [Server management](../iceberg-rest-service.md#server-management) part.
@@ -215,33 +217,19 @@ The classpath of the server:
 
 ## Example
 
-### Credential Vending for Iceberg REST Server
+### Testing Credential Vending with a Spark Client
 
-Suppose the Iceberg table data is stored in S3, follow the steps below:
+After configuring credential vending (see [Example: Credential Vending Defaults](#example-credential-vending-defaults) above and [Iceberg REST Catalog Service > Example Configurations](../iceberg-rest-service.md#example-configurations) for the full server setup), test the end-to-end flow with a Spark client.
 
-1. Download the [Gravitino Iceberg AWS bundle JAR](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-iceberg-aws-bundle), and place it in the classpath of Iceberg REST server.
-
-2. Add s3 token credential configurations.
-
-```
-gravitino.iceberg-rest.warehouse = s3://{bucket_name}/{warehouse_path}
-gravitino.iceberg-rest.io-impl= org.apache.iceberg.aws.s3.S3FileIO
-gravitino.iceberg-rest.credential-providers = s3-token
-gravitino.iceberg-rest.s3-access-key-id = xxx
-gravitino.iceberg-rest.s3-secret-access-key = xxx
-gravitino.iceberg-rest.s3-region = {region_name}
-gravitino.iceberg-rest.s3-role-arn = {role_arn}
-```
-
-3. Exploring the Iceberg table with a Spark client with credential vending enabled.
+The key header is `X-Iceberg-Access-Delegation=vended-credentials`. Without it, the REST server expects the client to provide credentials; with it, the REST server vends temporary credentials in its response.
 
 ```shell
 ./bin/spark-sql -v \
---packages org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.3.1 \
---conf spark.jars={path}/iceberg-aws-bundle-1.5.2.jar \
+--packages org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.10.0 \
+--conf spark.jars=/path/to/iceberg-aws-bundle-1.10.0.jar \
 --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
---conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog  \
---conf spark.sql.catalog.rest.type=rest  \
+--conf spark.sql.catalog.rest=org.apache.iceberg.spark.SparkCatalog \
+--conf spark.sql.catalog.rest.type=rest \
 --conf spark.sql.catalog.rest.uri=http://127.0.0.1:9001/iceberg/ \
 --conf spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation=vended-credentials
 ```
