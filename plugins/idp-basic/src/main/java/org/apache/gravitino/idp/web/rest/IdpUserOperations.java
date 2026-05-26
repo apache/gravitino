@@ -39,7 +39,7 @@ import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.dto.util.IdpDTOConverters;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
-import org.apache.gravitino.idp.web.IdpRestUtils;
+import org.apache.gravitino.idp.web.IdpRESTUtils;
 import org.apache.gravitino.metrics.MetricNames;
 
 /** REST resource for built-in IdP user management exposed by the {@code idp-basic} plugin. */
@@ -67,10 +67,10 @@ public class IdpUserOperations {
   @Timed(name = "get-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-idp-user", absolute = true)
   public Response getUser(@PathParam("user") String user) {
-    return IdpRestUtils.doAs(
+    return IdpRESTUtils.doAs(
         httpRequest,
         () ->
-            IdpRestUtils.ok(
+            IdpRESTUtils.ok(
                 new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user)))),
         "user",
         IdpOperationType.GET,
@@ -82,11 +82,11 @@ public class IdpUserOperations {
   @Timed(name = "add-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-user", absolute = true)
   public Response addUser(AddUserRequest request) {
-    return IdpRestUtils.doAs(
+    return IdpRESTUtils.doAs(
         httpRequest,
         () -> {
           request.validate();
-          return IdpRestUtils.ok(
+          return IdpRESTUtils.ok(
               new IdpUserResponse(
                   IdpDTOConverters.toDTO(
                       userGroupManager.addUser(request.getUser(), request.getPassword()))));
@@ -102,12 +102,12 @@ public class IdpUserOperations {
   @Timed(name = "change-idp-user-password." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "change-idp-user-password", absolute = true)
   public Response changePassword(@PathParam("user") String user, ChangePasswordRequest request) {
-    return IdpRestUtils.doAs(
+    return IdpRESTUtils.doAs(
         httpRequest,
         () -> {
           request.validate();
           userGroupManager.changePassword(user, request.getPassword());
-          return IdpRestUtils.ok(
+          return IdpRESTUtils.ok(
               new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user))));
         },
         "user",
@@ -121,9 +121,9 @@ public class IdpUserOperations {
   @Timed(name = "remove-idp-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-idp-user", absolute = true)
   public Response removeUser(@PathParam("user") String user) {
-    return IdpRestUtils.doAs(
+    return IdpRESTUtils.doAs(
         httpRequest,
-        () -> IdpRestUtils.ok(new RemoveResponse(userGroupManager.removeUser(user))),
+        () -> IdpRESTUtils.ok(new RemoveResponse(userGroupManager.removeUser(user))),
         "user",
         IdpOperationType.REMOVE,
         user);

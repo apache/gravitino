@@ -29,7 +29,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.web.IdpManagement;
-import org.apache.gravitino.idp.web.IdpRestUtils;
+import org.apache.gravitino.idp.web.IdpRESTUtils;
 
 /**
  * Enforces built-in IdP management API access rules without server interception:
@@ -77,7 +77,7 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
   public void filter(ContainerRequestContext requestContext) throws IOException {
     if (!basicAuthenticatorEnabled(authenticatorsSupplier.get())) {
       requestContext.abortWith(
-          IdpRestUtils.notFound(
+          IdpRESTUtils.notFound(
               BASIC_AUTHENTICATOR_REQUIRED_MESSAGE,
               new NotFoundException(BASIC_AUTHENTICATOR_REQUIRED_MESSAGE)));
       return;
@@ -85,7 +85,7 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
 
     GravitinoAuthorizer authorizer = authorizerSupplier.get();
     if (authorizer == null || !authorizer.isServiceAdmin()) {
-      requestContext.abortWith(IdpRestUtils.forbidden(SERVICE_ADMIN_REQUIRED_MESSAGE, null));
+      requestContext.abortWith(IdpRESTUtils.forbidden(SERVICE_ADMIN_REQUIRED_MESSAGE, null));
     }
   }
 

@@ -33,13 +33,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** REST helpers for built-in IdP resources in the {@code idp-basic} plugin. */
-public final class IdpRestUtils {
+public final class IdpRESTUtils {
 
-  private static final Logger LOG = LoggerFactory.getLogger(IdpRestUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(IdpRESTUtils.class);
 
   private static final MediaType JSON = MediaType.APPLICATION_JSON_TYPE;
 
-  private IdpRestUtils() {}
+  private IdpRESTUtils() {}
 
   public static <T> Response ok(T entity) {
     return json(Response.Status.OK, entity);
