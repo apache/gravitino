@@ -34,6 +34,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigConstants;
+import org.apache.gravitino.idp.storage.relational.converters.IdpSQLExceptionConverterFactory;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
@@ -43,7 +44,7 @@ import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 
-abstract class AbstractIdpMetaStorageTest {
+public abstract class AbstractIdpMetaStorageTest {
   private static final String H2_BACKEND = "h2";
   private static final String MYSQL_BACKEND = "mysql";
   private static final String POSTGRESQL_BACKEND = "postgresql";
@@ -51,12 +52,16 @@ abstract class AbstractIdpMetaStorageTest {
   private static final TestDatabaseName POSTGRESQL_TEST_DATABASE = TestDatabaseName.PG_JDBC_BACKEND;
 
   protected JDBCBackend backend;
-  protected SqlSession sharedSession;
+  public SqlSession sharedSession;
+
+  protected Config getConfig() {
+    return config;
+  }
 
   private Config config;
   private Path h2Path;
 
-  static Stream<String> storageProvider() {
+  public static Stream<String> storageProvider() {
     return Stream.of(H2_BACKEND, MYSQL_BACKEND, POSTGRESQL_BACKEND);
   }
 
@@ -69,6 +74,7 @@ abstract class AbstractIdpMetaStorageTest {
     }
 
     SqlSessionFactoryHelper.getInstance().close();
+    IdpSQLExceptionConverterFactory.close();
     ContainerSuite.getInstance().close();
 
     if (h2Path != null && Files.exists(h2Path)) {
@@ -77,10 +83,11 @@ abstract class AbstractIdpMetaStorageTest {
     }
   }
 
-  protected void init(String type) throws IOException {
+  public void init(String type) throws IOException {
     config = createBackendConfig(type);
     backend = new JDBCBackend();
     backend.initialize(config);
+    IdpSQLExceptionConverterFactory.initConverter(config);
     sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
     initializeMappers();
   }
@@ -90,6 +97,24 @@ abstract class AbstractIdpMetaStorageTest {
       sharedSession.close();
       sharedSession = null;
     }
+  }
+
+  /**
+   * Re-initializes the JDBC backend after another component closed the shared SqlSession factory.
+   */
+  protected void reinitializeBackend() throws IOException {
+    if (backend != null) {
+      backend.close();
+    }
+    backend = new JDBCBackend();
+    backend.initialize(config);
+    IdpSQLExceptionConverterFactory.initConverter(config);
+  }
+
+  protected void reopenSession() {
+    closeSession();
+    sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+    initializeMappers();
   }
 
   protected void initializeMappers() {}

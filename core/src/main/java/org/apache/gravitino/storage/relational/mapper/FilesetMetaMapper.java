@@ -240,8 +240,8 @@ public interface FilesetMetaMapper {
 
   @UpdateProvider(
       type = FilesetMetaSQLProviderFactory.class,
-      method = "softDeleteFilesetMetasBySchemaId")
-  Integer softDeleteFilesetMetasBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteFilesetMetasBySchemaIds")
+  Integer softDeleteFilesetMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = FilesetMetaSQLProviderFactory.class,

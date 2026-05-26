@@ -132,7 +132,6 @@ abstract class AbstractGlueCatalogIT {
 
   private Map<String, String> hiveTableProps() {
     Map<String, String> props = new HashMap<>();
-    props.put(GlueConstants.TABLE_TYPE, "EXTERNAL_TABLE");
     props.put(GlueConstants.INPUT_FORMAT_CLASS, HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS);
     props.put(GlueConstants.OUTPUT_FORMAT, HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS);
     props.put(GlueConstants.SERDE_LIB, HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS);
@@ -283,7 +282,6 @@ abstract class AbstractGlueCatalogIT {
     assertEquals(2, loaded.columns().length);
     assertEquals("id", loaded.columns()[0].name());
     assertEquals(Types.LongType.get(), loaded.columns()[0].dataType());
-    assertEquals("EXTERNAL_TABLE", loaded.properties().get(GlueConstants.TABLE_TYPE));
     assertNotNull(loaded.properties().get(GlueConstants.INPUT_FORMAT_CLASS));
     assertNotNull(loaded.properties().get(GlueConstants.OUTPUT_FORMAT));
     assertNotNull(loaded.properties().get(GlueConstants.SERDE_LIB));

@@ -29,11 +29,6 @@ import org.apache.ibatis.annotations.Param;
 public class IdpUserGroupRelPostgreSQLProvider extends IdpUserGroupRelBaseSQLProvider {
 
   @Override
-  protected String currentTimeMillisExpression() {
-    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
-  }
-
-  @Override
   public String softDeleteRelations(
       @Param("groupName") String groupName, @Param("usernames") List<String> usernames) {
     return "<script>"
@@ -94,5 +89,10 @@ public class IdpUserGroupRelPostgreSQLProvider extends IdpUserGroupRelBaseSQLPro
         + " WHERE id IN (SELECT id FROM "
         + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
+
+  @Override
+  protected String currentTimeMillisExpression() {
+    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
   }
 }

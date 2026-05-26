@@ -146,6 +146,12 @@ Gravitino server uses tree lock to ensure the consistency of the data. The tree 
 | `gravitino.catalog.cache.evictionIntervalMs` | The interval in milliseconds to evict the catalog cache; default 3600000ms(1h).                                                                                                                     | `3600000`     | No       | 0.1.0         |
 | `gravitino.catalog.classloader.isolated`     | Whether to use an isolated classloader for catalog. If `true`, an isolated classloader loads all catalog-related libraries and configurations, not the AppClassLoader. The default value is `true`. | `true`        | No       | 0.1.0         |
 
+### Schema configuration
+
+| Configuration item          | Description                                                                                                                                                                                                                                                                                                                                                                          | Default value | Required | Since version |
+|-----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
+| `gravitino.schema.separator` | The separator used to represent a hierarchical (multi-level) schema in schema names at the API boundary, e.g. `:` for `A:B:C`. It only takes effect for catalogs that support hierarchical schemas (currently the Iceberg catalog). The value must not be blank and must not contain `.` or the internal physical separator (ASCII-1, `\u0001`). See [Hierarchical schema](./lakehouse-iceberg-catalog.md#hierarchical-schema). | `:`           | No       | 1.3.0         |
+
 ### Auxiliary service configuration
 
 | Configuration item            | Description                                                                                                                    | Default value | Since Version |
@@ -239,29 +245,47 @@ When processing pre-event, you could throw a `ForbiddenException` to skip the fo
 
 The audit log framework defines how audit logs are formatted and written to various storages. The formatter defines an interface that transforms different `Event` types into a unified `AuditLog`. The writer defines an interface to writing AuditLog to different storages.
 
-Gravitino provides a default implement to log basic audit information to a file, you could extend the audit system by implementation corresponding interfaces.
+Gravitino provides a default implementation to log basic audit information to a file. You can extend the audit system by implementing the corresponding interfaces.
 
-| Property name                         | Description                            | Default value                               | Required | Since Version              |
-|---------------------------------------|----------------------------------------|---------------------------------------------|----------|----------------------------|
-| `gravitino.audit.enabled`             | The audit log enable flag.             | false                                       | NO       | 0.7.0-incubating           |
-| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter  | NO       | 0.7.0-incubating           | 
-| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.SimpleFormatter  | NO       | 0.7.0-incubating           | 
+| Property name                         | Description                            | Default value                                  | Required | Since Version    |
+|---------------------------------------|----------------------------------------|------------------------------------------------|----------|------------------|
+| `gravitino.audit.enabled`             | The audit log enable flag.             | false                                          | NO       | 0.7.0-incubating |
+| `gravitino.audit.writer.className`    | The class name of audit log writer.    | org.apache.gravitino.audit.FileAuditWriter     | NO       | 0.7.0-incubating |
+| `gravitino.audit.formatter.className` | The class name of audit log formatter. | org.apache.gravitino.audit.v2.SimpleFormatterV2 | NO      | 0.7.0-incubating |
 
 #### Audit log formatter
 
-The Formatter defines an interface that formats metadata audit logs into a unified format. `SimpleFormatter` is a default implement to format audit information, you don't need to do extra configurations.
+The `Formatter` interface transforms an `Event` into an `AuditLog`. `SimpleFormatterV2` is the default implementation and requires no extra configuration. It produces a tab-separated line with the following fields: timestamp, user, operation type, identifier, operation status, event source, remote address, and custom info.
 
 #### Audit log writer
 
-The `AuditLogWriter` defines an interface that enables the writing of metadata audit logs to different storage mediums such as files, databases, etc.
+The `AuditLogWriter` interface enables writing audit logs to different storage mediums (files, databases, etc.).
 
-Writer configuration begins with `gravitino.audit.writer.${name}`, where `${name}` is replaced with the actual writer name defined in method `name()`. `FileAuditWriter` is a default implement to log audit information, whose name is `file`.
+`FileAuditWriter` is the default implementation. It delegates all file management — rotation, compression, and retention — to Log4j2 via a dedicated logger named `gravitino.audit`. The appender is configured in `conf/log4j2.properties` (see the `audit_file` appender group). The default configuration rotates daily and on 256 MB, compresses rotated files with gzip, and deletes files older than 30 days.
 
-| Property name                                   | Description                                                                   | Default value       | Required | Since Version    |
-|-------------------------------------------------|-------------------------------------------------------------------------------|---------------------|----------|------------------|
-| `gravitino.audit.writer.file.fileName`          | The audit log file name, the path is `${sys:gravitino.log.path}/${fileName}`. | gravitino_audit.log | NO       | 0.7.0-incubating |
-| `gravitino.audit.writer.file.flushIntervalSecs` | The flush interval time of the audit file in seconds.                         | 10                  | NO       | 0.7.0-incubating |
-| `gravitino.audit.writer.file.append`            | Whether the log will be written to the end or the beginning of the file.      | true                | NO       | 0.7.0-incubating |
+##### Deprecated FileAuditWriter properties
+
+The following `gravitino.audit.writer.file.*` properties were accepted in earlier versions but are now **deprecated** and have no effect. `FileAuditWriter` emits a `WARN` log at startup if any of them are present. Configure the equivalent behavior directly in `conf/log4j2.properties` instead.
+
+| Deprecated property                             | Migration: configure in `conf/log4j2.properties`                  |
+|-------------------------------------------------|--------------------------------------------------------------------|
+| `gravitino.audit.writer.file.fileName`          | `appender.audit_file.fileName`                                     |
+| `gravitino.audit.writer.file.append`            | `appender.audit_file.append`                                       |
+| `gravitino.audit.writer.file.flushIntervalSecs` | Use `immediateFlush` on the appender or an async appender wrapper  |
+
+Example — change the audit log path:
+
+```properties
+# conf/log4j2.properties
+appender.audit_file.fileName = /var/log/gravitino/my_audit.log
+appender.audit_file.filePattern = /var/log/gravitino/my_audit_%d{yyyyMMdd}.%i.log.gz
+```
+
+Example — adjust retention to 90 days:
+
+```properties
+appender.audit_file.strategy.delete.ifLastModified.age = 90d
+```
 
 ### Security configuration
 

@@ -49,6 +49,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdap
 import org.apache.gravitino.trino.connector.catalog.hive.SortingColumn.Order;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
 
 /** Transforming Apache Gravitino Hive metadata to Trino. */
 public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
@@ -74,7 +75,23 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,
       List<PropertyMetadata<?>> columnProperties) {
-    super(schemaProperties, tableProperties, columnProperties, new HiveDataTypeTransformer());
+    this(schemaProperties, tableProperties, columnProperties, new HiveDataTypeTransformer());
+  }
+
+  /**
+   * Constructs a new HiveMetadataAdapter with a custom data type transformer.
+   *
+   * @param schemaProperties the schema properties metadata
+   * @param tableProperties the table properties metadata
+   * @param columnProperties the column properties metadata
+   * @param dataTypeTransformer the data type transformer to use
+   */
+  public HiveMetadataAdapter(
+      List<PropertyMetadata<?>> schemaProperties,
+      List<PropertyMetadata<?>> tableProperties,
+      List<PropertyMetadata<?>> columnProperties,
+      GeneralDataTypeTransformer dataTypeTransformer) {
+    super(schemaProperties, tableProperties, columnProperties, dataTypeTransformer);
     this.tableConverter = new HiveTablePropertyConverter();
     this.schemaConverter = new HiveSchemaPropertyConverter();
   }
@@ -194,18 +211,9 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
     Map<String, Object> properties = toTrinoTableProperties(gravitinoTable.getProperties());
 
     if (ArrayUtils.isNotEmpty(gravitinoTable.getPartitioning())) {
-      // Only support simple partition now like partition by a, b, c.
-      // Format like partition like partition by year(a), b, c is NOT supported now.
       properties.put(
           HivePropertyMeta.HIVE_PARTITION_KEY,
-          gravitinoTable.getPartitioning().length > 0
-              ? Arrays.stream(gravitinoTable.getPartitioning())
-                  .map(
-                      ts ->
-                          ((Transform.SingleFieldTransform) ts)
-                              .fieldName()[0].toLowerCase(Locale.ENGLISH))
-                  .collect(Collectors.toList())
-              : Collections.emptyList());
+          toTrinoPartitionKeys(gravitinoTable.getPartitioning()));
     }
 
     if (gravitinoTable.getDistribution() != null
@@ -248,5 +256,17 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
         columnMetadataList,
         properties,
         Optional.ofNullable(gravitinoTable.getComment()));
+  }
+
+  /**
+   * Converts Gravitino partition transforms to Trino partition key names. Subclasses may override
+   * this to support transform types beyond {@link Transform.SingleFieldTransform}.
+   */
+  protected List<String> toTrinoPartitionKeys(Transform[] partitioning) {
+    // Only support simple partition now like partition by a, b, c.
+    // Format like partition by year(a), b, c is NOT supported now.
+    return Arrays.stream(partitioning)
+        .map(ts -> ((Transform.SingleFieldTransform) ts).fieldName()[0].toLowerCase(Locale.ENGLISH))
+        .collect(Collectors.toList());
   }
 }

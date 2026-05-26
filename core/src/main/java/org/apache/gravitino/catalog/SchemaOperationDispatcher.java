@@ -351,9 +351,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   /**
    * Reconciles auto-created ancestor entities after a hierarchical schema leaf is dropped. This
    * mirrors {@code IcebergNamespaceHookDispatcher.dropNamespace}: walk the ancestors
-   * innermost-to-outermost and delete the orphaned Gravitino entity for each ancestor that no
-   * longer exists in the catalog, stopping at the first ancestor that still exists (its existence
-   * implies all of its outer ancestors exist). For a flat schema name this is a no-op.
+   * innermost-to-outermost to find the outermost ancestor that no longer exists in the catalog,
+   * stopping at the first ancestor that still exists (its existence implies all of its outer
+   * ancestors exist). A single cascade delete of that outermost orphaned ancestor removes it and
+   * all descendant schema entities (the intermediate ancestors) in one batched operation, rather
+   * than issuing one delete per ancestor. For a flat schema name this is a no-op.
    *
    * @param catalogIdent the identifier of the catalog the schema belongs to
    * @param ident the identifier of the dropped (leaf) schema
@@ -363,6 +365,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     List<String> ancestorNames = HierarchicalSchemaUtil.getAncestorNames(ident.name(), separator);
     String metalake = ident.namespace().level(0);
     String catalog = ident.namespace().level(1);
+    NameIdentifier outermostOrphan = null;
     for (int i = ancestorNames.size() - 1; i >= 0; i--) {
       NameIdentifier ancestorIdent =
           NameIdentifierUtil.ofSchema(metalake, catalog, ancestorNames.get(i));
@@ -374,13 +377,20 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       if (ancestorExistsInCatalog) {
         break;
       }
-      try {
-        store.delete(ancestorIdent, SCHEMA, true);
-      } catch (NoSuchEntityException e) {
-        LOG.warn("The orphaned ancestor schema does not exist in the store: {}", ancestorIdent, e);
-      } catch (Exception e) {
-        throw new RuntimeException(e);
-      }
+      outermostOrphan = ancestorIdent;
+    }
+    if (outermostOrphan == null) {
+      return;
+    }
+    // The leaf was already deleted by the caller; cascade-deleting the outermost orphaned ancestor
+    // cleans up it and every intermediate ancestor (the relational store matches descendant schemas
+    // by name prefix) in a single batched delete.
+    try {
+      store.delete(outermostOrphan, SCHEMA, true);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("The orphaned ancestor schema does not exist in the store: {}", outermostOrphan, e);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 

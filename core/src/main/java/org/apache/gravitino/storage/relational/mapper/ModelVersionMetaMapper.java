@@ -78,8 +78,8 @@ public interface ModelVersionMetaMapper {
 
   @UpdateProvider(
       type = ModelVersionMetaSQLProviderFactory.class,
-      method = "softDeleteModelVersionMetasBySchemaId")
-  Integer softDeleteModelVersionMetasBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteModelVersionMetasBySchemaIds")
+  Integer softDeleteModelVersionMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = ModelVersionMetaSQLProviderFactory.class,

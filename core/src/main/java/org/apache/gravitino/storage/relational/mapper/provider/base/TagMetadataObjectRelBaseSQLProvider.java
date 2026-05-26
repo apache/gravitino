@@ -207,42 +207,63 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + ")";
   }
 
-  public String softDeleteTagMetadataObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
-    return " UPDATE "
+  public String softDeleteTagMetadataObjectRelsBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " tmt SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
-        + " st WHERE st.schema_id = #{schemaId} AND"
-        + " st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
+        + " st WHERE st.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND st.schema_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'SCHEMA'"
         + " UNION"
         + " SELECT tt.schema_id FROM "
         + TopicMetaMapper.TABLE_NAME
-        + " tt WHERE tt.schema_id = #{schemaId} AND"
-        + " tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
+        + " tt WHERE tt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND tt.topic_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TOPIC'"
         + " UNION"
         + " SELECT tat.schema_id FROM "
         + TableMetaMapper.TABLE_NAME
-        + " tat WHERE tat.schema_id = #{schemaId} AND"
-        + " tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
+        + " tat WHERE tat.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND tat.table_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'TABLE'"
         + " UNION"
         + " SELECT ft.schema_id FROM "
         + FilesetMetaMapper.META_TABLE_NAME
-        + " ft WHERE ft.schema_id = #{schemaId} AND"
-        + " ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
+        + " ft WHERE ft.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND ft.fileset_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FILESET'"
         + " UNION"
         + " SELECT cot.schema_id FROM "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " cot WHERE cot.schema_id = #{schemaId} AND"
-        + " cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
+        + " cot WHERE cot.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND cot.column_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'COLUMN'"
         + " UNION"
         + " SELECT mt.schema_id FROM "
         + ModelMetaMapper.TABLE_NAME
-        + " mt WHERE mt.schema_id = #{schemaId} AND"
-        + " mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
-        + ")";
+        + " mt WHERE mt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
+        + ")"
+        + "</script>";
   }
 
   public String softDeleteTagMetadataObjectRelsByTableId(@Param("tableId") Long tableId) {
