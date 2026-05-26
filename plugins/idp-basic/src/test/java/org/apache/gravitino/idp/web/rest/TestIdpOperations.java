@@ -167,12 +167,15 @@ class TestIdpOperations extends JerseyTest {
     when(MANAGER.getUser("user1")).thenReturn(buildUser("user1"));
     when(MANAGER.removeUser("user1")).thenReturn(true);
 
-    Response resetResp =
+    Response changePasswordResp =
         target("/idp/users/user1")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .put(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resetResp.getStatus());
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), changePasswordResp.getStatus());
+
+    IdpUserResponse userResponse = changePasswordResp.readEntity(IdpUserResponse.class);
+    Assertions.assertEquals("user1", userResponse.getUser().name());
 
     Response removeResp =
         target("/idp/users/user1")
