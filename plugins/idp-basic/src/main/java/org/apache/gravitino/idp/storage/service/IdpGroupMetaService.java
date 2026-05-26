@@ -122,14 +122,14 @@ public class IdpGroupMetaService {
    * Changes built-in IdP group membership in a single transaction.
    *
    * @param groupName The group name.
-   * @param additions The usernames to add.
-   * @param removals The usernames to remove.
+   * @param usersToAdd The usernames to add.
+   * @param usersToRemove The usernames to remove.
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "changeGroupMembership")
   public void changeGroupMembership(
-      String groupName, List<String> additions, List<String> removals) {
+      String groupName, List<String> usersToAdd, List<String> usersToRemove) {
     SessionUtils.doMultipleWithCommit(
         () -> {
           IdpGroupPO group =
@@ -149,8 +149,8 @@ public class IdpGroupMetaService {
                   mapper -> mapper.selectUsernamesByGroupName(groupName));
           Set<String> oldUsernames = Sets.newHashSet(currentUsernames);
           Set<String> newUsernames = Sets.newHashSet(oldUsernames);
-          newUsernames.addAll(additions);
-          newUsernames.removeAll(removals);
+          newUsernames.addAll(usersToAdd);
+          newUsernames.removeAll(usersToRemove);
 
           Set<String> insertUsernames = Sets.difference(newUsernames, oldUsernames);
           Set<String> deleteUsernames = Sets.difference(oldUsernames, newUsernames);
