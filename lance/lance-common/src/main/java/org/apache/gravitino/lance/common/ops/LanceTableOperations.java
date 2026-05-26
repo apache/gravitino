@@ -20,6 +20,7 @@ package org.apache.gravitino.lance.common.ops;
 
 import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.credential.CredentialPrivilege;
 import org.lance.namespace.model.CreateEmptyTableResponse;
 import org.lance.namespace.model.CreateTableResponse;
 import org.lance.namespace.model.DeclareTableResponse;
@@ -36,9 +37,15 @@ public interface LanceTableOperations {
    * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
    * @param delimiter the delimiter used in the namespace
    * @param version the version of the table to describe, if null, describe the latest version
+   * @param credentialPrivilege the privilege level for vended credentials, empty means no
+   *     credential vending
    * @return the table description
    */
-  DescribeTableResponse describeTable(String tableId, String delimiter, Optional<Long> version);
+  DescribeTableResponse describeTable(
+      String tableId,
+      String delimiter,
+      Optional<Long> version,
+      Optional<CredentialPrivilege> credentialPrivilege);
 
   /**
    * Create a new table.

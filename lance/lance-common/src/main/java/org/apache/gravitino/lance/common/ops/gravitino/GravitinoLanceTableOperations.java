@@ -29,18 +29,26 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialPrivilege;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
@@ -50,6 +58,8 @@ import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.utils.PrincipalUtils;
+import org.lance.namespace.errors.ServiceUnavailableException;
 import org.lance.namespace.errors.TableNotFoundException;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
@@ -75,6 +85,9 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
 
   private final GravitinoLanceNamespaceWrapper namespaceWrapper;
 
+  private final ConcurrentHashMap<String, CatalogCredentialManager> credentialManagers =
+      new ConcurrentHashMap<>();
+
   private enum CreateMode {
     CREATE,
     EXIST_OK,
@@ -98,9 +111,23 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     this.namespaceWrapper = namespaceWrapper;
   }
 
+  public void close() {
+    for (Map.Entry<String, CatalogCredentialManager> entry : credentialManagers.entrySet()) {
+      try {
+        entry.getValue().close();
+      } catch (Exception e) {
+        LOG.warn("Error closing credential manager for catalog {}", entry.getKey(), e);
+      }
+    }
+    credentialManagers.clear();
+  }
+
   @Override
   public DescribeTableResponse describeTable(
-      String tableId, String delimiter, Optional<Long> version) {
+      String tableId,
+      String delimiter,
+      Optional<Long> version,
+      Optional<CredentialPrivilege> credentialPrivilege) {
     if (!version.isEmpty()) {
       throw new UnsupportedOperationException(
           "Describing specific table version is not supported. It should be null to indicate the"
@@ -111,8 +138,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     Preconditions.checkArgument(
         nsId.levels() == 3, "Expected at 3-level namespace but got: %s", nsId.levels());
 
-    String catalogName = nsId.levelAtListPos(0);
-    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(catalogName);
+    Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
     NameIdentifier tableIdentifier =
         NameIdentifier.of(nsId.levelAtListPos(1), nsId.levelAtListPos(2));
 
@@ -131,9 +157,60 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
         Optional.ofNullable(table.properties().get(LANCE_TABLE_VERSION))
             .map(Long::valueOf)
             .orElse(null));
-    response.setStorageOptions(
-        LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), table.properties()));
+    if (credentialPrivilege.isPresent()) {
+      response.setStorageOptions(
+          buildVendedStorageOptions(catalog, table, credentialPrivilege.get()));
+    } else {
+      response.setStorageOptions(
+          LancePropertiesUtils.resolveLanceStorageOptions(
+              catalog.properties(), table.properties()));
+    }
     return response;
+  }
+
+  private Map<String, String> buildVendedStorageOptions(
+      Catalog catalog, Table table, CredentialPrivilege credentialPrivilege) {
+    String tableLocation = table.properties().get(LANCE_LOCATION);
+    Preconditions.checkArgument(
+        tableLocation != null && !tableLocation.isEmpty(),
+        "Table location is required for credential vending");
+
+    ImmutableSet<String> paths = ImmutableSet.of(tableLocation);
+    String userName = PrincipalUtils.getCurrentUserName();
+
+    PathBasedCredentialContext context =
+        credentialPrivilege == CredentialPrivilege.WRITE
+            ? new PathBasedCredentialContext(userName, paths, ImmutableSet.of())
+            : new PathBasedCredentialContext(userName, ImmutableSet.of(), paths);
+
+    CatalogCredentialManager credManager =
+        credentialManagers.computeIfAbsent(
+            catalog.name(), name -> new CatalogCredentialManager(name, catalog.properties()));
+
+    Credential credential;
+    try {
+      credential = credManager.getCredentialByPath(tableLocation, context);
+    } catch (IllegalArgumentException e) {
+      LOG.debug(
+          "No credential providers configured for catalog {}, falling back to original storage options",
+          catalog.name());
+      return LancePropertiesUtils.resolveLanceStorageOptions(
+          catalog.properties(), table.properties());
+    }
+
+    if (credential == null) {
+      LOG.warn("Failed to generate credential for table: {}", tableLocation);
+      throw new ServiceUnavailableException(
+          "Couldn't generate credential for table: " + tableLocation);
+    }
+
+    Map<String, String> baseStorageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalog.properties(), table.properties());
+    Map<String, String> vendedProperties = CredentialPropertyUtils.toLanceProperties(credential);
+
+    Map<String, String> mergedOptions = new HashMap<>(baseStorageOptions);
+    mergedOptions.putAll(vendedProperties);
+    return mergedOptions;
   }
 
   @Override
