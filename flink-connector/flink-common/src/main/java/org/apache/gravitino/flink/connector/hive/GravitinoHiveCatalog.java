@@ -186,7 +186,9 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     if (!(newTable instanceof ResolvedCatalogTable)) {
       throw new CatalogException("Generic table must be a resolved catalog table");
     }
-    // For generic tables, re-serialize the entire schema into flink.* properties.
+    // For generic tables, we re-serialize the entire table schema and partition keys into
+    // flink.* properties, so the individual tableChanges are not needed. The newTable
+    // parameter contains the final state after applying all changes.
     applyGenericTableAlter(tablePath, table, (ResolvedCatalogTable) newTable);
   }
 
