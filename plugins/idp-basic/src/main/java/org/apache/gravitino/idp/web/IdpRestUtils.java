@@ -22,13 +22,20 @@ import java.security.PrivilegedExceptionAction;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.idp.exception.AlreadyExistsException;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** REST helpers for built-in IdP resources in the {@code idp-basic} plugin. */
 public final class IdpRestUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IdpRestUtils.class);
 
   private static final MediaType JSON = MediaType.APPLICATION_JSON_TYPE;
 
@@ -45,6 +52,17 @@ public final class IdpRestUtils {
             httpRequest.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME);
     return PrincipalUtils.doAs(
         principal == null ? new UserPrincipal(AuthConstants.ANONYMOUS_USER) : principal, action);
+  }
+
+  public static Response handleException(
+      String resourceType, IdpOperationType op, String name, Exception e) {
+    String formatted = StringUtils.isBlank(name) ? "" : " [" + name + "]";
+    String errorMsg =
+        String.format(
+            "Failed to operate built-in IdP %s %s operation [%s], reason [%s]",
+            resourceType, formatted, op.name(), e.getMessage());
+    LOG.warn(errorMsg, e);
+    return toErrorResponse(errorMsg, e);
   }
 
   public static Response illegalArguments(String message, Throwable throwable) {
@@ -79,6 +97,22 @@ public final class IdpRestUtils {
   public static Response internalError(String message, Throwable throwable) {
     return json(
         Response.Status.INTERNAL_SERVER_ERROR, ErrorResponse.internalError(message, throwable));
+  }
+
+  private static Response toErrorResponse(String errorMsg, Exception e) {
+    if (e instanceof IllegalArgumentException) {
+      return illegalArguments(errorMsg, e);
+    }
+    if (e instanceof NotFoundException) {
+      return notFound(errorMsg, e);
+    }
+    if (e instanceof AlreadyExistsException) {
+      return alreadyExists(errorMsg, e);
+    }
+    if (e instanceof IllegalStateException || e instanceof UnsupportedOperationException) {
+      return unsupportedOperation(errorMsg, e);
+    }
+    return internalError(errorMsg, e);
   }
 
   private static Response json(Response.Status status, Object entity) {

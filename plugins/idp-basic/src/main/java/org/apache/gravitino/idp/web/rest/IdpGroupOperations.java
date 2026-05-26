@@ -43,7 +43,6 @@ import org.apache.gravitino.idp.dto.util.IdpDTOConverters;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
-import org.apache.gravitino.idp.web.IdpRestExceptionHandlers;
 import org.apache.gravitino.idp.web.IdpRestUtils;
 import org.apache.gravitino.metrics.MetricNames;
 
@@ -79,7 +78,7 @@ public class IdpGroupOperations {
               IdpRestUtils.ok(
                   new IdpGroupResponse(IdpDTOConverters.toDTO(userGroupManager.getGroup(group)))));
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleException("group", IdpOperationType.GET, group, e);
+      return IdpRestUtils.handleException("group", IdpOperationType.GET, group, e);
     }
   }
 
@@ -98,8 +97,7 @@ public class IdpGroupOperations {
                     IdpDTOConverters.toDTO(userGroupManager.addGroup(request.getGroup()))));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleException(
-          "group", IdpOperationType.ADD, request.getGroup(), e);
+      return IdpRestUtils.handleException("group", IdpOperationType.ADD, request.getGroup(), e);
     }
   }
 
@@ -115,7 +113,7 @@ public class IdpGroupOperations {
           httpRequest,
           () -> IdpRestUtils.ok(new RemoveResponse(userGroupManager.removeGroup(group, force))));
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleException("group", IdpOperationType.REMOVE, group, e);
+      return IdpRestUtils.handleException("group", IdpOperationType.REMOVE, group, e);
     }
   }
 
@@ -138,7 +136,7 @@ public class IdpGroupOperations {
             return IdpRestUtils.ok(new IdpGroupResponse(IdpDTOConverters.toDTO(groupEntity)));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleException("group", IdpOperationType.ADD, group, e);
+      return IdpRestUtils.handleException("group", IdpOperationType.ADD, group, e);
     }
   }
 
@@ -161,7 +159,7 @@ public class IdpGroupOperations {
             return IdpRestUtils.ok(new IdpGroupResponse(IdpDTOConverters.toDTO(groupEntity)));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleException("group", IdpOperationType.REMOVE, group, e);
+      return IdpRestUtils.handleException("group", IdpOperationType.REMOVE, group, e);
     }
   }
 }

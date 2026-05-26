@@ -40,7 +40,6 @@ import org.apache.gravitino.idp.dto.util.IdpDTOConverters;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
-import org.apache.gravitino.idp.web.IdpRestExceptionHandlers;
 import org.apache.gravitino.idp.web.IdpRestUtils;
 import org.apache.gravitino.metrics.MetricNames;
 
@@ -76,7 +75,7 @@ public class IdpUserOperations {
               IdpRestUtils.ok(
                   new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user)))));
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleException("user", IdpOperationType.GET, user, e);
+      return IdpRestUtils.handleException("user", IdpOperationType.GET, user, e);
     }
   }
 
@@ -96,8 +95,7 @@ public class IdpUserOperations {
                         userGroupManager.addUser(request.getUser(), request.getPassword()))));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleException(
-          "user", IdpOperationType.ADD, request.getUser(), e);
+      return IdpRestUtils.handleException("user", IdpOperationType.ADD, request.getUser(), e);
     }
   }
 
@@ -119,7 +117,7 @@ public class IdpUserOperations {
                 new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user))));
           });
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleException("user", IdpOperationType.UPDATE, user, e);
+      return IdpRestUtils.handleException("user", IdpOperationType.UPDATE, user, e);
     }
   }
 
@@ -134,7 +132,7 @@ public class IdpUserOperations {
           httpRequest,
           () -> IdpRestUtils.ok(new RemoveResponse(userGroupManager.removeUser(user))));
     } catch (Exception e) {
-      return IdpRestExceptionHandlers.handleException("user", IdpOperationType.REMOVE, user, e);
+      return IdpRestUtils.handleException("user", IdpOperationType.REMOVE, user, e);
     }
   }
 }

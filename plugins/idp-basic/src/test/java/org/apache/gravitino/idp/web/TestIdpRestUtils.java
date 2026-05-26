@@ -25,22 +25,22 @@ import org.apache.gravitino.idp.exception.NotFoundException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestIdpRestExceptionHandlers {
+public class TestIdpRestUtils {
 
   @Test
   public void testHandleExceptionMapsKnownErrors() {
     Response notFound =
-        IdpRestExceptionHandlers.handleException(
+        IdpRestUtils.handleException(
             "user", IdpOperationType.GET, "alice", new NotFoundException("missing"));
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), notFound.getStatus());
 
     Response alreadyExists =
-        IdpRestExceptionHandlers.handleException(
+        IdpRestUtils.handleException(
             "group", IdpOperationType.ADD, "engineering", new AlreadyExistsException("exists"));
     Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), alreadyExists.getStatus());
 
     Response illegalArguments =
-        IdpRestExceptionHandlers.handleException(
+        IdpRestUtils.handleException(
             "user", IdpOperationType.ADD, "alice", new IllegalArgumentException("invalid"));
     Assertions.assertEquals(
         Response.Status.BAD_REQUEST.getStatusCode(), illegalArguments.getStatus());
