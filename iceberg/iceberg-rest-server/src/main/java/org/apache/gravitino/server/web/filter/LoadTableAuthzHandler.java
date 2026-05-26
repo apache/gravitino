@@ -20,7 +20,7 @@
 package org.apache.gravitino.server.web.filter;
 
 import java.lang.reflect.Parameter;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
@@ -147,7 +147,7 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
       IcebergCatalogWrapper catalogWrapper,
       TableIdentifier tableIdentifier) {
 
-    Map<String, Object> emptyPathParams = new HashMap<>();
+    Map<String, Object> emptyPathParams = Collections.emptyMap();
     AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
     Optional<String> emptyEntityType = Optional.empty();
 
@@ -213,11 +213,8 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
       return false;
     }
 
-    // Metadata tables have namespace length > 1 (e.g., catalog.db.table has 3 levels)
-    // Regular tables have namespace length = 1 (e.g., catalog.db has 2 levels, but we get "db")
-    if (namespace.levels().length > 1) {
-      return true;
-    }
-    return false;
+    // Metadata tables have namespace length > 1 (e.g., catalog.db.table has 3 levels).
+    // Regular tables have namespace length = 1 (e.g., catalog.db has 2 levels, but we get "db").
+    return namespace.levels().length > 1;
   }
 }

@@ -20,7 +20,7 @@
 package org.apache.gravitino.server.web.filter;
 
 import java.lang.reflect.Parameter;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
@@ -128,7 +128,7 @@ public class LoadViewAuthzHandler implements AuthorizationHandler {
       IcebergCatalogWrapper catalogWrapper,
       TableIdentifier viewIdentifier) {
 
-    Map<String, Object> emptyPathParams = new HashMap<>();
+    Map<String, Object> emptyPathParams = Collections.emptyMap();
     AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
     Optional<String> emptyEntityType = Optional.empty();
 
