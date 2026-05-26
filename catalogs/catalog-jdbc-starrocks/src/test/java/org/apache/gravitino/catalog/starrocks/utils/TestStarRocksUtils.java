@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.starrocks.utils;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.util.Collections;
@@ -27,6 +28,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -205,5 +208,20 @@ public class TestStarRocksUtils {
     Distribution distribution2 =
         StarRocksUtils.extractDistributionInfoFromSql(createTableSqlWithAuto);
     assertEquals(distribution2.number(), -1);
+
+    // Test external table without DISTRIBUTED BY clause
+    String createExternalTableSql =
+            "CREATE EXTERNAL TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP";
+    Distribution distribution3 =
+            StarRocksUtils.extractDistributionInfoFromSql(createExternalTableSql);
+    assertSame(Distributions.NONE, distribution3);
+
+    // Test case-insensitive DISTRIBUTED BY
+    String createTableSqlLowerCase =
+            "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE(`col1`)\n()\n distributed by hash(`col1`) buckets 3";
+    Distribution distribution5 =
+            StarRocksUtils.extractDistributionInfoFromSql(createTableSqlLowerCase);
+    assertEquals(distribution5.number(), 3);
+    assertEquals(distribution5.strategy(), Strategy.HASH);
   }
 }

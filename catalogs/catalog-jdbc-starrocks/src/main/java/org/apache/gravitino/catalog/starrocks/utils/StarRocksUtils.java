@@ -177,7 +177,7 @@ public class StarRocksUtils {
           .build();
     }
 
-    throw new RuntimeException("Failed to extract distribution info in sql:" + createTableSql);
+    return Distributions.NONE;
   }
 
   public static String extractTableCommentFromSql(String createTableSql) {

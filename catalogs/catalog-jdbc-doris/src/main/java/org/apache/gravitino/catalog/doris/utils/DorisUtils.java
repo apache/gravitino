@@ -217,7 +217,7 @@ public final class DorisUtils {
           .build();
     }
 
-    throw new RuntimeException("Failed to extract distribution info in sql:" + createTableSql);
+    return Distributions.NONE;
   }
 
   private static int extractBucketNum(Matcher matcher) {
