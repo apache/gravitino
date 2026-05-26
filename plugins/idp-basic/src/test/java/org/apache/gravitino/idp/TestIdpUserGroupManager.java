@@ -132,7 +132,8 @@ public class TestIdpUserGroupManager {
     Assertions.assertTrue(manager.changePassword("testChangePassword", NEW_VALID_PASSWORD));
     Assertions.assertEquals("testChangePassword", manager.getUser("testChangePassword").name());
 
-    Assertions.assertFalse(manager.changePassword("not-exist", VALID_PASSWORD));
+    Assertions.assertThrows(
+        NotFoundException.class, () -> manager.changePassword("not-exist", VALID_PASSWORD));
   }
 
   @Test

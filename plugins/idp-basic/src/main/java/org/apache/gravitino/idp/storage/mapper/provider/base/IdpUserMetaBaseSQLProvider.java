@@ -69,8 +69,7 @@ public class IdpUserMetaBaseSQLProvider {
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET password_hash = #{passwordHash}"
         + " WHERE user_name = #{username}"
-        + " AND deleted_at = 0"
-        + " AND password_hash <> #{passwordHash}";
+        + " AND deleted_at = 0";
   }
 
   public String softDeleteIdpUser(@Param("username") String username) {
