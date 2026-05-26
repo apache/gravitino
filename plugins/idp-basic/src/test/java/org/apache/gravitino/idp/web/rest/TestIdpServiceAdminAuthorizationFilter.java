@@ -24,29 +24,26 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.lang.reflect.Method;
 import java.util.Collections;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestIdpServiceAdminAuthorizationFilter {
 
   @Test
-  void testAllowsServiceAdminOnAnnotatedUserOperation() throws Exception {
+  void testAllowsServiceAdminOnIdpPath() throws Exception {
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
     when(authorizer.isServiceAdmin()).thenReturn(true);
 
     IdpServiceAdminAuthorizationFilter filter =
         new IdpServiceAdminAuthorizationFilter(
             () -> Collections.singletonList(IdpServiceAdminAuthorizationFilter.BASIC_AUTHENTICATOR),
-            () -> authorizer,
-            () -> getMethod(IdpUserOperations.class, "getUser", String.class));
+            () -> authorizer);
     ContainerRequestContext requestContext = mockRequestContext("idp/users/alice");
 
     filter.filter(requestContext);
@@ -56,15 +53,14 @@ class TestIdpServiceAdminAuthorizationFilter {
   }
 
   @Test
-  void testRejectsNonServiceAdminOnAnnotatedGroupOperation() throws Exception {
+  void testRejectsNonServiceAdminOnIdpPath() throws Exception {
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
     when(authorizer.isServiceAdmin()).thenReturn(false);
 
     IdpServiceAdminAuthorizationFilter filter =
         new IdpServiceAdminAuthorizationFilter(
             () -> Collections.singletonList(IdpServiceAdminAuthorizationFilter.BASIC_AUTHENTICATOR),
-            () -> authorizer,
-            () -> getMethod(IdpGroupOperations.class, "getGroup", String.class));
+            () -> authorizer);
     ContainerRequestContext requestContext = mockRequestContext("idp/groups/engineering");
 
     filter.filter(requestContext);
@@ -83,10 +79,7 @@ class TestIdpServiceAdminAuthorizationFilter {
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
 
     IdpServiceAdminAuthorizationFilter filter =
-        new IdpServiceAdminAuthorizationFilter(
-            Collections::emptyList,
-            () -> authorizer,
-            () -> getMethod(IdpUserOperations.class, "addUser", AddUserRequest.class));
+        new IdpServiceAdminAuthorizationFilter(Collections::emptyList, () -> authorizer);
     ContainerRequestContext requestContext = mockRequestContext("idp/users");
 
     filter.filter(requestContext);
@@ -98,6 +91,22 @@ class TestIdpServiceAdminAuthorizationFilter {
     Assertions.assertEquals(
         IdpServiceAdminAuthorizationFilter.BASIC_AUTHENTICATOR_REQUIRED_MESSAGE,
         errorResponse.getMessage());
+    verify(authorizer, never()).isServiceAdmin();
+  }
+
+  @Test
+  void testSkipsNonIdpPaths() throws Exception {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+
+    IdpServiceAdminAuthorizationFilter filter =
+        new IdpServiceAdminAuthorizationFilter(
+            () -> Collections.singletonList(IdpServiceAdminAuthorizationFilter.BASIC_AUTHENTICATOR),
+            () -> authorizer);
+    ContainerRequestContext requestContext = mockRequestContext("metalakes");
+
+    filter.filter(requestContext);
+
+    verify(requestContext, never()).abortWith(any(Response.class));
     verify(authorizer, never()).isServiceAdmin();
   }
 
@@ -114,13 +123,5 @@ class TestIdpServiceAdminAuthorizationFilter {
         org.mockito.ArgumentCaptor.forClass(Response.class);
     verify(requestContext).abortWith(responseCaptor.capture());
     return responseCaptor.getValue();
-  }
-
-  private static Method getMethod(Class<?> clazz, String name, Class<?>... parameterTypes) {
-    try {
-      return clazz.getMethod(name, parameterTypes);
-    } catch (NoSuchMethodException e) {
-      throw new RuntimeException(e);
-    }
   }
 }

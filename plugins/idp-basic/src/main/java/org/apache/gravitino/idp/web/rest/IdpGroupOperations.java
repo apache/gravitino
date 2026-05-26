@@ -77,9 +77,6 @@ public class IdpGroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-idp-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-idp-group", absolute = true)
-  @IdpAuthorizationExpression(
-      expression = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_AUTHORIZATION_EXPRESSION,
-      errorMessage = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_REQUIRED_MESSAGE)
   public Response getGroup(@PathParam("group") String group) {
     try {
       return IdpRestUtils.doAs(
@@ -102,9 +99,6 @@ public class IdpGroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "add-idp-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-idp-group", absolute = true)
-  @IdpAuthorizationExpression(
-      expression = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_AUTHORIZATION_EXPRESSION,
-      errorMessage = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_REQUIRED_MESSAGE)
   public Response addGroup(AddGroupRequest request) {
     if (request == null) {
       return IdpRestExceptionHandlers.handleGroupException(
@@ -138,9 +132,6 @@ public class IdpGroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "remove-idp-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "remove-idp-group", absolute = true)
-  @IdpAuthorizationExpression(
-      expression = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_AUTHORIZATION_EXPRESSION,
-      errorMessage = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_REQUIRED_MESSAGE)
   public Response removeGroup(
       @PathParam("group") String group, @DefaultValue("false") @QueryParam("force") boolean force) {
     try {
@@ -164,9 +155,6 @@ public class IdpGroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "change-idp-group-membership." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "change-idp-group-membership", absolute = true)
-  @IdpAuthorizationExpression(
-      expression = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_AUTHORIZATION_EXPRESSION,
-      errorMessage = IdpServiceAdminAuthorizationFilter.SERVICE_ADMIN_REQUIRED_MESSAGE)
   public Response changeMembership(
       @PathParam("group") String group, GroupMembershipChangeRequest request) {
     if (request == null) {

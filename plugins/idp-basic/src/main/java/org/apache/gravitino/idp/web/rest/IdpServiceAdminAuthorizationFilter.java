@@ -19,18 +19,15 @@
 package org.apache.gravitino.idp.web.rest;
 
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Supplier;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.container.ResourceInfo;
-import javax.ws.rs.core.Context;
 import javax.ws.rs.ext.Provider;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.web.IdpRestUtils;
 
 /**
@@ -47,9 +44,6 @@ public class IdpServiceAdminAuthorizationFilter implements ContainerRequestFilte
   /** Authenticator name that enables built-in IdP management APIs. */
   public static final String BASIC_AUTHENTICATOR = "basic";
 
-  /** Authorization expression that matches the server-side service admin checks. */
-  public static final String SERVICE_ADMIN_AUTHORIZATION_EXPRESSION = "SERVICE_ADMIN";
-
   /** Error message when the caller is not a service admin. */
   public static final String SERVICE_ADMIN_REQUIRED_MESSAGE =
       "Only service admins can manage built-in IdP users and groups.";
@@ -60,25 +54,19 @@ public class IdpServiceAdminAuthorizationFilter implements ContainerRequestFilte
 
   private final Supplier<List<String>> authenticatorsSupplier;
   private final Supplier<GravitinoAuthorizer> authorizerSupplier;
-  private final Supplier<Method> resourceMethodSupplier;
-
-  @Context private ResourceInfo resourceInfo;
 
   /** Creates a filter backed by the running Gravitino server configuration and authorizer. */
   public IdpServiceAdminAuthorizationFilter() {
-    this.authenticatorsSupplier =
-        () -> GravitinoEnv.getInstance().config().get(Configs.AUTHENTICATORS);
-    this.authorizerSupplier = IdpServiceAdminAuthorizationFilter::resolveAuthorizer;
-    this.resourceMethodSupplier = this::resolveResourceMethod;
+    this(
+        () -> GravitinoEnv.getInstance().config().get(Configs.AUTHENTICATORS),
+        () -> GravitinoEnv.getInstance().gravitinoAuthorizer());
   }
 
   IdpServiceAdminAuthorizationFilter(
       Supplier<List<String>> authenticatorsSupplier,
-      Supplier<GravitinoAuthorizer> authorizerSupplier,
-      Supplier<Method> resourceMethodSupplier) {
+      Supplier<GravitinoAuthorizer> authorizerSupplier) {
     this.authenticatorsSupplier = authenticatorsSupplier;
     this.authorizerSupplier = authorizerSupplier;
-    this.resourceMethodSupplier = resourceMethodSupplier;
   }
 
   @Override
@@ -92,15 +80,13 @@ public class IdpServiceAdminAuthorizationFilter implements ContainerRequestFilte
       requestContext.abortWith(
           IdpRestUtils.notFound(
               BASIC_AUTHENTICATOR_REQUIRED_MESSAGE,
-              new org.apache.gravitino.idp.exception.NotFoundException(
-                  BASIC_AUTHENTICATOR_REQUIRED_MESSAGE)));
+              new NotFoundException(BASIC_AUTHENTICATOR_REQUIRED_MESSAGE)));
       return;
     }
 
     GravitinoAuthorizer authorizer = authorizerSupplier.get();
-    if (authorizer == null || !isAuthorized(authorizer)) {
-      String message = resolveAuthorizationFailureMessage();
-      requestContext.abortWith(IdpRestUtils.forbidden(message, null));
+    if (authorizer == null || !authorizer.isServiceAdmin()) {
+      requestContext.abortWith(IdpRestUtils.forbidden(SERVICE_ADMIN_REQUIRED_MESSAGE, null));
     }
   }
 
@@ -110,35 +96,5 @@ public class IdpServiceAdminAuthorizationFilter implements ContainerRequestFilte
 
   private static boolean isBasicAuthenticatorEnabled(List<String> authenticators) {
     return authenticators != null && authenticators.contains(BASIC_AUTHENTICATOR);
-  }
-
-  private boolean isAuthorized(GravitinoAuthorizer authorizer) {
-    IdpAuthorizationExpression expression = resolveAuthorizationExpression();
-    if (expression == null) {
-      return authorizer.isServiceAdmin();
-    }
-
-    return IdpAuthorizationExpressionEvaluator.evaluate(expression, authorizer);
-  }
-
-  private IdpAuthorizationExpression resolveAuthorizationExpression() {
-    Method method = resourceMethodSupplier.get();
-    return method == null ? null : method.getAnnotation(IdpAuthorizationExpression.class);
-  }
-
-  private Method resolveResourceMethod() {
-    return resourceInfo == null ? null : resourceInfo.getResourceMethod();
-  }
-
-  private String resolveAuthorizationFailureMessage() {
-    IdpAuthorizationExpression expression = resolveAuthorizationExpression();
-    if (expression != null && StringUtils.isNotBlank(expression.errorMessage())) {
-      return expression.errorMessage();
-    }
-    return SERVICE_ADMIN_REQUIRED_MESSAGE;
-  }
-
-  private static GravitinoAuthorizer resolveAuthorizer() {
-    return GravitinoEnv.getInstance().gravitinoAuthorizer();
   }
 }
