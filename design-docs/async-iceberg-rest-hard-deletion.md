@@ -126,9 +126,9 @@ doubles as the name-reuse tombstone (§5.7).
             │
             ▼
   IcebergTableOperationExecutor.dropTable
-            │  X-Gravitino-Async-Purge header (default: true)
+            │  X-Gravitino-Async-Purge header (absent ⇒ async)
       ┌─────┴───────────────┐
-      │ true (default)      │ X-Gravitino-Async-Purge: false
+      │ header absent       │ X-Gravitino-Async-Purge: false
       ▼                     ▼
  persist iceberg_purge_job   CatalogUtil.dropTableData
  row, return 204             (synchronous, on request thread)
@@ -141,10 +141,11 @@ doubles as the name-reuse tombstone (§5.7).
    → SUCCEEDED | FAILED
 ```
 
-The header is a boolean whose value is `true` or `false`; it defaults to
-`true`, so async is the default path. The synchronous path is retained only
-as a per-request fallback a client opts into with `X-Gravitino-Async-Purge:
-false`. The header name uses canonical HTTP casing (each word capitalized).
+The header is optional and has no default value: when it is **absent** —
+which is the case for any standard Iceberg client — the drop is async. A
+client opts into the synchronous fallback by sending
+`X-Gravitino-Async-Purge: false` (the header name uses canonical HTTP casing,
+each word capitalized).
 
 ### 5.2 User flow
 
@@ -407,7 +408,7 @@ land.
 
 Whether a given drop runs asynchronously is **not** a server config — it is a
 per-request **client** choice via the `X-Gravitino-Async-Purge` header
-(default async; `false` selects synchronous deletion). The server-side keys
+(absent ⇒ async; `false` selects synchronous deletion). The server-side keys
 only tune the worker pool and retries:
 
 | Key                                                           | Default  | Description                                                                  |
