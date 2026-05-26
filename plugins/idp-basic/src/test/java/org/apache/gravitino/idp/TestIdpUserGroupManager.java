@@ -35,6 +35,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.exception.AlreadyExistsException;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
@@ -49,6 +50,14 @@ import org.junit.jupiter.api.Test;
 public class TestIdpUserGroupManager {
 
   private static final String VALID_PASSWORD = "Passw0rd-1234";
+  private static final String ANOTHER_VALID_PASSWORD = "AnotherPass1!";
+  private static final String NEW_VALID_PASSWORD = "New-Password1!";
+
+  static {
+    IdpCredentialValidator.validatePassword(VALID_PASSWORD);
+    IdpCredentialValidator.validatePassword(ANOTHER_VALID_PASSWORD);
+    IdpCredentialValidator.validatePassword(NEW_VALID_PASSWORD);
+  }
 
   private static IdpUserGroupManager manager;
   private static Path h2Path;
@@ -93,7 +102,7 @@ public class TestIdpUserGroupManager {
     Assertions.assertTrue(user.groupNames().isEmpty());
 
     Assertions.assertThrows(
-        AlreadyExistsException.class, () -> manager.addUser("testAdd", "AnotherPass1!"));
+        AlreadyExistsException.class, () -> manager.addUser("testAdd", ANOTHER_VALID_PASSWORD));
   }
 
   @Test
@@ -120,7 +129,7 @@ public class TestIdpUserGroupManager {
   public void testChangePassword() throws IOException {
     manager.addUser("testChangePassword", VALID_PASSWORD);
 
-    Assertions.assertTrue(manager.changePassword("testChangePassword", "New-Password1!"));
+    Assertions.assertTrue(manager.changePassword("testChangePassword", NEW_VALID_PASSWORD));
     Assertions.assertEquals("testChangePassword", manager.getUser("testChangePassword").name());
 
     Assertions.assertFalse(manager.changePassword("not-exist", VALID_PASSWORD));
