@@ -59,6 +59,15 @@ To enable Basic mode:
   strings before starting Gravitino. Each password must be 12 to 64 characters long, and usernames
   must not contain `:`.
 
+For the client side, enable Basic mode with the following code:
+
+```java
+GravitinoClient client = GravitinoClient.builder(uri)
+    .withMetalake("metalake")
+    .withBasicAuth("admin", "YourSecureGravitinoPassword")
+    .build();
+```
+
 When using curl or other HTTP clients, authenticate with the `Authorization` header:
 
 ```shell
