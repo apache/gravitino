@@ -20,19 +20,19 @@ This documentation assumes familiarity with the Lance REST service setup as desc
 
 The following table outlines the tested compatibility between Gravitino versions and Lance connector versions:
 
-| Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions |
-|--------------------------------|--------------------------------|------------------------------|
-| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                |
-| 1.3.0                          | 0.1.0 - 0.4.0                  | 0.3.0 - 0.4.2                |
+| Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions                  |
+|--------------------------------|--------------------------------|-----------------------------------------------|
+| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
+| 1.3.0                          | 0.1.0 - 0.4.0                  | 0.3.0 - 0.4.2, 0.2.0 supports with conditions |
 
 :::note
 - These version ranges show which versions are expected to work together.
 - For Gravitino 1.3.0, the explicitly verified release versions are
   `lance-spark` {0.1.0, 0.1.1, 0.2.0, 0.4.0} and `lance-ray`
-  {0.3.0, 0.4.2}. lance-ray 0.2.0 and earlier are *not* supported on 1.3.0
+  {0.3.0, 0.4.2}. By default, lance-ray 0.2.0 and earlier are *not* supported on 1.3.0
   because pip resolves them with an older `lance-namespace` whose request
   schema is incompatible with the upgraded server-side `lance-namespace-core`
-  (0.7.5+).
+  (0.7.5+). But if can still use lance-ray 0.2.0 with Gravitino 1.3.0 by pining pylance to 3.x or 4.x; 
 - Before using in production, please test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::
