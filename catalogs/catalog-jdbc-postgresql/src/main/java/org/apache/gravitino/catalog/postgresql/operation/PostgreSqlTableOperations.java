@@ -718,13 +718,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   @Override
   protected ResultSet getIndexInfo(String schemaName, String tableName, DatabaseMetaData metaData)
       throws SQLException {
-    return metaData.getIndexInfo(database, schemaName, tableName, false, false);
+    return metaData.getIndexInfo(
+        metaData.getConnection().getCatalog(), schemaName, tableName, false, false);
   }
 
   @Override
   protected ResultSet getPrimaryKeys(String schemaName, String tableName, DatabaseMetaData metaData)
       throws SQLException {
-    return metaData.getPrimaryKeys(database, schemaName, tableName);
+    return metaData.getPrimaryKeys(metaData.getConnection().getCatalog(), schemaName, tableName);
   }
 
   @Override
@@ -739,14 +740,14 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   protected ResultSet getTable(Connection connection, String schema, String tableName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getTables(database, schema, tableName, null);
+    return metaData.getTables(connection.getCatalog(), schema, tableName, null);
   }
 
   @Override
   protected ResultSet getColumns(Connection connection, String schema, String tableName)
       throws SQLException {
     DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getColumns(database, schema, tableName, null);
+    return metaData.getColumns(connection.getCatalog(), schema, tableName, null);
   }
 
   @Override
