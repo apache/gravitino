@@ -467,7 +467,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
         .build();
   }
 
-  private GenericTable toGenericTable(TableEntity tableEntity) {
+  protected GenericTable toGenericTable(TableEntity tableEntity) {
     return GenericTable.builder()
         .withName(tableEntity.name())
         .withComment(tableEntity.comment())
@@ -482,7 +482,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
         .build();
   }
 
-  private List<ColumnEntity> toColumnEntities(
+  protected List<ColumnEntity> toColumnEntities(
       Column[] columns, AuditInfo audit, IdGenerator idGenerator) {
     return columns == null
         ? Collections.emptyList()

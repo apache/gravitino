@@ -178,19 +178,12 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
                 null);
     Assertions.assertEquals(createdTable.name(), emptyTableName);
 
-    // Now try to alter the property LANCE_TABLE_CREATE_EMPTY
-    IllegalArgumentException e =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .alterTable(
-                        nameIdentifier,
-                        TableChange.setProperty(LANCE_TABLE_CREATE_EMPTY, "false")));
-
-    Assertions.assertTrue(
-        e.getMessage().contains("Property lance.create-empty is immutable or reserved"));
+    // Verify that LANCE_TABLE_CREATE_EMPTY property can be altered (it is mutable)
+    Table alteredTable =
+        catalog
+            .asTableCatalog()
+            .alterTable(nameIdentifier, TableChange.setProperty(LANCE_TABLE_CREATE_EMPTY, "false"));
+    Assertions.assertEquals("false", alteredTable.properties().get(LANCE_TABLE_CREATE_EMPTY));
   }
 
   @Test

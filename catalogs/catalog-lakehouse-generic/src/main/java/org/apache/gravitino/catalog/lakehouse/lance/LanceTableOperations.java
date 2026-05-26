@@ -19,10 +19,13 @@
 package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_CREATE_EMPTY;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -32,18 +35,24 @@ import java.util.stream.Collectors;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
+import org.apache.gravitino.connector.GenericColumn;
 import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -52,6 +61,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
 import org.lance.WriteParams;
@@ -111,6 +121,91 @@ public class LanceTableOperations extends ManagedTableOperations {
   public void setCatalogProperties(Map<String, String> catalogProperties) {
     this.catalogProperties =
         catalogProperties == null ? Map.of() : ImmutableMap.copyOf(catalogProperties);
+  }
+
+  @Override
+  public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
+    Table table = super.loadTable(ident);
+    if (Boolean.parseBoolean(table.properties().get(LANCE_TABLE_CREATE_EMPTY))) {
+      return healCreateEmptyTable(ident, table);
+    }
+    return table;
+  }
+
+  private Column[] readSchemaFromLanceDataset(String location, Map<String, String> storageOptions) {
+    try (Dataset dataset = openDataset(location, storageOptions)) {
+      List<Field> fields = dataset.getSchema().getFields();
+      if (fields.isEmpty()) {
+        return null;
+      }
+      return fields.stream()
+          .map(
+              field ->
+                  GenericColumn.builder()
+                      .withName(field.getName())
+                      .withType(LanceDataTypeConverter.CONVERTER.toGravitino(field))
+                      .withNullable(field.isNullable())
+                      .build())
+          .toArray(Column[]::new);
+    } catch (Exception e) {
+      LOG.warn("Failed to read schema from Lance dataset at {}, skipping heal", location, e);
+      return null;
+    }
+  }
+
+  private Table healCreateEmptyTable(NameIdentifier ident, Table table) {
+    String location = table.properties().get(Table.PROPERTY_LOCATION);
+    if (StringUtils.isBlank(location)) {
+      return table;
+    }
+
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    Column[] columns = readSchemaFromLanceDataset(location, storageOptions);
+    if (columns == null || columns.length == 0) {
+      return table;
+    }
+
+    try {
+      AuditInfo auditInfo =
+          AuditInfo.builder()
+              .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+              .withCreateTime(Instant.now())
+              .build();
+      List<ColumnEntity> columnEntities = toColumnEntities(columns, auditInfo, idGenerator());
+
+      TableEntity updatedEntity =
+          store()
+              .update(
+                  ident,
+                  TableEntity.class,
+                  Entity.EntityType.TABLE,
+                  oldEntity -> {
+                    Map<String, String> newProps = new HashMap<>(oldEntity.properties());
+                    newProps.remove(LANCE_TABLE_CREATE_EMPTY);
+                    return TableEntity.builder()
+                        .withId(oldEntity.id())
+                        .withName(oldEntity.name())
+                        .withNamespace(oldEntity.namespace())
+                        .withComment(oldEntity.comment())
+                        .withColumns(columnEntities)
+                        .withProperties(newProps)
+                        .withPartitioning(oldEntity.partitioning())
+                        .withDistribution(oldEntity.distribution())
+                        .withSortOrders(oldEntity.sortOrders())
+                        .withIndexes(oldEntity.indexes())
+                        .withAuditInfo(oldEntity.auditInfo())
+                        .build();
+                  });
+
+      return toGenericTable(updatedEntity);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Table {} not found during heal, returning as-is", ident);
+      return table;
+    } catch (IOException e) {
+      LOG.warn("Failed to heal create-empty table {}", ident, e);
+      return table;
+    }
   }
 
   @Override

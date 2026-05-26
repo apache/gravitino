@@ -71,7 +71,7 @@ public class LanceTableDelegator implements LakehouseTableDelegator {
             LANCE_TABLE_CREATE_EMPTY,
             "Whether this is a lance create empty table (declare table) operation.",
             false,
-            true /* immutable */,
+            false /* immutable */,
             false /* defaultValue */,
             false /* hidden */,
             false));
