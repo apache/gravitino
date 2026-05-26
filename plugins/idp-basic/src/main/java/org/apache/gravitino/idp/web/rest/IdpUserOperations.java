@@ -20,6 +20,7 @@ package org.apache.gravitino.idp.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -30,13 +31,11 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
-import org.apache.gravitino.idp.dto.util.IdpDTOConverters;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpOperationType;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
@@ -51,13 +50,8 @@ public class IdpUserOperations {
 
   @Context private HttpServletRequest httpRequest;
 
-  public IdpUserOperations() {
-    this(
-        new IdpUserGroupManager(
-            GravitinoEnv.getInstance().config(), GravitinoEnv.getInstance().idGenerator()));
-  }
-
-  IdpUserOperations(IdpUserGroupManager userGroupManager) {
+  @Inject
+  public IdpUserOperations(IdpUserGroupManager userGroupManager) {
     this.userGroupManager = userGroupManager;
   }
 
@@ -69,9 +63,7 @@ public class IdpUserOperations {
   public Response getUser(@PathParam("user") String user) {
     return IdpRESTUtils.doAs(
         httpRequest,
-        () ->
-            IdpRESTUtils.ok(
-                new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user)))),
+        () -> IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO())),
         "user",
         IdpOperationType.GET,
         user);
@@ -88,8 +80,7 @@ public class IdpUserOperations {
           request.validate();
           return IdpRESTUtils.ok(
               new IdpUserResponse(
-                  IdpDTOConverters.toDTO(
-                      userGroupManager.addUser(request.getUser(), request.getPassword()))));
+                  userGroupManager.addUser(request.getUser(), request.getPassword()).toDTO()));
         },
         "user",
         IdpOperationType.ADD,
@@ -107,8 +98,7 @@ public class IdpUserOperations {
         () -> {
           request.validate();
           userGroupManager.changePassword(user, request.getPassword());
-          return IdpRESTUtils.ok(
-              new IdpUserResponse(IdpDTOConverters.toDTO(userGroupManager.getUser(user))));
+          return IdpRESTUtils.ok(new IdpUserResponse(userGroupManager.getUser(user).toDTO()));
         },
         "user",
         IdpOperationType.UPDATE,

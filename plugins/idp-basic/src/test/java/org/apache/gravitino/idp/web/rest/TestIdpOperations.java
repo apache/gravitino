@@ -34,7 +34,6 @@ import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
@@ -80,19 +79,20 @@ class TestIdpOperations extends JerseyTest {
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteUser()).thenReturn(null);
-    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
-    when(authorizer.isServiceAdmin()).thenReturn(true);
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(new IdpUserOperations(MANAGER));
-    resourceConfig.register(new IdpGroupOperations(MANAGER));
+    resourceConfig.register(IdpUserOperations.class);
+    resourceConfig.register(IdpGroupOperations.class);
     resourceConfig.register(
         new IdpAuthorizationFilter(
-            () -> List.of(IdpAuthorizationFilter.BASIC_AUTHENTICATOR), () -> authorizer));
+            () -> List.of(IdpAuthorizationFilter.BASIC_AUTHENTICATOR),
+            () -> List.of("admin"),
+            () -> "admin"));
     resourceConfig.register(
         new AbstractBinder() {
           @Override
           protected void configure() {
+            bind(MANAGER).to(IdpUserGroupManager.class);
             bind(request).to(HttpServletRequest.class);
           }
         });
@@ -168,13 +168,13 @@ class TestIdpOperations extends JerseyTest {
         new GroupMembershipChangeRequest(new String[] {"user1", "user2"}, null);
     when(MANAGER.changeGroupMembership("group1", Arrays.asList("user1", "user2"), null))
         .thenReturn(buildGroup("group1", Arrays.asList("user1", "user2")));
-    assertStatus(Response.Status.OK, put("/idp/groups/group1/add", addReq));
+    assertStatus(Response.Status.OK, put("/idp/groups/group1/users", addReq));
 
     GroupMembershipChangeRequest removeReq =
         new GroupMembershipChangeRequest(null, new String[] {"user1", "user2"});
     when(MANAGER.changeGroupMembership("group1", null, Arrays.asList("user1", "user2")))
         .thenReturn(buildGroup("group1"));
-    assertStatus(Response.Status.OK, put("/idp/groups/group1/remove", removeReq));
+    assertStatus(Response.Status.OK, put("/idp/groups/group1/users", removeReq));
   }
 
   @Test

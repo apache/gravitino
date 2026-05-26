@@ -20,6 +20,7 @@ package org.apache.gravitino.idp.model;
 
 import java.util.List;
 import java.util.Objects;
+import org.apache.gravitino.idp.dto.IdpGroupDTO;
 
 /** Built-in IdP group. */
 public class IdpGroup {
@@ -46,6 +47,15 @@ public class IdpGroup {
   /** Returns the usernames in the group. */
   public List<String> usernames() {
     return usernames;
+  }
+
+  /**
+   * Converts this group to a REST DTO.
+   *
+   * @return the group DTO
+   */
+  public IdpGroupDTO toDTO() {
+    return IdpGroupDTO.builder().withName(name).withUsers(usernames).build();
   }
 
   @Override
