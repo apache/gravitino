@@ -23,13 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
@@ -39,6 +39,9 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
@@ -58,11 +61,7 @@ class TestServiceAdminInitializer {
 
   @Test
   void testInitializeCreatesMissingServiceAdmin() throws IOException {
-    config.loadFromMap(
-        ImmutableMap.of(
-            "gravitino.authenticators", "basic",
-            "gravitino.authorization.serviceAdmins", "admin1,admin2"),
-        t -> true);
+    loadConfig("basic", "admin1,admin2");
     when(userMetaService.idpUserExists("admin1")).thenReturn(false);
     when(userMetaService.idpUserExists("admin2")).thenReturn(true);
     when(passwordHasher.hash("Passw0rd-For-Admin1")).thenReturn("hashed-password");
@@ -77,43 +76,26 @@ class TestServiceAdminInitializer {
     assertEquals("hashed-password", userPO.getPasswordHash());
     assertEquals(42L, userPO.getUserId());
     assertEquals(POConverters.INIT_VERSION, userPO.getCurrentVersion());
-    verify(userMetaService, times(1)).insertIdpUser(any());
     verify(passwordHasher).hash("Passw0rd-For-Admin1");
   }
 
   @Test
   void testInitializeSkipsWhenBasicAuthenticatorDisabledEvenIfPayloadInvalid() throws IOException {
-    config.loadFromMap(
-        ImmutableMap.of(
-            "gravitino.authenticators", "simple",
-            "gravitino.authorization.serviceAdmins", "admin1"),
-        t -> true);
-
+    loadConfig("simple", "admin1");
     initialize("not-json");
-
     verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
   }
 
   @Test
   void testInitializeSkipsWhenNoServiceAdminsConfigured() throws IOException {
-    config.loadFromMap(
-        ImmutableMap.of(
-            "gravitino.authenticators", "basic",
-            "gravitino.authorization.serviceAdmins", ""),
-        t -> true);
-
+    loadConfig("basic", "");
     initialize("[\"admin1:Passw0rd-For-Admin1\"]");
-
     verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
   }
 
   @Test
   void testInitializeSkipsWhenAllServiceAdminsAlreadyExist() throws IOException {
-    config.loadFromMap(
-        ImmutableMap.of(
-            "gravitino.authenticators", "basic",
-            "gravitino.authorization.serviceAdmins", "admin1,admin2"),
-        t -> true);
+    loadConfig("basic", "admin1,admin2");
     when(userMetaService.idpUserExists("admin1")).thenReturn(true);
     when(userMetaService.idpUserExists("admin2")).thenReturn(true);
 
@@ -127,11 +109,7 @@ class TestServiceAdminInitializer {
 
   @Test
   void testInitializeFailsWhenRequiredPasswordMissing() throws IOException {
-    config.loadFromMap(
-        ImmutableMap.of(
-            "gravitino.authenticators", "basic",
-            "gravitino.authorization.serviceAdmins", "admin1"),
-        t -> true);
+    loadConfig("basic", "admin1");
     when(userMetaService.idpUserExists("admin1")).thenReturn(false);
 
     IllegalArgumentException exception =
@@ -144,96 +122,45 @@ class TestServiceAdminInitializer {
     verify(userMetaService, never()).insertIdpUser(any());
   }
 
-  @Test
-  void testInitializeFailsWhenPasswordPayloadIsInvalidJson() {
-    config.loadFromMap(
-        ImmutableMap.of(
-            "gravitino.authenticators", "basic",
-            "gravitino.authorization.serviceAdmins", "admin1"),
-        t -> true);
+  @ParameterizedTest
+  @MethodSource("invalidPasswordPayloads")
+  void testInitializeFailsOnInvalidPasswordPayload(String payload, String expectedMessage) {
+    loadConfig("basic", "admin1");
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> initialize("not-json"));
+        assertThrows(IllegalArgumentException.class, () -> initialize(payload));
 
-    assertEquals(
-        "GRAVITINO_INITIAL_ADMIN_PASSWORD must be a JSON array of 'username:password' strings",
-        exception.getMessage());
+    assertEquals(expectedMessage, exception.getMessage());
     verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
   }
 
-  @Test
-  void testInitializeFailsWhenPasswordPayloadEntryFormatInvalid() {
-    config.loadFromMap(
-        ImmutableMap.of(
-            "gravitino.authenticators", "basic",
-            "gravitino.authorization.serviceAdmins", "admin1"),
-        t -> true);
-
-    IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> initialize("[\"admin1\"]"));
-
-    assertEquals(
-        "GRAVITINO_INITIAL_ADMIN_PASSWORD entry 'admin1' must use the format username:password",
-        exception.getMessage());
-    verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
+  private static Stream<Arguments> invalidPasswordPayloads() {
+    return Stream.of(
+        Arguments.of(
+            "not-json",
+            "GRAVITINO_INITIAL_ADMIN_PASSWORD must be a JSON array of 'username:password' strings"),
+        Arguments.of(
+            "[\"admin1\"]",
+            "GRAVITINO_INITIAL_ADMIN_PASSWORD entry 'admin1' must use the format username:password"),
+        Arguments.of(
+            "[\"other:Passw0rd-For-Other\"]",
+            "GRAVITINO_INITIAL_ADMIN_PASSWORD entry 'other' is not a configured service admin"),
+        Arguments.of(
+            "[\"admin1:Passw0rd-For-Admin1\",\"admin1:Passw0rd-For-Admin1-Another\"]",
+            "GRAVITINO_INITIAL_ADMIN_PASSWORD contains duplicate entries for service admin admin1"),
+        Arguments.of("[\"admin1:short\"]", "Password length must be at least 12 characters"));
   }
 
-  @Test
-  void testInitializeFailsWhenPasswordPayloadContainsUnknownAdmin() {
+  private void loadConfig(String authenticators, String serviceAdmins) {
     config.loadFromMap(
         ImmutableMap.of(
-            "gravitino.authenticators", "basic",
-            "gravitino.authorization.serviceAdmins", "admin1"),
+            "gravitino.authenticators", authenticators,
+            "gravitino.authorization.serviceAdmins", serviceAdmins),
         t -> true);
-
-    IllegalArgumentException exception =
-        assertThrows(
-            IllegalArgumentException.class, () -> initialize("[\"other:Passw0rd-For-Other\"]"));
-
-    assertEquals(
-        "GRAVITINO_INITIAL_ADMIN_PASSWORD entry 'other' is not a configured service admin",
-        exception.getMessage());
-    verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
-  }
-
-  @Test
-  void testInitializeFailsWhenPasswordPayloadContainsDuplicateAdmin() {
-    config.loadFromMap(
-        ImmutableMap.of(
-            "gravitino.authenticators", "basic",
-            "gravitino.authorization.serviceAdmins", "admin1"),
-        t -> true);
-
-    IllegalArgumentException exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                initialize(
-                    "[\"admin1:Passw0rd-For-Admin1\",\"admin1:Passw0rd-For-Admin1-Another\"]"));
-
-    assertEquals(
-        "GRAVITINO_INITIAL_ADMIN_PASSWORD contains duplicate entries for service admin admin1",
-        exception.getMessage());
-    verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
-  }
-
-  @Test
-  void testInitializeFailsWhenPasswordDoesNotSatisfyPolicy() {
-    config.loadFromMap(
-        ImmutableMap.of(
-            "gravitino.authenticators", "basic",
-            "gravitino.authorization.serviceAdmins", "admin1"),
-        t -> true);
-
-    IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> initialize("[\"admin1:short\"]"));
-
-    assertEquals("Password length must be at least 12 characters", exception.getMessage());
-    verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
   }
 
   private void initialize(@Nullable String initialAdminPasswords) throws IOException {
-    ServiceAdminInitializer.getInstance()
-        .initialize(config, userMetaService, passwordHasher, idGenerator, initialAdminPasswords);
+    ServiceAdminInitializer.initialize(
+        config, userMetaService, passwordHasher, idGenerator, initialAdminPasswords);
   }
 }

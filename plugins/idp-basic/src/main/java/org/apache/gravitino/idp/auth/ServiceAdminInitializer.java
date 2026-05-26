@@ -43,7 +43,7 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 
 /** Initializes configured service admins in the built-in IdP during server startup. */
-public class ServiceAdminInitializer {
+public final class ServiceAdminInitializer {
 
   static final String INITIAL_ADMIN_PASSWORD_ENV = "GRAVITINO_INITIAL_ADMIN_PASSWORD";
 
@@ -51,25 +51,12 @@ public class ServiceAdminInitializer {
 
   private ServiceAdminInitializer() {}
 
-  private static class InstanceHolder {
-    private static final ServiceAdminInitializer INSTANCE = new ServiceAdminInitializer();
-  }
-
-  /**
-   * Get the singleton instance of the ServiceAdminInitializer.
-   *
-   * @return The singleton instance of the ServiceAdminInitializer.
-   */
-  public static ServiceAdminInitializer getInstance() {
-    return InstanceHolder.INSTANCE;
-  }
-
   /**
    * Initialize the service admins using the current runtime environment.
    *
    * @param config The configuration object to initialize the service admins.
    */
-  public void initialize(Config config) throws IOException {
+  public static void initialize(Config config) throws IOException {
     initialize(
         config,
         IdpUserMetaService.getInstance(),
@@ -78,7 +65,7 @@ public class ServiceAdminInitializer {
         System.getenv(INITIAL_ADMIN_PASSWORD_ENV));
   }
 
-  void initialize(
+  static void initialize(
       Config config,
       IdpUserMetaService userMetaService,
       PasswordHasher passwordHasher,
@@ -108,18 +95,9 @@ public class ServiceAdminInitializer {
           "Missing initial password for configured service admin %s; declare %s",
           serviceAdmin,
           INITIAL_ADMIN_PASSWORD_ENV);
-      initializeServiceAdmin(serviceAdmin, password, userMetaService, passwordHasher, idGenerator);
+      userMetaService.insertIdpUser(
+          newUserPO(serviceAdmin, passwordHasher.hash(password), idGenerator));
     }
-  }
-
-  private void initializeServiceAdmin(
-      String userName,
-      String password,
-      IdpUserMetaService userMetaService,
-      PasswordHasher passwordHasher,
-      IdGenerator idGenerator)
-      throws IOException {
-    userMetaService.insertIdpUser(newUserPO(userName, passwordHasher.hash(password), idGenerator));
   }
 
   private static IdpUserPO newUserPO(
@@ -134,11 +112,11 @@ public class ServiceAdminInitializer {
         .build();
   }
 
-  private boolean enabledBasicAuthenticator(Config config) {
+  private static boolean enabledBasicAuthenticator(Config config) {
     return config.get(Configs.AUTHENTICATORS).contains(BASIC_AUTHENTICATOR);
   }
 
-  private List<String> configuredServiceAdmins(Config config) {
+  private static List<String> configuredServiceAdmins(Config config) {
     List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
     if (serviceAdmins == null || serviceAdmins.isEmpty()) {
       return ImmutableList.of();
@@ -146,7 +124,7 @@ public class ServiceAdminInitializer {
     return ImmutableList.copyOf(serviceAdmins);
   }
 
-  private Map<String, String> parseInitialAdminPasswords(
+  private static Map<String, String> parseInitialAdminPasswords(
       List<String> serviceAdmins, @Nullable String initialAdminPasswords) {
     if (StringUtils.isBlank(initialAdminPasswords)) {
       return ImmutableMap.of();
@@ -196,12 +174,12 @@ public class ServiceAdminInitializer {
     return ImmutableMap.copyOf(passwordsByAdmin);
   }
 
-  private void validateUserName(String userName) {
+  private static void validateUserName(String userName) {
     Preconditions.checkArgument(StringUtils.isNotBlank(userName), "User name is required");
     Preconditions.checkArgument(!userName.contains(":"), "User name cannot contain ':'");
   }
 
-  private void validatePassword(String password) {
+  private static void validatePassword(String password) {
     Preconditions.checkArgument(StringUtils.isNotBlank(password), "Password is required");
     Preconditions.checkArgument(
         password.length() >= 12, "Password length must be at least 12 characters");

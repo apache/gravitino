@@ -19,13 +19,26 @@
 
 package org.apache.gravitino.idp;
 
-import org.apache.gravitino.idp.storage.IdpStorageBootstrap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
 import org.apache.gravitino.server.plugin.ServerPluginBootstrap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/** Server plugin bootstrap for the built-in IdP (idp-basic). */
+/**
+ * Server plugin bootstrap for the built-in IdP (idp-basic).
+ *
+ * <p>Initializes configured service admins once per JVM when the plugin is on the server classpath.
+ */
 public final class IdpServerPluginBootstrap implements ServerPluginBootstrap {
 
+  private static final Logger LOG = LoggerFactory.getLogger(IdpServerPluginBootstrap.class);
+
   private static final String NAME = "idp-basic";
+
+  private static final AtomicBoolean INITIALIZED = new AtomicBoolean(false);
 
   @Override
   public String name() {
@@ -33,7 +46,22 @@ public final class IdpServerPluginBootstrap implements ServerPluginBootstrap {
   }
 
   @Override
-  public void initializeOnce() {
-    IdpStorageBootstrap.initializeOnce();
+  public void initializeOnce() throws Exception {
+    if (!INITIALIZED.compareAndSet(false, true)) {
+      return;
+    }
+
+    Config config = GravitinoEnv.getInstance().config();
+    try {
+      ServiceAdminInitializer.initialize(config);
+    } catch (RuntimeException e) {
+      INITIALIZED.set(false);
+      LOG.error("Failed to initialize built-in IdP plugin", e);
+      throw e;
+    } catch (Exception e) {
+      INITIALIZED.set(false);
+      LOG.error("Failed to initialize built-in IdP plugin", e);
+      throw e;
+    }
   }
 }

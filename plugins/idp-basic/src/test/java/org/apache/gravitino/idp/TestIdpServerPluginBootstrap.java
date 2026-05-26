@@ -17,21 +17,29 @@
  * under the License.
  */
 
-package org.apache.gravitino.server.plugin;
+package org.apache.gravitino.idp;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ServiceLoader;
+import org.apache.gravitino.server.plugin.ServerPluginBootstrap;
 import org.junit.jupiter.api.Test;
 
-class TestServerPluginBootstrapper {
+class TestIdpServerPluginBootstrap {
 
   @Test
-  void testIdpBasicBootstrapIsDiscoverable() {
-    boolean foundIdpBasic =
+  void testRegisteredViaServiceLoader() {
+    ServerPluginBootstrap bootstrap =
         ServiceLoader.load(ServerPluginBootstrap.class).stream()
             .map(ServiceLoader.Provider::get)
-            .anyMatch(bootstrap -> "idp-basic".equals(bootstrap.name()));
-    assertTrue(foundIdpBasic, "idp-basic ServerPluginBootstrap should be on the test classpath");
+            .filter(provider -> "idp-basic".equals(provider.name()))
+            .findFirst()
+            .orElseThrow(
+                () ->
+                    new AssertionError(
+                        "IdpServerPluginBootstrap should be registered via META-INF/services"));
+    assertEquals("idp-basic", bootstrap.name());
+    assertTrue(bootstrap instanceof IdpServerPluginBootstrap);
   }
 }
