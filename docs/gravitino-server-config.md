@@ -20,69 +20,57 @@ The examples below show typical contents of `${GRAVITINO_HOME}/conf/gravitino.co
 
 ### Development
 
-Minimal configuration for local development using the embedded H2 backend. Most defaults are appropriate.
+Defaults are appropriate for local development with the embedded H2 backend. Opt in to the Iceberg REST server for local query-engine testing.
 
 ```properties
-# HTTP server (defaults shown for clarity)
-gravitino.server.webserver.host=0.0.0.0
-gravitino.server.webserver.httpPort=8090
-
-# Storage backend (H2 embedded, no setup required)
-gravitino.entity.store=relational
-gravitino.entity.store.relational=JDBCBackend
-gravitino.entity.store.relational.jdbcUrl=jdbc:h2
-gravitino.entity.store.relational.jdbcDriver=org.h2.Driver
-gravitino.entity.store.relational.jdbcUser=gravitino
-gravitino.entity.store.relational.jdbcPassword=gravitino
-
-# Iceberg REST server, useful for local query-engine testing (optional)
+# Iceberg REST server (in-memory catalog for local testing)
 gravitino.auxService.names=iceberg-rest
-gravitino.iceberg-rest.httpPort=9001
-gravitino.iceberg-rest.catalog-backend=memory
 gravitino.iceberg-rest.warehouse=/tmp/gravitino-iceberg-warehouse
+
+# Authentication defaults to `simple` mode (anonymous user).
+# See the Authentication section below to enable OAuth or Kerberos.
 ```
 
 ### Production
 
-Configuration tuned for production load with an externally managed MySQL backend, larger thread pools, and observability features enabled.
+Configuration for production load: externally managed MySQL backend, larger cache and lock limits, audit logging, and OAuth authentication. Properties matching their default values are omitted.
 
 ```properties
-# HTTP server (tuned for production load)
-gravitino.server.webserver.host=0.0.0.0
-gravitino.server.webserver.httpPort=8090
-gravitino.server.webserver.minThreads=32
-gravitino.server.webserver.maxThreads=400
-gravitino.server.webserver.threadPoolWorkQueueSize=200
-
-# Storage backend (externally managed MySQL)
-gravitino.entity.store=relational
-gravitino.entity.store.relational=JDBCBackend
+# Storage backend: externally managed MySQL (overrides default embedded H2)
 gravitino.entity.store.relational.jdbcUrl=jdbc:mysql://gravitino-db.example.com:3306/gravitino
 gravitino.entity.store.relational.jdbcDriver=com.mysql.cj.jdbc.Driver
-gravitino.entity.store.relational.jdbcUser=gravitino
+gravitino.entity.store.relational.jdbcUser=<your-mysql-user>
 gravitino.entity.store.relational.jdbcPassword=<set-via-secret-management>
 gravitino.entity.store.relational.maxConnections=200
-gravitino.entity.store.relational.storagePath=/opt/gravitino/data/jdbc
 
-# Tree lock limits sized for a larger metadata graph
+# Tree lock: sized for a larger metadata graph
 gravitino.lock.maxNodes=500000
 gravitino.lock.minNodes=5000
 
-# Cache with stats enabled for observability
-gravitino.cache.enabled=true
+# Cache: stats enabled for observability, larger capacity
 gravitino.cache.enableStats=true
 gravitino.cache.maxEntries=100000
 
 # Audit logging
 gravitino.audit.enabled=true
 
-# Iceberg REST server (using JDBC catalog backend in production)
+# Iceberg REST server with JDBC catalog backend (overrides default in-memory)
 gravitino.auxService.names=iceberg-rest
-gravitino.iceberg-rest.httpPort=9001
 gravitino.iceberg-rest.catalog-backend=jdbc
 gravitino.iceberg-rest.warehouse=s3://your-warehouse-bucket/
 
-# Authentication — see Authentication section below for the full property reference
+# Authentication: OAuth 2.0 / OIDC with JWKS-based token validation.
+# Example values shown for Azure AD; substitute your identity provider's URLs.
+# For Kerberos, simple auth, or static-key OAuth, see the Authentication section below.
+gravitino.authenticators=oauth
+gravitino.authenticator.oauth.provider=oidc
+gravitino.authenticator.oauth.tokenValidatorClass=org.apache.gravitino.server.authentication.JwksTokenValidator
+gravitino.authenticator.oauth.authority=https://login.microsoftonline.com/<tenant-id>/v2.0
+gravitino.authenticator.oauth.jwksUri=https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys
+gravitino.authenticator.oauth.clientId=<your-app-client-id>
+gravitino.authenticator.oauth.serviceAudience=<your-app-client-id-or-api-identifier>
+gravitino.authenticator.oauth.scope=openid profile email
+gravitino.authenticator.oauth.principalFields=preferred_username,email,sub
 ```
 
 Initialize the MySQL backend before starting the server. See [Storage Backend](#storage-backend) for the schema setup commands.
