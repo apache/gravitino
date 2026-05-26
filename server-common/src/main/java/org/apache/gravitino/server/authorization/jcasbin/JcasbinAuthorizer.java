@@ -116,18 +116,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinAuthorizer.class);
 
-  /** {@code subjectType} literal returned for {@code user_meta} rows. */
-  private static final String SUBJECT_TYPE_USER = "USER";
-
-  /** {@code subjectType} literal returned for {@code group_meta} rows. */
-  private static final String SUBJECT_TYPE_GROUP = "GROUP";
-
-  /** {@code subjectType} literal returned for {@code user_role_rel} rows. */
-  private static final String SUBJECT_TYPE_USER_ROLE = "USER_ROLE";
-
-  /** {@code subjectType} literal returned for {@code group_role_rel} rows. */
-  private static final String SUBJECT_TYPE_GROUP_ROLE = "GROUP_ROLE";
-
   /** Jcasbin enforcer is used for metadata authorization. */
   private Enforcer allowEnforcer;
 
@@ -373,7 +361,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   @Override
-  public boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+  public boolean isSelf(
+      Entity.EntityType type,
+      NameIdentifier nameIdentifier,
+      AuthorizationRequestContext requestContext) {
     String metalake = nameIdentifier.namespace().level(0);
     String currentUserName = PrincipalUtils.getCurrentUserName();
     if (Entity.EntityType.USER == type) {
@@ -388,31 +379,21 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         }
         long resolvedRoleId = roleId.get();
 
-        // Route through the same version-validated caches that authorize() / isOwner() use, so
-        // the role list comes from userRoleCache / groupRoleCache instead of an extra direct
-        // listEntitiesByRelation call against the EntityStore. The role-list DB queries
-        // (listRolesByUserId / listRolesByGroupId) are then deduplicated across repeated
-        // isSelf(ROLE) calls — and shared with authorize() — by the process-wide Caffeine
-        // caches. The fresh per-call AuthorizationRequestContext only scopes the version
-        // probes (getUserUpdatedAt / getGroupUpdatedAt), which are lightweight single-row
-        // SELECTs and are not the queries the issue calls out as redundant.
-        AuthorizationRequestContext ctx = new AuthorizationRequestContext();
-        Optional<UserUpdatedAt> userInfoOpt = loadUserInfo(metalake, currentUserName, ctx);
+        Optional<UserUpdatedAt> userInfoOpt =
+            loadUserInfo(metalake, currentUserName, requestContext);
         if (!userInfoOpt.isPresent()) {
           return false;
         }
         UserUpdatedAt userInfo = userInfoOpt.get();
         long userId = userInfo.getUserId();
 
-        // Direct user-role assignments via the version-validated cache.
         List<Long> directRoleIds = loadUserRoles(metalake, currentUserName, userId, userInfo);
         if (directRoleIds.contains(resolvedRoleId)) {
           return true;
         }
 
-        // Group-inherited assignments via the same cache path used by loadRolePrivilege.
         for (String groupname : currentPrincipalGroupNames()) {
-          List<Long> groupRoleIds = loadGroupRoles(metalake, groupname, userId, ctx);
+          List<Long> groupRoleIds = loadGroupRoles(metalake, groupname, userId, requestContext);
           if (groupRoleIds.contains(resolvedRoleId)) {
             return true;
           }
@@ -641,15 +622,24 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         MetadataObject metadataObject,
         String privilege,
         AuthorizationRequestContext requestContext) {
+      // OWNER does not consult JCasbin policies — it short-circuits to the owner cache in
+      // authorizeByJcasbin. Skip the fat prefetch and role-binding work when no non-OWNER
+      // privilege has been evaluated yet in this request.
+      boolean ownerOnly =
+          AuthConstants.OWNER.equals(privilege)
+              && requestContext.getPrefetchedRoleVersions() == null;
+
       long userId;
       UserUpdatedAt userInfo;
       try {
-        // Step 1a: lightweight UNION query — get userId + user.updated_at AND every group's
-        //          version in one round trip. Subsequent loadUserInfo / loadGroupInfo calls in
-        //          this request hit the per-request cache (0 DB queries).
-        Optional<UserUpdatedAt> userInfoOpt =
-            prefetchUserAndGroupInfo(
-                metalake, username, currentPrincipalGroupNames(), requestContext);
+        Optional<UserUpdatedAt> userInfoOpt;
+        if (ownerOnly || requestContext.getPrefetchedRoleVersions() != null) {
+          userInfoOpt = loadUserInfo(metalake, username, requestContext);
+        } else {
+          userInfoOpt =
+              prefetchUserAndGroupInfo(
+                  metalake, username, currentPrincipalGroupNames(), requestContext);
+        }
         if (!userInfoOpt.isPresent()) {
           LOG.debug("User {} not found in metalake {}", username, metalake);
           return false;
@@ -661,8 +651,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         return false;
       }
 
-      // Steps 1b→3: version-validated role loading — pass userInfo to avoid re-query
-      loadRolePrivilege(metalake, username, userId, userInfo, requestContext);
+      if (!ownerOnly) {
+        // Steps 1b→3: version-validated role loading (skipped for OWNER-only requests since
+        // the enforcer is not consulted on the OWNER short-circuit).
+        loadRolePrivilege(metalake, username, userId, userInfo, requestContext);
+      }
 
       // For requests such as CREATE SCHEMA, the metadata object may be null. This method
       // performs object-scoped authorization, so without a metadata object it cannot evaluate
@@ -764,14 +757,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    *       at the just-read user version, so the next {@link #loadUserRoles} call observes a
    *       version-validated cache hit.
    *   <li>{@code groupRoleCache} (process-wide) — same idea per group.
-   *   <li>{@code requestContext.prefetchedRoleVersions} — roleId → {@code role_meta.updated_at} map
+   *   <li>{@code requestContext.prefetchedRoleVersions} — roleId → {@link RoleUpdatedAt} map
    *       consumed by {@link #versionCheckAndLoadRoles} to skip its dedicated probe.
    * </ul>
    *
-   * <p>The SQL is guarded by {@code prefetchedRoleVersions}, not only by the user-info cache. OWNER
-   * checks can legitimately populate {@link #loadUserInfo} before the first privilege check in the
-   * same request; the fat prefetch must still run once so the role-relation and role-version probes
-   * are collapsed into this query.
+   * <p>The fat prefetch runs at most once per request, gated by {@code prefetchedRoleVersions}.
    */
   private Optional<UserUpdatedAt> prefetchUserAndGroupInfo(
       String metalake,
@@ -784,39 +774,31 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return loadUserInfo(metalake, username, requestContext);
     }
 
-    synchronized (requestContext) {
-      if (requestContext.getPrefetchedRoleVersions() != null) {
-        return loadUserInfo(metalake, username, requestContext);
-      }
+    List<AuthSubjectVersion> rows =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            m -> m.batchGetAuthSubjectsForUser(metalake, username, groupNames));
 
-      List<AuthSubjectVersion> rows =
-          SessionUtils.getWithoutCommit(
-              UserMetaMapper.class,
-              m -> m.batchGetAuthSubjectsForUser(metalake, username, groupNames));
+    UserUpdatedAt foundUser = null;
+    Map<String, GroupUpdatedAt> foundGroups = new HashMap<>();
+    Map<Long, RoleUpdatedAt> roleVersions = new HashMap<>();
+    LinkedHashSet<Long> userRoleIds = new LinkedHashSet<>();
+    Map<Long, LinkedHashSet<Long>> groupRoleIdsByGroupId = new HashMap<>();
 
-      // Pivot the flat result into per-subject buckets.
-      UserUpdatedAt foundUser = null;
-      long userUpdatedAtForRoles = 0L;
-      Map<String, GroupUpdatedAt> foundGroups = new HashMap<>();
-      // roleId -> RoleUpdatedAt (carries roleName too, needed by the policy reload path).
-      Map<Long, RoleUpdatedAt> roleVersions = new HashMap<>();
-      // Direct user role ids (ordered + de-duped).
-      LinkedHashSet<Long> userRoleIds = new LinkedHashSet<>();
-      // Group-inherited role ids, bucketed by parent group id.
-      Map<Long, LinkedHashSet<Long>> groupRoleIdsByGroupId = new HashMap<>();
-
-      for (AuthSubjectVersion row : rows) {
-        String t = row.getSubjectType();
-        if (SUBJECT_TYPE_USER.equals(t)) {
+    for (AuthSubjectVersion row : rows) {
+      switch (row.getSubjectType()) {
+        case USER:
           foundUser = new UserUpdatedAt(row.getId(), row.getUpdatedAt());
-          userUpdatedAtForRoles = row.getUpdatedAt();
-        } else if (SUBJECT_TYPE_GROUP.equals(t)) {
+          break;
+        case GROUP:
           foundGroups.put(row.getName(), new GroupUpdatedAt(row.getId(), row.getUpdatedAt()));
-        } else if (SUBJECT_TYPE_USER_ROLE.equals(t)) {
+          break;
+        case USER_ROLE:
           userRoleIds.add(row.getId());
           roleVersions.put(
               row.getId(), new RoleUpdatedAt(row.getId(), row.getName(), row.getUpdatedAt()));
-        } else if (SUBJECT_TYPE_GROUP_ROLE.equals(t)) {
+          break;
+        case GROUP_ROLE:
           Long parentGroupId = row.getParentId();
           if (parentGroupId != null) {
             groupRoleIdsByGroupId
@@ -825,47 +807,42 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
           }
           roleVersions.put(
               row.getId(), new RoleUpdatedAt(row.getId(), row.getName(), row.getUpdatedAt()));
-        }
+          break;
+        default:
+          break;
       }
-
-      Optional<UserUpdatedAt> foundUserOpt = Optional.ofNullable(foundUser);
-      requestContext.computeUserInfoIfAbsent(userKey, k -> foundUserOpt);
-
-      // Prime the per-request groupInfoCache (negative-cache absent groups too).
-      for (String groupName : groupNames) {
-        String groupKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupName);
-        final Optional<GroupUpdatedAt> groupValue = Optional.ofNullable(foundGroups.get(groupName));
-        requestContext.computeGroupInfoIfAbsent(groupKey, gk -> groupValue);
-      }
-
-      // Prime the process-wide userRoleCache with the fresh role id list at the current
-      // user version. The next loadUserRoles call will observe a version-validated cache hit
-      // and skip its listRolesByUserId DB fallback. Skipped when the user row is absent
-      // (no user means no role binding possible).
-      if (foundUser != null) {
-        userRoleCache.put(
-            JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username),
-            new CachedUserRoleRels(
-                foundUser.getUserId(), userUpdatedAtForRoles, new ArrayList<>(userRoleIds)));
-      }
-
-      // Prime the process-wide groupRoleCache per present group.
-      for (Map.Entry<String, GroupUpdatedAt> e : foundGroups.entrySet()) {
-        String gname = e.getKey();
-        GroupUpdatedAt ginfo = e.getValue();
-        LinkedHashSet<Long> ridSet =
-            groupRoleIdsByGroupId.getOrDefault(ginfo.getGroupId(), new LinkedHashSet<>());
-        groupRoleCache.put(
-            JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, gname),
-            new CachedGroupRoleRels(
-                ginfo.getGroupId(), ginfo.getUpdatedAt(), new ArrayList<>(ridSet)));
-      }
-
-      // Stash role versions for versionCheckAndLoadRoles to short-circuit its probe.
-      requestContext.setPrefetchedRoleVersions(roleVersions);
-
-      return foundUserOpt;
     }
+
+    Optional<UserUpdatedAt> foundUserOpt = Optional.ofNullable(foundUser);
+    requestContext.computeUserInfoIfAbsent(userKey, k -> foundUserOpt);
+
+    for (String groupName : groupNames) {
+      String groupKey = JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, groupName);
+      final Optional<GroupUpdatedAt> groupValue = Optional.ofNullable(foundGroups.get(groupName));
+      requestContext.computeGroupInfoIfAbsent(groupKey, gk -> groupValue);
+    }
+
+    if (foundUser != null) {
+      userRoleCache.put(
+          JcasbinAuthorizationCacheKeys.userRoleKey(metalake, username),
+          new CachedUserRoleRels(
+              foundUser.getUserId(), foundUser.getUpdatedAt(), new ArrayList<>(userRoleIds)));
+    }
+
+    for (Map.Entry<String, GroupUpdatedAt> e : foundGroups.entrySet()) {
+      String gname = e.getKey();
+      GroupUpdatedAt ginfo = e.getValue();
+      LinkedHashSet<Long> ridSet =
+          groupRoleIdsByGroupId.getOrDefault(ginfo.getGroupId(), new LinkedHashSet<>());
+      groupRoleCache.put(
+          JcasbinAuthorizationCacheKeys.groupRoleKey(metalake, gname),
+          new CachedGroupRoleRels(
+              ginfo.getGroupId(), ginfo.getUpdatedAt(), new ArrayList<>(ridSet)));
+    }
+
+    requestContext.setPrefetchedRoleVersions(roleVersions);
+
+    return foundUserOpt;
   }
 
   /**
@@ -1070,30 +1047,26 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       String metalake, List<Long> roleIds, AuthorizationRequestContext requestContext) {
     List<Long> uniqueRoleIds = roleIds.stream().distinct().collect(Collectors.toList());
 
-    List<RoleUpdatedAt> roleVersions;
     Map<Long, RoleUpdatedAt> prefetched = requestContext.getPrefetchedRoleVersions();
-    if (prefetched != null && prefetched.keySet().containsAll(uniqueRoleIds)) {
-      // Fat-JOIN prefetch already returned every role's updated_at; skip the dedicated
-      // batchGetRoleUpdatedAt probe and reuse the per-request map. Saves 1 DB round trip on
-      // the cache-warm path.
-      roleVersions = new ArrayList<>(uniqueRoleIds.size());
-      for (Long rid : uniqueRoleIds) {
-        roleVersions.add(prefetched.get(rid));
+    List<RoleUpdatedAt> roleVersions = new ArrayList<>(uniqueRoleIds.size());
+    List<Long> missingRoleIds = new ArrayList<>();
+    for (Long rid : uniqueRoleIds) {
+      RoleUpdatedAt rv = prefetched == null ? null : prefetched.get(rid);
+      if (rv != null) {
+        roleVersions.add(rv);
+      } else {
+        missingRoleIds.add(rid);
       }
-    } else {
-      // Step 3 fallback: batch fetch (roleId, roleName, updated_at) for all role IDs — 1 query.
-      roleVersions =
+    }
+    if (!missingRoleIds.isEmpty()) {
+      roleVersions.addAll(
           SessionUtils.getWithoutCommit(
-              RoleMetaMapper.class, m -> m.batchGetRoleUpdatedAt(uniqueRoleIds));
+              RoleMetaMapper.class, m -> m.batchGetRoleUpdatedAt(missingRoleIds)));
     }
 
-    // Detect roles that were deleted in the DB. Any roleId we asked about but did not get a
-    // version back for has been hard-deleted (or marked deleted at the storage layer); the
-    // corresponding p-rows in {@link #allowEnforcer} / {@link #denyEnforcer} would otherwise
-    // continue granting privileges to anyone whose userRoleCache snapshot still includes the
-    // role id (e.g. when role_meta is deleted without bumping user_meta.updated_at). Clearing
-    // the policies and evicting {@link #loadedRoles} ensures that even a stale grouping row
-    // grants nothing; the grouping row itself is pruned on the next userRoleCache reload.
+    // Any roleId asked about but not returned has been deleted in the DB; clear its policies so
+    // a stale grouping row in the enforcer can't keep granting privileges before the next
+    // userRoleCache reload prunes the g-row itself.
     Set<Long> existingRoleIds = new HashSet<>(roleVersions.size());
     for (RoleUpdatedAt rv : roleVersions) {
       existingRoleIds.add(rv.getRoleId());
@@ -1108,9 +1081,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     List<RoleUpdatedAt> staleRoleVersions = new ArrayList<>();
     for (RoleUpdatedAt rv : roleVersions) {
       Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(rv.getRoleId());
-
       if (cachedUpdatedAt.isPresent() && cachedUpdatedAt.get() >= rv.getUpdatedAt()) {
-        // Role policies are still current
         continue;
       }
       staleRoleVersions.add(rv);
@@ -1135,7 +1106,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     if (roleEntities == null) {
       roleEntities = new ArrayList<>();
     }
+    // Some EntityStore implementations don't support batchGet for ROLE and return empty;
+    // fall back to per-role get so policies still load.
     if (roleEntities.isEmpty()) {
+      roleEntities = new ArrayList<>(staleRoleVersions.size());
       for (RoleUpdatedAt rv : staleRoleVersions) {
         try {
           roleEntities.add(
@@ -1153,7 +1127,6 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
         staleRoleVersions.stream().collect(Collectors.toMap(RoleUpdatedAt::getRoleId, rv -> rv));
     for (RoleEntity roleEntity : roleEntities) {
       if (roleEntity == null) {
-        LOG.warn("entityStore.batchGet returned null role entity");
         continue;
       }
       RoleUpdatedAt rv = staleRoleVersionById.get(roleEntity.id());
@@ -1164,8 +1137,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       long dbUpdatedAt = rv.getUpdatedAt();
       Optional<Long> cachedUpdatedAt = loadedRoles.getIfPresent(roleId);
 
-      // Stale or missing: refresh only permission policies. Do not call deleteRole here because it
-      // also removes the current user's freshly bound grouping links.
+      // Refresh only permission policies. deleteRole would also remove the current user's freshly
+      // bound grouping links.
       if (cachedUpdatedAt.isPresent()) {
         clearRolePolicies(roleId);
       }

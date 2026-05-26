@@ -216,34 +216,6 @@ public class TestJcasbinAuthorizer {
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, 1000L));
 
-    // The hot path uses batchGetUserAndGroupUpdatedAt to fetch user + all group versions in one
-    // UNION query; synthesize its result from the per-subject getUserUpdatedAt /
-    // getGroupUpdatedAt stubs so tests can keep stubbing those at the per-subject granularity.
-    when(userMetaMapper.batchGetUserAndGroupUpdatedAt(anyString(), anyString(), anyList()))
-        .thenAnswer(
-            invocation -> {
-              String mlk = invocation.getArgument(0);
-              String uname = invocation.getArgument(1);
-              List<String> gNames = invocation.getArgument(2);
-              List<AuthSubjectVersion> rows = new ArrayList<>();
-              UserUpdatedAt u = userMetaMapper.getUserUpdatedAt(mlk, uname);
-              if (u != null) {
-                rows.add(
-                    new AuthSubjectVersion("USER", u.getUserId(), uname, u.getUpdatedAt(), null));
-              }
-              if (gNames != null) {
-                for (String gn : gNames) {
-                  GroupUpdatedAt g = groupMetaMapper.getGroupUpdatedAt(mlk, gn);
-                  if (g != null) {
-                    rows.add(
-                        new AuthSubjectVersion(
-                            "GROUP", g.getGroupId(), gn, g.getUpdatedAt(), null));
-                  }
-                }
-              }
-              return rows;
-            });
-
     // Fat-JOIN variant used by the cache-warm path: assemble user + groups + direct user roles
     // + group-inherited roles + role versions from the existing per-subject mocks. Lets tests
     // continue stubbing at the per-subject granularity.
@@ -255,15 +227,14 @@ public class TestJcasbinAuthorizer {
               List<String> gNames = invocation.getArgument(2);
               List<AuthSubjectVersion> rows = new ArrayList<>();
               UserUpdatedAt u = userMetaMapper.getUserUpdatedAt(mlk, uname);
-              // Always include role rows for every roleId returned by listRolesByUserId /
-              // listRolesByGroupId; production SQL is an INNER JOIN onto role_meta so any role
-              // in user_role_rel/group_role_rel is necessarily in role_meta. updated_at falls
-              // back to 0 when mockedRoleVersions has no entry (matches "role exists but version
-              // is unknown to this test"); downstream policy load relies on the entityStore.get
-              // stub set up per-test.
               if (u != null) {
                 rows.add(
-                    new AuthSubjectVersion("USER", u.getUserId(), uname, u.getUpdatedAt(), null));
+                    new AuthSubjectVersion(
+                        AuthSubjectVersion.Kind.USER,
+                        u.getUserId(),
+                        uname,
+                        u.getUpdatedAt(),
+                        null));
                 List<RolePO> directRoles = roleMetaMapper.listRolesByUserId(u.getUserId());
                 if (directRoles != null) {
                   for (RolePO rp : directRoles) {
@@ -271,7 +242,7 @@ public class TestJcasbinAuthorizer {
                     long roleUpdatedAt = rv != null ? rv.getUpdatedAt() : 0L;
                     rows.add(
                         new AuthSubjectVersion(
-                            "USER_ROLE",
+                            AuthSubjectVersion.Kind.USER_ROLE,
                             rp.getRoleId(),
                             rp.getRoleName(),
                             roleUpdatedAt,
@@ -285,7 +256,11 @@ public class TestJcasbinAuthorizer {
                   if (g != null) {
                     rows.add(
                         new AuthSubjectVersion(
-                            "GROUP", g.getGroupId(), gn, g.getUpdatedAt(), null));
+                            AuthSubjectVersion.Kind.GROUP,
+                            g.getGroupId(),
+                            gn,
+                            g.getUpdatedAt(),
+                            null));
                     List<RolePO> groupRoles = roleMetaMapper.listRolesByGroupId(g.getGroupId());
                     if (groupRoles != null) {
                       for (RolePO rp : groupRoles) {
@@ -293,7 +268,7 @@ public class TestJcasbinAuthorizer {
                         long roleUpdatedAt = rv != null ? rv.getUpdatedAt() : 0L;
                         rows.add(
                             new AuthSubjectVersion(
-                                "GROUP_ROLE",
+                                AuthSubjectVersion.Kind.GROUP_ROLE,
                                 rp.getRoleId(),
                                 rp.getRoleName(),
                                 roleUpdatedAt,
@@ -806,11 +781,15 @@ public class TestJcasbinAuthorizer {
     mockGroupWithRoles(GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of(groupRoleName));
 
     // isSelf should return true -- role is assigned to user's group
-    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+    assertTrue(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.ROLE, roleIdent, new AuthorizationRequestContext()));
 
     // A principal with no groups should fail
     setCurrentPrincipalWithGroup(null);
-    assertFalse(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+    assertFalse(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.ROLE, roleIdent, new AuthorizationRequestContext()));
 
     restoreDefaultPrincipal();
   }
@@ -835,8 +814,10 @@ public class TestJcasbinAuthorizer {
     Mockito.clearInvocations(roleMetaMapper);
 
     // 1st call: miss → listRolesByUserId; 2nd call: cache hit → no extra listRolesByUserId.
-    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
-    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+    AuthorizationRequestContext ctx1 = new AuthorizationRequestContext();
+    AuthorizationRequestContext ctx2 = new AuthorizationRequestContext();
+    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent, ctx1));
+    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent, ctx2));
 
     Mockito.verify(roleMetaMapper, Mockito.times(1)).listRolesByUserId(eq(USER_ID));
 
@@ -855,7 +836,9 @@ public class TestJcasbinAuthorizer {
     setCurrentPrincipalWithGroup(null);
     Mockito.clearInvocations(supportsRelationOperations);
 
-    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+    assertTrue(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.ROLE, roleIdent, new AuthorizationRequestContext()));
 
     Mockito.verify(supportsRelationOperations, Mockito.never())
         .listEntitiesByRelation(any(), any(), any());

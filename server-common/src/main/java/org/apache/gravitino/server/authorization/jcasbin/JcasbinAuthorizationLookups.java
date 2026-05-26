@@ -94,10 +94,9 @@ public class JcasbinAuthorizationLookups {
 
   /**
    * Two-tier owner lookup: request-level dedup first, then the shared {@code ownerRelCache}, and
-   * finally a single {@code owner_meta} query. Positive DB fetches populate both tiers so
-   * subsequent {@code isOwner} calls — in this request and later ones — hit the shared cache.
-   * Missing owners are cached only for the current request; otherwise a missed invalidation could
-   * keep a cross-request negative owner result stale until TTL expiry.
+   * finally a single {@code owner_meta} query. Positive DB fetches populate both tiers; missing
+   * owners are cached only for the current request to avoid pinning a cross-request negative result
+   * through a missed invalidation.
    */
   public Optional<OwnerInfo> resolveOwnerId(
       Long metadataId,

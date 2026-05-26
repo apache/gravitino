@@ -77,13 +77,8 @@ public class AuthorizationRequestContext {
 
   /**
    * Per-request roleId → {@link RoleUpdatedAt} map populated by the fat-JOIN prefetch on the
-   * authorize hot path. When present, the role-policy version probe can skip its dedicated {@code
-   * batchGetRoleUpdatedAt} round trip and use this map as the source of truth for {@code
-   * loadedRoles} cache staleness checks (the {@code roleName} on each entry is what subsequent
-   * {@code entityStore.get(NameIdentifier.ofRole(...))} reloads keys off of).
-   *
-   * <p>{@code null} means "prefetch did not run / did not populate role versions" — callers must
-   * fall back to the legacy per-call DB probe.
+   * authorize hot path. When present, {@code versionCheckAndLoadRoles} can skip its dedicated
+   * {@code batchGetRoleUpdatedAt} round trip.
    */
   private volatile Map<Long, RoleUpdatedAt> prefetchedRoleVersions;
 
@@ -199,20 +194,20 @@ public class AuthorizationRequestContext {
   }
 
   /**
-   * Returns the per-request roleId → {@link RoleUpdatedAt} map populated by the fat-JOIN prefetch,
-   * or {@code null} if no prefetch has been seeded for this request.
+   * Returns the prefetched roleId → {@link RoleUpdatedAt} map, or {@code null} when the fat-JOIN
+   * prefetch has not run for this request.
    *
-   * @return the prefetched role-version map or {@code null}
+   * @return the prefetched role-versions map or {@code null}
    */
   public Map<Long, RoleUpdatedAt> getPrefetchedRoleVersions() {
     return prefetchedRoleVersions;
   }
 
   /**
-   * Sets the per-request prefetched role-versions map; called once by the authorize hot path after
-   * the fat-JOIN prefetch.
+   * Sets the prefetched roleId → {@link RoleUpdatedAt} map; called once per request by the
+   * authorize hot path after the fat-JOIN prefetch.
    *
-   * @param prefetchedRoleVersions roleId → {@link RoleUpdatedAt}; immutable view recommended
+   * @param prefetchedRoleVersions roleId → {@link RoleUpdatedAt} map
    */
   public void setPrefetchedRoleVersions(Map<Long, RoleUpdatedAt> prefetchedRoleVersions) {
     this.prefetchedRoleVersions = prefetchedRoleVersions;

@@ -88,9 +88,14 @@ public interface GravitinoAuthorizer extends Closeable {
    *
    * @param type user or group
    * @param nameIdentifier name of user or group
+   * @param requestContext authorization request context; enables per-request dedup with other
+   *     authorization calls in the same request
    * @return authorization result
    */
-  boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier);
+  boolean isSelf(
+      Entity.EntityType type,
+      NameIdentifier nameIdentifier,
+      AuthorizationRequestContext requestContext);
 
   /**
    * Determine whether the user is the metalake user.

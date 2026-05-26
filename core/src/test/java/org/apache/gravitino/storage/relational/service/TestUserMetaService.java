@@ -1165,7 +1165,7 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void batchGetUserAndGroupUpdatedAt() throws IOException {
+  void batchGetAuthSubjectsForUser() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     BaseMetalake metalake =
@@ -1202,24 +1202,25 @@ class TestUserMetaService extends TestJDBCBackend {
     groupMetaService.insertGroup(groupA, false);
     groupMetaService.insertGroup(groupB, false);
 
-    // Case 1: user + multiple groups → UNION returns one row per subject.
+    // Case 1: user + multiple groups, no role bindings → one row per subject.
     List<AuthSubjectVersion> rows =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
             m ->
-                m.batchGetUserAndGroupUpdatedAt(
+                m.batchGetAuthSubjectsForUser(
                     metalakeName, "batchUser", Lists.newArrayList("batchGroupA", "batchGroupB")));
     assertEquals(3, rows.size());
     AuthSubjectVersion userRow =
-        rows.stream().filter(r -> "USER".equals(r.getSubjectType())).findFirst().orElseThrow();
+        rows.stream()
+            .filter(r -> AuthSubjectVersion.Kind.USER == r.getSubjectType())
+            .findFirst()
+            .orElseThrow();
     assertEquals(user.id(), userRow.getId());
     assertEquals("batchUser", userRow.getName());
-    // updated_at starts at 0 on insert and is bumped by touchUserUpdatedAt; the cache uses it
-    // as a version sentinel, not a wall-clock timestamp, so any value is acceptable here.
     assertTrue(userRow.getUpdatedAt() >= 0);
     List<AuthSubjectVersion> groupRows =
         rows.stream()
-            .filter(r -> "GROUP".equals(r.getSubjectType()))
+            .filter(r -> AuthSubjectVersion.Kind.GROUP == r.getSubjectType())
             .sorted(Comparator.comparing(AuthSubjectVersion::getName))
             .collect(java.util.stream.Collectors.toList());
     assertEquals(2, groupRows.size());
@@ -1228,26 +1229,24 @@ class TestUserMetaService extends TestJDBCBackend {
     assertEquals("batchGroupB", groupRows.get(1).getName());
     assertEquals(groupB.id(), groupRows.get(1).getId());
 
-    // Case 2: empty group list → user-only branch (no UNION, no foreach).
+    // Case 2: empty group list → user-only branch (no GROUP / GROUP_ROLE UNION).
     List<AuthSubjectVersion> userOnly =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            m ->
-                m.batchGetUserAndGroupUpdatedAt(
-                    metalakeName, "batchUser", Collections.emptyList()));
+            m -> m.batchGetAuthSubjectsForUser(metalakeName, "batchUser", Collections.emptyList()));
     assertEquals(1, userOnly.size());
-    assertEquals("USER", userOnly.get(0).getSubjectType());
+    assertEquals(AuthSubjectVersion.Kind.USER, userOnly.get(0).getSubjectType());
     assertEquals(user.id(), userOnly.get(0).getId());
 
-    // Case 3: missing user + missing group → row for whichever does exist; empty rows for others.
+    // Case 3: missing user + missing group → only the present group row is returned.
     List<AuthSubjectVersion> missing =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
             m ->
-                m.batchGetUserAndGroupUpdatedAt(
+                m.batchGetAuthSubjectsForUser(
                     metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup", "batchGroupA")));
     assertEquals(1, missing.size(), "Only the existing group should be returned");
-    assertEquals("GROUP", missing.get(0).getSubjectType());
+    assertEquals(AuthSubjectVersion.Kind.GROUP, missing.get(0).getSubjectType());
     assertEquals("batchGroupA", missing.get(0).getName());
 
     // Case 4: both user and groups missing → empty result.
@@ -1255,7 +1254,7 @@ class TestUserMetaService extends TestJDBCBackend {
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
             m ->
-                m.batchGetUserAndGroupUpdatedAt(
+                m.batchGetAuthSubjectsForUser(
                     metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup")));
     assertTrue(none.isEmpty());
   }

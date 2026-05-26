@@ -212,46 +212,6 @@ public class UserMetaBaseSQLProvider {
         + " AND um.deleted_at = 0";
   }
 
-  public String batchGetUserAndGroupUpdatedAt(
-      @Param("metalakeName") String metalakeName,
-      @Param("userName") String userName,
-      @Param("groupNames") List<String> groupNames) {
-    String userSelect =
-        "SELECT 'USER' as subjectType, um.user_id as id, um.user_name as name,"
-            + " um.updated_at as updatedAt"
-            + " FROM "
-            + USER_TABLE_NAME
-            + " um"
-            + " JOIN "
-            + MetalakeMetaMapper.TABLE_NAME
-            + " mm ON um.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
-            + " WHERE mm.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
-            + " AND um.deleted_at = 0";
-
-    if (groupNames == null || groupNames.isEmpty()) {
-      // Omit the GROUP branch entirely so the SQL stays portable across H2/MySQL/PostgreSQL
-      // and we avoid emitting an empty IN clause.
-      return userSelect;
-    }
-
-    return "<script>"
-        + userSelect
-        + " UNION ALL "
-        + "SELECT 'GROUP' as subjectType, gm.group_id as id, gm.group_name as name,"
-        + " gm.updated_at as updatedAt"
-        + " FROM "
-        + GROUP_TABLE_NAME
-        + " gm"
-        + " JOIN "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm2 ON gm.metalake_id = mm2.metalake_id AND mm2.deleted_at = 0"
-        + " WHERE mm2.metalake_name = #{metalakeName}"
-        + " AND gm.group_name IN"
-        + " <foreach item='g' collection='groupNames' open='(' separator=',' close=')'>#{g}</foreach>"
-        + " AND gm.deleted_at = 0"
-        + "</script>";
-  }
-
   public String batchGetAuthSubjectsForUser(
       @Param("metalakeName") String metalakeName,
       @Param("userName") String userName,

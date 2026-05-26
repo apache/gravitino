@@ -24,20 +24,21 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 /**
- * One row of the batched auth-subject probe. The {@code subjectType} literal column distinguishes
- * the row's kind:
+ * One row of the batched auth-subject probe. The {@link Kind} discriminator distinguishes the row's
+ * kind; the {@code id}, {@code name}, {@code updatedAt} and {@code parentId} fields are interpreted
+ * accordingly:
  *
  * <ul>
- *   <li>{@code "USER"}: {@code id} = {@code user_id}, {@code name} = {@code user_name}, {@code
+ *   <li>{@link Kind#USER}: {@code id} = {@code user_id}, {@code name} = {@code user_name}, {@code
  *       updatedAt} = {@code user_meta.updated_at}, {@code parentId} = {@code null}.
- *   <li>{@code "GROUP"}: {@code id} = {@code group_id}, {@code name} = {@code group_name}, {@code
- *       updatedAt} = {@code group_meta.updated_at}, {@code parentId} = {@code null}.
- *   <li>{@code "USER_ROLE"}: {@code id} = {@code role_id}, {@code name} = {@code role_name}, {@code
- *       updatedAt} = {@code role_meta.updated_at}, {@code parentId} = the owning {@code user_id}
- *       (lets the caller bucket multiple direct roles by their user).
- *   <li>{@code "GROUP_ROLE"}: {@code id} = {@code role_id}, {@code name} = {@code role_name},
+ *   <li>{@link Kind#GROUP}: {@code id} = {@code group_id}, {@code name} = {@code group_name},
+ *       {@code updatedAt} = {@code group_meta.updated_at}, {@code parentId} = {@code null}.
+ *   <li>{@link Kind#USER_ROLE}: {@code id} = {@code role_id}, {@code name} = {@code role_name},
  *       {@code updatedAt} = {@code role_meta.updated_at}, {@code parentId} = the owning {@code
- *       group_id} (lets the caller bucket inherited roles per group).
+ *       user_id}.
+ *   <li>{@link Kind#GROUP_ROLE}: {@code id} = {@code role_id}, {@code name} = {@code role_name},
+ *       {@code updatedAt} = {@code role_meta.updated_at}, {@code parentId} = the owning {@code
+ *       group_id}.
  * </ul>
  */
 @Getter
@@ -46,8 +47,20 @@ import lombok.Setter;
 @AllArgsConstructor
 public class AuthSubjectVersion {
 
-  /** {@code "USER"}, {@code "GROUP"}, {@code "USER_ROLE"}, or {@code "GROUP_ROLE"}. */
-  private String subjectType;
+  /** Discriminates the row's underlying subject kind. */
+  public enum Kind {
+    /** {@code user_meta} row. */
+    USER,
+    /** {@code group_meta} row. */
+    GROUP,
+    /** {@code user_role_rel} JOIN {@code role_meta} row; {@code parentId} is the owning user. */
+    USER_ROLE,
+    /** {@code group_role_rel} JOIN {@code role_meta} row; {@code parentId} is the owning group. */
+    GROUP_ROLE
+  }
+
+  /** Row kind discriminator; populated from the SQL literal in the UNION branches. */
+  private Kind subjectType;
 
   /** {@code user_id}, {@code group_id}, or {@code role_id}. */
   private long id;
@@ -59,8 +72,9 @@ public class AuthSubjectVersion {
   private long updatedAt;
 
   /**
-   * Owning subject id for role rows: {@code user_id} for {@code USER_ROLE} and {@code group_id} for
-   * {@code GROUP_ROLE}; {@code null} for {@code USER} / {@code GROUP} rows.
+   * Owning subject id for role rows: {@code user_id} for {@link Kind#USER_ROLE} and {@code
+   * group_id} for {@link Kind#GROUP_ROLE}; {@code null} for {@link Kind#USER} / {@link Kind#GROUP}
+   * rows.
    */
   private Long parentId;
 }
