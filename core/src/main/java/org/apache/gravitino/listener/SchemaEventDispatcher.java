@@ -79,7 +79,7 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
           new ListSchemaEvent(
               PrincipalUtils.getCurrentUserName(),
               namespace,
-              nameIdentifiers != null ? nameIdentifiers.length : 0));
+              nameIdentifiers != null ? nameIdentifiers.length : -1));
       return nameIdentifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(

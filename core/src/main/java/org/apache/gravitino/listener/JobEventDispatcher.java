@@ -81,7 +81,7 @@ public class JobEventDispatcher implements JobOperationDispatcher {
           new ListJobTemplatesEvent(
               PrincipalUtils.getCurrentUserName(),
               metalake,
-              jobTemplates != null ? jobTemplates.size() : 0));
+              jobTemplates != null ? jobTemplates.size() : -1));
       return jobTemplates;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -190,7 +190,7 @@ public class JobEventDispatcher implements JobOperationDispatcher {
               PrincipalUtils.getCurrentUserName(),
               metalake,
               jobTemplateName,
-              jobs != null ? jobs.size() : 0));
+              jobs != null ? jobs.size() : -1));
       return jobs;
     } catch (Exception e) {
       eventBus.dispatchEvent(

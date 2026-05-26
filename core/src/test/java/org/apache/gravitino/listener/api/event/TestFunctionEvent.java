@@ -200,6 +200,7 @@ public class TestFunctionEvent {
     FunctionInfo[] functionInfos = ((ListFunctionInfosEvent) event).functionInfos();
     Assertions.assertEquals(1, functionInfos.length);
     checkFunctionInfo(functionInfos[0], function);
+    Assertions.assertEquals(1, ((ListFunctionInfosEvent) event).resultCount());
     Assertions.assertEquals(OperationType.LIST_FUNCTION_INFOS, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 

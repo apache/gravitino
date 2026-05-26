@@ -189,7 +189,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     try {
       User[] users = dispatcher.listUsers(metalake);
       eventBus.dispatchEvent(
-          new ListUsersEvent(initiator, metalake, users != null ? users.length : 0));
+          new ListUsersEvent(initiator, metalake, users != null ? users.length : -1));
 
       return users;
     } catch (Exception e) {
@@ -207,7 +207,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     try {
       String[] userNames = dispatcher.listUserNames(metalake);
       eventBus.dispatchEvent(
-          new ListUserNamesEvent(initiator, metalake, userNames != null ? userNames.length : 0));
+          new ListUserNamesEvent(initiator, metalake, userNames != null ? userNames.length : -1));
 
       return userNames;
     } catch (Exception e) {
@@ -278,7 +278,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     try {
       Group[] groups = dispatcher.listGroups(metalake);
       eventBus.dispatchEvent(
-          new ListGroupsEvent(initiator, metalake, groups != null ? groups.length : 0));
+          new ListGroupsEvent(initiator, metalake, groups != null ? groups.length : -1));
 
       return groups;
     } catch (Exception e) {
@@ -296,7 +296,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     try {
       String[] groupNames = dispatcher.listGroupNames(metalake);
       eventBus.dispatchEvent(
-          new ListGroupNamesEvent(initiator, metalake, groupNames != null ? groupNames.length : 0));
+          new ListGroupNamesEvent(
+              initiator, metalake, groupNames != null ? groupNames.length : -1));
 
       return groupNames;
     } catch (Exception e) {
@@ -457,7 +458,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     try {
       String[] roleNames = dispatcher.listRoleNames(metalake);
       eventBus.dispatchEvent(
-          new ListRoleNamesEvent(initiator, metalake, roleNames != null ? roleNames.length : 0));
+          new ListRoleNamesEvent(initiator, metalake, roleNames != null ? roleNames.length : -1));
 
       return roleNames;
     } catch (Exception e) {
@@ -477,7 +478,7 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       String[] roleNames = dispatcher.listRoleNamesByObject(metalake, object);
       eventBus.dispatchEvent(
           new ListRoleNamesEvent(
-              initiator, metalake, object, roleNames != null ? roleNames.length : 0));
+              initiator, metalake, object, roleNames != null ? roleNames.length : -1));
 
       return roleNames;
     } catch (Exception e) {

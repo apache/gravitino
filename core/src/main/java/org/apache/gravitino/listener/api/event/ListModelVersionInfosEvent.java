@@ -38,13 +38,13 @@ public class ListModelVersionInfosEvent extends ModelEvent implements ListEvent 
       String user, NameIdentifier identifier, ModelVersionInfo[] versions) {
     super(user, identifier);
 
-    this.versions = versions != null ? versions : new ModelVersionInfo[0];
+    this.versions = versions;
   }
 
   /**
    * Returns the versions of the model in this list operation.
    *
-   * @return The versions of the model.
+   * @return The versions of the model, or {@code null} if the result was not captured.
    */
   public ModelVersionInfo[] versions() {
     return versions;
@@ -53,7 +53,7 @@ public class ListModelVersionInfosEvent extends ModelEvent implements ListEvent 
   /** {@inheritDoc} */
   @Override
   public int resultCount() {
-    return versions.length;
+    return versions != null ? versions.length : -1;
   }
 
   /**

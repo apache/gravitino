@@ -90,7 +90,7 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
           new ListPoliciesEvent(
               PrincipalUtils.getCurrentUserName(),
               metalake,
-              policyNames != null ? policyNames.length : 0));
+              policyNames != null ? policyNames.length : -1));
       return policyNames;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -109,7 +109,7 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
           new ListPolicyInfosEvent(
               PrincipalUtils.getCurrentUserName(),
               metalake,
-              policies != null ? policies.length : 0));
+              policies != null ? policies.length : -1));
       return policies;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -276,7 +276,7 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
           new ListMetadataObjectsForPolicyEvent(
               PrincipalUtils.getCurrentUserName(),
               NameIdentifierUtil.ofPolicy(metalake, policyName),
-              metadataObjects != null ? metadataObjects.length : 0));
+              metadataObjects != null ? metadataObjects.length : -1));
       return metadataObjects;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -302,7 +302,7 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
               PrincipalUtils.getCurrentUserName(),
               metalake,
               metadataObject,
-              policies != null ? policies.length : 0));
+              policies != null ? policies.length : -1));
       return policies;
     } catch (Exception e) {
       eventBus.dispatchEvent(

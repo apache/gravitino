@@ -45,7 +45,7 @@ public final class ListFunctionInfosEvent extends FunctionEvent implements ListE
   public ListFunctionInfosEvent(String user, Namespace namespace, FunctionInfo[] functionInfos) {
     super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
-    this.functionInfos = functionInfos != null ? functionInfos : new FunctionInfo[0];
+    this.functionInfos = functionInfos;
   }
 
   /**
@@ -60,7 +60,8 @@ public final class ListFunctionInfosEvent extends FunctionEvent implements ListE
   /**
    * Provides the function infos associated with this event.
    *
-   * @return An array of {@link FunctionInfo} instances that were listed.
+   * @return An array of {@link FunctionInfo} instances that were listed, or {@code null} if the
+   *     result was not captured.
    */
   public FunctionInfo[] functionInfos() {
     return functionInfos;
@@ -69,7 +70,7 @@ public final class ListFunctionInfosEvent extends FunctionEvent implements ListE
   /** {@inheritDoc} */
   @Override
   public int resultCount() {
-    return functionInfos.length;
+    return functionInfos != null ? functionInfos.length : -1;
   }
 
   @Override

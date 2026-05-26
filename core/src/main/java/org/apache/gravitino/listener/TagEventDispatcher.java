@@ -85,7 +85,7 @@ public class TagEventDispatcher implements TagDispatcher {
           new ListTagsEvent(
               PrincipalUtils.getCurrentUserName(),
               metalake,
-              tagNames != null ? tagNames.length : 0));
+              tagNames != null ? tagNames.length : -1));
       return tagNames;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -101,7 +101,7 @@ public class TagEventDispatcher implements TagDispatcher {
       Tag[] tags = dispatcher.listTagsInfo(metalake);
       eventBus.dispatchEvent(
           new ListTagsInfoEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, tags != null ? tags.length : 0));
+              PrincipalUtils.getCurrentUserName(), metalake, tags != null ? tags.length : -1));
       return tags;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -200,7 +200,7 @@ public class TagEventDispatcher implements TagDispatcher {
               PrincipalUtils.getCurrentUserName(),
               metalake,
               name,
-              metadataObjects != null ? metadataObjects.length : 0));
+              metadataObjects != null ? metadataObjects.length : -1));
       return metadataObjects;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -223,7 +223,7 @@ public class TagEventDispatcher implements TagDispatcher {
               PrincipalUtils.getCurrentUserName(),
               metalake,
               metadataObject,
-              tags != null ? tags.length : 0));
+              tags != null ? tags.length : -1));
       return tags;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -245,7 +245,7 @@ public class TagEventDispatcher implements TagDispatcher {
               PrincipalUtils.getCurrentUserName(),
               metalake,
               metadataObject,
-              tags != null ? tags.length : 0));
+              tags != null ? tags.length : -1));
       return tags;
     } catch (Exception e) {
       eventBus.dispatchEvent(

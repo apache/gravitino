@@ -181,7 +181,7 @@ public class IcebergViewEventDispatcher implements IcebergViewOperationDispatche
       List<TableIdentifier> identifiers = listViewsResponse.identifiers();
       eventBus.dispatchEvent(
           new IcebergListViewEvent(
-              context, gravitinoNameIdentifier, identifiers != null ? identifiers.size() : 0));
+              context, gravitinoNameIdentifier, identifiers != null ? identifiers.size() : -1));
       return listViewsResponse;
     } catch (Exception e) {
       eventBus.dispatchEvent(new IcebergListViewFailureEvent(context, gravitinoNameIdentifier, e));

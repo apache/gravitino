@@ -136,7 +136,7 @@ public class PartitionEventDispatcher implements PartitionDispatcher {
           new ListPartitionEvent(
               PrincipalUtils.getCurrentUserName(),
               ident,
-              listPartitions != null ? listPartitions.length : 0));
+              listPartitions != null ? listPartitions.length : -1));
       return listPartitions;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -155,7 +155,7 @@ public class PartitionEventDispatcher implements PartitionDispatcher {
           new ListPartitionNamesEvent(
               PrincipalUtils.getCurrentUserName(),
               ident,
-              listPartitionNames != null ? listPartitionNames.length : 0));
+              listPartitionNames != null ? listPartitionNames.length : -1));
       return listPartitionNames;
     } catch (Exception e) {
       eventBus.dispatchEvent(

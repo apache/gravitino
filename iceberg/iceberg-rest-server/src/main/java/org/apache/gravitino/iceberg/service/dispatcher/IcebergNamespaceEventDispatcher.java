@@ -198,7 +198,7 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
       List<Namespace> namespaces = listResponse.namespaces();
       eventBus.dispatchEvent(
           new IcebergListNamespacesEvent(
-              context, nameIdentifier, namespaces != null ? namespaces.size() : 0));
+              context, nameIdentifier, namespaces != null ? namespaces.size() : -1));
       return listResponse;
     } catch (Exception e) {
       eventBus.dispatchEvent(new IcebergListNamespacesFailureEvent(context, nameIdentifier, e));

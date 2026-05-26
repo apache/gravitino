@@ -187,6 +187,7 @@ public class TestFilesetEvent {
     Assertions.assertEquals(subPath, ((ListFilesEvent) event).subPath());
     Assertions.assertEquals(OperationType.LIST_FILESET_FILES, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(-1, ((ListFilesEvent) event).resultCount());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(ListFilesPreEvent.class, preEvent.getClass());

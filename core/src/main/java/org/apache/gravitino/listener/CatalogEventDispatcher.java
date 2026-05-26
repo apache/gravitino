@@ -86,7 +86,7 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
           new ListCatalogEvent(
               PrincipalUtils.getCurrentUserName(),
               namespace,
-              nameIdentifiers != null ? nameIdentifiers.length : 0));
+              nameIdentifiers != null ? nameIdentifiers.length : -1));
       return nameIdentifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -104,7 +104,7 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
           new ListCatalogEvent(
               PrincipalUtils.getCurrentUserName(),
               namespace,
-              catalogs != null ? catalogs.length : 0));
+              catalogs != null ? catalogs.length : -1));
       return catalogs;
     } catch (Exception e) {
       eventBus.dispatchEvent(

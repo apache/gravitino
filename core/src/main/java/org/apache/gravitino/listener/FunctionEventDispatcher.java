@@ -79,7 +79,7 @@ public class FunctionEventDispatcher implements FunctionDispatcher {
       NameIdentifier[] nameIdentifiers = dispatcher.listFunctions(namespace);
       eventBus.dispatchEvent(
           new ListFunctionEvent(
-              user, namespace, nameIdentifiers != null ? nameIdentifiers.length : 0));
+              user, namespace, nameIdentifiers != null ? nameIdentifiers.length : -1));
       return nameIdentifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListFunctionFailureEvent(user, namespace, e));

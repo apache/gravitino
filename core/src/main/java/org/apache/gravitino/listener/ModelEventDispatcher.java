@@ -194,7 +194,7 @@ public class ModelEventDispatcher implements ModelDispatcher {
     try {
       NameIdentifier[] models = dispatcher.listModels(namespace);
       eventBus.dispatchEvent(
-          new ListModelEvent(user, namespace, models != null ? models.length : 0));
+          new ListModelEvent(user, namespace, models != null ? models.length : -1));
       return models;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListModelFailureEvent(user, namespace, e));
