@@ -30,11 +30,6 @@ import org.apache.ibatis.annotations.Param;
 public class IdpUserGroupRelH2Provider extends IdpUserGroupRelBaseSQLProvider {
 
   @Override
-  protected String currentTimeMillisExpression() {
-    return "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
-  }
-
-  @Override
   public String softDeleteRelations(
       @Param("groupName") String groupName, @Param("usernames") List<String> usernames) {
     return "<script>"
@@ -83,5 +78,10 @@ public class IdpUserGroupRelH2Provider extends IdpUserGroupRelBaseSQLProvider {
         + " AND r.deleted_at = 0"
         + " WHEN MATCHED THEN UPDATE SET r.deleted_at = "
         + currentTimeMillisExpression();
+  }
+
+  @Override
+  protected String currentTimeMillisExpression() {
+    return "DATEDIFF('MILLISECOND', TIMESTAMP '1970-01-01 00:00:00', CURRENT_TIMESTAMP())";
   }
 }

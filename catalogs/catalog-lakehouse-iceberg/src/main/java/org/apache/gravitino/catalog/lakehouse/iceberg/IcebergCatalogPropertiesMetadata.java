@@ -33,6 +33,7 @@ import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
+import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
@@ -125,15 +126,17 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 false /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_IMPL,
-                "Table metadata cache implementation",
+                "Table metadata cache implementation. Set to empty string(\"\") if "
+                    + "catalog-backend is rest catalog, or custom catalog without the "
+                    + "SupportsMetadataLocation interface.",
                 false /* immutable */,
-                null /* defaultValue */,
+                LocalTableMetadataCache.class.getName() /* defaultValue */,
                 false /* hidden */),
             integerOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_CAPACITY,
                 "Table metadata cache capacity",
                 false /* immutable */,
-                200 /* defaultValue */,
+                1000 /* defaultValue */,
                 false /* hidden */),
             integerOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES,

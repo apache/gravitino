@@ -29,6 +29,8 @@ paths:
         - schema
       summary: List schemas
       operationId: listSchemas
+      parameters:
+        - $ref: "#/components/parameters/parentSchema"
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/EntityListResponse"
@@ -151,6 +153,22 @@ paths:
 
 components:
 
+  parameters:
+    parentSchema:
+      name: parentSchema
+      in: query
+      description: >
+        The parent schema whose direct child schemas are listed. Only meaningful for catalogs that
+        support hierarchical (multi-level) schemas, such as an Iceberg catalog accessed through the
+        Gravitino REST server with a configured schema separator (`gravitino.schema.separator`,
+        default `:`). For example, when the schemas `a`, `a:b` and `a:b:c` exist, listing with
+        `parentSchema=a:b` returns `[a:b:c]`. When omitted, only the top-level schemas under the
+        catalog are returned (the direct children of the catalog root, e.g. `a`), not the nested
+        ones.
+      required: false
+      schema:
+        type: string
+
   schemas:
 
     SchemaCreateRequest:
@@ -160,7 +178,11 @@ components:
       properties:
         name:
           type: string
-          description: The name of the schema
+          description: >
+            The name of the schema. For catalogs that support hierarchical (multi-level) schemas,
+            the name may encode a nested path joined by the configured schema separator
+            (`gravitino.schema.separator`, default `:`), e.g. `a:b:c` creates schema `c` under the
+            existing parent schema `a:b`.
         comment:
           type: string
           description: A comment describing the schema

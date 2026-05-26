@@ -26,11 +26,6 @@ import org.apache.ibatis.annotations.Param;
 public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
 
   @Override
-  protected String currentTimeMillisExpression() {
-    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
-  }
-
-  @Override
   public String deleteIdpUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
@@ -38,5 +33,10 @@ public class IdpUserMetaPostgreSQLProvider extends IdpUserMetaBaseSQLProvider {
         + " WHERE user_id IN (SELECT user_id FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
+
+  @Override
+  protected String currentTimeMillisExpression() {
+    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
   }
 }
