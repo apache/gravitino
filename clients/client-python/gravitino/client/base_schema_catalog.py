@@ -119,17 +119,32 @@ class BaseSchemaCatalog(
     def as_function_catalog(self):
         return self
 
-    def list_schemas(self) -> List[str]:
-        """List all the schemas under the given catalog namespace.
+    def list_schemas(self, parent_schema: Optional[str] = None) -> List[str]:
+        """List the schemas under the given catalog namespace, or directly under the given parent
+        schema when ``parent_schema`` is provided.
+
+        Args:
+            parent_schema: The parent (possibly hierarchical) schema name whose direct children are
+                listed, e.g. ``"a"`` or ``"a:b"``. When ``None``, all schemas under the catalog are
+                listed. Must not be blank when provided.
 
         Raises:
+            IllegalArgumentException if ``parent_schema`` is provided but blank.
             NoSuchCatalogException if the catalog with specified namespace does not exist.
+            NoSuchSchemaException if ``parent_schema`` is provided but does not exist.
 
         Returns:
-             A list of schema names under the given catalog namespace.
+             A list of schema names under the given catalog namespace or parent schema.
         """
+        params = None
+        if parent_schema is not None:
+            if not parent_schema.strip():
+                raise IllegalArgumentException("parentSchema must not be null or blank")
+            params = {"parentSchema": parent_schema}
+
         resp = self.rest_client.get(
             BaseSchemaCatalog.format_schema_request_path(self._schema_namespace()),
+            params=params,
             error_handler=SCHEMA_ERROR_HANDLER,
         )
         entity_list_response = EntityListResponse.from_json(

@@ -45,8 +45,8 @@ public interface FunctionVersionMetaMapper {
 
   @UpdateProvider(
       type = FunctionVersionMetaSQLProviderFactory.class,
-      method = "softDeleteFunctionVersionMetasBySchemaId")
-  Integer softDeleteFunctionVersionMetasBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteFunctionVersionMetasBySchemaIds")
+  Integer softDeleteFunctionVersionMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = FunctionVersionMetaSQLProviderFactory.class,

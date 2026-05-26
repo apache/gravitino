@@ -53,8 +53,8 @@ The following table outlines the tested compatibility between Gravitino versions
     `from lance import LanceNamespaceStorageOptionsProvider`, which no longer
     exists in the `pylance` 6.0.0 wheel that `lance-namespace==0.7.5` pulls
     in, raising `ImportError: cannot import name
-    'LanceNamespaceStorageOptionsProvider' from 'lance'`. **But if you can still use lance-ray 0.2.0 with Gravitino 1.3.0 by pining pylance to 3.x or 4.x.**
-
+    'LanceNamespaceStorageOptionsProvider' from 'lance'`. **You can still use
+    lance-ray 0.2.0 with Gravitino 1.3.0 by pinning pylance to 3.x or 4.x.**
 - Before using in production, please test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::

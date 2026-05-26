@@ -48,7 +48,7 @@ public class TestIcebergExceptionMapper {
   public void testIcebergExceptionMapper() {
     checkExceptionStatus(new IllegalArgumentException(""), 400);
     checkExceptionStatus(new ValidationException(""), 400);
-    checkExceptionStatus(new NamespaceNotEmptyException(""), 400);
+    checkExceptionStatus(new NamespaceNotEmptyException(""), 409);
     checkExceptionStatus(new NotAuthorizedException(""), 401);
     checkExceptionStatus(new TokenExpiredException("expired"), 419);
     checkExceptionStatus(new AuthenticationTimeoutException("expired"), 419);

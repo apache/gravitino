@@ -22,7 +22,21 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { ExclamationCircleFilled, PlusOutlined } from '@ant-design/icons'
-import { Breadcrumb, Button, Divider, Flex, Input, Popover, Space, Spin, Table, Tabs, Tooltip, Typography } from 'antd'
+import {
+  Breadcrumb,
+  Button,
+  Divider,
+  Flex,
+  Input,
+  Modal,
+  Popover,
+  Space,
+  Spin,
+  Table,
+  Tabs,
+  Tooltip,
+  Typography
+} from 'antd'
 import { useAntdColumnResize } from 'react-antd-column-resize'
 import useResizeObserver from 'use-resize-observer'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
@@ -41,6 +55,7 @@ import {
   deleteModel,
   deleteTopic,
   deleteTable,
+  deleteView,
   getTableDetails,
   getCurrentEntityOwner
 } from '@/lib/store/metalakes'
@@ -126,11 +141,13 @@ export default function SchemaDetailsPage() {
           anthEnable
             ? [
                 { label: 'Tables', key: 'Tables' },
+                { label: 'Views', key: 'Views' },
                 { label: 'Functions', key: 'Functions' },
                 { label: 'Associated Roles', key: 'Associated Roles' }
               ]
             : [
                 { label: 'Tables', key: 'Tables' },
+                { label: 'Views', key: 'Views' },
                 { label: 'Functions', key: 'Functions' }
               ]
         )
@@ -217,6 +234,18 @@ export default function SchemaDetailsPage() {
         children: undefined
       }
     })
+
+  const viewData = [...(store.views || [])]
+    .filter(c => {
+      if (search === '') return true
+
+      return c.name.includes(search)
+    })
+    .map(entity => ({
+      ...entity,
+      key: entity.name,
+      children: undefined
+    }))
 
   const tagContent = (
     <div>
@@ -360,7 +389,11 @@ export default function SchemaDetailsPage() {
               )
               break
             case 'relational':
-              await dispatch(deleteTable({ metalake: currentMetalake, catalog, catalogType, schema, table: entity }))
+              if (type === 'view') {
+                await dispatch(deleteView({ metalake: currentMetalake, catalog, schema, view: entity }))
+              } else {
+                await dispatch(deleteTable({ metalake: currentMetalake, catalog, catalogType, schema, table: entity }))
+              }
               break
             case 'model':
               await dispatch(deleteModel({ metalake: currentMetalake, catalog, catalogType, schema, model: entity }))
@@ -441,9 +474,52 @@ export default function SchemaDetailsPage() {
     [nameCol, entityType, store.tableLoading, anthEnable, catalogData?.provider]
   )
 
+  const viewColumns = useMemo(
+    () => [
+      {
+        title: 'View Name',
+        dataIndex: 'name',
+        key: 'name',
+        width: 300,
+        ellipsis: true,
+        sorter: (a, b) => a?.name.toLowerCase().localeCompare(b?.name.toLowerCase()),
+        render: name => (
+          <Link
+            data-refer={`view-link-${name}`}
+            href={`/catalogs?metalake=${encodeURIComponent(currentMetalake)}&catalogType=${catalogType}&catalog=${encodeURIComponent(catalog)}&schema=${encodeURIComponent(schema)}&view=${encodeURIComponent(name)}`}
+          >
+            {name}
+          </Link>
+        )
+      },
+      {
+        title: 'Actions',
+        dataIndex: 'action',
+        key: 'action',
+        width: 100,
+        render: (_, record) => (
+          <a data-refer={`delete-view-${record.name}`}>
+            <Tooltip title='Delete'>
+              <Icons.Trash2Icon className='size-4' onClick={() => showDeleteConfirm(Modal, record, 'view')} />
+            </Tooltip>
+          </a>
+        )
+      }
+    ],
+    [currentMetalake, catalogType, catalog, schema, catalogData?.provider]
+  )
+
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
     return { columns, minWidth: 100 }
   }, [columns])
+
+  const {
+    resizableColumns: viewResizableColumns,
+    components: viewComponents,
+    tableWidth: viewTableWidth
+  } = useAntdColumnResize(() => {
+    return { columns: viewColumns, minWidth: 100 }
+  }, [viewColumns])
 
   return (
     <div ref={ref}>
@@ -540,10 +616,28 @@ export default function SchemaDetailsPage() {
         <AssociatedTable
           metalake={currentMetalake}
           metadataObjectType={'schema'}
-          metadataObjectFullName={`${catalog}.${store.activatedDetails.name}`}
+          metadataObjectFullName={`${catalog}.${schema}`}
         />
       ) : tabKey === 'Functions' ? (
         <Functions metalake={currentMetalake} catalog={catalog} schema={schema} />
+      ) : tabKey === 'Views' ? (
+        <>
+          <Flex justify='flex-end' className='mb-4'>
+            <div className='flex w-1/3 gap-4'>
+              <Search name='searchViewInput' placeholder='Search...' value={search} onChange={onSearchTable} />
+            </div>
+          </Flex>
+          <Table
+            data-refer='view-list-grid'
+            size='small'
+            style={{ maxHeight: 'calc(100vh - 30rem)' }}
+            scroll={{ x: viewTableWidth, y: 'calc(100vh - 37rem)' }}
+            dataSource={viewData}
+            pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
+            columns={viewResizableColumns}
+            components={viewComponents}
+          />
+        </>
       ) : (
         <>
           <Flex justify='flex-end' className='mb-4'>

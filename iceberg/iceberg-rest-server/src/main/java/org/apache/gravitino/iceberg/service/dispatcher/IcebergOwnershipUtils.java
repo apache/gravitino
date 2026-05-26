@@ -18,10 +18,15 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -53,11 +58,44 @@ public class IcebergOwnershipUtils {
       ownerDispatcher.setOwner(
           metalake,
           NameIdentifierUtil.toMetadataObject(
-              IcebergIdentifierUtils.toGravitinoSchemaIdentifier(metalake, catalogName, namespace),
+              IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+                  metalake, catalogName, namespace, HierarchicalSchemaUtil.schemaSeparator()),
               Entity.EntityType.SCHEMA),
           user,
           Owner.Type.USER);
     }
+  }
+
+  /**
+   * Sets the owner of multiple schemas (namespaces) to the specified user in a single dispatcher
+   * call, when supported by the dispatcher. No-op when {@code ownerDispatcher} is {@code null} or
+   * {@code namespaces} is empty.
+   *
+   * @param metalake the metalake name
+   * @param catalogName the catalog name
+   * @param namespaces the Iceberg namespaces to assign ownership for
+   * @param user the user to set as owner
+   * @param ownerDispatcher the owner dispatcher to use
+   */
+  public static void setSchemaOwners(
+      String metalake,
+      String catalogName,
+      Collection<Namespace> namespaces,
+      String user,
+      OwnerDispatcher ownerDispatcher) {
+    if (ownerDispatcher == null || namespaces.isEmpty()) {
+      return;
+    }
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    List<MetadataObject> objects = new ArrayList<>(namespaces.size());
+    for (Namespace namespace : namespaces) {
+      objects.add(
+          NameIdentifierUtil.toMetadataObject(
+              IcebergIdentifierUtils.toGravitinoSchemaIdentifier(
+                  metalake, catalogName, namespace, separator),
+              Entity.EntityType.SCHEMA));
+    }
+    ownerDispatcher.setOwners(metalake, objects, user, Owner.Type.USER);
   }
 
   /**
@@ -82,7 +120,10 @@ public class IcebergOwnershipUtils {
           metalake,
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, tableName)),
+                  metalake,
+                  catalogName,
+                  TableIdentifier.of(namespace, tableName),
+                  HierarchicalSchemaUtil.schemaSeparator()),
               Entity.EntityType.TABLE),
           user,
           Owner.Type.USER);
@@ -111,7 +152,10 @@ public class IcebergOwnershipUtils {
           metalake,
           NameIdentifierUtil.toMetadataObject(
               IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                  metalake, catalogName, TableIdentifier.of(namespace, viewName)),
+                  metalake,
+                  catalogName,
+                  TableIdentifier.of(namespace, viewName),
+                  HierarchicalSchemaUtil.schemaSeparator()),
               Entity.EntityType.VIEW),
           user,
           Owner.Type.USER);

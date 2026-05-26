@@ -32,6 +32,7 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
@@ -97,7 +98,10 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
         // Delete the entity for the dropped table.
         store.delete(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
-                metalake, context.catalogName(), tableIdentifier),
+                metalake,
+                context.catalogName(),
+                tableIdentifier,
+                HierarchicalSchemaUtil.schemaSeparator()),
             Entity.EntityType.TABLE);
       }
     } catch (NoSuchEntityException ignore) {
@@ -126,12 +130,13 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
     dispatcher.renameTable(context, renameTableRequest);
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
     NameIdentifier tableSource =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), renameTableRequest.source());
+            metalake, context.catalogName(), renameTableRequest.source(), separator);
     NameIdentifier tableDest =
         IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake, context.catalogName(), renameTableRequest.destination());
+            metalake, context.catalogName(), renameTableRequest.destination(), separator);
     EntityStore store = GravitinoEnv.getInstance().entityStore();
     try {
       if (store != null) {
@@ -204,9 +209,11 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     if (tableDispatcher != null) {
       tableDispatcher.loadTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
-              metalake, context.catalogName(), TableIdentifier.of(namespace, tableName)));
+              metalake,
+              context.catalogName(),
+              TableIdentifier.of(namespace, tableName),
+              HierarchicalSchemaUtil.schemaSeparator()));
     }
-
     IcebergOwnershipUtils.setTableOwner(
         metalake,
         context.catalogName(),

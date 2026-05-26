@@ -22,65 +22,23 @@ package org.apache.gravitino.audit;
 import static org.apache.gravitino.audit.AuditLog.Operation;
 import static org.apache.gravitino.audit.AuditLog.Status;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
-import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.audit.v2.SimpleAuditLogV2;
 import org.apache.gravitino.audit.v2.SimpleFormatterV2;
-import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.FailureEvent;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestAuditManager {
-  private static final Logger LOG = LoggerFactory.getLogger(TestAuditManager.class);
-
-  private static final String DEFAULT_FILE_NAME = "gravitino_audit.log";
 
   private static final int EVENT_NUM = 2000;
-
-  private Path logPath;
-
-  @BeforeAll
-  public void setup() {
-    String logDir = System.getProperty("gravitino.log.path");
-    Path logDirPath = Paths.get(logDir);
-    if (!Files.exists(logDirPath)) {
-      try {
-        Files.createDirectories(logDirPath);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
-    this.logPath = Paths.get(logDir + "/" + DEFAULT_FILE_NAME);
-    if (Files.exists(logPath)) {
-      LOG.warn(
-          String.format("tmp audit log file: %s already exists, delete it", DEFAULT_FILE_NAME));
-      try {
-        Files.delete(logPath);
-        LOG.warn(String.format("delete tmp audit log file: %s success", DEFAULT_FILE_NAME));
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
-  }
 
   /** Test audit log with custom audit writer and formatter. */
   @Test
@@ -109,10 +67,10 @@ public class TestAuditManager {
     DummyAuditLog formattedAuditLog = formatter.format(dummyEvent);
 
     Assertions.assertNotNull(formattedAuditLog);
-    Assertions.assertEquals(formattedAuditLog.operation(), Operation.UNKNOWN_OPERATION);
-    Assertions.assertEquals(formattedAuditLog.status(), Status.SUCCESS);
-    Assertions.assertEquals(formattedAuditLog.user(), "user");
-    Assertions.assertEquals(formattedAuditLog.identifier(), "a.b.c.d");
+    Assertions.assertEquals(Operation.UNKNOWN_OPERATION, formattedAuditLog.operation());
+    Assertions.assertEquals(Status.SUCCESS, formattedAuditLog.status());
+    Assertions.assertEquals("user", formattedAuditLog.user());
+    Assertions.assertEquals("a.b.c.d", formattedAuditLog.identifier());
     Assertions.assertEquals(formattedAuditLog.timestamp(), dummyEvent.eventTime());
     Assertions.assertEquals(formattedAuditLog, dummyAuditWriter.getAuditLogs().get(0));
 
@@ -121,97 +79,41 @@ public class TestAuditManager {
     eventBus.dispatchEvent(dummyFailEvent);
     DummyAuditLog formattedFailAuditLog = formatter.format(dummyFailEvent);
     Assertions.assertEquals(formattedFailAuditLog, dummyAuditWriter.getAuditLogs().get(1));
-    Assertions.assertEquals(formattedFailAuditLog.operation(), Operation.UNKNOWN_OPERATION);
-    Assertions.assertEquals(formattedFailAuditLog.status(), Status.FAILURE);
+    Assertions.assertEquals(Operation.UNKNOWN_OPERATION, formattedFailAuditLog.operation());
+    Assertions.assertEquals(Status.FAILURE, formattedFailAuditLog.status());
     Assertions.assertEquals(formattedFailAuditLog, dummyAuditWriter.getAuditLogs().get(1));
   }
 
-  /** Test audit log with default audit writer and formatter. */
-  @SuppressWarnings("deprecation")
+  /** Verify that FileAuditWriter is used by default and delegates to SimpleFormatterV2. */
   @Test
   public void testFileAuditLog() {
     Config config = new Config(false) {};
     config.set(Configs.AUDIT_LOG_ENABLED_CONF, true);
-    DummyEvent dummyEvent = mockDummyEvent();
     EventListenerManager eventListenerManager = mockEventListenerManager();
     AuditLogManager auditLogManager = mockAuditLogManager(config, eventListenerManager);
     EventBus eventBus = eventListenerManager.createEventBus();
-    eventBus.dispatchEvent(dummyEvent);
+
+    // Dispatching events must not throw even though no file appender is configured in the test.
+    eventBus.dispatchEvent(mockDummyEvent());
+
     Assertions.assertInstanceOf(FileAuditWriter.class, auditLogManager.getAuditLogWriter());
     Assertions.assertInstanceOf(
-        SimpleFormatterV2.class, (auditLogManager.getAuditLogWriter()).getFormatter());
-
-    FileAuditWriter fileAuditWriter = (FileAuditWriter) auditLogManager.getAuditLogWriter();
-    String fileName = fileAuditWriter.fileName;
-    try {
-      fileAuditWriter.outWriter.flush();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-
-    String auditLog = readAuditLog(fileName);
-    Formatter formatter = fileAuditWriter.getFormatter();
-    SimpleAuditLogV2 formattedAuditLog = (SimpleAuditLogV2) formatter.format(dummyEvent);
-
-    Assertions.assertNotNull(formattedAuditLog);
-    Assertions.assertEquals(formattedAuditLog.toString(), auditLog);
+        SimpleFormatterV2.class, auditLogManager.getAuditLogWriter().getFormatter());
   }
 
+  /** Verify that dispatching many events does not throw or deadlock. */
   @Test
-  public void testBathEvents() {
+  public void testBatchEvents() {
     Config config = new Config(false) {};
     config.set(Configs.AUDIT_LOG_ENABLED_CONF, true);
-    // set immediate flush to true for testing, so that the audit log will be read immediately
-    config.set(
-        new ConfigBuilder("gravitino.audit.writer.file.immediateFlush").stringConf(), "true");
-
     EventListenerManager eventListenerManager = mockEventListenerManager();
-    AuditLogManager auditLogManager = mockAuditLogManager(config, eventListenerManager);
+    mockAuditLogManager(config, eventListenerManager);
     EventBus eventBus = eventListenerManager.createEventBus();
 
     for (int i = 0; i < EVENT_NUM; i++) {
-      DummyEvent dummyEvent = mockDummyEvent();
-      eventBus.dispatchEvent(dummyEvent);
+      eventBus.dispatchEvent(mockDummyEvent());
     }
-
-    FileAuditWriter fileAuditWriter = (FileAuditWriter) auditLogManager.getAuditLogWriter();
-    String fileName = fileAuditWriter.fileName;
-    try {
-      fileAuditWriter.outWriter.flush();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-    long auditSize = getAuditSize(fileName);
-    Assertions.assertEquals(EVENT_NUM, auditSize);
-  }
-
-  @AfterEach
-  public void cleanup() {
-    try {
-      if (Files.exists(logPath)) {
-        Files.delete(logPath);
-        LOG.warn(String.format("delete tmp audit log file: %s success", DEFAULT_FILE_NAME));
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private String readAuditLog(String fileName) {
-    try (BufferedReader reader =
-        Files.newBufferedReader(Paths.get(fileName), StandardCharsets.UTF_8)) {
-      return reader.readLine();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private long getAuditSize(String fileName) {
-    try (Stream<String> lines = Files.lines(Paths.get(fileName))) {
-      return lines.count();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+    // No assertion needed — we just verify no exception is thrown for a large batch.
   }
 
   private AuditLogManager mockAuditLogManager(

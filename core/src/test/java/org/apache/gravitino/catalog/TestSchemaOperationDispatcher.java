@@ -295,4 +295,59 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertThrows(
         RuntimeException.class, () -> dispatcher.dropSchema(schemaIdent, false));
   }
+
+  @Test
+  public void testDropHierarchicalSchemaCleansUpOrphanedAncestors() throws IOException {
+    // Clear any spy stubs leaked from other tests sharing the static entityStore.
+    reset(entityStore);
+    // Only the leaf "orphanA:orphanB:orphanC" is created in the catalog and the store. Names are
+    // unique to this test because the catalog connector keeps its schemas in shared static state.
+    NameIdentifier leaf = NameIdentifier.of(metalake, catalog, "orphanA:orphanB:orphanC");
+    dispatcher.createSchema(leaf, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    // Simulate the ancestor entities the relational store auto-creates for a hierarchical name.
+    NameIdentifier ancestorAb = NameIdentifier.of(metalake, catalog, "orphanA:orphanB");
+    NameIdentifier ancestorA = NameIdentifier.of(metalake, catalog, "orphanA");
+    putSchemaEntity(ancestorAb);
+    putSchemaEntity(ancestorA);
+
+    // The catalog only knows the leaf, so dropping it leaves the ancestors orphaned in the store;
+    // since neither ancestor exists in the catalog, both entities must be cleaned up.
+    Assertions.assertTrue(dispatcher.dropSchema(leaf, false));
+    Assertions.assertFalse(entityStore.exists(ancestorAb, SCHEMA));
+    Assertions.assertFalse(entityStore.exists(ancestorA, SCHEMA));
+  }
+
+  @Test
+  public void testDropHierarchicalSchemaKeepsAncestorsThatStillExist() throws IOException {
+    // Clear any spy stubs leaked from other tests sharing the static entityStore.
+    reset(entityStore);
+    // Both the parent "keepA:keepB" and the leaf "keepA:keepB:keepC" exist in the catalog and the
+    // store. Names are unique to this test to avoid the connector's shared static schema state.
+    NameIdentifier parentAb = NameIdentifier.of(metalake, catalog, "keepA:keepB");
+    NameIdentifier leaf = NameIdentifier.of(metalake, catalog, "keepA:keepB:keepC");
+    dispatcher.createSchema(parentAb, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    dispatcher.createSchema(leaf, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    // Simulate the top-level ancestor entity.
+    NameIdentifier ancestorA = NameIdentifier.of(metalake, catalog, "keepA");
+    putSchemaEntity(ancestorA);
+
+    // "keepA:keepB" still exists in the catalog, so cleanup stops there and keeps it and "keepA".
+    Assertions.assertTrue(dispatcher.dropSchema(leaf, false));
+    Assertions.assertTrue(entityStore.exists(parentAb, SCHEMA));
+    Assertions.assertTrue(entityStore.exists(ancestorA, SCHEMA));
+  }
+
+  private void putSchemaEntity(NameIdentifier ident) throws IOException {
+    SchemaEntity entity =
+        SchemaEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(entity, true);
+  }
 }

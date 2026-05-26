@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -33,6 +34,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
@@ -56,9 +58,9 @@ public class MetadataIdConverter {
    *
    * @param metadataObject The metadata object to convert.
    * @param metalake The metalake name.
-   * @return The metadata id.
+   * @return The metadata id, empty if metadata does not exist.
    */
-  public static Long getID(MetadataObject metadataObject, String metalake) {
+  public static Optional<Long> getID(MetadataObject metadataObject, String metalake) {
     Preconditions.checkArgument(metadataObject != null, "Metadata object cannot be null");
     EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
@@ -76,12 +78,14 @@ public class MetadataIdConverter {
       entity =
           entityStore.get(
               normalizedIdent, entityType, EntityClassMapper.getEntityClass(entityType));
+    } catch (NoSuchEntityException nse) {
+      return Optional.empty();
     } catch (IOException e) {
       throw new RuntimeException(
           "failed to load entity from entity store: " + metadataObject.fullName(), e);
     }
 
-    return extractIdFromEntity(entity);
+    return Optional.of(extractIdFromEntity(entity));
   }
 
   @VisibleForTesting

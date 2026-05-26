@@ -24,13 +24,17 @@ import static org.apache.gravitino.rel.types.Types.ByteType;
 import static org.apache.gravitino.rel.types.Types.DateType;
 import static org.apache.gravitino.rel.types.Types.DecimalType;
 import static org.apache.gravitino.rel.types.Types.DoubleType;
+import static org.apache.gravitino.rel.types.Types.ExternalType;
 import static org.apache.gravitino.rel.types.Types.FixedCharType;
 import static org.apache.gravitino.rel.types.Types.FixedType;
 import static org.apache.gravitino.rel.types.Types.FloatType;
 import static org.apache.gravitino.rel.types.Types.IntegerType;
+import static org.apache.gravitino.rel.types.Types.ListType;
 import static org.apache.gravitino.rel.types.Types.LongType;
+import static org.apache.gravitino.rel.types.Types.MapType;
 import static org.apache.gravitino.rel.types.Types.ShortType;
 import static org.apache.gravitino.rel.types.Types.StringType;
+import static org.apache.gravitino.rel.types.Types.StructType;
 import static org.apache.gravitino.rel.types.Types.TimeType;
 import static org.apache.gravitino.rel.types.Types.TimestampType;
 import static org.apache.gravitino.rel.types.Types.UUIDType;
@@ -45,6 +49,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
@@ -106,7 +111,6 @@ final class GlueIcebergTableHelper {
   private static final Set<String> EXCLUDED_TABLE_PROPS =
       Set.of(
           GlueConstants.LOCATION,
-          GlueConstants.TABLE_TYPE,
           GlueConstants.METADATA_LOCATION,
           GlueConstants.INPUT_FORMAT_CLASS,
           GlueConstants.OUTPUT_FORMAT,
@@ -132,17 +136,23 @@ final class GlueIcebergTableHelper {
   /**
    * Creates an Iceberg {@link Catalog} backed by AWS Glue.
    *
-   * @param config Gravitino catalog configuration (region, credentials, endpoint, etc.)
+   * @param config Gravitino catalog configuration (region, credentials, endpoint, etc.). Must
+   *     contain {@code aws-region} and {@code warehouse}.
    * @return an initialized Iceberg Glue catalog
+   * @throws IllegalArgumentException if {@code aws-region} or {@code warehouse} is not configured
    */
   static Catalog createGlueCatalog(Map<String, String> config) {
     String region = config.get(GlueConstants.AWS_REGION);
     Preconditions.checkArgument(region != null, "AWS region is required for Iceberg Glue catalog");
 
+    String warehouse = config.get(GlueConstants.WAREHOUSE);
+    Preconditions.checkArgument(
+        warehouse != null,
+        "Warehouse is required for Iceberg Glue catalog; configure '%s' on the catalog.",
+        GlueConstants.WAREHOUSE);
+
     Map<String, String> icebergProps = new HashMap<>();
-    // Warehouse is required by Iceberg catalog initialization but is not used when each table
-    // provides an explicit location.
-    icebergProps.put(IcebergConstants.WAREHOUSE, "/tmp/gravitino-glue-iceberg");
+    icebergProps.put(IcebergConstants.WAREHOUSE, warehouse);
     icebergProps.put(CATALOG_IMPL, GLUE_CATALOG);
     icebergProps.put(IcebergConstants.AWS_S3_REGION, region);
 
@@ -161,7 +171,7 @@ final class GlueIcebergTableHelper {
     }
 
     String endpoint = config.get(GlueConstants.AWS_GLUE_ENDPOINT);
-    if (endpoint != null) {
+    if (StringUtils.isNotBlank(endpoint)) {
       icebergProps.put(GLUE_ENDPOINT, endpoint);
     }
 
@@ -199,11 +209,96 @@ final class GlueIcebergTableHelper {
     mergedProps.putAll(icebergTable.properties());
     table.setProperties(mergedProps);
 
+    // Overwrite Glue's Hive-style column types with the accurate types from the Iceberg schema.
+    // Glue stores Iceberg TIME as "string", REAL as "float", etc., so the Iceberg schema is the
+    // authoritative source for column types on Iceberg tables.
+    Schema icebergSchema = icebergTable.schema();
+    Column[] columns =
+        icebergSchema.columns().stream()
+            .map(
+                field ->
+                    GlueColumn.builder()
+                        .withName(field.name())
+                        .withType(fromIcebergType(field.type()))
+                        .withComment(field.doc())
+                        .withNullable(field.isOptional())
+                        .build())
+            .toArray(Column[]::new);
+    table.setColumns(columns);
+
     if (!icebergTable.spec().fields().isEmpty()) {
       table.setPartitioning(convertPartitionSpec(icebergTable.spec(), icebergTable.schema()));
     }
     if (!icebergTable.sortOrder().fields().isEmpty()) {
       table.setSortOrders(convertIcebergSortOrder(icebergTable.sortOrder(), icebergTable.schema()));
+    }
+  }
+
+  /**
+   * Converts an Iceberg type to the equivalent Gravitino type.
+   *
+   * <p>TIME and TIMESTAMP types are always returned with microsecond (6) precision, matching
+   * Iceberg's internal representation.
+   */
+  // TODO: the Iceberg-to-Gravitino conversions in this class (type mapping, partition spec,
+  // sort order, etc.) duplicate logic in catalog-lakehouse-iceberg. Consider extracting them
+  // to a shared layer (e.g. catalog-common) so both catalogs can reuse the code.
+  // The parameter uses FQN because org.apache.iceberg.types.Type and
+  // org.apache.gravitino.rel.types.Type share the same simple name.
+  static Type fromIcebergType(org.apache.iceberg.types.Type icebergType) {
+    switch (icebergType.typeId()) {
+      case BOOLEAN:
+        return BooleanType.get();
+      case INTEGER:
+        return IntegerType.get();
+      case LONG:
+        return LongType.get();
+      case FLOAT:
+        return FloatType.get();
+      case DOUBLE:
+        return DoubleType.get();
+      case STRING:
+        return StringType.get();
+      case BINARY:
+        return BinaryType.get();
+      case UUID:
+        return UUIDType.get();
+      case DATE:
+        return DateType.get();
+      case TIME:
+        return TimeType.of(6);
+      case TIMESTAMP:
+        Types.TimestampType ts = (Types.TimestampType) icebergType;
+        return ts.shouldAdjustToUTC()
+            ? TimestampType.withTimeZone(6)
+            : TimestampType.withoutTimeZone(6);
+      case DECIMAL:
+        Types.DecimalType decimal = (Types.DecimalType) icebergType;
+        return DecimalType.of(decimal.precision(), decimal.scale());
+      case FIXED:
+        Types.FixedType fixed = (Types.FixedType) icebergType;
+        return FixedType.of(fixed.length());
+      case LIST:
+        Types.ListType list = (Types.ListType) icebergType;
+        return ListType.of(fromIcebergType(list.elementType()), list.isElementOptional());
+      case MAP:
+        Types.MapType map = (Types.MapType) icebergType;
+        return MapType.of(
+            fromIcebergType(map.keyType()),
+            fromIcebergType(map.valueType()),
+            map.isValueOptional());
+      case STRUCT:
+        Types.StructType struct = (Types.StructType) icebergType;
+        StructType.Field[] fields =
+            struct.fields().stream()
+                .map(
+                    f ->
+                        StructType.Field.of(
+                            f.name(), fromIcebergType(f.type()), f.isOptional(), f.doc()))
+                .toArray(StructType.Field[]::new);
+        return StructType.of(fields);
+      default:
+        return ExternalType.of(icebergType.typeId().name());
     }
   }
 
@@ -399,7 +494,7 @@ final class GlueIcebergTableHelper {
     return spec.fields().stream()
         .map(
             field -> {
-              String colName = schema.findColumnName(field.sourceId());
+              String colName = resolveColumnName(schema, field.sourceId());
               String transformStr = field.transform().toString().toLowerCase(Locale.ROOT);
               if (transformStr.startsWith("identity")) {
                 return Transforms.identity(colName);
@@ -434,7 +529,7 @@ final class GlueIcebergTableHelper {
     return iceSortOrder.fields().stream()
         .map(
             field -> {
-              String colName = schema.findColumnName(field.sourceId());
+              String colName = resolveColumnName(schema, field.sourceId());
               SortDirection direction =
                   field.direction() == org.apache.iceberg.SortDirection.ASC
                       ? SortDirection.ASCENDING
@@ -686,6 +781,19 @@ final class GlueIcebergTableHelper {
 
   private static NullOrder toIcebergNullOrder(NullOrdering ordering) {
     return ordering == NullOrdering.NULLS_FIRST ? NullOrder.NULLS_FIRST : NullOrder.NULLS_LAST;
+  }
+
+  /**
+   * Returns the column name for the given Iceberg field ID, throwing if the field is not found in
+   * the schema.
+   */
+  private static String resolveColumnName(Schema schema, int sourceId) {
+    String colName = schema.findColumnName(sourceId);
+    Preconditions.checkState(
+        colName != null,
+        "No column found for Iceberg field ID %s; schema may be out of sync",
+        sourceId);
+    return colName;
   }
 
   /**
