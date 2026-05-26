@@ -249,10 +249,11 @@ thus bounds the concurrent jobs per server; there is no separate claim-batch
 size.
 
 Ownership is tracked by a **heartbeat** alone: the worker that claims a job
-keeps refreshing `heartbeat_at` while it runs and remembers the ids it owns
-in memory (no owner column — a stale row is reclaimable by anyone, which is
-exactly the failover behavior we want). A job is abandoned, and reclaimable,
-once its heartbeat is older than `heartbeatTimeout`.
+keeps refreshing `heartbeat_at` while it runs and remembers in memory, per
+owned id, the `heartbeat_at` value it last wrote (no owner column — a stale
+row is reclaimable by anyone, which is exactly the failover behavior we want).
+A job is abandoned, and reclaimable, once its heartbeat is older than
+`heartbeatTimeout`.
 
 Claiming is an optimistic compare-and-swap `UPDATE` that works on **every**
 SQL backend. A free thread reads a small candidate window and claims the
@@ -320,9 +321,33 @@ bounds total file-delete concurrency on the server regardless of how many
 jobs run at once; raise it to drain large tables faster when purge
 throughput matters.
 
-A separate task sends a heartbeat every `heartbeatTimeout / 3` on the ids
-this worker owns. If the host dies the heartbeat stops; once a row ages past
-`heartbeatTimeout` another replica reclaims it.
+**Updating the heartbeat.** One background task per worker process — not one
+per job — runs every `heartbeatTimeout / 3`, so two updates can be missed
+(a GC pause, a brief DB hiccup) before the row looks abandoned. For each id
+the process owns it issues a guarded `UPDATE`:
+
+```sql
+UPDATE iceberg_purge_job
+   SET heartbeat_at = :now
+ WHERE id = :id
+   AND state = 'RUNNING'
+   AND heartbeat_at = :lastValueIWrote;   -- CAS on the value I last wrote
+```
+
+The `heartbeat_at` value the worker last wrote is the lease: the `UPDATE`
+is a compare-and-swap on it, so it succeeds (`affected_rows = 1`, and the
+worker records the new `:now` as its next `:lastValueIWrote`) **only while
+this process is still the owner**. If the process stalled past
+`heartbeatTimeout` and a peer reclaimed the job, the peer's claim overwrote
+`heartbeat_at`; this process's next CAS then matches no row
+(`affected_rows = 0`), and it reads that as "I no longer own this job" —
+it stops deleting and drops the id from its in-memory set. That is how
+ownership transfers cleanly with no owner column. The claim itself
+(`SET heartbeat_at=:now` above) seeds the first `:lastValueIWrote`; finishing
+or releasing a job removes the id from the set so the task stops touching it.
+A worker owns at most `worker-threads` ids, so this is a handful of cheap
+point updates per cycle. If the host dies the task stops entirely and the
+rows age out for reclaim.
 
 ### 5.6 Failure model, restart, and crash recovery
 
