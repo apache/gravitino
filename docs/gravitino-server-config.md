@@ -23,9 +23,12 @@ The examples below show typical contents of `${GRAVITINO_HOME}/conf/gravitino.co
 Defaults are appropriate for local development with the embedded H2 backend. Opt in to the Iceberg REST server for local query-engine testing.
 
 ```properties
-# Iceberg REST server (in-memory catalog for local testing)
+# Sample gravitino.conf (development)
+
+# Iceberg REST server: auxiliary mode with shared Gravitino catalogs
 gravitino.auxService.names=iceberg-rest
-gravitino.iceberg-rest.warehouse=/tmp/gravitino-iceberg-warehouse
+gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider
+gravitino.iceberg-rest.gravitino-metalake=test
 
 # Authentication defaults to `simple` mode (anonymous user).
 # See the Authentication section below to enable OAuth or Kerberos.
@@ -36,6 +39,8 @@ gravitino.iceberg-rest.warehouse=/tmp/gravitino-iceberg-warehouse
 Configuration for production load: externally managed MySQL backend, larger cache and lock limits, audit logging, and OAuth authentication. Properties matching their default values are omitted.
 
 ```properties
+# Sample gravitino.conf (production)
+
 # Storage backend: externally managed MySQL (overrides default embedded H2)
 gravitino.entity.store.relational.jdbcUrl=jdbc:mysql://gravitino-db.example.com:3306/gravitino
 gravitino.entity.store.relational.jdbcDriver=com.mysql.cj.jdbc.Driver
@@ -54,10 +59,10 @@ gravitino.cache.maxEntries=100000
 # Audit logging
 gravitino.audit.enabled=true
 
-# Iceberg REST server with JDBC catalog backend (overrides default in-memory)
+# Iceberg REST server: auxiliary mode with shared Gravitino catalogs
 gravitino.auxService.names=iceberg-rest
-gravitino.iceberg-rest.catalog-backend=jdbc
-gravitino.iceberg-rest.warehouse=s3://your-warehouse-bucket/
+gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider
+gravitino.iceberg-rest.gravitino-metalake=production
 
 # Authentication: OAuth 2.0 / OIDC with JWKS-based token validation.
 # Example values shown for Azure AD; substitute your identity provider's URLs.
