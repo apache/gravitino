@@ -38,8 +38,8 @@ public class LanceConstants {
   public static final String LANCE_TABLE_REGISTER = "lance.register";
 
   public static final String LANCE_TABLE_VERSION = "lance.version";
-  // Mark whether it is to create an empty Lance table(no data files)
-  public static final String LANCE_TABLE_CREATE_EMPTY = "lance.create-empty";
+  // Mark whether the table is declared only in metadata without creating a Lance dataset.
+  public static final String LANCE_TABLE_DECLARED = "lance.declared";
 
   public static final String LANCE_TABLE_FORMAT = "lance";
 }
