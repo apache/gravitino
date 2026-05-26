@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.commons.collections4.MapUtils;
@@ -59,6 +60,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    * @param catalog the Gravitino catalog client
    * @param sparkProperties the mutable Spark properties map to update
    */
+  @VisibleForTesting
   static void applyJdbcCredential(Catalog catalog, Map<String, String> sparkProperties) {
     Credential[] credentials;
     try {

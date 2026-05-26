@@ -19,9 +19,11 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory;
 import org.apache.flink.connector.jdbc.table.JdbcDynamicTableFactory;
 import org.apache.flink.table.catalog.AbstractCatalog;
@@ -91,37 +93,39 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   @Override
   public void open() throws CatalogException {
-    if (jdbcCatalog == null) {
-      try {
-        applyJdbcCredential(catalog(), mutableOptions);
-      } catch (NoSuchCatalogException ignored) {
-        // During CREATE CATALOG, open() is called before the catalog is stored in Gravitino.
-        // In this case credentials are already present in the user-provided options.
-      }
-      CatalogFactory.Context contextWithCredentials =
-          new CatalogFactory.Context() {
-            @Override
-            public String getName() {
-              return context.getName();
-            }
-
-            @Override
-            public Map<String, String> getOptions() {
-              return mutableOptions;
-            }
-
-            @Override
-            public org.apache.flink.configuration.ReadableConfig getConfiguration() {
-              return context.getConfiguration();
-            }
-
-            @Override
-            public ClassLoader getClassLoader() {
-              return context.getClassLoader();
-            }
-          };
-      this.jdbcCatalog = createInnerCatalog(contextWithCredentials);
+    if (jdbcCatalog != null) {
+      super.open();
+      return;
     }
+    try {
+      applyJdbcCredential(catalog(), mutableOptions);
+    } catch (NoSuchCatalogException ignored) {
+      // During CREATE CATALOG, open() is called before the catalog is stored in Gravitino.
+      // In this case credentials are already present in the user-provided options.
+    }
+    CatalogFactory.Context contextWithCredentials =
+        new CatalogFactory.Context() {
+          @Override
+          public String getName() {
+            return context.getName();
+          }
+
+          @Override
+          public Map<String, String> getOptions() {
+            return mutableOptions;
+          }
+
+          @Override
+          public ReadableConfig getConfiguration() {
+            return context.getConfiguration();
+          }
+
+          @Override
+          public ClassLoader getClassLoader() {
+            return context.getClassLoader();
+          }
+        };
+    this.jdbcCatalog = createInnerCatalog(contextWithCredentials);
     super.open();
   }
 
@@ -154,6 +158,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    * @param catalog the Gravitino catalog client
    * @param options the mutable Flink catalog options map to update
    */
+  @VisibleForTesting
   static void applyJdbcCredential(Catalog catalog, Map<String, String> options) {
     Credential[] credentials;
     try {
