@@ -256,10 +256,13 @@ public class UserMetaBaseSQLProvider {
       @Param("metalakeName") String metalakeName,
       @Param("userName") String userName,
       @Param("groupNames") List<String> groupNames) {
+    String nullParentId = nullParentIdExpression();
     // USER row.
     String userBranch =
         "SELECT 'USER' AS subjectType, um.user_id AS id, um.user_name AS name,"
-            + " um.updated_at AS updatedAt, CAST(NULL AS BIGINT) AS parentId"
+            + " um.updated_at AS updatedAt, "
+            + nullParentId
+            + " AS parentId"
             + " FROM "
             + USER_TABLE_NAME
             + " um"
@@ -298,7 +301,9 @@ public class UserMetaBaseSQLProvider {
     String groupBranch =
         " UNION ALL "
             + "SELECT 'GROUP' AS subjectType, gm.group_id AS id, gm.group_name AS name,"
-            + " gm.updated_at AS updatedAt, CAST(NULL AS BIGINT) AS parentId"
+            + " gm.updated_at AS updatedAt, "
+            + nullParentId
+            + " AS parentId"
             + " FROM "
             + GROUP_TABLE_NAME
             + " gm"
@@ -333,5 +338,9 @@ public class UserMetaBaseSQLProvider {
             + " AND gm.deleted_at = 0";
 
     return "<script>" + userBranch + userRoleBranch + groupBranch + groupRoleBranch + "</script>";
+  }
+
+  protected String nullParentIdExpression() {
+    return "CAST(NULL AS SIGNED)";
   }
 }

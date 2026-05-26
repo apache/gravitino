@@ -112,4 +112,9 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " SET updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
+
+  @Override
+  protected String nullParentIdExpression() {
+    return "CAST(NULL AS BIGINT)";
+  }
 }
