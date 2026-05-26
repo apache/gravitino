@@ -137,7 +137,7 @@ jobs:
           configure_instance distribution/package-b/conf/gravitino.conf 8190 9011 9111
 
           # Instance B also needs the JDBC driver.
-          cp distribution/package/libs/mysql-connector-java-8.0.33.jar \
+          cp distribution/package/libs/mysql-connector-java-8.0.14.jar \
              distribution/package-b/libs/
 
       - name: Start both Gravitino instances
