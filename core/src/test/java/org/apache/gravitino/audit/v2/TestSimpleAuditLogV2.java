@@ -172,7 +172,7 @@ public class TestSimpleAuditLogV2 {
     SimpleAuditLogV2 log =
         new SimpleAuditLogV2(base) {
           @Override
-          public java.util.Map<String, String> customInfo() {
+          public Map<String, String> customInfo() {
             return ImmutableMap.of("env", "prod");
           }
         };
@@ -189,7 +189,7 @@ public class TestSimpleAuditLogV2 {
     SimpleAuditLogV2 log =
         new SimpleAuditLogV2(base) {
           @Override
-          public java.util.Map<String, String> customInfo() {
+          public Map<String, String> customInfo() {
             return ImmutableMap.of("count", "user-value");
           }
         };

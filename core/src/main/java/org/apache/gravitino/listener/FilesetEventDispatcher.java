@@ -79,7 +79,9 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
       NameIdentifier[] nameIdentifiers = dispatcher.listFilesets(namespace);
       eventBus.dispatchEvent(
           new ListFilesetEvent(
-              PrincipalUtils.getCurrentUserName(), namespace, nameIdentifiers.length));
+              PrincipalUtils.getCurrentUserName(),
+              namespace,
+              nameIdentifiers != null ? nameIdentifiers.length : 0));
       return nameIdentifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(

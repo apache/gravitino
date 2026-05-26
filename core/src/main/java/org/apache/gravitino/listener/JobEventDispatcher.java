@@ -79,7 +79,9 @@ public class JobEventDispatcher implements JobOperationDispatcher {
       List<JobTemplateEntity> jobTemplates = jobOperationDispatcher.listJobTemplates(metalake);
       eventBus.dispatchEvent(
           new ListJobTemplatesEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, jobTemplates.size()));
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              jobTemplates != null ? jobTemplates.size() : 0));
       return jobTemplates;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -185,7 +187,10 @@ public class JobEventDispatcher implements JobOperationDispatcher {
       List<JobEntity> jobs = jobOperationDispatcher.listJobs(metalake, jobTemplateName);
       eventBus.dispatchEvent(
           new ListJobsEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, jobTemplateName, jobs.size()));
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              jobTemplateName,
+              jobs != null ? jobs.size() : 0));
       return jobs;
     } catch (Exception e) {
       eventBus.dispatchEvent(

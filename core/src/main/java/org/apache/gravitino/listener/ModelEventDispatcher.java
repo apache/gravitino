@@ -193,7 +193,8 @@ public class ModelEventDispatcher implements ModelDispatcher {
     eventBus.dispatchEvent(new ListModelPreEvent(user, namespace));
     try {
       NameIdentifier[] models = dispatcher.listModels(namespace);
-      eventBus.dispatchEvent(new ListModelEvent(user, namespace, models.length));
+      eventBus.dispatchEvent(
+          new ListModelEvent(user, namespace, models != null ? models.length : 0));
       return models;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListModelFailureEvent(user, namespace, e));

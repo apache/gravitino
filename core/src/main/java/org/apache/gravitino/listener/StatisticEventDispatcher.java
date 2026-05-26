@@ -73,7 +73,8 @@ public class StatisticEventDispatcher implements StatisticDispatcher {
 
     try {
       List<Statistic> statistics = dispatcher.listStatistics(metalake, metadataObject);
-      eventBus.dispatchEvent(new ListStatisticsEvent(user, identifier, statistics.size()));
+      eventBus.dispatchEvent(
+          new ListStatisticsEvent(user, identifier, statistics != null ? statistics.size() : 0));
       return statistics;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListStatisticsFailureEvent(user, identifier, e));
@@ -174,7 +175,11 @@ public class StatisticEventDispatcher implements StatisticDispatcher {
       List<PartitionStatistics> partitionStatistics =
           dispatcher.listPartitionStatistics(metalake, metadataObject, range);
       eventBus.dispatchEvent(
-          new ListPartitionStatisticsEvent(user, identifier, range, partitionStatistics.size()));
+          new ListPartitionStatisticsEvent(
+              user,
+              identifier,
+              range,
+              partitionStatistics != null ? partitionStatistics.size() : 0));
       return partitionStatistics;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListPartitionStatisticsFailureEvent(user, identifier, e, range));
