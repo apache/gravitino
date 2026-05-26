@@ -6,25 +6,25 @@ keywords:
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Introduction
+Apache Gravitino exposes runtime metrics via the [Dropwizard Metrics](https://metrics.dropwizard.io/) library. Metrics are available through JMX and an HTTP endpoint, in both JSON and Prometheus formats. Metrics behavior is configured in `gravitino.conf`; see [Server Configuration > Metrics](gravitino-server-config.md#metrics) for the property reference.
 
-Apache Gravitino Metrics builds upon the [Dropwizard Metrics](https://metrics.dropwizard.io/). It exports these metrics through both JMX and an HTTP server, supporting JSON and Prometheus formats. Retrieve them via HTTP requests, as illustrated below:
+Retrieve metrics from a running server (substitute the Gravitino server or Iceberg REST server address for `127.0.0.1:8090`):
 
 ```shell
-// Use Gravitino Server address or Iceberg REST server address to replace 127.0.0.1:8090
-// Get metrics in JSON format
+# JSON format
 curl http://127.0.0.1:8090/metrics
-// Get metrics in Prometheus format
+
+# Prometheus format
 curl http://127.0.0.1:8090/prometheus/metrics
 ```
 
-### Metrics Source
+Metrics with the `gravitino-server` prefix are emitted by the Gravitino server; those with the `iceberg-rest-server` prefix are emitted by the embedded Iceberg REST server.
 
-#### HTTP Server Metrics
+## HTTP Server Metrics
 
-HTTP server metrics encompass the histogram of HTTP request processing time and the number of HTTP response codes, categorized by different HTTP interfaces such as `create-table` and `load-table`.
+HTTP server metrics include a histogram of HTTP request processing time and counts of HTTP response codes, partitioned by endpoint (for example `create-table` and `load-table`).
 
-For instance, you can get Prometheus metrics for `create-table` operation in the Gravitino server as follows:
+Example Prometheus output for the `create-table` operation:
 
 ```text
 gravitino_server_1xx_responses_total{operation="create-table",} 0.0
@@ -41,33 +41,36 @@ gravitino_server_http_request_duration_seconds{operation="create-table",quantile
 gravitino_server_http_request_duration_seconds{operation="create-table",quantile="0.999",} 0.0
 ```
 
-:::info
-Metrics with the `gravitino-server` prefix pertain to the Gravitino server, while those with the `iceberg-rest-server` prefix are for the Gravitino Iceberg REST server.
-:::
+## JVM Metrics
 
-#### JVM Metrics
+JVM metrics use [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html) from the Dropwizard library, including `BufferPoolMetricSet`, `GarbageCollectorMetricSet`, and `MemoryUsageGaugeSet`. JVM metric names start with the `jvm` prefix (for example, `jvm.heap.used` in JSON, `jvm_heap_used` in Prometheus).
 
-JVM metrics source uses [JVM instrumentation](https://metrics.dropwizard.io/4.2.0/manual/jvm.html) with BufferPoolMetricSet, GarbageCollectorMetricSet, and MemoryUsageGaugeSet.
-These metrics start with the `jvm` prefix, like `jvm.heap.used` in JSON format, `jvm_heap_used` in Prometheus format.
+## Catalog Metrics
 
-#### Catalog Metrics
+Catalog metrics report runtime statistics from individual catalog instances. All catalog metric names start with the `gravitino-catalog` prefix and carry the labels `provider`, `metalake`, and `catalog` to distinguish instances.
 
-Catalog metrics provide the metrics from different catalog instances.
-All the catalog metrics start with the `gravitino-catalog` prefix in Prometheus format and with labels `provider`, `metalake`, and `catalog` to distinguish different catalog instances.
+Catalog metrics are currently supported for Fileset and JDBC catalogs only.
 
-Catalog metrics only support Fileset catalog and JDBC catalog. 
-
-Get Prometheus metrics for a Fileset catalog named `test_catalog` under a metalake named `test_metalake` in the Gravitino server as follows:
+Example Prometheus output for a Fileset catalog named `test_catalog` in a metalake named `test_metalake`:
 
 ```text
 gravitino_catalog_filesystem_cache_hits{provider="fileset",metalake="test_metalake",catalog="test_catalog",} 0.0
 gravitino_catalog_filesystem_cache_misses{provider="fileset",metalake="test_metalake",catalog="test_catalog",} 0.0
 ```
 
-Get Prometheus metrics for a JDBC catalog named `test_catalog` under a metalake named `test_metalake` in the Gravitino server as follows:
+Example Prometheus output for a JDBC catalog named `test_catalog` in a metalake named `test_metalake`:
 
 ```text
 gravitino_catalog_datasource_idle_connections{provider="jdbc",metalake="test_metalake",catalog="test_catalog",} 1.0
 gravitino_catalog_datasource_active_connections{provider="jdbc",metalake="test_metalake",catalog="test_catalog",} 0.0
 gravitino_catalog_datasource_max_connections{provider="jdbc",metalake="test_metalake",catalog="test_catalog",} 10.0
 ```
+
+## Configuration
+
+Metrics behavior is configured in `gravitino.conf`. See [Server Configuration > Metrics](gravitino-server-config.md#metrics) for the property reference.
+
+## Related
+
+- [Server Configuration](gravitino-server-config.md)
+- [Iceberg REST Server](iceberg-rest-service.md)

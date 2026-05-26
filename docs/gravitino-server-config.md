@@ -348,6 +348,8 @@ Refer to [security](security/security.md) for HTTPS and authentication configura
 
 ### Metrics
 
+Gravitino exposes runtime metrics via JMX and an HTTP endpoint. The property below tunes metrics collection. See [Metrics](metrics.md) for available metrics and how to retrieve them.
+
 | Configuration item                        | Description                                          | Default value | Required | Since Version |
 |-------------------------------------------|------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.metrics.timeSlidingWindowSecs` | The seconds of Gravitino metrics time sliding window | 60            | No       | 0.5.1         |
