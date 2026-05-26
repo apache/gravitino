@@ -283,11 +283,11 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
 
     // Check whether it's a metadata-only declare table operation.
-    boolean createEmpty =
+    boolean declaredOnly =
         Optional.ofNullable(properties.get(LanceConstants.LANCE_TABLE_DECLARED))
             .map(Boolean::parseBoolean)
             .orElse(false);
-    if (createEmpty) {
+    if (declaredOnly) {
       // For declare table, we just create the table metadata in Gravitino without creating the
       // underlying Lance dataset.
       return super.createTable(

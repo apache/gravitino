@@ -95,11 +95,8 @@ class TestLanceRayIntegration(IntegrationTestEnv):
     def setUpClass(cls):
         super().setUpClass()
 
-        gravitino_home = os.environ.get("GRAVITINO_HOME")
-        if not gravitino_home:
-            raise RuntimeError(
-                "GRAVITINO_HOME must be set to the distribution package directory"
-            )
+        cls._get_gravitino_home()
+        gravitino_home = cls.gravitino_home
         cls.main_conf_path = os.path.join(gravitino_home, MAIN_CONF_FILE)
 
         # Bind the lance-rest aux service to our test metalake. If the same

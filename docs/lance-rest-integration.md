@@ -20,15 +20,16 @@ This documentation assumes familiarity with the Lance REST service setup as desc
 
 The following table outlines the tested compatibility between Gravitino versions and Lance connector versions:
 
-| Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions |
-|--------------------------------|--------------------------------|------------------------------|
-| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                |
-| 1.3.0                          | 0.2.0 - 0.4.0                  | 0.3.0 - 0.4.2                |
+| Gravitino Version (Lance REST) | Supported lance-spark Versions | Supported lance-ray Versions                  |
+|--------------------------------|--------------------------------|-----------------------------------------------|
+| 1.1.1 - 1.2.1                  | 0.0.10 - 0.0.15                | 0.0.6 - 0.0.8                                 |
+| 1.3.0                          | 0.2.0 - 0.4.0                  | 0.3.0 - 0.4.2, 0.2.0 supports with conditions |
 
 :::note
 - These version ranges show which versions are expected to work together.
-- For Gravitino 1.3.0, the explicitly verified release versions are
-  `lance-spark` {0.2.0, 0.4.0} and `lance-ray` {0.3.0, 0.4.2}.
+- For Gravitino 1.3.0, the explicitly verified release versions
+  `lance-spark` {0.2.0, 0.4.0} and `lance-ray` {0.3.0, 0.4.2}, 0.2.0 with conditions.
+
 - **`lance-spark` 0.1.0 and 0.1.1 are not supported on Gravitino 1.3.0.**
   Those bundles create tables by calling the legacy
   `POST /lance/v1/table/{id}/create-empty` endpoint, which 1.3.0 no longer
@@ -52,7 +53,8 @@ The following table outlines the tested compatibility between Gravitino versions
     `from lance import LanceNamespaceStorageOptionsProvider`, which no longer
     exists in the `pylance` 6.0.0 wheel that `lance-namespace==0.7.5` pulls
     in, raising `ImportError: cannot import name
-    'LanceNamespaceStorageOptionsProvider' from 'lance'`.
+    'LanceNamespaceStorageOptionsProvider' from 'lance'`. **But if you can still use lance-ray 0.2.0 with Gravitino 1.3.0 by pining pylance to 3.x or 4.x.**
+
 - Before using in production, please test the exact connector versions in your own environment.
 - The Lance ecosystem is changing quickly, so some versions may introduce breaking changes.
 :::

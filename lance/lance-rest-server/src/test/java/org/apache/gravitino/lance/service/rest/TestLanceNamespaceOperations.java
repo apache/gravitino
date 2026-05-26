@@ -112,7 +112,7 @@ public class TestLanceNamespaceOperations extends JerseyTest {
     // auto-register a Jackson provider that calls ObjectMapper.findAndRegisterModules().
     // When jackson-module-scala is on the classpath (pulled in by spark-sql), the
     // auto-discovered provider deserializes JSON objects as Scala Maps instead of
-    // java.util.Map, breaking extractPropertiesFromBody().
+    // java.util.Map, breaking Lance REST request handling that expects Java Maps.
     resourceConfig.property(CommonProperties.FEATURE_AUTO_DISCOVERY_DISABLE, true);
     resourceConfig.property(CommonProperties.MOXY_JSON_FEATURE_DISABLE, true);
     ObjectMapper mapper = new ObjectMapper();
