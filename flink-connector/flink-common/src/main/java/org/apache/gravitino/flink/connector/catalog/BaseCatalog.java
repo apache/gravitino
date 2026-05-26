@@ -322,40 +322,40 @@ public abstract class BaseCatalog extends AbstractCatalog {
   @Override
   public void renameTable(ObjectPath tablePath, String newTableName, boolean ignoreIfNotExists)
       throws TableNotExistException, TableAlreadyExistException, CatalogException {
-    NameIdentifier identifier =
-        NameIdentifier.of(Namespace.of(tablePath.getDatabaseName()), newTableName);
-
-    if (catalog().asTableCatalog().tableExists(identifier)) {
-      throw new TableAlreadyExistException(
-          catalogName(), new ObjectPath(tablePath.getDatabaseName(), newTableName));
-    }
-    ViewCatalog viewCatalog = null;
-    try {
-      viewCatalog = catalog().asViewCatalog();
-    } catch (UnsupportedOperationException ignored) {
-      // catalog does not support views
-    }
-
     NameIdentifier srcIdent =
         NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName());
-    boolean isAlterView = false;
-    if (viewCatalog != null) {
-      if (viewCatalog.viewExists(identifier)) {
-        throw new TableAlreadyExistException(
-            catalogName(), new ObjectPath(tablePath.getDatabaseName(), newTableName));
-      }
-      isAlterView = viewCatalog.viewExists(srcIdent);
-    }
+    ObjectPath newPath = new ObjectPath(tablePath.getDatabaseName(), newTableName);
+
     try {
-      if (isAlterView) {
-        viewCatalog.alterView(srcIdent, ViewChange.rename(newTableName));
-      } else {
-        catalog().asTableCatalog().alterTable(srcIdent, TableChange.rename(newTableName));
+      catalog().asTableCatalog().alterTable(srcIdent, TableChange.rename(newTableName));
+      return;
+    } catch (NoSuchTableException ignored) {
+      // source is not a table, try as a view below
+    } catch (TableAlreadyExistsException e) {
+      throw new TableAlreadyExistException(catalogName(), newPath, e);
+    } catch (Exception e) {
+      throw new CatalogException(e);
+    }
+
+    ViewCatalog viewCatalog;
+    try {
+      viewCatalog = catalog().asViewCatalog();
+    } catch (UnsupportedOperationException e) {
+      // catalog does not support views; source does not exist as table or view
+      if (!ignoreIfNotExists) {
+        throw new TableNotExistException(catalogName(), tablePath);
       }
-    } catch (NoSuchViewException | NoSuchTableException e) {
+      return;
+    }
+
+    try {
+      viewCatalog.alterView(srcIdent, ViewChange.rename(newTableName));
+    } catch (NoSuchViewException e) {
       if (!ignoreIfNotExists) {
         throw new TableNotExistException(catalogName(), tablePath, e);
       }
+    } catch (ViewAlreadyExistsException e) {
+      throw new TableAlreadyExistException(catalogName(), newPath, e);
     } catch (Exception e) {
       throw new CatalogException(e);
     }
