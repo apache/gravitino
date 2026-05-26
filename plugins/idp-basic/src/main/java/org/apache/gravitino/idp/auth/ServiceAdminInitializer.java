@@ -24,6 +24,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,8 +32,15 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.idp.basic.password.PasswordHasher;
+import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
+import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.utils.POConverters;
 
 /** Initializes configured service admins in the built-in IdP during server startup. */
 public class ServiceAdminInitializer {
@@ -57,19 +65,26 @@ public class ServiceAdminInitializer {
   }
 
   /**
-   * Initialize the service admins.
+   * Initialize the service admins using the current runtime environment.
    *
    * @param config The configuration object to initialize the service admins.
-   * @param serviceAdminManager The manager used to create service admins.
    */
-  public void initialize(Config config, ServiceAdminManager serviceAdminManager) {
-    initialize(config, serviceAdminManager, System.getenv(INITIAL_ADMIN_PASSWORD_ENV));
+  public void initialize(Config config) throws IOException {
+    initialize(
+        config,
+        IdpUserMetaService.getInstance(),
+        PasswordHasherFactory.create(),
+        GravitinoEnv.getInstance().idGenerator(),
+        System.getenv(INITIAL_ADMIN_PASSWORD_ENV));
   }
 
   void initialize(
       Config config,
-      ServiceAdminManager serviceAdminManager,
-      @Nullable String initialAdminPasswords) {
+      IdpUserMetaService userMetaService,
+      PasswordHasher passwordHasher,
+      IdGenerator idGenerator,
+      @Nullable String initialAdminPasswords)
+      throws IOException {
     if (!enabledBasicAuthenticator(config)) {
       return;
     }
@@ -83,7 +98,7 @@ public class ServiceAdminInitializer {
         parseInitialAdminPasswords(serviceAdmins, initialAdminPasswords);
     for (String serviceAdmin : serviceAdmins) {
       validateUserName(serviceAdmin);
-      if (serviceAdminManager.serviceAdminExists(serviceAdmin)) {
+      if (userMetaService.idpUserExists(serviceAdmin)) {
         continue;
       }
 
@@ -93,8 +108,30 @@ public class ServiceAdminInitializer {
           "Missing initial password for configured service admin %s; declare %s",
           serviceAdmin,
           INITIAL_ADMIN_PASSWORD_ENV);
-      serviceAdminManager.initializeServiceAdmin(serviceAdmin, password);
+      initializeServiceAdmin(serviceAdmin, password, userMetaService, passwordHasher, idGenerator);
     }
+  }
+
+  private void initializeServiceAdmin(
+      String userName,
+      String password,
+      IdpUserMetaService userMetaService,
+      PasswordHasher passwordHasher,
+      IdGenerator idGenerator)
+      throws IOException {
+    userMetaService.insertIdpUser(newUserPO(userName, passwordHasher.hash(password), idGenerator));
+  }
+
+  private static IdpUserPO newUserPO(
+      String username, String passwordHash, IdGenerator idGenerator) {
+    return IdpUserPO.builder()
+        .withUserId(idGenerator.nextId())
+        .withUsername(username)
+        .withPasswordHash(passwordHash)
+        .withCurrentVersion(POConverters.INIT_VERSION)
+        .withLastVersion(POConverters.INIT_VERSION)
+        .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
+        .build();
   }
 
   private boolean enabledBasicAuthenticator(Config config) {

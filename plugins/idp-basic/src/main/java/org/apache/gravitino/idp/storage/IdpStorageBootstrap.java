@@ -23,18 +23,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
-import org.apache.gravitino.idp.auth.ServiceAdminManager;
-import org.apache.gravitino.idp.storage.gc.IdpLegacyGarbageCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * One-time initialization for built-in IdP storage components that are not wired through core
- * entity-store lifecycle.
- *
- * <p>Not invoked from {@link
- * org.apache.gravitino.idp.storage.mapper.provider.IdpBasicMapperPackageProvider} in the current
- * PR; a future change can wire this through server/plugin lifecycle.
+ * One-time initialization for built-in IdP components that are not wired through core entity-store
+ * lifecycle.
  */
 public final class IdpStorageBootstrap {
 
@@ -44,7 +38,7 @@ public final class IdpStorageBootstrap {
 
   private IdpStorageBootstrap() {}
 
-  /** Initializes IdP storage background tasks and service admins once per JVM. */
+  /** Initializes built-in IdP service admins once per JVM. */
   public static void initializeOnce() {
     if (!INITIALIZED.compareAndSet(false, true)) {
       return;
@@ -52,9 +46,7 @@ public final class IdpStorageBootstrap {
 
     Config config = GravitinoEnv.getInstance().config();
     try {
-      ServiceAdminInitializer.getInstance()
-          .initialize(config, ServiceAdminManager.fromEnvironment());
-      IdpLegacyGarbageCollector.startScheduledCollector(config);
+      ServiceAdminInitializer.getInstance().initialize(config);
     } catch (RuntimeException e) {
       INITIALIZED.set(false);
       LOG.error("Failed to initialize built-in IdP storage", e);
