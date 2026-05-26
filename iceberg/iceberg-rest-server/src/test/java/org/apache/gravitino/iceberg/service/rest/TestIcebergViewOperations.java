@@ -50,6 +50,8 @@ import org.apache.gravitino.listener.api.event.IcebergReplaceViewFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergReplaceViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergViewExistsEvent;
 import org.apache.gravitino.listener.api.event.IcebergViewExistsPreEvent;
+import org.apache.gravitino.listener.api.event.OperationType;
+import org.apache.gravitino.listener.api.event.PreEvent;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirements;
 import org.apache.iceberg.catalog.Namespace;
@@ -172,16 +174,23 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
 
     dummyEventListener.clearEvent();
     verifyReplaceSucc(namespace, "replace_foo1", metadata);
-    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergReplaceViewPreEvent);
-    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergReplaceViewEvent);
+    PreEvent replacePreEvent = dummyEventListener.popPreEvent();
+    Event replacePostEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(replacePreEvent instanceof IcebergReplaceViewPreEvent);
+    Assertions.assertTrue(replacePostEvent instanceof IcebergReplaceViewEvent);
+    Assertions.assertEquals(OperationType.REPLACE_VIEW, replacePreEvent.operationType());
+    Assertions.assertEquals(OperationType.REPLACE_VIEW, replacePostEvent.operationType());
 
     verifyDropViewSucc(namespace, "replace_foo1");
 
     dummyEventListener.clearEvent();
     verifyUpdateViewFail(namespace, "replace_foo1", 404, metadata);
-    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergReplaceViewPreEvent);
-    Assertions.assertTrue(
-        dummyEventListener.popPostEvent() instanceof IcebergReplaceViewFailureEvent);
+    PreEvent replaceFailurePreEvent = dummyEventListener.popPreEvent();
+    Event replaceFailurePostEvent = dummyEventListener.popPostEvent();
+    Assertions.assertTrue(replaceFailurePreEvent instanceof IcebergReplaceViewPreEvent);
+    Assertions.assertTrue(replaceFailurePostEvent instanceof IcebergReplaceViewFailureEvent);
+    Assertions.assertEquals(OperationType.REPLACE_VIEW, replaceFailurePreEvent.operationType());
+    Assertions.assertEquals(OperationType.REPLACE_VIEW, replaceFailurePostEvent.operationType());
 
     verifyDropNamespaceSucc(namespace);
     verifyUpdateViewFail(namespace, "replace_foo1", 404, metadata);
