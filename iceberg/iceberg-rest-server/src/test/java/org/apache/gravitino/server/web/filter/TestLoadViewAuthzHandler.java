@@ -99,7 +99,8 @@ public class TestLoadViewAuthzHandler {
     @AuthorizationExpression(
         expression = AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION,
         allowCheckExistence =
-            AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_SECONDARY_AUTHORIZATION_EXPRESSION,
+            AuthorizationExpressionConstants
+                .ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION,
         accessMetadataType = MetadataObject.Type.VIEW)
     public void loadView(
         @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String prefix,

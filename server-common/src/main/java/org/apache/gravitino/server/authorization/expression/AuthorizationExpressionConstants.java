@@ -49,7 +49,7 @@ public class AuthorizationExpressionConstants {
                   """;
 
   /**
-   * Secondary expression for Iceberg REST {@code loadTable}: used when the primary load-table
+   * Existence-check expression for Iceberg REST {@code loadTable}: used when the primary load-table
    * expression is forbidden, to allow schema-level principals who can create/select views to
    * resolve a table identifier (e.g. view backing table) without full table privileges.
    */
@@ -110,12 +110,12 @@ public class AuthorizationExpressionConstants {
                   """;
 
   /**
-   * Secondary expression for Iceberg REST {@code loadView}: when the primary load-view expression
-   * is forbidden, allows schema-level principals with view or referenced-table paths (similar shape
-   * to {@link #ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION}, tuned for view metadata
-   * and backing relation resolution).
+   * Existence-check expression for Iceberg REST {@code loadView}: when the primary load-view
+   * expression is forbidden, allows schema-level principals with view or referenced-table paths
+   * (similar shape to {@link #ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION}, tuned for
+   * view metadata and backing relation resolution).
    */
-  public static final String ICEBERG_LOAD_VIEW_SECONDARY_AUTHORIZATION_EXPRESSION =
+  public static final String ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION =
       """
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  &&
                   (ANY_CREATE_VIEW || TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)

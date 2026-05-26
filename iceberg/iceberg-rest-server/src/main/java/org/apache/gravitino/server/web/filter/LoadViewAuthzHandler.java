@@ -172,6 +172,7 @@ public class LoadViewAuthzHandler implements AuthorizationHandler {
         return expr;
       }
     }
-    return AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_SECONDARY_AUTHORIZATION_EXPRESSION;
+    return AuthorizationExpressionConstants
+        .ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION;
   }
 }

@@ -186,21 +186,22 @@ public class TestIcebergViewAuthorizationExpression {
                 "METALAKE::USE_CATALOG")));
 
     // CREATE_VIEW alone does NOT grant the primary load-view permission; existence checks for
-    // view creation are handled by the secondary (allowCheckExistence) expression -- see
-    // {@link AuthorizationExpressionConstants#ICEBERG_LOAD_VIEW_SECONDARY_AUTHORIZATION_EXPRESSION}
-    // and {@link #testIcebergLoadViewSecondaryAuthorizationExpression()} below.
+    // view creation are handled by the allowCheckExistence expression -- see
+    // {@link
+    // AuthorizationExpressionConstants#ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION}
+    // and {@link #testIcebergLoadViewAllowCheckExistenceAuthorizationExpression()} below.
     assertFalse(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::CREATE_VIEW", "SCHEMA::USE_SCHEMA", "CATALOG::USE_CATALOG")));
   }
 
   @Test
-  public void testIcebergLoadViewSecondaryAuthorizationExpression() throws OgnlException {
-    // Secondary expression used by LoadViewAuthzHandler when the primary load-view expression
+  public void testIcebergLoadViewAllowCheckExistenceAuthorizationExpression() throws OgnlException {
+    // Existence-check expression used by LoadViewAuthzHandler when the primary load-view expression
     // denies: should allow schema-level principals with create-view or table-access privileges to
     // resolve a view identifier (existence check) even without full load-view privileges.
     String expression =
-        AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_SECONDARY_AUTHORIZATION_EXPRESSION;
+        AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION;
     MockAuthorizationExpressionEvaluator mockEvaluator =
         new MockAuthorizationExpressionEvaluator(expression);
 
@@ -238,7 +239,7 @@ public class TestIcebergViewAuthorizationExpression {
         AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION,
         annotation.expression());
     assertEquals(
-        AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_SECONDARY_AUTHORIZATION_EXPRESSION,
+        AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION,
         annotation.allowCheckExistence());
 
     Parameter viewParameter = method.getParameters()[2];
