@@ -45,6 +45,13 @@ final class FlussMetadataUtils {
                 LinkedHashMap::new));
   }
 
+  /**
+   * Returns a Fluss column name from a Gravitino field path.
+   *
+   * <p>Gravitino represents column references as string arrays so they can address nested fields
+   * such as {@code ["address", "city"]}. Fluss table changes only accept top-level column names, so
+   * the path must contain exactly one non-empty name.
+   */
   static String requireTopLevelField(String[] fieldName) {
     if (fieldName.length != 1 || Objects.requireNonNull(fieldName[0]).isEmpty()) {
       throw new IllegalArgumentException("Fluss only supports top-level fields");
