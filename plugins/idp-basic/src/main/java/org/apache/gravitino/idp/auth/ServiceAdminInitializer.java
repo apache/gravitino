@@ -34,6 +34,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auth.AuthenticatorType;
+import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
 import org.apache.gravitino.idp.exception.NotFoundException;
@@ -85,7 +86,7 @@ public final class ServiceAdminInitializer {
     Map<String, String> initialPasswords =
         parseInitialAdminPasswords(serviceAdmins, initialAdminPasswords);
     for (String serviceAdmin : serviceAdmins) {
-      validateUsername(serviceAdmin);
+      IdpCredentialValidator.validateUsername(serviceAdmin);
       if (idpUserExists(userMetaService, serviceAdmin)) {
         continue;
       }
@@ -161,8 +162,8 @@ public final class ServiceAdminInitializer {
 
       String username = entry.substring(0, separatorIndex);
       String password = entry.substring(separatorIndex + 1);
-      validateUsername(username);
-      validatePassword(password);
+      IdpCredentialValidator.validateUsername(username);
+      IdpCredentialValidator.validatePassword(password);
       Preconditions.checkArgument(
           serviceAdmins.contains(username),
           "%s entry '%s' is not a configured service admin",
@@ -177,18 +178,5 @@ public final class ServiceAdminInitializer {
     }
 
     return ImmutableMap.copyOf(passwordsByAdmin);
-  }
-
-  private static void validateUsername(String username) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(username), "Username is required");
-    Preconditions.checkArgument(!username.contains(":"), "Username cannot contain ':'");
-  }
-
-  private static void validatePassword(String password) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(password), "Password is required");
-    Preconditions.checkArgument(
-        password.length() >= 12, "Password length must be at least 12 characters");
-    Preconditions.checkArgument(
-        password.length() <= 64, "Password length must be at most 64 characters");
   }
 }

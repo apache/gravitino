@@ -150,7 +150,9 @@ class TestServiceAdminInitializer {
         Arguments.of(
             "[\"admin1:Passw0rd-For-Admin1\",\"admin1:Passw0rd-For-Admin1-Another\"]",
             "GRAVITINO_INITIAL_ADMIN_PASSWORD contains duplicate entries for service admin admin1"),
-        Arguments.of("[\"admin1:short\"]", "Password length must be at least 12 characters"));
+        Arguments.of(
+            "[\"admin1:short\"]",
+            "Password must be at least 12 characters long and at most 64 characters long"));
   }
 
   private static IdpUserPO existingUser(String username) {
