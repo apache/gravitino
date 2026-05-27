@@ -118,7 +118,7 @@ public class BasicAuthenticator implements Authenticator {
 
       String password = parts[1];
       if (StringUtils.isBlank(password)) {
-        throw invalidCredentials();
+        throw new UnauthorizedException("Invalid username or password", BASIC_CHALLENGE);
       }
       return new BasicCredentials(username, password);
     } catch (IllegalArgumentException e) {
@@ -138,10 +138,6 @@ public class BasicAuthenticator implements Authenticator {
 
   private static UnauthorizedException unauthorized(String message) {
     return new UnauthorizedException(message, BASIC_CHALLENGE);
-  }
-
-  private static UnauthorizedException invalidCredentials() {
-    return unauthorized("Invalid username or password");
   }
 
   private static final class BasicCredentials {

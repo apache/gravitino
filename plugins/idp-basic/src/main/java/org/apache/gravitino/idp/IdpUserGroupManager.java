@@ -53,8 +53,6 @@ import org.apache.gravitino.storage.relational.utils.POConverters;
  */
 public class IdpUserGroupManager implements Closeable {
 
-  private static final String BASIC_CHALLENGE = AuthConstants.AUTHORIZATION_BASIC_HEADER.trim();
-  private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid username or password";
   private static final String BASIC_AUTHENTICATOR_CLASS_NAME =
       BasicAuthenticator.class.getCanonicalName();
 
@@ -214,11 +212,13 @@ public class IdpUserGroupManager implements Closeable {
     try {
       IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
       if (!passwordHasher.verify(password, userPO.getPasswordHash())) {
-        throw invalidCredentials();
+        throw new UnauthorizedException(
+            "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
       }
       return new IdpUser(username, USER_SERVICE.listGroupNamesByUsername(username));
     } catch (NotFoundException e) {
-      throw invalidCredentials();
+      throw new UnauthorizedException(
+          "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
     }
   }
 
@@ -316,10 +316,6 @@ public class IdpUserGroupManager implements Closeable {
     } catch (NotFoundException e) {
       return false;
     }
-  }
-
-  private static UnauthorizedException invalidCredentials() {
-    return new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE, BASIC_CHALLENGE);
   }
 
   private static Map<String, String> parseInitialAdminPasswords(
