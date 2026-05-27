@@ -37,7 +37,7 @@ public class IdpGroupMetaH2Provider extends IdpGroupMetaBaseSQLProvider {
         + " WHEN u.user_name IS NOT NULL AND u.user_name <> ''"
         + " THEN '\"' || u.user_name || '\"'"
         + " ELSE NULL"
-        + " END ORDER BY u.user_name), '')"
+        + " END), '')"
         + " || ']' as usernames"
         + " FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME

@@ -38,7 +38,7 @@ public class IdpGroupMetaBaseSQLProvider {
 
   public String selectIdpGroupWithUsers(@Param("groupName") String groupName) {
     return "SELECT g.group_name as name,"
-        + " COALESCE(JSON_ARRAYAGG(u.user_name ORDER BY u.user_name), JSON_ARRAY()) as usernames"
+        + " COALESCE(JSON_ARRAYAGG(u.user_name), JSON_ARRAY()) as usernames"
         + " FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g LEFT JOIN "

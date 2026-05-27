@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
@@ -156,7 +157,7 @@ public class IdpRESTApiIT extends BaseIT {
 
     group =
         putMembership(GROUP1, new GroupMembershipChangeRequest(new String[] {USER1, USER2}, null));
-    Assertions.assertEquals(List.of(USER1, USER2), group.getGroup().users());
+    Assertions.assertEquals(Set.of(USER1, USER2), Set.copyOf(group.getGroup().users()));
 
     assertError(405, deleteGroupResponse(GROUP1, false), ErrorConstants.UNSUPPORTED_OPERATION_CODE);
 

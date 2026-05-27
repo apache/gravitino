@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
@@ -70,8 +71,9 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroup("missing"));
     assertEquals("engineering", groupMetaService.getIdpGroup("engineering").name());
-    assertIterableEquals(
-        List.of("user1", "user2"), groupMetaService.getIdpGroup("engineering").usernames());
+    assertEquals(
+        Set.of("user1", "user2"),
+        Set.copyOf(groupMetaService.getIdpGroup("engineering").usernames()));
   }
 
   @ParameterizedTest
