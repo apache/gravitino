@@ -34,7 +34,7 @@ public class IdpBasicMapperPackageProvider implements MapperPackageProvider {
   public List<Class<?>> getMapperClasses() {
     GravitinoEnv env = GravitinoEnv.getInstance();
     if (env.config() != null) {
-      IdpRESTFeature.apply(env.config());
+      IdpRESTFeature.registerBasicAuthenticator(env.config());
     }
     return ImmutableList.of(
         IdpUserMetaMapper.class, IdpGroupMetaMapper.class, IdpUserGroupRelMapper.class);

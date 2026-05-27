@@ -59,7 +59,7 @@ public class IdpRESTFeature implements Feature {
   /** Environment variable for the initial password of configured service admins. */
   public static final String INITIAL_ADMIN_PASSWORD_ENV = "GRAVITINO_INITIAL_ADMIN_PASSWORD";
 
-  public static void apply(Config config) {
+  public static void registerBasicAuthenticator(Config config) {
     List<String> extensionPackages = config.get(Configs.REST_API_EXTENSION_PACKAGES);
     if (extensionPackages == null || !extensionPackages.contains(IDP_REST_EXTENSION_PACKAGE)) {
       return;
