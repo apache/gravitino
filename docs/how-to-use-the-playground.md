@@ -34,36 +34,38 @@ The playground runs several services. The TCP ports used may clash with existing
 
 ## Usage
 
-### Launch the Playground with Curl
+1. Launch the playground. Choose one of the following methods:
 
-```shell
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/apache/gravitino-playground/HEAD/install.sh)"
-```
+   With curl:
 
-### Launch the Playground with Git
+   ```shell
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/apache/gravitino-playground/HEAD/install.sh)"
+   ```
 
-```shell
-git clone git@github.com:apache/gravitino-playground.git
-cd gravitino-playground
-```
+   With git:
 
-#### Start
+   ```shell
+   git clone git@github.com:apache/gravitino-playground.git
+   cd gravitino-playground
+   ```
 
-```
-./playground.sh start
-```
+2. Start the playground:
 
-#### Check Status
+   ```shell
+   ./playground.sh start
+   ```
 
-```shell 
-./playground.sh status
-```
+3. Check the status:
 
-#### Stop the Playground
+   ```shell
+   ./playground.sh status
+   ```
 
-```shell
-./playground.sh stop
-```
+4. Stop the playground:
+
+   ```shell
+   ./playground.sh stop
+   ```
 
 ## Run Trino SQL Queries
 
