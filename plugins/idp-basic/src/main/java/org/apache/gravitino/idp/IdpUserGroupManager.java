@@ -39,6 +39,7 @@ import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
+import org.apache.gravitino.idp.storage.relational.IdpGarbageCollector;
 import org.apache.gravitino.idp.storage.relational.IdpRelationalStorage;
 import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
@@ -58,6 +59,7 @@ public class IdpUserGroupManager implements Closeable {
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
 
   private final IdpRelationalStorage relationalStorage;
+  private final IdpGarbageCollector garbageCollector;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
 
@@ -71,6 +73,8 @@ public class IdpUserGroupManager implements Closeable {
     this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
     this.passwordHasher = PasswordHasherFactory.create();
+    this.garbageCollector = new IdpGarbageCollector(config);
+    this.garbageCollector.start();
   }
 
   public void initializeConfiguredServiceAdmins(Config config, String initialAdminPassword)
@@ -228,6 +232,7 @@ public class IdpUserGroupManager implements Closeable {
 
   @Override
   public void close() throws IOException {
+    garbageCollector.close();
     relationalStorage.close();
   }
 

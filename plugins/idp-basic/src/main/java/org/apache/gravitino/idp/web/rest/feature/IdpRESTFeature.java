@@ -28,7 +28,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
-import org.apache.gravitino.idp.storage.relational.IdpGarbageCollector;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
 import org.apache.gravitino.idp.web.rest.IdpGroupOperations;
@@ -71,8 +70,6 @@ public class IdpRESTFeature implements Feature {
     } catch (IOException e) {
       throw new IllegalStateException("Failed to initialize built-in IdP service admins", e);
     }
-
-    new IdpGarbageCollector(config).start();
 
     context.register(IdpBasicBinder.class);
     context.register(IdpUserOperations.class);
