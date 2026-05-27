@@ -48,9 +48,10 @@ For production tables this fails in three ways:
 - Concurrent purges saturate the Jetty pool.
 - Mid-purge failures leak files with no retry or audit trail.
 
-We want the drop to return quickly, finish file deletion reliably in the
-background, survive restarts, and run safely across multiple server
-replicas — while keeping the synchronous path available as a rollback.
+We want an opt-in path where the drop returns quickly, finishes file
+deletion reliably in the background, survives restarts, and runs safely
+across multiple server replicas — while synchronous deletion remains the
+default, selected automatically for any client that does not opt in.
 
 *Not in scope:* `RelationalGarbageCollector`, which deletes tombstoned
 **rows** from Gravitino's relational backend. Different IO surface,
@@ -63,8 +64,9 @@ different failure model — kept separate.
 1. **Fast response**: `DELETE … ?purgeRequested=true` returns at typical
    request latency (target p99 < 500 ms, < 5 s even for the largest
    tables) regardless of table size.
-2. **Operational simplicity**: Ship a single async deletion path; retain
-   the synchronous path behind a flag purely for rollback.
+2. **Operational simplicity**: Ship one async deletion path as an opt-in;
+   synchronous deletion stays the default so existing behavior is unchanged
+   unless a client explicitly asks for async.
 3. **Reliable deletion**: The async path deletes every file the
    synchronous purge would have, retries transient failures, and survives
    restarts and replica failover.
@@ -93,7 +95,8 @@ different failure model — kept separate.
 An earlier draft proposed a pluggable `IcebergPurger` SPI. Review feedback
 pushed back: no second implementation is in flight, and the goal is a
 simpler design with a smaller bug surface. We chose a single async
-implementation with a synchronous rollback flag.
+implementation gated behind a per-request opt-in, with synchronous deletion
+as the default.
 
 | Approach                                                    | Pros                                                                                     | Cons                                                                                             | Decision                                                                |
 |-------------------------------------------------------------|------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------|
@@ -103,7 +106,7 @@ implementation with a synchronous rollback flag.
 | External job system (Quartz / Temporal)                     | Mature scheduling, retries, observability                                                | Heavy operational burden on every operator                                                       | **Rejected** — disproportionate for one workload                        |
 | Enumerate files at enqueue time                             | Worker needs no metadata re-read                                                         | Slow on large tables (defeats the latency goal), bloats job rows                                 | **Rejected** — store `metadata_location`, re-read at run time           |
 | Object-store job markers (no DB table)                      | No schema / migration                                                                    | Hand-rolled lease + renewal, no indexed scheduling, fragments per-bucket                         | **Rejected** — higher net complexity (see below)                        |
-| **JDBC job table + worker pool, synchronous fallback flag** | Smallest bug surface; restart-safe and cluster-safe via CAS claim; one code path to test | No built-in extension point                                                                      | **Chosen**                                                              |
+| **JDBC job table + worker pool, async opt-in (synchronous default)** | Smallest bug surface; restart-safe and cluster-safe via CAS claim; one code path to test | No built-in extension point                                                                      | **Chosen**                                                              |
 
 **Why not an S3-only control plane?** Conditional writes (`If-None-Match`)
 let workers claim jobs without a relational backend, but it *raises* net
@@ -126,33 +129,34 @@ doubles as the name-reuse tombstone (§5.7).
             │
             ▼
   IcebergTableOperationExecutor.dropTable
-            │  X-Gravitino-Async-Purge header (absent ⇒ async)
-      ┌─────┴───────────────┐
-      │ header absent       │ X-Gravitino-Async-Purge: false
-      ▼                     ▼
- persist iceberg_cleanup_job   CatalogUtil.dropTableData
- row, return 204             (synchronous, on request thread)
-      │
-      ▼
- worker pool (any replica)
-   claims job via CAS UPDATE (heartbeat ownership)
-   → rebuild snapshot graph from metadata_location
-   → stream + delete every reachable file, retry on later polls
-   → SUCCEEDED | FAILED
+            │  X-Gravitino-Async-Purge header (absent ⇒ synchronous)
+      ┌─────┴───────────────────────────┐
+      │ header absent                   │ X-Gravitino-Async-Purge: true
+      ▼                                 ▼
+ CatalogUtil.dropTableData         persist iceberg_cleanup_job
+ (synchronous, on request thread)  row, return 204
+                                        │
+                                        ▼
+                                  worker pool (any replica)
+                                    claims job via CAS UPDATE (heartbeat ownership)
+                                    → rebuild snapshot graph from metadata_location
+                                    → stream + delete every reachable file, retry on later polls
+                                    → SUCCEEDED | FAILED
 ```
 
-The header is optional and has no default value: when it is **absent** —
-which is the case for any standard Iceberg client — the drop is async. A
-client opts into the synchronous fallback by sending
-`X-Gravitino-Async-Purge: false` (the header name uses canonical HTTP casing,
-each word capitalized).
+The header is optional and defaults to synchronous: when it is **absent** —
+which is the case for any standard Iceberg client — the drop is synchronous,
+preserving today's "deleted means gone" behavior. A client opts into async
+deletion by sending `X-Gravitino-Async-Purge: true` (the header name uses
+canonical HTTP casing, each word capitalized).
 
 ### 5.2 User flow
 
 1. A client issues
-   `DELETE /v1/{prefix}/namespaces/{ns}/tables/{t}?purgeRequested=true`.
-   No client change is needed for async; strict synchronous deletion is
-   selected by adding `X-Gravitino-Async-Purge: false`.
+   `DELETE /v1/{prefix}/namespaces/{ns}/tables/{t}?purgeRequested=true`
+   with `X-Gravitino-Async-Purge: true` to opt into async deletion. Absent
+   the header — the case for any standard Iceberg client — the drop is
+   synchronous (today's behavior). Steps 2–5 describe the async path.
 2. The server runs authorization on the request thread, loads the table
    metadata location, drops the catalog entry, and persists an
    `iceberg_cleanup_job` row.
@@ -172,7 +176,7 @@ public void dropTable(IcebergRequestContext ctx, TableIdentifier id,
   IcebergCatalogWrapper w = catalogWrapperManager.getCatalogWrapper(ctx.catalogName());
   if (!purgeRequested) { w.dropTable(id); return; }
 
-  if (!asyncPurgeEnabled) {                 // fallback path
+  if (!asyncPurgeEnabled) {                 // default when header is absent
     w.purgeTable(id);                       // synchronous, today's behavior
     return;
   }
@@ -568,7 +572,7 @@ land.
 
 Whether a given drop runs asynchronously is **not** a server config — it is a
 per-request **client** choice via the `X-Gravitino-Async-Purge` header
-(absent ⇒ async; `false` selects synchronous deletion). The server-side keys
+(absent ⇒ synchronous; `true` opts into async deletion). The server-side keys
 only tune the worker pool and retries:
 
 | Key                                                           | Default  | Description                                                                  |
@@ -618,7 +622,7 @@ the response. With this design:
 
 The async-vs-synchronous choice rides on the optional `X-Gravitino-Async-Purge`
 header — a Gravitino extension, not part of the Iceberg REST spec. A standard
-client never sends it and gets the async default, so the protocol is
+client never sends it and gets the synchronous default, so the protocol is
 unchanged.
 
 ---
@@ -626,8 +630,8 @@ unchanged.
 ## 6. Task Breakdown
 
 Ordered so dependencies come first. Each item maps to one GitHub issue/PR.
-Async purge ships **as the default in 1.3**; the synchronous path remains
-only as a rollback flag.
+Synchronous purge remains **the default in 1.3**; async purge ships as an
+opt-in path selected per request via the `X-Gravitino-Async-Purge` header.
 
 ### Phase 1 (1.3): Async purge core
 - [ ] Add the `iceberg_cleanup_job` schema and migrations (MySQL, H2, PostgreSQL)
@@ -662,10 +666,10 @@ only as a rollback flag.
   - `TestIcebergPurgeWorker` — claiming, heartbeat renewal on a thread that
     stays fresh while delete batches block, contention (H2), bulk-delete
     batching, and `CallerRunsPolicy` back-pressure when the delete queue fills.
-  - `TestIcebergTableOperationExecutorAsyncPurge` — async default enqueues
-    exactly one job; a repeated drop returns `404` and enqueues no second job;
-    `X-Gravitino-Async-Purge: false` falls back to synchronous purge; thrown
-    errors surface as 5xx.
+  - `TestIcebergTableOperationExecutorAsyncPurge` — `X-Gravitino-Async-Purge:
+    true` enqueues exactly one job; a repeated drop returns `404` and enqueues
+    no second job; an absent header runs the synchronous purge (the default);
+    thrown errors surface as 5xx.
   - `TestIcebergPurgeTombstone` (§5.7) — `createTable`/`register` at an
     identifier with an active job returns `409`, succeeds once
     `SUCCEEDED`/`FAILED`; `loadTable`/`alterTable`/repeated `dropTable`
@@ -674,8 +678,8 @@ only as a rollback flag.
   - Drop a table; REST returns < 500 ms; worker eventually clears every file.
   - Restart REST mid-purge (`kill -9`); purge resumes.
   - Two replicas on one DB; no duplicate deletions or orphans.
-  - Synchronous fallback: existing `IcebergRESTServiceIT` reruns unchanged
-    with `X-Gravitino-Async-Purge: false`.
+  - Synchronous default: existing `IcebergRESTServiceIT` reruns unchanged
+    with no `X-Gravitino-Async-Purge` header.
 - Scale & concurrency:
   - High-file-count fixtures: medium (~50K files), large (~500K files).
   - Concurrent-drop tier; drop returns within 5 s regardless of table size.
