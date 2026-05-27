@@ -267,7 +267,6 @@ export default function SchemaDetailsPage() {
     setEntityType(nextEntityType)
   }, [catalogType, anthEnable, subSchemas])
 
-  // 独立useEffect专门处理tabKey的同步，监听hasSubSchemas和catalogType
   useEffect(() => {
     const hasSubSchemas = subSchemas.length > 0
     if (hasSubSchemas) {
