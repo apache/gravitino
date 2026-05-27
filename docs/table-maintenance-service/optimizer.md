@@ -7,17 +7,19 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-The Table Maintenance Service compacts Iceberg tables based on policies you attach to catalogs, schemas, or tables. Attach a policy at the scope you want, collect table statistics, and the optimizer decides which partitions need compaction, scores them, and submits Spark jobs to rewrite the data files.
+The Table Maintenance Service automates table maintenance by attaching policies to catalogs, schemas, or tables, collecting statistics, and submitting jobs based on policy rules. The framework is generic: metrics infrastructure, policy evaluation, and job submission are not tied to any specific table format. In alpha, the built-in capability covers Iceberg data file compaction on identity-partitioned tables. Other table formats and maintenance actions are supported through Java ServiceLoader extension points.
 
 The CLI commands and configuration keys use the `optimizer` name.
 
 ## Alpha Scope
 
-The Table Maintenance Service is in **alpha**. Confirm your environment matches the supported scope before starting a POC:
+The Table Maintenance Service framework is general, but the built-in capabilities ship with a narrow scope. Confirm your environment matches before starting a POC against the built-ins; anything outside this list requires custom extensions (see [Extension Guide](./optimizer-extension-guide.md)).
 
-- **Iceberg only.** No Hudi, Delta, Paimon, or fileset support.
-- **Identity partition transforms only.** Tables using `days()`, `hours()`, `bucket()`, or `truncate()` partitions will fail during rewrite. See the compatibility matrix in [Troubleshooting](./optimizer-troubleshooting.md).
-- **Compaction strategy only.** No snapshot expiration, orphan file cleanup, or sort/cluster optimization.
+Built-in capabilities in alpha:
+
+- **Compaction is the only built-in strategy.** No built-in snapshot expiration, orphan file cleanup, or sort/cluster optimization.
+- **Built-in compaction targets Iceberg only.** Hudi, Delta, Paimon, and filesets require custom strategy handlers and job adapters.
+- **Identity partition transforms only.** Iceberg tables using `days()`, `hours()`, `bucket()`, or `truncate()` partitions will fail during rewrite. See the compatibility matrix in [Troubleshooting](./optimizer-troubleshooting.md).
 - **CLI-driven.** No built-in scheduler; trigger runs from the optimizer CLI or your own scheduler.
 
 ## Extensibility
@@ -29,7 +31,7 @@ The framework is designed for extension beyond the built-in capability. Custom p
 The optimizer workflow has four steps:
 
 1. **Attach a policy.** Define thresholds and weights, then attach to a catalog, schema, or table.
-2. **Collect statistics.** Run the built-in update-stats job to populate per-partition signals such as `custom-data-file-mse` (file-size variance) and `custom-delete-file-number`.
+2. **Collect statistics.** Run a stats collection job to populate per-partition signals. The built-in Iceberg job populates `custom-data-file-mse` (file-size variance) and `custom-delete-file-number`; other metrics are possible through custom calculators.
 3. **Evaluate and submit.** Run `submit-strategy-jobs`. The optimizer reads the policy, scores partitions against current statistics, and submits a Spark rewrite job for the highest-scoring candidates.
 4. **Verify.** Track job status through the Gravitino REST API and inspect rewrite logs or Iceberg snapshot history.
 
