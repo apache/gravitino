@@ -113,13 +113,10 @@ public class FlussCatalogOperations implements CatalogOperations, SupportsSchema
       String comment,
       Map<String, String> properties)
       throws Exception {
-    Configuration flussConfig = toFlussConfiguration(properties, null);
-    try (Connection testConnection = connectionFactory.apply(flussConfig)) {
-      new FlussAdminOps(testConnection.getAdmin())
-          .doAsAdmin(
-              Admin::listDatabases,
-              e -> new ConnectionFailedException(e, "Failed to connect to Fluss cluster"));
-    }
+    Preconditions.checkState(ops != null, "Fluss catalog operations has not been initialized");
+    ops.doAsAdmin(
+        Admin::listDatabases,
+        e -> new ConnectionFailedException(e, "Failed to connect to Fluss cluster"));
   }
 
   @Override

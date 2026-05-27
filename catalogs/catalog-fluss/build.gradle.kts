@@ -46,6 +46,7 @@ dependencies {
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockito.inline)
+  testImplementation(libs.testcontainers)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
@@ -89,7 +90,8 @@ tasks.getByName("generateMetadataFileForMavenJavaPublication") {
 
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
-  if (skipITs) {
+  val skipUTs = project.hasProperty("skipTests")
+  if (skipITs && !skipUTs) {
     exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)

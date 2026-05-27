@@ -33,13 +33,16 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.apache.fluss.client.admin.Admin;
 import org.apache.fluss.exception.PartitionNotExistException;
+import org.apache.fluss.exception.TableNotExistException;
 import org.apache.fluss.metadata.PartitionInfo;
 import org.apache.fluss.metadata.PartitionSpec;
 import org.apache.fluss.metadata.ResolvedPartitionSpec;
 import org.apache.fluss.metadata.TablePath;
+import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
@@ -113,6 +116,16 @@ class TestFlussTableOperations {
   }
 
   @Test
+  void testDropPartitionReturnsFalseWhenTableDoesNotExist() {
+    Admin admin = mock(Admin.class);
+    when(admin.dropPartition(eq(TABLE_PATH), any(PartitionSpec.class), eq(false)))
+        .thenReturn(failedFuture(new TableNotExistException("missing")));
+    FlussTableOperations operations = operations(admin);
+
+    assertFalse(operations.dropPartition(QUALIFIED_PARTITION_NAME));
+  }
+
+  @Test
   void testAddPartitionCreatesFlussSpecWithConfiguredPartitionKeys() {
     Admin admin = mock(Admin.class);
     when(admin.createPartition(eq(TABLE_PATH), any(PartitionSpec.class), eq(false)))
@@ -126,6 +139,19 @@ class TestFlussTableOperations {
     verify(admin).createPartition(eq(TABLE_PATH), specCaptor.capture(), eq(false));
     assertEquals("20250405", specCaptor.getValue().getSpecMap().get("event_day"));
     assertEquals("US", specCaptor.getValue().getSpecMap().get("region"));
+  }
+
+  @Test
+  void testGetPartitionThrowsWhenPartitionIsNotFound() {
+    Admin admin = mock(Admin.class);
+    PartitionSpec spec =
+        new PartitionSpec(ImmutableMap.of("event_day", "20250405", "region", "US"));
+    when(admin.listPartitionInfos(TABLE_PATH, spec))
+        .thenReturn(CompletableFuture.completedFuture(List.of()));
+    FlussTableOperations operations = operations(admin);
+
+    assertThrows(
+        NoSuchPartitionException.class, () -> operations.getPartition(QUALIFIED_PARTITION_NAME));
   }
 
   @Test
@@ -145,6 +171,39 @@ class TestFlussTableOperations {
   }
 
   @Test
+  void testAddPartitionRejectsInvalidPartitionDefinitions() {
+    Admin admin = mock(Admin.class);
+    FlussTableOperations operations = operations(admin);
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            operations.addPartition(
+                Partitions.list(
+                    "region=US", new Literal<?>[][] {{Literals.stringLiteral("US")}}, Map.of())));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            operations.addPartition(
+                Partitions.identity(
+                    new String[][] {{"event_day"}},
+                    new Literal<?>[] {Literals.stringLiteral("20250405")})));
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            operations.addPartition(
+                Partitions.identity(
+                    new String[][] {{"event_day"}, {"region", "country"}},
+                    new Literal<?>[] {
+                      Literals.stringLiteral("20250405"), Literals.stringLiteral("US")
+                    })));
+
+    verifyNoInteractions(admin);
+  }
+
+  @Test
   void testGetPartitionRejectsWrongQualifiedPartitionKeyOrder() {
     Admin admin = mock(Admin.class);
     FlussTableOperations operations = operations(admin);
@@ -155,6 +214,35 @@ class TestFlussTableOperations {
             () -> operations.getPartition("region=US/event_day=20250405"));
 
     assertTrue(exception.getMessage().contains("must match Fluss partition key"));
+    verifyNoInteractions(admin);
+  }
+
+  @Test
+  void testGetPartitionRejectsMalformedQualifiedPartitionName() {
+    Admin admin = mock(Admin.class);
+    FlussTableOperations operations = operations(admin);
+
+    assertThrows(
+        IllegalArgumentException.class, () -> operations.getPartition("event_day=20250405"));
+    assertThrows(
+        IllegalArgumentException.class, () -> operations.getPartition("event_day=20250405/region"));
+
+    verifyNoInteractions(admin);
+  }
+
+  @Test
+  void testNonPartitionedTableRejectsPartitionName() {
+    Admin admin = mock(Admin.class);
+    FlussTableOperations operations =
+        new FlussTableOperations(new FlussAdminOps(admin), TABLE_PATH, List.of());
+
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> operations.getPartition(QUALIFIED_PARTITION_NAME));
+    assertThrows(
+        UnsupportedOperationException.class,
+        () -> operations.dropPartition(QUALIFIED_PARTITION_NAME));
+
     verifyNoInteractions(admin);
   }
 
