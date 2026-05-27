@@ -70,77 +70,15 @@ paths:
 components:
   schemas:
     ErrorModel:
-      type: object
-      description: JSON error payload returned in a response with further details on the error
-      required:
-        - message
-        - type
-        - code
-      properties:
-        code:
-          type: integer
-          minimum: 1000
-          maximum: 1100
-          description: HTTP response code
-          example: 1002
-        type:
-          type: string
-          description: Internal type definition of the error
-        message:
-          type: string
-          description: A human-readable message
-        stack:
-          type: array
-          items:
-            type: string
+      $ref: "../openapi.yaml#/components/schemas/ErrorModel"
 
   responses:
     BadRequestErrorResponse:
-      description:
-        Indicates a bad request error. It could be caused by an unexpected request
-        body format or other forms of request validation failure, such as invalid json.
-      content:
-        application/vnd.gravitino.v1+json:
-          schema:
-            $ref: "#/components/schemas/ErrorModel"
-          example: {
-            "code": 1003,
-            "type": "BadRequestException",
-            "message": "Malformed request"
-          }
-
+      $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
     ServerErrorResponse:
-      description:
-        A server-side problem that might not be addressable from the client side.
-      content:
-        application/vnd.gravitino.v1+json:
-          schema:
-            $ref: "#/components/schemas/ErrorModel"
-          example: {
-            "code": 1002,
-            "type": "RuntimeException",
-            "message": "Internal Server Error",
-            "stack": [
-              "java.lang.RuntimeException: Internal Server Error"
-            ]
-          }
-
+      $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
     RemoveResponse:
-      description: Represents a response for a remove operation
-      content:
-        application/vnd.gravitino.v1+json:
-          schema:
-            type: object
-            properties:
-              code:
-                type: integer
-                format: int32
-                description: Status code of the response
-                enum:
-                  - 0
-              removed:
-                type: boolean
-                description: Whether the remove operation was successful
+      $ref: "../openapi.yaml#/components/responses/RemoveResponse"
 
   parameters:
     user:
@@ -152,5 +90,4 @@ components:
 
   securitySchemes:
     BasicAuth:
-      type: http
-      scheme: basic
+      $ref: "../openapi.yaml#/components/securitySchemes/BasicAuth"
