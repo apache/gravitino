@@ -13,6 +13,7 @@ jobs:
       branch-1-0: ${{ steps.check-labels.outputs.branch-1-0 }}
       branch-1-1: ${{ steps.check-labels.outputs.branch-1-1 }}
       branch-1-2: ${{ steps.check-labels.outputs.branch-1-2 }}
+      branch-1-3: ${{ steps.check-labels.outputs.branch-1-3 }}
       commit-sha: ${{ steps.get-commit.outputs.commit-sha }}
       commit-message: ${{ steps.get-commit.outputs.commit-message }}
     steps:
@@ -83,6 +84,12 @@ jobs:
             echo "branch-1-2=false" >> $GITHUB_OUTPUT
           fi
 
+          if echo "$LABELS" | grep -q "branch-1.3"; then
+            echo "branch-1-3=true" >> $GITHUB_OUTPUT
+          else
+            echo "branch-1-3=false" >> $GITHUB_OUTPUT
+          fi
+
   cherry-pick-branch-1-0:
     needs: detect-cherry-pick-labels
     if: needs.detect-cherry-pick-labels.outputs.branch-1-0 == 'true'
@@ -109,6 +116,16 @@ jobs:
     uses: ./.github/workflows/cherry-pick-branch.yml
     with:
       target-branch: branch-1.2
+      commit-sha: ${{ needs.detect-cherry-pick-labels.outputs.commit-sha }}
+      commit-message: ${{ needs.detect-cherry-pick-labels.outputs.commit-message }}
+    secrets: inherit
+
+  cherry-pick-branch-1-3:
+    needs: detect-cherry-pick-labels
+    if: needs.detect-cherry-pick-labels.outputs.branch-1-3 == 'true'
+    uses: ./.github/workflows/cherry-pick-branch.yml
+    with:
+      target-branch: branch-1.3
       commit-sha: ${{ needs.detect-cherry-pick-labels.outputs.commit-sha }}
       commit-message: ${{ needs.detect-cherry-pick-labels.outputs.commit-message }}
     secrets: inherit
