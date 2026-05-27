@@ -21,7 +21,6 @@ package org.apache.gravitino.idp.storage.relational;
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -70,8 +69,8 @@ public final class IdpGarbageCollector implements Closeable {
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
 
-  @VisibleForTesting
-  void collectAndClean() {
+  /** Collects and physically deletes soft-deleted built-in IdP metadata past the retention window. */
+  public void collectAndClean() {
     long threadId = Thread.currentThread().getId();
     LOG.debug("Thread {} start to collect built-in IdP garbage...", threadId);
 
