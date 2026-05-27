@@ -45,7 +45,7 @@ curl -v -X GET \
 
 ### Basic mode
 
-In Basic mode, Gravitino verifies HTTP Basic credentials against built-in IdP user metadata stored
+In Basic mode, Gravitino verifies HTTP Basic credentials against built-in IDP user metadata stored
 in the relational entity store.
 
 To enable Basic mode:
@@ -54,8 +54,9 @@ To enable Basic mode:
   distribution).
 - Set `gravitino.authenticators` to `basic`.
 - Set `gravitino.entity.store` to `relational` and configure the relational JDBC backend.
+- Set `gravitino.server.rest.extensionPackages` to `org.apache.gravitino.idp.web.rest.feature`.
 - Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
-  the built-in IdP.
+  the built-in IDP.
 - On the first startup, if any configured service admin does not yet have a password, set the
   `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable to a JSON array of `username:password`
   strings before starting Gravitino. Each password must be 12 to 64 characters long, and usernames
@@ -370,6 +371,7 @@ Append the following to `conf/gravitino.conf`:
 gravitino.entity.store = relational
 gravitino.entity.store.relational = JDBCBackend
 gravitino.authenticators = basic
+gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
 gravitino.authorization.serviceAdmins = admin
 ```
 
