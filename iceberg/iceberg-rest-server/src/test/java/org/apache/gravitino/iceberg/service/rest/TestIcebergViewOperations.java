@@ -178,6 +178,8 @@ public class TestIcebergViewOperations extends IcebergNamespaceTestBase {
     Event replacePostEvent = dummyEventListener.popPostEvent();
     Assertions.assertTrue(replacePreEvent instanceof IcebergReplaceViewPreEvent);
     Assertions.assertTrue(replacePostEvent instanceof IcebergReplaceViewEvent);
+    IcebergReplaceViewEvent replaceViewEvent = (IcebergReplaceViewEvent) replacePostEvent;
+    Assertions.assertNotNull(replaceViewEvent.replaceViewRequest());
     Assertions.assertEquals(OperationType.REPLACE_VIEW, replacePreEvent.operationType());
     Assertions.assertEquals(OperationType.REPLACE_VIEW, replacePostEvent.operationType());
 
