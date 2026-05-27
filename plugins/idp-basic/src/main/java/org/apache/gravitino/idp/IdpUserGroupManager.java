@@ -29,7 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
-import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
@@ -159,7 +159,7 @@ public class IdpUserGroupManager implements Closeable {
             "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
       }
       return getUser(username);
-    } catch (NoSuchUserException e) {
+    } catch (NotFoundException e) {
       throw new UnauthorizedException(
           "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
     }
@@ -171,7 +171,7 @@ public class IdpUserGroupManager implements Closeable {
    * @param username The username.
    * @param password The new plaintext password.
    * @return {@code true} if the password was updated
-   * @throws NoSuchUserException if the user does not exist
+   * @throws NotFoundException if the user does not exist
    */
   public boolean changePassword(String username, String password) {
     return USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password));
@@ -251,7 +251,7 @@ public class IdpUserGroupManager implements Closeable {
     try {
       USER_SERVICE.getIdpUserByUsername(username);
       return true;
-    } catch (NoSuchUserException e) {
+    } catch (NotFoundException e) {
       return false;
     }
   }

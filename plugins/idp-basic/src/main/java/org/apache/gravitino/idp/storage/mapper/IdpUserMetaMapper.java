@@ -42,12 +42,6 @@ public interface IdpUserMetaMapper {
   @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUser")
   IdpUserPO selectIdpUser(@Param("username") String username);
 
-  /**
-   * Loads a built-in IdP user and aggregated group names from joined tables.
-   *
-   * @param username The username.
-   * @return The joined user row, or null if the user does not exist.
-   */
   @SelectProvider(type = IdpUserMetaSQLProviderFactory.class, method = "selectIdpUserWithGroups")
   IdpUserWithGroupsPO selectIdpUserWithGroups(@Param("username") String username);
 

@@ -39,8 +39,7 @@ import java.util.Comparator;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
-import org.apache.gravitino.exceptions.NoSuchGroupException;
-import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.model.IdpGroup;
@@ -112,7 +111,7 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testGet", user.name());
 
     Throwable exception =
-        Assertions.assertThrows(NoSuchUserException.class, () -> manager.getUser("not-exist"));
+        Assertions.assertThrows(NotFoundException.class, () -> manager.getUser("not-exist"));
     Assertions.assertTrue(exception.getMessage().contains("IdP user not found: not-exist"));
   }
 
@@ -132,7 +131,7 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testChangePassword", manager.getUser("testChangePassword").name());
 
     Assertions.assertThrows(
-        NoSuchUserException.class, () -> manager.changePassword("not-exist", VALID_PASSWORD));
+        NotFoundException.class, () -> manager.changePassword("not-exist", VALID_PASSWORD));
   }
 
   @Test
@@ -152,7 +151,7 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testGetGroup", group.name());
 
     Throwable exception =
-        Assertions.assertThrows(NoSuchGroupException.class, () -> manager.getGroup("not-exist"));
+        Assertions.assertThrows(NotFoundException.class, () -> manager.getGroup("not-exist"));
     Assertions.assertTrue(exception.getMessage().contains("IdP group not found: not-exist"));
   }
 
@@ -223,7 +222,7 @@ public class TestIdpUserGroupManager {
       throws IOException {
     loadServiceAdminConfig(BASIC_AUTHENTICATOR_CLASS, "");
     manager.initializeConfiguredServiceAdmins(config, VALID_PASSWORD);
-    Assertions.assertThrows(NoSuchUserException.class, () -> manager.getUser("initAdminSkipList1"));
+    Assertions.assertThrows(NotFoundException.class, () -> manager.getUser("initAdminSkipList1"));
   }
 
   @Test
