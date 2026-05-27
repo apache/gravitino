@@ -48,15 +48,6 @@ The diagram shows end-to-end interactions between the CLI, Gravitino server, Spa
 
 POC users should follow the policy-driven workflow. The local JSONL calculator is a developer and integration-testing tool.
 
-## Where to Go Next
-
-- **First time running the optimizer:** [Optimizer Quick Start](./optimizer-quick-start.md). End-to-end policy attach, stats collection, rewrite submission, and verification on a demo table.
-- **Tuning the compaction policy for your tables:** [Iceberg Compaction Policy](../iceberg-compaction-policy.md). Explains the MSE metric, weights, and thresholds.
-- **Configuring the optimizer for your environment:** [Optimizer Configuration](./optimizer-configuration.md).
-- **Looking up a specific CLI command:** [Optimizer CLI Reference](./optimizer-cli-reference.md).
-- **Debugging a stuck or failed job:** [Optimizer Troubleshooting](./optimizer-troubleshooting.md).
-- **Integrating custom providers, handlers, or sinks:** [Optimizer Extension Guide](./optimizer-extension-guide.md).
-
 ## Configuration Layers
 
 Three layers of configuration interact. See [Optimizer Configuration](./optimizer-configuration.md) for the full reference.
