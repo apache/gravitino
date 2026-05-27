@@ -90,6 +90,26 @@ Please note that, it only takes affect in `gravitino.conf`, you don't need to sp
 The filter in `customFilters` should be a standard javax servlet filter.
 You can also specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
 
+### Table purge behavior
+
+When a client drops a table with `purgeRequested=true`, Gravitino keeps the existing synchronous behavior by default. The catalog entry and table files are removed before the `DELETE` request returns.
+
+A client can opt in to asynchronous file cleanup by sending the HTTP header `X-Gravitino-Async-Purge: true` with `DELETE ...?purgeRequested=true`. In this mode, Gravitino removes the catalog entry before returning `204 No Content`, records a durable cleanup job in the Gravitino relational backend, and deletes table files in the background. While an active cleanup job exists for the table identifier, `createTable` and `registerTable` requests for the same catalog, namespace, and table return `409 Conflict`. After cleanup reaches a terminal state, the identifier can be reused.
+
+Only the literal header value `true`, ignoring case and surrounding whitespace, enables asynchronous purge. If the header is absent, `false`, or any other value, the request uses synchronous purge.
+
+Asynchronous purge uses the same relational backend as Gravitino's entity store. Initialize or upgrade the backend schema before enabling clients to use the async header.
+
+| Configuration item | Description | Default value | Required | Since Version |
+|--------------------|-------------|---------------|----------|---------------|
+| `gravitino.iceberg-rest.async-purge.worker-threads` | Worker pool size per server. Each worker claims and runs purge jobs from the shared backend table. | `2` | No | 1.3.0 |
+| `gravitino.iceberg-rest.async-purge.delete-threads` | Server-wide file-delete pool size shared by purge jobs. | `4` | No | 1.3.0 |
+| `gravitino.iceberg-rest.async-purge.delete-batch-size` | Number of files per bulk-delete batch. | `1000` | No | 1.3.0 |
+| `gravitino.iceberg-rest.async-purge.poll-interval-ms` | Worker polling interval in milliseconds. This also controls retry pacing for pending jobs. | `5000` | No | 1.3.0 |
+| `gravitino.iceberg-rest.async-purge.heartbeat-timeout-ms` | Age in milliseconds after which a running job with no fresh heartbeat can be reclaimed by another worker. | `300000` | No | 1.3.0 |
+| `gravitino.iceberg-rest.async-purge.max-attempts` | Number of failed attempts before a purge job is marked `FAILED`. | `5` | No | 1.3.0 |
+| `gravitino.iceberg-rest.async-purge.retention-hours` | Retention time for terminal `SUCCEEDED` or `FAILED` purge rows before pruning. | `720` | No | 1.3.0 |
+
 ### Catalog backend configuration
 
 :::info
