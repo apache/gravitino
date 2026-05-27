@@ -42,6 +42,7 @@ import org.apache.spark.sql.connector.expressions.DaysTransform;
 import org.apache.spark.sql.connector.expressions.HoursTransform;
 import org.apache.spark.sql.connector.expressions.IdentityTransform;
 import org.apache.spark.sql.connector.expressions.MonthsTransform;
+import org.apache.spark.sql.connector.expressions.NamedReference;
 import org.apache.spark.sql.connector.expressions.SortedBucketTransform;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.connector.expressions.YearsTransform;
@@ -124,7 +125,7 @@ public class SparkTableInfo {
     // V1Table.schema() includes partition columns in the data schema. We must filter them
     // out so that columns contains only the data columns (non-partition columns).
     // Collect partition column names first, then filter schema fields.
-    java.util.Set<String> partitionColNames = new java.util.HashSet<>();
+    Set<String> partitionColNames = new HashSet<>();
     Arrays.stream(baseTable.partitioning())
         .forEach(
             transform -> {
@@ -137,8 +138,7 @@ public class SparkTableInfo {
                   sparkTableInfo.addPartition(transform);
                   // Collect bucket partition column names
                   if (transform instanceof BucketTransform) {
-                    for (org.apache.spark.sql.connector.expressions.NamedReference ref :
-                        ((BucketTransform) transform).references()) {
+                    for (NamedReference ref : ((BucketTransform) transform).references()) {
                       for (String fieldName : ref.fieldNames()) {
                         partitionColNames.add(fieldName);
                       }

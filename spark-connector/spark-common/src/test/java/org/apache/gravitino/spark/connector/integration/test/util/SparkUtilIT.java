@@ -162,8 +162,8 @@ public abstract class SparkUtilIT extends BaseIT {
       CatalogPlugin currentCatalog = catalogManager.currentCatalog();
       tableCatalog = (TableCatalog) currentCatalog;
     } else if (parts.length == 3) {
-      // Fully qualified: cat.db.table
-      identifier = Identifier.of(new String[] {parts[0], parts[1]}, parts[2]);
+      // Fully qualified: cat.db.table — namespace is only the db part, not the catalog
+      identifier = Identifier.of(new String[] {parts[1]}, parts[2]);
       CatalogPlugin catalog = catalogManager.catalog(parts[0]);
       tableCatalog = (TableCatalog) catalog;
     } else {

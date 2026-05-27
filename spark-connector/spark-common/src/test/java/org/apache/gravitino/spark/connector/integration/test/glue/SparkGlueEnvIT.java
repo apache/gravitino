@@ -19,6 +19,8 @@
 package org.apache.gravitino.spark.connector.integration.test.glue;
 
 import java.io.IOException;
+import java.util.Collections;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
@@ -262,14 +264,10 @@ public abstract class SparkGlueEnvIT extends SparkCommonIT {
   }
 
   private void initMetalakeAndCatalogs() {
-    client.createMetalake(metalakeName, "", java.util.Collections.emptyMap());
+    client.createMetalake(metalakeName, "", Collections.emptyMap());
     GravitinoMetalake metalake = client.loadMetalake(metalakeName);
     metalake.createCatalog(
-        getCatalogName(),
-        org.apache.gravitino.Catalog.Type.RELATIONAL,
-        getProvider(),
-        "",
-        getCatalogConfigs());
+        getCatalogName(), Catalog.Type.RELATIONAL, getProvider(), "", getCatalogConfigs());
   }
 
   /**

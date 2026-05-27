@@ -275,10 +275,15 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     if (isIcebergTable(gravitinoTable)) {
       SparkCatalog icebergCatalog = getOrCreateIcebergGlueCatalog();
       // Reuse the already-loaded sparkTable when the caller has it; load only when missing.
-      Table icebergSparkTable =
-          (sparkTable instanceof SparkTable)
-              ? sparkTable
-              : loadIcebergSparkTable(identifier, icebergCatalog);
+      Table icebergSparkTable;
+      try {
+        icebergSparkTable =
+            (sparkTable instanceof SparkTable)
+                ? sparkTable
+                : loadIcebergSparkTable(identifier, icebergCatalog);
+      } catch (NoSuchTableException e) {
+        throw new RuntimeException("Iceberg table not found in Glue catalog: " + identifier, e);
+      }
       return new SparkIcebergTable(
           identifier,
           gravitinoTable,
@@ -400,16 +405,9 @@ public class GravitinoGlueCatalog extends BaseCatalog {
    * @param icebergCatalog the Iceberg SparkCatalog
    * @return the Spark table
    */
-  private Table loadIcebergSparkTable(Identifier identifier, SparkCatalog icebergCatalog) {
-    try {
-      return icebergCatalog.loadTable(identifier);
-    } catch (NoSuchTableException e) {
-      throw new RuntimeException(
-          String.format(
-              "Failed to load Iceberg table: %s",
-              String.join(".", getDatabase(identifier), identifier.name())),
-          e);
-    }
+  private Table loadIcebergSparkTable(Identifier identifier, SparkCatalog icebergCatalog)
+      throws NoSuchTableException {
+    return icebergCatalog.loadTable(identifier);
   }
 
   /** Creates the namespace in Derby if it does not already exist. */

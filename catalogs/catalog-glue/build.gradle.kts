@@ -96,6 +96,10 @@ tasks {
 }
 
 tasks.test {
+  val skipITs = project.hasProperty("skipITs")
+  if (skipITs) {
+    exclude("**/integration/test/**")
+  }
   dependsOn(tasks.jar)
 }
 
