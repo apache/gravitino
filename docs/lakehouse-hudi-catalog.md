@@ -13,13 +13,56 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage Apache Hudi metadata.
+The Hudi catalog enables Apache Gravitino to surface Apache Hudi table metadata from a Hive Metastore Service. Use it when you want Hudi tables discoverable and governable through Gravitino alongside relational, lakehouse, and fileset catalogs. The catalog is read-only by design: it supports listing, loading, and existence checks for Hudi schemas and tables, but does not create, alter, or drop them. Write operations on Hudi tables continue to go through Hudi's own engines (Flink, Spark).
 
 ### Requirements and Limitations
 
-:::info
-Tested and verified with Apache Hudi `0.15.0`.
-:::
+- **Hudi version:** tested and verified with Apache Hudi `0.15.0`.
+- **Supported metadata backend:** Hive Metastore Service (HMS) only. The `catalog-backend` property accepts only `hms` at present. JDBC and other backends are not supported.
+- **Read-only catalog.** The Hudi catalog supports only read operations: `listSchema`, `loadSchema`, `schemaExists`, `listTable`, `loadTable`, and `tableExists`. Creating, altering, or dropping Hudi schemas or tables through Gravitino is not supported. Use Hudi's own engines (Flink, Spark) for write operations.
+- **No timeline management.** Hudi's commit timeline (commit, rollback, savepoint, clean, compact, cluster) is not exposed through the catalog interface. Use Hudi's own engines or the Hudi CLI for timeline operations.
+- **Authentication.** `simple` and `Kerberos` are supported on the HMS backend. For Kerberos, set `authentication.type` to `kerberos` and configure the principal and keytab properties, along with the related `gravitino.bypass.` Hadoop-security keys.
+- **Identity partitioning only.** Hudi natively supports identity partitioning; other partition transforms are not exposed.
+- **No table indexes, no sort orders, no distributions, no column default values.** Table-level properties stored in HMS surface as read-only Gravitino table properties on load.
+
+## Quick Start
+
+Create a minimum-viable Hudi catalog and confirm it can reach the Hive Metastore Service that catalogs your Hudi tables. The example assumes a Gravitino server at `http://localhost:8090`, a metalake named `test`, and a Hive Metastore Service at `thrift://localhost:9083`. Adjust the values for your environment.
+
+### Create the Catalog
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "hudi_catalog",
+    "type": "RELATIONAL",
+    "comment": "Hudi catalog",
+    "provider": "lakehouse-hudi",
+    "properties": {
+      "catalog-backend": "hms",
+      "uri": "thrift://localhost:9083"
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs
+```
+
+The response is a JSON object describing the created catalog.
+
+### Verify the Catalog
+
+```bash
+# List catalogs in the metalake. hudi_catalog should appear.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs" | jq
+
+# Load the catalog directly and inspect its properties.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/hudi_catalog" | jq
+
+# List schemas. The call exercises the HMS Thrift connection and returns the Hive databases visible to the metastore.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/hudi_catalog/schemas" | jq
+```
+
+**Success check:** the catalog-list response includes `hudi_catalog`, the load-catalog response shows `"provider":"lakehouse-hudi"` with `catalog-backend` set to `hms` and `uri` set to the Thrift URI, and the schema-list response includes the Hive databases in the metastore (typically at least `default`). If the schema-list call returns a Thrift connection error, verify the HMS is running and reachable from the Gravitino server. For Kerberos-enabled HMS, additional authentication configuration is required; see [Catalog Backend Security](#catalog-backend-security) below.
 
 ## Catalog
 
@@ -27,9 +70,10 @@ Tested and verified with Apache Hudi `0.15.0`.
 
 The Hudi catalog:
 
-- Acts as a catalog proxy backed by `HMS`.
-- Supports only read operations (list and load) on Hudi schemas and tables.
-- Does not support timeline management operations.
+- Acts as a Gravitino front-end over a Hive Metastore Service (HMS) that catalogs Hudi tables.
+- Supports only read operations on Hudi schemas and tables (`listSchema`, `loadSchema`, `schemaExists`, `listTable`, `loadTable`, `tableExists`). Write operations on Hudi tables continue to go through Hudi's own engines (Flink, Spark).
+- Surfaces Hudi table parameters stored in HMS as read-only Gravitino table properties on load.
+- Does not expose Hudi's commit timeline (commit, rollback, savepoint, clean, compact, cluster). Use Hudi's own engines or the Hudi CLI for timeline operations.
 
 ### Catalog Properties
 
