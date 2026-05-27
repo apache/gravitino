@@ -60,7 +60,7 @@ jobs:
 
       - name: Set up helm-unittest
         if: steps.list-changed.outputs.changed == 'true'
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v1.1.0
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest.git --version v1.1.0 --verify=false
 
       - name: Unit test Gravitino chart
         if: steps.list-changed.outputs.changed == 'true'
