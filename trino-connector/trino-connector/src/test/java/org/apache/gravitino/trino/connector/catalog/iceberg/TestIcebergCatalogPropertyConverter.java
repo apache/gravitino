@@ -25,6 +25,7 @@ import io.trino.spi.TrinoException;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.property.PropertyConverter;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -111,7 +112,8 @@ public class TestIcebergCatalogPropertyConverter {
     IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
 
     Map<String, String> config =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
+        adapter.buildInternalConnectorConfig(
+            new GravitinoCatalog("test", mockCatalog), new Credential[0]);
 
     // test converted properties
     Assertions.assertEquals(config.get("hive.metastore.uri"), "thrift://localhost:9083");
@@ -150,7 +152,8 @@ public class TestIcebergCatalogPropertyConverter {
     IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
 
     Map<String, String> config =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
+        adapter.buildInternalConnectorConfig(
+            new GravitinoCatalog("test", mockCatalog), new Credential[0]);
 
     // test converted properties
     Assertions.assertEquals(

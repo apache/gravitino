@@ -25,18 +25,34 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event that is triggered upon the successful list of catalogs. */
 @DeveloperApi
-public final class ListCatalogEvent extends CatalogEvent {
+public final class ListCatalogEvent extends CatalogEvent implements ListEvent {
   private final Namespace namespace;
+  private final int catalogCount;
 
   /**
    * Constructs an instance of {@code ListCatalogEvent}.
    *
    * @param user The username of the individual who initiated the catalog listing.
    * @param namespace The namespace from which catalogs were listed.
+   * @param catalogCount The number of catalogs returned by the list operation.
    */
-  public ListCatalogEvent(String user, Namespace namespace) {
+  public ListCatalogEvent(String user, Namespace namespace, int catalogCount) {
     super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
+    this.catalogCount = catalogCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListCatalogEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the catalog listing.
+   * @param namespace The namespace from which catalogs were listed.
+   * @deprecated Use {@link #ListCatalogEvent(String, Namespace, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListCatalogEvent(String user, Namespace namespace) {
+    this(user, namespace, -1);
   }
 
   /**
@@ -46,6 +62,12 @@ public final class ListCatalogEvent extends CatalogEvent {
    */
   public Namespace namespace() {
     return namespace;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return catalogCount;
   }
 
   /**
