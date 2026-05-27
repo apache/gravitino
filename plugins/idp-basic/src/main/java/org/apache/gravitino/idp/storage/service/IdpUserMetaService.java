@@ -20,13 +20,10 @@ package org.apache.gravitino.idp.storage.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
@@ -34,7 +31,7 @@ import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.idp.storage.po.IdpUserWithGroupsPO;
 import org.apache.gravitino.idp.storage.relational.utils.IdpExceptionUtils;
-import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.idp.storage.relational.utils.IdpPOConverters;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -72,26 +69,7 @@ public class IdpUserMetaService {
     if (userWithGroups == null) {
       throw new NotFoundException("IdP user not found: %s", username);
     }
-    return toIdpUser(userWithGroups);
-  }
-
-  private static IdpUser toIdpUser(IdpUserWithGroupsPO userWithGroups) {
-    return new IdpUser(
-        userWithGroups.getName(),
-        userWithGroups.getPasswordHash(),
-        parseGroupNames(userWithGroups.getGroupNames()));
-  }
-
-  private static List<String> parseGroupNames(@Nullable String groupNamesJson) {
-    if (groupNamesJson == null || groupNamesJson.isBlank()) {
-      return Collections.emptyList();
-    }
-    try {
-      return JsonUtils.anyFieldMapper()
-          .readValue(groupNamesJson, new TypeReference<List<String>>() {});
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to parse IdP user group names", e);
-    }
+    return IdpPOConverters.fromIdpUserWithGroupsPO(userWithGroups);
   }
 
   @Monitored(

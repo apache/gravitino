@@ -20,14 +20,13 @@ package org.apache.gravitino.idp.model;
 
 import java.util.List;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.gravitino.idp.dto.IdpUserDTO;
 
 /** Built-in IdP user. */
 public class IdpUser {
 
   private final String name;
-  @Nullable private final String passwordHash;
+  private final String passwordHash;
   private final List<String> groupNames;
 
   /**
@@ -37,7 +36,7 @@ public class IdpUser {
    * @param passwordHash The password hash, or null when not loaded or not applicable.
    * @param groupNames The group names the user belongs to.
    */
-  public IdpUser(String name, @Nullable String passwordHash, List<String> groupNames) {
+  public IdpUser(String name, String passwordHash, List<String> groupNames) {
     this.name = name;
     this.passwordHash = passwordHash;
     this.groupNames = groupNames;
@@ -53,7 +52,6 @@ public class IdpUser {
    *
    * @return The password hash, or null if not available.
    */
-  @Nullable
   public String passwordHash() {
     return passwordHash;
   }

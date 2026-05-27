@@ -125,8 +125,9 @@ public class IdpUserGroupManager implements Closeable {
    * @return The created built-in IdP user.
    */
   public IdpUser addUser(String username, String password) throws IOException {
-    USER_SERVICE.insertIdpUser(newUserPO(username, passwordHasher.hash(password)));
-    return new IdpUser(username, null, Collections.emptyList());
+    String passwordHash = passwordHasher.hash(password);
+    USER_SERVICE.insertIdpUser(newUserPO(username, passwordHash));
+    return new IdpUser(username, passwordHash, Collections.emptyList());
   }
 
   /**
