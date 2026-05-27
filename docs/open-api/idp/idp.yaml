@@ -43,7 +43,7 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/IdpUserResponse"
+                $ref: "#/components/schemas/IdpUserResponse"
               examples:
                 IdpUserResponse:
                   $ref: "#/components/examples/IdpUserResponse"
@@ -79,7 +79,7 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/IdpUserResponse"
+                $ref: "#/components/schemas/IdpUserResponse"
               examples:
                 IdpUserResponse:
                   $ref: "#/components/examples/IdpUserResponse"
@@ -118,7 +118,7 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/IdpUserResponse"
+                $ref: "#/components/schemas/IdpUserResponse"
               examples:
                 IdpUserResponse:
                   $ref: "#/components/examples/IdpUserResponse"
@@ -184,7 +184,7 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/IdpGroupResponse"
+                $ref: "#/components/schemas/IdpGroupResponse"
               examples:
                 IdpGroupResponse:
                   $ref: "#/components/examples/IdpGroupResponse"
@@ -220,7 +220,7 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/IdpGroupResponse"
+                $ref: "#/components/schemas/IdpGroupResponse"
               examples:
                 IdpGroupResponse:
                   $ref: "#/components/examples/IdpGroupResponse"
@@ -261,6 +261,15 @@ paths:
               examples:
                 NotFoundException:
                   $ref: "#/components/examples/IdpNotFoundException"
+        "405":
+          description: Method Not Allowed - The group is not empty and force is false
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                GroupNotEmptyException:
+                  $ref: "#/components/examples/IdpGroupNotEmptyException"
         "5xx":
           $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -291,7 +300,7 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "#/components/responses/IdpGroupResponse"
+                $ref: "#/components/schemas/IdpGroupResponse"
               examples:
                 IdpGroupResponse:
                   $ref: "#/components/examples/IdpGroupResponse"
@@ -349,7 +358,9 @@ components:
       properties:
         user:
           type: string
-          description: The username of the built-in IDP user to add
+          description: >
+            The username to add. Request payloads use `user`, while user objects in
+            responses use `name` (see IdpUser), matching the server JSON field names.
         password:
           type: string
           format: password
@@ -374,25 +385,31 @@ components:
       properties:
         group:
           type: string
-          description: The name of the built-in IDP group to add
+          description: >
+            The group name to add. Request payloads use `group`, while group objects in
+            responses use `name` (see IdpGroup), matching the server JSON field names.
 
     GroupMembershipChangeRequest:
       type: object
+      anyOf:
+        - required:
+            - usersToAdd
+        - required:
+            - usersToRemove
       properties:
         usersToAdd:
           type: array
           items:
             type: string
+          minItems: 1
           description: The usernames to add to the built-in IDP group
-          nullable: true
         usersToRemove:
           type: array
           items:
             type: string
+          minItems: 1
           description: The usernames to remove from the built-in IDP group
-          nullable: true
 
-  responses:
     IdpUserResponse:
       type: object
       properties:
@@ -417,6 +434,7 @@ components:
         group:
           $ref: "#/components/schemas/IdpGroup"
 
+  responses:
     IdpForbiddenErrorResponse:
       description: Forbidden - Built-in IDP REST APIs are disabled or the caller is not authorized
       content:
@@ -469,12 +487,19 @@ components:
       value: {
         "code": 1003,
         "type": "NotFoundException",
-        "message": "Built-in IDP resource does not exist"
+        "message": "Failed to operate built-in IdP user [alice] operation [GET], reason [User does not exist]"
       }
 
     IdpAlreadyExistsException:
       value: {
         "code": 1004,
         "type": "AlreadyExistsException",
-        "message": "Built-in IDP resource already exists"
+        "message": "Failed to operate built-in IdP user [] operation [ADD], reason [User already exists]"
+      }
+
+    IdpGroupNotEmptyException:
+      value: {
+        "code": 1003,
+        "type": "IllegalStateException",
+        "message": "Failed to operate built-in IdP group [engineers] operation [REMOVE], reason [Group is not empty]"
       }
