@@ -234,10 +234,10 @@ tests:
             name: init-mysql
           any: true
       - matchRegex:
-          path: spec.template.spec.initContainers[1].command[2]
+          path: spec.template.spec.initContainers[?(@.name == "init-mysql")].command[2]
           pattern: "Waiting for MySQL to be ready"
       - contains:
-          path: spec.template.spec.initContainers[1].env
+          path: spec.template.spec.initContainers[?(@.name == "init-mysql")].env
           content:
             name: GRAVITINO_DB
             value: gravitino
@@ -257,10 +257,10 @@ tests:
             name: init-postgresql
           any: true
       - matchRegex:
-          path: spec.template.spec.initContainers[1].command[2]
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
           pattern: "Waiting for PostgreSQL to be ready"
       - contains:
-          path: spec.template.spec.initContainers[1].env
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
           content:
             name: GRAVITINO_DB
             value: gravitino
