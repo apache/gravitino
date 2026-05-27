@@ -50,8 +50,10 @@ in the relational entity store.
 
 To enable Basic mode:
 
+- Include the `idp-basic` plugin jar on the server classpath (included in the official
+  distribution). The plugin registers the `basic` authenticator automatically during server
+  startup.
 - Set `gravitino.entity.store` to `relational` and configure the relational JDBC backend.
-- Set `gravitino.authenticators` to `basic`.
 - Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
   the built-in IdP.
 - On the first startup, if any configured service admin does not yet have a password, set the
@@ -66,6 +68,17 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .withMetalake("metalake")
     .withBasicAuth("admin", "YourSecureGravitinoPassword")
     .build();
+```
+
+```python
+from gravitino.auth.basic_auth_provider import BasicAuthProvider
+from gravitino.client.gravitino_client import GravitinoClient
+
+client = GravitinoClient(
+    uri="http://localhost:8090",
+    metalake_name="metalake",
+    auth_data_provider=BasicAuthProvider("admin", "YourSecureGravitinoPassword"),
+)
 ```
 
 ### OAuth mode

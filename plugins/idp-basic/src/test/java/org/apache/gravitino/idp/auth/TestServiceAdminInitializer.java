@@ -30,7 +30,6 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.stream.Stream;
-import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.exception.NotFoundException;
@@ -69,7 +68,7 @@ class TestServiceAdminInitializer {
     when(passwordHasher.hash("Passw0rd-For-Admin1")).thenReturn("hashed-password");
     when(idGenerator.nextId()).thenReturn(42L);
 
-    initialize("[\"admin1:Passw0rd-For-Admin1\",\"admin2:Passw0rd-For-Admin2\"]");
+    initializeWithPayload("[\"admin1:Passw0rd-For-Admin1\",\"admin2:Passw0rd-For-Admin2\"]");
 
     ArgumentCaptor<IdpUserPO> userCaptor = ArgumentCaptor.forClass(IdpUserPO.class);
     verify(userMetaService).insertIdpUser(userCaptor.capture());
@@ -84,14 +83,14 @@ class TestServiceAdminInitializer {
   @Test
   void testInitializeSkipsWhenBasicAuthenticatorDisabledEvenIfPayloadInvalid() throws IOException {
     loadConfig("simple", "admin1");
-    initialize("not-json");
+    initializeWithPayload("not-json");
     verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
   }
 
   @Test
   void testInitializeSkipsWhenNoServiceAdminsConfigured() throws IOException {
     loadConfig("basic", "");
-    initialize("[\"admin1:Passw0rd-For-Admin1\"]");
+    initializeWithPayload("[\"admin1:Passw0rd-For-Admin1\"]");
     verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
   }
 
@@ -101,7 +100,7 @@ class TestServiceAdminInitializer {
     when(userMetaService.getIdpUserByUsername("admin1")).thenReturn(existingUser("admin1"));
     when(userMetaService.getIdpUserByUsername("admin2")).thenReturn(existingUser("admin2"));
 
-    initialize(null);
+    initializeWithoutPayload();
 
     verify(userMetaService).getIdpUserByUsername("admin1");
     verify(userMetaService).getIdpUserByUsername("admin2");
@@ -116,7 +115,7 @@ class TestServiceAdminInitializer {
         .thenThrow(new NotFoundException("IdP user not found: %s", "admin1"));
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> initialize(null));
+        assertThrows(IllegalArgumentException.class, this::initializeWithoutPayload);
 
     assertEquals(
         "Missing initial password for configured service admin admin1; declare"
@@ -131,7 +130,7 @@ class TestServiceAdminInitializer {
     loadConfig("basic", "admin1");
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> initialize(payload));
+        assertThrows(IllegalArgumentException.class, () -> initializeWithPayload(payload));
 
     assertEquals(expectedMessage, exception.getMessage());
     verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
@@ -173,7 +172,11 @@ class TestServiceAdminInitializer {
         t -> true);
   }
 
-  private void initialize(@Nullable String initialAdminPasswords) throws IOException {
+  private void initializeWithoutPayload() throws IOException {
+    ServiceAdminInitializer.initialize(config, userMetaService, passwordHasher, idGenerator, null);
+  }
+
+  private void initializeWithPayload(String initialAdminPasswords) throws IOException {
     ServiceAdminInitializer.initialize(
         config, userMetaService, passwordHasher, idGenerator, initialAdminPasswords);
   }

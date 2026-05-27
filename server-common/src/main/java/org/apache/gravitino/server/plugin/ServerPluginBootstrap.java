@@ -40,4 +40,11 @@ public interface ServerPluginBootstrap {
    * @throws Exception If initialization fails.
    */
   void initialize() throws Exception;
+
+  /**
+   * Stops the plugin during server shutdown.
+   *
+   * @throws Exception If shutdown fails.
+   */
+  default void stop() throws Exception {}
 }

@@ -22,7 +22,10 @@ package org.apache.gravitino.idp;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.ServiceLoader;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.server.plugin.ServerPluginBootstrap;
 import org.junit.jupiter.api.Test;
 
@@ -41,5 +44,17 @@ class TestIdpServerPluginBootstrap {
                         "IdpServerPluginBootstrap should be registered via META-INF/services"));
     assertEquals("idp-basic", bootstrap.name());
     assertTrue(bootstrap instanceof IdpServerPluginBootstrap);
+  }
+
+  @Test
+  void testRegisterBasicAuthenticator() {
+    Config config = new Config(false) {};
+    config.loadFromMap(ImmutableMap.of("gravitino.authenticators", "simple"), t -> true);
+
+    IdpServerPluginBootstrap.registerBasicAuthenticator(config);
+
+    assertTrue(config.get(Configs.AUTHENTICATORS).contains("basic"));
+    IdpServerPluginBootstrap.registerBasicAuthenticator(config);
+    assertEquals(1, config.get(Configs.AUTHENTICATORS).stream().filter("basic"::equals).count());
   }
 }

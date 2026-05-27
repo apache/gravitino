@@ -45,4 +45,20 @@ public final class ServerPluginBootstrapper {
       }
     }
   }
+
+  /** Stops all {@link ServerPluginBootstrap} providers present on the classpath. */
+  public static void stop() {
+    ServiceLoader<ServerPluginBootstrap> loader = ServiceLoader.load(ServerPluginBootstrap.class);
+    for (ServerPluginBootstrap bootstrap : loader) {
+      try {
+        LOG.info("Stopping server plugin bootstrap: {}", bootstrap.name());
+        bootstrap.stop();
+      } catch (RuntimeException e) {
+        throw e;
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            String.format("Failed to stop server plugin bootstrap: %s", bootstrap.name()), e);
+      }
+    }
+  }
 }

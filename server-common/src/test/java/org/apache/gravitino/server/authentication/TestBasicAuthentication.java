@@ -29,7 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
-import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Collections;
@@ -39,11 +39,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
-import org.apache.gravitino.idp.basic.password.PasswordHasher;
-import org.apache.gravitino.idp.exception.NotFoundException;
-import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
+import org.apache.gravitino.idp.model.IdpUser;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -51,11 +49,10 @@ public class TestBasicAuthentication {
 
   private static final String USER = "alice";
   private static final String PASSWORD = "Passw0rd-For-Alice";
-  private static final String PASSWORD_HASH = "hash-1";
 
   @Test
   public void testFilterSuccess() throws Exception {
-    BasicAuthenticator authenticator = aliceAuthenticator(true);
+    BasicAuthenticator authenticator = aliceAuthenticator();
     FilterChain chain = mock(FilterChain.class);
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -74,11 +71,9 @@ public class TestBasicAuthentication {
 
   @Test
   public void testFilterUnauthorized() throws Exception {
-    IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    when(userMetaService.getIdpUserByUsername(USER))
-        .thenThrow(new NotFoundException("IdP user not found: %s", USER));
-    BasicAuthenticator authenticator =
-        createBasicAuthenticator(userMetaService, mock(PasswordHasher.class));
+    IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
+    when(userGroupManager.authenticate(USER, "wrong")).thenReturn(null);
+    BasicAuthenticator authenticator = createBasicAuthenticator(userGroupManager);
     FilterChain chain = mock(FilterChain.class);
     HttpServletRequest request = mock(HttpServletRequest.class);
     HttpServletResponse response = mock(HttpServletResponse.class);
@@ -91,15 +86,11 @@ public class TestBasicAuthentication {
     verify(chain, never()).doFilter(request, response);
   }
 
-  private static BasicAuthenticator aliceAuthenticator(boolean passwordValid) throws Exception {
-    IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    PasswordHasher passwordHasher = mock(PasswordHasher.class);
-    IdpUserPO userPO = mock(IdpUserPO.class);
-    when(userMetaService.getIdpUserByUsername(USER)).thenReturn(userPO);
-    when(userPO.getPasswordHash()).thenReturn(PASSWORD_HASH);
-    when(passwordHasher.verify(PASSWORD, PASSWORD_HASH)).thenReturn(passwordValid);
-    when(userMetaService.listGroupNamesByUsername(USER)).thenReturn(Collections.emptyList());
-    return createBasicAuthenticator(userMetaService, passwordHasher);
+  private static BasicAuthenticator aliceAuthenticator() throws Exception {
+    IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
+    when(userGroupManager.authenticate(USER, PASSWORD))
+        .thenReturn(new IdpUser(USER, Collections.emptyList()));
+    return createBasicAuthenticator(userGroupManager);
   }
 
   private static void stubAuthHeader(HttpServletRequest request, String username, String password) {
@@ -109,13 +100,13 @@ public class TestBasicAuthentication {
                 .elements());
   }
 
-  private static BasicAuthenticator createBasicAuthenticator(
-      IdpUserMetaService userMetaService, PasswordHasher passwordHasher) throws Exception {
-    Constructor<BasicAuthenticator> constructor =
-        BasicAuthenticator.class.getDeclaredConstructor(
-            IdpUserMetaService.class, PasswordHasher.class);
-    constructor.setAccessible(true);
-    return constructor.newInstance(userMetaService, passwordHasher);
+  private static BasicAuthenticator createBasicAuthenticator(IdpUserGroupManager userGroupManager)
+      throws Exception {
+    BasicAuthenticator authenticator = new BasicAuthenticator();
+    Field field = BasicAuthenticator.class.getDeclaredField("userGroupManager");
+    field.setAccessible(true);
+    field.set(authenticator, userGroupManager);
+    return authenticator;
   }
 
   private static String basicAuthHeader(String username, String password) {

@@ -19,9 +19,13 @@
 
 package org.apache.gravitino.idp;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
 import org.apache.gravitino.server.plugin.ServerPluginBootstrap;
 import org.slf4j.Logger;
@@ -38,6 +42,8 @@ public final class IdpServerPluginBootstrap implements ServerPluginBootstrap {
 
   private static final String NAME = "idp-basic";
 
+  private static final String BASIC_AUTHENTICATOR = AuthenticatorType.BASIC.name().toLowerCase();
+
   private static final AtomicBoolean INITIALIZED = new AtomicBoolean(false);
 
   @Override
@@ -53,6 +59,7 @@ public final class IdpServerPluginBootstrap implements ServerPluginBootstrap {
 
     Config config = GravitinoEnv.getInstance().config();
     try {
+      registerBasicAuthenticator(config);
       ServiceAdminInitializer.initialize(config);
     } catch (RuntimeException e) {
       INITIALIZED.set(false);
@@ -62,6 +69,14 @@ public final class IdpServerPluginBootstrap implements ServerPluginBootstrap {
       INITIALIZED.set(false);
       LOG.error("Failed to initialize built-in IdP plugin", e);
       throw e;
+    }
+  }
+
+  static void registerBasicAuthenticator(Config config) {
+    List<String> authenticators = new ArrayList<>(config.get(Configs.AUTHENTICATORS));
+    if (!authenticators.contains(BASIC_AUTHENTICATOR)) {
+      authenticators.add(BASIC_AUTHENTICATOR);
+      config.set(Configs.AUTHENTICATORS, authenticators);
     }
   }
 }

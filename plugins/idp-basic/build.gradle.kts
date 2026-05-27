@@ -74,29 +74,10 @@ tasks {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
   }
 
-  val copyLibsToStandalonePackage by registering(Copy::class) {
-    dependsOn(jar)
-    from(layout.buildDirectory.dir("libs")) {
-      include("gravitino-idp-basic-*.jar")
-      exclude("*-javadoc.jar", "*-sources.jar")
-    }
-    from(configurations.runtimeClasspath) {
-      include("bcprov-jdk18on-*.jar")
-    }
-    into("$rootDir/distribution/gravitino-iceberg-rest-server/libs")
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-  }
-
   register("copyLibAndConfigs", Copy::class) {
     group = "gravitino distribution"
     description = "Copy idp-basic plugin jar into distribution package libs"
     dependsOn(copyLibs)
-  }
-
-  register("copyLibAndConfigsToStandalonePackage", Copy::class) {
-    group = "gravitino distribution"
-    description = "Copy idp-basic plugin jar into standalone Iceberg REST server libs"
-    dependsOn(copyLibsToStandalonePackage)
   }
 
   test {

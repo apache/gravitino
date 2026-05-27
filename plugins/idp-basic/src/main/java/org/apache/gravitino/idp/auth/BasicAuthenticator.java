@@ -28,33 +28,27 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
-import org.apache.gravitino.idp.basic.password.PasswordHasher;
-import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
-import org.apache.gravitino.idp.exception.NotFoundException;
-import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
+import org.apache.gravitino.idp.IdpUserGroupManager;
+import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.server.authentication.Authenticator;
+import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.RandomIdGenerator;
 
 /** Authenticates HTTP Basic credentials against built-in IdP user metadata. */
 public class BasicAuthenticator implements Authenticator {
 
   private static final String BASIC_CHALLENGE = AuthConstants.AUTHORIZATION_BASIC_HEADER.trim();
 
-  private IdpUserMetaService userMetaService;
-  private PasswordHasher passwordHasher;
+  private IdpUserGroupManager userGroupManager;
 
-  /** Creates a {@link BasicAuthenticator} for reflective loading. */
+  /** Creates a {@link BasicAuthenticator} for reflective loading by {@link Authenticator}. */
   public BasicAuthenticator() {}
-
-  BasicAuthenticator(IdpUserMetaService userMetaService, PasswordHasher passwordHasher) {
-    this.userMetaService = userMetaService;
-    this.passwordHasher = passwordHasher;
-  }
 
   @Override
   public boolean isDataFromToken() {
@@ -64,8 +58,7 @@ public class BasicAuthenticator implements Authenticator {
   @Override
   public Principal authenticateToken(byte[] tokenData) {
     Preconditions.checkState(
-        userMetaService != null && passwordHasher != null,
-        "Basic authenticator has not been initialized");
+        userGroupManager != null, "Basic authenticator has not been initialized");
     String authData = requireBasicAuthHeader(tokenData);
     BasicCredentials credentials = parseBasicCredentials(authData);
     return authenticate(credentials, authData);
@@ -73,8 +66,10 @@ public class BasicAuthenticator implements Authenticator {
 
   @Override
   public void initialize(Config config) {
-    this.userMetaService = IdpUserMetaService.getInstance();
-    this.passwordHasher = PasswordHasherFactory.create();
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    IdGenerator idGenerator =
+        env.idGenerator() != null ? env.idGenerator() : RandomIdGenerator.INSTANCE;
+    this.userGroupManager = new IdpUserGroupManager(config, idGenerator);
   }
 
   @Override
@@ -109,19 +104,19 @@ public class BasicAuthenticator implements Authenticator {
     try {
       String decodedCredential =
           new String(Base64.getDecoder().decode(credential), StandardCharsets.UTF_8);
-      int separatorIndex = decodedCredential.indexOf(':');
-      if (separatorIndex < 0) {
+      String[] parts = decodedCredential.split(":", 2);
+      if (parts.length != 2) {
         throw new BadRequestException(
             "Malformed Basic authorization header: credentials must be in username:password format");
       }
 
-      String userName = decodedCredential.substring(0, separatorIndex);
+      String userName = parts[0];
       if (userName.isEmpty()) {
         throw new BadRequestException(
             "Malformed Basic authorization header: username must not be empty");
       }
 
-      String password = decodedCredential.substring(separatorIndex + 1);
+      String password = parts[1];
       if (StringUtils.isBlank(password)) {
         throw invalidCredentials();
       }
@@ -132,24 +127,16 @@ public class BasicAuthenticator implements Authenticator {
   }
 
   private UserPrincipal authenticate(BasicCredentials credentials, String authData) {
-    IdpUserPO userPO = loadUser(credentials.userName());
-    if (!passwordHasher.verify(credentials.password(), userPO.getPasswordHash())) {
+    IdpUser user = userGroupManager.authenticate(credentials.userName(), credentials.password());
+    if (user == null) {
       throw invalidCredentials();
     }
 
     List<UserGroup> groups =
-        userMetaService.listGroupNamesByUsername(credentials.userName()).stream()
+        user.groupNames().stream()
             .map(groupName -> new UserGroup(Optional.empty(), groupName))
             .collect(Collectors.toList());
-    return new UserPrincipal(credentials.userName(), groups, authData);
-  }
-
-  private IdpUserPO loadUser(String userName) {
-    try {
-      return userMetaService.getIdpUserByUsername(userName);
-    } catch (NotFoundException e) {
-      throw invalidCredentials();
-    }
+    return new UserPrincipal(user.name(), groups, authData);
   }
 
   private static UnauthorizedException unauthorized(String message) {

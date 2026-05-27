@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
@@ -33,10 +34,8 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
-import org.apache.gravitino.idp.basic.password.PasswordHasher;
-import org.apache.gravitino.idp.exception.NotFoundException;
-import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
+import org.apache.gravitino.idp.IdpUserGroupManager;
+import org.apache.gravitino.idp.model.IdpUser;
 import org.junit.jupiter.api.Test;
 
 class TestBasicAuthenticator {
@@ -51,7 +50,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testSupportsBasic() {
+  void testSupportsBasic() throws Exception {
     BasicAuthenticator authenticator = authenticator();
 
     assertTrue(authenticator.supportsToken(basicAuthBytes(basicAuthHeader("alice", "secret"))));
@@ -60,7 +59,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testEmptyHeader() {
+  void testEmptyHeader() throws Exception {
     BasicAuthenticator authenticator = authenticator();
     UnauthorizedException exception =
         assertThrows(UnauthorizedException.class, () -> authenticator.authenticateToken(null));
@@ -70,7 +69,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testMissingCredentials() {
+  void testMissingCredentials() throws Exception {
     BasicAuthenticator authenticator = authenticator();
     BadRequestException exception =
         assertThrows(
@@ -84,16 +83,11 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testValidCredentials() {
-    IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    PasswordHasher passwordHasher = mock(PasswordHasher.class);
-    IdpUserPO userPO = mock(IdpUserPO.class);
-    when(userMetaService.getIdpUserByUsername("alice")).thenReturn(userPO);
-    when(userPO.getPasswordHash()).thenReturn("hash-1");
-    when(passwordHasher.verify("Passw0rd-For-Alice", "hash-1")).thenReturn(true);
-    when(userMetaService.listGroupNamesByUsername("alice"))
-        .thenReturn(Arrays.asList("group-a", "group-b"));
-    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
+  void testValidCredentials() throws Exception {
+    IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
+    when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice"))
+        .thenReturn(new IdpUser("alice", Arrays.asList("group-a", "group-b")));
+    BasicAuthenticator authenticator = authenticator(userGroupManager);
     String authHeader = basicAuthHeader("alice", "Passw0rd-For-Alice");
 
     UserPrincipal principal =
@@ -107,12 +101,10 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testUserNotFound() {
-    IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    PasswordHasher passwordHasher = mock(PasswordHasher.class);
-    when(userMetaService.getIdpUserByUsername("alice"))
-        .thenThrow(new NotFoundException("IdP user not found: %s", "alice"));
-    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
+  void testUserNotFound() throws Exception {
+    IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
+    when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice")).thenReturn(null);
+    BasicAuthenticator authenticator = authenticator(userGroupManager);
 
     UnauthorizedException exception =
         assertThrows(
@@ -125,7 +117,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testInvalidBase64() {
+  void testInvalidBase64() throws Exception {
     BasicAuthenticator authenticator = authenticator();
 
     BadRequestException exception =
@@ -137,7 +129,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testMissingSeparator() {
+  void testMissingSeparator() throws Exception {
     BasicAuthenticator authenticator = authenticator();
     String credential =
         Base64.getEncoder().encodeToString("aliceonly".getBytes(StandardCharsets.UTF_8));
@@ -153,7 +145,7 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testEmptyUsername() {
+  void testEmptyUsername() throws Exception {
     BasicAuthenticator authenticator = authenticator();
     String credential =
         Base64.getEncoder().encodeToString(":password".getBytes(StandardCharsets.UTF_8));
@@ -168,15 +160,11 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testTrimmedCredential() {
-    IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    PasswordHasher passwordHasher = mock(PasswordHasher.class);
-    IdpUserPO userPO = mock(IdpUserPO.class);
-    when(userMetaService.getIdpUserByUsername("alice")).thenReturn(userPO);
-    when(userPO.getPasswordHash()).thenReturn("hash-1");
-    when(passwordHasher.verify("Passw0rd-For-Alice", "hash-1")).thenReturn(true);
-    when(userMetaService.listGroupNamesByUsername("alice")).thenReturn(Arrays.asList());
-    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
+  void testTrimmedCredential() throws Exception {
+    IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
+    when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice"))
+        .thenReturn(new IdpUser("alice", Arrays.asList()));
+    BasicAuthenticator authenticator = authenticator(userGroupManager);
     String credential =
         "  "
             + Base64.getEncoder()
@@ -190,13 +178,9 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testBlankPassword() {
-    IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    PasswordHasher passwordHasher = mock(PasswordHasher.class);
-    IdpUserPO userPO = mock(IdpUserPO.class);
-    when(userMetaService.getIdpUserByUsername("alice")).thenReturn(userPO);
-    when(userPO.getPasswordHash()).thenReturn("hash-1");
-    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
+  void testBlankPassword() throws Exception {
+    IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
+    BasicAuthenticator authenticator = authenticator(userGroupManager);
 
     UnauthorizedException exception =
         assertThrows(
@@ -207,14 +191,10 @@ class TestBasicAuthenticator {
   }
 
   @Test
-  void testWrongPassword() {
-    IdpUserMetaService userMetaService = mock(IdpUserMetaService.class);
-    PasswordHasher passwordHasher = mock(PasswordHasher.class);
-    IdpUserPO userPO = mock(IdpUserPO.class);
-    when(userMetaService.getIdpUserByUsername("alice")).thenReturn(userPO);
-    when(userPO.getPasswordHash()).thenReturn("hash-1");
-    when(passwordHasher.verify("Passw0rd-For-Alice", "hash-1")).thenReturn(false);
-    BasicAuthenticator authenticator = new BasicAuthenticator(userMetaService, passwordHasher);
+  void testWrongPassword() throws Exception {
+    IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
+    when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice")).thenReturn(null);
+    BasicAuthenticator authenticator = authenticator(userGroupManager);
 
     UnauthorizedException exception =
         assertThrows(
@@ -245,7 +225,16 @@ class TestBasicAuthenticator {
     return (AuthConstants.AUTHORIZATION_BASIC_HEADER + credential).getBytes(StandardCharsets.UTF_8);
   }
 
-  private BasicAuthenticator authenticator() {
-    return new BasicAuthenticator(mock(IdpUserMetaService.class), mock(PasswordHasher.class));
+  private BasicAuthenticator authenticator() throws Exception {
+    return authenticator(mock(IdpUserGroupManager.class));
+  }
+
+  private static BasicAuthenticator authenticator(IdpUserGroupManager userGroupManager)
+      throws Exception {
+    BasicAuthenticator authenticator = new BasicAuthenticator();
+    Field field = BasicAuthenticator.class.getDeclaredField("userGroupManager");
+    field.setAccessible(true);
+    field.set(authenticator, userGroupManager);
+    return authenticator;
   }
 }

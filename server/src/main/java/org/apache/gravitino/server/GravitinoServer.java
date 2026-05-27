@@ -210,6 +210,7 @@ public class GravitinoServer extends ResourceConfig {
   public void stop() throws IOException {
     GravitinoAuthorizerProvider.getInstance().close();
     server.stop();
+    ServerPluginBootstrapper.stop();
     gravitinoEnv.shutdown();
     if (lineageService != null) {
       lineageService.close();

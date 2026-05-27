@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
@@ -97,6 +98,27 @@ public class IdpUserGroupManager implements Closeable {
   public IdpUser getUser(String username) {
     IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
     return new IdpUser(userPO.getUsername(), USER_SERVICE.listGroupNamesByUsername(username));
+  }
+
+  /**
+   * Authenticates a built-in IdP user with the given plaintext password.
+   *
+   * @param username The username.
+   * @param password The plaintext password.
+   * @return The authenticated user with group memberships, or {@code null} when credentials are
+   *     invalid.
+   */
+  @Nullable
+  public IdpUser authenticate(String username, String password) {
+    try {
+      IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
+      if (!passwordHasher.verify(password, userPO.getPasswordHash())) {
+        return null;
+      }
+      return new IdpUser(username, USER_SERVICE.listGroupNamesByUsername(username));
+    } catch (NotFoundException e) {
+      return null;
+    }
   }
 
   /**
