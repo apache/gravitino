@@ -64,8 +64,7 @@ public class StarRocksUtils {
   // still expected to start with "strategy(".
   private static final Pattern DISTRIBUTED_BY_CLAUSE_PATTERN =
       Pattern.compile(
-          "(?:^|\\s|\\))DISTRIBUTED\\s+BY\\s+(?:RANDOM\\b|\\w+\\s*\\()",
-          Pattern.CASE_INSENSITIVE);
+          "(?:^|\\s|\\))DISTRIBUTED\\s+BY\\s+(?:RANDOM\\b|\\w+\\s*\\()", Pattern.CASE_INSENSITIVE);
 
   private static final Pattern TABLE_COMMENT_PATTERN =
       Pattern.compile("COMMENT\\s*\"([^\\(]+?)\\s*\\(From Gravitino,.*\\)\"");
