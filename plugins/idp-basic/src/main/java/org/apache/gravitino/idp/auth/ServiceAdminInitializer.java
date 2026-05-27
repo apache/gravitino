@@ -22,7 +22,6 @@ package org.apache.gravitino.idp.auth;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -74,60 +73,54 @@ public final class ServiceAdminInitializer {
       IdGenerator idGenerator,
       @Nullable String initialAdminPasswords)
       throws IOException {
-    if (!enabledBasicAuthenticator(config)) {
+    List<String> authenticators = config.get(Configs.AUTHENTICATORS);
+    if (authenticators == null || !authenticators.contains(BASIC_AUTHENTICATOR)) {
       return;
     }
 
-    List<String> serviceAdmins = configuredServiceAdmins(config);
-    if (serviceAdmins.isEmpty()) {
+    List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
+    if (serviceAdmins == null || serviceAdmins.isEmpty()) {
       return;
     }
 
-    Map<String, String> initialPasswords =
+    Map<String, String> passwordsByAdmin =
         parseInitialAdminPasswords(serviceAdmins, initialAdminPasswords);
     for (String serviceAdmin : serviceAdmins) {
       IdpCredentialValidator.validateUsername(serviceAdmin);
-      if (idpUserExists(userMetaService, serviceAdmin)) {
+      if (userExists(userMetaService, serviceAdmin)) {
         continue;
       }
 
-      String password = initialPasswords.get(serviceAdmin);
+      String password = passwordsByAdmin.get(serviceAdmin);
       Preconditions.checkArgument(
           StringUtils.isNotBlank(password),
           "Missing initial password for configured service admin %s; declare %s",
           serviceAdmin,
           INITIAL_ADMIN_PASSWORD_ENV);
       userMetaService.insertIdpUser(
-          IdpUserPO.builder()
-              .withUserId(idGenerator.nextId())
-              .withUsername(serviceAdmin)
-              .withPasswordHash(passwordHasher.hash(password))
-              .withCurrentVersion(POConverters.INIT_VERSION)
-              .withLastVersion(POConverters.INIT_VERSION)
-              .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
-              .build());
+          newServiceAdminUser(idGenerator, passwordHasher, serviceAdmin, password));
     }
   }
 
-  private static boolean idpUserExists(IdpUserMetaService userMetaService, String username) {
+  private static IdpUserPO newServiceAdminUser(
+      IdGenerator idGenerator, PasswordHasher passwordHasher, String username, String password) {
+    return IdpUserPO.builder()
+        .withUserId(idGenerator.nextId())
+        .withUsername(username)
+        .withPasswordHash(passwordHasher.hash(password))
+        .withCurrentVersion(POConverters.INIT_VERSION)
+        .withLastVersion(POConverters.INIT_VERSION)
+        .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
+        .build();
+  }
+
+  private static boolean userExists(IdpUserMetaService userMetaService, String username) {
     try {
       userMetaService.getIdpUserByUsername(username);
       return true;
     } catch (NotFoundException e) {
       return false;
     }
-  }
-
-  private static boolean enabledBasicAuthenticator(Config config) {
-    return config.get(Configs.AUTHENTICATORS).contains(BASIC_AUTHENTICATOR);
-  }
-
-  private static List<String> configuredServiceAdmins(Config config) {
-    List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
-    if (serviceAdmins == null || serviceAdmins.isEmpty()) {
-      return ImmutableList.of();
-    }
-    return ImmutableList.copyOf(serviceAdmins);
   }
 
   private static Map<String, String> parseInitialAdminPasswords(
@@ -148,35 +141,39 @@ public final class ServiceAdminInitializer {
 
     Map<String, String> passwordsByAdmin = new LinkedHashMap<>();
     for (String entry : entries) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(entry),
-          "%s must not contain blank entries",
-          INITIAL_ADMIN_PASSWORD_ENV);
-
-      int separatorIndex = entry.indexOf(':');
-      Preconditions.checkArgument(
-          separatorIndex > 0,
-          "%s entry '%s' must use the format username:password",
-          INITIAL_ADMIN_PASSWORD_ENV,
-          entry);
-
-      String username = entry.substring(0, separatorIndex);
-      String password = entry.substring(separatorIndex + 1);
-      IdpCredentialValidator.validateUsername(username);
-      IdpCredentialValidator.validatePassword(password);
-      Preconditions.checkArgument(
-          serviceAdmins.contains(username),
-          "%s entry '%s' is not a configured service admin",
-          INITIAL_ADMIN_PASSWORD_ENV,
-          username);
-      Preconditions.checkArgument(
-          !passwordsByAdmin.containsKey(username),
-          "%s contains duplicate entries for service admin %s",
-          INITIAL_ADMIN_PASSWORD_ENV,
-          username);
-      passwordsByAdmin.put(username, password);
+      putInitialPassword(serviceAdmins, passwordsByAdmin, entry);
     }
-
     return ImmutableMap.copyOf(passwordsByAdmin);
+  }
+
+  private static void putInitialPassword(
+      List<String> serviceAdmins, Map<String, String> passwordsByAdmin, String entry) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(entry),
+        "%s must not contain blank entries",
+        INITIAL_ADMIN_PASSWORD_ENV);
+
+    String[] credentials = entry.split(":", 2);
+    Preconditions.checkArgument(
+        credentials.length == 2,
+        "%s entry '%s' must use the format username:password",
+        INITIAL_ADMIN_PASSWORD_ENV,
+        entry);
+
+    String username = credentials[0];
+    String password = credentials[1];
+    IdpCredentialValidator.validateUsername(username);
+    IdpCredentialValidator.validatePassword(password);
+    Preconditions.checkArgument(
+        serviceAdmins.contains(username),
+        "%s entry '%s' is not a configured service admin",
+        INITIAL_ADMIN_PASSWORD_ENV,
+        username);
+    Preconditions.checkArgument(
+        !passwordsByAdmin.containsKey(username),
+        "%s contains duplicate entries for service admin %s",
+        INITIAL_ADMIN_PASSWORD_ENV,
+        username);
+    passwordsByAdmin.put(username, password);
   }
 }
