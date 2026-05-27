@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
@@ -135,7 +136,18 @@ public class EntityChangeLogPoller implements AutoCloseable {
   }
 
   @VisibleForTesting
-  synchronized void pollChanges() {
+  void pollChanges() {
+    try {
+      doPollChanges();
+    } catch (Exception e) {
+      if (handleInterruptIfAny(e, "Entity change poll")) {
+        return;
+      }
+      LOG.warn("Entity change poll failed", e);
+    }
+  }
+
+  private synchronized void doPollChanges() {
     List<EntityChangeRecord> changes = fetchEntityChanges();
     if (changes.isEmpty()) {
       pruneExpiredChangesIfNeeded();
@@ -149,9 +161,10 @@ public class EntityChangeLogPoller implements AutoCloseable {
       }
     }
 
+    List<EntityChangeRecord> dispatchedChanges = Collections.unmodifiableList(changes);
     for (EntityChangeLogListener listener : listeners) {
       try {
-        listener.onEntityChange(changes);
+        listener.onEntityChange(dispatchedChanges);
       } catch (Exception e) {
         LOG.warn("Entity change listener {} failed", listener.getClass().getName(), e);
       }
@@ -165,6 +178,23 @@ public class EntityChangeLogPoller implements AutoCloseable {
     return SessionUtils.getWithoutCommit(
         EntityChangeLogMapper.class,
         m -> m.selectEntityChanges(entityPollHighWaterId, ENTITY_CHANGE_POLLER_MAX_ROWS));
+  }
+
+  private static boolean handleInterruptIfAny(Throwable e, String context) {
+    Throwable t = e;
+    while (t != null) {
+      if (t instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+        LOG.debug("{} interrupted, stopping poll cycle", context);
+        return true;
+      }
+      t = t.getCause();
+    }
+    if (Thread.currentThread().isInterrupted()) {
+      LOG.debug("{} ran while thread was interrupted, stopping poll cycle", context);
+      return true;
+    }
+    return false;
   }
 
   private void pruneExpiredChangesIfNeeded() {

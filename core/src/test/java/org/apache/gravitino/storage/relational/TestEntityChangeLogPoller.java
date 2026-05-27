@@ -112,6 +112,58 @@ public class TestEntityChangeLogPoller {
   }
 
   @Test
+  void testPollChangesCatchesFetchFailures() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    when(mapper.selectEntityChanges(0L, 500)).thenThrow(new RuntimeException("db failed"));
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      sessionUtils
+          .when(() -> SessionUtils.getWithoutCommit(any(), any()))
+          .thenAnswer(
+              invocation -> {
+                Function<Object, Object> func = invocation.getArgument(1);
+                return func.apply(mapper);
+              });
+
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+
+      Assertions.assertDoesNotThrow(poller::pollChanges);
+    }
+  }
+
+  @Test
+  void testDispatchesImmutableBatchToListeners() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    EntityChangeRecord first = change(1L, "CATALOG", "ml1.cat1");
+    EntityChangeRecord second = change(2L, "SCHEMA", "ml1.cat1.sch1");
+    when(mapper.selectEntityChanges(0L, 500)).thenReturn(new ArrayList<>(List.of(first, second)));
+
+    List<EntityChangeRecord> received = new ArrayList<>();
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      sessionUtils
+          .when(() -> SessionUtils.getWithoutCommit(any(), any()))
+          .thenAnswer(
+              invocation -> {
+                Function<Object, Object> func = invocation.getArgument(1);
+                return func.apply(mapper);
+              });
+      sessionUtils
+          .when(() -> SessionUtils.doWithoutCommit(any(), any()))
+          .thenAnswer(invocation -> null);
+
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+      poller.registerListener(
+          changes -> Assertions.assertThrows(UnsupportedOperationException.class, changes::clear));
+      poller.registerListener(received::addAll);
+
+      poller.pollChanges();
+    }
+
+    Assertions.assertEquals(List.of(first, second), received);
+  }
+
+  @Test
   void testPrunesExpiredChangesAfterCleanupInterval() {
     EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
     when(mapper.selectEntityChanges(0L, 500)).thenReturn(List.of());

@@ -102,14 +102,7 @@ public class JcasbinAuthorizationLookups {
       MetadataObject.Type metadataType,
       AuthorizationRequestContext requestContext) {
     return requestContext.computeOwnerIfAbsent(
-        metadataId,
-        id -> {
-          try {
-            return ownerRelCache.get(id, ignored -> loadOwnerInfo(id, metadataType));
-          } catch (NoSuchOwnerInfoException e) {
-            return Optional.empty();
-          }
-        });
+        metadataId, id -> ownerRelCache.get(id, ignored -> loadOwnerInfo(id, metadataType)));
   }
 
   private static Optional<OwnerInfo> loadOwnerInfo(
@@ -118,15 +111,6 @@ public class JcasbinAuthorizationLookups {
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class,
             m -> m.selectOwnerByMetadataObjectIdAndType(metadataId, metadataType.name()));
-    if (ownerInfo == null) {
-      throw new NoSuchOwnerInfoException(metadataId);
-    }
-    return Optional.of(ownerInfo);
-  }
-
-  private static class NoSuchOwnerInfoException extends RuntimeException {
-    private NoSuchOwnerInfoException(Long metadataId) {
-      super(String.format("No owner info found for metadata object id %s", metadataId));
-    }
+    return ownerInfo == null ? Optional.empty() : Optional.of(ownerInfo);
   }
 }

@@ -19,15 +19,22 @@
 package org.apache.gravitino.server.authorization.jcasbin;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.cache.CaffeineGravitinoCache;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 /** Tests for {@link JcasbinAuthorizationLookups}. */
 public class TestJcasbinAuthorizationLookups {
@@ -70,8 +77,43 @@ public class TestJcasbinAuthorizationLookups {
     Assertions.assertEquals(0, ownerRelCache.putCount);
   }
 
+  @Test
+  void testResolveOwnerIdCachesMissingOwnerInSharedCache() {
+    OwnerMetaMapper ownerMetaMapper = Mockito.mock(OwnerMetaMapper.class);
+    Mockito.when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(100L, "TABLE"))
+        .thenReturn(null);
+
+    CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
+    try (CaffeineGravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache =
+            new CaffeineGravitinoCache<>(60_000L, 100L);
+        MockedStatic<SessionUtils> sessionUtils = Mockito.mockStatic(SessionUtils.class)) {
+      sessionUtils
+          .when(() -> SessionUtils.getWithoutCommit(Mockito.any(), Mockito.any()))
+          .thenAnswer(
+              invocation -> {
+                Function<Object, Object> func = invocation.getArgument(1);
+                return func.apply(ownerMetaMapper);
+              });
+      JcasbinAuthorizationLookups lookups =
+          new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
+
+      Assertions.assertFalse(
+          lookups
+              .resolveOwnerId(100L, MetadataObject.Type.TABLE, new AuthorizationRequestContext())
+              .isPresent());
+      Assertions.assertFalse(
+          lookups
+              .resolveOwnerId(100L, MetadataObject.Type.TABLE, new AuthorizationRequestContext())
+              .isPresent());
+    }
+
+    Mockito.verify(ownerMetaMapper, Mockito.times(1))
+        .selectOwnerByMetadataObjectIdAndType(100L, "TABLE");
+  }
+
   private static class CountingCache<K, V> implements GravitinoCache<K, V> {
     private final V value;
+    private final Map<K, V> loadedValues = new HashMap<>();
     private int getCount;
     private int getIfPresentCount;
     private int putCount;
@@ -89,7 +131,7 @@ public class TestJcasbinAuthorizationLookups {
     @Override
     public V get(K key, Function<K, V> loader) {
       getCount++;
-      return value;
+      return loadedValues.computeIfAbsent(key, ignored -> value);
     }
 
     @Override
