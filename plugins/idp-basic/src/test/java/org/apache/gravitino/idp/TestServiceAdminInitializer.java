@@ -56,6 +56,7 @@ class TestServiceAdminInitializer {
   private IdpUserMetaService userMetaService;
   private PasswordHasher passwordHasher;
   private IdGenerator idGenerator;
+  private IdpUserGroupManager manager;
 
   @BeforeEach
   void setUp() {
@@ -63,6 +64,7 @@ class TestServiceAdminInitializer {
     userMetaService = Mockito.mock(IdpUserMetaService.class);
     passwordHasher = Mockito.mock(PasswordHasher.class);
     idGenerator = Mockito.mock(IdGenerator.class);
+    manager = new IdpUserGroupManager(idGenerator, userMetaService, passwordHasher);
   }
 
   @Test
@@ -191,12 +193,10 @@ class TestServiceAdminInitializer {
   }
 
   private void initializeWithoutPayload() throws IOException {
-    IdpUserGroupManager.initializeConfiguredServiceAdmins(
-        config, userMetaService, passwordHasher, idGenerator, "");
+    manager.initializeConfiguredServiceAdmins(config, "");
   }
 
-  private void initializeWithPayload(String initialAdminPasswords) throws IOException {
-    IdpUserGroupManager.initializeConfiguredServiceAdmins(
-        config, userMetaService, passwordHasher, idGenerator, initialAdminPasswords);
+  private void initializeWithPayload(String initialAdminPassword) throws IOException {
+    manager.initializeConfiguredServiceAdmins(config, initialAdminPassword);
   }
 }

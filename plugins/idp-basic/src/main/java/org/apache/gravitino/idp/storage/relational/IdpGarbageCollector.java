@@ -69,7 +69,9 @@ public final class IdpGarbageCollector implements Closeable {
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
 
-  /** Collects and physically deletes soft-deleted built-in IdP metadata past the retention window. */
+  /**
+   * Collects and physically deletes soft-deleted built-in IdP metadata past the retention window.
+   */
   public void collectAndClean() {
     long threadId = Thread.currentThread().getId();
     LOG.debug("Thread {} start to collect built-in IdP garbage...", threadId);

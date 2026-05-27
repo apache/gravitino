@@ -83,7 +83,7 @@ public class TestIdpUserGroupManager {
 
   @AfterAll
   public static void tearDown() throws IOException {
-    IdpUserGroupManager.closeInstance();
+    manager.close();
     manager = null;
 
     if (h2Path != null && Files.exists(h2Path)) {

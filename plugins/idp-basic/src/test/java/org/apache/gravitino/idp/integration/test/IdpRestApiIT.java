@@ -84,6 +84,7 @@ public class IdpRestApiIT extends BaseIT {
 
   private GravitinoServer gravitinoServer;
   private ServerConfig gravitinoServerConfig;
+  private IdpUserGroupManager idpUserGroupManager;
   private Path h2Path;
   private String apiBase;
 
@@ -102,6 +103,9 @@ public class IdpRestApiIT extends BaseIT {
 
     serverUri = String.format("http://localhost:%d", httpPort);
     apiBase = serverUri + "/api";
+    idpUserGroupManager =
+        IdpUserGroupManager.getInstance(
+            gravitinoServerConfig, GravitinoEnv.getInstance().idGenerator());
   }
 
   @AfterAll
@@ -111,7 +115,10 @@ public class IdpRestApiIT extends BaseIT {
       gravitinoServer.stop();
       gravitinoServer = null;
     }
-    IdpUserGroupManager.closeInstance();
+    if (idpUserGroupManager != null) {
+      idpUserGroupManager.close();
+      idpUserGroupManager = null;
+    }
     if (h2Path != null) {
       FileUtils.deleteDirectory(h2Path.toFile());
     }

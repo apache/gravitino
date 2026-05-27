@@ -83,8 +83,8 @@ class TestBasicAuthenticationIntegration {
   @AfterAll
   static void tearDown() throws IOException {
     authenticator = null;
+    userGroupManager.close();
     userGroupManager = null;
-    IdpUserGroupManager.closeInstance();
     if (h2Path != null && Files.exists(h2Path)) {
       try (Stream<Path> paths = Files.walk(h2Path)) {
         paths
