@@ -21,7 +21,6 @@ package org.apache.gravitino.idp.storage.relational;
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -78,11 +77,6 @@ public final class IdpGarbageCollector implements Closeable {
       instance.close();
       instance = null;
     }
-  }
-
-  @VisibleForTesting
-  static synchronized void resetInstance() throws IOException {
-    closeInstance();
   }
 
   IdpGarbageCollector(Config config) {
