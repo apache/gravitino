@@ -54,7 +54,9 @@ function check_process_status() {
 
 function found_lance_rest_server_pid() {
   process_name='GravitinoLanceRESTServer';
-  RUNNING_PIDS=$(ps x | grep ${process_name} | grep -v grep | awk '{print $1}');
+  RUNNING_PIDS=$(
+    ps xww | grep -F "${process_name}" | grep -F "${GRAVITINO_HOME}" | grep -v grep | awk '{print $1}'
+  );
 
   if [[ -z "${RUNNING_PIDS}" ]]; then
     return
