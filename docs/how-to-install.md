@@ -4,7 +4,7 @@ slug: "/how-to-install"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Binary
+## Binary installation
 
 :::note
 Apache Gravitino supports running on Java 17, and higher versions should also work but not fully tested. Make sure you have Java installed and
@@ -56,28 +56,26 @@ The Gravitino binary distribution package contains the following files:
 ```
 
 :::note
-Catalogs `OceanBase` and `ClickHouse` are not included in the Gravitino binary distribution package (see above) by default due to package size limitations and License compatibility issues since 1.2.0.
-If you want to use these two catalogs, build the Gravitino binary distribution package yourself and use tarball `gravitino-<version>-bin-all.tar.gz`, which contains all catalogs including those in the `catalogs-contrib` module.
-For more details about it, refer to [Reorg catalogs structure](https://github.com/apache/gravitino/pull/9781)
+The OceanBase and ClickHouse catalogs are not included in the Gravitino binary distribution package by default due to package-size and license-compatibility constraints. To use these catalogs, build Gravitino from source and use the `gravitino-<version>-bin-all.tar.gz` tarball, which includes all catalogs from the `catalogs-contrib` module.
 :::
 
-### Initialize the RDBMS (Optional)
+### Initialize the RDBMS (optional)
 
-If you want to use the relational backend storage, you need to initialize the RDBMS first. For the details on initializing the RDBMS, see [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
+To use a relational metadata backend such as MySQL or PostgreSQL, initialize the database before starting Gravitino. See [How to use relational backend storage](./how-to-use-relational-backend-storage.md) for details.
 
-### Configure the Server
+### Configure the server
 
 The Gravitino server configuration file is `conf/gravitino.conf`. Configure the Gravitino server by modifying this file. Basic configurations have already been added to this file. All the configurations are listed in [Gravitino Server Configurations](./gravitino-server-config.md).
 
-### Configure the Server Log
+### Configure the server log
 
 The Gravitino server log configuration file is `conf/log4j2.properties`. Gravitino uses Log4j2 as the logging system. Refer to the [Log4j2 configuration guide](https://logging.apache.org/log4j/2.x/) to do the log configuration.
 
-### Configure the Server Environment
+### Configure the server environment
 
 The Gravitino server environment configuration file is `conf/gravitino-env.sh`. Gravitino exposes several environment variables. Modify them in this file.
 
-### Configure Catalogs
+### Configure catalogs
 
 Gravitino supports multiple catalogs. Configure the catalog-level configurations by modifying the related configuration file in the `catalogs/<catalog-provider>/conf` directory. The configurations you set here apply to all the catalogs of the same type you create.
 
@@ -89,14 +87,14 @@ Gravitino takes the catalog configurations in the following order:
 1. Catalog `properties` specified in catalog creation API or REST API.
 2. Catalog configurations specified in the catalog configuration file.
 
-The catalog `properties` can override the catalog configurations specified in the configurationfile.
+The catalog `properties` can override the catalog configurations specified in the configuration file.
 :::
 
 Gravitino supports passing in catalog-specific configurations if you add `gravitino.bypass.`. For example, if you want to pass in the HMS-specific configuration `hive.metastore.client.capability.check` to the underlying Hive client in the Hive catalog, add the `gravitino.bypass.` prefix.
 
 Also, Gravitino supports loading catalog-specific configurations from external files. For example,you can put your own `hive-site.xml` file in the `catalogs/hive/conf` directory, and Gravitino loads it automatically.
 
-### Start the Server
+### Start the server
 
 After configuring the Gravitino server, start the Gravitino server by running:
 
@@ -122,7 +120,7 @@ to make sure Gravitino is running.
 If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` environment variable in the `conf/gravitino-env.sh` file. Then create a `Remote JVM Debug` configuration in `IntelliJ IDEA` and debug `gravitino.server.main`.
 :::
 
-### Manage Gravitino Iceberg REST Server in Gravitino Package
+### Run the Iceberg REST server
 
 Run the Iceberg REST server as either a standalone server or as an auxiliary service embedded in the Gravitino server. To start it as a standalone server, use the command `./bin/gravitino-iceberg-rest-server.sh start` with configurations specified in `./conf/gravitino-iceberg-rest-server.conf`. Alternatively, use `./bin/gravitino.sh start` to launch a Gravitino server that integrates both the Iceberg REST service and the Gravitino service, with all configurations centralized in `conf/gravitino.conf`. 
 
