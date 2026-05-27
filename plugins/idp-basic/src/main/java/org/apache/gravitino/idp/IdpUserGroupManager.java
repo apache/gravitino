@@ -19,12 +19,10 @@
 package org.apache.gravitino.idp;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -110,22 +108,23 @@ public class IdpUserGroupManager implements Closeable {
       return;
     }
 
-    Map<String, String> passwordsByAdmin =
-        parseInitialAdminPasswords(serviceAdmins, initialAdminPassword);
+    if (StringUtils.isNotBlank(initialAdminPassword)) {
+      IdpCredentialValidator.validatePassword(initialAdminPassword);
+    }
+
     for (String serviceAdmin : serviceAdmins) {
       IdpCredentialValidator.validateUsername(serviceAdmin);
       if (userExists(serviceAdmin)) {
         continue;
       }
 
-      String password = passwordsByAdmin.get(serviceAdmin);
       Preconditions.checkArgument(
-          StringUtils.isNotBlank(password),
+          StringUtils.isNotBlank(initialAdminPassword),
           "Missing initial password for configured service admin %s; declare"
               + " GRAVITINO_INITIAL_ADMIN_PASSWORD",
           serviceAdmin);
       userMetaService.insertIdpUser(
-          buildUserPO(idGenerator, serviceAdmin, passwordHasher.hash(password)));
+          buildUserPO(idGenerator, serviceAdmin, passwordHasher.hash(initialAdminPassword)));
     }
   }
 
@@ -285,20 +284,6 @@ public class IdpUserGroupManager implements Closeable {
     } catch (NotFoundException e) {
       return false;
     }
-  }
-
-  private static Map<String, String> parseInitialAdminPasswords(
-      List<String> serviceAdmins, String initialAdminPassword) {
-    if (StringUtils.isBlank(initialAdminPassword)) {
-      return ImmutableMap.of();
-    }
-
-    IdpCredentialValidator.validatePassword(initialAdminPassword);
-    ImmutableMap.Builder<String, String> passwordsByAdmin = ImmutableMap.builder();
-    for (String serviceAdmin : serviceAdmins) {
-      passwordsByAdmin.put(serviceAdmin, initialAdminPassword);
-    }
-    return passwordsByAdmin.build();
   }
 
   private IdpGroupPO newGroupPO(String groupName) {
