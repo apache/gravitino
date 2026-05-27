@@ -71,20 +71,6 @@ Default values:
 - `ratio = 0.15`
 - `minDataFileMse = (134217728 × 0.15)^2 = 405323966463344`
 
-### Target File Size
-
-The Gravitino default `target-file-size-bytes = 134217728` (128 MiB) does not match the Iceberg project default of 512 MiB or many production deployments. Set `target-file-size-bytes` in `rewriteOptions` to match your table's actual `write.target-file-size-bytes` property:
-
-```json
-{
-  "rewriteOptions": {
-    "target-file-size-bytes": "536870912"
-  }
-}
-```
-
-Common values are 128 MiB (`134217728`), 256 MiB (`268435456`), and 512 MiB (`536870912`). When you change the target, recompute `minDataFileMse` using the formula above so the trigger threshold matches the new target.
-
 ### Trigger Behavior
 
 A partition is selected for compaction when either threshold is met:
