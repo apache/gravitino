@@ -57,12 +57,14 @@ public class StarRocksUtils {
       Pattern.compile(
           "DISTRIBUTED BY\\s+(HASH|RANDOM)\\s*(\\(([^)]+)\\))?\\s*(BUCKETS\\s+(\\d+))?");
 
-  // Match only top-level DISTRIBUTED BY clause boundaries to avoid false positives
-  // from column comments. For strategy shape, RANDOM has no column list while
-  // others are expected to start with "strategy(".
+  // Match DISTRIBUTED BY clause presence in a formatting-independent way.
+  // Accept any whitespace before DISTRIBUTED so single-line SQL, CRLF line endings,
+  // and clauses following other table options (for example ENGINE=...) are detected.
+  // Keep the strategy-shape guard so RANDOM has no column list while others are
+  // still expected to start with "strategy(".
   private static final Pattern DISTRIBUTED_BY_CLAUSE_PATTERN =
       Pattern.compile(
-          "(?:^|\\n|\\))\\s*DISTRIBUTED\\s+BY\\s+(?:RANDOM\\b|\\w+\\s*\\()",
+          "(?:^|\\s|\\))DISTRIBUTED\\s+BY\\s+(?:RANDOM\\b|\\w+\\s*\\()",
           Pattern.CASE_INSENSITIVE);
 
   private static final Pattern TABLE_COMMENT_PATTERN =
