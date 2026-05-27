@@ -78,7 +78,7 @@ public class TestIdpUserGroupManager {
     config.set(STORE_DELETE_AFTER_TIME, 20 * 60 * 1000L);
     config.set(CACHE_ENABLED, false);
 
-    manager = IdpUserGroupManager.getInstance(config, RandomIdGenerator.INSTANCE);
+    manager = new IdpUserGroupManager(config, RandomIdGenerator.INSTANCE);
   }
 
   @AfterAll

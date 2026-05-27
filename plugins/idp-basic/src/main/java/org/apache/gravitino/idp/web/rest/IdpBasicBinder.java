@@ -28,7 +28,7 @@ public class IdpBasicBinder extends AbstractBinder {
   @Override
   protected void configure() {
     GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    bind(IdpUserGroupManager.getInstance(gravitinoEnv.config(), gravitinoEnv.idGenerator()))
+    bind(new IdpUserGroupManager(gravitinoEnv.config(), gravitinoEnv.idGenerator()))
         .to(IdpUserGroupManager.class);
   }
 }

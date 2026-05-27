@@ -56,25 +56,9 @@ public class IdpUserGroupManager implements Closeable {
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
 
-  private static volatile IdpUserGroupManager instance;
-
   private final IdpRelationalStorage relationalStorage;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
-
-  public static IdpUserGroupManager getInstance(Config config, IdGenerator idGenerator) {
-    IdpUserGroupManager local = instance;
-    if (local == null) {
-      synchronized (IdpUserGroupManager.class) {
-        local = instance;
-        if (local == null) {
-          instance = new IdpUserGroupManager(config, idGenerator);
-          local = instance;
-        }
-      }
-    }
-    return local;
-  }
 
   /**
    * Creates a built-in IdP user and group manager.
@@ -239,11 +223,6 @@ public class IdpUserGroupManager implements Closeable {
   @Override
   public void close() throws IOException {
     relationalStorage.close();
-    synchronized (IdpUserGroupManager.class) {
-      if (instance == this) {
-        instance = null;
-      }
-    }
   }
 
   private IdpUserPO newUserPO(String username, String passwordHash) {

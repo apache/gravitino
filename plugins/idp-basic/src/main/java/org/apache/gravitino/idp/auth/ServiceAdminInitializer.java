@@ -35,8 +35,9 @@ public final class ServiceAdminInitializer {
 
   public static void initialize(Config config) throws IOException {
     GravitinoEnv env = GravitinoEnv.getInstance();
-    IdpUserGroupManager manager = IdpUserGroupManager.getInstance(config, env.idGenerator());
-    manager.initializeConfiguredServiceAdmins(
-        config, StringUtils.defaultString(System.getenv(INITIAL_ADMIN_PASSWORD_ENV)));
+    try (IdpUserGroupManager manager = new IdpUserGroupManager(config, env.idGenerator())) {
+      manager.initializeConfiguredServiceAdmins(
+          config, StringUtils.defaultString(System.getenv(INITIAL_ADMIN_PASSWORD_ENV)));
+    }
   }
 }

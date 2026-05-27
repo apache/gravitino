@@ -62,17 +62,14 @@ public final class IdpGarbageCollector implements Closeable {
     storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
   }
 
-  /** Starts the scheduled garbage collection task. */
+  /** Starts the scheduled garbage collector. */
   public void start() {
     long dateTimelineMinute = storeDeleteAfterTimeMillis / 1000 / 60;
     long frequency = Math.max(dateTimelineMinute / 10, 10);
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);
   }
 
-  /**
-   * Collects and physically deletes soft-deleted built-in IdP metadata past the retention window.
-   */
-  public void collectAndClean() {
+  void collectAndClean() {
     long threadId = Thread.currentThread().getId();
     LOG.debug("Thread {} start to collect built-in IdP garbage...", threadId);
 

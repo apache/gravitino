@@ -76,7 +76,7 @@ class TestBasicAuthenticationIntegration {
 
     authenticator = new BasicAuthenticator();
     authenticator.initialize(config);
-    userGroupManager = IdpUserGroupManager.getInstance(config, RandomIdGenerator.INSTANCE);
+    userGroupManager = new IdpUserGroupManager(config, RandomIdGenerator.INSTANCE);
     userGroupManager.addUser(USER, PASSWORD);
   }
 
