@@ -279,14 +279,14 @@ public abstract class GravitinoClientBase implements Closeable {
     /**
      * Sets Basic authentication for Gravitino using the built-in IdP.
      *
-     * @param userName The username.
+     * @param username The username.
      * @param password The password.
      * @return This Builder instance for method chaining.
      */
-    public Builder<T> withBasicAuth(String userName, String password) {
-      Preconditions.checkArgument(StringUtils.isNotBlank(userName), "userName can't be blank");
+    public Builder<T> withBasicAuth(String username, String password) {
+      Preconditions.checkArgument(StringUtils.isNotBlank(username), "username can't be blank");
       Preconditions.checkArgument(StringUtils.isNotBlank(password), "password can't be blank");
-      this.authDataProvider = new BasicTokenProvider(userName, password);
+      this.authDataProvider = new BasicTokenProvider(username, password);
       return this;
     }
 

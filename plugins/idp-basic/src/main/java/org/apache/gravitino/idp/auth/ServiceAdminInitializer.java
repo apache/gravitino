@@ -85,7 +85,7 @@ public final class ServiceAdminInitializer {
     Map<String, String> initialPasswords =
         parseInitialAdminPasswords(serviceAdmins, initialAdminPasswords);
     for (String serviceAdmin : serviceAdmins) {
-      validateUserName(serviceAdmin);
+      validateUsername(serviceAdmin);
       if (idpUserExists(userMetaService, serviceAdmin)) {
         continue;
       }
@@ -159,29 +159,29 @@ public final class ServiceAdminInitializer {
           INITIAL_ADMIN_PASSWORD_ENV,
           entry);
 
-      String userName = entry.substring(0, separatorIndex);
+      String username = entry.substring(0, separatorIndex);
       String password = entry.substring(separatorIndex + 1);
-      validateUserName(userName);
+      validateUsername(username);
       validatePassword(password);
       Preconditions.checkArgument(
-          serviceAdmins.contains(userName),
+          serviceAdmins.contains(username),
           "%s entry '%s' is not a configured service admin",
           INITIAL_ADMIN_PASSWORD_ENV,
-          userName);
+          username);
       Preconditions.checkArgument(
-          !passwordsByAdmin.containsKey(userName),
+          !passwordsByAdmin.containsKey(username),
           "%s contains duplicate entries for service admin %s",
           INITIAL_ADMIN_PASSWORD_ENV,
-          userName);
-      passwordsByAdmin.put(userName, password);
+          username);
+      passwordsByAdmin.put(username, password);
     }
 
     return ImmutableMap.copyOf(passwordsByAdmin);
   }
 
-  private static void validateUserName(String userName) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(userName), "User name is required");
-    Preconditions.checkArgument(!userName.contains(":"), "User name cannot contain ':'");
+  private static void validateUsername(String username) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(username), "Username is required");
+    Preconditions.checkArgument(!username.contains(":"), "Username cannot contain ':'");
   }
 
   private static void validatePassword(String password) {

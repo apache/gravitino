@@ -110,8 +110,8 @@ public class BasicAuthenticator implements Authenticator {
             "Malformed Basic authorization header: credentials must be in username:password format");
       }
 
-      String userName = parts[0];
-      if (userName.isEmpty()) {
+      String username = parts[0];
+      if (username.isEmpty()) {
         throw new BadRequestException(
             "Malformed Basic authorization header: username must not be empty");
       }
@@ -120,14 +120,14 @@ public class BasicAuthenticator implements Authenticator {
       if (StringUtils.isBlank(password)) {
         throw invalidCredentials();
       }
-      return new BasicCredentials(userName, password);
+      return new BasicCredentials(username, password);
     } catch (IllegalArgumentException e) {
       throw new BadRequestException(e, "Malformed Basic authorization header: invalid base64");
     }
   }
 
   private UserPrincipal authenticate(BasicCredentials credentials, String authData) {
-    IdpUser user = userGroupManager.authenticate(credentials.userName(), credentials.password());
+    IdpUser user = userGroupManager.authenticate(credentials.username(), credentials.password());
     if (user == null) {
       throw invalidCredentials();
     }
@@ -148,16 +148,16 @@ public class BasicAuthenticator implements Authenticator {
   }
 
   private static final class BasicCredentials {
-    private final String userName;
+    private final String username;
     private final String password;
 
-    private BasicCredentials(String userName, String password) {
-      this.userName = userName;
+    private BasicCredentials(String username, String password) {
+      this.username = username;
       this.password = password;
     }
 
-    private String userName() {
-      return userName;
+    private String username() {
+      return username;
     }
 
     private String password() {

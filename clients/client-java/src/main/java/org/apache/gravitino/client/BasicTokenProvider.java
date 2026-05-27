@@ -29,12 +29,12 @@ final class BasicTokenProvider implements AuthDataProvider {
 
   private final byte[] token;
 
-  BasicTokenProvider(String userName, String password) {
-    this.token = buildToken(userName, password);
+  BasicTokenProvider(String username, String password) {
+    this.token = buildToken(username, password);
   }
 
-  private static byte[] buildToken(String userName, String password) {
-    String userInformation = userName + ":" + password;
+  private static byte[] buildToken(String username, String password) {
+    String userInformation = username + ":" + password;
     return (AuthConstants.AUTHORIZATION_BASIC_HEADER
             + new String(
                 Base64.getEncoder().encode(userInformation.getBytes(StandardCharsets.UTF_8)),
