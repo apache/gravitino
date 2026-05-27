@@ -100,3 +100,23 @@ CREATE TABLE IF NOT EXISTS `idp_group_user_rel` (
     KEY `idx_iug_gid` (`group_id`),
     KEY `idx_iug_uid` (`user_id`)
 ) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
+  `id`                BIGINT        AUTO_INCREMENT,
+  `metalake_name`     VARCHAR(128)  NOT NULL,
+  `catalog_name`      VARCHAR(128)  NOT NULL,
+  `namespace`         VARCHAR(512)  NOT NULL,
+  `table_name`        VARCHAR(256)  NOT NULL,
+  `metadata_location` VARCHAR(1024) NOT NULL,
+  `file_io_impl`      VARCHAR(256)  NOT NULL,
+  `file_io_props`     CLOB          NOT NULL,
+  `state`             VARCHAR(16)   NOT NULL,
+  `attempts`          INT           NOT NULL DEFAULT 0,
+  `last_error`        VARCHAR(2048) NULL,
+  `heartbeat_at`      BIGINT        NULL,
+  `created_by`        VARCHAR(128)  NOT NULL,
+  `updated_at`        BIGINT        NOT NULL,
+  PRIMARY KEY (`id`)
+);
+CREATE INDEX IF NOT EXISTS `idx_state_updated` ON `iceberg_cleanup_job` (`state`, `updated_at`);
+CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`catalog_name`, `namespace`, `table_name`, `state`);
