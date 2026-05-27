@@ -608,7 +608,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testCatalogChangeLogListenerInvalidatesCatalogCache() throws Exception {
+  void testCatalogChangeLogListenerInvalidatesCatalogCacheForRemoteChange() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "change_log_catalog");
     Map<String, String> props =
         ImmutableMap.of(
@@ -632,6 +632,37 @@ public class TestCatalogManager {
                 1L, "metalake", "CATALOG", "metalake.change_log_catalog", OperateType.ALTER, 0L)));
 
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+  }
+
+  @Test
+  void testCatalogChangeLogListenerSkipsInvalidationForLocalMutation() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "change_log_local");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    Assertions.assertNotNull(catalogManager.loadCatalogAndWrap(ident));
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+
+    catalogManager.markLocalMutation(ident);
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+    listener.onEntityChange(
+        List.of(
+            new EntityChangeRecord(
+                1L, "metalake", "CATALOG", "metalake.change_log_local", OperateType.ALTER, 0L)));
+
+    Assertions.assertNotNull(
+        catalogManager.getCatalogCache().getIfPresent(ident),
+        "Cache should NOT be invalidated for local mutations");
   }
 
   @Test

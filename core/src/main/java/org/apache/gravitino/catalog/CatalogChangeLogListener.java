@@ -55,6 +55,11 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
         continue;
       }
 
+      if (catalogManager.consumeLocalMutation(ident)) {
+        LOG.debug("Skipping catalog cache invalidation for local mutation: {}", ident);
+        continue;
+      }
+
       LOG.debug("Invalidating catalog cache due to entity change log: {}", ident);
       catalogManager.getCatalogCache().invalidate(ident);
     }

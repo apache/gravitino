@@ -51,8 +51,10 @@ import java.util.Optional;
 import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -292,6 +294,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final IdGenerator idGenerator;
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
+  private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
+      new ConcurrentHashMap<>();
 
   /**
    * Constructs a CatalogManager instance.
@@ -352,6 +356,34 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   public void addCatalogCacheRemoveListener(Consumer<NameIdentifier> listener) {
     removalListeners.add(listener);
+  }
+
+  /**
+   * Records that this process has just mutated the given catalog locally. The entity change log
+   * poller will see the corresponding change log row and should skip cache invalidation for it
+   * because this process already updated the cache.
+   *
+   * @param ident the catalog identifier (pre-mutation name for renames)
+   */
+  void markLocalMutation(NameIdentifier ident) {
+    localMutationCounts.computeIfAbsent(ident, k -> new AtomicInteger()).incrementAndGet();
+  }
+
+  /**
+   * Attempts to consume one local mutation marker for the given identifier.
+   *
+   * @return true if a local mutation was pending and has been consumed (caller should skip
+   *     invalidation), false if the change originated from a remote node
+   */
+  boolean consumeLocalMutation(NameIdentifier ident) {
+    boolean[] consumed = {false};
+    localMutationCounts.computeIfPresent(
+        ident,
+        (k, count) -> {
+          consumed[0] = true;
+          return count.decrementAndGet() <= 0 ? null : count;
+        });
+    return consumed[0];
   }
 
   /**
@@ -612,6 +644,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                   return newCatalogBuilder.build();
                 });
+            markLocalMutation(ident);
             catalogCache.invalidate(ident);
             return null;
           } catch (IOException e) {
@@ -652,6 +685,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                   return newCatalogBuilder.build();
                 });
+            markLocalMutation(ident);
             catalogCache.invalidate(ident);
             return null;
           } catch (IOException e) {
@@ -738,6 +772,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // the old catalog identifier from the store (after the invalidate) will get
             // NoSuchCatalogException instead of stale data. Invalidating before the update creates
             // a window where the background thread repopulates the cache with the old entity.
+            markLocalMutation(ident);
             catalogCache.invalidate(ident);
             // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
             // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
@@ -812,6 +847,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // Invalidate after store.delete() to prevent a background thread from repopulating
             // the cache with stale data between invalidate and delete.
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
+            markLocalMutation(ident);
             catalogCache.invalidate(ident);
             return deleted;
 
@@ -1331,6 +1367,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
             return newCatalogBuilder.build();
           });
+      markLocalMutation(nameIdentifier);
       catalogCache.invalidate(nameIdentifier);
 
     } catch (NoSuchCatalogException e) {
