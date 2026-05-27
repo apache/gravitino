@@ -45,5 +45,6 @@ tasks {
 
   build {
     dependsOn(lintOpenAPI)
+    dependsOn(lintIdpOpenAPI)
   }
 }
