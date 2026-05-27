@@ -6,11 +6,11 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Binary Installation
 
-:::note
-Apache Gravitino supports running on Java 17, and higher versions should also work but not fully tested. Make sure you have Java installed and
-`JAVA_HOME` configured correctly. To confirm the Java version, run the
-`${JAVA_HOME}/bin/java -version` command.
-:::
+### Prerequisites
+
+- Linux or macOS host.
+- Java 17 (any JVM on x86_64 or ARM64) with `java` on `PATH` or `JAVA_HOME` set. Confirm with `java -version`.
+- Port 8090 available on the host for the Gravitino REST API.
 
 The Gravitino package comprises both the Gravitino server and the Gravitino Iceberg REST server. Manage these servers independently or run them concurrently on a single server.
 
@@ -55,9 +55,7 @@ The Gravitino binary distribution package contains the following files:
     └── scripts/                                # Extra scripts for Gravitino.
 ```
 
-:::note
-The OceanBase and ClickHouse catalogs are not included in the Gravitino binary distribution package by default due to package-size and license-compatibility constraints. To use these catalogs, build Gravitino from source and use the `gravitino-<version>-bin-all.tar.gz` tarball, which includes all catalogs from the `catalogs-contrib` module.
-:::
+The `OceanBase` and `ClickHouse` catalogs are not included in the standard binary distribution due to package-size and license-compatibility constraints. To use these catalogs, build Gravitino from source and use the `gravitino-<version>-bin-all.tar.gz` tarball, which includes all catalogs from the `catalogs-contrib` module.
 
 ### Initialize the RDBMS (Optional)
 
@@ -127,6 +125,11 @@ Run the Iceberg REST server as either a standalone server or as an auxiliary ser
 For more detailed information about the Gravitino Iceberg REST server, refer to [Iceberg REST server document](./iceberg-rest-service.md).
 
 ## Docker
+
+### Prerequisites
+
+- Docker Engine 20.10+ or Docker Desktop 4.0+.
+- Port 8090 available on the host.
 
 Gravitino publishes the Docker image to [Docker Hub](https://hub.docker.com/r/apache/gravitino/tags).
 Run the Gravitino Docker image by running:
