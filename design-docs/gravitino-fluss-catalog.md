@@ -73,10 +73,12 @@ Defines the following catalog properties for `provider=fluss`:
 
 ### Operations Mapping
 
-For `FlussCatalogOperations`, catalog-level operations are mapped to Fluss cluster connection and validation, schema-level operations are mapped to Fluss database capabilities, table-level operations are mapped to Fluss table capabilities, and partition-level operations are mapped to Fluss partition capabilities. The implementation should provide the following interfaces:
-- TableOperations
+For `FlussCatalogOperations`, catalog-level operations are mapped to Fluss cluster connection and validation, schema-level operations are mapped to Fluss database capabilities, and table-level operations are mapped to Fluss table capabilities. Partition operations are exposed from loaded Fluss table objects through `FlussTableOperations`. The implementation should provide the following interfaces:
 - SupportsSchemas
 - TableCatalog
+
+For table-level partition APIs, `FlussTableOperations` should provide:
+- TableOperations
 - SupportsPartitions
 
 #### Catalog Operations
@@ -100,7 +102,7 @@ Gravitino schema operations are mapped to Fluss database or namespace capabiliti
 | `listSchemas` | List databases | Returns Fluss databases as Gravitino schemas. |
 | `createSchema` | Create a database | Creates a Fluss database from Gravitino schema metadata. |
 | `loadSchema` | Load database metadata | Loads database metadata and converts it to a Gravitino schema object. |
-| `alterSchema` | Update database metadata | Updates mutable database metadata such as properties or comments. |
+| `alterSchema` | Not supported by Fluss 0.9.x | Returns the current schema when no changes are requested; otherwise rejects schema alteration explicitly. |
 | `dropSchema` | Drop a database | Drops the mapped Fluss database using the cascade behavior described below. |
 
 #### Schema Drop Semantics
@@ -125,25 +127,32 @@ Gravitino table operations are mapped to Fluss table capabilities through a tran
 
 #### Table Change Support
 
-`alterTable` must only translate changes that are supported by the target Fluss version. The initial implementation should be conservative and fail fast before calling Fluss when a requested change is known to be unsupported. Unsupported changes should be rejected with `UnsupportedOperationException` or `IllegalArgumentException` at the adapter boundary, while invalid Fluss-side changes should be translated from Fluss validation errors to the closest Gravitino exception.
+`alterTable` translates Gravitino table changes to Fluss `TableChange` objects and then calls Fluss `Admin.alterTable(...)`. The initial metadata integration keeps the adapter checks focused on changes that can be rejected without contacting Fluss, such as unsupported Gravitino change types, nested fields, duplicate columns, missing columns, invalid positions, default values, and auto-increment changes. Other Fluss-side validation, including whether a concrete table option or schema evolution is valid for the target Fluss table, is delegated to Fluss and translated to the closest Gravitino exception by the exception converter.
 
 | Gravitino `TableChange` | Initial Fluss handling | Notes |
 | ----------------------- | ---------------------- | ----- |
-| `SetProperty` / `RemoveProperty` for alterable `table.*` options | Supported when the option is alterable in Fluss | Fluss 0.9 alterable options include datalake enablement/freshness, tiered-log local segments, auto-partition retention, and statistics columns. Immutable storage options such as bucket number, bucket keys, primary key, partition keys, and most physical layout options must be rejected. |
+| `SetProperty` / `RemoveProperty` | Translated to Fluss `set` / `reset` table options | The adapter does not maintain its own allowlist of alterable options. Fluss validates whether each option can actually be changed. Table property metadata accepts the `table.` prefix for Fluss table options. |
 | `UpdateComment` | Not supported by Fluss 0.9 | Fluss 0.9 stores table comments in `TableDescriptor`, but its `alterTable` change model does not expose a table-level comment update operation. Reject with `UnsupportedOperationException` instead of silently dropping the change. |
-| `AddColumn` | Supported only for appending a nullable column at the end of the schema | Fluss 0.9 schema evolution rejects adding columns at non-last positions and rejects non-nullable new columns. |
-| `DeleteColumn`, `RenameColumn`, `UpdateColumnType`, `UpdateColumnPosition`, `UpdateColumnDefaultValue`, `UpdateColumnNullability`, `UpdateColumnAutoIncrement` | Not supported initially | Fluss 0.9 server-side schema evolution rejects drop, rename, and modify-column operations. |
+| `RenameTable` | Not supported by Fluss 0.9 | Reject with `UnsupportedOperationException`. |
+| `AddColumn` | Supported for top-level nullable columns | Converts default position to Fluss `last`, and also supports `first` and `after(existingColumn)`. Rejects nested fields, duplicate names, non-nullable additions, default values, and auto-increment columns at the adapter boundary. |
+| `DeleteColumn` | Supported for top-level columns | Converts to Fluss `dropColumn`. If the column is missing and `ifExists=true`, the adapter returns no Fluss change. |
+| `RenameColumn` | Supported for top-level columns | Rejects missing columns, empty new names, and duplicate new names before calling Fluss. |
+| `UpdateColumnType` | Supported for top-level columns | Converts to Fluss `modifyColumn` while preserving the existing nullability and comment. |
+| `UpdateColumnComment` | Supported for top-level columns | Converts to Fluss `modifyColumn` while preserving the existing type. |
+| `UpdateColumnNullability` | Supported for top-level columns | Converts to Fluss `modifyColumn` with the updated Fluss data type nullability. |
+| `UpdateColumnPosition` | Supported for top-level columns | Converts to Fluss `modifyColumn` with `first` or `after(existingColumn)`; Gravitino default position is rejected for column-position updates. |
+| `UpdateColumnDefaultValue`, `UpdateColumnAutoIncrement` | Not supported | Reject with `UnsupportedOperationException`; Fluss table changes do not support altering default values or auto-increment through this adapter. |
 | `AddIndex` / `DeleteIndex` | Not supported initially | The Fluss primary key is part of table creation metadata and should not be changed through `alterTable`. |
 | Distribution, partitioning, primary-key, bucket-number, or bucket-key changes | Not supported | These properties define Fluss physical layout and routing. Changing them requires a future migration design rather than a metadata-only alter. |
 
 #### Partition Operations
 
-Partition operations are exposed through Gravitino's existing partition interfaces and translated into Fluss partition capabilities only for partitioned Fluss tables.
+Partition operations are exposed through Gravitino's existing partition interfaces and translated into Fluss partition capabilities only for Fluss identity-partitioned tables. The adapter accepts only top-level identity partition fields in the same order as the Fluss table partition keys. Calling partition lookup or mutation on a non-partitioned table is rejected before calling Fluss.
 
 | Gravitino Operation | Fluss Metadata Capability | Notes |
 | ------------------- | ------------------------- | ----- |
 | `listPartitions` | List table partition metadata | Lists Fluss partitions and converts them into Gravitino partition objects. |
-| `getPartition` | Read or filter partition metadata | The adapter may call the Fluss partition-list capability and filter the returned partition metadata by the requested partition spec when a single-partition API is unavailable. |
+| `getPartition` | Read partition metadata | Builds a Fluss `PartitionSpec`, calls `Admin.listPartitionInfos(tablePath, spec)`, and returns the matching partition or `NoSuchPartitionException`. |
 | `addPartition` | Create a manual partition | Adds a manual partition to a partitioned Fluss table. |
 | `dropPartition` | Drop a manual partition | Drops a manual partition from a partitioned Fluss table. |
 
@@ -157,7 +166,7 @@ The operation mapping above is intentionally expressed in terms of metadata capa
 | List databases or namespaces | `Admin.listDatabases()` | `Admin.listDatabaseSummaries()` may be used when summary fields are needed and supported. |
 | Create a database or namespace | `Admin.createDatabase(...)` | Uses a Fluss `DatabaseDescriptor` derived from Gravitino schema metadata. |
 | Load database or namespace metadata | `Admin.getDatabaseInfo(...)` | Converts Fluss database metadata to a Gravitino schema object. |
-| Update database or namespace metadata | `Admin.alterDatabase(...)` | Applies supported property or comment changes. |
+| Update database or namespace metadata | N/A in the initial implementation | Fluss 0.9.x schema/database alteration is rejected by the adapter when changes are requested. |
 | Drop a database or namespace | `Admin.dropDatabase(...)` | Honors the Gravitino schema drop semantics and the Fluss cascade behavior. |
 | List tables in a database or namespace | `Admin.listTables(...)` | Returns table names under the mapped schema/database. |
 | Create a table from a translated descriptor | `Admin.createTable(...)` | Uses a Fluss `TableDescriptor` translated from Gravitino table metadata. |
@@ -280,7 +289,7 @@ Add a Fluss adapter to `spark-connector` with the same pattern used by the exist
 | Component | Responsibility |
 | --------- | -------------- |
 | `org.apache.gravitino.spark.connector.fluss.GravitinoFlussCatalog` | Extends Gravitino Spark `BaseCatalog`; creates and initializes a native `org.apache.fluss.spark.SparkCatalog`. |
-| Version-specific classes | Add `GravitinoFlussCatalogSpark34` and `GravitinoFlussCatalogSpark35`. Spark 3.3 is not supported in the initial implementation because Fluss does not provide a Spark 3.3 runtime module. |
+| Version-specific classes | Add `GravitinoFlussCatalogSpark34` and `GravitinoFlussCatalogSpark35`. Spark 3.3 is not supported in the initial Spark adapter because Fluss does not provide a Spark 3.3 runtime module. |
 | `org.apache.gravitino.spark.connector.fluss.FlussPropertiesConverter` | Converts `bootstrap.servers`, Spark bypass properties, and Fluss table properties between Gravitino and Spark. |
 | `CatalogNameAdaptor` mapping | Adds `fluss-3.4` and `fluss-3.5` mappings so `GravitinoDriverPlugin` can auto-register `provider=fluss` catalogs. |
 | `org.apache.gravitino.spark.connector.fluss.SparkFlussTable` | A thin wrapper around native Fluss `SparkTable`, or direct delegation when no extra metadata behavior is needed. It delegates `SupportsRead` and `SupportsWrite` to Fluss. |
@@ -309,9 +318,9 @@ This gives operators the desired user experience: Flink and Spark users work wit
 
 ### Compatibility
 
-The initial implementation targets Apache Fluss 0.9 as the compatibility baseline. The required Fluss API surface includes Java metadata APIs for databases, tables, partitions, ACL management, the Fluss Flink connector, and the Fluss Spark 3.4/3.5 connector modules.
+The initial metadata integration targets Apache Fluss 0.9.1-incubating as the compatibility baseline. The implemented `catalog-fluss` module depends on the Fluss Java client metadata APIs for databases, tables, table changes, and partitions.
 
-Engine support should follow the Fluss 0.9 connector matrix. Flink support can be added for the Flink versions where both Gravitino and Fluss ship compatible connector modules. Spark support is limited to Spark 3.4 and Spark 3.5 in the initial implementation.
+Engine connector support should follow the Fluss connector matrix in a later phase. Flink support can be added for the Flink versions where both Gravitino and Fluss ship compatible connector modules. Spark support should be limited to the Spark versions supported by Fluss runtime modules. ACL synchronization and authorization pushdown also remain future work unless a later PR adds the Fluss ACL management API usage.
 
 ## Error Handling
 
@@ -319,7 +328,7 @@ The Fluss catalog should make connectivity failures visible without making Gravi
 
 Error handling rules:
 
-- `testConnection` should use a bounded Fluss client request timeout. Operators can tune this through Fluss client properties such as `gravitino.bypass.client.request-timeout`. A timeout or connection failure should be reported as a Gravitino connection failure.
+- `testConnection` should use a bounded Fluss client request timeout. Operators can tune this through Fluss client properties such as `gravitino.bypass.client.request.timeout`. A timeout or connection failure should be reported as a Gravitino connection failure.
 - Fluss not-found exceptions should be translated to the corresponding Gravitino exceptions, such as `NoSuchSchemaException`, `NoSuchTableException`, or `NoSuchPartitionException` where applicable.
 - Fluss already-exists exceptions should be translated to Gravitino already-exists exceptions.
 - Fluss non-empty database errors should be translated to `NonEmptySchemaException`.
