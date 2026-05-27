@@ -884,6 +884,7 @@ export const fetchSchemas = createAsyncThunk(
 
     const schemas = identifiers.map(schema => {
       const schemaName = schema.name
+
       const schemaItem = findInTree(
         getState().metalakes.metalakeTree,
         'key',

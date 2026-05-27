@@ -144,6 +144,7 @@ export default function SchemaDetailsPage() {
   useEffect(() => {
     if (!currentMetalake || !catalog || !schema) {
       setSubSchemas([])
+
       return
     }
 
@@ -153,10 +154,12 @@ export default function SchemaDetailsPage() {
       )
       if (err || !res) {
         setSubSchemas([])
+
         return
       }
 
       const { schemas = [] } = res?.payload || {}
+
       const nextSubSchemas = schemas.map(item => {
         return {
           ...item,
@@ -302,6 +305,7 @@ export default function SchemaDetailsPage() {
       cancelText: 'Cancel',
       onOk: async () => {
         await dispatch(deleteSchema({ metalake: currentMetalake, catalog, catalogType, schema: name }))
+
         const [err, res] = await to(
           dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
         )

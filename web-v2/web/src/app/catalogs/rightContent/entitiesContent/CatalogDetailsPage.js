@@ -249,6 +249,7 @@ export default function CatalogDetailsPage() {
   const columns = useMemo(() => {
     // wrap showDeleteConfirm to accept name only for shared builder
     const showDeleteForShared = name => showDeleteConfirm(createContext(name), name, 'schema')
+
     return buildSchemaColumns({
       currentMetalake,
       catalog,
