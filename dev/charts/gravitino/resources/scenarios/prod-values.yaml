@@ -1,0 +1,93 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Production scenario for the Apache Gravitino Helm chart.
+#
+# Mirrors the production sample gravitino.conf in
+# docs/gravitino-server-config.md#production.
+#
+# Configures externally managed MySQL as the metadata backend, larger
+# cache and tree-lock limits, audit logging, the Iceberg REST server
+# in auxiliary mode with the dynamic config provider, and OAuth 2.0
+# OIDC authentication with JWKS-based token validation.
+#
+# Placeholders use the convention <placeholder-name>. Fill in your own
+# values for the JDBC URL/user/password, OIDC tenant ID, client ID,
+# and service audience before applying this file. Sensitive values
+# (JDBC password, OAuth client secret) should be sourced from a
+# Kubernetes Secret rather than embedded as plaintext; the Secret-
+# reference mechanism is tracked separately in the chart's enterprise
+# readiness work.
+#
+# Initialize the MySQL metadata backend before installing. See
+# docs/how-to-use-relational-backend-storage.md for setup steps and
+# SQL scripts.
+#
+# Apply with:
+#   curl -O https://raw.githubusercontent.com/apache/gravitino/main/dev/charts/gravitino/resources/scenarios/prod-values.yaml
+#   # edit placeholders below to fill in your environment
+#   helm install gravitino oci://registry-1.docker.io/apache/gravitino-helm \
+#     --version <VERSION> -n gravitino --create-namespace -f prod-values.yaml
+
+# Externally managed MySQL metadata backend.
+# Leave mysql.enabled and postgresql.enabled at their defaults (false)
+# so the chart does not deploy an in-cluster database. Provide the
+# external JDBC URL directly.
+entity:
+  jdbcUrl: jdbc:mysql://<your-mysql-host>:3306/<your-database>
+  jdbcDriver: com.mysql.cj.jdbc.Driver
+  jdbcUser: <your-mysql-user>
+  jdbcPassword: <your-mysql-password>
+  maxConnections: 200
+
+# Tree-lock tuning for production load.
+lock:
+  maxNodes: 500000
+  minNodes: 5000
+
+# Cache tuning for production load.
+cache:
+  maxEntries: 100000
+  enableStats: true
+
+# Audit logging.
+audit:
+  enabled: true
+
+# Iceberg REST server in auxiliary mode with shared Gravitino catalogs.
+icebergRest:
+  catalogConfigProvider: dynamic-config-provider
+  dynamicConfigProvider:
+    metalake: production
+
+# OAuth 2.0 / OIDC authentication with JWKS-based token validation.
+# Example values shown for Azure AD; substitute your identity provider's
+# URLs and identifiers. For Kerberos, simple auth, or static-key OAuth,
+# see the Authentication section of gravitino-server-config.md.
+authenticators: oauth
+authenticator:
+  oauth:
+    provider: oidc
+    tokenValidatorClass: org.apache.gravitino.server.authentication.JwksTokenValidator
+    authority: https://login.microsoftonline.com/<your-tenant-id>/v2.0
+    jwksUri: https://login.microsoftonline.com/<your-tenant-id>/discovery/v2.0/keys
+    clientId: <your-app-client-id>
+    serviceAudience: <your-app-client-id-or-api-identifier>
+    scope: openid profile email
+    principalFields: preferred_username,email,sub
