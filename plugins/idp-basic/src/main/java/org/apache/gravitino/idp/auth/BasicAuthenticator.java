@@ -37,7 +37,6 @@ import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.server.authentication.Authenticator;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.storage.RandomIdGenerator;
 
 /** Authenticates HTTP Basic credentials against built-in IdP user metadata. */
 public class BasicAuthenticator implements Authenticator {
@@ -65,9 +64,7 @@ public class BasicAuthenticator implements Authenticator {
   @Override
   public void initialize(Config config) {
     GravitinoEnv env = GravitinoEnv.getInstance();
-    IdGenerator idGenerator =
-        env.idGenerator() != null ? env.idGenerator() : RandomIdGenerator.INSTANCE;
-    this.userGroupManager = new IdpUserGroupManager(config, idGenerator);
+    this.userGroupManager = new IdpUserGroupManager(config, env.idGenerator());
   }
 
   @Override
