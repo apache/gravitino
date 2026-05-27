@@ -55,8 +55,6 @@ dependencies {
   implementation(libs.prometheus.servlet)
   implementation(libs.nimbus.jose.jwt)
 
-  testImplementation(project(":plugins:idp-basic"))
-
   testImplementation(libs.commons.io)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)

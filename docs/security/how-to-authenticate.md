@@ -51,8 +51,8 @@ in the relational entity store.
 To enable Basic mode:
 
 - Include the `idp-basic` plugin jar on the server classpath (included in the official
-  distribution). The plugin registers the `basic` authenticator automatically during server
-  startup.
+  distribution).
+- Set `gravitino.authenticators` to `basic`.
 - Set `gravitino.entity.store` to `relational` and configure the relational JDBC backend.
 - Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
   the built-in IdP.

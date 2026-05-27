@@ -47,7 +47,6 @@ import org.apache.gravitino.metrics.source.MetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
-import org.apache.gravitino.server.plugin.ServerPluginBootstrapper;
 import org.apache.gravitino.server.web.ConfigServlet;
 import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
@@ -104,7 +103,6 @@ public class GravitinoServer extends ResourceConfig {
 
   public void initialize() {
     gravitinoEnv.initializeFullComponents(serverConfig);
-    ServerPluginBootstrapper.initialize();
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
@@ -210,7 +208,6 @@ public class GravitinoServer extends ResourceConfig {
   public void stop() throws IOException {
     GravitinoAuthorizerProvider.getInstance().close();
     server.stop();
-    ServerPluginBootstrapper.stop();
     gravitinoEnv.shutdown();
     if (lineageService != null) {
       lineageService.close();
