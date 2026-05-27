@@ -44,6 +44,7 @@ dependencies {
   compileOnly(libs.lombok)
   compileOnly(libs.slf4j.api)
 
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
