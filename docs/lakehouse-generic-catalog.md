@@ -15,7 +15,7 @@ import TabItem from '@theme/TabItem';
 
 ## Overview
 
-The generic lakehouse catalog integrates Gravitino with file-system-based lakehouse storage. It manages metadata for lakehouse tables across storage backends and exposes a consistent interface for data discovery, governance, and access control.
+The Generic Lakehouse catalog enables Apache Gravitino to manage lakehouse table metadata for formats that do not have a dedicated Gravitino catalog (Iceberg, Paimon, and Hudi each have their own catalog). It manages metadata for tables stored on a Hadoop Compatible File System and exposes a consistent interface for discovery, governance, and access control through Gravitino, with table I/O continuing to go through each format's own engine integration (for example, `lance-spark` for Lance). Use it when you want a single Gravitino-managed access surface that covers Lance datasets and other emerging lakehouse formats alongside relational, dedicated-lakehouse, and fileset catalogs.
 
 Gravitino fully supports the **Lance** lakehouse format; support for additional formats is planned.
 
@@ -26,6 +26,52 @@ Gravitino fully supports the **Lance** lakehouse format; support for additional 
 3. **Storage Flexibility**: Work with any file system, local, or cloud object stores
 4. **Gravitino Integration**: Leverage Gravitino's metadata management, access control, lineage tracking, and data discovery
 5. **Easy Migration**: Register existing lakehouse tables without data movement
+
+### Requirements and Limitations
+
+- **Supported lakehouse formats.** Apache Lance is fully supported. Delta is documented in a [per-format guide](./lakehouse-generic-delta-table.md); check that guide for current support level. Additional formats including Iceberg, Hudi, and others are planned.
+- **Filesystem-based storage.** The catalog manages metadata for tables stored on a Hadoop Compatible File System (local, HDFS, S3, GCS, ADLS, OSS). The same Gravitino cloud bundle JARs used by the Fileset catalog (`gravitino-aws-bundle`, `gravitino-gcp-bundle`, `gravitino-aliyun-bundle`, `gravitino-azure-bundle`) provide the corresponding storage drivers when needed.
+- **Location resolution.** Table storage paths resolve through table-level, schema-level, and catalog-level location precedence; see [Key Property: `location`](#key-property-location) for the full resolution rules.
+- **Format-specific capabilities.** Table-level operations vary by format. See the per-format guides linked under [Table Management](#table-management) for what each format supports.
+- **Metadata only.** The catalog manages metadata and the table-to-path mapping; it does not store or transfer data files. Use the appropriate engine integration (for example, `lance-spark`) for table reads and writes.
+
+## Quick Start
+
+Create a minimum-viable Generic Lakehouse catalog and confirm it is reachable. The example uses a local filesystem path so the walkthrough runs against a default Gravitino installation with no external metastore or cloud storage. For HDFS or cloud-backed catalogs, set `location` to the appropriate URI and ensure the corresponding Gravitino bundle JAR is on the Gravitino server. The walkthrough assumes a Gravitino server at `http://localhost:8090` and a metalake named `test`.
+
+### Create the Catalog
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "lakehouse_catalog",
+    "type": "RELATIONAL",
+    "comment": "Generic lakehouse catalog",
+    "provider": "lakehouse-generic",
+    "properties": {
+      "location": "file:///tmp/lakehouse"
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs
+```
+
+The response is a JSON object describing the created catalog. A fuller create-catalog example with both shell and Java tabs is provided in [Create a Catalog](#create-a-catalog) under Catalog Management below.
+
+### Verify the Catalog
+
+```bash
+# List catalogs in the metalake. lakehouse_catalog should appear.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs" | jq
+
+# Load the catalog directly and inspect its properties.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/lakehouse_catalog" | jq
+
+# List schemas. The response is an empty array on a freshly created catalog until a schema is added.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/lakehouse_catalog/schemas" | jq
+```
+
+**Success check:** the catalog-list response includes `lakehouse_catalog`, the load-catalog response shows `"provider":"lakehouse-generic"` with `location` set to `file:///tmp/lakehouse`, and the schema-list response is a JSON array (an empty array on a fresh catalog is expected). If load-catalog returns an error, confirm that the Gravitino server process has write access to the configured location. For cloud-backed catalogs, ensure the corresponding Gravitino bundle JAR is present on the Gravitino server.
 
 ## Catalog Management
 
@@ -198,3 +244,4 @@ For additional operations, refer to [Schema Operations documentation](./manage-r
 Different lakehouse table formats have different capabilities, so table-operation support varies by format. See the per-format documentation:
 
 - [Lance format](./lakehouse-generic-lance-table.md)
+- [Delta format](./lakehouse-generic-delta-table.md)
