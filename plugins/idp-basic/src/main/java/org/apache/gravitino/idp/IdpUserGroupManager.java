@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.idp;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
@@ -87,11 +86,6 @@ public class IdpUserGroupManager implements Closeable {
       instance = null;
     }
     IdpGarbageCollector.closeInstance();
-  }
-
-  @VisibleForTesting
-  static synchronized void resetInstance() throws IOException {
-    closeInstance();
   }
 
   private IdpUserGroupManager(Config config, IdGenerator idGenerator) {
