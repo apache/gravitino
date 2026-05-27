@@ -58,13 +58,39 @@ public class IdpUserGroupManager implements Closeable {
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
 
+  private static volatile IdpUserGroupManager instance;
+
   private final IdpRelationalStorage relationalStorage;
   private final IdpGarbageCollector garbageCollector;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
 
   /**
+   * Returns the shared built-in IdP user and group manager for the server process.
+   *
+   * @param config The server configuration.
+   * @param idGenerator The id generator.
+   * @return The singleton manager instance.
+   */
+  public static IdpUserGroupManager getInstance(Config config, IdGenerator idGenerator) {
+    IdpUserGroupManager local = instance;
+    if (local == null) {
+      synchronized (IdpUserGroupManager.class) {
+        local = instance;
+        if (local == null) {
+          local = new IdpUserGroupManager(config, idGenerator);
+          instance = local;
+        }
+      }
+    }
+    return local;
+  }
+
+  /**
    * Creates a built-in IdP user and group manager.
+   *
+   * <p>Prefer {@link #getInstance(Config, IdGenerator)} in server code so REST, authentication, and
+   * startup initialization share one instance.
    *
    * @param config The server configuration.
    * @param idGenerator The id generator.

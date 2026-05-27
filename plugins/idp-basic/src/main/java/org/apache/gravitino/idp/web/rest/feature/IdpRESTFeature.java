@@ -62,10 +62,8 @@ public class IdpRESTFeature implements Feature {
     registerBasicAuthenticator(config);
 
     try {
-      try (IdpUserGroupManager manager = new IdpUserGroupManager(config, env.idGenerator())) {
-        manager.initializeConfiguredServiceAdmins(
-            config, System.getenv(INITIAL_ADMIN_PASSWORD_ENV));
-      }
+      IdpUserGroupManager manager = IdpUserGroupManager.getInstance(config, env.idGenerator());
+      manager.initializeConfiguredServiceAdmins(config, System.getenv(INITIAL_ADMIN_PASSWORD_ENV));
       LOG.info("Initialized built-in IdP service admins");
     } catch (IOException e) {
       throw new IllegalStateException("Failed to initialize built-in IdP service admins", e);
