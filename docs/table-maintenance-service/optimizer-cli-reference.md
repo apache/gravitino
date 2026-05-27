@@ -9,20 +9,30 @@ license: "This software is licensed under the Apache License version 2."
 
 Use `--help` to list all commands, or `--help --type <command>` for command-specific help.
 
-By default, optimizer CLI loads `conf/gravitino-optimizer.conf` from the current working
-directory. Use `--conf-path` only when you need a custom config file.
+By default, optimizer CLI loads `conf/gravitino-optimizer.conf` from the current working directory. Use `--conf-path` only when you need a custom config file.
+
+### Choosing a Command
+
+Pick a command by what you need to do:
+
+- **Run the policy-driven workflow.** `submit-strategy-jobs` evaluates an attached policy and submits a Spark rewrite job for partitions that qualify.
+- **Submit a stats Spark job without policy evaluation.** `submit-update-stats-job` runs the built-in Iceberg update-stats job directly.
+- **Feed handwritten statistics or metrics for testing.** `update-statistics` and `append-metrics` run a local calculator against JSONL input. No Spark, no server-side job.
+- **Read or evaluate stored data.** `list-table-metrics`, `list-job-metrics`, and `monitor-metrics` query persisted data from the metrics repository.
 
 ## Command Quick Reference
 
+Commands are grouped by layer: Spark job submission, stored-data queries, and local JSONL processing.
+
 | Command (`--type`) | Required options | Optional options | Purpose |
 | --- | --- | --- | --- |
-| `submit-strategy-jobs` | `--identifiers`, `--strategy-name` | `--dry-run`, `--limit` | Recommend and optionally submit jobs |
-| `update-statistics` | `--calculator-name` | `--identifiers`, `--statistics-payload`, `--file-path` | Calculate and persist statistics |
-| `append-metrics` | `--calculator-name` | `--identifiers`, `--statistics-payload`, `--file-path` | Calculate and append metrics |
-| `monitor-metrics` | `--identifiers`, `--action-time` | `--range-seconds`, `--partition-path` | Evaluate rules with before/after metrics |
-| `list-table-metrics` | `--identifiers` | `--partition-path` | Query stored table or partition metrics |
-| `list-job-metrics` | `--identifiers` | None | Query stored job metrics |
-| `submit-update-stats-job` | `--identifiers` | `--dry-run`, `--update-mode`, `--updater-options`, `--spark-conf` | Submit built-in Iceberg update stats/metrics Spark jobs |
+| `submit-strategy-jobs` | `--identifiers`, `--strategy-name` | `--dry-run`, `--limit` | Evaluate an attached policy and submit a Spark rewrite job for qualifying partitions. The policy-driven workflow. |
+| `submit-update-stats-job` | `--identifiers` | `--dry-run`, `--update-mode`, `--updater-options`, `--spark-conf` | Submit the built-in Iceberg update-stats Spark job directly, without policy evaluation. |
+| `list-table-metrics` | `--identifiers` | `--partition-path` | Read stored table or partition metrics from the metrics repository. |
+| `list-job-metrics` | `--identifiers` | None | Read stored job metrics from the metrics repository. |
+| `monitor-metrics` | `--identifiers`, `--action-time` | `--range-seconds`, `--partition-path` | Evaluate monitor rules against stored metrics, comparing samples before and after the action time. |
+| `update-statistics` | `--calculator-name` | `--identifiers`, `--statistics-payload`, `--file-path` | Calculate and persist statistics from JSONL input using a local calculator. No Spark. |
+| `append-metrics` | `--calculator-name` | `--identifiers`, `--statistics-payload`, `--file-path` | Calculate and append metrics from JSONL input using a local calculator. No Spark. |
 
 ### Option Field Meanings
 
