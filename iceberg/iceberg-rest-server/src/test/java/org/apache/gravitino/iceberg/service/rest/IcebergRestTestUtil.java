@@ -153,7 +153,8 @@ public class IcebergRestTestUtil {
           new IcebergViewEventDispatcher(
               icebergViewOperationExecutor, eventBus, configProvider.getMetalakeName());
       IcebergNamespaceOperationExecutor icebergNamespaceOperationExecutor =
-          new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
+          new IcebergNamespaceOperationExecutor(
+              icebergCatalogWrapperManager, mock(IcebergPurgeService.class));
       IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
           new IcebergNamespaceEventDispatcher(
               icebergNamespaceOperationExecutor, eventBus, configProvider.getMetalakeName());

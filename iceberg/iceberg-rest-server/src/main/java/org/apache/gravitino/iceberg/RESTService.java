@@ -143,7 +143,8 @@ public class RESTService implements GravitinoAuxiliaryService {
 
     // Namespace: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
-        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
+        new IcebergNamespaceOperationExecutor(
+            icebergCatalogWrapperManager, (IcebergPurgeService) null);
     IcebergNamespaceOperationDispatcher icebergNamespaceEventDispatcher =
         new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {

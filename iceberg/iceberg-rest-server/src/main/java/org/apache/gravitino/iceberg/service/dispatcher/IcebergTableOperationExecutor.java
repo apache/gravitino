@@ -39,6 +39,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
@@ -66,6 +67,13 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
+    String tableName = createTableRequest.name();
+    if (purgeService != null
+        && purgeService.isNameOccupied(context.catalogName(), namespace.toString(), tableName)) {
+      throw new AlreadyExistsException(
+          "Table %s.%s is being purged; retry after cleanup completes", namespace, tableName);
+    }
+
     String authenticatedUser = context.userName();
     if (!AuthConstants.ANONYMOUS_USER.equals(authenticatedUser)) {
       String existingOwner = createTableRequest.properties().get(IcebergConstants.OWNER);

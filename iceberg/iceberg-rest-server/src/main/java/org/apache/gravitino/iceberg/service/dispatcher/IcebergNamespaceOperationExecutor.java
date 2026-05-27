@@ -24,8 +24,10 @@ import java.util.Map;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
+import org.apache.gravitino.iceberg.service.purge.IcebergPurgeService;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
@@ -42,11 +44,13 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
   private static final Logger LOG =
       LoggerFactory.getLogger(IcebergNamespaceOperationExecutor.class);
 
-  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
+  private final IcebergCatalogWrapperManager icebergCatalogWrapperManager;
+  private final IcebergPurgeService purgeService;
 
   public IcebergNamespaceOperationExecutor(
-      IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager, IcebergPurgeService purgeService) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
+    this.purgeService = purgeService;
   }
 
   @Override
@@ -121,6 +125,13 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
       IcebergRequestContext context,
       Namespace namespace,
       RegisterTableRequest registerTableRequest) {
+    String tableName = registerTableRequest.name();
+    if (purgeService != null
+        && purgeService.isNameOccupied(context.catalogName(), namespace.toString(), tableName)) {
+      throw new AlreadyExistsException(
+          "Table %s.%s is being purged; retry after cleanup completes", namespace, tableName);
+    }
+
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .registerTable(namespace, registerTableRequest, context.requestCredentialVending());
