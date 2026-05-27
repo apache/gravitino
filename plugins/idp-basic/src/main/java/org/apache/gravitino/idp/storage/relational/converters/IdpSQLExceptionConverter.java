@@ -21,8 +21,6 @@ package org.apache.gravitino.idp.storage.relational.converters;
 import java.io.IOException;
 import java.sql.SQLException;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
-import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
-import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 
 /** Converts JDBC SQL exceptions to built-in IdP exceptions. */
 public final class IdpSQLExceptionConverter {
@@ -66,12 +64,6 @@ public final class IdpSQLExceptionConverter {
   public void toIdpException(SQLException sqlException, String resourceType, String name)
       throws IOException {
     if (isDuplicateEntry(sqlException)) {
-      if ("user".equals(resourceType)) {
-        throw new UserAlreadyExistsException(sqlException, "IdP user %s already exists", name);
-      }
-      if ("group".equals(resourceType)) {
-        throw new GroupAlreadyExistsException(sqlException, "IdP group %s already exists", name);
-      }
       throw new AlreadyExistsException(
           sqlException, "IdP %s %s already exists", resourceType, name);
     }

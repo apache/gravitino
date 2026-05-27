@@ -38,10 +38,9 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
-import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.model.IdpGroup;
@@ -100,7 +99,7 @@ public class TestIdpUserGroupManager {
     Assertions.assertTrue(user.groupNames().isEmpty());
 
     Assertions.assertThrows(
-        UserAlreadyExistsException.class, () -> manager.addUser("testAdd", ANOTHER_VALID_PASSWORD));
+        AlreadyExistsException.class, () -> manager.addUser("testAdd", ANOTHER_VALID_PASSWORD));
   }
 
   @Test
@@ -140,8 +139,7 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testAddGroup", group.name());
     Assertions.assertTrue(group.usernames().isEmpty());
 
-    Assertions.assertThrows(
-        GroupAlreadyExistsException.class, () -> manager.addGroup("testAddGroup"));
+    Assertions.assertThrows(AlreadyExistsException.class, () -> manager.addGroup("testAddGroup"));
   }
 
   @Test
