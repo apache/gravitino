@@ -53,7 +53,5 @@ final class BasicTokenProvider implements AuthDataProvider {
   }
 
   @Override
-  public void close() throws IOException {
-    // no op
-  }
+  public void close() throws IOException {}
 }

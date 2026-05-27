@@ -47,7 +47,6 @@ public class BasicAuthenticator implements Authenticator {
 
   private IdpUserGroupManager userGroupManager;
 
-  /** Creates a {@link BasicAuthenticator} for reflective loading by {@link Authenticator}. */
   public BasicAuthenticator() {}
 
   @Override

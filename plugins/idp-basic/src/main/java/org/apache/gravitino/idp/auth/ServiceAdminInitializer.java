@@ -33,11 +33,6 @@ public final class ServiceAdminInitializer {
 
   private ServiceAdminInitializer() {}
 
-  /**
-   * Initialize the service admins using the current runtime environment.
-   *
-   * @param config The configuration object to initialize the service admins.
-   */
   public static void initialize(Config config) throws IOException {
     GravitinoEnv env = GravitinoEnv.getInstance();
     IdpUserGroupManager manager = IdpUserGroupManager.getInstance(config, env.idGenerator());

@@ -65,13 +65,6 @@ public class IdpUserGroupManager implements Closeable {
   private final IdpGroupMetaService groupMetaService;
   private final IdpGarbageCollector garbageCollector;
 
-  /**
-   * Returns the process-wide built-in IdP user and group manager, creating it on first use.
-   *
-   * @param config The server configuration.
-   * @param idGenerator The id generator.
-   * @return The singleton {@link IdpUserGroupManager} instance.
-   */
   public static IdpUserGroupManager getInstance(Config config, IdGenerator idGenerator) {
     IdpUserGroupManager local = instance;
     if (local == null) {
@@ -106,13 +99,6 @@ public class IdpUserGroupManager implements Closeable {
     this.garbageCollector = null;
   }
 
-  /**
-   * Initializes configured service admins that do not yet exist in the built-in IdP.
-   *
-   * @param config The server configuration.
-   * @param initialAdminPassword Initial password from {@code GRAVITINO_INITIAL_ADMIN_PASSWORD}.
-   * @throws IOException if persisting a service admin fails
-   */
   public void initializeConfiguredServiceAdmins(Config config, String initialAdminPassword)
       throws IOException {
     if (!basicAuthenticatorEnabled(config)) {
@@ -143,13 +129,6 @@ public class IdpUserGroupManager implements Closeable {
     }
   }
 
-  /**
-   * Returns whether the built-in IdP basic authenticator is enabled through {@link
-   * Configs#AUTHENTICATORS}.
-   *
-   * @param config The server configuration.
-   * @return {@code true} when {@link BasicAuthenticator} is configured
-   */
   public static boolean basicAuthenticatorEnabled(Config config) {
     List<String> authenticators = config.get(Configs.AUTHENTICATORS);
     return authenticators != null && authenticators.contains(BASIC_AUTHENTICATOR_CLASS_NAME);
@@ -188,14 +167,6 @@ public class IdpUserGroupManager implements Closeable {
     return new IdpUser(userPO.getUsername(), userMetaService.listGroupNamesByUsername(username));
   }
 
-  /**
-   * Authenticates a built-in IdP user with the given plaintext password.
-   *
-   * @param username The username.
-   * @param password The plaintext password.
-   * @return The authenticated user with group memberships.
-   * @throws UnauthorizedException when the username or password is invalid.
-   */
   public IdpUser authenticate(String username, String password) {
     try {
       IdpUserPO userPO = userMetaService.getIdpUserByUsername(username);
