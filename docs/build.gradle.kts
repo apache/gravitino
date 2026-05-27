@@ -29,6 +29,11 @@ configure<NodeExtension> {
 tasks {
   val lintOpenAPI by registering(NpxTask::class) {
     command.set("@redocly/cli@1.23.1")
+    args.set(listOf("lint", "--extends=recommended-strict", "${project.projectDir}/open-api/openapi.yaml"))
+  }
+
+  val lintIdpOpenAPI by registering(NpxTask::class) {
+    command.set("@redocly/cli@1.23.1")
     args.set(
       listOf(
         "lint",

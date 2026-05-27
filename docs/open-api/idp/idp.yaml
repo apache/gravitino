@@ -22,10 +22,10 @@ paths:
   /idp/users:
     post:
       tags:
-        - idp
-      summary: Add built-in IdP user
+        - IDP
+      summary: Add built-in IDP user
       description: >
-        Creates a built-in IdP user with the given username and password.
+        Creates a built-in IDP user with the given username and password.
         Requires the `basic` authenticator and the `idp-basic` plugin to be enabled.
       operationId: addIdpUser
       requestBody:
@@ -39,7 +39,7 @@ paths:
                 $ref: "#/components/examples/AddUserRequest"
       responses:
         "200":
-          description: Returns the added built-in IdP user
+          description: Returns the added built-in IDP user
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -52,7 +52,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "409":
-          description: Conflict - The built-in IdP user already exists
+          description: Conflict - The built-in IDP user already exists
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -69,13 +69,13 @@ paths:
 
     get:
       tags:
-        - idp
-      summary: Get built-in IdP user
-      description: Returns the specified built-in IdP user, including group membership.
+        - IDP
+      summary: Get built-in IDP user
+      description: Returns the specified built-in IDP user, including group membership.
       operationId: getIdpUser
       responses:
         "200":
-          description: Returns the built-in IdP user object
+          description: Returns the built-in IDP user object
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -86,7 +86,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified built-in IdP user does not exist
+          description: Not Found - The specified built-in IDP user does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -99,9 +99,9 @@ paths:
 
     put:
       tags:
-        - idp
-      summary: Change built-in IdP user password
-      description: Updates the password of the specified built-in IdP user.
+        - IDP
+      summary: Change built-in IDP user password
+      description: Updates the password of the specified built-in IDP user.
       operationId: changeIdpUserPassword
       requestBody:
         required: true
@@ -114,7 +114,7 @@ paths:
                 $ref: "#/components/examples/ChangePasswordRequest"
       responses:
         "200":
-          description: Returns the built-in IdP user after the password change
+          description: Returns the built-in IDP user after the password change
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -127,7 +127,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified built-in IdP user does not exist
+          description: Not Found - The specified built-in IDP user does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -140,8 +140,8 @@ paths:
 
     delete:
       tags:
-        - idp
-      summary: Remove built-in IdP user
+        - IDP
+      summary: Remove built-in IDP user
       operationId: removeIdpUser
       responses:
         "200":
@@ -151,7 +151,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified built-in IdP user does not exist
+          description: Not Found - The specified built-in IDP user does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -165,9 +165,9 @@ paths:
   /idp/groups:
     post:
       tags:
-        - idp
-      summary: Add built-in IdP group
-      description: Creates a built-in IdP group with the given name.
+        - IDP
+      summary: Add built-in IDP group
+      description: Creates a built-in IDP group with the given name.
       operationId: addIdpGroup
       requestBody:
         required: true
@@ -180,7 +180,7 @@ paths:
                 $ref: "#/components/examples/AddGroupRequest"
       responses:
         "200":
-          description: Returns the added built-in IdP group
+          description: Returns the added built-in IDP group
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -193,7 +193,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "409":
-          description: Conflict - The built-in IdP group already exists
+          description: Conflict - The built-in IDP group already exists
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -210,13 +210,13 @@ paths:
 
     get:
       tags:
-        - idp
-      summary: Get built-in IdP group
-      description: Returns the specified built-in IdP group, including member usernames.
+        - IDP
+      summary: Get built-in IDP group
+      description: Returns the specified built-in IDP group, including member usernames.
       operationId: getIdpGroup
       responses:
         "200":
-          description: Returns the built-in IdP group object
+          description: Returns the built-in IDP group object
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -227,7 +227,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified built-in IdP group does not exist
+          description: Not Found - The specified built-in IDP group does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -240,8 +240,8 @@ paths:
 
     delete:
       tags:
-        - idp
-      summary: Remove built-in IdP group
+        - IDP
+      summary: Remove built-in IDP group
       operationId: removeIdpGroup
       parameters:
         - $ref: "./openapi.yaml#/components/parameters/force"
@@ -253,7 +253,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified built-in IdP group does not exist
+          description: Not Found - The specified built-in IDP group does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -270,10 +270,10 @@ paths:
 
     put:
       tags:
-        - idp
-      summary: Change built-in IdP group membership
+        - IDP
+      summary: Change built-in IDP group membership
       description: >
-        Adds and/or removes users from the specified built-in IdP group in a single request,
+        Adds and/or removes users from the specified built-in IDP group in a single request,
         similar to tag association. At least one of `usersToAdd` or `usersToRemove` must be set.
       operationId: changeIdpGroupMembership
       requestBody:
@@ -287,7 +287,7 @@ paths:
                 $ref: "#/components/examples/GroupMembershipChangeRequest"
       responses:
         "200":
-          description: Returns the built-in IdP group after membership changes
+          description: Returns the built-in IDP group after membership changes
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -300,7 +300,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified built-in IdP group or user does not exist
+          description: Not Found - The specified built-in IDP group or user does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -320,12 +320,12 @@ components:
       properties:
         name:
           type: string
-          description: The username of the built-in IdP user
+          description: The username of the built-in IDP user
         groups:
           type: array
           items:
             type: string
-          description: The built-in IdP groups the user belongs to
+          description: The built-in IDP groups the user belongs to
 
     IdpGroup:
       type: object
@@ -334,12 +334,12 @@ components:
       properties:
         name:
           type: string
-          description: The name of the built-in IdP group
+          description: The name of the built-in IDP group
         users:
           type: array
           items:
             type: string
-          description: The usernames of members in the built-in IdP group
+          description: The usernames of members in the built-in IDP group
 
     AddUserRequest:
       type: object
@@ -349,11 +349,11 @@ components:
       properties:
         user:
           type: string
-          description: The username of the built-in IdP user to add
+          description: The username of the built-in IDP user to add
         password:
           type: string
           format: password
-          description: The password of the built-in IdP user to add
+          description: The password of the built-in IDP user to add
           writeOnly: true
 
     ChangePasswordRequest:
@@ -364,7 +364,7 @@ components:
         password:
           type: string
           format: password
-          description: The new password of the built-in IdP user
+          description: The new password of the built-in IDP user
           writeOnly: true
 
     AddGroupRequest:
@@ -374,7 +374,7 @@ components:
       properties:
         group:
           type: string
-          description: The name of the built-in IdP group to add
+          description: The name of the built-in IDP group to add
 
     GroupMembershipChangeRequest:
       type: object
@@ -383,13 +383,13 @@ components:
           type: array
           items:
             type: string
-          description: The usernames to add to the built-in IdP group
+          description: The usernames to add to the built-in IDP group
           nullable: true
         usersToRemove:
           type: array
           items:
             type: string
-          description: The usernames to remove from the built-in IdP group
+          description: The usernames to remove from the built-in IDP group
           nullable: true
 
   responses:
@@ -418,7 +418,7 @@ components:
           $ref: "#/components/schemas/IdpGroup"
 
     IdpForbiddenErrorResponse:
-      description: Forbidden - Built-in IdP REST APIs are disabled or the caller is not authorized
+      description: Forbidden - Built-in IDP REST APIs are disabled or the caller is not authorized
       content:
         application/vnd.gravitino.v1+json:
           schema:
@@ -469,12 +469,12 @@ components:
       value: {
         "code": 1003,
         "type": "NotFoundException",
-        "message": "Built-in IdP resource does not exist"
+        "message": "Built-in IDP resource does not exist"
       }
 
     IdpAlreadyExistsException:
       value: {
         "code": 1004,
         "type": "AlreadyExistsException",
-        "message": "Built-in IdP resource already exists"
+        "message": "Built-in IDP resource already exists"
       }

@@ -18,14 +18,18 @@
 ---
 openapi: 3.0.3
 info:
-  title: Gravitino Built-in IdP REST API
+  title: Gravitino Built-in IDP REST API
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
   version: 1.3.0-SNAPSHOT
   description: |
-    OpenAPI specification for built-in IdP user and group management APIs exposed
+    OpenAPI specification for built-in IDP user and group management APIs exposed
     by the `idp-basic` plugin when the `basic` authenticator is enabled.
+
+    These APIs are available only with the `basic` authenticator. They are not
+    available when Gravitino is configured with OAuth-only authentication. Callers
+    must authenticate with HTTP Basic Auth and be listed in `gravitino.authorization.serviceAdmins`.
 
 servers:
   - url: "{scheme}://{host}:{port}/{basePath}"
@@ -45,7 +49,6 @@ servers:
         default: "api"
 
 security:
-  - OAuth2WithJWT: [serviceAudience]
   - BasicAuth: []
 
 paths:
@@ -141,40 +144,13 @@ components:
 
   parameters:
     user:
-      name: user
-      in: path
-      description: The username of the built-in IdP user
-      required: true
-      schema:
-        type: string
-
+      $ref: "../openapi.yaml#/components/parameters/user"
     group:
-      name: group
-      in: path
-      description: The name of the built-in IdP group
-      required: true
-      schema:
-        type: string
-
+      $ref: "../openapi.yaml#/components/parameters/group"
     force:
-      name: force
-      in: query
-      description: Force the operation to be executed
-      required: false
-      schema:
-        type: boolean
-        default: false
+      $ref: "../openapi.yaml#/components/parameters/force"
 
   securitySchemes:
-    OAuth2WithJWT:
-      type: oauth2
-      description: OAuth2 with JWT
-      flows:
-        clientCredentials:
-          tokenUrl: https://external-oauth-server.com/token
-          scopes:
-            serviceAudience: The audience name when Gravitino uses OAuth as the authenticator.
-
     BasicAuth:
       type: http
       scheme: basic
