@@ -21,6 +21,7 @@ package org.apache.gravitino.stats.storage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
@@ -207,7 +208,7 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                   .removalListener(
                       (RemovalListener<Long, DatasetHolder>)
                           (key, value, cause) -> {
-                            if (value != null) {
+                            if (value != null && cause != RemovalCause.EXPLICIT) {
                               closeDatasetHolder(value);
                             }
                           })
