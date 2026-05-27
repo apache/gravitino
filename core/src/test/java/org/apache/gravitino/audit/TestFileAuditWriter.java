@@ -23,7 +23,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.audit.v2.SimpleFormatterV2;
+import org.apache.gravitino.listener.api.event.ListCatalogEvent;
+import org.apache.gravitino.listener.api.event.ListMetalakeEvent;
+import org.apache.gravitino.listener.api.event.ListTableEvent;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LogEvent;
@@ -139,6 +143,62 @@ public class TestFileAuditWriter {
     FileAuditWriter writer = new FileAuditWriter();
     writer.init(new SimpleFormatterV2(), new HashMap<>());
     Assertions.assertTrue(warnCapture.getEvents().isEmpty());
+  }
+
+  @Test
+  public void testListTableEventProducesCorrectLogLine() {
+    FileAuditWriter writer = new FileAuditWriter();
+    writer.init(new SimpleFormatterV2(), new HashMap<>());
+
+    ListTableEvent event = new ListTableEvent("alice", Namespace.of("m", "c", "s"), 4);
+    writer.doWrite(writer.getFormatter().format(event));
+
+    Assertions.assertEquals(1, auditCapture.getEvents().size());
+    String line = auditCapture.getEvents().get(0).getMessage().getFormattedMessage();
+    String[] fields = line.split("\t", -1);
+    Assertions.assertEquals(8, fields.length, "Expected 8 tab-separated fields");
+    Assertions.assertEquals("alice", fields[1]);
+    Assertions.assertEquals("LIST_TABLE", fields[2]);
+    Assertions.assertEquals("m.c.s", fields[3]);
+    Assertions.assertEquals("SUCCESS", fields[4]);
+    Assertions.assertEquals("GRAVITINO_SERVER", fields[5]);
+    Assertions.assertEquals("unknown", fields[6]);
+    Assertions.assertEquals("{count=4}", fields[7]); // count surfaced in last field
+  }
+
+  @Test
+  public void testListMetalakeEventNullIdentifierInLogLine() {
+    FileAuditWriter writer = new FileAuditWriter();
+    writer.init(new SimpleFormatterV2(), new HashMap<>());
+
+    ListMetalakeEvent event = new ListMetalakeEvent("bob", 2);
+    writer.doWrite(writer.getFormatter().format(event));
+
+    String line = auditCapture.getEvents().get(0).getMessage().getFormattedMessage();
+    String[] fields = line.split("\t", -1);
+    Assertions.assertEquals(8, fields.length);
+    Assertions.assertEquals("bob", fields[1]);
+    Assertions.assertEquals("LIST_METALAKE", fields[2]);
+    Assertions.assertEquals("null", fields[3]); // null identifier serialises as "null"
+    Assertions.assertEquals("{count=2}", fields[7]);
+  }
+
+  @Test
+  public void testListCatalogEventLogLine() {
+    FileAuditWriter writer = new FileAuditWriter();
+    writer.init(new SimpleFormatterV2(), new HashMap<>());
+
+    ListCatalogEvent event = new ListCatalogEvent("carol", Namespace.of("metalake"), 3);
+    writer.doWrite(writer.getFormatter().format(event));
+
+    String line = auditCapture.getEvents().get(0).getMessage().getFormattedMessage();
+    String[] fields = line.split("\t", -1);
+    Assertions.assertEquals(8, fields.length);
+    Assertions.assertEquals("carol", fields[1]);
+    Assertions.assertEquals("LIST_CATALOG", fields[2]);
+    Assertions.assertEquals("metalake", fields[3]);
+    Assertions.assertEquals("SUCCESS", fields[4]);
+    Assertions.assertEquals("{count=3}", fields[7]);
   }
 
   @Test

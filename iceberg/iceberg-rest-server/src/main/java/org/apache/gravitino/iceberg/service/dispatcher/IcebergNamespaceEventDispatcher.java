@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -191,16 +192,18 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
             metalakeName, context.catalogName(), parentNamespace);
     eventBus.dispatchEvent(new IcebergListNamespacesPreEvent(context, nameIdentifier));
 
-    ListNamespacesResponse listResponse;
     try {
-      listResponse = operationDispatcher.listNamespaces(context, parentNamespace);
+      ListNamespacesResponse listResponse =
+          operationDispatcher.listNamespaces(context, parentNamespace);
+      List<Namespace> namespaces = listResponse.namespaces();
+      eventBus.dispatchEvent(
+          new IcebergListNamespacesEvent(
+              context, nameIdentifier, namespaces != null ? namespaces.size() : -1));
+      return listResponse;
     } catch (Exception e) {
       eventBus.dispatchEvent(new IcebergListNamespacesFailureEvent(context, nameIdentifier, e));
       throw e;
     }
-
-    eventBus.dispatchEvent(new IcebergListNamespacesEvent(context, nameIdentifier));
-    return listResponse;
   }
 
   @Override
