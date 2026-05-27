@@ -24,14 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class TestIdpRestFeature {
+class TestIdpRESTFeature {
 
   @Test
   void testBasicAuthenticatorEnabled() {
-    assertFalse(IdpRestFeature.basicAuthenticatorEnabled(null));
-    assertFalse(IdpRestFeature.basicAuthenticatorEnabled(List.of("simple")));
+    assertFalse(IdpRESTFeature.basicAuthenticatorEnabled(null));
+    assertFalse(IdpRESTFeature.basicAuthenticatorEnabled(List.of("simple")));
     assertTrue(
-        IdpRestFeature.basicAuthenticatorEnabled(
-            List.of("simple", IdpRestFeature.BASIC_AUTHENTICATOR)));
+        IdpRESTFeature.basicAuthenticatorEnabled(
+            List.of("simple", IdpRESTFeature.BASIC_AUTHENTICATOR)));
   }
 }

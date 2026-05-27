@@ -39,7 +39,7 @@ import org.apache.gravitino.idp.web.rest.IdpUserOperations;
  * when the {@code basic} authenticator is enabled.
  */
 @Provider
-public class IdpRestFeature implements Feature {
+public class IdpRESTFeature implements Feature {
 
   /** Authenticator name that enables built-in IdP management APIs. */
   public static final String BASIC_AUTHENTICATOR = "basic";

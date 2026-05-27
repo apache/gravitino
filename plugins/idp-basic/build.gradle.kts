@@ -44,6 +44,8 @@ dependencies {
 
   testImplementation(project(":common"))
   testImplementation(project(":core"))
+  testImplementation(project(":server"))
+  testImplementation(project(":server-common"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
 
   testImplementation(libs.awaitility)

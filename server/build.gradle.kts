@@ -58,8 +58,6 @@ dependencies {
     exclude(group = "org.junit.jupiter")
   }
 
-  testImplementation(project(":plugins:idp-basic"))
-
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.inline)

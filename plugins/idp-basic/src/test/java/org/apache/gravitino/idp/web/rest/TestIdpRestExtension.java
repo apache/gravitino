@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.server;
+package org.apache.gravitino.idp.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
@@ -41,11 +41,14 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import org.apache.commons.io.FileUtils;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.GravitinoServer;
+import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -69,7 +72,7 @@ public class TestIdpRestExtension {
   @BeforeAll
   void init() throws IOException {
     httpPort = RESTUtils.findAvailablePort(5000, 6000);
-    h2Path = Files.createTempDirectory("gravitino_server_idp_rest_it_");
+    h2Path = Files.createTempDirectory("gravitino_idp_rest_extension_it_");
   }
 
   @AfterAll
