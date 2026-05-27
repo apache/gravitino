@@ -23,7 +23,6 @@ import java.util.List;
 import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.FeatureContext;
 import javax.ws.rs.ext.Provider;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
@@ -66,7 +65,7 @@ public class IdpRESTFeature implements Feature {
     try {
       try (IdpUserGroupManager manager = new IdpUserGroupManager(config, env.idGenerator())) {
         manager.initializeConfiguredServiceAdmins(
-            config, StringUtils.defaultString(System.getenv(INITIAL_ADMIN_PASSWORD_ENV)));
+            config, System.getenv(INITIAL_ADMIN_PASSWORD_ENV));
       }
       LOG.info("Initialized built-in IdP service admins");
     } catch (IOException e) {
