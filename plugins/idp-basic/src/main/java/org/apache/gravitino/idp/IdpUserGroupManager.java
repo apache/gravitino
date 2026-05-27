@@ -19,12 +19,17 @@
 package org.apache.gravitino.idp;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
 import org.apache.gravitino.idp.exception.NotFoundException;
@@ -94,6 +99,50 @@ public class IdpUserGroupManager implements Closeable {
     this.passwordHasher = PasswordHasherFactory.create();
     this.garbageCollector = new IdpGarbageCollector(config);
     garbageCollector.start();
+  }
+
+  /**
+   * Initializes configured service admins that do not yet exist in the built-in IdP.
+   *
+   * @param config The server configuration.
+   * @param initialAdminPassword Initial password from {@code GRAVITINO_INITIAL_ADMIN_PASSWORD}.
+   * @throws IOException if persisting a service admin fails
+   */
+  public void initializeConfiguredServiceAdmins(Config config, String initialAdminPassword)
+      throws IOException {
+    initializeConfiguredServiceAdmins(
+        config, USER_SERVICE, passwordHasher, idGenerator, initialAdminPassword);
+  }
+
+  static void initializeConfiguredServiceAdmins(
+      Config config,
+      IdpUserMetaService userMetaService,
+      PasswordHasher passwordHasher,
+      IdGenerator idGenerator,
+      String initialAdminPassword)
+      throws IOException {
+    List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
+    if (serviceAdmins == null || serviceAdmins.isEmpty()) {
+      return;
+    }
+
+    Map<String, String> passwordsByAdmin =
+        parseInitialAdminPasswords(serviceAdmins, initialAdminPassword);
+    for (String serviceAdmin : serviceAdmins) {
+      IdpCredentialValidator.validateUsername(serviceAdmin);
+      if (userExists(userMetaService, serviceAdmin)) {
+        continue;
+      }
+
+      String password = passwordsByAdmin.get(serviceAdmin);
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(password),
+          "Missing initial password for configured service admin %s; declare"
+              + " GRAVITINO_INITIAL_ADMIN_PASSWORD",
+          serviceAdmin);
+      userMetaService.insertIdpUser(
+          buildUserPO(idGenerator, serviceAdmin, passwordHasher.hash(password)));
+    }
   }
 
   /**
@@ -222,6 +271,11 @@ public class IdpUserGroupManager implements Closeable {
   }
 
   private IdpUserPO newUserPO(String username, String passwordHash) {
+    return buildUserPO(idGenerator, username, passwordHash);
+  }
+
+  private static IdpUserPO buildUserPO(
+      IdGenerator idGenerator, String username, String passwordHash) {
     return IdpUserPO.builder()
         .withUserId(idGenerator.nextId())
         .withUsername(username)
@@ -230,6 +284,29 @@ public class IdpUserGroupManager implements Closeable {
         .withLastVersion(POConverters.INIT_VERSION)
         .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
         .build();
+  }
+
+  private static boolean userExists(IdpUserMetaService userMetaService, String username) {
+    try {
+      userMetaService.getIdpUserByUsername(username);
+      return true;
+    } catch (NotFoundException e) {
+      return false;
+    }
+  }
+
+  private static Map<String, String> parseInitialAdminPasswords(
+      List<String> serviceAdmins, String initialAdminPassword) {
+    if (StringUtils.isBlank(initialAdminPassword)) {
+      return ImmutableMap.of();
+    }
+
+    IdpCredentialValidator.validatePassword(initialAdminPassword);
+    ImmutableMap.Builder<String, String> passwordsByAdmin = ImmutableMap.builder();
+    for (String serviceAdmin : serviceAdmins) {
+      passwordsByAdmin.put(serviceAdmin, initialAdminPassword);
+    }
+    return passwordsByAdmin.build();
   }
 
   private IdpGroupPO newGroupPO(String groupName) {
