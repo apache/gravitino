@@ -7,22 +7,11 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Before Running Quick Start
 
-- Prepare a running Gravitino server.
-- Ensure target metalake exists (examples use `test`).
-- Configure `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome` for Spark templates.
-- For faster status feedback during verification, set `gravitino.job.statusPullIntervalInMs`
-  to a smaller value (for example `10000`) and restart Gravitino.
-- If your Iceberg REST backend is in-memory, avoid restarting it during this quick start because
-  restart resets metadata and data files.
-
-For full config details, see [Optimizer Configuration](./optimizer-configuration.md).
-
-## Success Criteria
-
-- Update-stats job finishes and table statistics/metrics include `custom-data-file-mse` and
-  `custom-delete-file-number`.
-- `submit-strategy-jobs` prints `SUBMIT` with a rewrite job ID.
-- Rewrite job log shows `Rewritten data files: <N>` where `N > 0` for non-empty tables.
+- **Gravitino server.** A running Gravitino server is required at `http://localhost:8090` (the default). Start one if needed before continuing.
+- **Iceberg REST catalog endpoint.** The walkthrough uses `http://localhost:9001/iceberg`. Gravitino's default installation runs an in-memory Iceberg REST service at that endpoint, so no extra setup is needed. Avoid restarting Gravitino during the walkthrough because the in-memory backend resets on restart. To use an external Iceberg REST catalog (Lakekeeper, Apache Polaris, Snowflake Open Catalog), substitute its URI in the catalog creation in Step 2 and in the `catalog_uri` fields in Steps 5 and 6.
+- **Metalake.** The examples use a metalake named `test`. Create one if it does not already exist.
+- **Spark.** The Spark templates need Spark binaries on the server. Either set `SPARK_HOME` in the environment that started the Gravitino server, or set `gravitino.jobExecutor.local.sparkHome` in `${GRAVITINO_HOME}/conf/gravitino.conf` and restart. See [Optimizer Configuration](./optimizer-configuration.md) for related server config keys.
+- **Faster status feedback (optional).** Gravitino pulls job status every `gravitino.job.statusPullIntervalInMs` milliseconds (default `300000`, about 5 minutes). To see status changes faster during the walkthrough, set this key to `10000` in `${GRAVITINO_HOME}/conf/gravitino.conf` and restart.
 
 ## Quick Start a: Built-in Table Maintenance Workflow
 
@@ -42,12 +31,7 @@ curl -sS "http://localhost:8090/api/metalakes/test" | jq
 curl -sS "http://localhost:8090/api/metalakes/test/jobs/templates?details=true" | jq '.jobTemplates[].name'
 ```
 
-Expected names include:
-
-- `builtin-iceberg-update-stats`
-- `builtin-iceberg-rewrite-data-files`
-
-If missing, verify `gravitino-jobs` JAR in `auxlib`, then restart Gravitino.
+**Success check:** both `builtin-iceberg-update-stats` and `builtin-iceberg-rewrite-data-files` appear in the output. If either is missing, ensure the `gravitino-jobs` JAR is in the Gravitino server's `auxlib` directory and restart.
 
 ### Step 2: Prepare Demo Metadata Objects
 
@@ -94,6 +78,8 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/metalakes/test/catalogs/rest_catalog/schemas/db/tables
 ```
 
+**Success check:** each curl returns a JSON response describing the created object. If a curl returns an "already exists" error, the object was created on a previous run; safe to proceed.
+
 ### Step 3: Seed Demo Data (Recommended)
 
 Use Spark SQL to create enough small files so compaction has visible effect:
@@ -109,6 +95,8 @@ ${SPARK_HOME}/bin/spark-sql \
       INSERT INTO rest_catalog.db.t1 \
       SELECT id, concat('name_', CAST(id AS STRING)) FROM range(0, 100000);"
 ```
+
+**Success check:** Spark exits without error. The table `rest_catalog.db.t1` now contains 100,000 rows distributed across multiple small data files.
 
 ### Step 4: Create and Attach Built-In Compaction Policy
 
@@ -140,7 +128,9 @@ Verify association:
 curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies?details=true" | jq
 ```
 
-### Step 5: Submit Built-In Update Stats Job
+**Success check:** the response lists `iceberg_compaction_default` among the policies attached to table `rest_catalog.db.t1`.
+
+### Step 5: Submit Built-In Update-Stats Job
 
 ```bash
 update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -167,6 +157,10 @@ update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+
 
 echo "update-stats job id: ${update_stats_job_id}"
 ```
+
+The `updater_options` and `spark_conf` values are JSON objects passed as escaped strings, which is what the `jobConf` API expects for nested configuration.
+
+**Success check:** the echo line shows a non-empty job ID. The actual job runs asynchronously on Spark; verify completion in Step 7.
 
 ### Step 6: Trigger Rewrite Submission with `submit-strategy-jobs`
 
@@ -218,28 +212,45 @@ strategy_job_id=$(echo "${submit_output}" | sed -n 's/.*jobId=\([^[:space:]]*\).
 echo "strategy rewrite job id: ${strategy_job_id}"
 ```
 
+**Success check:** the dry run prints lines starting with `DRY-RUN` for each partition the policy selects. The real run prints a line containing `SUBMIT` and `jobId=<id>`, and the echo line shows the captured rewrite job ID. The rewrite runs asynchronously on Spark; verify completion in Step 7.
+
 ### Step 7: Track Status and Verify Results
 
+Job status visible through the REST API may lag the real Spark process by up to `gravitino.job.statusPullIntervalInMs` milliseconds (default `300000`, about 5 minutes). If you lowered this in the prerequisites, status will refresh faster.
+
+**Check job status:**
+
 ```bash
-# Check job status by id
 curl -sS "http://localhost:8090/api/metalakes/test/jobs/runs/${update_stats_job_id}" | jq
 curl -sS "http://localhost:8090/api/metalakes/test/jobs/runs/${strategy_job_id}" | jq
+```
 
-# Verify table statistics after update-stats
+Each response shows the job's current `status`, which progresses through `QUEUED`, `STARTED`, and `SUCCEEDED` (or `FAILED`). Wait until both jobs reach `SUCCEEDED` before checking results. If either reports `FAILED`, inspect the staging log path shown in the response.
+
+**Check metrics after the update-stats job:**
+
+```bash
 curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/statistics" | jq
+```
 
-# Staging path is controlled by `gravitino.job.stagingDir` (default: `/tmp/gravitino/jobs/staging`).
-# Verify rewrite actually rewrote files (N should be > 0 for non-empty table).
+After a successful update-stats run, the response includes entries for `custom-data-file-mse` and `custom-delete-file-number` with non-zero numeric values. Their presence confirms the update-stats job populated table metrics.
+
+**Verify the rewrite produced output:**
+
+```bash
+# The staging directory root is controlled by `gravitino.job.stagingDir` (default: `/tmp/gravitino/jobs/staging`).
 log_dir="/tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-data-files/${strategy_job_id}"
 grep -E "Rewritten data files|Added data files|completed successfully" \
   "${log_dir}/output.log"
 ```
 
-By default, Gravitino pulls job status every `300000` ms (`gravitino.job.statusPullIntervalInMs`).
-REST status may lag real Spark process state by up to about 5 minutes.
+Look for a line matching `Rewritten data files: N` where `N > 0`. If the grep returns nothing, confirm the staging directory matches the configured `gravitino.job.stagingDir` and that the rewrite job has reached `SUCCEEDED`.
+
+**Success check:** both job status responses show `"status":"SUCCEEDED"`, the statistics response contains `custom-data-file-mse` and `custom-delete-file-number`, and the rewrite log shows `Rewritten data files: N` with `N > 0`.
 
 ## Related
 
+- [Iceberg Compaction Policy](../iceberg-compaction-policy.md)
 - [Optimizer Configuration](./optimizer-configuration.md)
 - [Optimizer CLI Reference](./optimizer-cli-reference.md)
 - [Optimizer Troubleshooting](./optimizer-troubleshooting.md)
