@@ -19,6 +19,8 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -28,6 +30,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import org.apache.gravitino.catalog.CatalogChangeLogListener;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -101,6 +104,8 @@ import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.EntityChangeLogPoller;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
 import org.slf4j.Logger;
@@ -118,6 +123,9 @@ public class GravitinoEnv {
   private boolean manageFullComponents = true;
 
   private EntityStore entityStore;
+
+  private EntityChangeLogPoller entityChangeLogPoller;
+  private CatalogChangeLogListener catalogChangeLogListener;
 
   private CatalogDispatcher catalogDispatcher;
 
@@ -437,6 +445,16 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the global entity change log poller if the current entity store supports it.
+   *
+   * @return the global entity change log poller, or null when it is not available
+   */
+  @Nullable
+  public EntityChangeLogPoller entityChangeLogPoller() {
+    return entityChangeLogPoller;
+  }
+
+  /**
    * Get The GravitinoAuthorizer
    *
    * @return the GravitinoAuthorizer instance
@@ -466,6 +484,9 @@ public class GravitinoEnv {
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
+    if (entityChangeLogPoller != null) {
+      entityChangeLogPoller.start();
+    }
     if (manageFullComponents) {
       auxServiceManager.serviceStart();
     }
@@ -474,6 +495,17 @@ public class GravitinoEnv {
   /** Shutdown the Gravitino environment. */
   public void shutdown() {
     LOG.info("Shutting down Gravitino Environment...");
+
+    if (entityChangeLogPoller != null) {
+      if (catalogChangeLogListener != null) {
+        entityChangeLogPoller.unregisterListener(catalogChangeLogListener);
+      }
+      try {
+        entityChangeLogPoller.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close EntityChangeLogPoller.", e);
+      }
+    }
 
     if (entityStore != null) {
       try {
@@ -565,6 +597,18 @@ public class GravitinoEnv {
     // CatalogHookDispatcher -> CatalogEventDispatcher -> CatalogNormalizeDispatcher ->
     // CatalogManager
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    this.entityChangeLogPoller = null;
+    this.catalogChangeLogListener = null;
+    if (entityStore instanceof RelationalEntityStore) {
+      this.entityChangeLogPoller =
+          new EntityChangeLogPoller(
+              config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
+              TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
+              TimeUnit.SECONDS.toMillis(
+                  config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)));
+      this.catalogChangeLogListener = new CatalogChangeLogListener(catalogManager);
+      this.entityChangeLogPoller.registerListener(catalogChangeLogListener);
+    }
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);
     CatalogEventDispatcher catalogEventDispatcher =

@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.cache.GravitinoCache;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.EntityChangeLogListener;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
@@ -47,18 +47,14 @@ import org.slf4j.LoggerFactory;
  * Eventual-consistency invalidator for {@link JcasbinAuthorizer}'s {@code metadataIdCache} and
  * {@code ownerRelCache}.
  *
- * <p>One scheduled thread drains {@code entity_change_log} and {@code owner_meta} change rows since
- * a high-water-mark cursor and invalidates the affected keys. Other Gravitino nodes therefore
- * observe ALTER/DROP and owner changes within one poll interval.
+ * <p>This class polls {@code owner_meta} itself and receives {@code entity_change_log} batches from
+ * the global entity change log poller.
  *
- * <p>Both polls run on every tick — a failure in one does not stop the other.
+ * <p>Other Gravitino nodes therefore observe ALTER/DROP and owner changes within one poll interval.
  */
-public class JcasbinChangePoller implements AutoCloseable {
+public class JcasbinChangePoller implements EntityChangeLogListener, AutoCloseable {
 
   private static final Logger LOG = LoggerFactory.getLogger(JcasbinChangePoller.class);
-
-  /** Max entity-change rows to fetch per poller cycle. */
-  private static final int ENTITY_CHANGE_POLLER_MAX_ROWS = 500;
 
   private final GravitinoCache<String, Long> metadataIdCache;
   private final GravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache;
@@ -66,7 +62,6 @@ public class JcasbinChangePoller implements AutoCloseable {
 
   private ScheduledExecutorService scheduler;
   private volatile long ownerPollHighWaterId = 0;
-  private volatile long entityPollHighWaterId = 0;
 
   /**
    * @param metadataIdCache the metadata-id cache to invalidate on entity changes
@@ -84,26 +79,14 @@ public class JcasbinChangePoller implements AutoCloseable {
   }
 
   /**
-   * Initializes the high-water cursors to the current DB tail (so startup does not scan historical
-   * changes) and schedules periodic polling.
-   *
-   * <p>Known trade-off: an id-based high-water mark can miss rows whose id is allocated before the
-   * cursor snapshot but whose commit lands after it. Concretely, if writer A holds {@code id=N-1}
-   * uncommitted while writer B commits {@code id=N}, {@code selectMaxChangeId()} returns N and the
-   * next poll queries {@code id > N} — A's row is never consumed. In that case the affected cache
-   * entry stays stale until either (a) a request-side path catches it on the next request, or (b)
-   * TTL eviction. Acceptable for the eventual-consistency caches targeted here; revisit if we ever
-   * route strong-consistency data through this poller.
+   * Initializes the owner-change high-water cursor to the current DB tail and schedules periodic
+   * polling.
    */
   public void start() {
     ownerPollHighWaterId =
         getOrDefault(
             SessionUtils.getWithoutCommit(
                 OwnerMetaMapper.class, OwnerMetaMapper::selectMaxChangeId));
-    entityPollHighWaterId =
-        getOrDefault(
-            SessionUtils.getWithoutCommit(
-                EntityChangeLogMapper.class, EntityChangeLogMapper::selectMaxChangeId));
 
     scheduler =
         Executors.newSingleThreadScheduledExecutor(
@@ -127,16 +110,6 @@ public class JcasbinChangePoller implements AutoCloseable {
         return;
       }
       LOG.warn("Owner change poll failed", e);
-    }
-
-    try {
-      LOG.debug("Polling for entity changes after id {}", entityPollHighWaterId);
-      pollEntityChanges();
-    } catch (Exception e) {
-      if (handleInterruptIfAny(e, "Entity change poll")) {
-        return;
-      }
-      LOG.warn("Entity change poll failed", e);
     }
   }
 
@@ -202,8 +175,7 @@ public class JcasbinChangePoller implements AutoCloseable {
   }
 
   /**
-   * Drains entity-change rows past {@link #entityPollHighWaterId} and invalidates the affected
-   * {@code metadataIdCache} keys.
+   * Invalidates the affected {@code metadataIdCache} keys from an entity-change batch.
    *
    * <p><b>Contract with the writer side:</b> {@code entity_change_log.full_name} must be the
    * <i>pre-mutation</i> name (the name that consumers currently have cached). The writers in {@code
@@ -216,13 +188,8 @@ public class JcasbinChangePoller implements AutoCloseable {
    * for the rationale. The single-threaded scheduler already prevents overlapping runs in
    * production, and the per-batch invalidation atomicity is provided by the cache itself.
    */
-  private synchronized void pollEntityChanges() {
-    List<EntityChangeRecord> changes =
-        SessionUtils.getWithoutCommit(
-            EntityChangeLogMapper.class,
-            m -> m.selectEntityChanges(entityPollHighWaterId, ENTITY_CHANGE_POLLER_MAX_ROWS));
-
-    long maxSeenId = entityPollHighWaterId;
+  @Override
+  public synchronized void onEntityChange(List<EntityChangeRecord> changes) {
     Set<String> containerPrefixes = new LinkedHashSet<>();
     Set<String> leafKeys = new LinkedHashSet<>();
     for (EntityChangeRecord change : changes) {
@@ -235,9 +202,6 @@ public class JcasbinChangePoller implements AutoCloseable {
         mdType = MetadataObject.Type.valueOf(entityType.toUpperCase(Locale.ROOT));
       } catch (IllegalArgumentException e) {
         LOG.warn("Unknown entity type in change log: {}", entityType);
-        if (change.getId() > maxSeenId) {
-          maxSeenId = change.getId();
-        }
         continue;
       }
 
@@ -249,13 +213,8 @@ public class JcasbinChangePoller implements AutoCloseable {
       } else {
         leafKeys.add(cacheKey);
       }
-
-      if (change.getId() > maxSeenId) {
-        maxSeenId = change.getId();
-      }
     }
     invalidateCoalescedKeys(containerPrefixes, leafKeys);
-    entityPollHighWaterId = maxSeenId;
   }
 
   @Override

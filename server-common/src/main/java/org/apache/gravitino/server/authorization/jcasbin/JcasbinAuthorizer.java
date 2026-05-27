@@ -95,11 +95,10 @@ import org.slf4j.LoggerFactory;
  *       correctness — TTL eviction only bounds memory. User/group role snapshots use write-based
  *       TTLs through {@link CaffeineGravitinoCache}; loaded role policies use access-based TTLs
  *       through {@link JcasbinLoadedRolesCache}.
- *   <li><b>Eventual-consistency caches</b> — {@link #metadataIdCache} and {@link #ownerRelCache}. A
- *       single background poller ({@link #changePoller}) drains {@code entity_change_log} and
- *       {@code owner_meta} change rows since a high-water-mark cursor and invalidates the affected
- *       keys. Other Gravitino nodes therefore observe ALTER/DROP and owner changes within one poll
- *       interval.
+ *   <li><b>Eventual-consistency caches</b> — {@link #metadataIdCache} and {@link #ownerRelCache}.
+ *       The global entity change log poller dispatches {@code entity_change_log} batches to {@link
+ *       #changePoller}, while {@link #changePoller} polls {@code owner_meta}. Other Gravitino nodes
+ *       therefore observe ALTER/DROP and owner changes within one poll interval.
  * </ol>
  *
  * <p>The pollers are best-effort and intentionally cheap; see {@link JcasbinChangePoller} for the
@@ -199,6 +198,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     ownerRelCache = new CaffeineGravitinoCache<>(ttlMs, ownerCacheSize);
     lookups = new JcasbinAuthorizationLookups(metadataIdCache, ownerRelCache);
     changePoller = new JcasbinChangePoller(metadataIdCache, ownerRelCache, pollIntervalSecs);
+    if (GravitinoEnv.getInstance().entityChangeLogPoller() != null) {
+      GravitinoEnv.getInstance().entityChangeLogPoller().registerListener(changePoller);
+    }
     changePoller.start();
   }
 
@@ -540,6 +542,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public void close() throws IOException {
     if (changePoller != null) {
+      if (GravitinoEnv.getInstance().entityChangeLogPoller() != null) {
+        GravitinoEnv.getInstance().entityChangeLogPoller().unregisterListener(changePoller);
+      }
       changePoller.close();
     }
     if (userRoleCache != null) {
@@ -893,8 +898,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /**
    * Resolves GroupEntity objects for the current principal's groups, skipping any that are stale or
-   * not found in the store. Used by {@link #isSelf} (ROLE branch) and owner checks that need full
-   * group entities instead of only group names.
+   * not found in the store. Used by role self-checks and owner checks that need full group entities
+   * instead of only group names.
    */
   private List<GroupEntity> resolveCurrentUserGroups(String metalake, EntityStore entityStore) {
     Principal principal = PrincipalUtils.getCurrentPrincipal();

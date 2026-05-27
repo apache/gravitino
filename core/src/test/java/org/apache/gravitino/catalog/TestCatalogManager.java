@@ -35,6 +35,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -65,6 +66,8 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -602,6 +605,33 @@ public class TestCatalogManager {
     Mockito.doCallRealMethod()
         .when(catalogManager)
         .createCatalogWrapper(any(CatalogEntity.class), eq(null));
+  }
+
+  @Test
+  void testCatalogChangeLogListenerInvalidatesCatalogCache() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "change_log_catalog");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    Assertions.assertNotNull(catalogManager.loadCatalogAndWrap(ident));
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+    listener.onEntityChange(
+        List.of(
+            new EntityChangeRecord(
+                1L, "metalake", "CATALOG", "metalake.change_log_catalog", OperateType.ALTER, 0L)));
+
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
   }
 
   @Test

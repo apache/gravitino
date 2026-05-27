@@ -35,8 +35,8 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * falls back to a shared {@link GravitinoCache} on a request miss, and finally issues a single DB
  * query on a cache miss. A successful DB fetch populates both tiers so subsequent calls — in this
  * request and later ones — hit the cache. The two underlying caches are invalidated externally by
- * {@link JcasbinChangePoller} (HA peers) and by the {@link
- * org.apache.gravitino.authorization.GravitinoAuthorizer#handleMetadataOwnerChange} / {@link
+ * the global entity change log poller, {@link JcasbinChangePoller} (owner changes), and by the
+ * {@link org.apache.gravitino.authorization.GravitinoAuthorizer#handleMetadataOwnerChange} / {@link
  * org.apache.gravitino.authorization.GravitinoAuthorizer#handleEntityNameIdMappingChange} hooks
  * (local mutations).
  */
@@ -103,15 +103,30 @@ public class JcasbinAuthorizationLookups {
       AuthorizationRequestContext requestContext) {
     return requestContext.computeOwnerIfAbsent(
         metadataId,
-        id ->
-            ownerRelCache.get(
-                id,
-                ignored -> {
-                  OwnerInfo ownerInfo =
-                      SessionUtils.getWithoutCommit(
-                          OwnerMetaMapper.class,
-                          m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
-                  return ownerInfo == null ? Optional.empty() : Optional.of(ownerInfo);
-                }));
+        id -> {
+          try {
+            return ownerRelCache.get(id, ignored -> loadOwnerInfo(id, metadataType));
+          } catch (NoSuchOwnerInfoException e) {
+            return Optional.empty();
+          }
+        });
+  }
+
+  private static Optional<OwnerInfo> loadOwnerInfo(
+      Long metadataId, MetadataObject.Type metadataType) {
+    OwnerInfo ownerInfo =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class,
+            m -> m.selectOwnerByMetadataObjectIdAndType(metadataId, metadataType.name()));
+    if (ownerInfo == null) {
+      throw new NoSuchOwnerInfoException(metadataId);
+    }
+    return Optional.of(ownerInfo);
+  }
+
+  private static class NoSuchOwnerInfoException extends RuntimeException {
+    private NoSuchOwnerInfoException(Long metadataId) {
+      super(String.format("No owner info found for metadata object id %s", metadataId));
+    }
   }
 }
