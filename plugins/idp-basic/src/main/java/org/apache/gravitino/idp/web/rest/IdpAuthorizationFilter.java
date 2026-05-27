@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.web.IdpManagement;
@@ -69,6 +70,8 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
   }
 
   static boolean isServiceAdmin(List<String> serviceAdmins, String currentUser) {
-    return currentUser != null && serviceAdmins != null && serviceAdmins.contains(currentUser);
+    return StringUtils.isNotBlank(currentUser)
+        && serviceAdmins != null
+        && serviceAdmins.contains(currentUser);
   }
 }

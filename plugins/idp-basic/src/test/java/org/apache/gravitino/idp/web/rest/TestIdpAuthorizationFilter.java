@@ -30,6 +30,8 @@ class TestIdpAuthorizationFilter {
   void testIsServiceAdmin() {
     assertFalse(IdpAuthorizationFilter.isServiceAdmin(null, "admin"));
     assertFalse(IdpAuthorizationFilter.isServiceAdmin(List.of("admin"), null));
+    assertFalse(IdpAuthorizationFilter.isServiceAdmin(List.of("admin"), ""));
+    assertFalse(IdpAuthorizationFilter.isServiceAdmin(List.of("admin"), "   "));
     assertFalse(IdpAuthorizationFilter.isServiceAdmin(List.of("admin"), "other"));
     assertTrue(IdpAuthorizationFilter.isServiceAdmin(List.of("admin", "ops"), "admin"));
   }

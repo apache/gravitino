@@ -218,7 +218,7 @@ public abstract class AbstractIdpMetaStorageTest {
                     "schema-%s-%s.sql", ConfigConstants.CURRENT_SCRIPT_VERSION, databaseType));
     return Arrays.stream(Files.readString(scriptPath).split(";"))
         .map(String::trim)
-        .filter(sql -> !sql.isEmpty())
+        .filter(StringUtils::isNotBlank)
         .toArray(String[]::new);
   }
 

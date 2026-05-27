@@ -160,7 +160,7 @@ class TestBasicAuthenticator {
             () -> authenticator.authenticateToken(basicAuthBytesWithCredential(credential)));
 
     assertEquals(
-        "Malformed Basic authorization header: username must not be empty", exception.getMessage());
+        "Malformed Basic authorization header: username must not be blank", exception.getMessage());
     assertEquals("Basic", exception.getChallenges().get(0));
   }
 

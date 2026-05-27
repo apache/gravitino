@@ -285,7 +285,7 @@ public class IdpRestApiIT {
                     "schema-%s-%s.sql", ConfigConstants.CURRENT_SCRIPT_VERSION, databaseType));
     return Arrays.stream(Files.readString(scriptPath).split(";"))
         .map(String::trim)
-        .filter(sql -> !sql.isEmpty())
+        .filter(StringUtils::isNotBlank)
         .toArray(String[]::new);
   }
 
@@ -363,7 +363,7 @@ public class IdpRestApiIT {
       String apiBase, String path, String username, String password) throws Exception {
     HttpRequest.Builder builder =
         HttpRequest.newBuilder().uri(URI.create(apiBase + path)).header("Accept", ACCEPT).GET();
-    if (username != null) {
+    if (StringUtils.isNotBlank(username)) {
       builder.header("Authorization", basicAuth(username, password));
     }
     return HTTP.send(builder.build(), HttpResponse.BodyHandlers.ofString());

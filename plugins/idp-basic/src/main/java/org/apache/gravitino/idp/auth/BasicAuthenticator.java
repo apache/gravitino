@@ -84,7 +84,7 @@ public class BasicAuthenticator implements Authenticator {
     }
 
     String authData = new String(tokenData, StandardCharsets.UTF_8);
-    if (authData.trim().isEmpty()) {
+    if (StringUtils.isBlank(authData)) {
       throw new UnauthorizedException("Empty token authorization header", BASIC_CHALLENGE);
     }
     if (!authData.startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER)) {
@@ -95,10 +95,10 @@ public class BasicAuthenticator implements Authenticator {
 
   private BasicCredentials parseBasicCredentials(String authData) {
     String credential = authData.substring(AuthConstants.AUTHORIZATION_BASIC_HEADER.length());
-    credential = credential.trim();
-    if (credential.isEmpty()) {
+    if (StringUtils.isBlank(credential)) {
       throw new BadRequestException("Malformed Basic authorization header: missing credentials");
     }
+    credential = credential.trim();
 
     try {
       String decodedCredential =
@@ -111,9 +111,9 @@ public class BasicAuthenticator implements Authenticator {
       }
 
       String username = parts[0];
-      if (username.isEmpty()) {
+      if (StringUtils.isBlank(username)) {
         throw new UnauthorizedException(
-            "Malformed Basic authorization header: username must not be empty", BASIC_CHALLENGE);
+            "Malformed Basic authorization header: username must not be blank", BASIC_CHALLENGE);
       }
 
       String password = parts[1];
