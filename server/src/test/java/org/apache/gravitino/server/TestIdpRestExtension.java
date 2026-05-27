@@ -30,7 +30,6 @@ import static org.apache.gravitino.Configs.REST_API_EXTENSION_PACKAGES;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
@@ -60,7 +59,8 @@ import org.mockito.Mockito;
 public class TestIdpRestExtension {
 
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
-  private static final String IDP_REST_PACKAGE = "org.apache.gravitino.idp.web.rest";
+  private static final String IDP_REST_EXTENSION_PACKAGE =
+      "org.apache.gravitino.idp.web.rest.feature";
   private static final HttpClient HTTP = HttpClient.newHttpClient();
 
   private int httpPort;
@@ -89,13 +89,13 @@ public class TestIdpRestExtension {
   }
 
   @Test
-  public void testWithExtension() throws Exception {
+  public void testWithExtensionWithoutBasicAuthenticator() throws Exception {
     try (ServerHarness harness = startServer(newConfig(true))) {
-      HttpResponse<String> missingResponse = getUser(harness.port(), "missing-user");
-      assertEquals(404, missingResponse.statusCode());
-      assertTrue(
-          isNotFoundError(missingResponse.body()),
-          "Registered IdP REST should return Gravitino NOT_FOUND error body");
+      HttpResponse<String> response = getUser(harness.port(), "missing-user");
+      assertEquals(404, response.statusCode());
+      assertFalse(
+          isNotFoundError(response.body()),
+          "IdP REST routes should not be registered when basic authenticator is disabled");
     }
   }
 
@@ -117,7 +117,7 @@ public class TestIdpRestExtension {
             .put(CACHE_ENABLED.getKey(), "false")
             .put(ENABLE_AUTHORIZATION.getKey(), "false");
     if (enableExtension) {
-      builder.put(REST_API_EXTENSION_PACKAGES.getKey(), IDP_REST_PACKAGE);
+      builder.put(REST_API_EXTENSION_PACKAGES.getKey(), IDP_REST_EXTENSION_PACKAGE);
     }
 
     ServerConfig serverConfig = new ServerConfig();

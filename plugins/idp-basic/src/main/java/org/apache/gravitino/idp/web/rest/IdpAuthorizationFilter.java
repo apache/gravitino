@@ -23,80 +23,50 @@ import java.util.List;
 import java.util.function.Supplier;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.web.IdpManagement;
 import org.apache.gravitino.idp.web.IdpRESTUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
- * Enforces built-in IdP management API access rules without server interception:
+ * Enforces built-in IdP management API access rules without server interception.
  *
- * <ul>
- *   <li>Available only when {@code basic} is configured in {@link Configs#AUTHENTICATORS}
- *   <li>Caller must be listed in {@link Configs#SERVICE_ADMINS}
- * </ul>
+ * <p>Caller must be listed in {@link Configs#SERVICE_ADMINS}. This filter runs as a Jersey request
+ * filter after the servlet {@code AuthenticationFilter} has authenticated the caller and populated
+ * the current user principal.
  *
- * <p>This filter runs as a Jersey request filter after the servlet {@code AuthenticationFilter} has
- * authenticated the caller and populated the current user principal.
- *
- * <p>Scoped to resources annotated with {@link IdpManagement} via Jersey name binding.
+ * <p>Registered only when {@code basic} is configured in {@link Configs#AUTHENTICATORS}. Scoped to
+ * resources annotated with {@link IdpManagement} via Jersey name binding.
  */
-@Provider
 @IdpManagement
 public class IdpAuthorizationFilter implements ContainerRequestFilter {
-
-  /** Authenticator name that enables built-in IdP management APIs. */
-  public static final String BASIC_AUTHENTICATOR = "basic";
 
   /** Error message when the caller is not a service admin. */
   public static final String SERVICE_ADMIN_REQUIRED_MESSAGE =
       "Only service admins can manage built-in IdP users and groups.";
 
-  /** Error message when the {@code basic} authenticator is not enabled. */
-  public static final String BASIC_AUTHENTICATOR_REQUIRED_MESSAGE =
-      "Built-in IdP management APIs are available only when the basic authenticator is enabled.";
-
-  private final Supplier<List<String>> authenticatorsSupplier;
   private final Supplier<List<String>> serviceAdminsSupplier;
   private final Supplier<String> currentUserSupplier;
 
   /** Creates a filter backed by the running Gravitino server configuration. */
   public IdpAuthorizationFilter() {
     this(
-        () -> GravitinoEnv.getInstance().config().get(Configs.AUTHENTICATORS),
         () -> GravitinoEnv.getInstance().config().get(Configs.SERVICE_ADMINS),
         PrincipalUtils::getCurrentUserName);
   }
 
   IdpAuthorizationFilter(
-      Supplier<List<String>> authenticatorsSupplier,
-      Supplier<List<String>> serviceAdminsSupplier,
-      Supplier<String> currentUserSupplier) {
-    this.authenticatorsSupplier = authenticatorsSupplier;
+      Supplier<List<String>> serviceAdminsSupplier, Supplier<String> currentUserSupplier) {
     this.serviceAdminsSupplier = serviceAdminsSupplier;
     this.currentUserSupplier = currentUserSupplier;
   }
 
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
-    if (!basicAuthenticatorEnabled(authenticatorsSupplier.get())) {
-      requestContext.abortWith(
-          IdpRESTUtils.notFound(
-              BASIC_AUTHENTICATOR_REQUIRED_MESSAGE,
-              new NotFoundException(BASIC_AUTHENTICATOR_REQUIRED_MESSAGE)));
-      return;
-    }
-
     if (!isServiceAdmin(serviceAdminsSupplier.get(), currentUserSupplier.get())) {
       requestContext.abortWith(IdpRESTUtils.forbidden(SERVICE_ADMIN_REQUIRED_MESSAGE, null));
     }
-  }
-
-  static boolean basicAuthenticatorEnabled(List<String> authenticators) {
-    return authenticators != null && authenticators.contains(BASIC_AUTHENTICATOR);
   }
 
   static boolean isServiceAdmin(List<String> serviceAdmins, String currentUser) {

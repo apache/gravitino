@@ -18,13 +18,11 @@
  */
 package org.apache.gravitino.idp.web.rest;
 
-import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 
 /** Registers built-in IdP REST dependencies for Jersey/HK2 injection. */
-@Provider
 public class IdpBasicBinder extends AbstractBinder {
 
   @Override

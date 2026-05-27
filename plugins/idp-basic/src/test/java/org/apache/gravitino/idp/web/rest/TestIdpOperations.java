@@ -83,11 +83,7 @@ class TestIdpOperations extends JerseyTest {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(IdpUserOperations.class);
     resourceConfig.register(IdpGroupOperations.class);
-    resourceConfig.register(
-        new IdpAuthorizationFilter(
-            () -> List.of(IdpAuthorizationFilter.BASIC_AUTHENTICATOR),
-            () -> List.of("admin"),
-            () -> "admin"));
+    resourceConfig.register(new IdpAuthorizationFilter(() -> List.of("admin"), () -> "admin"));
     resourceConfig.register(
         new AbstractBinder() {
           @Override

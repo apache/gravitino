@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.web.rest;
+package org.apache.gravitino.idp.web.rest.feature;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -24,13 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class TestIdpAuthorizationFilter {
+class TestIdpRestFeature {
 
   @Test
-  void testIsServiceAdmin() {
-    assertFalse(IdpAuthorizationFilter.isServiceAdmin(null, "admin"));
-    assertFalse(IdpAuthorizationFilter.isServiceAdmin(List.of("admin"), null));
-    assertFalse(IdpAuthorizationFilter.isServiceAdmin(List.of("admin"), "other"));
-    assertTrue(IdpAuthorizationFilter.isServiceAdmin(List.of("admin", "ops"), "admin"));
+  void testBasicAuthenticatorEnabled() {
+    assertFalse(IdpRestFeature.basicAuthenticatorEnabled(null));
+    assertFalse(IdpRestFeature.basicAuthenticatorEnabled(List.of("simple")));
+    assertTrue(
+        IdpRestFeature.basicAuthenticatorEnabled(
+            List.of("simple", IdpRestFeature.BASIC_AUTHENTICATOR)));
   }
 }
