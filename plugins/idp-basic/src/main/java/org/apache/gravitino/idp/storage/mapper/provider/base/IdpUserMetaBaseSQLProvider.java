@@ -37,7 +37,7 @@ public class IdpUserMetaBaseSQLProvider {
   }
 
   public String selectIdpUserWithGroups(@Param("username") String username) {
-    return "SELECT u.user_name as name,"
+    return "SELECT u.user_name as name, u.password_hash as passwordHash,"
         + " COALESCE(JSON_ARRAYAGG(g.group_name), JSON_ARRAY()) as groupNames"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
@@ -48,7 +48,7 @@ public class IdpUserMetaBaseSQLProvider {
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
         + " WHERE u.user_name = #{username} AND u.deleted_at = 0"
-        + " GROUP BY u.user_id, u.user_name";
+        + " GROUP BY u.user_id, u.user_name, u.password_hash";
   }
 
   public String selectIdpUsersByUsernames(@Param("usernames") List<String> usernames) {

@@ -20,28 +20,42 @@ package org.apache.gravitino.idp.model;
 
 import java.util.List;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.gravitino.idp.dto.IdpUserDTO;
 
 /** Built-in IdP user. */
 public class IdpUser {
 
   private final String name;
+  @Nullable private final String passwordHash;
   private final List<String> groupNames;
 
   /**
    * Creates a built-in IdP user.
    *
    * @param name The username.
+   * @param passwordHash The password hash, or null when not loaded or not applicable.
    * @param groupNames The group names the user belongs to.
    */
-  public IdpUser(String name, List<String> groupNames) {
+  public IdpUser(String name, @Nullable String passwordHash, List<String> groupNames) {
     this.name = name;
+    this.passwordHash = passwordHash;
     this.groupNames = groupNames;
   }
 
   /** Returns the username. */
   public String name() {
     return name;
+  }
+
+  /**
+   * Returns the password hash when loaded from storage.
+   *
+   * @return The password hash, or null if not available.
+   */
+  @Nullable
+  public String passwordHash() {
+    return passwordHash;
   }
 
   /** Returns the group names the user belongs to. */
@@ -67,12 +81,14 @@ public class IdpUser {
       return false;
     }
     IdpUser that = (IdpUser) other;
-    return Objects.equals(name, that.name) && Objects.equals(groupNames, that.groupNames);
+    return Objects.equals(name, that.name)
+        && Objects.equals(passwordHash, that.passwordHash)
+        && Objects.equals(groupNames, that.groupNames);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, groupNames);
+    return Objects.hash(name, passwordHash, groupNames);
   }
 
   @Override

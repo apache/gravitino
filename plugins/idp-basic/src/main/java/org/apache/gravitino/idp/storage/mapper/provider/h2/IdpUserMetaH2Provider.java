@@ -30,7 +30,7 @@ public class IdpUserMetaH2Provider extends IdpUserMetaBaseSQLProvider {
 
   @Override
   public String selectIdpUserWithGroups(@Param("username") String username) {
-    return "SELECT u.user_name as name,"
+    return "SELECT u.user_name as name, u.password_hash as passwordHash,"
         + " '['"
         + " || COALESCE(GROUP_CONCAT("
         + " CASE"
@@ -48,7 +48,7 @@ public class IdpUserMetaH2Provider extends IdpUserMetaBaseSQLProvider {
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
         + " WHERE u.user_name = #{username} AND u.deleted_at = 0"
-        + " GROUP BY u.user_id, u.user_name";
+        + " GROUP BY u.user_id, u.user_name, u.password_hash";
   }
 
   @Override

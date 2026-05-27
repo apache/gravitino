@@ -105,13 +105,11 @@ public class IdpUserGroupManager implements Closeable {
       return;
     }
 
-    if (StringUtils.isBlank(initialAdminPassword)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Missing initial password for configured service admin %s; declare"
-                  + " GRAVITINO_INITIAL_ADMIN_PASSWORD",
-              missingServiceAdmins.get(0)));
-    }
+    Preconditions.checkArgument(
+        !StringUtils.isBlank(initialAdminPassword),
+        "Missing initial password for configured service admin %s; declare"
+            + " GRAVITINO_INITIAL_ADMIN_PASSWORD",
+        missingServiceAdmins.get(0));
     IdpCredentialValidator.validatePassword(initialAdminPassword);
     String passwordHash = passwordHasher.hash(initialAdminPassword);
     for (String serviceAdmin : missingServiceAdmins) {
@@ -128,7 +126,7 @@ public class IdpUserGroupManager implements Closeable {
    */
   public IdpUser addUser(String username, String password) throws IOException {
     USER_SERVICE.insertIdpUser(newUserPO(username, passwordHasher.hash(password)));
-    return new IdpUser(username, Collections.emptyList());
+    return new IdpUser(username, null, Collections.emptyList());
   }
 
   /**
@@ -153,12 +151,12 @@ public class IdpUserGroupManager implements Closeable {
 
   public IdpUser authenticate(String username, String password) {
     try {
-      IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
-      if (!passwordHasher.verify(password, userPO.getPasswordHash())) {
+      IdpUser user = USER_SERVICE.getIdpUser(username);
+      if (user.passwordHash() == null || !passwordHasher.verify(password, user.passwordHash())) {
         throw new UnauthorizedException(
             "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
       }
-      return getUser(username);
+      return user;
     } catch (NotFoundException e) {
       throw new UnauthorizedException(
           "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());

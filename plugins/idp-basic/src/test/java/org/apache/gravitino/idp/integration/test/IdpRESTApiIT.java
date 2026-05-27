@@ -76,7 +76,7 @@ import org.mockito.Mockito;
  * <p>Runs the same REST scenario against H2, MySQL, and PostgreSQL relational backends.
  */
 @Tag("gravitino-docker-test")
-public class IdpRestApiIT {
+public class IdpRESTApiIT {
 
   private static final String H2_BACKEND = "h2";
   private static final String MYSQL_BACKEND = "mysql";
@@ -201,7 +201,7 @@ public class IdpRestApiIT {
   private void cleanupRelationalBackend(String backendType) throws IOException {
     if (H2_BACKEND.equals(backendType) && h2Path != null && Files.exists(h2Path)) {
       try (Stream<Path> paths = Files.walk(h2Path)) {
-        paths.sorted(Comparator.reverseOrder()).forEach(IdpRestApiIT::deletePath);
+        paths.sorted(Comparator.reverseOrder()).forEach(IdpRESTApiIT::deletePath);
       }
       h2Path = null;
     }

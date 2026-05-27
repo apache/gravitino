@@ -20,16 +20,14 @@
 package org.apache.gravitino.idp.storage.mapper;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
-import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserGroupRelPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.idp.storage.utils.IdpPOConverters;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -113,9 +111,11 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
                 .withDeletedAt(0L)
                 .build()));
 
-    IdpUser user = IdpPOConverters.toIdpUser(idpUserMetaMapper.selectIdpUserWithGroups("alice"));
-    assertEquals("alice", user.name());
-    assertIterableEquals(List.of("dev", "ops"), user.groupNames());
+    var userWithGroups = idpUserMetaMapper.selectIdpUserWithGroups("alice");
+    assertEquals("alice", userWithGroups.getName());
+    assertEquals("hash-a", userWithGroups.getPasswordHash());
+    assertTrue(userWithGroups.getGroupNames().contains("dev"));
+    assertTrue(userWithGroups.getGroupNames().contains("ops"));
     assertNull(idpUserMetaMapper.selectIdpUserWithGroups("unknown"));
   }
 

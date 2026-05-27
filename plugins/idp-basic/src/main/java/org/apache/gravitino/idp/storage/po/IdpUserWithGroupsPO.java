@@ -38,5 +38,6 @@ import lombok.ToString;
 @Builder(setterPrefix = "with")
 public class IdpUserWithGroupsPO {
   private String name;
+  private String passwordHash;
   private String groupNames;
 }
