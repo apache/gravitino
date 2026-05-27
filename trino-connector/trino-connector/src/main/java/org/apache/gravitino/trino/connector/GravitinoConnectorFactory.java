@@ -156,8 +156,8 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   private void checkTrinoSpiVersion(ConnectorContext context, GravitinoConfig config) {
-    String spiVersion = context.getSpiVersion();
-    trinoVersion = Integer.parseInt(spiVersion);
+    String numericSpiVersion = spiVersion.split("[^0-9]")[0];
+    trinoVersion = Integer.parseInt(numericSpiVersion);
 
     // check catalog name with metalake are supported in this trino version
     if (!config.singleMetalakeMode() && !supportCatalogNameWithMetalake()) {
