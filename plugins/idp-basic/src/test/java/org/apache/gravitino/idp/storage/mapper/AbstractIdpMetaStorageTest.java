@@ -84,7 +84,7 @@ public abstract class AbstractIdpMetaStorageTest {
   }
 
   public void init(String type) throws IOException {
-    config = createRelationalBackendConfig(type);
+    config = createBackendConfig(type);
     backend = new JDBCBackend();
     backend.initialize(config);
     IdpSQLExceptionConverterFactory.initConverter(config);
@@ -119,7 +119,7 @@ public abstract class AbstractIdpMetaStorageTest {
 
   protected void initializeMappers() {}
 
-  protected Config createRelationalBackendConfig(String type) throws IOException {
+  private Config createBackendConfig(String type) throws IOException {
     Config backendConfig = new Config(false) {};
     backendConfig.set(Configs.ENTITY_STORE, Configs.RELATIONAL_ENTITY_STORE);
     backendConfig.set(Configs.ENTITY_RELATIONAL_STORE, type);
@@ -218,7 +218,7 @@ public abstract class AbstractIdpMetaStorageTest {
                     "schema-%s-%s.sql", ConfigConstants.CURRENT_SCRIPT_VERSION, databaseType));
     return Arrays.stream(Files.readString(scriptPath).split(";"))
         .map(String::trim)
-        .filter(StringUtils::isNotBlank)
+        .filter(sql -> !sql.isEmpty())
         .toArray(String[]::new);
   }
 
