@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.idp;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
@@ -48,23 +49,55 @@ public class IdpUserGroupManager implements Closeable {
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
 
+  private static volatile IdpUserGroupManager instance;
+
   private final IdpRelationalStorage relationalStorage;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
-  private final IdpGarbageCollector garbageCollector;
 
   /**
-   * Creates a built-in IdP user and group manager.
+   * Returns the process-wide built-in IdP user and group manager, creating it on first use.
    *
    * @param config The server configuration.
    * @param idGenerator The id generator.
+   * @return The singleton {@link IdpUserGroupManager} instance.
    */
-  public IdpUserGroupManager(Config config, IdGenerator idGenerator) {
+  public static IdpUserGroupManager getInstance(Config config, IdGenerator idGenerator) {
+    IdpUserGroupManager local = instance;
+    if (local == null) {
+      synchronized (IdpUserGroupManager.class) {
+        local = instance;
+        if (local == null) {
+          instance = new IdpUserGroupManager(config, idGenerator);
+          local = instance;
+        }
+      }
+    }
+    return local;
+  }
+
+  /**
+   * Closes and clears the singleton instance.
+   *
+   * @throws IOException if closing underlying resources fails
+   */
+  public static synchronized void closeInstance() throws IOException {
+    if (instance != null) {
+      instance.close();
+      instance = null;
+    }
+    IdpGarbageCollector.closeInstance();
+  }
+
+  @VisibleForTesting
+  static synchronized void resetInstance() throws IOException {
+    closeInstance();
+  }
+
+  private IdpUserGroupManager(Config config, IdGenerator idGenerator) {
     this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
     this.passwordHasher = PasswordHasherFactory.create();
-    this.garbageCollector = new IdpGarbageCollector(config);
-    garbageCollector.start();
   }
 
   /**
@@ -188,7 +221,6 @@ public class IdpUserGroupManager implements Closeable {
 
   @Override
   public void close() throws IOException {
-    garbageCollector.close();
     relationalStorage.close();
   }
 

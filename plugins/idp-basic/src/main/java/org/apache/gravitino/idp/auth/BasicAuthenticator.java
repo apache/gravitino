@@ -69,7 +69,7 @@ public class BasicAuthenticator implements Authenticator {
     GravitinoEnv env = GravitinoEnv.getInstance();
     IdGenerator idGenerator =
         env.idGenerator() != null ? env.idGenerator() : RandomIdGenerator.INSTANCE;
-    this.userGroupManager = new IdpUserGroupManager(config, idGenerator);
+    this.userGroupManager = IdpUserGroupManager.getInstance(config, idGenerator);
   }
 
   @Override

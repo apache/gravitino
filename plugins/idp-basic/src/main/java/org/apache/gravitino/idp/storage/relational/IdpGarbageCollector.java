@@ -21,6 +21,7 @@ package org.apache.gravitino.idp.storage.relational;
 import static org.apache.gravitino.Configs.GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -41,6 +42,8 @@ public final class IdpGarbageCollector implements Closeable {
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
 
+  private static volatile IdpGarbageCollector instance;
+
   private final long storeDeleteAfterTimeMillis;
 
   private final ScheduledExecutorService garbageCollectorPool =
@@ -54,16 +57,39 @@ public final class IdpGarbageCollector implements Closeable {
           new ThreadPoolExecutor.AbortPolicy());
 
   /**
-   * Creates a garbage collector for built-in IdP metadata.
+   * Starts the process-wide built-in IdP garbage collector, creating it on first use.
    *
    * @param config The server configuration.
    */
-  public IdpGarbageCollector(Config config) {
+  public static synchronized void startInstance(Config config) {
+    if (instance == null) {
+      instance = new IdpGarbageCollector(config);
+      instance.start();
+    }
+  }
+
+  /**
+   * Closes and clears the singleton garbage collector instance.
+   *
+   * @throws IOException if shutting down the collector pool fails
+   */
+  public static synchronized void closeInstance() throws IOException {
+    if (instance != null) {
+      instance.close();
+      instance = null;
+    }
+  }
+
+  @VisibleForTesting
+  static synchronized void resetInstance() throws IOException {
+    closeInstance();
+  }
+
+  IdpGarbageCollector(Config config) {
     storeDeleteAfterTimeMillis = config.get(STORE_DELETE_AFTER_TIME);
   }
 
-  /** Starts the scheduled garbage collector. */
-  public void start() {
+  private void start() {
     long dateTimelineMinute = storeDeleteAfterTimeMillis / 1000 / 60;
     long frequency = Math.max(dateTimelineMinute / 10, 10);
     garbageCollectorPool.scheduleAtFixedRate(this::collectAndClean, 5, frequency, TimeUnit.MINUTES);

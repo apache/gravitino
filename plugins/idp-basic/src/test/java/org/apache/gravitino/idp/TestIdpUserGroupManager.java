@@ -78,15 +78,13 @@ public class TestIdpUserGroupManager {
     config.set(STORE_DELETE_AFTER_TIME, 20 * 60 * 1000L);
     config.set(CACHE_ENABLED, false);
 
-    manager = new IdpUserGroupManager(config, RandomIdGenerator.INSTANCE);
+    manager = IdpUserGroupManager.getInstance(config, RandomIdGenerator.INSTANCE);
   }
 
   @AfterAll
   public static void tearDown() throws IOException {
-    if (manager != null) {
-      manager.close();
-      manager = null;
-    }
+    IdpUserGroupManager.closeInstance();
+    manager = null;
 
     if (h2Path != null && Files.exists(h2Path)) {
       try (Stream<Path> paths = Files.walk(h2Path)) {

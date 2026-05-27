@@ -27,6 +27,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
+import org.apache.gravitino.idp.storage.relational.IdpGarbageCollector;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
 import org.apache.gravitino.idp.web.rest.IdpGroupOperations;
@@ -40,7 +41,7 @@ import org.apache.gravitino.idp.web.rest.IdpUserOperations;
  * org.apache.gravitino.idp.web.rest.feature} so Jersey only auto-discovers this feature. IdP REST
  * resource classes remain in {@code org.apache.gravitino.idp.web.rest} and are registered here only
  * when the {@code basic} authenticator is enabled. Also initializes configured service admins in
- * the built-in IdP when they do not yet exist.
+ * the built-in IdP when they do not yet exist and starts the built-in IdP garbage collector.
  */
 @Provider
 public class IdpRESTFeature implements Feature {
@@ -60,6 +61,8 @@ public class IdpRESTFeature implements Feature {
     } catch (IOException e) {
       throw new IllegalStateException("Failed to initialize built-in IdP service admins", e);
     }
+
+    IdpGarbageCollector.startInstance(config);
 
     context.register(IdpBasicBinder.class);
     context.register(IdpUserOperations.class);

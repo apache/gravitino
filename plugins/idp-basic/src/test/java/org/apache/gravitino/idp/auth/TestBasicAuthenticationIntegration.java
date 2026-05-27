@@ -74,22 +74,17 @@ class TestBasicAuthenticationIntegration {
     config.set(STORE_DELETE_AFTER_TIME, 20 * 60 * 1000L);
     config.set(CACHE_ENABLED, false);
 
-    userGroupManager = new IdpUserGroupManager(config, RandomIdGenerator.INSTANCE);
-    userGroupManager.addUser(USER, PASSWORD);
-
     authenticator = new BasicAuthenticator();
     authenticator.initialize(config);
+    userGroupManager = IdpUserGroupManager.getInstance(config, RandomIdGenerator.INSTANCE);
+    userGroupManager.addUser(USER, PASSWORD);
   }
 
   @AfterAll
   static void tearDown() throws IOException {
-    if (authenticator != null) {
-      authenticator = null;
-    }
-    if (userGroupManager != null) {
-      userGroupManager.close();
-      userGroupManager = null;
-    }
+    authenticator = null;
+    userGroupManager = null;
+    IdpUserGroupManager.closeInstance();
     if (h2Path != null && Files.exists(h2Path)) {
       try (Stream<Path> paths = Files.walk(h2Path)) {
         paths
