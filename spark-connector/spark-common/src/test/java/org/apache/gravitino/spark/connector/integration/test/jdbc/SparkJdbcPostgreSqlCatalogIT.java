@@ -22,8 +22,6 @@ import static org.apache.gravitino.integration.test.util.TestDatabaseName.PG_CAT
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import org.apache.gravitino.credential.CredentialConstants;
-import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
@@ -117,8 +115,6 @@ public class SparkJdbcPostgreSqlCatalogIT extends SparkCommonIT {
     catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, this.pgDriver);
     catalogProperties.put(
         JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE, PG_CATALOG_PG_IT.toString());
-    catalogProperties.put(
-        CredentialConstants.CREDENTIAL_PROVIDERS, JdbcCredential.JDBC_CREDENTIAL_TYPE);
     return catalogProperties;
   }
 }
