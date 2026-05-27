@@ -132,7 +132,14 @@ public class AuthenticationFilter implements Filter {
     response.sendError(status, exception.getMessage());
   }
 
-  private static boolean isHealthCheckRequest(ServletRequest request) {
+  /**
+   * Returns {@code true} if the request targets a health check endpoint that should bypass
+   * authentication. Subclasses may override this to add additional bypass paths.
+   *
+   * @param request the incoming servlet request
+   * @return {@code true} if the request should skip authentication
+   */
+  protected boolean isHealthCheckRequest(ServletRequest request) {
     if (!(request instanceof HttpServletRequest)) {
       return false;
     }
@@ -142,11 +149,15 @@ public class AuthenticationFilter implements Filter {
     }
     // Also match /health, /health/*, and /health.html — root-level aliases that forward to
     // /api/health/*. During a forward, getRequestURI() returns the original URI, not the target.
+    // Also match /iceberg/health and /iceberg/health/* for the Iceberg REST server health
+    // endpoints.
     return path.equals("/health")
         || path.startsWith("/health/")
         || path.equals("/health.html")
         || path.equals("/api/health")
-        || path.startsWith("/api/health/");
+        || path.startsWith("/api/health/")
+        || path.equals("/iceberg/health")
+        || path.startsWith("/iceberg/health/");
   }
 
   @Override
