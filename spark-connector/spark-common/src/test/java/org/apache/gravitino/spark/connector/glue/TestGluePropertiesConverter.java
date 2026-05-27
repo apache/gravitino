@@ -131,18 +131,10 @@ public class TestGluePropertiesConverter {
 
   // --- toSparkCatalogProperties tests (single-arg version) ---
 
-  static final String FACTORY_CLASS =
-      "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory";
-
-  // The patched Hive 2.3.9 JARs use hive.imetastoreclient.factory.class (not the standard key).
-  static final String FACTORY_KEY = "hive.imetastoreclient.factory.class";
-
   @Test
-  void testToSparkCatalogPropertiesAlwaysIncludesFactory() {
-    // Factory class is always emitted so HiveTableCatalog connects to Glue instead of Derby.
+  void testToSparkCatalogPropertiesEmpty() {
     Map<String, String> sparkProps = converter.toSparkCatalogProperties(ImmutableMap.of());
-    Assertions.assertEquals(FACTORY_CLASS, sparkProps.get(FACTORY_KEY));
-    Assertions.assertEquals(1, sparkProps.size());
+    Assertions.assertTrue(sparkProps.isEmpty());
   }
 
   @Test
@@ -150,9 +142,8 @@ public class TestGluePropertiesConverter {
     Map<String, String> sparkProps =
         converter.toSparkCatalogProperties(
             ImmutableMap.of(GluePropertiesConverter.AWS_REGION, "us-east-1"));
-    Assertions.assertEquals(FACTORY_CLASS, sparkProps.get(FACTORY_KEY));
     Assertions.assertEquals("us-east-1", sparkProps.get("aws.region"));
-    Assertions.assertEquals(2, sparkProps.size());
+    Assertions.assertEquals(1, sparkProps.size());
   }
 
   @Test

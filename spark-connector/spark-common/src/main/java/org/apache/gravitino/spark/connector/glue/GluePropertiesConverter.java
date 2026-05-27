@@ -79,12 +79,6 @@ public class GluePropertiesConverter implements PropertiesConverter {
   public Map<String, String> toSparkCatalogProperties(Map<String, String> properties) {
     Preconditions.checkArgument(properties != null, "Glue Catalog properties should not be null");
     HashMap<String, String> all = new HashMap<>();
-    // The patched Hive 2.3.9 JARs (from sdaberdaku/aws-glue-data-catalog-spark-client) expose
-    // hive.imetastoreclient.factory.class (HiveConf.ConfVars.IMETASTORE_CLIENT_FACTORY_CLASS)
-    // which the patched Hive.class reads to create the IMetaStoreClient via a factory.
-    all.put(
-        "hive.imetastoreclient.factory.class",
-        "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory");
     String region = properties.get(AWS_REGION);
     if (StringUtils.isNotBlank(region)) {
       all.put("aws.region", region);
