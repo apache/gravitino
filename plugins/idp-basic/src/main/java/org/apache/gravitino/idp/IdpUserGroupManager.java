@@ -205,8 +205,7 @@ public class IdpUserGroupManager implements Closeable {
    * @return The built-in IdP group.
    */
   public IdpGroup getGroup(String groupName) {
-    IdpGroupPO groupPO = GROUP_SERVICE.getIdpGroupByName(groupName);
-    return new IdpGroup(groupPO.getGroupName(), GROUP_SERVICE.listUsernamesByGroupName(groupName));
+    return GROUP_SERVICE.getIdpGroup(groupName);
   }
 
   /**

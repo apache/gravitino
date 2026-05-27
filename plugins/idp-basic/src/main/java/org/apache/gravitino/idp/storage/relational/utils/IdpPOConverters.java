@@ -23,7 +23,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
+import org.apache.gravitino.idp.storage.po.IdpGroupWithUsersPO;
 import org.apache.gravitino.idp.storage.po.IdpUserWithGroupsPO;
 import org.apache.gravitino.json.JsonUtils;
 
@@ -40,19 +42,30 @@ public final class IdpPOConverters {
   public static IdpUser fromIdpUserWithGroupsPO(IdpUserWithGroupsPO userPO) {
     Objects.requireNonNull(userPO, "userPO must not be null");
     return new IdpUser(
-        userPO.getName(), userPO.getPasswordHash(), parseGroupNames(userPO.getGroupNames()));
+        userPO.getName(), userPO.getPasswordHash(), parseJsonStringList(userPO.getGroupNames()));
+  }
+
+  /**
+   * Converts a joined group row to a built-in IdP group.
+   *
+   * @param groupPO The joined group row.
+   * @return The built-in IdP group.
+   */
+  public static IdpGroup fromIdpGroupWithUsersPO(IdpGroupWithUsersPO groupPO) {
+    Objects.requireNonNull(groupPO, "groupPO must not be null");
+    return new IdpGroup(groupPO.getName(), parseJsonStringList(groupPO.getUsernames()));
   }
 
   @SuppressWarnings("unchecked")
-  private static List<String> parseGroupNames(String groupNamesJson) {
-    if (StringUtils.isBlank(groupNamesJson)) {
+  private static List<String> parseJsonStringList(String json) {
+    if (StringUtils.isBlank(json)) {
       return Collections.emptyList();
     }
     try {
-      List<String> groupNames = JsonUtils.anyFieldMapper().readValue(groupNamesJson, List.class);
-      return groupNames.stream().filter(StringUtils::isNotBlank).collect(Collectors.toList());
+      List<String> values = JsonUtils.anyFieldMapper().readValue(json, List.class);
+      return values.stream().filter(StringUtils::isNotBlank).collect(Collectors.toList());
     } catch (Exception e) {
-      throw new RuntimeException("Failed to parse built-in IdP group names JSON", e);
+      throw new RuntimeException("Failed to parse built-in IdP JSON string list", e);
     }
   }
 }

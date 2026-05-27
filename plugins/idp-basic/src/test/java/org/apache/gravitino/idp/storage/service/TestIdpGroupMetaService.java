@@ -49,6 +49,33 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
+  void testGetIdpGroup(String type) throws IOException {
+    init(type);
+    insertUsers(2);
+    IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
+    runServiceCall(
+        () ->
+            groupMetaService.insertIdpGroup(
+                IdpGroupPO.builder()
+                    .withGroupId(1L)
+                    .withGroupName("engineering")
+                    .withCurrentVersion(1L)
+                    .withLastVersion(0L)
+                    .withDeletedAt(0L)
+                    .build()));
+    runServiceCall(
+        () ->
+            groupMetaService.changeGroupMembership(
+                "engineering", List.of("user1", "user2"), List.of()));
+
+    assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroup("missing"));
+    assertEquals("engineering", groupMetaService.getIdpGroup("engineering").name());
+    assertIterableEquals(
+        List.of("user1", "user2"), groupMetaService.getIdpGroup("engineering").usernames());
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
   void testInsertIdpGroup(String type) throws IOException {
     init(type);
     insertUsers(4);
