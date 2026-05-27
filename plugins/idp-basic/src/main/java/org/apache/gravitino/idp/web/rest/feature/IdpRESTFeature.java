@@ -19,7 +19,6 @@
 package org.apache.gravitino.idp.web.rest.feature;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.FeatureContext;
@@ -35,6 +34,8 @@ import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
 import org.apache.gravitino.idp.web.rest.IdpGroupOperations;
 import org.apache.gravitino.idp.web.rest.IdpUserOperations;
+import org.apache.gravitino.server.authentication.Authenticator;
+import org.apache.gravitino.server.authentication.ServerAuthenticator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,25 +54,15 @@ public class IdpRESTFeature implements Feature {
 
   public static final String IDP_REST_EXTENSION_PACKAGE = IdpRESTFeature.class.getPackageName();
 
-  public static final String BASIC_AUTHENTICATOR_CLASS =
-      BasicAuthenticator.class.getCanonicalName();
-
   /** Environment variable for the initial password of configured service admins. */
   public static final String INITIAL_ADMIN_PASSWORD_ENV = "GRAVITINO_INITIAL_ADMIN_PASSWORD";
-
-  public static void registerBasicAuthenticator(Config config) {
-    List<String> authenticators = new ArrayList<>(config.get(Configs.AUTHENTICATORS));
-    if (authenticators.contains(BASIC_AUTHENTICATOR_CLASS)) {
-      return;
-    }
-    authenticators.add(0, BASIC_AUTHENTICATOR_CLASS);
-    config.set(Configs.AUTHENTICATORS, authenticators);
-  }
 
   @Override
   public boolean configure(FeatureContext context) {
     GravitinoEnv env = GravitinoEnv.getInstance();
     Config config = env.config();
+    registerBasicAuthenticator(config);
+
     try {
       try (IdpUserGroupManager manager = new IdpUserGroupManager(config, env.idGenerator())) {
         manager.initializeConfiguredServiceAdmins(
@@ -89,5 +80,20 @@ public class IdpRESTFeature implements Feature {
     context.register(IdpGroupOperations.class);
     context.register(IdpAuthorizationFilter.class);
     return true;
+  }
+
+  private static void registerBasicAuthenticator(Config config) {
+    List<Authenticator> authenticators = ServerAuthenticator.getInstance().authenticators();
+    if (authenticators == null) {
+      return;
+    }
+    for (Authenticator authenticator : authenticators) {
+      if (authenticator instanceof BasicAuthenticator) {
+        return;
+      }
+    }
+    BasicAuthenticator basicAuthenticator = new BasicAuthenticator();
+    basicAuthenticator.initialize(config);
+    authenticators.add(0, basicAuthenticator);
   }
 }
