@@ -4,248 +4,84 @@ slug: "/getting-started/index"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Introduction
+In about 15 minutes, you can install Gravitino, start the server, and create your first metalake using the REST API. Java 17 is the only prerequisite.
 
-There are several options for getting started with Apache Gravitino.
+For a fuller demo environment that includes Apache Hive, Trino, Apache Spark, MySQL, and PostgreSQL, use the [Gravitino playground](../how-to-use-the-playground.md). For production deployment patterns including Docker and Kubernetes, see [Install Gravitino](../how-to-install.md) and the [Helm chart](../chart.md).
 
-<!--Docker option-->
-Installing and configuring Hive and Trino can be a little complex.
-If you are unfamiliar with the technologies, using Docker might be a good choice.
-There are pre-packaged containers for Gravitino, Apache Hive, Apache Hadoop,
-Trino, MySQL, PostgreSQL, and others.
-Check [installing Gravitino playground](./playground.md) for more details.
+## Prerequisites
 
-<!--Build from source-->
-This page guides you through the process of downloading and installing Gravitino
-from source.
+- Linux or macOS host.
+- Java 17 (any JVM on x86_64 or ARM64) with `java` on `PATH` or `JAVA_HOME` set. Confirm with `java -version`.
+- Port 8090 available on the host for the Gravitino REST API.
 
-1. [Prepare environment](#environment-preparation)
-   - Deploy and run Gravitino on [Amazon Web Service (AWS)](#aws)
-   - Deploy and run Gravitino on [Google Compute Platform (GCP)](#gcp)
-   - Run Gravitino on [your own machine](#local-workstation)
-1. [Install Gravitino](#install-gravitino)
-1. [Start Gravitino](#start-gravitino)
-1. [Install Apache Hive](#install-apache-hive)
-1. [Interact with Apache Gravitino API](#interact-with-apache-gravitino-api)
+## Download and Start Gravitino
 
-:::note
-If you want to access the instance remotely, be sure to read
-[Accessing Gravitino on AWS externally](./aws-remote-access.md).
-:::
-
-## Environment Preparation
-
-### AWS
-
-To work in an AWS environment, follow these steps:
-
-1. In the AWS console, launch a new instance.
-   Select `Ubuntu` as the operating system and `t2.xlarge` as the instance type.
-   Create a key pair named *Gravitino.pem* for SSH access and download it.
-   Allow HTTP and HTTPS traffic if you want to connect to the instance remotely.
-   Set the Elastic Block Store storage to 20GiB.
-   Leave all other settings at their defaults.
-   Other operating systems and instance types may work but have not been fully tested.
-
-1. Start the instance and connect to it via SSH using the downloaded `.pem` file:
-
-   ```shell
-   ssh ubuntu@<IP_address> -i ~/Downloads/Gravitino.pem
-   ```
-
-   **Note**: you may need to adjust the permissions on your `.pem` file using
-   `chmod 400` to enable SSH connections.
-
-1. Update the Ubuntu OS to ensure it's up-to-date:
-
-   ```shell
-   sudo apt update
-   sudo apt upgrade
-   ```
-
-   <!--TODO: need Red Hat commands?-->
-   You may need to reboot the instance for all changes to take effect.
-
-1. Install the Java Development Kit (JDK). Java 17 is supported.
-
-   ```shell
-   sudo apt install openjdk-<version>-jdk-headless
-   ```
-
-   Verify the Java version with:
-
-   ```shell
-   java -version
-   ```
-
-   You should see information about the OpenJDK version.
-
-### GCP
-
-To work on the GCP platform, follow these steps:
-
-1. In the Google Cloud console, launch a new instance.
-   Select `e2-standard-4` as the instance type and 20 GB for the boot disk size.
-   Allow HTTP and HTTPS traffic if you want to connect to the instance remotely.
-   Leave all other settings as their defaults.
-   Other operating systems and instance types may work, but are not fully tested.
-
-1. Start the instance and connect to it via the SSH-in-browser tool.
-
-1. Update the Debian OS to ensure it's up-to-date:
-
-   ```shell
-   sudo apt update
-   sudo apt upgrade
-   ```
-
-   You may need to reboot the instance for all changes to take effect.
-
-1. Install the Java Development Kit (JDK), Java 17 is supported.
-
-   ```shell
-   wget -O - https://apt.corretto.aws/corretto.key | sudo gpg --dearmor -o /usr/share/keyrings/corretto-keyring.gpg
-   echo "deb [signed-by=/usr/share/keyrings/corretto-keyring.gpg] https://apt.corretto.aws stable main" | sudo tee /etc/apt/sources.list.d/corretto.list
-   sudo apt-get update
-   sudo apt-get install -y java-<version>-amazon-corretto-jdk
-   ```
-
-   Verify the Java version with:
-
-   ```shell
-   java -version
-   ```
-
-   You should see information about the OpenJDK version.
-
-### Local Workstation
-
-To build and install Gravitino locally on a macOS or a Linux workstation,
-follow these steps:
-
-1. Install the Java Development Kit (JDK). Java 17 is supported.
-   This can be done using [sdkman](https://sdkman.io/), for example:
-
-   ```shell
-   sdk install java <version>
-   ```
-
-   You can also use different package managers to install JDK, for example,
-   [Homebrew](https://brew.sh/) on macOS, `apt` on Ubuntu/Debian, and
-   `yum` on CentOS/RedHat.
-
-## Install Gravitino
-
-Install Gravitino from the binary release packages or the container images.
-Follow [how-to-install](../how-to-install.md).
-
-Or you can install Gravitino from scratch.
-Follow [how-to-build](../how-to-build.md) and [how-to-install](../how-to-install.md).
-
-## Start Gravitino
-
-Start Gravitino using the `gravitino.sh` script:
+Download the latest Gravitino binary distribution from the [Apache Gravitino releases page](https://github.com/apache/gravitino/releases), then extract and enter the directory:
 
 ```shell
-<path-to-gravitino>/bin/gravitino.sh start
+tar -xzf gravitino-<version>-bin.tar.gz
+cd gravitino-<version>-bin
 ```
 
-## Install Apache Hive
+Start the server with the default configuration:
 
-If you already have Apache Hive and Apache Hadoop in your environment,
-you can skip this step and use the existing service with Gravitino.
-Or else, you can follow the [instructions](./hive.md) to install Apache Hive.
+```shell
+./bin/gravitino.sh start
+```
 
-## Interact with Apache Gravitino API
+Gravitino runs in the background and listens on port 8090.
 
-After deploying the Gravitino server, you can interact with it
-using the RESTful APIs to create and modify metadata.
+## Verify the Server Is Running
 
-:::tip
-The following examples use `localhost` as the host name.
-Revise based on your environment.
-:::
+Check the version endpoint:
 
-1. Create a Metalake:
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/version
+```
 
-   ```shell
-   curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-     -H "Content-Type: application/json" \
-     -d '{"name":"my-metalake","comment":"Test metalake"}' \
-     http://localhost:8090/api/metalakes
-   ```
+A successful response returns the Gravitino version, build date, and git commit. If you see a connection refused error, check the server logs in `logs/gravitino-server.log`.
 
-   Verify the MetaLake has been created:
+Open the Gravitino Web UI at `http://localhost:8090` for a graphical view of the server. The web UI is empty at first since no metalakes exist yet.
 
-   ```shell
-   curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     -H "Content-Type: application/json" \
-     http://localhost:8090/api/metalakes
+## Create Your First Metalake
 
-   curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     -H "Content-Type: application/json" \
-     http://localhost:8090/api/metalakes/my-metalake
-   ```
+A metalake is the top-level container for metadata in Gravitino. Each catalog you add later lives inside a metalake. Create one through the REST API:
 
-   Note that if you are requesting a Metalake that doesn't exist, you'll get a
-   `NoSuchMetalakeException` error.
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"demo_metalake","comment":"Demo metalake for quickstart"}' \
+  http://localhost:8090/api/metalakes
+```
 
-   ```shell
-   curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     -H "Content-Type: application/json" \
-     http://localhost:8090/api/metalakes/none
-   ```
+List all metalakes to confirm the result:
 
-1. Create a catalog in Hive:
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/metalakes
+```
 
-   First, list the current catalogs to verify that no catalogs exist.
+The response includes `demo_metalake` alongside its audit fields. Refresh the Web UI to see the same metalake there.
 
-   ```shell
-   curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     -H "Content-Type: application/json" \
-     http://localhost:8090/api/metalakes/my-metalake/catalogs
-   ```
+## Add a Catalog
 
-   Create a new Hive catalog.
+A metalake holds one or more catalogs, each connecting Gravitino to a specific metadata source. The catalog setup depends on which source you are federating. See the catalog documentation for setup details:
 
-   ```shell
-   curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-     -H "Content-Type: application/json" \
-     -d '{"name":"my-catalog","comment":"Test catalog", "type":"RELATIONAL", "provider":"hive", "properties":{"metastore.uris":"thrift://localhost:9083"}}' \
-     http://localhost:8090/api/metalakes/my-metalake/catalogs
-   ```
+- [Apache Iceberg catalog](../lakehouse-iceberg-catalog.md) for Iceberg tables in object storage.
+- [Apache Hive catalog](../apache-hive-catalog.md) for Hive tables managed through an existing Hive Metastore.
+- [JDBC catalogs](../jdbc-mysql-catalog.md) for relational databases such as MySQL, PostgreSQL, and others.
+- [Fileset catalog](../fileset-catalog.md) for raw file collections in HDFS, S3, GCS, OSS, or ADLS.
+- [Apache Kafka catalog](../kafka-catalog.md) for Kafka topic metadata.
+- [Model catalog](../model-catalog.md) for ML model metadata.
 
-   Verify that the catalog has been created:
+## Where to Go Next
 
-   ```shell
-   curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-     -H "Content-Type: application/json" \
-     http://localhost:8090/api/metalakes/my-metalake/catalogs
-   ```
-
-   :::tip
-   The `metastore.uris` property used for the Hive catalog has to
-   be adapted to your environment.
-   :::
-
-## Next Steps
-
-- Delve deeper into the [documentation](https://gravitino.apache.org/docs/latest)
-  for advanced features and configuration options.
-
-- Bookmark [Gravitino Website](https://gravitino.apache.org) for updates,
-   latest releases, new features, optimizations, and security enhancements.
-
-- Read our [blogs](https://gravitino.apache.org/blog)
-
-- Join the Gravitino community forums to connect with developers and other users,
-  for experience sharing and seeking help if needed.
-  Questions and comments are all welcome.
-
-  - Join [Gravitino Slack channel](https://the-asf.slack.com)
-  - Explore the GitHub repository for [issues](https://github.com/apache/gravitino/issues)
-    or [pull requests](https://github.com/apache/gravitino/pulls),
-    and pick something you are interested in working on.
+- Read the [Overview](../overview.md) for architecture and the broader capability set.
+- Use the [Gravitino playground](../how-to-use-the-playground.md) for end-to-end demos including federated queries across catalogs.
+- Configure [authentication](../security/how-to-authenticate.md) and [access control](../security/access-control.md) before exposing Gravitino beyond a local trial.
+- Set up the [Iceberg REST catalog service](../iceberg-rest-service.md) to let any IRC-compatible engine query through Gravitino.
+- Manage metadata programmatically with the [Java client](../how-to-use-gravitino-client.md) or [Python client](../how-to-use-python-client.md).
 
 <img src="https://analytics.apache.org/matomo.php?idsite=62&rec=1&bots=1&action_name=GettingStarted" alt="" />
 

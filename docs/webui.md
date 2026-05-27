@@ -14,7 +14,7 @@ This document primarily outlines how users can manage metadata within Apache Gra
 
 Integrate [OAuth settings](security/security.md) to view, add, modify, and delete metalakes, create catalogs, and view catalogs, schemas, and tables, among other functions.
 
-[Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#local-workstation) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`, by default is [http://localhost:8090](http://localhost:8090).
+[Build](./how-to-build.md#quick-start) and [deploy](./getting-started/index.md#download-and-start-gravitino) the Gravitino Web UI and open it in a browser at `http://<gravitino-host>:<gravitino-port>`, by default is [http://localhost:8090](http://localhost:8090).
 
 ## Initial Page
 
@@ -75,7 +75,7 @@ At the top-right, there is an icon button that takes you to the login page when 
 
 #### Create Metalake
 
-See the [API reference](./getting-started/index.md#interact-with-apache-gravitino-api) for the underlying REST call.
+See the [API reference](./getting-started/index.md#create-your-first-metalake) for the underlying REST call.
 
 On the homepage, clicking on the `CREATE METALAKE` button displays a dialog to create a metalake.
 
