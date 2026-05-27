@@ -69,15 +69,15 @@ cd gravitino-playground
 
 1. Log in to the Gravitino playground Trino Docker container:
 
-```shell
-docker exec -it playground-trino bash
-```
+   ```shell
+   docker exec -it playground-trino bash
+   ```
 
 2. Open the Trino CLI in the container.
 
-```shell
-trino@container_id:/$ trino
-```
+   ```shell
+   trino@container_id:/$ trino
+   ```
 
 ## Jupyter Notebook
 
@@ -91,15 +91,15 @@ trino@container_id:/$ trino
 
 1. Log in to the Gravitino playground Spark Docker container:
 
-```shell
-docker exec -it playground-spark bash
-```
+   ```shell
+   docker exec -it playground-spark bash
+   ```
 
 2. Open the Spark SQL client in the container.
 
-```shell
-spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
-```
+   ```shell
+   spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
+   ```
 
 ## Monitor Gravitino
 
@@ -188,30 +188,30 @@ Consider generating data with SparkSQL and then querying this data using Trino. 
 
 1. Login Spark container and execute the SQLs:
 
-```sql
-// using Hive catalog to create Hive table
-USE catalog_hive;
-CREATE DATABASE product;
-USE product;
+   ```sql
+   // using Hive catalog to create Hive table
+   USE catalog_hive;
+   CREATE DATABASE product;
+   USE product;
 
-CREATE TABLE IF NOT EXISTS employees (
-    id INT,
-    name STRING,
-    age INT
-)
-PARTITIONED BY (department STRING)
-STORED AS PARQUET;
-DESC TABLE EXTENDED employees;
+   CREATE TABLE IF NOT EXISTS employees (
+       id INT,
+       name STRING,
+       age INT
+   )
+   PARTITIONED BY (department STRING)
+   STORED AS PARQUET;
+   DESC TABLE EXTENDED employees;
 
-INSERT OVERWRITE TABLE employees PARTITION(department='Engineering') VALUES (1, 'John Doe', 30), (2, 'Jane Smith', 28);
-INSERT OVERWRITE TABLE employees PARTITION(department='Marketing') VALUES (3, 'Mike Brown', 32);
-```
+   INSERT OVERWRITE TABLE employees PARTITION(department='Engineering') VALUES (1, 'John Doe', 30), (2, 'Jane Smith', 28);
+   INSERT OVERWRITE TABLE employees PARTITION(department='Marketing') VALUES (3, 'Mike Brown', 32);
+   ```
 
 2. Login Trino container and execute SQLs:
 
-```sql
-SELECT * FROM catalog_hive.product.employees WHERE department = 'Engineering';
-```
+   ```sql
+   SELECT * FROM catalog_hive.product.employees WHERE department = 'Engineering';
+   ```
 
 The demo is located in the `jupyter` folder, and you can open the `gravitino-spark-trino-example.ipynb`
 demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
@@ -236,40 +236,40 @@ Please note that `catalog_rest` in SparkSQL and `catalog_iceberg` in Gravitino a
 
 1. Login Spark container and execute the steps.
 
-```shell
-docker exec -it playground-spark bash
-```
+   ```shell
+   docker exec -it playground-spark bash
+   ```
 
-```shell
-spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
-```
+   ```shell
+   spark@container_id:/$ cd /opt/spark && /bin/bash bin/spark-sql
+   ```
 
-```SQL
-use catalog_rest;
-create database sales;
-use sales;
-create table customers (customer_id int, customer_name varchar(100), customer_email varchar(100));
-describe extended customers;
-insert into customers (customer_id, customer_name, customer_email) values (11,'Rory Brown','rory@123.com');
-insert into customers (customer_id, customer_name, customer_email) values (12,'Jerry Washington','jerry@dt.com');
-```
+   ```SQL
+   use catalog_rest;
+   create database sales;
+   use sales;
+   create table customers (customer_id int, customer_name varchar(100), customer_email varchar(100));
+   describe extended customers;
+   insert into customers (customer_id, customer_name, customer_email) values (11,'Rory Brown','rory@123.com');
+   insert into customers (customer_id, customer_name, customer_email) values (12,'Jerry Washington','jerry@dt.com');
+   ```
 
 2. Login Trino container and execute the steps.
-Get all the customers from both the Hive and Iceberg tables.
+   Get all the customers from both the Hive and Iceberg tables.
 
-```shell
-docker exec -it playground-trino bash
-```
+   ```shell
+   docker exec -it playground-trino bash
+   ```
 
-```shell
-trino@container_id:/$ trino
-```
+   ```shell
+   trino@container_id:/$ trino
+   ```
 
-```SQL
-select * from catalog_hive.sales.customers
-union
-select * from catalog_iceberg.sales.customers;
-```
+   ```SQL
+   select * from catalog_hive.sales.customers
+   union
+   select * from catalog_iceberg.sales.customers;
+   ```
 
 The demo is located in the `jupyter` folder, and you can open the `gravitino-spark-trino-example.ipynb`
 demo via Jupyter Notebook by [http://localhost:18888](http://localhost:18888).
