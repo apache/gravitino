@@ -49,9 +49,11 @@ import Icons from '@/components/Icons'
 import Policies from '@/components/PolicyTag'
 import TableActions from '@/components/TableActions'
 import PropertiesContent from '@/components/PropertiesContent'
+import buildSchemaColumns from './SharedSchemaColumns'
 import {
   getCatalogDetails,
   fetchSchemas,
+  deleteSchema,
   deleteFileset,
   deleteModel,
   deleteTopic,
@@ -81,6 +83,8 @@ const { Search } = Input
 
 export default function SchemaDetailsPage() {
   const [openSchema, setOpenSchema] = useState(false)
+  const [editSchemaName, setEditSchemaName] = useState('')
+  const [editSchemaInit, setEditSchemaInit] = useState(true)
   const [openTable, setOpenTable] = useState(false)
   const [openFileset, setOpenFileset] = useState(false)
   const [openTopic, setOpenTopic] = useState(false)
@@ -289,6 +293,28 @@ export default function SchemaDetailsPage() {
     setTabKey(key)
   }
 
+  const showDeleteSchemaConfirm = (modal, name) => {
+    modal.confirm({
+      title: `Are you sure to delete the schema ${name}?`,
+      icon: <ExclamationCircleFilled />,
+      okText: 'Delete',
+      okType: 'danger',
+      cancelText: 'Cancel',
+      onOk: async () => {
+        await dispatch(deleteSchema({ metalake: currentMetalake, catalog, catalogType, schema: name }))
+        const [err, res] = await to(
+          dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
+        )
+        if (!err && res) {
+          const { schemas = [] } = res.payload || {}
+          const nextSubSchemas = schemas.map(item => ({ ...item, name: item.name, key: item.name, title: item.name }))
+          setSubSchemas(nextSubSchemas)
+        }
+        treeRef.current.onLoadData({ key: catalog, nodeType: 'catalog', inUse: 'true' }, true)
+      }
+    })
+  }
+
   const tableData = [...store.tableData]
     .filter(c => {
       if (search === '') return true
@@ -370,6 +396,8 @@ export default function SchemaDetailsPage() {
   }
 
   const handleEditSchema = () => {
+    setEditSchemaName(schema)
+    setEditSchemaInit(true)
     setOpenSchema(true)
   }
 
@@ -589,27 +617,22 @@ export default function SchemaDetailsPage() {
     [currentMetalake, catalogType, catalog, schema, catalogData?.provider]
   )
 
-  const subSchemaColumns = useMemo(
-    () => [
-      {
-        title: 'Schema Name',
-        dataIndex: 'name',
-        key: 'name',
-        width: 300,
-        ellipsis: true,
-        sorter: (a, b) => a?.name.toLowerCase().localeCompare(b?.name.toLowerCase()),
-        render: name => (
-          <Link
-            data-refer={`subschema-link-${name}`}
-            href={`/catalogs?metalake=${encodeURIComponent(currentMetalake)}&catalogType=${catalogType}&catalog=${encodeURIComponent(catalog)}&schema=${encodeURIComponent(name)}`}
-          >
-            {name}
-          </Link>
-        )
-      }
-    ],
-    [currentMetalake, catalogType, catalog]
-  )
+  const subSchemaColumns = useMemo(() => {
+    return buildSchemaColumns({
+      currentMetalake,
+      catalog,
+      catalogType,
+      anthEnable,
+      provider: catalogData?.provider,
+      handleEditSchema: name => {
+        setEditSchemaName(name)
+        setEditSchemaInit(false)
+        setOpenSchema(true)
+      },
+      showDeleteConfirm: name => showDeleteSchemaConfirm(Modal, name),
+      handleSetOwner
+    })
+  }, [currentMetalake, catalog, catalogType, anthEnable, catalogData?.provider])
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
     return { columns, minWidth: 100 }
@@ -866,8 +889,8 @@ export default function SchemaDetailsPage() {
           catalogType={catalogType}
           provider={catalogData?.provider}
           locationProviders={catalogData?.properties?.['filesystem-providers']?.split(',') || []}
-          editSchema={schema}
-          init={true}
+          editSchema={editSchemaName || schema}
+          init={editSchemaInit}
         />
       )}
       {openOwner && (
