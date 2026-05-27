@@ -45,6 +45,8 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NoSuchUserException.class, () -> userMetaService.getIdpUserByUsername("missing"));
     assertEquals("user1", userMetaService.getIdpUserByUsername("user1").getUsername());
+    assertEquals("user1", userMetaService.getIdpUser("user1").name());
+    assertThrows(NoSuchUserException.class, () -> userMetaService.getIdpUser("missing"));
   }
 
   @ParameterizedTest

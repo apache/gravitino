@@ -19,10 +19,37 @@
 
 package org.apache.gravitino.idp.storage.mapper.provider.h2;
 
+import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
+import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserMetaBaseSQLProvider;
+import org.apache.ibatis.annotations.Param;
 
 /** SQL provider for IdP user metadata statements on H2 backends. */
 public class IdpUserMetaH2Provider extends IdpUserMetaBaseSQLProvider {
+
+  @Override
+  public String selectIdpUserWithGroups(@Param("username") String username) {
+    return "SELECT u.user_name as name,"
+        + " '['"
+        + " || COALESCE(GROUP_CONCAT("
+        + " CASE"
+        + " WHEN g.group_name IS NOT NULL AND g.group_name <> ''"
+        + " THEN '\"' || g.group_name || '\"'"
+        + " ELSE NULL"
+        + " END), '')"
+        + " || ']' as groupNames"
+        + " FROM "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " u LEFT JOIN "
+        + IdpUserGroupRelMapper.IDP_USER_GROUP_REL_TABLE_NAME
+        + " r ON r.user_id = u.user_id AND r.deleted_at = 0"
+        + " LEFT JOIN "
+        + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
+        + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
+        + " WHERE u.user_name = #{username} AND u.deleted_at = 0"
+        + " GROUP BY u.user_id, u.user_name";
+  }
 
   @Override
   protected String currentTimeMillisExpression() {

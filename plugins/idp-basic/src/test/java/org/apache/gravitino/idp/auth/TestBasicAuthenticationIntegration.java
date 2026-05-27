@@ -32,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -43,6 +44,7 @@ import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
+import org.apache.gravitino.idp.IdpUserGroupManagerTestHelper;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -74,17 +76,22 @@ class TestBasicAuthenticationIntegration {
     config.set(STORE_DELETE_AFTER_TIME, 20 * 60 * 1000L);
     config.set(CACHE_ENABLED, false);
 
-    authenticator = new BasicAuthenticator();
-    authenticator.initialize(config);
-    userGroupManager = new IdpUserGroupManager(config, RandomIdGenerator.INSTANCE);
+    userGroupManager = IdpUserGroupManagerTestHelper.newManager(config, RandomIdGenerator.INSTANCE);
     userGroupManager.addUser(USER, PASSWORD);
+
+    authenticator = new BasicAuthenticator();
+    Field userGroupManagerField = BasicAuthenticator.class.getDeclaredField("userGroupManager");
+    userGroupManagerField.setAccessible(true);
+    userGroupManagerField.set(authenticator, userGroupManager);
   }
 
   @AfterAll
   static void tearDown() throws IOException {
     authenticator = null;
-    userGroupManager.close();
-    userGroupManager = null;
+    if (userGroupManager != null) {
+      userGroupManager.close();
+      userGroupManager = null;
+    }
     if (h2Path != null && Files.exists(h2Path)) {
       try (Stream<Path> paths = Files.walk(h2Path)) {
         paths

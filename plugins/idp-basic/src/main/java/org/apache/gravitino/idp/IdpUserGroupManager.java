@@ -69,29 +69,17 @@ public class IdpUserGroupManager implements Closeable {
    * @return The singleton manager instance.
    */
   public static IdpUserGroupManager getInstance(Config config, IdGenerator idGenerator) {
-    IdpUserGroupManager local = instance;
-    if (local == null) {
+    if (instance == null) {
       synchronized (IdpUserGroupManager.class) {
-        local = instance;
-        if (local == null) {
-          local = new IdpUserGroupManager(config, idGenerator);
-          instance = local;
+        if (instance == null) {
+          instance = new IdpUserGroupManager(config, idGenerator);
         }
       }
     }
-    return local;
+    return instance;
   }
 
-  /**
-   * Creates a built-in IdP user and group manager.
-   *
-   * <p>Prefer {@link #getInstance(Config, IdGenerator)} in server code so REST, authentication, and
-   * startup initialization share one instance.
-   *
-   * @param config The server configuration.
-   * @param idGenerator The id generator.
-   */
-  public IdpUserGroupManager(Config config, IdGenerator idGenerator) {
+  private IdpUserGroupManager(Config config, IdGenerator idGenerator) {
     this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
     this.passwordHasher = PasswordHasherFactory.create();
@@ -160,8 +148,7 @@ public class IdpUserGroupManager implements Closeable {
    * @return The built-in IdP user.
    */
   public IdpUser getUser(String username) {
-    IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
-    return new IdpUser(userPO.getUsername(), USER_SERVICE.listGroupNamesByUsername(username));
+    return USER_SERVICE.getIdpUser(username);
   }
 
   public IdpUser authenticate(String username, String password) {
@@ -171,7 +158,7 @@ public class IdpUserGroupManager implements Closeable {
         throw new UnauthorizedException(
             "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
       }
-      return new IdpUser(username, USER_SERVICE.listGroupNamesByUsername(username));
+      return getUser(username);
     } catch (NoSuchUserException e) {
       throw new UnauthorizedException(
           "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());

@@ -77,13 +77,15 @@ public class TestIdpUserGroupManager {
   public static void setUp() throws Exception {
     h2Path = Files.createTempDirectory("gravitino_idp_manager_h2_");
     config = createH2Config(h2Path);
-    manager = new IdpUserGroupManager(config, RandomIdGenerator.INSTANCE);
+    manager = IdpUserGroupManagerTestHelper.newManager(config, RandomIdGenerator.INSTANCE);
   }
 
   @AfterAll
   public static void tearDown() throws IOException {
-    manager.close();
-    manager = null;
+    if (manager != null) {
+      manager.close();
+      manager = null;
+    }
 
     if (h2Path != null && Files.exists(h2Path)) {
       try (Stream<Path> paths = Files.walk(h2Path)) {

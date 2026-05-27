@@ -120,7 +120,7 @@ public class IdpRestApiIT {
       gravitinoServer.start();
       String apiBase = String.format("http://localhost:%d/api", httpPort);
       idpUserGroupManager =
-          new IdpUserGroupManager(serverConfig, GravitinoEnv.getInstance().idGenerator());
+          IdpUserGroupManager.getInstance(serverConfig, GravitinoEnv.getInstance().idGenerator());
 
       assertEquals(200, get(apiBase, "/version", ADMIN, ADMIN_PASSWORD).statusCode());
       // No Authorization: simple authenticator allows anonymous access; IdP filter rejects.
