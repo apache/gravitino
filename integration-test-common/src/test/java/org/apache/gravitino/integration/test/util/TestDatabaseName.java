@@ -63,6 +63,15 @@ public enum TestDatabaseName {
   /** Represents the MySQL database used for testing catalog credential integration. */
   MYSQL_CATALOG_CREDENTIAL_IT,
 
+  /** Represents the PostgreSQL database used for testing catalog credential integration. */
+  PG_CATALOG_CREDENTIAL_IT {
+    /** PostgreSQL only accept lowercase database name */
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  },
+
   PG_JDBC_BACKEND,
 
   /** Represents the PostgreSQL database for CatalogPostgreSqlIT. */

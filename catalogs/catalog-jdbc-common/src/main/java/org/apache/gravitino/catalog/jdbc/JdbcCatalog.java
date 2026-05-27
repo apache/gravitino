@@ -175,7 +175,9 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
 
     String jdbcUser = properties.get(JdbcConfig.USERNAME.getKey());
     String jdbcPassword = properties.get(JdbcConfig.PASSWORD.getKey());
-    if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {
+    // Register provider when user is configured; allow empty-string password (e.g. StarRocks
+    // default). Only skip when password is absent (null) entirely without a user.
+    if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
       properties.put(CredentialConstants.CREDENTIAL_PROVIDERS, JdbcCredential.JDBC_CREDENTIAL_TYPE);
     }
 
