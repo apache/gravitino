@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.idp.auth;
+package org.apache.gravitino.idp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -174,11 +174,12 @@ class TestServiceAdminInitializer {
   }
 
   private void initializeWithoutPayload() throws IOException {
-    ServiceAdminInitializer.initialize(config, userMetaService, passwordHasher, idGenerator, "");
+    IdpUserGroupManager.initializeConfiguredServiceAdmins(
+        config, userMetaService, passwordHasher, idGenerator, "");
   }
 
   private void initializeWithPayload(String initialAdminPasswords) throws IOException {
-    ServiceAdminInitializer.initialize(
+    IdpUserGroupManager.initializeConfiguredServiceAdmins(
         config, userMetaService, passwordHasher, idGenerator, initialAdminPasswords);
   }
 }
