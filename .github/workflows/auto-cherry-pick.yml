@@ -10,8 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     name: Detect cherry-pick labels from merged PR
     outputs:
-      branch-1-0: ${{ steps.check-labels.outputs.branch-1-0 }}
-      branch-1-1: ${{ steps.check-labels.outputs.branch-1-1 }}
       branch-1-2: ${{ steps.check-labels.outputs.branch-1-2 }}
       branch-1-3: ${{ steps.check-labels.outputs.branch-1-3 }}
       commit-sha: ${{ steps.get-commit.outputs.commit-sha }}
@@ -66,18 +64,6 @@ jobs:
           echo "PR #$PR_NUMBER labels: $LABELS"
           
           # Check for each branch label
-          if echo "$LABELS" | grep -q "branch-1.0"; then
-            echo "branch-1-0=true" >> $GITHUB_OUTPUT
-          else
-            echo "branch-1-0=false" >> $GITHUB_OUTPUT
-          fi
-          
-          if echo "$LABELS" | grep -q "branch-1.1"; then
-            echo "branch-1-1=true" >> $GITHUB_OUTPUT
-          else
-            echo "branch-1-1=false" >> $GITHUB_OUTPUT
-          fi
-          
           if echo "$LABELS" | grep -q "branch-1.2"; then
             echo "branch-1-2=true" >> $GITHUB_OUTPUT
           else
@@ -89,26 +75,6 @@ jobs:
           else
             echo "branch-1-3=false" >> $GITHUB_OUTPUT
           fi
-
-  cherry-pick-branch-1-0:
-    needs: detect-cherry-pick-labels
-    if: needs.detect-cherry-pick-labels.outputs.branch-1-0 == 'true'
-    uses: ./.github/workflows/cherry-pick-branch.yml
-    with:
-      target-branch: branch-1.0
-      commit-sha: ${{ needs.detect-cherry-pick-labels.outputs.commit-sha }}
-      commit-message: ${{ needs.detect-cherry-pick-labels.outputs.commit-message }}
-    secrets: inherit
-
-  cherry-pick-branch-1-1:
-    needs: detect-cherry-pick-labels
-    if: needs.detect-cherry-pick-labels.outputs.branch-1-1 == 'true'
-    uses: ./.github/workflows/cherry-pick-branch.yml
-    with:
-      target-branch: branch-1.1
-      commit-sha: ${{ needs.detect-cherry-pick-labels.outputs.commit-sha }}
-      commit-message: ${{ needs.detect-cherry-pick-labels.outputs.commit-message }}
-    secrets: inherit
 
   cherry-pick-branch-1-2:
     needs: detect-cherry-pick-labels
