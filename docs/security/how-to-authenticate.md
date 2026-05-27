@@ -50,17 +50,13 @@ in the relational entity store.
 
 To enable Basic mode:
 
-- Include the `idp-basic` plugin jar on the server classpath (included in the official
-  distribution).
 - Set `gravitino.authenticators` to `basic`.
-- Set `gravitino.entity.store` to `relational` and configure the relational JDBC backend.
-- Set `gravitino.server.rest.extensionPackages` to `org.apache.gravitino.idp.web.rest.feature`.
 - Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
   the built-in IDP.
 - On the first startup, if any configured service admin does not yet have a password, set the
-  `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable to a JSON array of `username:password`
-  strings before starting Gravitino. Each password must be 12 to 64 characters long, and usernames
-  must not contain `:`.
+  `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable to the initial password (12 to 64
+  characters) before starting Gravitino. The same password is applied to every configured service
+  admin that does not yet exist in the built-in IDP.
 
 For the client side, enable Basic mode with the following code:
 
@@ -379,7 +375,7 @@ On the first startup, if the `admin` service admin does not yet have a password 
 set initial passwords before starting the server:
 
 ```bash
-export GRAVITINO_INITIAL_ADMIN_PASSWORD='["admin:YourSecureGravitinoPassword"]'
+export GRAVITINO_INITIAL_ADMIN_PASSWORD='YourSecureGravitinoPassword'
 ./bin/start-gravitino.sh
 ```
 

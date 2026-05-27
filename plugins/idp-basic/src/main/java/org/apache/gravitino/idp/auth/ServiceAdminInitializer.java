@@ -19,12 +19,9 @@
 
 package org.apache.gravitino.idp.auth;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -39,7 +36,6 @@ import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
-import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 
@@ -124,56 +120,16 @@ public final class ServiceAdminInitializer {
   }
 
   private static Map<String, String> parseInitialAdminPasswords(
-      List<String> serviceAdmins, @Nullable String initialAdminPasswords) {
-    if (StringUtils.isBlank(initialAdminPasswords)) {
+      List<String> serviceAdmins, @Nullable String initialAdminPassword) {
+    if (StringUtils.isBlank(initialAdminPassword)) {
       return ImmutableMap.of();
     }
 
-    final List<String> entries;
-    try {
-      entries =
-          JsonUtils.objectMapper()
-              .readValue(initialAdminPasswords, new TypeReference<List<String>>() {});
-    } catch (JsonProcessingException e) {
-      throw new IllegalArgumentException(
-          INITIAL_ADMIN_PASSWORD_ENV + " must be a JSON array of 'username:password' strings", e);
+    IdpCredentialValidator.validatePassword(initialAdminPassword);
+    ImmutableMap.Builder<String, String> passwordsByAdmin = ImmutableMap.builder();
+    for (String serviceAdmin : serviceAdmins) {
+      passwordsByAdmin.put(serviceAdmin, initialAdminPassword);
     }
-
-    Map<String, String> passwordsByAdmin = new LinkedHashMap<>();
-    for (String entry : entries) {
-      putInitialPassword(serviceAdmins, passwordsByAdmin, entry);
-    }
-    return ImmutableMap.copyOf(passwordsByAdmin);
-  }
-
-  private static void putInitialPassword(
-      List<String> serviceAdmins, Map<String, String> passwordsByAdmin, String entry) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(entry),
-        "%s must not contain blank entries",
-        INITIAL_ADMIN_PASSWORD_ENV);
-
-    String[] credentials = entry.split(":", 2);
-    Preconditions.checkArgument(
-        credentials.length == 2,
-        "%s entry '%s' must use the format username:password",
-        INITIAL_ADMIN_PASSWORD_ENV,
-        entry);
-
-    String username = credentials[0];
-    String password = credentials[1];
-    IdpCredentialValidator.validateUsername(username);
-    IdpCredentialValidator.validatePassword(password);
-    Preconditions.checkArgument(
-        serviceAdmins.contains(username),
-        "%s entry '%s' is not a configured service admin",
-        INITIAL_ADMIN_PASSWORD_ENV,
-        username);
-    Preconditions.checkArgument(
-        !passwordsByAdmin.containsKey(username),
-        "%s contains duplicate entries for service admin %s",
-        INITIAL_ADMIN_PASSWORD_ENV,
-        username);
-    passwordsByAdmin.put(username, password);
+    return passwordsByAdmin.build();
   }
 }

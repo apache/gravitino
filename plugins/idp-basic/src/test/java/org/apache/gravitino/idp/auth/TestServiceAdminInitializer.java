@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.List;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
@@ -68,7 +69,7 @@ class TestServiceAdminInitializer {
     when(passwordHasher.hash("Passw0rd-For-Admin1")).thenReturn("hashed-password");
     when(idGenerator.nextId()).thenReturn(42L);
 
-    initializeWithPayload("[\"admin1:Passw0rd-For-Admin1\",\"admin2:Passw0rd-For-Admin2\"]");
+    initializeWithPayload("Passw0rd-For-Admin1");
 
     ArgumentCaptor<IdpUserPO> userCaptor = ArgumentCaptor.forClass(IdpUserPO.class);
     verify(userMetaService).insertIdpUser(userCaptor.capture());
@@ -83,14 +84,14 @@ class TestServiceAdminInitializer {
   @Test
   void testInitializeSkipsWhenBasicAuthenticatorDisabledEvenIfPayloadInvalid() throws IOException {
     loadConfig("simple", "admin1");
-    initializeWithPayload("not-json");
+    initializeWithPayload("short");
     verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
   }
 
   @Test
   void testInitializeSkipsWhenNoServiceAdminsConfigured() throws IOException {
     loadConfig("basic", "");
-    initializeWithPayload("[\"admin1:Passw0rd-For-Admin1\"]");
+    initializeWithPayload("Passw0rd-For-Admin1");
     verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
   }
 
@@ -136,22 +137,30 @@ class TestServiceAdminInitializer {
     verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
   }
 
+  @Test
+  void testInitializeUsesSamePasswordForAllMissingServiceAdmins() throws IOException {
+    loadConfig("basic", "admin1,admin2");
+    when(userMetaService.getIdpUserByUsername("admin1"))
+        .thenThrow(new NotFoundException("IdP user not found: %s", "admin1"));
+    when(userMetaService.getIdpUserByUsername("admin2"))
+        .thenThrow(new NotFoundException("IdP user not found: %s", "admin2"));
+    when(passwordHasher.hash("Passw0rd-For-Admin1")).thenReturn("hashed-password");
+    when(idGenerator.nextId()).thenReturn(42L, 43L);
+
+    initializeWithPayload("Passw0rd-For-Admin1");
+
+    ArgumentCaptor<IdpUserPO> userCaptor = ArgumentCaptor.forClass(IdpUserPO.class);
+    verify(userMetaService, Mockito.times(2)).insertIdpUser(userCaptor.capture());
+    assertEquals(
+        List.of("admin1", "admin2"),
+        userCaptor.getAllValues().stream().map(IdpUserPO::getUsername).toList());
+    verify(passwordHasher, Mockito.times(2)).hash("Passw0rd-For-Admin1");
+  }
+
   private static Stream<Arguments> invalidPasswordPayloads() {
     return Stream.of(
         Arguments.of(
-            "not-json",
-            "GRAVITINO_INITIAL_ADMIN_PASSWORD must be a JSON array of 'username:password' strings"),
-        Arguments.of(
-            "[\"admin1\"]",
-            "GRAVITINO_INITIAL_ADMIN_PASSWORD entry 'admin1' must use the format username:password"),
-        Arguments.of(
-            "[\"other:Passw0rd-For-Other\"]",
-            "GRAVITINO_INITIAL_ADMIN_PASSWORD entry 'other' is not a configured service admin"),
-        Arguments.of(
-            "[\"admin1:Passw0rd-For-Admin1\",\"admin1:Passw0rd-For-Admin1-Another\"]",
-            "GRAVITINO_INITIAL_ADMIN_PASSWORD contains duplicate entries for service admin admin1"),
-        Arguments.of(
-            "[\"admin1:short\"]",
+            "short",
             "Password must be at least 12 characters long and at most 64 characters long"));
   }
 

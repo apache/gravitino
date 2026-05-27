@@ -88,7 +88,7 @@ public class IdpRestApiIT extends BaseIT {
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    setEnv(INITIAL_ADMIN_PASSWORD_ENV, String.format("[\"%s:%s\"]", ADMIN, ADMIN_PASSWORD));
+    setEnv(INITIAL_ADMIN_PASSWORD_ENV, ADMIN_PASSWORD);
 
     int httpPort = RESTUtils.findAvailablePort(5000, 6000);
     h2Path = Files.createTempDirectory("gravitino_idp_rest_api_it_");
