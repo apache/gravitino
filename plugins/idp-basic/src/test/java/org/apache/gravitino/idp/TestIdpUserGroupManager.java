@@ -217,14 +217,6 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testInitializeConfiguredServiceAdminsSkipsWhenBasicAuthenticatorDisabled()
-      throws IOException {
-    loadServiceAdminConfig("simple", "initAdminSkipAuth1");
-    manager.initializeConfiguredServiceAdmins(config, "short");
-    Assertions.assertThrows(NoSuchUserException.class, () -> manager.getUser("initAdminSkipAuth1"));
-  }
-
-  @Test
   public void testInitializeConfiguredServiceAdminsSkipsWhenNoServiceAdminsConfigured()
       throws IOException {
     loadServiceAdminConfig(BASIC_AUTHENTICATOR_CLASS, "");

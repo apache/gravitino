@@ -31,7 +31,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
-import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
@@ -51,9 +50,6 @@ import org.apache.gravitino.storage.relational.utils.POConverters;
  * org.apache.gravitino.authorization.UserGroupManager} but operates on global IdP metadata.
  */
 public class IdpUserGroupManager implements Closeable {
-
-  private static final String BASIC_AUTHENTICATOR_CLASS_NAME =
-      BasicAuthenticator.class.getCanonicalName();
 
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
@@ -105,10 +101,6 @@ public class IdpUserGroupManager implements Closeable {
 
   public void initializeConfiguredServiceAdmins(Config config, String initialAdminPassword)
       throws IOException {
-    if (!basicAuthenticatorEnabled(config)) {
-      return;
-    }
-
     List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
     if (serviceAdmins == null || serviceAdmins.isEmpty()) {
       return;
@@ -137,11 +129,6 @@ public class IdpUserGroupManager implements Closeable {
     for (String serviceAdmin : missingServiceAdmins) {
       USER_SERVICE.insertIdpUser(newUserPO(serviceAdmin, passwordHash));
     }
-  }
-
-  public static boolean basicAuthenticatorEnabled(Config config) {
-    List<String> authenticators = config.get(Configs.AUTHENTICATORS);
-    return authenticators != null && authenticators.contains(BASIC_AUTHENTICATOR_CLASS_NAME);
   }
 
   /**
