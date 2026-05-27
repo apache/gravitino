@@ -101,22 +101,28 @@ public class IdpUserMetaService {
   }
 
   /**
-   * Updates the password hash for an active user, following the core relational meta update flow:
-   * load the current row, commit the update, and use the affected row count as the success signal.
+   * Updates the password hash for an active user. Succeeds when the user exists and the update is
+   * committed, even if the stored hash is already equal to {@code passwordHash}.
    *
    * @param username username of the user
    * @param passwordHash new password hash to store
-   * @return {@code true} if the user exists and the password hash was updated
+   * @return {@code true} if the password hash was updated
+   * @throws NotFoundException if the user does not exist or is soft-deleted
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "updateIdpUserPassword")
   public boolean updateIdpUserPassword(String username, String passwordHash) {
-    Integer updated =
-        SessionUtils.doWithCommitAndFetchResult(
-            IdpUserMetaMapper.class,
-            mapper -> mapper.updateIdpUserPassword(username, passwordHash));
-    return updated > 0;
+    return SessionUtils.doWithCommitAndFetchResult(
+        IdpUserMetaMapper.class,
+        mapper -> {
+          IdpUserPO userPO = mapper.selectIdpUser(username);
+          if (userPO == null) {
+            throw new NotFoundException("IdP user not found: %s", username);
+          }
+          mapper.updateIdpUserPassword(username, passwordHash);
+          return true;
+        });
   }
 
   @Monitored(
