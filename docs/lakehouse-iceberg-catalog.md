@@ -13,13 +13,57 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage Apache Iceberg metadata.
+The Iceberg catalog enables Apache Gravitino to manage Apache Iceberg metadata, acting as a federated proxy over an Iceberg metadata backend (Hive, JDBC, or REST). Use it when you want a single Gravitino-managed access surface over one or more Iceberg catalogs, with the option to federate them alongside other relational, lakehouse, and fileset catalogs and serve them through Gravitino's own Iceberg REST endpoint for downstream engines such as Spark, Trino, and Flink.
 
 ### Requirements and Limitations
 
-:::info
-Builds with Apache Iceberg `1.10.0`. The Apache Iceberg table format version is `2` by default.
-:::
+- **Iceberg version:** built with Apache Iceberg `1.10.0`. Newly created tables default to Iceberg table format version `2`.
+- **Supported metadata backends:** `hive`, `jdbc`, and `rest`. Select with the `catalog-backend` property.
+- **Supported storage providers:** S3, OSS, GCS, ADLS, and HDFS. Each provider requires the corresponding Gravitino Iceberg bundle JAR in `catalogs/lakehouse-iceberg/libs/` on the Gravitino server. Since Gravitino 1.1.0, the Gravitino bundles include the upstream Iceberg storage bundles, so one Gravitino bundle JAR per cloud is sufficient.
+- **Authentication.** On the Hive backend, `simple` and `Kerberos` are supported. On the JDBC backend, username/password is supported. On the REST backend, authentication is configured on the REST endpoint itself.
+- **No column default values.**
+- **No table indexes.** Iceberg uses partitioning, sort orders, and per-column file statistics for pruning instead.
+- **No snapshot, branch, or tag management through the catalog interface.** Use Iceberg's own SQL extensions or stored procedures (for example, through Spark or Trino) for snapshot rollback, branch creation, and tagging.
+
+## Quick Start
+
+Create a minimum-viable Iceberg catalog and confirm it is reachable. The example creates a REST-backed Iceberg catalog pointing at Gravitino's default in-memory Iceberg REST service at `http://localhost:9001/iceberg`, so it runs against a default Gravitino installation with no external Iceberg metastore. For JDBC, Hive, or external REST backends (Lakekeeper, Apache Polaris, Snowflake Open Catalog), see [Catalog Properties](#catalog-properties) below. The walkthrough assumes a Gravitino server at `http://localhost:8090` and a metalake named `test`.
+
+### Create the Catalog
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "iceberg_catalog",
+    "type": "RELATIONAL",
+    "comment": "Iceberg catalog",
+    "provider": "lakehouse-iceberg",
+    "properties": {
+      "catalog-backend": "rest",
+      "uri": "http://localhost:9001/iceberg",
+      "warehouse": ""
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs
+```
+
+The response is a JSON object describing the created catalog. An empty `warehouse` targets the default catalog on the REST backend.
+
+### Verify the Catalog
+
+```bash
+# List catalogs in the metalake. iceberg_catalog should appear.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs" | jq
+
+# Load the catalog directly and inspect its properties.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/iceberg_catalog" | jq
+
+# List schemas (Iceberg namespaces). On a fresh in-memory IRC server, the list may be empty until a schema is created.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/iceberg_catalog/schemas" | jq
+```
+
+**Success check:** the catalog-list response includes `iceberg_catalog`, and the load-catalog response shows `"provider":"lakehouse-iceberg"` with `catalog-backend` set to `rest`. The schema-list response is a JSON array; on a fresh in-memory backend the array may be empty, which is expected. If load-catalog returns a connection error, confirm the in-memory Iceberg REST service is running in the Gravitino server logs and verify the `uri` value.
 
 ## Catalog
 
@@ -27,12 +71,10 @@ Builds with Apache Iceberg `1.10.0`. The Apache Iceberg table format version is 
 
 The Iceberg catalog:
 
-- Works as a catalog proxy, supporting `Hive`, `JDBC`, and `REST` as metadata backend options.
-- Supports DDL operations on Iceberg schemas and tables.
-- Does not support snapshot or table management operations.
-- Supports multiple object storage providers (S3, GCS, ADLS, OSS, and HDFS).
-- Supports Kerberos or simple authentication when using Hive as the metadata backend.
-- Caches table metadata.
+- Acts as a catalog proxy over an external Iceberg metadata backend selected by `catalog-backend`.
+- Supports DDL operations on Iceberg schemas, tables, and views.
+- Reads and writes table data through the Iceberg FileIO for the configured storage provider.
+- Caches Iceberg table metadata; see [Table Metadata Cache](#table-metadata-cache) for tuning.
 
 ### Catalog Properties
 
@@ -218,15 +260,17 @@ Use the following properties to configure metadata backend security as needed. F
 
 #### Table Metadata Cache
 
-Gravitino includes a pluggable cache system for table metadata. It validates the cached metadata location against the metadata backend before returning a hit, so cached data stays correct.
+Gravitino includes a pluggable cache for Iceberg table metadata. The cache validates the cached metadata location against the metadata backend before returning a hit, so cached entries stay correct even after a table is updated through another writer.
 
 | Property                    | Description                                 | Default | Required | Since |
 |---------------------------------------|---------------------------------------------|---------------|----------|---------------|
-| `table-metadata-cache-impl`           | The implement of the cache.                 | (none)        | No       | 1.1.0         |
-| `table-metadata-cache-capacity`       | The capacity of table metadata cache.       | 200           | No       | 1.1.0         |
-| `table-metadata-cache-expire-minutes` | The expire minutes of table metadata cache. | 60            | No       | 1.1.0         |
+| `table-metadata-cache-impl`           | Fully qualified class name of the cache implementation. Leave unset to use the built-in in-memory cache. | (none)        | No       | 1.1.0         |
+| `table-metadata-cache-capacity`       | Maximum number of table-metadata entries the cache holds. | 200           | No       | 1.1.0         |
+| `table-metadata-cache-expire-minutes` | Time-to-live for cache entries, in minutes. | 60            | No       | 1.1.0         |
 
-Gravitino provides the built-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache`, which stores cached data in memory. To plug in a custom cache, implement the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
+The built-in implementation is `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache`, which stores cached entries in memory. To plug in a custom cache, implement the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface and set `table-metadata-cache-impl` to its class name.
+
+The default `table-metadata-cache-capacity` of `200` is suitable for development. For production workloads that read from a large number of tables, increase the capacity (a value of `1000` or higher is a reasonable starting point) and consider extending `table-metadata-cache-expire-minutes` based on how frequently the underlying tables change through external writers.
 
 ### Catalog Operations
 
@@ -236,7 +280,10 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-The Iceberg catalog does not support cascade-dropping schemas.
+- A Gravitino schema corresponds to an Iceberg namespace on the configured backend.
+- Supports creating schemas with arbitrary properties (see [Schema Properties](#schema-properties) for the one exception).
+- Supports dropping empty schemas.
+- Does not support cascade-dropping non-empty schemas. Drop the schema's tables first.
 
 ### Schema Properties
 
@@ -250,7 +297,12 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Table Capabilities
 
-The Iceberg catalog does not support column default values.
+- A Gravitino table corresponds to an Iceberg table inside the configured catalog and namespace.
+- Supports create, alter, drop, and load operations on Iceberg tables.
+- Supports the partition transforms, sort-order expressions, and distribution modes listed in the sections below.
+- Supports passing through Iceberg table properties such as `format`, `format-version`, and `location` at create time; see [Table Properties](#table-properties).
+- Does not support column default values.
+- Does not support table indexes; see [Table Indexes](#table-indexes) for why.
 
 ### Table Partitions
 
@@ -352,7 +404,7 @@ Pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configurat
 
 ### Table Indexes
 
-The Iceberg catalog does not support table indexes.
+The Iceberg catalog does not support table indexes. Iceberg relies on partitioning, sort orders, and per-column file statistics (min/max, null count, value count) for predicate pushdown and pruning. To improve query performance on a specific access pattern, choose a partition transform that matches the predicate column or sort the data on the predicate column.
 
 ### Table Operations
 
