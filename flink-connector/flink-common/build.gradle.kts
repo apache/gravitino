@@ -29,7 +29,7 @@ repositories {
 val flinkVersion: String = libs.versions.flink18.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 val connectorIcebergVersion: String = libs.versions.iceberg4flink18.get()
-val gravitinoIcebergVersion: String = libs.versions.iceberg.get()
+val gravitinoIcebergVersion: String = connectorIcebergVersion
 val paimonVersion: String = libs.versions.paimon4flink18.get()
 
 // The Flink only support scala 2.12, and all scala api will be removed in a future version.

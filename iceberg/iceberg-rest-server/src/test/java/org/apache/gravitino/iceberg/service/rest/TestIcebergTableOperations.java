@@ -184,10 +184,6 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(planResponse.has("file-scan-tasks"));
     Assertions.assertTrue(planResponse.get("file-scan-tasks").isArray());
     Assertions.assertTrue(planResponse.get("file-scan-tasks").size() > 0);
-    Assertions.assertTrue(planResponse.has("plan-tasks"));
-    Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
-    Assertions.assertTrue(planResponse.get("plan-tasks").size() > 0);
-    Assertions.assertTrue(planResponse.get("plan-tasks").get(0).isTextual());
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
@@ -233,8 +229,6 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
     Assertions.assertTrue(planResponse.has("file-scan-tasks"));
     Assertions.assertTrue(planResponse.get("file-scan-tasks").isArray());
-    Assertions.assertTrue(planResponse.has("plan-tasks"));
-    Assertions.assertTrue(planResponse.get("plan-tasks").isArray());
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);

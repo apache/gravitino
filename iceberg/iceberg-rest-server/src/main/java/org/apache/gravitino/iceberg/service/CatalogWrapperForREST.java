@@ -63,7 +63,6 @@ import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Scan;
-import org.apache.iceberg.ScanTaskParser;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.Table;
@@ -472,8 +471,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             tableIdentifier);
       }
 
-      PlanTableScanResponse response =
-          buildCompletedPlanTableScanResponse(tableIdentifier, fileScanTasksList);
+      PlanTableScanResponse response = buildCompletedPlanTableScanResponse(fileScanTasksList);
 
       // Cache the scan plan response
       scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
@@ -493,11 +491,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   /**
-   * Builds a synchronous COMPLETED scan plan response.
-   *
-   * <p>Populates both {@code plan-tasks} (JSON strings via {@link ScanTaskParser#toJson}) and
-   * {@code file-scan-tasks} (structured tasks) so older REST clients (e.g. Iceberg 1.9.x Flink) and
-   * Iceberg 1.11+ clients can parse the same response.
+   * Builds a synchronous COMPLETED scan plan response for Iceberg 1.11 REST clients.
    *
    * <p>{@code withSpecsById} is deprecated in Iceberg 1.11 but still used by {@link
    * org.apache.iceberg.rest.CatalogHandlers#planTableScan}. Remove when upstream provides a
@@ -505,24 +499,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    */
   @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
-      TableIdentifier tableIdentifier, List<FileScanTask> fileScanTasks) {
-    List<String> planTasks = new ArrayList<>();
+      List<FileScanTask> fileScanTasks) {
     Map<Integer, PartitionSpec> specsById = new HashMap<>();
     List<DeleteFile> deleteFiles = new ArrayList<>();
 
     for (FileScanTask fileScanTask : fileScanTasks) {
-      try {
-        planTasks.add(ScanTaskParser.toJson(fileScanTask));
-        specsById.putIfAbsent(fileScanTask.spec().specId(), fileScanTask.spec());
-        if (!fileScanTask.deletes().isEmpty()) {
-          deleteFiles.addAll(fileScanTask.deletes());
-        }
-      } catch (Exception e) {
-        throw new RuntimeException(
-            String.format(
-                "Failed to serialize scan task for table: %s. Error: %s",
-                tableIdentifier, e.getMessage()),
-            e);
+      specsById.putIfAbsent(fileScanTask.spec().specId(), fileScanTask.spec());
+      if (!fileScanTask.deletes().isEmpty()) {
+        deleteFiles.addAll(fileScanTask.deletes());
       }
     }
 
@@ -532,7 +516,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     PlanTableScanResponse.Builder responseBuilder =
         PlanTableScanResponse.builder()
             .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanTasks(planTasks)
             .withFileScanTasks(fileScanTasks)
             .withSpecsById(specsById);
 
