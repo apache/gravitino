@@ -103,7 +103,10 @@ class TestBasicAuthenticator {
   @Test
   void testUserNotFound() throws Exception {
     IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
-    when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice")).thenReturn(null);
+    when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice"))
+        .thenThrow(
+            new UnauthorizedException(
+                "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim()));
     BasicAuthenticator authenticator = authenticator(userGroupManager);
 
     UnauthorizedException exception =
@@ -193,7 +196,10 @@ class TestBasicAuthenticator {
   @Test
   void testWrongPassword() throws Exception {
     IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
-    when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice")).thenReturn(null);
+    when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice"))
+        .thenThrow(
+            new UnauthorizedException(
+                "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim()));
     BasicAuthenticator authenticator = authenticator(userGroupManager);
 
     UnauthorizedException exception =

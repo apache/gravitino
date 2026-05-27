@@ -128,9 +128,6 @@ public class BasicAuthenticator implements Authenticator {
 
   private UserPrincipal authenticate(BasicCredentials credentials, String authData) {
     IdpUser user = userGroupManager.authenticate(credentials.username(), credentials.password());
-    if (user == null) {
-      throw invalidCredentials();
-    }
 
     List<UserGroup> groups =
         user.groupNames().stream()

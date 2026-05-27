@@ -72,7 +72,10 @@ public class TestBasicAuthentication {
   @Test
   public void testFilterUnauthorized() throws Exception {
     IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
-    when(userGroupManager.authenticate(USER, "wrong")).thenReturn(null);
+    when(userGroupManager.authenticate(USER, "wrong"))
+        .thenThrow(
+            new UnauthorizedException(
+                "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim()));
     BasicAuthenticator authenticator = createBasicAuthenticator(userGroupManager);
     FilterChain chain = mock(FilterChain.class);
     HttpServletRequest request = mock(HttpServletRequest.class);

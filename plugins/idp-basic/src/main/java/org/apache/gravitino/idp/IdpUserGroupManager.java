@@ -29,6 +29,9 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.exceptions.UnauthorizedException;
+import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
@@ -49,6 +52,11 @@ import org.apache.gravitino.storage.relational.utils.POConverters;
  * org.apache.gravitino.authorization.UserGroupManager} but operates on global IdP metadata.
  */
 public class IdpUserGroupManager implements Closeable {
+
+  private static final String BASIC_CHALLENGE = AuthConstants.AUTHORIZATION_BASIC_HEADER.trim();
+  private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid username or password";
+  private static final String BASIC_AUTHENTICATOR_CLASS_NAME =
+      BasicAuthenticator.class.getCanonicalName();
 
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
@@ -121,6 +129,10 @@ public class IdpUserGroupManager implements Closeable {
       IdGenerator idGenerator,
       String initialAdminPassword)
       throws IOException {
+    if (!basicAuthenticatorEnabled(config)) {
+      return;
+    }
+
     List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
     if (serviceAdmins == null || serviceAdmins.isEmpty()) {
       return;
@@ -143,6 +155,18 @@ public class IdpUserGroupManager implements Closeable {
       userMetaService.insertIdpUser(
           buildUserPO(idGenerator, serviceAdmin, passwordHasher.hash(password)));
     }
+  }
+
+  /**
+   * Returns whether the built-in IdP basic authenticator is enabled through {@link
+   * Configs#AUTHENTICATORS}.
+   *
+   * @param config The server configuration.
+   * @return {@code true} when {@link BasicAuthenticator} is configured
+   */
+  public static boolean basicAuthenticatorEnabled(Config config) {
+    List<String> authenticators = config.get(Configs.AUTHENTICATORS);
+    return authenticators != null && authenticators.contains(BASIC_AUTHENTICATOR_CLASS_NAME);
   }
 
   /**
@@ -183,19 +207,18 @@ public class IdpUserGroupManager implements Closeable {
    *
    * @param username The username.
    * @param password The plaintext password.
-   * @return The authenticated user with group memberships, or {@code null} when credentials are
-   *     invalid.
+   * @return The authenticated user with group memberships.
+   * @throws UnauthorizedException when the username or password is invalid.
    */
-  @Nullable
   public IdpUser authenticate(String username, String password) {
     try {
       IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
       if (!passwordHasher.verify(password, userPO.getPasswordHash())) {
-        return null;
+        throw invalidCredentials();
       }
       return new IdpUser(username, USER_SERVICE.listGroupNamesByUsername(username));
     } catch (NotFoundException e) {
-      return null;
+      throw invalidCredentials();
     }
   }
 
@@ -293,6 +316,10 @@ public class IdpUserGroupManager implements Closeable {
     } catch (NotFoundException e) {
       return false;
     }
+  }
+
+  private static UnauthorizedException invalidCredentials() {
+    return new UnauthorizedException(INVALID_CREDENTIALS_MESSAGE, BASIC_CHALLENGE);
   }
 
   private static Map<String, String> parseInitialAdminPasswords(

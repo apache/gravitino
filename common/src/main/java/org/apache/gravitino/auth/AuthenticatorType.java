@@ -31,8 +31,5 @@ public enum AuthenticatorType {
   OAUTH,
 
   /** Authentication that uses Kerberos. */
-  KERBEROS,
-
-  /** Authentication that uses built-in IdP username and password. */
-  BASIC
+  KERBEROS
 }

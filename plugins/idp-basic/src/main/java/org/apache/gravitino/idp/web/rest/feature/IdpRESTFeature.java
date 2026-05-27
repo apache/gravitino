@@ -25,6 +25,7 @@ import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
@@ -45,6 +46,10 @@ public class IdpRESTFeature implements Feature {
   @Override
   public boolean configure(FeatureContext context) {
     Config config = GravitinoEnv.getInstance().config();
+    if (!IdpUserGroupManager.basicAuthenticatorEnabled(config)) {
+      return false;
+    }
+
     try {
       ServiceAdminInitializer.initialize(config);
     } catch (IOException e) {

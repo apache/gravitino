@@ -91,7 +91,17 @@ public class TestIdpRestExtension {
 
   @Test
   public void testWithoutExtension() throws Exception {
-    try (ServerHarness harness = startServer(newConfig(false))) {
+    try (ServerHarness harness = startServer(newConfig(false, false))) {
+      HttpResponse<String> response = getUser(harness.port(), "missing-user");
+      assertEquals(404, response.statusCode());
+      assertFalse(isNotFoundError(response.body()));
+    }
+  }
+
+  @Test
+  public void testWithExtensionButWithoutBasicAuthenticatorDoesNotRegisterIdpRoutes()
+      throws Exception {
+    try (ServerHarness harness = startServer(newConfig(true, false))) {
       HttpResponse<String> response = getUser(harness.port(), "missing-user");
       assertEquals(404, response.statusCode());
       assertFalse(isNotFoundError(response.body()));
@@ -101,13 +111,13 @@ public class TestIdpRestExtension {
   @Test
   public void testWithExtensionRegistersIdpRoutes() throws Exception {
     setEnv(INITIAL_ADMIN_PASSWORD_ENV, ADMIN_PASSWORD);
-    try (ServerHarness harness = startServer(newConfig(true))) {
+    try (ServerHarness harness = startServer(newConfig(true, true))) {
       HttpResponse<String> response = getUser(harness.port(), "missing-user");
       assertEquals(401, response.statusCode());
     }
   }
 
-  private ServerConfig newConfig(boolean enableExtension) {
+  private ServerConfig newConfig(boolean enableExtension, boolean enableBasicAuthenticator) {
     ImmutableMap.Builder<String, String> builder =
         ImmutableMap.<String, String>builder()
             .put(
@@ -127,8 +137,10 @@ public class TestIdpRestExtension {
     if (enableExtension) {
       builder
           .put(REST_API_EXTENSION_PACKAGES.getKey(), IDP_REST_EXTENSION_PACKAGE)
-          .put(SERVICE_ADMINS.getKey(), "admin")
-          .put(AUTHENTICATORS.getKey(), BASIC_AUTHENTICATOR_CLASS);
+          .put(SERVICE_ADMINS.getKey(), "admin");
+    }
+    if (enableBasicAuthenticator) {
+      builder.put(AUTHENTICATORS.getKey(), BASIC_AUTHENTICATOR_CLASS);
     }
 
     ServerConfig serverConfig = new ServerConfig();
