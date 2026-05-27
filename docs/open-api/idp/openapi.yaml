@@ -68,26 +68,6 @@ paths:
     $ref: "./idp.yaml#/paths/~1idp~1groups~1%7Bgroup%7D~1users"
 
 components:
-  schemas:
-    ErrorModel:
-      $ref: "../openapi.yaml#/components/schemas/ErrorModel"
-
-  responses:
-    BadRequestErrorResponse:
-      $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
-    ServerErrorResponse:
-      $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
-    RemoveResponse:
-      $ref: "../openapi.yaml#/components/responses/RemoveResponse"
-
-  parameters:
-    user:
-      $ref: "../openapi.yaml#/components/parameters/user"
-    group:
-      $ref: "../openapi.yaml#/components/parameters/group"
-    force:
-      $ref: "../openapi.yaml#/components/parameters/force"
-
   securitySchemes:
     BasicAuth:
       $ref: "../openapi.yaml#/components/securitySchemes/BasicAuth"

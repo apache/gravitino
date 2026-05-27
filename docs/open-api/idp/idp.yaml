@@ -48,7 +48,7 @@ paths:
                 IdpUserResponse:
                   $ref: "#/components/examples/IdpUserResponse"
         "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "409":
@@ -56,16 +56,16 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
               examples:
                 AlreadyExistsException:
                   $ref: "#/components/examples/IdpAlreadyExistsException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
   /idp/users/{user}:
     parameters:
-      - $ref: "./openapi.yaml#/components/parameters/user"
+      - $ref: "../openapi.yaml#/components/parameters/user"
 
     get:
       tags:
@@ -90,12 +90,12 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
               examples:
                 NotFoundException:
                   $ref: "#/components/examples/IdpNotFoundException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
     put:
       tags:
@@ -123,7 +123,7 @@ paths:
                 IdpUserResponse:
                   $ref: "#/components/examples/IdpUserResponse"
         "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
@@ -131,12 +131,12 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
               examples:
                 NotFoundException:
                   $ref: "#/components/examples/IdpNotFoundException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
     delete:
       tags:
@@ -145,9 +145,9 @@ paths:
       operationId: removeIdpUser
       responses:
         "200":
-          $ref: "./openapi.yaml#/components/responses/RemoveResponse"
+          $ref: "../openapi.yaml#/components/responses/RemoveResponse"
         "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
@@ -155,12 +155,12 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
               examples:
                 NotFoundException:
                   $ref: "#/components/examples/IdpNotFoundException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
   /idp/groups:
     post:
@@ -189,7 +189,7 @@ paths:
                 IdpGroupResponse:
                   $ref: "#/components/examples/IdpGroupResponse"
         "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "409":
@@ -197,16 +197,16 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
               examples:
                 AlreadyExistsException:
                   $ref: "#/components/examples/IdpAlreadyExistsException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
   /idp/groups/{group}:
     parameters:
-      - $ref: "./openapi.yaml#/components/parameters/group"
+      - $ref: "../openapi.yaml#/components/parameters/group"
 
     get:
       tags:
@@ -231,12 +231,12 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
               examples:
                 NotFoundException:
                   $ref: "#/components/examples/IdpNotFoundException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
     delete:
       tags:
@@ -244,12 +244,12 @@ paths:
       summary: Remove built-in IDP group
       operationId: removeIdpGroup
       parameters:
-        - $ref: "./openapi.yaml#/components/parameters/force"
+        - $ref: "../openapi.yaml#/components/parameters/force"
       responses:
         "200":
-          $ref: "./openapi.yaml#/components/responses/RemoveResponse"
+          $ref: "../openapi.yaml#/components/responses/RemoveResponse"
         "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
@@ -257,16 +257,16 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
               examples:
                 NotFoundException:
                   $ref: "#/components/examples/IdpNotFoundException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
   /idp/groups/{group}/users:
     parameters:
-      - $ref: "./openapi.yaml#/components/parameters/group"
+      - $ref: "../openapi.yaml#/components/parameters/group"
 
     put:
       tags:
@@ -296,7 +296,7 @@ paths:
                 IdpGroupResponse:
                   $ref: "#/components/examples/IdpGroupResponse"
         "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
@@ -304,12 +304,12 @@ paths:
           content:
             application/vnd.gravitino.v1+json:
               schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
               examples:
                 NotFoundException:
                   $ref: "#/components/examples/IdpNotFoundException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
   schemas:
@@ -422,7 +422,7 @@ components:
       content:
         application/vnd.gravitino.v1+json:
           schema:
-            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+            $ref: "../openapi.yaml#/components/schemas/ErrorModel"
 
   examples:
     AddUserRequest:
