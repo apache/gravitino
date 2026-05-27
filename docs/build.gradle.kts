@@ -33,7 +33,6 @@ tasks {
       listOf(
         "lint",
         "--extends=recommended-strict",
-        "${project.projectDir}/open-api/openapi.yaml",
         "${project.projectDir}/open-api/idp/openapi.yaml"
       )
     )
