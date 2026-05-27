@@ -518,9 +518,9 @@ http://localhost:8090/api/idp/users/alice
 }
 ```
 
-#### 9.1.2 Create a local user
+#### 9.1.2 Add a local user
 
-You can create a local user by providing a user name and password. The password must be stored as a
+You can add a local user by providing a user name and password. The password must be stored as a
 hash rather than plaintext.
 
 The request path for REST API is `/api/idp/users`.
@@ -631,9 +631,9 @@ http://localhost:8090/api/idp/groups/engineering
 }
 ```
 
-#### 9.1.6 Create a local group
+#### 9.1.6 Add a local group
 
-You can create a local group by providing a group name.
+You can add a local group by providing a group name.
 
 The request path for REST API is `/api/idp/groups`.
 

@@ -662,6 +662,12 @@ public class TestLancePartitionStatisticStorage {
     properties.put("location", location);
     properties.put("datasetCacheSize", "10");
 
+    EntityStore entityStore = mock(EntityStore.class);
+    TableEntity tableEntity = mock(TableEntity.class);
+    when(entityStore.get(any(), any(), any())).thenReturn(tableEntity);
+    when(tableEntity.id()).thenReturn(1L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
+
     LancePartitionStatisticStorage storage = new LancePartitionStatisticStorage(properties);
 
     try {
