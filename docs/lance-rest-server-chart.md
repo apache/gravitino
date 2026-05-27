@@ -6,16 +6,16 @@ keyword:
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Introduction
-
-This Helm chart deploys the Apache Gravitino Lance REST server on Kubernetes with customizable configurations.
+Deploy the Apache Gravitino Lance REST server on Kubernetes with its dedicated Helm chart. Values in `values.yaml` and overrides in `gravitino-lance-rest-server.conf` are both customizable through Helm.
 
 ## Prerequisites
 
 - Kubernetes 1.29+
 - Helm 3+
+- A running Apache Gravitino server reachable from the Kubernetes cluster
+- A metalake created in the Gravitino server before Lance REST is deployed
 
-## Installation
+## Sources
 
 ### Install from OCI Registry (Recommended for Released Versions)
 
@@ -52,7 +52,7 @@ Install the chart:
 helm upgrade --install gravitino-lance ./gravitino-lance-rest-server -n gravitino --create-namespace
 ```
 
-## View Chart Values
+## Chart Values
 
 Override chart defaults by customizing parameters in `values.yaml`. Configuration in [gravitino-lance-rest-server.conf](../dev/charts/gravitino-lance-rest-server/resources/gravitino-lance-rest-server.conf) can also be modified through Helm `values.yaml`.
 
@@ -62,7 +62,7 @@ To display the default values for the chart, run:
 helm show values oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version <VERSION>
 ```
 
-## Install Helm Chart
+## Deployment
 
 ```console
 helm upgrade --install [RELEASE_NAME] oci://registry-1.docker.io/apache/gravitino-lance-rest-server-helm --version <VERSION> [flags]
@@ -103,25 +103,7 @@ helm upgrade --install gravitino-lance oci://registry-1.docker.io/apache/graviti
   -f /path/to/values.yaml
 ```
 
-## Configuration Notes
-
-### Gravitino Backend Configuration
-
-Make sure to configure the Gravitino backend connection properly:
-
-```yaml
-lanceRest:
-  gravitinoUri: http://your-gravitino-server:8090
-  gravitinoMetalake: your-metalake-name
-```
-
-The Lance REST server requires a running Gravitino instance. Ensure that:
-
-1. The Gravitino server is reachable from the Lance REST server pods.
-2. The metalake specified in `gravitinoMetalake` exists in Gravitino.
-3. Network policies allow communication between Lance REST and Gravitino.
-
-## Uninstall Helm Chart
+## Uninstall
 
 ```console
 helm uninstall [RELEASE_NAME] -n [NAMESPACE]
