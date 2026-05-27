@@ -7,119 +7,76 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Overview
 
-The Table Maintenance Service (Optimizer) automates table maintenance by connecting:
-
-- Statistics and metrics collection
-- Rule evaluation and strategy recommendation
-- Job template based execution
+The Table Maintenance Service compacts Iceberg tables based on policies you attach to catalogs, schemas, or tables. Attach a policy at the scope you want, collect table statistics, and the optimizer decides which partitions need compaction, scores them, and submits Spark jobs to rewrite the data files.
 
 The CLI commands and configuration keys use the `optimizer` name.
 
-## Alpha Status and Limitations
+## Alpha Scope
 
-The Table Maintenance Service is in **alpha** stage.
+The Table Maintenance Service is in **alpha**. Confirm your environment matches the supported scope before starting a POC:
 
-Limitations:
+- **Iceberg only.** No Hudi, Delta, Paimon, or fileset support.
+- **Identity partition transforms only.** Tables using `days()`, `hours()`, `bucket()`, or `truncate()` partitions will fail during rewrite. See the compatibility matrix in [Troubleshooting](./optimizer-troubleshooting.md).
+- **Compaction strategy only.** No snapshot expiration, orphan file cleanup, or sort/cluster optimization.
+- **CLI-driven.** No built-in scheduler; trigger runs from the optimizer CLI or your own scheduler.
 
-- It is operated through the optimizer CLI workflow.
-- The built-in maintenance strategy focuses on Iceberg table compaction.
-- Compaction support is limited to Iceberg tables with identity partition transforms.
+## Extensibility
 
-## Extensibility and Roadmap
+The framework is designed for extension beyond the built-in capability. Custom providers, strategy handlers, job adapters, calculators, and evaluators are loaded through Java ServiceLoader and config keys. See [Optimizer Extension Guide](./optimizer-extension-guide.md).
 
-Although the built-in capability is intentionally narrow in alpha, the framework is designed for
-extension:
+## How It Works
 
-- Integrate external systems by implementing custom providers and adapters.
-- Add new strategies and handlers beyond built-in compaction.
-- Plug in custom metrics, evaluators, and job submitters for different environments.
+The optimizer workflow has four steps:
 
-See [Optimizer Extension Guide](./optimizer-extension-guide.md) for extension points.
-
-Future versions will continue improving the out-of-the-box experience and evolve toward a more
-ready-to-use maintenance service.
-
-## Architecture Overview
-
-The optimizer workflow is based on six parts:
-
-1. Metadata objects: catalog/schema/table in a metalake.
-2. Statistics and metrics: table/partition signals used for decision making.
-3. Policies: strategy intent, for example `system_iceberg_compaction`.
-4. Job templates: executable contracts, for example built-in Spark templates.
-5. Job executor: local or custom backend that runs submitted jobs.
-6. Status and logs: REST job state plus local staging logs.
+1. **Attach a policy.** Define thresholds and weights, then attach to a catalog, schema, or table.
+2. **Collect statistics.** Run the built-in update-stats job to populate per-partition signals such as `custom-data-file-mse` (file-size variance) and `custom-delete-file-number`.
+3. **Evaluate and submit.** Run `submit-strategy-jobs`. The optimizer reads the policy, scores partitions against current statistics, and submits a Spark rewrite job for the highest-scoring candidates.
+4. **Verify.** Track job status through the Gravitino REST API and inspect rewrite logs or Iceberg snapshot history.
 
 ![Optimizer architecture and workflow](../assets/table-maintenance-service/optimizer-architecture-workflow.png)
 
-The following diagram shows the end-to-end interactions between CLI, Gravitino server, Spark jobs,
-JDBC metrics repository, and the Recommender/Updater/Monitor modules.
-
-Typical data flow:
-
-1. Collect statistics and metrics for target tables.
-2. Evaluate rules and produce candidate actions.
-3. Submit jobs using a concrete template and `jobConf`.
-4. Track status and verify results on table metadata and logs.
+The diagram shows end-to-end interactions between the CLI, Gravitino server, Spark jobs, the JDBC metrics repository, and the Recommender, Updater, and Monitor modules.
 
 ## Execution Modes
 
-| Mode | Main entry | Best for | Output |
-| --- | --- | --- | --- |
-| Built-in maintenance workflow | Gravitino REST + built-in templates | Server-side operational runs | Submitted Spark jobs and updated metadata |
-| Optimizer CLI local calculator | `gravitino-optimizer.sh` | Local file-driven testing and batch scripts | Statistics/metrics updates and optional submissions |
+| Mode | Entry point | Use when |
+| --- | --- | --- |
+| Policy-driven workflow | Gravitino REST + optimizer CLI | You want the optimizer to compact your tables based on attached policies. **This is the POC path.** |
+| Local JSONL calculator | `gravitino-optimizer.sh --calculator-name local-stats-calculator` | You want to test rule evaluation against handwritten statistics without running Spark. |
 
-Use built-in maintenance workflow when you want policy-driven server execution.
-Use CLI local calculator when you want to feed JSONL input directly.
+POC users should follow the policy-driven workflow. The local JSONL calculator is a developer and integration-testing tool.
 
-## Start Here
+## Where to Go Next
 
-- Configuration first: read [Optimizer Configuration](./optimizer-configuration.md).
-- Need custom integrations: read [Optimizer Extension Guide](./optimizer-extension-guide.md).
-- First-time enablement: run [Optimizer Quick Start and Verification](./optimizer-quick-start.md).
-- CLI-only usage: read [Optimizer CLI Reference](./optimizer-cli-reference.md).
-- Runtime failures or mismatched results: check [Optimizer Troubleshooting](./optimizer-troubleshooting.md).
+- **First time running the optimizer:** [Optimizer Quick Start](./optimizer-quick-start.md). End-to-end policy attach, stats collection, rewrite submission, and verification on a demo table.
+- **Tuning the compaction policy for your tables:** [Iceberg Compaction Policy](../iceberg-compaction-policy.md). Explains the MSE metric, weights, and thresholds.
+- **Configuring the optimizer for your environment:** [Optimizer Configuration](./optimizer-configuration.md).
+- **Looking up a specific CLI command:** [Optimizer CLI Reference](./optimizer-cli-reference.md).
+- **Debugging a stuck or failed job:** [Optimizer Troubleshooting](./optimizer-troubleshooting.md).
+- **Integrating custom providers, handlers, or sinks:** [Optimizer Extension Guide](./optimizer-extension-guide.md).
 
-## Lifecycle
+## Configuration Layers
 
-### Step 1: Collect
-
-Generate or ingest table and partition statistics/metrics.
-
-### Step 2: Evaluate
-
-Apply policies and rules to decide whether maintenance should run.
-
-### Step 3: Submit
-
-Pick a job template and submit job with concrete `jobConf`.
-
-### Step 4: Observe
-
-Check REST job status and validate resulting statistics, metrics, or rewritten data files.
-
-## Configuration Model
+Three layers of configuration interact. See [Optimizer Configuration](./optimizer-configuration.md) for the full reference.
 
 | Layer | Scope | Typical keys |
 | --- | --- | --- |
-| Gravitino server config | Runtime for job manager and executor | `gravitino.job.executor`, `gravitino.job.statusPullIntervalInMs`, `gravitino.jobExecutor.local.sparkHome` |
-| Job submission `jobConf` | Per job run | `catalog_name`, `table_identifier`, `spark_*`, template-specific args |
+| Gravitino server config | Job manager and executor runtime | `gravitino.job.executor`, `gravitino.job.statusPullIntervalInMs`, `gravitino.jobExecutor.local.sparkHome` |
 | Optimizer CLI config | CLI commands | `gravitino.optimizer.*` in `conf/gravitino-optimizer.conf` |
+| Job submission `jobConf` | Per job run | `catalog_name`, `table_identifier`, `spark_*`, template-specific args |
 
-## Terminology Mapping
+## Names You Will See
 
-| Term | Example value | Used in |
-| --- | --- | --- |
-| Policy name | `iceberg_compaction_default` | Policy identity and CLI `--strategy-name` |
-| Policy type | `system_iceberg_compaction` | REST policy creation field `policyType` |
-| Strategy type | `iceberg-data-compaction` | Policy content field `strategy.type` and strategy handler config key |
+The optimizer uses four layered names. Distinguishing them matters because the CLI flag `--strategy-name` takes the policy name, not the strategy type.
 
-For strategy submission, `--strategy-name` must use policy name, not policy type or strategy type.
+| Layer | What it identifies | Example value | Where it appears |
+| --- | --- | --- | --- |
+| Policy name | A specific policy you create | `iceberg_compaction_default` | CLI `--strategy-name`, policy listing APIs |
+| Policy type | The kind of policy, which controls what fields are valid | `system_iceberg_compaction` | REST `policyType` field when creating a policy |
+| Strategy type | The action the policy generates | `iceberg-data-compaction` | Policy `strategy.type` field, strategy handler config |
+| Job template | The Spark job blueprint the strategy runs | `builtin-iceberg-rewrite-data-files` | Job submission and job status APIs |
 
-## Prerequisites and Verification
-
-Quick start prerequisites and success checks are documented in
-[Optimizer Quick Start and Verification](./optimizer-quick-start.md).
+A built-in compaction policy created with policy type `system_iceberg_compaction` generates a strategy of type `iceberg-data-compaction`, which runs the job template `builtin-iceberg-rewrite-data-files`.
 
 ## Related
 
