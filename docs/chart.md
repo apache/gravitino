@@ -51,19 +51,59 @@ helm upgrade --install gravitino ./gravitino -n gravitino --create-namespace
 
 ## Chart Values
 
-Override chart defaults by customizing parameters in `values.yaml`. Gravitino configuration in `gravitino.conf` can also be modified through Helm `values.yaml`.
+The chart ships sensible defaults in its `values.yaml`. To deploy with different settings, supply your own values file or pass `--set` flags at install time; Helm merges your overrides on top of the chart defaults using a deep merge, so any settings you do not mention keep their default values.
 
-To display the default values for the Gravitino chart, run:
+### Inspecting the Defaults
+
+To see the full set of values the chart understands, including their defaults and inline comments:
 
 ```console
 helm show values oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION>
 ```
 
-## Deployment
+The output is the chart's `values.yaml` in full. Each setting includes a comment describing its purpose. For property-by-property explanations of how Gravitino server configuration maps to chart values, see [Gravitino Server Configuration](./gravitino-server-config.md).
+
+### Customizing With a Values File
+
+Write your overrides into a YAML file containing only the keys you want to change. For example, `my-values.yaml`:
+
+```yaml
+cache:
+  maxEntries: 100000
+  enableStats: true
+
+audit:
+  enabled: true
+```
+
+Apply the file at install time with the `-f` flag:
 
 ```console
-helm upgrade --install [RELEASE_NAME] oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> [flags]
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
+  -n gravitino --create-namespace \
+  -f my-values.yaml
 ```
+
+Helm reads the chart's built-in `values.yaml` (defaults), overlays your file on top, and templates the resulting configuration. Settings not mentioned in your file keep their default values.
+
+### One-Off Overrides With --set
+
+For quick overrides without writing a file, use `--set`:
+
+```console
+helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
+  -n gravitino --create-namespace \
+  --set audit.enabled=true \
+  --set cache.maxEntries=100000
+```
+
+When both `-f` and `--set` are used, `--set` takes precedence over `-f`, and `-f` takes precedence over the chart's defaults.
+
+### Example Scenario Files
+
+The chart distribution includes example values files in `resources/scenarios/` for common deployment scenarios. These are starting templates: copy one out, customize for your environment, then install with `-f`. See the dev and production scenarios under [Deployment](#deployment) below.
+
+## Deployment
 
 ### Deploy with Default Configuration
 
@@ -73,23 +113,57 @@ Run the following command to deploy Gravitino using the default settings:
 helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> -n gravitino --create-namespace
 ```
 
-### Deploy with Custom Configuration
+### Deploy With the Dev Scenario
 
-To customize the deployment, use the --set flag to override specific values:
+The chart ships a `dev-values.yaml` scenario file at `resources/scenarios/dev-values.yaml`. The dev scenario opts in to the dynamic config provider for the Iceberg REST server so the IRC server federates a local Gravitino metalake named `test`. Other settings stay at chart defaults (embedded H2 metadata backend, simple authentication, no persistence), which are appropriate for local development.
+
+Extract the chart to access the scenario file:
+
+```console
+helm pull oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> --untar
+```
+
+The dev scenario applies as-is, no customization required:
 
 ```console
 helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
   -n gravitino --create-namespace \
-  --set key1=val1,key2=val2,...
+  -f gravitino/resources/scenarios/dev-values.yaml
 ```
 
-Alternatively, you can provide a custom values.yaml file:
+For the equivalent configuration applied directly to `gravitino.conf` (for the binary install path), see [Development Configuration](./gravitino-server-config.md#development).
+
+### Deploy With the Production Scenario
+
+The chart ships a `prod-values.yaml` scenario file at `resources/scenarios/prod-values.yaml`. The production scenario configures externally managed MySQL as the metadata backend, larger cache and tree-lock limits, audit logging, the Iceberg REST server with the dynamic config provider, and OAuth 2.0 OIDC authentication with JWKS-based token validation.
+
+The file contains placeholder values that must be filled in for your environment before applying.
+
+Extract the chart and copy the scenario file:
+
+```console
+helm pull oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> --untar
+cp gravitino/resources/scenarios/prod-values.yaml my-prod-values.yaml
+```
+
+Edit `my-prod-values.yaml` to fill in the placeholders:
+
+- `<your-mysql-host>`, `<your-database>`, `<your-mysql-user>`, `<your-mysql-password>` for the metadata backend
+- `<your-tenant-id>`, `<your-app-client-id>`, `<your-app-client-id-or-api-identifier>` for OIDC authentication
+
+Before installing, initialize the MySQL metadata backend. See [How to Use Relational Backend Storage](./how-to-use-relational-backend-storage.md) for setup steps and SQL scripts.
+
+Apply the customized values file:
 
 ```console
 helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
   -n gravitino --create-namespace \
-  -f /path/to/values.yaml
+  -f my-prod-values.yaml
 ```
+
+For the equivalent configuration applied directly to `gravitino.conf`, see [Production Configuration](./gravitino-server-config.md#production).
+
+The MySQL password and OAuth client secret are plaintext placeholders in `prod-values.yaml`. For production deployments, source these from Kubernetes Secrets rather than embedding them in your values file; chart-native Kubernetes Secret references are tracked in the chart's enterprise readiness work and will be documented when available.
 
 ### Deploy Gravitino with MySQL as the Storage Backend
 
@@ -113,31 +187,6 @@ helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-hel
 ```
 
 Then manually create a PersistentVolume (PV).
-
-### Deploy Gravitino Using an Existing MySQL Database
-
-Have the following MySQL credentials ready: username, password, and database name. Naming the database `gravitino` is recommended.
-
-Before deploying Gravitino, initialize your MySQL instance and create the tables Gravitino requires.
-
-```console
-mysql -h database-1.***.***.rds.amazonaws.com -P 3306 -u <YOUR-USERNAME> -p <YOUR-PASSWORD> < schema-0.*.0-mysql.sql
-```
-
-Use Helm to install or upgrade Gravitino, specifying the MySQL connection details.
-
-```console
-helm upgrade --install gravitino oci://registry-1.docker.io/apache/gravitino-helm --version <VERSION> \
-  -n gravitino --create-namespace \
-  --set entity.jdbcUrl="jdbc:mysql://database-1.***.***.rds.amazonaws.com:3306/gravitino" \
-  --set entity.jdbcDriver="com.mysql.cj.jdbc.Driver" \
-  --set entity.jdbcUser="admin" \
-  --set entity.jdbcPassword="admin123"
-```
-
-:::note
-Replace `database-1.***.***.rds.amazonaws.com` with your actual MySQL host. Change `admin` and `admin123` to your actual MySQL username and password. Ensure the target MySQL database (for example, `gravitino`) exists before deployment.
-:::
 
 ## Uninstall
 
