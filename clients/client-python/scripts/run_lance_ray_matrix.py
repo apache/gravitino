@@ -63,6 +63,10 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 PYTHON_CLIENT_DIR = REPO_ROOT / "clients" / "client-python"
 DEFAULT_MATRIX_DIR = PYTHON_CLIENT_DIR / "build" / "lance-ray-matrix"
 DEFAULT_GRAVITINO_HOME = REPO_ROOT / "distribution" / "package"
+LANCE_REST_CONF = Path("conf") / "gravitino.conf"
+LANCE_REST_METALAKE_BINDING = (
+    "gravitino.lance-rest.gravitino-metalake = lance_ray_test_metalake"
+)
 
 
 @dataclass
@@ -222,6 +226,43 @@ def run_unittest(venv_python: Path, gravitino_home: Path) -> int:
     ).returncode
 
 
+def count_lance_rest_binding(conf_path: Path) -> int:
+    if not conf_path.exists():
+        return 0
+    with conf_path.open(encoding="utf-8") as file:
+        return sum(1 for line in file if line.strip() == LANCE_REST_METALAKE_BINDING)
+
+
+def restore_lance_rest_binding_count(conf_path: Path, original_count: int) -> None:
+    if not conf_path.exists():
+        return
+
+    lines = conf_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    current_count = sum(
+        1 for line in lines if line.strip() == LANCE_REST_METALAKE_BINDING
+    )
+    surplus_count = current_count - original_count
+    if surplus_count <= 0:
+        return
+
+    filtered_lines = []
+    removed_count = 0
+    for line in reversed(lines):
+        if (
+            removed_count < surplus_count
+            and line.strip() == LANCE_REST_METALAKE_BINDING
+        ):
+            removed_count += 1
+            continue
+        filtered_lines.append(line)
+
+    conf_path.write_text("".join(reversed(filtered_lines)), encoding="utf-8")
+    print(
+        "[matrix] removed "
+        f"{removed_count} lance-rest binding line(s) from {conf_path}"
+    )
+
+
 def main() -> int:
     args = parse_args()
     versions = [v.strip() for v in args.versions.split(",") if v.strip()]
@@ -240,35 +281,40 @@ def main() -> int:
         )
         return 2
 
+    conf_path = gravitino_home / LANCE_REST_CONF
+    original_binding_count = count_lance_rest_binding(conf_path)
     results: List[VersionResult] = []
-    for version in versions:
-        print(f"\n========== lance-ray=={version} ==========")
-        venv_dir = matrix_dir / f".venv-{version}"
-        try:
-            venv_python = ensure_venv(args.python, venv_dir)
-            install_deps(
-                venv_python,
-                version,
-                args.ray_spec,
-                args.lance_namespace_spec,
-            )
-            generate_version_ini(venv_python)
-        except Exception as e:  # pylint: disable=broad-exception-caught
-            print(f"[matrix] {version}: setup failed: {e}", file=sys.stderr)
-            results.append(VersionResult(version, "setup-error", str(e)))
-            if not args.keep_going:
-                break
-            continue
+    try:
+        for version in versions:
+            print(f"\n========== lance-ray=={version} ==========")
+            venv_dir = matrix_dir / f".venv-{version}"
+            try:
+                venv_python = ensure_venv(args.python, venv_dir)
+                install_deps(
+                    venv_python,
+                    version,
+                    args.ray_spec,
+                    args.lance_namespace_spec,
+                )
+                generate_version_ini(venv_python)
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                print(f"[matrix] {version}: setup failed: {e}", file=sys.stderr)
+                results.append(VersionResult(version, "setup-error", str(e)))
+                if not args.keep_going:
+                    break
+                continue
 
-        rc = run_unittest(venv_python, gravitino_home)
-        if rc == 0:
-            print(f"[matrix] {version}: PASS")
-            results.append(VersionResult(version, "ok", "tests passed"))
-        else:
-            print(f"[matrix] {version}: FAIL (exit={rc})")
-            results.append(VersionResult(version, "fail", f"unittest exit {rc}"))
-            if not args.keep_going:
-                break
+            rc = run_unittest(venv_python, gravitino_home)
+            if rc == 0:
+                print(f"[matrix] {version}: PASS")
+                results.append(VersionResult(version, "ok", "tests passed"))
+            else:
+                print(f"[matrix] {version}: FAIL (exit={rc})")
+                results.append(VersionResult(version, "fail", f"unittest exit {rc}"))
+                if not args.keep_going:
+                    break
+    finally:
+        restore_lance_rest_binding_count(conf_path, original_binding_count)
 
     print("\n========== summary ==========")
     width = max(len(r.version) for r in results) if results else 0

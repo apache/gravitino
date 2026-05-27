@@ -302,10 +302,8 @@ class TestLanceRayIntegration(IntegrationTestEnv):
 
     def test_write_read_filter_via_lance_ray(self):
         # Imports are deferred so the skipIf decorator handles missing deps
-        # cleanly without import errors at module load time. The lance/ray
-        # extras live in `requirements-lance.txt` (and `setup.py`'s `lance`
-        # extra), so they aren't present in the default `dev` install used by
-        # pylint; silence the resulting import-error.
+        # cleanly without import errors at module load time. The matrix runner
+        # also swaps lance-ray versions in isolated venvs, so keep imports local.
         # pylint: disable=import-outside-toplevel,import-error
         import ray
         from lance_ray import read_lance, write_lance

@@ -34,7 +34,7 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 // this list. Override via `-PlanceSparkBundleVersions=0.2.0,0.3.0,0.4.0`.
 val lanceSparkBundleVersions: List<String> =
   ((project.properties["lanceSparkBundleVersions"] as? String) ?: "0.4.0")
-    .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    .split(",").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 if (lanceSparkBundleVersions.isEmpty()) {
   throw GradleException("lanceSparkBundleVersions must contain at least one version")
 }
