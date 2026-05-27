@@ -239,6 +239,36 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
   }
 
+  /**
+   * Loads current {@link TableMetadata}, bypassing the response cache. Used by the async purge path
+   * to snapshot the metadata location before dropping the catalog entry.
+   *
+   * @param tableIdentifier the table
+   * @return its metadata
+   */
+  public TableMetadata loadTableMetadata(TableIdentifier tableIdentifier) {
+    return CatalogHandlers.loadTable(getCatalog(), tableIdentifier).tableMetadata();
+  }
+
+  /**
+   * Returns the FileIO implementation configured for this catalog.
+   *
+   * @return the {@code io-impl} class, or the Iceberg default when unset
+   */
+  public String fileIoImpl() {
+    String impl = icebergConfig.get(IcebergConfig.IO_IMPL);
+    return StringUtils.isNotBlank(impl) ? impl : "org.apache.iceberg.io.ResolvingFileIO";
+  }
+
+  /**
+   * Returns catalog properties used to reconstruct FileIO in a purge worker.
+   *
+   * @return catalog properties snapshotted at enqueue time
+   */
+  public Map<String, String> fileIoProperties() {
+    return getIcebergConfig().getIcebergCatalogProperties();
+  }
+
   public LoadTableResponse loadTable(TableIdentifier tableIdentifier) {
     Optional<TableMetadata> tableMetadataOptional =
         getMetadataCache().getTableMetadata(tableIdentifier);

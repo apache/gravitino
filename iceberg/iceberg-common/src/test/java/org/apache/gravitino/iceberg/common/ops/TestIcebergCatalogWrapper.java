@@ -30,8 +30,12 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -77,11 +81,33 @@ public class TestIcebergCatalogWrapper {
     Assertions.assertTrue(TrackingTableMetadataCache.CLOSED.get());
   }
 
+  @Test
+  public void testLoadTableMetadataAndFileIo() {
+    IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(new IcebergConfig(memoryConfig()));
+    TableIdentifier tableIdentifier = TableIdentifier.of("db", "t");
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+
+    wrapper.createNamespace(
+        CreateNamespaceRequest.builder().withNamespace(Namespace.of("db")).build());
+    wrapper.getCatalog().createTable(tableIdentifier, schema);
+
+    TableMetadata meta = wrapper.loadTableMetadata(tableIdentifier);
+    Assertions.assertNotNull(meta.metadataFileLocation());
+    Assertions.assertNotNull(wrapper.fileIoImpl());
+    Assertions.assertNotNull(wrapper.fileIoProperties());
+  }
+
   private static TableMetadataCache invokeGetMetadataCache(IcebergCatalogWrapper wrapper)
       throws Exception {
     Method method = IcebergCatalogWrapper.class.getDeclaredMethod("getMetadataCache");
     method.setAccessible(true);
     return (TableMetadataCache) method.invoke(wrapper);
+  }
+
+  private static Map<String, String> memoryConfig() {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConstants.CATALOG_BACKEND, "memory");
+    return config;
   }
 
   private static Map<String, String> unreachableConfig() {
