@@ -306,6 +306,25 @@ public class TestJdbcViewCatalogOperations {
     Assertions.assertEquals("SELECT id FROM t", stubViewOps.views.get("existing_db").get("v2"));
   }
 
+  @Test
+  public void testAlterViewReplaceAndRename() {
+    stubViewOps.addView("existing_db", "v1", "SELECT 1");
+
+    Column[] cols = new Column[] {Column.of("id", Types.IntegerType.get(), "id")};
+    SQLRepresentation newRep =
+        SQLRepresentation.builder().withDialect("stub").withSql("SELECT id FROM t").build();
+
+    View result =
+        catalogOps.alterView(
+            NameIdentifier.of(Namespace.of("existing_db"), "v1"),
+            ViewChange.replaceView(cols, new Representation[] {newRep}, null, null, null),
+            ViewChange.rename("v2"));
+
+    Assertions.assertEquals("v2", result.name());
+    Assertions.assertFalse(stubViewOps.views.get("existing_db").containsKey("v1"));
+    Assertions.assertEquals("SELECT id FROM t", stubViewOps.views.get("existing_db").get("v2"));
+  }
+
   /** In-memory stub of {@link JdbcViewOperations} for testing without a real database. */
   private static class StubViewOperations extends JdbcViewOperations {
 
