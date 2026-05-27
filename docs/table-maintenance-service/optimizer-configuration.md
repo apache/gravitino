@@ -56,17 +56,24 @@ for HDFS or cloud object storage environments.
 
 ## Strategy Submission Configuration
 
-`submit-strategy-jobs` needs optimizer CLI config. This is a minimal working example:
+`submit-strategy-jobs` needs optimizer CLI config. The minimal working example below is grouped into three blocks: connection settings, built-in provider wiring, and job submission parameters.
 
 ```properties
+# Connection to Gravitino server. Adjust for your environment.
 gravitino.optimizer.gravitinoUri = http://localhost:8090
 gravitino.optimizer.gravitinoMetalake = test
 gravitino.optimizer.gravitinoDefaultCatalog = rest_catalog
+
+# Built-in provider and handler wiring. Maps the recommender providers
+# and strategy handler to the built-in implementations.
+# To plug in custom providers, see the Extension Guide.
 gravitino.optimizer.recommender.statisticsProvider = gravitino-statistics-provider
 gravitino.optimizer.recommender.strategyProvider = gravitino-strategy-provider
 gravitino.optimizer.recommender.tableMetaProvider = gravitino-table-metadata-provider
 gravitino.optimizer.recommender.jobSubmitter = gravitino-job-submitter
 gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler
+
+# Job submission parameters. Adjust catalog and Spark settings for your environment.
 gravitino.optimizer.jobSubmitterConfig.catalog_name = rest_catalog
 gravitino.optimizer.jobSubmitterConfig.spark_master = local[2]
 gravitino.optimizer.jobSubmitterConfig.spark_executor_instances = 1
