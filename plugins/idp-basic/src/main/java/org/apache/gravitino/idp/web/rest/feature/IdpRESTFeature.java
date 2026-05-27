@@ -52,10 +52,6 @@ public class IdpRESTFeature implements Feature {
   @Override
   public boolean configure(FeatureContext context) {
     Config config = GravitinoEnv.getInstance().config();
-    if (!basicAuthenticatorEnabled(config.get(Configs.AUTHENTICATORS))) {
-      return true;
-    }
-
     try {
       ServiceAdminInitializer.initialize(config);
     } catch (IOException e) {
