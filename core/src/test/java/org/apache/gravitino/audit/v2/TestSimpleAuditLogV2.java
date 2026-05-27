@@ -22,8 +22,13 @@ package org.apache.gravitino.audit.v2;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.ListCatalogEvent;
+import org.apache.gravitino.listener.api.event.ListMetalakeEvent;
+import org.apache.gravitino.listener.api.event.ListSchemaEvent;
+import org.apache.gravitino.listener.api.event.ListTableEvent;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.junit.jupiter.api.Assertions;
@@ -69,6 +74,147 @@ public class TestSimpleAuditLogV2 {
     Assertions.assertTrue(output.contains("LIST_TABLE"));
     Assertions.assertTrue(output.contains("metalake.catalog"));
     Assertions.assertTrue(output.contains("SUCCESS"));
+  }
+
+  // ---- list event tests ----
+  @Test
+  public void testListTableEventFormat() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "schema");
+    ListTableEvent event = new ListTableEvent("alice", namespace, 5);
+    SimpleAuditLogV2 log = new SimpleAuditLogV2(event);
+
+    Assertions.assertEquals(OperationType.LIST_TABLE, log.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, log.operationStatus());
+    Assertions.assertEquals("metalake.catalog.schema", log.identifier());
+    Assertions.assertEquals("alice", log.user());
+
+    String output = log.toString();
+    String[] fields = output.split("\t", -1);
+    Assertions.assertEquals(8, fields.length);
+    Assertions.assertTrue(
+        fields[0].matches("\\[\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}\\.\\d{3}\\]"));
+    Assertions.assertEquals("alice", fields[1]);
+    Assertions.assertEquals("LIST_TABLE", fields[2]);
+    Assertions.assertEquals("metalake.catalog.schema", fields[3]);
+    Assertions.assertEquals("SUCCESS", fields[4]);
+    Assertions.assertEquals("GRAVITINO_SERVER", fields[5]);
+    Assertions.assertEquals("unknown", fields[6]); // no RequestContext set in tests
+    Assertions.assertEquals("{count=5}", fields[7]); // count surfaced in last field
+  }
+
+  @Test
+  public void testListMetalakeEventNullIdentifier() {
+    ListMetalakeEvent event = new ListMetalakeEvent("bob", 3);
+    SimpleAuditLogV2 log = new SimpleAuditLogV2(event);
+
+    Assertions.assertNull(log.identifier());
+    Assertions.assertEquals(OperationType.LIST_METALAKE, log.operationType());
+
+    // toString() must not throw and must have 8 fields with count in last field.
+    String[] fields = log.toString().split("\t", -1);
+    Assertions.assertEquals(8, fields.length);
+    Assertions.assertEquals("bob", fields[1]);
+    Assertions.assertEquals("LIST_METALAKE", fields[2]);
+    Assertions.assertEquals("null", fields[3]);
+    Assertions.assertEquals("{count=3}", fields[7]);
+  }
+
+  @Test
+  public void testListCatalogEventFormat() {
+    Namespace namespace = Namespace.of("metalake");
+    ListCatalogEvent event = new ListCatalogEvent("carol", namespace, 2);
+    SimpleAuditLogV2 log = new SimpleAuditLogV2(event);
+
+    Assertions.assertEquals("metalake", log.identifier());
+    Assertions.assertEquals(OperationType.LIST_CATALOG, log.operationType());
+
+    String[] fields = log.toString().split("\t", -1);
+    Assertions.assertEquals("LIST_CATALOG", fields[2]);
+    Assertions.assertEquals("metalake", fields[3]);
+    Assertions.assertEquals("{count=2}", fields[7]);
+  }
+
+  @Test
+  public void testListSchemaEventFormat() {
+    Namespace namespace = Namespace.of("metalake", "catalog");
+    ListSchemaEvent event = new ListSchemaEvent("dave", namespace, 7);
+    SimpleAuditLogV2 log = new SimpleAuditLogV2(event);
+
+    String[] fields = log.toString().split("\t", -1);
+    Assertions.assertEquals("LIST_SCHEMA", fields[2]);
+    Assertions.assertEquals("metalake.catalog", fields[3]);
+    Assertions.assertEquals("{count=7}", fields[7]);
+  }
+
+  @Test
+  public void testListEventZeroCountInOutput() {
+    // count=0 is a valid result (empty list) and must appear in the log.
+    ListTableEvent event = new ListTableEvent("eve", Namespace.of("m", "c", "s"), 0);
+    String[] fields = new SimpleAuditLogV2(event).toString().split("\t", -1);
+    Assertions.assertEquals("{count=0}", fields[7]);
+  }
+
+  @Test
+  public void testListEventRemoteAddressDefaultsToUnknown() {
+    // No RequestContext set — Event subclasses fall back to "unknown".
+    ListTableEvent event = new ListTableEvent("frank", Namespace.of("m", "c", "s"), 4);
+    SimpleAuditLogV2 log = new SimpleAuditLogV2(event);
+
+    Assertions.assertEquals("unknown", log.remoteAddress());
+    String[] fields = log.toString().split("\t", -1);
+    Assertions.assertEquals("unknown", fields[6]);
+  }
+
+  @Test
+  public void testListEventCountMergedWithExistingCustomInfo() {
+    // Verify count and user-defined customInfo both appear in the audit log field.
+    ListTableEvent base = new ListTableEvent("grace", Namespace.of("m", "c", "s"), 9);
+    SimpleAuditLogV2 log =
+        new SimpleAuditLogV2(base) {
+          @Override
+          public Map<String, String> customInfo() {
+            return ImmutableMap.of("env", "prod");
+          }
+        };
+
+    String[] fields = log.toString().split("\t", -1);
+    Assertions.assertTrue(fields[7].contains("count=9"));
+    Assertions.assertTrue(fields[7].contains("env=prod"));
+  }
+
+  @Test
+  public void testListEventCountKeyCollisionPreservesBothValues() {
+    // When customInfo also contains a "count" key, both values must appear in the output.
+    ListTableEvent base = new ListTableEvent("grace", Namespace.of("m", "c", "s"), 9);
+    SimpleAuditLogV2 log =
+        new SimpleAuditLogV2(base) {
+          @Override
+          public Map<String, String> customInfo() {
+            return ImmutableMap.of("count", "user-value");
+          }
+        };
+
+    String lastField = log.toString().split("\t", -1)[7];
+    // Both the user-supplied value and the event-derived count must be present.
+    Assertions.assertTrue(lastField.contains("count=user-value"), lastField);
+    Assertions.assertTrue(lastField.contains("count=9"), lastField);
+  }
+
+  @Test
+  public void testNonListEventHasEmptyCountField() {
+    // A non-list stub event must not have count in the output.
+    SimpleAuditLogV2 log = new SimpleAuditLogV2(new StubEvent());
+    String[] fields = log.toString().split("\t", -1);
+    Assertions.assertEquals("", fields[7]);
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  public void testDeprecatedConstructorOmitsCountFromLog() {
+    // The deprecated no-count constructor sets resultCount()=-1; the log must not emit {count=-1}.
+    ListTableEvent event = new ListTableEvent("henry", Namespace.of("m", "c", "s"));
+    String[] fields = new SimpleAuditLogV2(event).toString().split("\t", -1);
+    Assertions.assertEquals("", fields[7]);
   }
 
   // ---- stubs ----

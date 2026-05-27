@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.catalog.jdbc.trino;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -46,7 +47,8 @@ public class TestTrinoClusterCatalogPropertyConverter {
     TrinoClusterConnectorAdapter adapter = new TrinoClusterConnectorAdapter();
 
     Map<String, String> config =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
+        adapter.buildInternalConnectorConfig(
+            new GravitinoCatalog("test", mockCatalog), new Credential[0]);
 
     // test the converted properties, it's generating connector configuration by properties name
     // with the prefix 'cluster.'

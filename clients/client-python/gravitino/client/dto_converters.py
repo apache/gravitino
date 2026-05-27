@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+from gravitino.api.authorization.privileges import Privilege
+from gravitino.api.authorization.securable_objects import SecurableObject
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_template import JobTemplate, JobType
@@ -36,6 +38,8 @@ from gravitino.api.tag.tag_change import TagChange
 from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_model_catalog import GenericModelCatalog
 from gravitino.client.relational_catalog import RelationalCatalog
+from gravitino.dto.authorization.privilege_dto import PrivilegeDTO
+from gravitino.dto.authorization.securable_object_dto import SecurableObjectDTO
 from gravitino.dto.catalog_dto import CatalogDTO
 from gravitino.dto.job.job_template_dto import JobTemplateDTO
 from gravitino.dto.job.shell_job_template_dto import ShellJobTemplateDTO
@@ -325,3 +329,12 @@ class DTOConverters:
             return TagUpdateRequest.RemoveTagPropertyRequest(change.removed_property)
 
         raise IllegalArgumentException(f"Unknown change type: {type(change)}")
+
+    @staticmethod
+    def to_privilege_dto(privilege: Privilege) -> PrivilegeDTO:
+        return PrivilegeDTO(privilege.name(), privilege.condition())
+
+    @staticmethod
+    def to_securable_object_dto(obj: SecurableObject) -> SecurableObjectDTO:
+        privilege_dtos = [DTOConverters.to_privilege_dto(p) for p in obj.privileges()]
+        return SecurableObjectDTO(obj.full_name(), obj.type(), privilege_dtos)

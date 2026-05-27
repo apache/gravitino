@@ -194,6 +194,7 @@ public class TestTableEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListTableEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListTableEvent) event).namespace());
+    Assertions.assertEquals(2, ((ListTableEvent) event).resultCount());
     Assertions.assertEquals(OperationType.LIST_TABLE, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
@@ -290,6 +291,14 @@ public class TestTableEvent {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
+  void testListTableEventDeprecatedConstructorReturnsNegativeCount() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "schema");
+    ListTableEvent event = new ListTableEvent("user", namespace);
+    Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @Test
   void testListTableFailureEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
@@ -348,7 +357,12 @@ public class TestTableEvent {
     when(dispatcher.loadTable(any(NameIdentifier.class))).thenReturn(table);
     when(dispatcher.dropTable(any(NameIdentifier.class))).thenReturn(true);
     when(dispatcher.purgeTable(any(NameIdentifier.class))).thenReturn(true);
-    when(dispatcher.listTables(any(Namespace.class))).thenReturn(null);
+    when(dispatcher.listTables(any(Namespace.class)))
+        .thenReturn(
+            new NameIdentifier[] {
+              NameIdentifier.of("metalake", "catalog", "schema", "t1"),
+              NameIdentifier.of("metalake", "catalog", "schema", "t2")
+            });
     when(dispatcher.alterTable(any(NameIdentifier.class), any(TableChange.class)))
         .thenReturn(table);
     return dispatcher;

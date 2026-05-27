@@ -177,6 +177,7 @@ public class TestViewEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListViewEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListViewEvent) event).namespace());
+    Assertions.assertEquals(1, ((ListViewEvent) event).resultCount());
     Assertions.assertEquals(OperationType.LIST_VIEW, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
@@ -311,7 +312,9 @@ public class TestViewEvent {
         .thenReturn(view);
     when(d.loadView(any(NameIdentifier.class))).thenReturn(view);
     when(d.dropView(any(NameIdentifier.class))).thenReturn(true);
-    when(d.listViews(any(Namespace.class))).thenReturn(null);
+    when(d.listViews(any(Namespace.class)))
+        .thenReturn(
+            new NameIdentifier[] {NameIdentifier.of("metalake", "catalog", "schema", "v1")});
     when(d.alterView(any(NameIdentifier.class), any(ViewChange.class))).thenReturn(view);
     return d;
   }
