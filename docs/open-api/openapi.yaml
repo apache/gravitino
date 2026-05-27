@@ -242,6 +242,21 @@ paths:
   /authn/me:
     $ref: "./authn.yaml#/paths/~1authn~1me"
 
+  /idp/users:
+    $ref: "./idp/idp.yaml#/paths/~1idp~1users"
+
+  /idp/users/{user}:
+    $ref: "./idp/idp.yaml#/paths/~1idp~1users~1%7Buser%7D"
+
+  /idp/groups:
+    $ref: "./idp/idp.yaml#/paths/~1idp~1groups"
+
+  /idp/groups/{group}:
+    $ref: "./idp/idp.yaml#/paths/~1idp~1groups~1%7Bgroup%7D"
+
+  /idp/groups/{group}/users:
+    $ref: "./idp/idp.yaml#/paths/~1idp~1groups~1%7Bgroup%7D~1users"
+
 components:
 
   schemas:
