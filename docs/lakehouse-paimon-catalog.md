@@ -10,13 +10,60 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage Apache Paimon metadata.
+The Paimon catalog enables Apache Gravitino to manage Apache Paimon metadata as a federated proxy over a Paimon catalog backend (`filesystem`, `jdbc`, `hive`, or a Paimon REST catalog, including Aliyun DLF). Use it when you want a single Gravitino-managed access surface that covers Paimon tables alongside relational, lakehouse, and fileset catalogs, with Paimon data accessible through downstream engines such as Flink, Spark, and Trino.
 
-### Requirements
+### Requirements and Limitations
 
-:::info
-Builds with Apache Paimon `1.2`.
-:::
+- **Paimon version:** built with Apache Paimon `1.2`.
+- **Supported catalog backends:** `filesystem`, `jdbc`, `hive`, and `rest`. Select with the `catalog-backend` property. The REST backend supports Paimon's REST catalog protocol, including Aliyun DLF.
+- **Supported storage providers:** local filesystem, HDFS, Amazon S3, and Aliyun OSS. The `warehouse` URI scheme selects the storage.
+- **JDBC driver required for the `jdbc` backend.** Place the JDBC driver (`com.mysql.cj.jdbc.Driver`, `com.mysql.jdbc.Driver`, or `org.postgresql.Driver`) in `catalogs/lakehouse-paimon/libs` on the Gravitino server.
+- **Cloud storage JARs required for S3 or OSS warehouses.** Place the corresponding Paimon filesystem JARs in `catalogs/lakehouse-paimon/lib` on the Gravitino server. See the [Paimon filesystems documentation](https://paimon.apache.org/docs/1.2/maintenance/filesystems/#s3) for details.
+- **Authentication.** `simple` and `Kerberos` are supported for the `filesystem` and `jdbc` backends. The `hive` backend does not currently support Kerberos. The `rest` backend uses either a bearer token (`token-provider: bear`, with the `token` property) or Aliyun DLF credentials (`token-provider: dlf`, with the `dlf-access-key-id` and `dlf-access-key-secret` properties).
+- **No `dropTable` operation.** Paimon's native `dropTable` removes both metadata and the table location from the filesystem and bypasses the trash. Use `purgeTable` instead.
+- **No `alterSchema`.** Schemas can be created, dropped (including cascade), loaded, and listed but cannot be altered.
+- **No auto-increment columns and no column-expression defaults.** Column literal defaults are supported through table properties such as `fields.{columnName}.default-value`.
+- **No table sort orders.** Table distributions are accepted only as a way to configure Paimon's bucketing (HASH strategy); arbitrary distribution semantics are not supported. The `bucket` and `bucket-key` table properties are reserved and derived from the distribution.
+- **Partition fields must not appear in the primary key.** Including a partition field in the primary key results in only one record per partition.
+
+## Quick Start
+
+Create a minimum-viable Paimon catalog and confirm it is reachable. The example uses the `filesystem` backend with a local warehouse path so the walkthrough runs against a default Gravitino installation with no external metastore or cloud storage. For JDBC, Hive, or REST backends (including Aliyun DLF), see the [Catalog Properties](#catalog-properties) section below. The walkthrough assumes a Gravitino server at `http://localhost:8090` and a metalake named `test`.
+
+### Create the Catalog
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "paimon_catalog",
+    "type": "RELATIONAL",
+    "comment": "Paimon catalog",
+    "provider": "lakehouse-paimon",
+    "properties": {
+      "catalog-backend": "filesystem",
+      "warehouse": "file:///tmp/paimon-warehouse"
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs
+```
+
+The response is a JSON object describing the created catalog.
+
+### Verify the Catalog
+
+```bash
+# List catalogs in the metalake. paimon_catalog should appear.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs" | jq
+
+# Load the catalog directly and inspect its properties.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/paimon_catalog" | jq
+
+# List schemas. The response is an empty array on a freshly created filesystem catalog until a schema is added.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/paimon_catalog/schemas" | jq
+```
+
+**Success check:** the catalog-list response includes `paimon_catalog`, the load-catalog response shows `"provider":"lakehouse-paimon"` with `catalog-backend` set to `filesystem` and `warehouse` set to the local path, and the schema-list response is a JSON array (an empty array on a fresh catalog is expected). If load-catalog returns an error, confirm that the Gravitino server process has write access to `/tmp/paimon-warehouse`. For non-filesystem backends, ensure the corresponding JDBC driver or cloud storage JAR is present in the Gravitino server's `catalogs/lakehouse-paimon` directory.
 
 ## Catalog
 
@@ -24,10 +71,11 @@ Builds with Apache Paimon `1.2`.
 
 The Paimon catalog:
 
-- Acts as a catalog proxy backed by `FilesystemCatalog`, `JdbcCatalog`, or `HiveCatalog`.
-- Supports DDL operations on Paimon schemas and tables.
-
-The Paimon catalog does not support `alterSchema`.
+- Acts as a catalog proxy backed by `FilesystemCatalog`, `JdbcCatalog`, `HiveCatalog`, or a Paimon REST catalog (including Aliyun DLF).
+- Supports DDL operations on Paimon schemas and tables, with the exception of `alterSchema`.
+- Supports Paimon views when the underlying backend exposes the view API; see [View Capabilities](#view-capabilities).
+- Caches Paimon catalog backends and forwards arbitrary Paimon catalog properties through `gravitino.bypass.` prefixed configuration.
+- Manages metadata only; data plane reads and writes continue to go through Paimon's own engines (Flink, Spark, Trino).
 
 ### Catalog Properties
 
@@ -123,7 +171,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 The Paimon catalog supports `createTable`, `purgeTable`, `alterTable`, `loadTable`, and `listTable`. Column default values are supported through table properties such as `fields.{columnName}.default-value`; column-expression defaults are not supported.
 
-The Paimon catalog does not support `dropTable`, table distribution, or table sort orders.
+The Paimon catalog does not support `dropTable` or table sort orders. Table distributions are accepted only as a way to configure Paimon's bucketing (HASH strategy); see [Table Properties](#table-properties) for the related `bucket` and `bucket-key` reserved properties.
 
 :::info
 The Paimon catalog deliberately omits `dropTable` because Paimon's `dropTable` removes both the metadata and the table location from the file system and skips the trash. Use `purgeTable` instead.
