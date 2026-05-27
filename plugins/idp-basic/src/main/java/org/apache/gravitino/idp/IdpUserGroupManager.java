@@ -21,6 +21,7 @@ package org.apache.gravitino.idp;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -83,23 +84,28 @@ public class IdpUserGroupManager implements Closeable {
       return;
     }
 
-    if (StringUtils.isNotBlank(initialAdminPassword)) {
-      IdpCredentialValidator.validatePassword(initialAdminPassword);
-    }
-
+    List<String> missingServiceAdmins = new ArrayList<>();
     for (String serviceAdmin : serviceAdmins) {
       IdpCredentialValidator.validateUsername(serviceAdmin);
-      if (checkUserExistence(serviceAdmin)) {
-        continue;
+      if (!checkUserExistence(serviceAdmin)) {
+        missingServiceAdmins.add(serviceAdmin);
       }
+    }
+    if (missingServiceAdmins.isEmpty()) {
+      return;
+    }
 
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(initialAdminPassword),
-          "Missing initial password for configured service admin %s; declare"
-              + " GRAVITINO_INITIAL_ADMIN_PASSWORD",
-          serviceAdmin);
-      USER_SERVICE.insertIdpUser(
-          newUserPO(serviceAdmin, passwordHasher.hash(initialAdminPassword)));
+    if (StringUtils.isBlank(initialAdminPassword)) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Missing initial password for configured service admin %s; declare"
+                  + " GRAVITINO_INITIAL_ADMIN_PASSWORD",
+              missingServiceAdmins.get(0)));
+    }
+    IdpCredentialValidator.validatePassword(initialAdminPassword);
+    String passwordHash = passwordHasher.hash(initialAdminPassword);
+    for (String serviceAdmin : missingServiceAdmins) {
+      USER_SERVICE.insertIdpUser(newUserPO(serviceAdmin, passwordHash));
     }
   }
 
