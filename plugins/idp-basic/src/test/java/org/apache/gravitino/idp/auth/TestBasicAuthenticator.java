@@ -32,7 +32,6 @@ import java.util.Arrays;
 import java.util.Base64;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
-import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.model.IdpUser;
@@ -71,15 +70,16 @@ class TestBasicAuthenticator {
   @Test
   void testMissingCredentials() throws Exception {
     BasicAuthenticator authenticator = authenticator();
-    BadRequestException exception =
+    UnauthorizedException exception =
         assertThrows(
-            BadRequestException.class,
+            UnauthorizedException.class,
             () ->
                 authenticator.authenticateToken(
                     AuthConstants.AUTHORIZATION_BASIC_HEADER.getBytes(StandardCharsets.UTF_8)));
 
     assertEquals(
         "Malformed Basic authorization header: missing credentials", exception.getMessage());
+    assertEquals("Basic", exception.getChallenges().get(0));
   }
 
   @Test
@@ -123,12 +123,13 @@ class TestBasicAuthenticator {
   void testInvalidBase64() throws Exception {
     BasicAuthenticator authenticator = authenticator();
 
-    BadRequestException exception =
+    UnauthorizedException exception =
         assertThrows(
-            BadRequestException.class,
+            UnauthorizedException.class,
             () -> authenticator.authenticateToken(basicAuthBytesWithCredential("not-valid!!!")));
 
     assertEquals("Malformed Basic authorization header: invalid base64", exception.getMessage());
+    assertEquals("Basic", exception.getChallenges().get(0));
   }
 
   @Test

@@ -32,7 +32,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
-import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.model.IdpUser;
@@ -96,7 +95,8 @@ public class BasicAuthenticator implements Authenticator {
   private BasicCredentials parseBasicCredentials(String authData) {
     String credential = authData.substring(AuthConstants.AUTHORIZATION_BASIC_HEADER.length());
     if (StringUtils.isBlank(credential)) {
-      throw new BadRequestException("Malformed Basic authorization header: missing credentials");
+      throw new UnauthorizedException(
+          "Malformed Basic authorization header: missing credentials", BASIC_CHALLENGE);
     }
     credential = credential.trim();
 
@@ -122,7 +122,8 @@ public class BasicAuthenticator implements Authenticator {
       }
       return new BasicCredentials(username, password);
     } catch (IllegalArgumentException e) {
-      throw new BadRequestException(e, "Malformed Basic authorization header: invalid base64");
+      throw new UnauthorizedException(
+          "Malformed Basic authorization header: invalid base64", BASIC_CHALLENGE);
     }
   }
 
