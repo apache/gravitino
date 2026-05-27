@@ -5,69 +5,61 @@ keyword: "table maintenance, optimizer, troubleshooting, spark, strategy"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Invalid `--type` value
+Common error messages and recovery paths, organized by where in the optimizer workflow you encounter them. Each entry shows the error or symptom, what it usually means, and the fix.
 
-Error: `Invalid --type`
+## CLI Usage Errors
 
-Use kebab-case values such as `update-statistics`, not `update_statistics`.
+These errors come from the optimizer CLI rejecting your invocation before doing any work. The fix is usually in your command-line arguments or config file path.
 
-## Conflicting `--statistics-payload` and `--file-path`
+### Invalid `--type` value
 
-Error: `--statistics-payload and --file-path cannot be used together`
+**Error:** `Invalid --type`
 
-For `local-stats-calculator`, use exactly one of them.
+The CLI rejects underscored variants of command names. Use kebab-case values such as `update-statistics`, not `update_statistics`.
 
-## Missing required input source
+### Conflicting `--statistics-payload` and `--file-path`
 
-Error: `requires one of --statistics-payload or --file-path`
+**Error:** `--statistics-payload and --file-path cannot be used together`
 
-When `--calculator-name local-stats-calculator` is used, one input source is required.
+The `local-stats-calculator` accepts input from exactly one source: inline JSON via `--statistics-payload` or a JSONL file via `--file-path`. Use one or the other.
 
-## Invalid `--partition-path` format
+### Missing required input source
 
-Error: `--partition-path must be a JSON array`
+**Error:** `requires one of --statistics-payload or --file-path`
 
-Use a JSON array format, for example:
+When `--calculator-name local-stats-calculator` is used, one input source is required. Add either `--statistics-payload` (inline JSON Lines) or `--file-path` (path to a JSONL file).
+
+### Invalid `--partition-path` format
+
+**Error:** `--partition-path must be a JSON array`
+
+Pass a JSON array, not a JSON object. Example:
 
 ```text
 [{"dt":"2026-01-01"}]
 ```
 
-## Job Status Appears Stale (`queued` or `started` for a Long Time)
+### Optimizer config file not found
 
-Check `gravitino.job.statusPullIntervalInMs` and local staging logs under:
+**Error:** `Specified optimizer config file does not exist`
 
-`/tmp/gravitino/jobs/staging/<metalake>/<job-template-name>/<job-id>/error.log`.
+Check the `--conf-path` value and file permissions. By default the CLI loads `conf/gravitino-optimizer.conf` from the current working directory; use `--conf-path` only to point at a different file.
 
-For local verification, reduce `gravitino.job.statusPullIntervalInMs` (for example `10000`) and
-restart Gravitino so REST status can refresh faster.
+## Strategy and Policy Errors
 
-## No identifiers match the strategy name
+These appear during `submit-strategy-jobs` when the optimizer cannot resolve a strategy or finds nothing to do.
 
-Error: `No identifiers matched strategy name ...`
+### No identifiers match the strategy name
 
-`--strategy-name` must be the policy name (for example `iceberg_compaction_default`), not the policy type (`system_iceberg_compaction`) and not the strategy type (`iceberg-data-compaction`).
+**Error:** `No identifiers matched strategy name ...`
 
-## Dry-Run Returns No `DRY-RUN` or `SUBMIT` Lines
+`--strategy-name` must be the policy name (for example `iceberg_compaction_default`), not the policy type (`system_iceberg_compaction`) and not the strategy type (`iceberg-data-compaction`). See [Names You Will See](./optimizer.md#names-you-will-see) for the distinction.
 
-This usually means trigger conditions are not met. For compaction, verify
-`custom-data-file-mse` and `custom-delete-file-number` in table statistics/metrics are large
-enough to satisfy policy rules.
+### Missing `StrategyHandler` for strategy type
 
-## `monitor-metrics` Returns `evaluation=false` Unexpectedly
+**Error:** `No StrategyHandler class configured for strategy type ...`
 
-Check both rule names and metric samples:
-
-1. Query current metrics first with `list-table-metrics` (and `--partition-path` for partition scope).
-2. Use the exact metric names returned by your environment in
-   `gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules`.
-3. Ensure `--action-time` is inside the range where both before and after samples exist.
-
-## Missing `StrategyHandler` for strategy type
-
-Error: `No StrategyHandler class configured for strategy type ...`
-
-Add strategy handler mapping to optimizer config, for example:
+The optimizer cannot find a handler for the strategy type that the policy generates. Add the handler mapping to your optimizer config:
 
 ```properties
 gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler
@@ -75,29 +67,44 @@ gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apac
 
 If you already use the packaged default optimizer config, this mapping may already exist.
 
-## Spark Job Fails with `hdfs://localhost:9000` or Filesystem Errors
+### Dry-run returns no `DRY-RUN` or `SUBMIT` lines
 
-Set local filesystem explicitly in Spark config:
+Trigger conditions are not met for any selected partition. For compaction, verify that `custom-data-file-mse` and `custom-delete-file-number` in table statistics and metrics are large enough to satisfy the policy rules. Run `list-table-metrics` on the target to inspect current values and compare against the policy's `minDataFileMse` and `minDeleteFileNumber`.
+
+## Job Execution Errors
+
+These appear after a Spark job has been submitted: status looks wrong, the job fails, or the rewrite cannot complete.
+
+### Job status appears stale (`queued` or `started` for a long time)
+
+REST job status may lag the real Spark process state by up to `gravitino.job.statusPullIntervalInMs` milliseconds (default `300000`, about 5 minutes). For local verification, reduce this value (for example `10000`) and restart Gravitino so REST status refreshes faster.
+
+If the status is genuinely stuck rather than just lagging, check the local staging logs at:
+
+```
+/tmp/gravitino/jobs/staging/<metalake>/<job-template-name>/<job-id>/error.log
+```
+
+### Spark job fails with `hdfs://localhost:9000` or filesystem errors
+
+The Spark job is trying to use HDFS by default. Set local filesystem explicitly in Spark config:
 
 ```properties
 spark.hadoop.fs.defaultFS=file:///
 ```
 
-## Rewrite Fails on Multi-level Partition (`identity + day(...)`)
+### Rewrite fails on multi-level partition transforms
 
-In release `1.2.0`, rewrite may fail for partition filters combining identity and day transform
-(for example `PARTITIONED BY (p, days(ts))`) with error:
+In release `1.2.0`, the rewrite path may fail for partition filters combining identity and day transforms (for example `PARTITIONED BY (p, days(ts))`) with an error like:
 
 ```text
 Cannot translate Spark expression ... day(cast(ts as date)) ... to data source filter
 ```
 
-How to verify:
+To verify the failure:
 
-1. Check job run status by rewrite job id under
-   `/api/metalakes/<metalake>/jobs/runs/<job-id>`.
-2. Check staging log:
-   `/tmp/gravitino/jobs/staging/<metalake>/builtin-iceberg-rewrite-data-files/<job-id>/error.log`.
+1. Check job run status by rewrite job id at `/api/metalakes/<metalake>/jobs/runs/<job-id>`.
+2. Check the staging log at `/tmp/gravitino/jobs/staging/<metalake>/builtin-iceberg-rewrite-data-files/<job-id>/error.log`.
 
 Workaround:
 
@@ -107,16 +114,13 @@ Workaround:
 Observed compatibility matrix in release `1.2.0` (rewrite path):
 
 - PASS: `p`, `p, c2` (identity-only partition transforms)
-- FAIL: `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)`,
-  `p, truncate(1, c2)`, `p, bucket(8, id)`
+- FAIL: `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)`, `p, truncate(1, c2)`, `p, bucket(8, id)`
 
-## `submit-update-stats-job` Fails with JDBC Metrics Errors
+### `submit-update-stats-job` fails with JDBC metrics errors
 
-When `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, ensure the JDBC driver is
-available to Spark runtime classpath. Typical failures include `ClassNotFoundException` for driver
-class or `No suitable driver`.
+When `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, the Spark job needs the JDBC driver JAR on its runtime classpath. Typical failures are `ClassNotFoundException` for the driver class or `No suitable driver`.
 
-Example in `--spark-conf`:
+Add the driver JAR via `--spark-conf`:
 
 ```json
 {
@@ -124,11 +128,17 @@ Example in `--spark-conf`:
 }
 ```
 
-## Optimizer config file not found
+## Monitoring and Metrics Errors
 
-Error: `Specified optimizer config file does not exist`
+These appear when reading stored metrics or running rule evaluations.
 
-Check your `--conf-path` and file permissions.
+### `monitor-metrics` returns `evaluation=false` unexpectedly
+
+Two things can cause this: rule names that do not match your stored metrics, or an evaluation window that does not contain both before and after samples.
+
+1. Query current metrics first with `list-table-metrics` (and `--partition-path` for partition scope).
+2. Use the exact metric names returned by your environment in `gravitino.optimizer.monitor.gravitinoMetricsEvaluator.rules`. Names produced by `submit-update-stats-job --update-mode metrics` are often `custom-*` prefixed (for example `custom-data-file-mse`).
+3. Ensure `--action-time` is inside the range where both before and after samples exist.
 
 ## Related
 
