@@ -56,7 +56,6 @@ import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
-import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
 import org.apache.gravitino.integration.test.container.PostgreSQLContainer;
@@ -169,7 +168,6 @@ public class IdpRestApiIT {
       if (gravitinoServer != null) {
         gravitinoServer.stop();
       }
-      IdpRESTFeature.closeGarbageCollector();
       if (idpUserGroupManager != null) {
         idpUserGroupManager.close();
       }
