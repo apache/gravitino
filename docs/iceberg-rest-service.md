@@ -592,6 +592,55 @@ Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.Loca
 |---------------------------------------------|--------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.extension-packages` | Comma-separated list of Iceberg REST API packages to expand. | (none)        | No       | 0.7.0-incubating |
 
+### Health check endpoints
+
+The Iceberg REST server exposes three health check endpoints following the same [MicroProfile Health](https://microprofile.io/project/eclipse/microprofile-health) semantics as the main Gravitino server. All endpoints are exempt from authentication. The readiness probe checks whether the `IcebergCatalogWrapperManager` has been initialized — it performs no I/O and has no configurable timeout.
+
+| Endpoint                     | Description                                                                                                                | HTTP status |
+|------------------------------|----------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /iceberg/health/live`   | Liveness probe. Returns 200 as long as the HTTP server thread can respond.                                                 | 200         |
+| `GET /iceberg/health/ready`  | Readiness probe. Returns 200 when the catalog wrapper manager is initialized; 503 when initialization is not yet complete. | 200 / 503   |
+| `GET /iceberg/health`        | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                              | 200 / 503   |
+
+Root-level aliases are also available for global traffic managers that require probes at well-known root paths:
+
+| Alias               | Forwards to                 |
+|---------------------|-----------------------------|
+| `GET /health`       | `GET /iceberg/health`       |
+| `GET /health/live`  | `GET /iceberg/health/live`  |
+| `GET /health/ready` | `GET /iceberg/health/ready` |
+| `GET /health.html`  | `GET /iceberg/health`       |
+
+**Response format:**
+
+All endpoints return a JSON body with the same shape as the main Gravitino server. The `code` field is always `0`. `status` is `UP` or `DOWN`. Liveness reports `httpServer` and readiness reports `catalogWrapperManager`.
+
+Healthy response (HTTP 200):
+
+```json
+{
+  "code": 0,
+  "status": "UP",
+  "checks": [
+    { "name": "httpServer", "status": "UP", "details": {} },
+    { "name": "catalogWrapperManager", "status": "UP", "details": {} }
+  ]
+}
+```
+
+Unhealthy response (HTTP 503):
+
+```json
+{
+  "code": 0,
+  "status": "DOWN",
+  "checks": [
+    { "name": "httpServer", "status": "UP", "details": {} },
+    { "name": "catalogWrapperManager", "status": "DOWN", "details": { "reason": "catalog wrapper manager not initialized" } }
+  ]
+}
+```
+
 ### Memory settings
 
 The Iceberg REST server uses `GRAVITINO_MEM` for JVM heap/metaspace flags. Default: `-Xms1024m -Xmx1024m -XX:MaxMetaspaceSize=512m`. Launch scripts append `GRAVITINO_MEM` to `JAVA_OPTS`; set it to adjust heap/metaspace sizes.
