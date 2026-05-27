@@ -27,10 +27,6 @@ info:
     OpenAPI specification for built-in IDP user and group management APIs exposed
     by the `idp-basic` plugin when the `basic` authenticator is enabled.
 
-    These APIs are available only with the `basic` authenticator. They are not
-    available when Gravitino is configured with OAuth-only authentication. Callers
-    must authenticate with HTTP Basic Auth and be listed in `gravitino.authorization.serviceAdmins`.
-
 servers:
   - url: "{scheme}://{host}:{port}/{basePath}"
     description: Generic base server URL, with all parts configurable.
