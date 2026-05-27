@@ -192,6 +192,48 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Returns the data source used by this catalog.
+   *
+   * @return The JDBC data source.
+   */
+  protected DataSource getDataSource() {
+    return dataSource;
+  }
+
+  /**
+   * Returns the exception converter used by this catalog.
+   *
+   * @return The JDBC exception converter.
+   */
+  protected JdbcExceptionConverter getExceptionConverter() {
+    return exceptionConverter;
+  }
+
+  /**
+   * Returns the type converter used by this catalog.
+   *
+   * @return The JDBC type converter.
+   */
+  protected JdbcTypeConverter getJdbcTypeConverter() {
+    return jdbcTypeConverter;
+  }
+
+  /**
+   * Checks whether a schema (database) exists.
+   *
+   * @param schemaName The schema name.
+   * @return {@code true} if the schema exists, {@code false} otherwise.
+   */
+  protected boolean schemaExists(String schemaName) {
+    try {
+      databaseOperation.load(schemaName);
+      return true;
+    } catch (NoSuchSchemaException e) {
+      return false;
+    }
+  }
+
   /** Closes the Jdbc catalog and releases the associated client pool. */
   @Override
   public void close() {

@@ -20,7 +20,6 @@ package org.apache.gravitino.catalog.mysql;
 
 import java.util.Map;
 import org.apache.gravitino.catalog.jdbc.JdbcCatalog;
-import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
@@ -29,6 +28,7 @@ import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConve
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import org.apache.gravitino.catalog.mysql.operation.MysqlDatabaseOperations;
 import org.apache.gravitino.catalog.mysql.operation.MysqlTableOperations;
+import org.apache.gravitino.catalog.mysql.operation.MysqlViewOperations;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
@@ -47,12 +47,13 @@ public class MysqlCatalog extends JdbcCatalog {
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     JdbcTypeConverter jdbcTypeConverter = createJdbcTypeConverter();
-    return new MySQLProtocolCompatibleCatalogOperations(
+    return new MysqlCatalogOperations(
         createExceptionConverter(),
         jdbcTypeConverter,
         createJdbcDatabaseOperations(),
         createJdbcTableOperations(),
-        createJdbcColumnDefaultValueConverter());
+        createJdbcColumnDefaultValueConverter(),
+        new MysqlViewOperations());
   }
 
   @Override

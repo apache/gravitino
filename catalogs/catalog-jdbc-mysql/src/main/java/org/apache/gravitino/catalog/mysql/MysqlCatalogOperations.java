@@ -16,16 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.postgresql;
+package org.apache.gravitino.catalog.mysql;
 
-import java.sql.Driver;
-import java.sql.DriverManager;
-import java.sql.SQLException;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.catalog.jdbc.JdbcCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.JdbcViewCatalogOperations;
+import org.apache.gravitino.catalog.jdbc.MySQLProtocolCompatibleCatalogOperations;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
@@ -39,14 +36,15 @@ import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 
-/** PostgreSQL-specific catalog operations with view support. */
-public class PostgreSQLCatalogOperations extends JdbcCatalogOperations implements ViewCatalog {
+/** MySQL-specific catalog operations with view support. */
+public class MysqlCatalogOperations extends MySQLProtocolCompatibleCatalogOperations
+    implements ViewCatalog {
 
   private final JdbcViewOperations viewOperations;
   private JdbcViewCatalogOperations viewCatalogOps;
 
   /**
-   * Constructs a new instance of PostgreSQLCatalogOperations.
+   * Constructs a new instance of MysqlCatalogOperations.
    *
    * @param exceptionConverter The exception converter.
    * @param jdbcTypeConverter The type converter.
@@ -55,7 +53,7 @@ public class PostgreSQLCatalogOperations extends JdbcCatalogOperations implement
    * @param columnDefaultValueConverter The column default value converter.
    * @param viewOperations The view operations.
    */
-  public PostgreSQLCatalogOperations(
+  public MysqlCatalogOperations(
       JdbcExceptionConverter exceptionConverter,
       JdbcTypeConverter jdbcTypeConverter,
       JdbcDatabaseOperations databaseOperation,
@@ -79,11 +77,6 @@ public class PostgreSQLCatalogOperations extends JdbcCatalogOperations implement
     viewOperations.initialize(
         getDataSource(), getExceptionConverter(), getJdbcTypeConverter(), conf);
     this.viewCatalogOps = new JdbcViewCatalogOperations(viewOperations, this::schemaExists);
-  }
-
-  @Override
-  protected Driver getDriver() throws SQLException {
-    return DriverManager.getDriver("jdbc:postgresql://dummy_address:12345/");
   }
 
   @Override
