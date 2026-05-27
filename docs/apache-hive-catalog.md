@@ -1,29 +1,77 @@
 ---
 title: "Hive Catalog"
 slug: "/apache-hive-catalog"
-date: 2023-12-10
-keyword: "hive catalog"
+keywords:
+  - hive
+  - hms
+  - metadata
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-Apache Gravitino can use [Apache Hive](https://hive.apache.org) as a catalog for metadata management.
+The Hive catalog enables Apache Gravitino to manage Hive metadata through a Hive Metastore Service (HMS), or a compatible implementation such as AWS Glue. Use it when you want a single Gravitino-managed access surface over a Hive metastore, with the option to federate it alongside other relational, lakehouse, and fileset catalogs, and to govern Hive-backed datasets that may sit on HDFS or on cloud object storage (S3, ADLS, GCS).
 
 ### Requirements and Limitations
 
-* The Hive catalog requires a Hive Metastore Service (HMS), or a compatible implementation such as AWS Glue.
-* Gravitino must have network access to the Hive metastore over the Thrift protocol.
+- **Hive Metastore Service required.** The Hive catalog connects to a Hive Metastore Service (HMS), or a compatible implementation such as AWS Glue. Gravitino must have network access to the metastore over the Thrift protocol.
+- **Supported HMS versions:** 2.x and 3.x. The Hive catalog detects the metastore version automatically; the `default.catalog` property is honored only by the Hive 3 backend.
+- **Supported storage backings:** HDFS, plus S3, Azure Blob Storage (ADLS), and Google Cloud Storage (GCS) when the underlying Hive metastore is configured for cloud storage. See [Hive Catalog with Cloud Storage](#hive-catalog-with-cloud-storage) below.
+- **Authentication.** `simple` and `Kerberos` are supported. For Kerberos, set the `kerberos.principal` and `kerberos.keytab-uri` properties together with the related `gravitino.bypass.hadoop.security.authentication`, `gravitino.bypass.hive.metastore.kerberos.principal`, and `gravitino.bypass.hive.metastore.sasl.enabled` Hadoop-security keys.
+- **No column default values.**
+- **No table indexes.** Hive removed native table indexes after 2.x; use partitioning and bucketing for pruning instead. See [Table Indexes](#table-indexes).
+- **Alter Partition is under development.** Other Hive Alter operations (table, column) are supported; see [Alter Operations](#alter-operations) for the full mapping.
 
-:::note
-The Hive catalog supports HMS versions 2.x and 3.x, and automatically detects which version is in use.
-:::
+## Quick Start
+
+Create a minimum-viable Hive catalog and confirm it is reachable. The example assumes a Gravitino server at `http://localhost:8090`, a metalake named `test`, and a Hive Metastore Service at `thrift://localhost:9083`. Adjust the values for your environment.
+
+### Create the Catalog
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "hive_catalog",
+    "type": "RELATIONAL",
+    "comment": "Hive catalog",
+    "provider": "hive",
+    "properties": {
+      "metastore.uris": "thrift://localhost:9083"
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs
+```
+
+The response is a JSON object describing the created catalog.
+
+### Verify the Catalog
+
+```bash
+# List catalogs in the metalake. hive_catalog should appear.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs" | jq
+
+# Load the catalog directly and inspect its properties.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/hive_catalog" | jq
+
+# List schemas (Hive databases). The response typically includes at least the `default` database.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/hive_catalog/schemas" | jq
+```
+
+**Success check:** the catalog-list response includes `hive_catalog`, the load-catalog response shows `"provider":"hive"` and `metastore.uris` set to the Thrift URI, and the schema-list response includes at least the `default` database. If the schema-list call returns a Thrift connection error, verify the Hive metastore is running and reachable on the configured port, and confirm that the Gravitino server has network access to that port.
 
 ## Catalog
 
 ### Catalog Capabilities
 
-The Hive catalog supports creating, updating, and deleting databases and tables in the HMS.
+The Hive catalog:
+
+- Acts as a Gravitino front-end over a Hive Metastore Service or compatible implementation (for example, AWS Glue).
+- Supports creating, listing, loading, altering, and dropping Hive databases and tables.
+- Supports Hive table partitioning (Identity transform only), bucketing (Hash distribution only), and sort orders, matching what Hive natively supports.
+- Supports Hive views stored in the metastore as `VIRTUAL_VIEW`, with automatic dialect detection across Hive, Trino, and Spark.
+- Supports user impersonation (`impersonation-enable`) and Kerberos authentication.
+- Optionally hides non-Hive tables (Iceberg, Paimon, Hudi) from listings when `list-all-tables=false`.
 
 ### Catalog Properties
 
@@ -86,7 +134,9 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-The Hive catalog supports creating, updating, and deleting databases in the HMS.
+- A Gravitino schema corresponds to a Hive database in the Hive Metastore Service.
+- Supports creating, altering, and dropping Hive databases.
+- Supports a schema-level `location` property to override the default warehouse directory; see [Schema Properties](#schema-properties).
 
 ### Schema Properties
 
@@ -188,7 +238,7 @@ The following table lists predefined table properties for a Hive table. Addition
 
 ### Table Indexes
 
-The Hive catalog does not support table indexes.
+The Hive catalog does not support table indexes. Hive removed native indexing support after the 2.x line; the equivalent performance levers are partitioning and bucketing. See [Table Partitioning](#table-partitioning) and [Table Sort Orders and Distributions](#table-sort-orders-and-distributions) for the supported attributes.
 
 ### Table Operations
 
@@ -245,7 +295,7 @@ Support for altering partitions is under development.
 
 Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md) for more details.
 
-## Hive Catalog with S3 Storage
+## Hive Catalog with Cloud Storage
 
-To create a Hive catalog backed by S3 storage, see the [Hive catalog with S3](./hive-catalog-with-cloud-storage.md) documentation. No S3-specific catalog configuration is required; the Hive catalog works with S3 the same way it works with HDFS, with the storage path pointing at S3. Set the `location` property to the desired S3 path when creating the database or table.
+To create a Hive catalog backed by S3, Azure Blob Storage (ADLS), or Google Cloud Storage (GCS), see the [Hive catalog with cloud storage](./hive-catalog-with-cloud-storage.md) guide. No cloud-specific configuration is required on the Gravitino side; the Hive catalog works with cloud storage the same way it works with HDFS, with the storage path pointing at the cloud bucket or container. Set the `location` property to the desired cloud path when creating the database or table, and configure the underlying Hive metastore for the storage backend as described in the cloud-storage guide.
 
