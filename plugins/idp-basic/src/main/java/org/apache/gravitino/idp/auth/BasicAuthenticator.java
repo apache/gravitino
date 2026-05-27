@@ -80,15 +80,15 @@ public class BasicAuthenticator implements Authenticator {
 
   private String requireBasicAuthHeader(byte[] tokenData) {
     if (tokenData == null) {
-      throw unauthorized("Empty token authorization header");
+      throw new UnauthorizedException("Empty token authorization header", BASIC_CHALLENGE);
     }
 
     String authData = new String(tokenData, StandardCharsets.UTF_8);
     if (authData.trim().isEmpty()) {
-      throw unauthorized("Empty token authorization header");
+      throw new UnauthorizedException("Empty token authorization header", BASIC_CHALLENGE);
     }
     if (!authData.startsWith(AuthConstants.AUTHORIZATION_BASIC_HEADER)) {
-      throw unauthorized("Invalid token authorization header");
+      throw new UnauthorizedException("Invalid token authorization header", BASIC_CHALLENGE);
     }
     return authData;
   }
@@ -105,13 +105,15 @@ public class BasicAuthenticator implements Authenticator {
           new String(Base64.getDecoder().decode(credential), StandardCharsets.UTF_8);
       String[] parts = decodedCredential.split(":", 2);
       if (parts.length != 2) {
-        throw unauthorized(
-            "Malformed Basic authorization header: credentials must be in username:password format");
+        throw new UnauthorizedException(
+            "Malformed Basic authorization header: credentials must be in username:password format",
+            BASIC_CHALLENGE);
       }
 
       String username = parts[0];
       if (username.isEmpty()) {
-        throw unauthorized("Malformed Basic authorization header: username must not be empty");
+        throw new UnauthorizedException(
+            "Malformed Basic authorization header: username must not be empty", BASIC_CHALLENGE);
       }
 
       String password = parts[1];
@@ -132,10 +134,6 @@ public class BasicAuthenticator implements Authenticator {
             .map(groupName -> new UserGroup(Optional.empty(), groupName))
             .collect(Collectors.toList());
     return new UserPrincipal(user.name(), groups, authData);
-  }
-
-  private static UnauthorizedException unauthorized(String message) {
-    return new UnauthorizedException(message, BASIC_CHALLENGE);
   }
 
   private static final class BasicCredentials {
