@@ -29,7 +29,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
@@ -43,8 +42,6 @@ import org.apache.gravitino.storage.relational.utils.POConverters;
 public final class ServiceAdminInitializer {
 
   static final String INITIAL_ADMIN_PASSWORD_ENV = "GRAVITINO_INITIAL_ADMIN_PASSWORD";
-
-  private static final String BASIC_AUTHENTICATOR = AuthenticatorType.BASIC.name().toLowerCase();
 
   private ServiceAdminInitializer() {}
 
@@ -69,11 +66,6 @@ public final class ServiceAdminInitializer {
       IdGenerator idGenerator,
       @Nullable String initialAdminPasswords)
       throws IOException {
-    List<String> authenticators = config.get(Configs.AUTHENTICATORS);
-    if (authenticators == null || !authenticators.contains(BASIC_AUTHENTICATOR)) {
-      return;
-    }
-
     List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
     if (serviceAdmins == null || serviceAdmins.isEmpty()) {
       return;

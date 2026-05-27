@@ -36,8 +36,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * filter after the servlet {@code AuthenticationFilter} has authenticated the caller and populated
  * the current user principal.
  *
- * <p>Registered only when {@code basic} is configured in {@link Configs#AUTHENTICATORS}. Scoped to
- * resources annotated with {@link IdpManagement} via Jersey name binding.
+ * <p>Scoped to resources annotated with {@link IdpManagement} via Jersey name binding.
  */
 @IdpManagement
 public class IdpAuthorizationFilter implements ContainerRequestFilter {

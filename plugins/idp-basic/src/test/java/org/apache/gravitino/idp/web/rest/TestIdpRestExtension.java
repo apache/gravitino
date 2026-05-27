@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.idp.web.rest;
 
+import static org.apache.gravitino.Configs.AUTHENTICATORS;
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
@@ -27,7 +28,9 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_M
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.apache.gravitino.Configs.REST_API_EXTENSION_PACKAGES;
+import static org.apache.gravitino.Configs.SERVICE_ADMINS;
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
+import static org.apache.gravitino.integration.test.util.BaseIT.setEnv;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
@@ -64,6 +67,10 @@ public class TestIdpRestExtension {
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String IDP_REST_EXTENSION_PACKAGE =
       "org.apache.gravitino.idp.web.rest.feature";
+  private static final String BASIC_AUTHENTICATOR_CLASS =
+      "org.apache.gravitino.idp.auth.BasicAuthenticator";
+  private static final String INITIAL_ADMIN_PASSWORD_ENV = "GRAVITINO_INITIAL_ADMIN_PASSWORD";
+  private static final String ADMIN_PASSWORD = "Passw0rd-For-Admin1";
   private static final HttpClient HTTP = HttpClient.newHttpClient();
 
   private int httpPort;
@@ -92,13 +99,11 @@ public class TestIdpRestExtension {
   }
 
   @Test
-  public void testWithExtensionWithoutBasicAuthenticator() throws Exception {
+  public void testWithExtensionRegistersIdpRoutes() throws Exception {
+    setEnv(INITIAL_ADMIN_PASSWORD_ENV, ADMIN_PASSWORD);
     try (ServerHarness harness = startServer(newConfig(true))) {
       HttpResponse<String> response = getUser(harness.port(), "missing-user");
-      assertEquals(404, response.statusCode());
-      assertFalse(
-          isNotFoundError(response.body()),
-          "IdP REST routes should not be registered when basic authenticator is disabled");
+      assertEquals(401, response.statusCode());
     }
   }
 
@@ -120,7 +125,10 @@ public class TestIdpRestExtension {
             .put(CACHE_ENABLED.getKey(), "false")
             .put(ENABLE_AUTHORIZATION.getKey(), "false");
     if (enableExtension) {
-      builder.put(REST_API_EXTENSION_PACKAGES.getKey(), IDP_REST_EXTENSION_PACKAGE);
+      builder
+          .put(REST_API_EXTENSION_PACKAGES.getKey(), IDP_REST_EXTENSION_PACKAGE)
+          .put(SERVICE_ADMINS.getKey(), "admin")
+          .put(AUTHENTICATORS.getKey(), BASIC_AUTHENTICATOR_CLASS);
     }
 
     ServerConfig serverConfig = new ServerConfig();

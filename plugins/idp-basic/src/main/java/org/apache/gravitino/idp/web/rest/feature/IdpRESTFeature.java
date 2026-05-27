@@ -19,7 +19,6 @@
 package org.apache.gravitino.idp.web.rest.feature;
 
 import java.io.IOException;
-import java.util.List;
 import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.FeatureContext;
 import javax.ws.rs.ext.Provider;
@@ -34,20 +33,16 @@ import org.apache.gravitino.idp.web.rest.IdpGroupOperations;
 import org.apache.gravitino.idp.web.rest.IdpUserOperations;
 
 /**
- * Conditionally registers built-in IdP REST resources when {@code basic} is configured in {@link
- * Configs#AUTHENTICATORS}.
+ * Registers built-in IdP REST resources for the idp-basic plugin.
  *
  * <p>Configure {@link Configs#REST_API_EXTENSION_PACKAGES} to {@code
- * org.apache.gravitino.idp.web.rest.feature} so Jersey only auto-discovers this feature. IdP REST
- * resource classes remain in {@code org.apache.gravitino.idp.web.rest} and are registered here only
- * when the {@code basic} authenticator is enabled. Also initializes configured service admins in
- * the built-in IdP when they do not yet exist and starts the built-in IdP garbage collector.
+ * org.apache.gravitino.idp.web.rest.feature} so Jersey auto-discovers this feature. IdP REST
+ * resource classes remain in {@code org.apache.gravitino.idp.web.rest} and are registered here.
+ * Also initializes configured service admins in the built-in IdP when they do not yet exist and
+ * starts the built-in IdP garbage collector.
  */
 @Provider
 public class IdpRESTFeature implements Feature {
-
-  /** Authenticator name that enables built-in IdP management APIs. */
-  public static final String BASIC_AUTHENTICATOR = "basic";
 
   @Override
   public boolean configure(FeatureContext context) {
@@ -65,15 +60,5 @@ public class IdpRESTFeature implements Feature {
     context.register(IdpGroupOperations.class);
     context.register(IdpAuthorizationFilter.class);
     return true;
-  }
-
-  /**
-   * Returns whether built-in IdP management REST APIs should be registered.
-   *
-   * @param authenticators configured authenticator names
-   * @return {@code true} when {@code basic} is included in {@code authenticators}
-   */
-  public static boolean basicAuthenticatorEnabled(List<String> authenticators) {
-    return authenticators != null && authenticators.contains(BASIC_AUTHENTICATOR);
   }
 }

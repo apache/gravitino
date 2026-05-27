@@ -62,7 +62,7 @@ class TestServiceAdminInitializer {
 
   @Test
   void testInitializeCreatesMissingServiceAdmin() throws IOException {
-    loadConfig("basic", "admin1,admin2");
+    loadConfig("admin1,admin2");
     when(userMetaService.getIdpUserByUsername("admin1"))
         .thenThrow(new NotFoundException("IdP user not found: %s", "admin1"));
     when(userMetaService.getIdpUserByUsername("admin2")).thenReturn(existingUser("admin2"));
@@ -82,22 +82,15 @@ class TestServiceAdminInitializer {
   }
 
   @Test
-  void testInitializeSkipsWhenBasicAuthenticatorDisabledEvenIfPayloadInvalid() throws IOException {
-    loadConfig("simple", "admin1");
-    initializeWithPayload("short");
-    verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
-  }
-
-  @Test
   void testInitializeSkipsWhenNoServiceAdminsConfigured() throws IOException {
-    loadConfig("basic", "");
+    loadConfig("");
     initializeWithPayload("Passw0rd-For-Admin1");
     verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
   }
 
   @Test
   void testInitializeSkipsWhenAllServiceAdminsAlreadyExist() throws IOException {
-    loadConfig("basic", "admin1,admin2");
+    loadConfig("admin1,admin2");
     when(userMetaService.getIdpUserByUsername("admin1")).thenReturn(existingUser("admin1"));
     when(userMetaService.getIdpUserByUsername("admin2")).thenReturn(existingUser("admin2"));
 
@@ -111,7 +104,7 @@ class TestServiceAdminInitializer {
 
   @Test
   void testInitializeFailsWhenRequiredPasswordMissing() throws IOException {
-    loadConfig("basic", "admin1");
+    loadConfig("admin1");
     when(userMetaService.getIdpUserByUsername("admin1"))
         .thenThrow(new NotFoundException("IdP user not found: %s", "admin1"));
 
@@ -128,7 +121,7 @@ class TestServiceAdminInitializer {
   @ParameterizedTest
   @MethodSource("invalidPasswordPayloads")
   void testInitializeFailsOnInvalidPasswordPayload(String payload, String expectedMessage) {
-    loadConfig("basic", "admin1");
+    loadConfig("admin1");
 
     IllegalArgumentException exception =
         assertThrows(IllegalArgumentException.class, () -> initializeWithPayload(payload));
@@ -139,7 +132,7 @@ class TestServiceAdminInitializer {
 
   @Test
   void testInitializeUsesSamePasswordForAllMissingServiceAdmins() throws IOException {
-    loadConfig("basic", "admin1,admin2");
+    loadConfig("admin1,admin2");
     when(userMetaService.getIdpUserByUsername("admin1"))
         .thenThrow(new NotFoundException("IdP user not found: %s", "admin1"));
     when(userMetaService.getIdpUserByUsername("admin2"))
@@ -175,12 +168,9 @@ class TestServiceAdminInitializer {
         .build();
   }
 
-  private void loadConfig(String authenticators, String serviceAdmins) {
+  private void loadConfig(String serviceAdmins) {
     config.loadFromMap(
-        ImmutableMap.of(
-            "gravitino.authenticators", authenticators,
-            "gravitino.authorization.serviceAdmins", serviceAdmins),
-        t -> true);
+        ImmutableMap.of("gravitino.authorization.serviceAdmins", serviceAdmins), t -> true);
   }
 
   private void initializeWithoutPayload() throws IOException {
