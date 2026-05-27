@@ -50,7 +50,6 @@ in the relational entity store.
 
 To enable Basic mode:
 
-- Set `gravitino.authenticators` to `org.apache.gravitino.idp.auth.BasicAuthenticator`.
 - Set `gravitino.server.rest.extensionPackages` to `org.apache.gravitino.idp.web.rest.feature`.
 - Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
   the built-in IDP.
@@ -364,7 +363,6 @@ This example shows how to enable built-in Basic authentication.
 Append the following to `conf/gravitino.conf`:
 
 ```text
-gravitino.authenticators = org.apache.gravitino.idp.auth.BasicAuthenticator
 gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
 gravitino.authorization.serviceAdmins = admin
 ```

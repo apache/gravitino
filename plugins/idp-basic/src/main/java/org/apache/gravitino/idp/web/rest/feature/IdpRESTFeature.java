@@ -19,12 +19,15 @@
 package org.apache.gravitino.idp.web.rest.feature;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.FeatureContext;
 import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
@@ -45,6 +48,25 @@ import org.slf4j.LoggerFactory;
 public class IdpRESTFeature implements Feature {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpRESTFeature.class);
+
+  public static final String IDP_REST_EXTENSION_PACKAGE = IdpRESTFeature.class.getPackageName();
+
+  public static final String BASIC_AUTHENTICATOR_CLASS =
+      BasicAuthenticator.class.getCanonicalName();
+
+  public static void apply(Config config) {
+    List<String> extensionPackages = config.get(Configs.REST_API_EXTENSION_PACKAGES);
+    if (extensionPackages == null || !extensionPackages.contains(IDP_REST_EXTENSION_PACKAGE)) {
+      return;
+    }
+
+    List<String> authenticators = new ArrayList<>(config.get(Configs.AUTHENTICATORS));
+    if (authenticators.contains(BASIC_AUTHENTICATOR_CLASS)) {
+      return;
+    }
+    authenticators.add(0, BASIC_AUTHENTICATOR_CLASS);
+    config.set(Configs.AUTHENTICATORS, authenticators);
+  }
 
   @Override
   public boolean configure(FeatureContext context) {

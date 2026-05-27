@@ -137,14 +137,15 @@ class TestBasicAuthenticator {
     String credential =
         Base64.getEncoder().encodeToString("aliceonly".getBytes(StandardCharsets.UTF_8));
 
-    BadRequestException exception =
+    UnauthorizedException exception =
         assertThrows(
-            BadRequestException.class,
+            UnauthorizedException.class,
             () -> authenticator.authenticateToken(basicAuthBytesWithCredential(credential)));
 
     assertEquals(
         "Malformed Basic authorization header: credentials must be in username:password format",
         exception.getMessage());
+    assertEquals("Basic", exception.getChallenges().get(0));
   }
 
   @Test
@@ -153,13 +154,14 @@ class TestBasicAuthenticator {
     String credential =
         Base64.getEncoder().encodeToString(":password".getBytes(StandardCharsets.UTF_8));
 
-    BadRequestException exception =
+    UnauthorizedException exception =
         assertThrows(
-            BadRequestException.class,
+            UnauthorizedException.class,
             () -> authenticator.authenticateToken(basicAuthBytesWithCredential(credential)));
 
     assertEquals(
         "Malformed Basic authorization header: username must not be empty", exception.getMessage());
+    assertEquals("Basic", exception.getChallenges().get(0));
   }
 
   @Test

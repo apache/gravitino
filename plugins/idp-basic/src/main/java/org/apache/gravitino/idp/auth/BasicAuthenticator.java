@@ -105,14 +105,13 @@ public class BasicAuthenticator implements Authenticator {
           new String(Base64.getDecoder().decode(credential), StandardCharsets.UTF_8);
       String[] parts = decodedCredential.split(":", 2);
       if (parts.length != 2) {
-        throw new BadRequestException(
+        throw unauthorized(
             "Malformed Basic authorization header: credentials must be in username:password format");
       }
 
       String username = parts[0];
       if (username.isEmpty()) {
-        throw new BadRequestException(
-            "Malformed Basic authorization header: username must not be empty");
+        throw unauthorized("Malformed Basic authorization header: username must not be empty");
       }
 
       String password = parts[1];
