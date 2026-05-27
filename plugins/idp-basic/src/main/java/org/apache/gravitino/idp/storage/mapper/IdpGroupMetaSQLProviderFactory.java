@@ -20,7 +20,6 @@
 package org.apache.gravitino.idp.storage.mapper;
 
 import com.google.common.collect.ImmutableMap;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpGroupMetaBaseSQLProvider;
 import org.apache.gravitino.idp.storage.mapper.provider.h2.IdpGroupMetaH2Provider;
@@ -46,9 +45,21 @@ public class IdpGroupMetaSQLProviderFactory {
 
   private IdpGroupMetaSQLProviderFactory() {}
 
-  private static IdpGroupMetaBaseSQLProvider currentProvider() {
-    return SQLProviderFactoryHelper.currentProvider(
-        PROVIDER_MAP, IdpGroupMetaSQLProviderFactory.class);
+  public static String selectIdpGroup(@Param("groupName") String groupName) {
+    return currentProvider().selectIdpGroup(groupName);
+  }
+
+  public static String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
+    return currentProvider().insertIdpGroup(groupPO);
+  }
+
+  public static String softDeleteIdpGroup(@Param("groupName") String groupName) {
+    return currentProvider().softDeleteIdpGroup(groupName);
+  }
+
+  public static String deleteIdpGroupMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return currentProvider().deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit);
   }
 
   static IdpGroupMetaBaseSQLProvider getProvider(String databaseId) {
@@ -56,24 +67,8 @@ public class IdpGroupMetaSQLProviderFactory {
         databaseId, PROVIDER_MAP, IdpGroupMetaSQLProviderFactory.class);
   }
 
-  public static String selectIdpGroup(@Param("groupName") String groupName) {
-    return currentProvider().selectIdpGroup(groupName);
-  }
-
-  public static String selectIdpGroups(@Param("groupNames") List<String> groupNames) {
-    return currentProvider().selectIdpGroups(groupNames);
-  }
-
-  public static String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
-    return currentProvider().insertIdpGroup(groupPO);
-  }
-
-  public static String softDeleteIdpGroup(@Param("groupId") Long groupId) {
-    return currentProvider().softDeleteIdpGroup(groupId);
-  }
-
-  public static String deleteIdpGroupMetasByLegacyTimeline(
-      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
-    return currentProvider().deleteIdpGroupMetasByLegacyTimeline(legacyTimeline, limit);
+  private static IdpGroupMetaBaseSQLProvider currentProvider() {
+    return SQLProviderFactoryHelper.currentProvider(
+        PROVIDER_MAP, IdpGroupMetaSQLProviderFactory.class);
   }
 }

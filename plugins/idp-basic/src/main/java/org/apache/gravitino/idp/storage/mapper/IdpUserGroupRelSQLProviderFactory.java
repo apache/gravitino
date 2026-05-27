@@ -46,16 +46,6 @@ public class IdpUserGroupRelSQLProviderFactory {
 
   private IdpUserGroupRelSQLProviderFactory() {}
 
-  private static IdpUserGroupRelBaseSQLProvider currentProvider() {
-    return SQLProviderFactoryHelper.currentProvider(
-        PROVIDER_MAP, IdpUserGroupRelSQLProviderFactory.class);
-  }
-
-  static IdpUserGroupRelBaseSQLProvider getProvider(String databaseId) {
-    return SQLProviderFactoryHelper.getProvider(
-        databaseId, PROVIDER_MAP, IdpUserGroupRelSQLProviderFactory.class);
-  }
-
   public static String selectGroupNamesByUsername(@Param("username") String username) {
     return currentProvider().selectGroupNamesByUsername(username);
   }
@@ -84,5 +74,15 @@ public class IdpUserGroupRelSQLProviderFactory {
   public static String deleteIdpUserGroupRelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return currentProvider().deleteIdpUserGroupRelMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  static IdpUserGroupRelBaseSQLProvider getProvider(String databaseId) {
+    return SQLProviderFactoryHelper.getProvider(
+        databaseId, PROVIDER_MAP, IdpUserGroupRelSQLProviderFactory.class);
+  }
+
+  private static IdpUserGroupRelBaseSQLProvider currentProvider() {
+    return SQLProviderFactoryHelper.currentProvider(
+        PROVIDER_MAP, IdpUserGroupRelSQLProviderFactory.class);
   }
 }

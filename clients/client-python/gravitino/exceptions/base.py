@@ -263,3 +263,11 @@ class NoSuchUserException(NotFoundException):
 
 class UserAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a user already exists."""
+
+
+class NoSuchGroupException(NotFoundException):
+    """An exception thrown when a group is not found."""
+
+
+class GroupAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a group already exists."""

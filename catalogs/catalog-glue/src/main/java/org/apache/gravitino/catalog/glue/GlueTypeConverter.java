@@ -258,9 +258,9 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     int start = 0;
     for (int i = 0; i < s.length(); i++) {
       char c = s.charAt(i);
-      if (c == '<') {
+      if (c == '<' || c == '(') {
         depth++;
-      } else if (c == '>') {
+      } else if (c == '>' || c == ')') {
         depth--;
       } else if (c == ',' && depth == 0) {
         parts.add(s.substring(start, i).trim());

@@ -50,12 +50,8 @@ class TestOwner(IntegrationTestEnv):
     def setUpClass(cls):
         cls._get_gravitino_home()
         conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        cls._reset_conf(
-            {"gravitino.authorization.enable": "true"}, conf_path
-        )
-        cls._append_conf(
-            {"gravitino.authorization.enable": "true"}, conf_path
-        )
+        cls._reset_conf({"gravitino.authorization.enable": "true"}, conf_path)
+        cls._append_conf({"gravitino.authorization.enable": "true"}, conf_path)
         if (
             os.environ.get("START_EXTERNAL_GRAVITINO") is not None
             and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
@@ -63,16 +59,12 @@ class TestOwner(IntegrationTestEnv):
             cls.restart_server()
         else:
             super().setUpClass()
-        cls.gravitino_admin_client = GravitinoAdminClient(
-            uri="http://localhost:8090"
-        )
+        cls.gravitino_admin_client = GravitinoAdminClient(uri="http://localhost:8090")
 
     @classmethod
     def tearDownClass(cls):
         conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
-        cls._reset_conf(
-            {"gravitino.authorization.enable": "false"}, conf_path
-        )
+        cls._reset_conf({"gravitino.authorization.enable": "false"}, conf_path)
         if (
             os.environ.get("START_EXTERNAL_GRAVITINO") is not None
             and os.environ.get("START_EXTERNAL_GRAVITINO").lower() == "true"
@@ -114,9 +106,7 @@ class TestOwner(IntegrationTestEnv):
             logger.warning("Failed to drop catalog %s", self.catalog_name)
 
         try:
-            self.gravitino_admin_client.drop_metalake(
-                self.metalake_name, force=True
-            )
+            self.gravitino_admin_client.drop_metalake(self.metalake_name, force=True)
         except GravitinoRuntimeException:
             logger.warning("Failed to drop metalake %s", self.metalake_name)
 
@@ -135,9 +125,7 @@ class TestOwner(IntegrationTestEnv):
         metalake_obj = MetadataObjects.of(
             [self.metalake_name], MetadataObject.Type.METALAKE
         )
-        self.gravitino_client.set_owner(
-            metalake_obj, self.test_user, Owner.Type.USER
-        )
+        self.gravitino_client.set_owner(metalake_obj, self.test_user, Owner.Type.USER)
 
         owner = self.gravitino_client.get_owner(metalake_obj)
         self.assertIsNotNone(owner)
@@ -157,9 +145,7 @@ class TestOwner(IntegrationTestEnv):
         self.assertTrue(len(owner.name()) > 0)
         self.assertEqual(Owner.Type.USER, owner.type())
 
-        self.gravitino_client.set_owner(
-            catalog_obj, self.test_user, Owner.Type.USER
-        )
+        self.gravitino_client.set_owner(catalog_obj, self.test_user, Owner.Type.USER)
         owner = self.gravitino_client.get_owner(catalog_obj)
         self.assertEqual(self.test_user, owner.name())
         self.assertEqual(Owner.Type.USER, owner.type())
@@ -171,9 +157,7 @@ class TestOwner(IntegrationTestEnv):
         schema_obj = MetadataObjects.of(
             [self.catalog_name, schema_name], MetadataObject.Type.SCHEMA
         )
-        self.gravitino_client.set_owner(
-            schema_obj, self.test_user, Owner.Type.USER
-        )
+        self.gravitino_client.set_owner(schema_obj, self.test_user, Owner.Type.USER)
 
         owner = self.gravitino_client.get_owner(schema_obj)
         self.assertIsNotNone(owner)

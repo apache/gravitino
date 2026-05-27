@@ -37,6 +37,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -334,6 +335,24 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     Object result = interceptor.invoke(invocation);
 
     assertNotEquals("PROCEEDED", result);
+  }
+
+  @Test
+  public void testShouldSkipAuthorizationReturnsFalseWhenCatalogDoesNotExist() {
+    IcebergCatalogWrapperManager wrapperManager = Mockito.mock(IcebergCatalogWrapperManager.class);
+    Mockito.when(wrapperManager.getCatalogWrapper(TEST_CATALOG))
+        .thenThrow(
+            new NoSuchCatalogException(
+                "Couldn't find Iceberg configuration for catalog %s", TEST_CATALOG));
+    resetContext(wrapperManager, true);
+
+    IcebergMetadataAuthorizationMethodInterceptor interceptor =
+        new IcebergMetadataAuthorizationMethodInterceptor();
+
+    assertFalse(
+        interceptor.shouldSkipAuthorization(
+            Map.of(Entity.EntityType.CATALOG, NameIdentifier.of(TEST_METALAKE, TEST_CATALOG))));
+    Mockito.verify(wrapperManager).getCatalogWrapper(TEST_CATALOG);
   }
 
   private void resetContext(IcebergCatalogWrapperManager wrapperManager) {

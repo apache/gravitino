@@ -18,14 +18,26 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergCatalogOperations {
+
+  private static final String METALAKE = "metalake";
+  private static final String CATALOG = "catalog";
+
   @Test
   public void testTestConnection() {
     IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
@@ -34,12 +46,53 @@ public class TestIcebergCatalogOperations {
             GravitinoRuntimeException.class,
             () ->
                 catalogOperations.testConnection(
-                    NameIdentifier.of("metalake", "catalog"),
+                    NameIdentifier.of(METALAKE, CATALOG),
                     Catalog.Type.RELATIONAL,
                     "iceberg",
                     "comment",
                     ImmutableMap.of()));
     Assertions.assertTrue(
         exception.getMessage().contains("Failed to run listNamespace on Iceberg catalog"));
+  }
+
+  @Test
+  public void testListSchemasConvertsMultiLevelNamespacesToLogicalNames() {
+    IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
+    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
+    catalogOperations.icebergCatalogWrapper = mockWrapper;
+
+    org.apache.iceberg.catalog.Namespace flatNs = org.apache.iceberg.catalog.Namespace.of("mydb");
+    org.apache.iceberg.catalog.Namespace hierarchicalNs =
+        org.apache.iceberg.catalog.Namespace.of("A", "B", "C");
+    ListNamespacesResponse mockResponse =
+        ListNamespacesResponse.builder().addAll(Arrays.asList(flatNs, hierarchicalNs)).build();
+    when(mockWrapper.listNamespace(any())).thenReturn(mockResponse);
+
+    NameIdentifier[] result = catalogOperations.listSchemas(Namespace.of(METALAKE, CATALOG));
+
+    Assertions.assertEquals(2, result.length);
+    // Flat namespace stays as-is.
+    Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "mydb".equals(id.name())));
+    // Multi-level Iceberg namespace is joined with the configured separator.
+    Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "A:B:C".equals(id.name())));
+  }
+
+  @Test
+  public void testListSchemasFlatOnlyReturnsUnchangedNames() {
+    IcebergCatalogWrapper mockWrapper = mock(IcebergCatalogWrapper.class);
+    IcebergCatalogOperations catalogOperations = new IcebergCatalogOperations();
+    catalogOperations.icebergCatalogWrapper = mockWrapper;
+
+    org.apache.iceberg.catalog.Namespace ns1 = org.apache.iceberg.catalog.Namespace.of("db1");
+    org.apache.iceberg.catalog.Namespace ns2 = org.apache.iceberg.catalog.Namespace.of("db2");
+    ListNamespacesResponse mockResponse =
+        ListNamespacesResponse.builder().addAll(Arrays.asList(ns1, ns2)).build();
+    when(mockWrapper.listNamespace(any())).thenReturn(mockResponse);
+
+    NameIdentifier[] result = catalogOperations.listSchemas(Namespace.of(METALAKE, CATALOG));
+
+    Assertions.assertEquals(2, result.length);
+    Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db1".equals(id.name())));
+    Assertions.assertTrue(Arrays.stream(result).anyMatch(id -> "db2".equals(id.name())));
   }
 }
