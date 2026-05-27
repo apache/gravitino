@@ -151,6 +151,8 @@ public class SparkTypeConverter {
       Types.FixedCharType charType = (Types.FixedCharType) gravitinoType;
       return CharType.apply((charType.length()));
     } else if (gravitinoType instanceof UUIDType) {
+      // Spark has no native UUID type. Represent UUID as StringType to align with
+      // Spark built-in PostgreSQL JDBC mapping (uuid -> StringType).
       return DataTypes.StringType;
     } else if (gravitinoType instanceof Types.BinaryType) {
       return DataTypes.BinaryType;
