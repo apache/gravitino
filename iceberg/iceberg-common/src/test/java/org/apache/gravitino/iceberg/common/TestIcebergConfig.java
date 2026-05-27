@@ -71,4 +71,16 @@ public class TestIcebergConfig {
     Assertions.assertFalse(
         icebergConfigWithNewKey.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ));
   }
+
+  @Test
+  public void testAsyncPurgeDefaults() {
+    IcebergConfig config = new IcebergConfig(ImmutableMap.of());
+    Assertions.assertEquals(2, config.get(IcebergConfig.ASYNC_PURGE_WORKER_THREADS));
+    Assertions.assertEquals(4, config.get(IcebergConfig.ASYNC_PURGE_DELETE_THREADS));
+    Assertions.assertEquals(1000, config.get(IcebergConfig.ASYNC_PURGE_DELETE_BATCH_SIZE));
+    Assertions.assertEquals(5000L, config.get(IcebergConfig.ASYNC_PURGE_POLL_INTERVAL_MS));
+    Assertions.assertEquals(300000L, config.get(IcebergConfig.ASYNC_PURGE_HEARTBEAT_TIMEOUT_MS));
+    Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_PURGE_MAX_ATTEMPTS));
+    Assertions.assertEquals(720, config.get(IcebergConfig.ASYNC_PURGE_RETENTION_HOURS));
+  }
 }

@@ -316,6 +316,55 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
 
+  public static final ConfigEntry<Integer> ASYNC_PURGE_WORKER_THREADS =
+      new ConfigBuilder("async-purge.worker-threads")
+          .doc("Worker pool size per server (concurrent async purge jobs).")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .createWithDefault(2);
+
+  public static final ConfigEntry<Integer> ASYNC_PURGE_DELETE_THREADS =
+      new ConfigBuilder("async-purge.delete-threads")
+          .doc("Server-wide file-delete pool size, shared across all purge jobs.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .createWithDefault(4);
+
+  public static final ConfigEntry<Integer> ASYNC_PURGE_DELETE_BATCH_SIZE =
+      new ConfigBuilder("async-purge.delete-batch-size")
+          .doc("Files per bulk-delete batch handed to the delete executor.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .createWithDefault(1000);
+
+  public static final ConfigEntry<Long> ASYNC_PURGE_POLL_INTERVAL_MS =
+      new ConfigBuilder("async-purge.poll-interval-ms")
+          .doc("Worker poll interval in milliseconds; also the retry interval.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .createWithDefault(5000L);
+
+  public static final ConfigEntry<Long> ASYNC_PURGE_HEARTBEAT_TIMEOUT_MS =
+      new ConfigBuilder("async-purge.heartbeat-timeout-ms")
+          .doc("Age in milliseconds after which a job with no heartbeat is reclaimable.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .longConf()
+          .createWithDefault(300000L);
+
+  public static final ConfigEntry<Integer> ASYNC_PURGE_MAX_ATTEMPTS =
+      new ConfigBuilder("async-purge.max-attempts")
+          .doc("Number of attempts before a purge job is marked FAILED.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .createWithDefault(5);
+
+  public static final ConfigEntry<Integer> ASYNC_PURGE_RETENTION_HOURS =
+      new ConfigBuilder("async-purge.retention-hours")
+          .doc("How long terminal (SUCCEEDED/FAILED) purge rows are retained before pruning.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .createWithDefault(720);
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }
