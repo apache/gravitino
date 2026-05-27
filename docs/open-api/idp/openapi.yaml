@@ -65,8 +65,116 @@ paths:
     $ref: "./idp.yaml#/paths/~1idp~1groups~1%7Bgroup%7D~1users"
 
 components:
+  schemas:
+    ErrorModel:
+      type: object
+      description: JSON error payload returned in a response with further details on the error
+      required:
+        - message
+        - type
+        - code
+      properties:
+        code:
+          type: integer
+          minimum: 1000
+          maximum: 1100
+          description: HTTP response code
+          example: 1002
+        type:
+          type: string
+          description: Internal type definition of the error
+        message:
+          type: string
+          description: A human-readable message
+        stack:
+          type: array
+          items:
+            type: string
+
+  responses:
+    BadRequestErrorResponse:
+      description:
+        Indicates a bad request error. It could be caused by an unexpected request
+        body format or other forms of request validation failure, such as invalid json.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "#/components/schemas/ErrorModel"
+          example: {
+            "code": 1003,
+            "type": "BadRequestException",
+            "message": "Malformed request"
+          }
+
+    ServerErrorResponse:
+      description:
+        A server-side problem that might not be addressable from the client side.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "#/components/schemas/ErrorModel"
+          example: {
+            "code": 1002,
+            "type": "RuntimeException",
+            "message": "Internal Server Error",
+            "stack": [
+              "java.lang.RuntimeException: Internal Server Error"
+            ]
+          }
+
+    RemoveResponse:
+      description: Represents a response for a remove operation
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              removed:
+                type: boolean
+                description: Whether the remove operation was successful
+
+  parameters:
+    user:
+      name: user
+      in: path
+      description: The username of the built-in IdP user
+      required: true
+      schema:
+        type: string
+
+    group:
+      name: group
+      in: path
+      description: The name of the built-in IdP group
+      required: true
+      schema:
+        type: string
+
+    force:
+      name: force
+      in: query
+      description: Force the operation to be executed
+      required: false
+      schema:
+        type: boolean
+        default: false
+
   securitySchemes:
     OAuth2WithJWT:
-      $ref: "../openapi.yaml#/components/securitySchemes/OAuth2WithJWT"
+      type: oauth2
+      description: OAuth2 with JWT
+      flows:
+        clientCredentials:
+          tokenUrl: https://external-oauth-server.com/token
+          scopes:
+            serviceAudience: The audience name when Gravitino uses OAuth as the authenticator.
+
     BasicAuth:
-      $ref: "../openapi.yaml#/components/securitySchemes/BasicAuth"
+      type: http
+      scheme: basic
