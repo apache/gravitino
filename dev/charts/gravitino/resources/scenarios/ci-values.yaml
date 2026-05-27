@@ -19,17 +19,16 @@
 mysql:
   enabled: true
 
-visibleConfigs: "gravitino.datastrato.custom.authorization.ranger.admin.url,gravitino.datastrato.custom.authorization.ranger.username,gravitino.datastrato.custom.authorization.ranger.password,gravitino.datastrato.custom.authorization.ranger.auth.type"
+visibleConfigs: "gravitino.custom.example.url,gravitino.custom.example.username,gravitino.custom.example.password,gravitino.custom.example.auth.type"
 
 visibleConfigsItems:
-  gravitino.datastrato.custom.authorization.ranger.admin.url: "http://ranger:6080"
-  gravitino.datastrato.custom.authorization.ranger.username: admin
-  gravitino.datastrato.custom.authorization.ranger.password: "rangerR0cks!"
-  gravitino.datastrato.custom.authorization.ranger.auth.type: simple
+  gravitino.custom.example.url: "http://example:6080"
+  gravitino.custom.example.username: admin
+  gravitino.custom.example.password: "exampleR0cks!"
+  gravitino.custom.example.auth.type: simple
 
 additionalConfigItems:
-  gravitino.testAdditionalConfigItems.names: audit,sync
-  gravitino.testAdditionalConfigItems.names.test: test
+  gravitino.eventListener.names: "audit,sync"
 
 extraVolumeMounts:
   - name: gravitino-log
