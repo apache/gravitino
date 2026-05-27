@@ -24,44 +24,48 @@ import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestResetPasswordRequest {
+public class TestChangePasswordRequest {
+
+  private static final String VALID_PASSWORD = "new_password12";
 
   @Test
-  public void testResetPasswordRequestSerDe() throws JsonProcessingException {
-    ResetPasswordRequest request = new ResetPasswordRequest("new_password");
+  public void testChangePasswordRequestSerDe() throws JsonProcessingException {
+    ChangePasswordRequest request = new ChangePasswordRequest(VALID_PASSWORD);
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
-    ResetPasswordRequest deserRequest =
-        JsonUtils.objectMapper().readValue(serJson, ResetPasswordRequest.class);
+    ChangePasswordRequest deserRequest =
+        JsonUtils.objectMapper().readValue(serJson, ChangePasswordRequest.class);
 
     Assertions.assertEquals(request, deserRequest);
-    Assertions.assertEquals("new_password", deserRequest.getPassword());
+    Assertions.assertEquals(VALID_PASSWORD, deserRequest.getPassword());
 
     // Test with null password
-    ResetPasswordRequest request1 = new ResetPasswordRequest();
+    ChangePasswordRequest request1 = new ChangePasswordRequest();
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(request1);
-    ResetPasswordRequest deserRequest1 =
-        JsonUtils.objectMapper().readValue(serJson1, ResetPasswordRequest.class);
+    ChangePasswordRequest deserRequest1 =
+        JsonUtils.objectMapper().readValue(serJson1, ChangePasswordRequest.class);
 
     Assertions.assertEquals(request1, deserRequest1);
     Assertions.assertNull(deserRequest1.getPassword());
   }
 
   @Test
-  public void testResetPasswordRequestValidate() {
-    Assertions.assertDoesNotThrow(() -> new ResetPasswordRequest("new_password").validate());
+  public void testChangePasswordRequestValidate() {
+    Assertions.assertDoesNotThrow(() -> new ChangePasswordRequest(VALID_PASSWORD).validate());
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new ResetPasswordRequest().validate());
+        IllegalArgumentException.class, () -> new ChangePasswordRequest().validate());
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new ResetPasswordRequest(" ").validate());
+        IllegalArgumentException.class, () -> new ChangePasswordRequest(" ").validate());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new ChangePasswordRequest("short").validate());
   }
 
   @Test
-  public void testResetPasswordRequestToStringDoesNotExposePassword() {
-    String requestString = new ResetPasswordRequest("new_password").toString();
+  public void testChangePasswordRequestToStringDoesNotExposePassword() {
+    String requestString = new ChangePasswordRequest(VALID_PASSWORD).toString();
 
-    Assertions.assertFalse(requestString.contains("new_password"));
+    Assertions.assertFalse(requestString.contains(VALID_PASSWORD));
     Assertions.assertFalse(requestString.contains("password="));
     Assertions.assertFalse(requestString.contains("\"password\""));
   }

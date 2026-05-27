@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.basic.password.PasswordHasherFactory;
+import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
@@ -104,7 +105,8 @@ public class IdpUserGroupManager implements Closeable {
    *
    * @param username The username.
    * @param password The new plaintext password.
-   * @return True if the password was updated, false if the user did not exist.
+   * @return {@code true} if the password was updated
+   * @throws NotFoundException if the user does not exist
    */
   public boolean changePassword(String username, String password) {
     return USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password));
