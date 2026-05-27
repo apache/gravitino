@@ -1,0 +1,84 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino lance rest server ingress
+templates:
+  - ingress.yaml
+tests:
+  - it: does not render ingress by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders networking v1 ingress for supported Kubernetes versions
+    release:
+      name: lance-rest
+    capabilities:
+      majorVersion: 1
+      minorVersion: 29
+    set:
+      ingress:
+        enabled: true
+        className: nginx
+        annotations:
+          nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+        hosts:
+          - host: lance-rest.example.com
+            paths:
+              - path: /lance
+                pathType: Prefix
+        tls:
+          - secretName: lance-rest-tls
+            hosts:
+              - lance-rest.example.com
+    asserts:
+      - isAPIVersion:
+          of: networking.k8s.io/v1
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.name
+          value: lance-rest-gravitino-lance-rest-server-helm
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/proxy-read-timeout"]
+          value: "3600"
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+      - equal:
+          path: spec.rules[0].host
+          value: lance-rest.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /lance
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: Prefix
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: lance-rest-gravitino-lance-rest-server-helm
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 9101
+      - equal:
+          path: spec.tls[0].secretName
+          value: lance-rest-tls
+      - contains:
+          path: spec.tls[0].hosts
+          content: lance-rest.example.com
