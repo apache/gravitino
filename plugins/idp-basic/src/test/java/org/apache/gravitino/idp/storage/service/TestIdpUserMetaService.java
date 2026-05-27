@@ -19,7 +19,6 @@
 package org.apache.gravitino.idp.storage.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -27,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.gravitino.idp.exception.AlreadyExistsException;
 import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.junit.jupiter.api.Tag;
@@ -67,7 +67,8 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
 
     assertThrows(NotFoundException.class, () -> userMetaService.getIdpUserByUsername("user1"));
     runServiceCall(() -> userMetaService.insertIdpUser(user1));
-    runServiceCall(() -> groupMetaService.addUsersToGroup("group1", List.of("user1")));
+    runServiceCall(
+        () -> groupMetaService.changeGroupMembership("group1", List.of("user1"), List.of()));
     assertEquals("user1", userMetaService.getIdpUserByUsername("user1").getUsername());
     assertIterableEquals(List.of("group1"), userMetaService.listGroupNamesByUsername("user1"));
 
@@ -80,7 +81,7 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
-    assertThrowsRuntimeException(() -> userMetaService.insertIdpUser(duplicateUser));
+    assertThrows(AlreadyExistsException.class, () -> userMetaService.insertIdpUser(duplicateUser));
   }
 
   @ParameterizedTest
@@ -90,13 +91,16 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
     insertUsers(1);
     IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
 
-    runServiceCall(() -> assertFalse(userMetaService.updateIdpUserPassword("missing", "hash-2")));
+    closeSession();
+    assertThrows(
+        NotFoundException.class, () -> userMetaService.updateIdpUserPassword("missing", "hash-2"));
+    refreshSession();
 
     runServiceCall(() -> assertTrue(userMetaService.updateIdpUserPassword("user1", "hash-2")));
     assertEquals("hash-2", userMetaService.getIdpUserByUsername("user1").getPasswordHash());
     assertEquals(1L, userMetaService.getIdpUserByUsername("user1").getCurrentVersion());
 
-    runServiceCall(() -> assertFalse(userMetaService.updateIdpUserPassword("user1", "hash-2")));
+    runServiceCall(() -> assertTrue(userMetaService.updateIdpUserPassword("user1", "hash-2")));
   }
 
   @ParameterizedTest

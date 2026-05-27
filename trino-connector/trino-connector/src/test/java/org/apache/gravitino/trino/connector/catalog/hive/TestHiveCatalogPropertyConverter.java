@@ -22,6 +22,7 @@ package org.apache.gravitino.trino.connector.catalog.hive;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
@@ -66,7 +67,8 @@ public class TestHiveCatalogPropertyConverter {
             name, "hive", "test catalog", Catalog.Type.RELATIONAL, properties);
     HiveConnectorAdapter adapter = new HiveConnectorAdapter();
     Map<String, String> config =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
+        adapter.buildInternalConnectorConfig(
+            new GravitinoCatalog("test", mockCatalog), new Credential[0]);
 
     // test converted properties
     Assertions.assertEquals(config.get("hive.metastore.uri"), "thrift://localhost:9083");

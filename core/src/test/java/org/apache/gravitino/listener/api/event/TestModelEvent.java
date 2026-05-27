@@ -907,6 +907,7 @@ class TestModelEvent {
     Assertions.assertEquals(existingIdentA, listModelVersionsEvent.identifier());
     Assertions.assertEquals(2, listModelVersionsEvent.versions().length);
     Assertions.assertArrayEquals(new int[] {1, 2}, listModelVersionsEvent.versions());
+    Assertions.assertEquals(2, listModelVersionsEvent.resultCount());
   }
 
   @Test
@@ -933,6 +934,7 @@ class TestModelEvent {
     Assertions.assertEquals(existingIdentA, listModelVersionInfosEvent.identifier());
     Assertions.assertEquals(1, listModelVersionInfosEvent.versions().length);
     checkModelVersionInfo(listModelVersionInfosEvent.versions()[0], firstModelVersion);
+    Assertions.assertEquals(1, listModelVersionInfosEvent.resultCount());
   }
 
   @Test

@@ -107,17 +107,31 @@ import org.apache.gravitino.listener.api.event.PartitionExistsEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
+import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
+import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.CreateViewEvent;
+import org.apache.gravitino.listener.api.event.view.CreateViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.DropViewEvent;
+import org.apache.gravitino.listener.api.event.view.DropViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.ListViewEvent;
+import org.apache.gravitino.listener.api.event.view.ListViewFailureEvent;
+import org.apache.gravitino.listener.api.event.view.LoadViewEvent;
+import org.apache.gravitino.listener.api.event.view.LoadViewFailureEvent;
 import org.apache.gravitino.listener.api.info.CatalogInfo;
 import org.apache.gravitino.listener.api.info.FilesetInfo;
 import org.apache.gravitino.listener.api.info.MetalakeInfo;
 import org.apache.gravitino.listener.api.info.SchemaInfo;
 import org.apache.gravitino.listener.api.info.TableInfo;
 import org.apache.gravitino.listener.api.info.TopicInfo;
+import org.apache.gravitino.listener.api.info.ViewInfo;
 import org.apache.gravitino.listener.api.info.partitions.IdentityPartitionInfo;
 import org.apache.gravitino.listener.api.info.partitions.PartitionInfo;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
@@ -162,6 +176,10 @@ public class TestOperation {
 
   private TopicInfo topicInfo;
 
+  private NameIdentifier viewIdentifier;
+
+  private ViewInfo viewInfo;
+
   private NameIdentifier partitionIdentifier;
 
   private PartitionInfo partitionInfo;
@@ -187,6 +205,9 @@ public class TestOperation {
     this.topicIdentifier = mockTopicIdentifier();
     this.topicInfo = mockTopicInfo();
 
+    this.viewIdentifier = mockViewIdentifier();
+    this.viewInfo = mockViewInfo();
+
     this.filesetIdentifier = mockFilesetIdentifier();
     this.filesetInfo = mockFilesetInfo();
 
@@ -198,51 +219,59 @@ public class TestOperation {
   public void testCreateOperation() {
     Event createMetalakeEvent = new CreateMetalakeEvent(USER, catalogIdentifier, metalakeInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createMetalakeEvent), AuditLog.Operation.CREATE_METALAKE);
+        AuditLog.Operation.CREATE_METALAKE, AuditLog.Operation.fromEvent(createMetalakeEvent));
     Event createMetalakeFaileEvent =
         new CreateMetalakeFailureEvent(USER, metalakeIdentifier, new Exception(), metalakeInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createMetalakeFaileEvent), AuditLog.Operation.CREATE_METALAKE);
+        AuditLog.Operation.CREATE_METALAKE, AuditLog.Operation.fromEvent(createMetalakeFaileEvent));
 
     Event createCatalogEvent = new CreateCatalogEvent(USER, catalogIdentifier, catalogInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createCatalogEvent), AuditLog.Operation.CREATE_CATALOG);
+        AuditLog.Operation.CREATE_CATALOG, AuditLog.Operation.fromEvent(createCatalogEvent));
     Event CreateCatalogFailureEvent =
         new CreateCatalogFailureEvent(USER, catalogIdentifier, new Exception(), catalogInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(CreateCatalogFailureEvent), AuditLog.Operation.CREATE_CATALOG);
+        AuditLog.Operation.CREATE_CATALOG, AuditLog.Operation.fromEvent(CreateCatalogFailureEvent));
 
     Event createSchemaEvent = new CreateSchemaEvent(USER, schemaIdentifier, schemaInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createSchemaEvent), AuditLog.Operation.CREATE_SCHEMA);
+        AuditLog.Operation.CREATE_SCHEMA, AuditLog.Operation.fromEvent(createSchemaEvent));
     Event createSchemaFailureEvent =
         new CreateSchemaFailureEvent(USER, schemaIdentifier, new Exception(), schemaInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createSchemaFailureEvent), AuditLog.Operation.CREATE_SCHEMA);
+        AuditLog.Operation.CREATE_SCHEMA, AuditLog.Operation.fromEvent(createSchemaFailureEvent));
 
     Event createTableEvent = new CreateTableEvent(USER, tableIdentifier, tableInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createTableEvent), AuditLog.Operation.CREATE_TABLE);
+        AuditLog.Operation.CREATE_TABLE, AuditLog.Operation.fromEvent(createTableEvent));
     Event createTableFailureEvent =
         new CreateTableFailureEvent(USER, tableIdentifier, new Exception(), tableInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createTableFailureEvent), AuditLog.Operation.CREATE_TABLE);
+        AuditLog.Operation.CREATE_TABLE, AuditLog.Operation.fromEvent(createTableFailureEvent));
 
     Event createFilesetEvent = new CreateFilesetEvent(USER, filesetIdentifier, filesetInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createFilesetEvent), AuditLog.Operation.CREATE_FILESET);
+        AuditLog.Operation.CREATE_FILESET, AuditLog.Operation.fromEvent(createFilesetEvent));
     Event createFilesetFailureEvent =
         new CreateFilesetFailureEvent(USER, filesetIdentifier, new Exception(), filesetInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createFilesetFailureEvent), AuditLog.Operation.CREATE_FILESET);
+        AuditLog.Operation.CREATE_FILESET, AuditLog.Operation.fromEvent(createFilesetFailureEvent));
 
     Event createTopicEvent = new CreateTopicEvent(USER, topicIdentifier, topicInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createTopicEvent), AuditLog.Operation.CREATE_TOPIC);
+        AuditLog.Operation.CREATE_TOPIC, AuditLog.Operation.fromEvent(createTopicEvent));
     Event createTopicFailureEvent =
         new CreateTopicFailureEvent(USER, topicIdentifier, new Exception(), topicInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(createTopicFailureEvent), AuditLog.Operation.CREATE_TOPIC);
+        AuditLog.Operation.CREATE_TOPIC, AuditLog.Operation.fromEvent(createTopicFailureEvent));
+
+    Event createViewEvent = new CreateViewEvent(USER, viewIdentifier, viewInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.CREATE_VIEW, AuditLog.Operation.fromEvent(createViewEvent));
+    Event createViewFailureEvent =
+        new CreateViewFailureEvent(USER, viewIdentifier, new Exception(), viewInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.CREATE_VIEW, AuditLog.Operation.fromEvent(createViewFailureEvent));
   }
 
   @Test
@@ -250,107 +279,122 @@ public class TestOperation {
     Event alterMetalakeEvent =
         new AlterMetalakeEvent(USER, metalakeIdentifier, new MetalakeChange[] {}, metalakeInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterMetalakeEvent), AuditLog.Operation.ALTER_METALAKE);
+        AuditLog.Operation.ALTER_METALAKE, AuditLog.Operation.fromEvent(alterMetalakeEvent));
     Event alterMetalakeFailureEvent =
         new AlterMetalakeFailureEvent(
             USER, metalakeIdentifier, new Exception(), new MetalakeChange[] {});
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterMetalakeFailureEvent), AuditLog.Operation.ALTER_METALAKE);
+        AuditLog.Operation.ALTER_METALAKE, AuditLog.Operation.fromEvent(alterMetalakeFailureEvent));
 
     Event alterCatalogEvent =
         new AlterCatalogEvent(USER, schemaIdentifier, new CatalogChange[] {}, catalogInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterCatalogEvent), AuditLog.Operation.ALTER_CATALOG);
+        AuditLog.Operation.ALTER_CATALOG, AuditLog.Operation.fromEvent(alterCatalogEvent));
     Event alterCatalogFailureEvent =
         new AlterCatalogFailureEvent(
             USER, catalogIdentifier, new Exception(), new CatalogChange[] {});
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterCatalogFailureEvent), AuditLog.Operation.ALTER_CATALOG);
+        AuditLog.Operation.ALTER_CATALOG, AuditLog.Operation.fromEvent(alterCatalogFailureEvent));
 
     Event alterSchemaEvent =
         new AlterSchemaEvent(USER, schemaIdentifier, new SchemaChange[] {}, schemaInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterSchemaEvent), AuditLog.Operation.ALTER_SCHEMA);
+        AuditLog.Operation.ALTER_SCHEMA, AuditLog.Operation.fromEvent(alterSchemaEvent));
     Event alterSchemaFailureEvent =
         new AlterSchemaFailureEvent(USER, schemaIdentifier, new Exception(), new SchemaChange[] {});
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterSchemaFailureEvent), AuditLog.Operation.ALTER_SCHEMA);
+        AuditLog.Operation.ALTER_SCHEMA, AuditLog.Operation.fromEvent(alterSchemaFailureEvent));
 
     Event alterTableEvent =
         new AlterTableEvent(USER, tableIdentifier, new TableChange[] {}, tableInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterTableEvent), AuditLog.Operation.ALTER_TABLE);
+        AuditLog.Operation.ALTER_TABLE, AuditLog.Operation.fromEvent(alterTableEvent));
     Event alterTableFailureEvent =
         new AlterTableFailureEvent(USER, tableIdentifier, new Exception(), new TableChange[] {});
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterTableFailureEvent), AuditLog.Operation.ALTER_TABLE);
+        AuditLog.Operation.ALTER_TABLE, AuditLog.Operation.fromEvent(alterTableFailureEvent));
 
     Event alterFilesetEvent =
         new AlterFilesetEvent(USER, filesetIdentifier, new FilesetChange[] {}, filesetInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterFilesetEvent), AuditLog.Operation.ALTER_FILESET);
+        AuditLog.Operation.ALTER_FILESET, AuditLog.Operation.fromEvent(alterFilesetEvent));
     Event alterFilesetFailureEvent =
         new AlterFilesetFailureEvent(
             USER, filesetIdentifier, new Exception(), new FilesetChange[] {});
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterFilesetFailureEvent), AuditLog.Operation.ALTER_FILESET);
+        AuditLog.Operation.ALTER_FILESET, AuditLog.Operation.fromEvent(alterFilesetFailureEvent));
 
     Event alterTopicEvent =
         new AlterTopicEvent(USER, topicIdentifier, new TopicChange[] {}, topicInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterTopicEvent), AuditLog.Operation.ALTER_TOPIC);
+        AuditLog.Operation.ALTER_TOPIC, AuditLog.Operation.fromEvent(alterTopicEvent));
     Event alterTopicFailureEvent =
         new AlterTopicFailureEvent(USER, topicIdentifier, new Exception(), new TopicChange[] {});
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(alterTopicFailureEvent), AuditLog.Operation.ALTER_TOPIC);
+        AuditLog.Operation.ALTER_TOPIC, AuditLog.Operation.fromEvent(alterTopicFailureEvent));
+
+    Event alterViewEvent = new AlterViewEvent(USER, viewIdentifier, new ViewChange[] {}, viewInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.ALTER_VIEW, AuditLog.Operation.fromEvent(alterViewEvent));
+    Event alterViewFailureEvent =
+        new AlterViewFailureEvent(USER, viewIdentifier, new Exception(), new ViewChange[] {});
+    Assertions.assertEquals(
+        AuditLog.Operation.ALTER_VIEW, AuditLog.Operation.fromEvent(alterViewFailureEvent));
   }
 
   @Test
   public void testDropOperation() {
     Event dropMetalakeEvent = new DropMetalakeEvent(USER, metalakeIdentifier, true);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropMetalakeEvent), AuditLog.Operation.DROP_METALAKE);
+        AuditLog.Operation.DROP_METALAKE, AuditLog.Operation.fromEvent(dropMetalakeEvent));
     Event dropMetalakeFailureEvent = new DropMetalakeFailureEvent(USER, metalakeIdentifier, null);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropMetalakeFailureEvent), AuditLog.Operation.DROP_METALAKE);
+        AuditLog.Operation.DROP_METALAKE, AuditLog.Operation.fromEvent(dropMetalakeFailureEvent));
 
     Event dropCatalogEvent = new DropCatalogEvent(USER, catalogIdentifier, true);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropCatalogEvent), AuditLog.Operation.DROP_CATALOG);
+        AuditLog.Operation.DROP_CATALOG, AuditLog.Operation.fromEvent(dropCatalogEvent));
     Event dropCatalogFailureEvent =
         new DropCatalogFailureEvent(USER, catalogIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropCatalogFailureEvent), AuditLog.Operation.DROP_CATALOG);
+        AuditLog.Operation.DROP_CATALOG, AuditLog.Operation.fromEvent(dropCatalogFailureEvent));
 
     Event dropSchemaEvent = new DropSchemaEvent(USER, schemaIdentifier, true, true);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropSchemaEvent), AuditLog.Operation.DROP_SCHEMA);
+        AuditLog.Operation.DROP_SCHEMA, AuditLog.Operation.fromEvent(dropSchemaEvent));
     Event dropSchemaFailureEvent =
         new DropSchemaFailureEvent(USER, schemaIdentifier, new Exception(), true);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropSchemaFailureEvent), AuditLog.Operation.DROP_SCHEMA);
+        AuditLog.Operation.DROP_SCHEMA, AuditLog.Operation.fromEvent(dropSchemaFailureEvent));
 
     Event dropTableEvent = new DropTableEvent(USER, tableIdentifier, true);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropTableEvent), AuditLog.Operation.DROP_TABLE);
+        AuditLog.Operation.DROP_TABLE, AuditLog.Operation.fromEvent(dropTableEvent));
     Event dropTableFailureEvent = new DropTableFailureEvent(USER, tableIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropTableFailureEvent), AuditLog.Operation.DROP_TABLE);
+        AuditLog.Operation.DROP_TABLE, AuditLog.Operation.fromEvent(dropTableFailureEvent));
 
     Event dropFilesetEvent = new DropFilesetEvent(USER, filesetIdentifier, true);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropFilesetEvent), AuditLog.Operation.DROP_FILESET);
+        AuditLog.Operation.DROP_FILESET, AuditLog.Operation.fromEvent(dropFilesetEvent));
     Event dropFilesetFailureEvent =
         new DropFilesetFailureEvent(USER, filesetIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropFilesetFailureEvent), AuditLog.Operation.DROP_FILESET);
+        AuditLog.Operation.DROP_FILESET, AuditLog.Operation.fromEvent(dropFilesetFailureEvent));
 
     Event dropTopicEvent = new DropTopicEvent(USER, topicIdentifier, true);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropTopicEvent), AuditLog.Operation.DROP_TOPIC);
+        AuditLog.Operation.DROP_TOPIC, AuditLog.Operation.fromEvent(dropTopicEvent));
     Event dropTopicFailureEvent = new DropTopicFailureEvent(USER, topicIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(dropTopicFailureEvent), AuditLog.Operation.DROP_TOPIC);
+        AuditLog.Operation.DROP_TOPIC, AuditLog.Operation.fromEvent(dropTopicFailureEvent));
+
+    Event dropViewEvent = new DropViewEvent(USER, viewIdentifier, true);
+    Assertions.assertEquals(
+        AuditLog.Operation.DROP_VIEW, AuditLog.Operation.fromEvent(dropViewEvent));
+    Event dropViewFailureEvent = new DropViewFailureEvent(USER, viewIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.DROP_VIEW, AuditLog.Operation.fromEvent(dropViewFailureEvent));
   }
 
   @Test
@@ -358,21 +402,21 @@ public class TestOperation {
     Event purgeMetalakeEvent =
         new PurgePartitionEvent(USER, metalakeIdentifier, true, PARTITION_NAME);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(purgeMetalakeEvent), AuditLog.Operation.PURGE_PARTITION);
+        AuditLog.Operation.PURGE_PARTITION, AuditLog.Operation.fromEvent(purgeMetalakeEvent));
     Event purgeMetalakeFailureEvent =
         new PurgePartitionFailureEvent(USER, partitionIdentifier, new Exception(), PARTITION_NAME);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(purgeMetalakeFailureEvent),
-        AuditLog.Operation.PURGE_PARTITION);
+        AuditLog.Operation.PURGE_PARTITION,
+        AuditLog.Operation.fromEvent(purgeMetalakeFailureEvent));
 
     Event purgeTableEvent = new PurgeTableEvent(USER, tableIdentifier, true);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(purgeTableEvent), AuditLog.Operation.PURGE_TABLE);
+        AuditLog.Operation.PURGE_TABLE, AuditLog.Operation.fromEvent(purgeTableEvent));
     Event purgePartitionFailureEvent =
         new PurgePartitionFailureEvent(USER, partitionIdentifier, new Exception(), PARTITION_NAME);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(purgePartitionFailureEvent),
-        AuditLog.Operation.PURGE_PARTITION);
+        AuditLog.Operation.PURGE_PARTITION,
+        AuditLog.Operation.fromEvent(purgePartitionFailureEvent));
   }
 
   @Test
@@ -380,153 +424,168 @@ public class TestOperation {
     Event getFileLocationEvent =
         new GetFileLocationEvent(USER, filesetIdentifier, "location", "subPath", new HashMap<>());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(getFileLocationEvent), AuditLog.Operation.GET_FILE_LOCATION);
+        AuditLog.Operation.GET_FILE_LOCATION, AuditLog.Operation.fromEvent(getFileLocationEvent));
     Event getFilesetFailureEvent =
         new GetFileLocationFailureEvent(USER, filesetIdentifier, "subPath", new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(getFilesetFailureEvent), AuditLog.Operation.GET_FILE_LOCATION);
+        AuditLog.Operation.GET_FILE_LOCATION, AuditLog.Operation.fromEvent(getFilesetFailureEvent));
 
     Event getPartitionEvent = new GetPartitionEvent(USER, partitionIdentifier, partitionInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(getPartitionEvent), AuditLog.Operation.GET_PARTITION);
+        AuditLog.Operation.GET_PARTITION, AuditLog.Operation.fromEvent(getPartitionEvent));
     Event getPartitionFailureEvent =
         new GetPartitionFailureEvent(USER, partitionIdentifier, new Exception(), PARTITION_NAME);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(getPartitionFailureEvent), AuditLog.Operation.GET_PARTITION);
+        AuditLog.Operation.GET_PARTITION, AuditLog.Operation.fromEvent(getPartitionFailureEvent));
   }
 
   @Test
   public void testListOperation() {
     Namespace namespace = Namespace.of("metalake", "catalog");
-    Event listCatalogEvent = new ListCatalogEvent(USER, namespace);
+    Event listCatalogEvent = new ListCatalogEvent(USER, namespace, 0);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listCatalogEvent), AuditLog.Operation.LIST_CATALOG);
+        AuditLog.Operation.LIST_CATALOG, AuditLog.Operation.fromEvent(listCatalogEvent));
     Event listCatalogFailureEvent = new ListCatalogFailureEvent(USER, new Exception(), namespace);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listCatalogFailureEvent), AuditLog.Operation.LIST_CATALOG);
+        AuditLog.Operation.LIST_CATALOG, AuditLog.Operation.fromEvent(listCatalogFailureEvent));
 
-    Event listSchemaEvent = new ListSchemaEvent(USER, namespace);
+    Event listSchemaEvent = new ListSchemaEvent(USER, namespace, 0);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listSchemaEvent), AuditLog.Operation.LIST_SCHEMA);
+        AuditLog.Operation.LIST_SCHEMA, AuditLog.Operation.fromEvent(listSchemaEvent));
     Event listSchemaFailureEvent = new ListSchemaFailureEvent(USER, namespace, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listSchemaFailureEvent), AuditLog.Operation.LIST_SCHEMA);
+        AuditLog.Operation.LIST_SCHEMA, AuditLog.Operation.fromEvent(listSchemaFailureEvent));
 
-    Event listTableEvent = new ListTableEvent(USER, namespace);
+    Event listTableEvent = new ListTableEvent(USER, namespace, 0);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listTableEvent), AuditLog.Operation.LIST_TABLE);
+        AuditLog.Operation.LIST_TABLE, AuditLog.Operation.fromEvent(listTableEvent));
     Event listTableFailureEvent = new ListTableFailureEvent(USER, namespace, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listTableFailureEvent), AuditLog.Operation.LIST_TABLE);
+        AuditLog.Operation.LIST_TABLE, AuditLog.Operation.fromEvent(listTableFailureEvent));
 
-    Event listTopicEvent = new ListTopicEvent(USER, namespace);
+    Event listTopicEvent = new ListTopicEvent(USER, namespace, 0);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listTopicEvent), AuditLog.Operation.LIST_TOPIC);
+        AuditLog.Operation.LIST_TOPIC, AuditLog.Operation.fromEvent(listTopicEvent));
     Event listTopicFailureEvent = new ListTopicFailureEvent(USER, namespace, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listTopicFailureEvent), AuditLog.Operation.LIST_TOPIC);
+        AuditLog.Operation.LIST_TOPIC, AuditLog.Operation.fromEvent(listTopicFailureEvent));
 
-    Event listFilesetEvent = new ListFilesetEvent(USER, namespace);
+    Namespace viewNamespace = Namespace.of("metalake", "catalog", "schema");
+    Event listViewEvent = new ListViewEvent(USER, viewNamespace, 0);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listFilesetEvent), AuditLog.Operation.LIST_FILESET);
+        AuditLog.Operation.LIST_VIEW, AuditLog.Operation.fromEvent(listViewEvent));
+    Event listViewFailureEvent = new ListViewFailureEvent(USER, viewNamespace, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.LIST_VIEW, AuditLog.Operation.fromEvent(listViewFailureEvent));
+
+    Event listFilesetEvent = new ListFilesetEvent(USER, namespace, 0);
+    Assertions.assertEquals(
+        AuditLog.Operation.LIST_FILESET, AuditLog.Operation.fromEvent(listFilesetEvent));
     Event listFilesetFailureEvent = new ListFilesetFailureEvent(USER, namespace, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listFilesetFailureEvent), AuditLog.Operation.LIST_FILESET);
+        AuditLog.Operation.LIST_FILESET, AuditLog.Operation.fromEvent(listFilesetFailureEvent));
 
-    Event listPartitionEvent = new ListPartitionEvent(USER, partitionIdentifier);
+    Event listPartitionEvent = new ListPartitionEvent(USER, partitionIdentifier, 0);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listPartitionEvent), AuditLog.Operation.LIST_PARTITION);
+        AuditLog.Operation.LIST_PARTITION, AuditLog.Operation.fromEvent(listPartitionEvent));
     Event listPartitionFailureEvent =
         new ListPartitionFailureEvent(USER, partitionIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(listPartitionFailureEvent), AuditLog.Operation.LIST_PARTITION);
+        AuditLog.Operation.LIST_PARTITION, AuditLog.Operation.fromEvent(listPartitionFailureEvent));
   }
 
   @Test
   public void testLoadOperation() {
     Event loadMetalakeEvent = new LoadMetalakeEvent(USER, metalakeIdentifier, metalakeInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadMetalakeEvent), AuditLog.Operation.LOAD_METALAKE);
+        AuditLog.Operation.LOAD_METALAKE, AuditLog.Operation.fromEvent(loadMetalakeEvent));
     Event loadMetalakeFailureEvent =
         new LoadMetalakeFailureEvent(USER, metalakeIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadMetalakeFailureEvent), AuditLog.Operation.LOAD_METALAKE);
+        AuditLog.Operation.LOAD_METALAKE, AuditLog.Operation.fromEvent(loadMetalakeFailureEvent));
 
     Event loadCatalogEvent = new LoadCatalogEvent(USER, catalogIdentifier, catalogInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadCatalogEvent), AuditLog.Operation.LOAD_CATALOG);
+        AuditLog.Operation.LOAD_CATALOG, AuditLog.Operation.fromEvent(loadCatalogEvent));
     Event loadCatalogFailureEvent =
         new LoadCatalogFailureEvent(USER, catalogIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadCatalogFailureEvent), AuditLog.Operation.LOAD_CATALOG);
+        AuditLog.Operation.LOAD_CATALOG, AuditLog.Operation.fromEvent(loadCatalogFailureEvent));
 
     Event loadSchemaEvent = new LoadSchemaEvent(USER, schemaIdentifier, schemaInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadSchemaEvent), AuditLog.Operation.LOAD_SCHEMA);
+        AuditLog.Operation.LOAD_SCHEMA, AuditLog.Operation.fromEvent(loadSchemaEvent));
     Event loadSchemaFailureEvent =
         new LoadSchemaFailureEvent(USER, schemaIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadSchemaFailureEvent), AuditLog.Operation.LOAD_SCHEMA);
+        AuditLog.Operation.LOAD_SCHEMA, AuditLog.Operation.fromEvent(loadSchemaFailureEvent));
 
     Event loadTableEvent = new LoadTableEvent(USER, tableIdentifier, tableInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadTableEvent), AuditLog.Operation.LOAD_TABLE);
+        AuditLog.Operation.LOAD_TABLE, AuditLog.Operation.fromEvent(loadTableEvent));
     Event loadTableFailureEvent = new LoadTableFailureEvent(USER, tableIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadTableFailureEvent), AuditLog.Operation.LOAD_TABLE);
+        AuditLog.Operation.LOAD_TABLE, AuditLog.Operation.fromEvent(loadTableFailureEvent));
 
     Event loadFilesetEvent = new LoadFilesetEvent(USER, filesetIdentifier, filesetInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadFilesetEvent), AuditLog.Operation.LOAD_FILESET);
+        AuditLog.Operation.LOAD_FILESET, AuditLog.Operation.fromEvent(loadFilesetEvent));
     Event loadFilesetFailureEvent =
         new LoadFilesetFailureEvent(USER, filesetIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadFilesetFailureEvent), AuditLog.Operation.LOAD_FILESET);
+        AuditLog.Operation.LOAD_FILESET, AuditLog.Operation.fromEvent(loadFilesetFailureEvent));
 
     Event loadTopicEvent = new LoadTopicEvent(USER, topicIdentifier, topicInfo);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadTopicEvent), AuditLog.Operation.LOAD_TOPIC);
+        AuditLog.Operation.LOAD_TOPIC, AuditLog.Operation.fromEvent(loadTopicEvent));
     Event loadTopicFailureEvent = new LoadTopicFailureEvent(USER, topicIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(loadTopicFailureEvent), AuditLog.Operation.LOAD_TOPIC);
+        AuditLog.Operation.LOAD_TOPIC, AuditLog.Operation.fromEvent(loadTopicFailureEvent));
+
+    Event loadViewEvent = new LoadViewEvent(USER, viewIdentifier, viewInfo);
+    Assertions.assertEquals(
+        AuditLog.Operation.LOAD_VIEW, AuditLog.Operation.fromEvent(loadViewEvent));
+    Event loadViewFailureEvent = new LoadViewFailureEvent(USER, viewIdentifier, new Exception());
+    Assertions.assertEquals(
+        AuditLog.Operation.LOAD_VIEW, AuditLog.Operation.fromEvent(loadViewFailureEvent));
   }
 
   @Test
   public void testEnableDisableOperation() {
     Event enableMetalakeEvent = new EnableMetalakeEvent(USER, metalakeIdentifier);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(enableMetalakeEvent), AuditLog.Operation.ENABLE_METALAKE);
+        AuditLog.Operation.ENABLE_METALAKE, AuditLog.Operation.fromEvent(enableMetalakeEvent));
     Event enableMetalakeFailureEvent =
         new EnableMetalakeFailureEvent(USER, metalakeIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(enableMetalakeFailureEvent),
-        AuditLog.Operation.ENABLE_METALAKE);
+        AuditLog.Operation.ENABLE_METALAKE,
+        AuditLog.Operation.fromEvent(enableMetalakeFailureEvent));
 
     Event disableMetalakeEvent = new DisableMetalakeEvent(USER, metalakeIdentifier);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(disableMetalakeEvent), AuditLog.Operation.DISABLE_METALAKE);
+        AuditLog.Operation.DISABLE_METALAKE, AuditLog.Operation.fromEvent(disableMetalakeEvent));
     Event disableMetalakeFailureEvent =
         new DisableMetalakeFailureEvent(USER, metalakeIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(disableMetalakeFailureEvent),
-        AuditLog.Operation.DISABLE_METALAKE);
+        AuditLog.Operation.DISABLE_METALAKE,
+        AuditLog.Operation.fromEvent(disableMetalakeFailureEvent));
 
     Event enableCatalogEvent = new EnableCatalogEvent(USER, catalogIdentifier);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(enableCatalogEvent), AuditLog.Operation.ENABLE_CATALOG);
+        AuditLog.Operation.ENABLE_CATALOG, AuditLog.Operation.fromEvent(enableCatalogEvent));
     Event enableCatalogFailureEvent =
         new EnableCatalogFailureEvent(USER, catalogIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(enableCatalogFailureEvent), AuditLog.Operation.ENABLE_CATALOG);
+        AuditLog.Operation.ENABLE_CATALOG, AuditLog.Operation.fromEvent(enableCatalogFailureEvent));
 
     Event disableCatalogEvent = new DisableCatalogEvent(USER, catalogIdentifier);
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(disableCatalogEvent), AuditLog.Operation.DISABLE_CATALOG);
+        AuditLog.Operation.DISABLE_CATALOG, AuditLog.Operation.fromEvent(disableCatalogEvent));
     Event disableCatalogFailureEvent =
         new DisableCatalogFailureEvent(USER, catalogIdentifier, new Exception());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(disableCatalogFailureEvent),
-        AuditLog.Operation.DISABLE_CATALOG);
+        AuditLog.Operation.DISABLE_CATALOG,
+        AuditLog.Operation.fromEvent(disableCatalogFailureEvent));
   }
 
   @Test
@@ -534,13 +593,13 @@ public class TestOperation {
     Event partitionExistsEvent =
         new PartitionExistsEvent(USER, partitionIdentifier, true, partitionIdentifier.name());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(partitionExistsEvent), AuditLog.Operation.PARTITION_EXIST);
+        AuditLog.Operation.PARTITION_EXIST, AuditLog.Operation.fromEvent(partitionExistsEvent));
 
     Event partitionExistsFailureEvent =
         new PartitionExistsEvent(USER, partitionIdentifier, true, partitionIdentifier.name());
     Assertions.assertEquals(
-        AuditLog.Operation.fromEvent(partitionExistsFailureEvent),
-        AuditLog.Operation.PARTITION_EXIST);
+        AuditLog.Operation.PARTITION_EXIST,
+        AuditLog.Operation.fromEvent(partitionExistsFailureEvent));
   }
 
   private NameIdentifier mockMetalakeIdentifier() {
@@ -600,6 +659,24 @@ public class TestOperation {
 
   private TopicInfo mockTopicInfo() {
     return new TopicInfo("topic", "comment", ImmutableMap.of("a", "b"), null);
+  }
+
+  private NameIdentifier mockViewIdentifier() {
+    return NameIdentifier.of("metalake", "catalog", "schema", "view");
+  }
+
+  private ViewInfo mockViewInfo() {
+    return new ViewInfo(
+        "view",
+        new Column[] {Column.of("a", Types.IntegerType.get())},
+        "comment",
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("trino").withSql("SELECT 1").build()
+        },
+        "dc",
+        "ds",
+        ImmutableMap.of("a", "b"),
+        null);
   }
 
   private NameIdentifier mockPartitionIdentifier() {

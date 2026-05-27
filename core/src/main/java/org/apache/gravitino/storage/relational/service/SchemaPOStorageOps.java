@@ -26,8 +26,12 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMapper> {
+
+  /** Escape character used when matching the cascade-delete name prefix with SQL {@code LIKE}. */
+  private static final String LIKE_ESCAPE_CHAR = "!";
 
   public SchemaPOStorageOps() {}
 
@@ -108,5 +112,37 @@ public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMap
   @Override
   public boolean supportsParentIdRelationalRead() {
     return true;
+  }
+
+  /**
+   * For HierarchicalSchema, the name passed in is in storage (physical) form. Descendants are
+   * stored as {@code <name><physicalSeparator>...}; we build that prefix once and let SQL match the
+   * exact row plus everything starting with the prefix.
+   *
+   * <p>Schema names may contain SQL {@code LIKE} metacharacters ({@code %} and {@code _}), so the
+   * literal prefix is escaped here and matched with an {@code ESCAPE} clause (see {@link
+   * org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider}). This
+   * guarantees a literal prefix match and prevents e.g. {@code a_b} from also matching {@code axb}.
+   */
+  @Override
+  public List<SchemaPO> listPOsByNamePrefix(
+      SchemaMetaMapper mapper, Long catalogId, String physicalName) {
+    String descendantPrefix =
+        escapeLikeMetacharacters(physicalName) + HierarchicalSchemaUtil.physicalSeparator();
+    return mapper.listSchemaPOsByCatalogIdAndNamePrefix(catalogId, physicalName, descendantPrefix);
+  }
+
+  /**
+   * Escapes SQL {@code LIKE} metacharacters so the value matches literally. The escape character
+   * itself is escaped first, then the {@code %} and {@code _} wildcards. The {@code !} escape
+   * character is chosen to avoid the backslash string-literal escaping differences between MySQL,
+   * H2, and PostgreSQL, and must stay in sync with the {@code ESCAPE} clause in {@link
+   * org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider#listSchemaPOsByCatalogIdAndNamePrefix}.
+   */
+  private static String escapeLikeMetacharacters(String value) {
+    return value
+        .replace(LIKE_ESCAPE_CHAR, LIKE_ESCAPE_CHAR + LIKE_ESCAPE_CHAR)
+        .replace("%", LIKE_ESCAPE_CHAR + "%")
+        .replace("_", LIKE_ESCAPE_CHAR + "_");
   }
 }

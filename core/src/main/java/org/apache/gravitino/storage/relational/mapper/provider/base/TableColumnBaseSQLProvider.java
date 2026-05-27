@@ -98,12 +98,18 @@ public class TableColumnBaseSQLProvider {
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
-  public String softDeleteColumnsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeleteColumnsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   public String deleteColumnPOsByLegacyTimeline(

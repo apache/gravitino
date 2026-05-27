@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.storage.gc;
+package org.apache.gravitino.idp.storage.relational;
 
 import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,7 +27,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
-import org.apache.gravitino.Config;
 import org.apache.gravitino.idp.storage.mapper.AbstractIdpMetaStorageTest;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
@@ -42,7 +41,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 @Tag("gravitino-docker-test")
-class TestIdpLegacyGarbageCollector extends AbstractIdpMetaStorageTest {
+class TestIdpGarbageCollector extends AbstractIdpMetaStorageTest {
   private IdpUserMetaMapper idpUserMetaMapper;
   private IdpGroupMetaMapper idpGroupMetaMapper;
   private IdpUserGroupRelMapper idpUserGroupRelMapper;
@@ -70,23 +69,21 @@ class TestIdpLegacyGarbageCollector extends AbstractIdpMetaStorageTest {
     assertEquals(2, countGroups());
     assertEquals(8, countUserGroupRels());
 
-    Config config = new Config(false) {};
-    config.set(STORE_DELETE_AFTER_TIME, 600000L);
+    getConfig().set(STORE_DELETE_AFTER_TIME, 600000L);
 
     closeSession();
-    IdpLegacyGarbageCollector garbageCollector = new IdpLegacyGarbageCollector(config);
-    garbageCollector.collectAndClean();
+    IdpGarbageCollector garbageCollector = new IdpGarbageCollector(getConfig());
+    try {
+      garbageCollector.collectAndClean();
+    } finally {
+      garbageCollector.close();
+    }
+    reinitializeBackend();
     reopenSession();
 
     assertEquals(0, countUsers());
     assertEquals(0, countGroups());
     assertEquals(0, countUserGroupRels());
-  }
-
-  private void reopenSession() {
-    closeSession();
-    sharedSession = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-    initializeMappers();
   }
 
   private void insertGroups() {

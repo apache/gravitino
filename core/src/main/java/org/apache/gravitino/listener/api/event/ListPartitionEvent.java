@@ -24,15 +24,39 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event that is triggered upon the successful list of partitions. */
 @DeveloperApi
-public final class ListPartitionEvent extends PartitionEvent {
+public final class ListPartitionEvent extends PartitionEvent implements ListEvent {
+
+  private final int partitionCount;
+
   /**
    * Constructs an instance of {@code ListPartitionEvent}.
    *
    * @param user The username of the individual who initiated the partition listing.
    * @param ident The identifier from which partitions were listed.
+   * @param partitionCount The number of partitions returned by the list operation.
    */
-  public ListPartitionEvent(String user, NameIdentifier ident) {
+  public ListPartitionEvent(String user, NameIdentifier ident, int partitionCount) {
     super(user, ident);
+    this.partitionCount = partitionCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListPartitionEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the partition listing.
+   * @param ident The identifier from which partitions were listed.
+   * @deprecated Use {@link #ListPartitionEvent(String, NameIdentifier, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListPartitionEvent(String user, NameIdentifier ident) {
+    this(user, ident, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return partitionCount;
   }
 
   /**
