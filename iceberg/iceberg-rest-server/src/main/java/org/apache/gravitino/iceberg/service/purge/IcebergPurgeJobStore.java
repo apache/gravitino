@@ -35,7 +35,7 @@ import org.apache.iceberg.jdbc.UncheckedInterruptedException;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
 
 /** JDBC persistence for {@code iceberg_cleanup_job}. */
-public class IcebergPurgeJobStore {
+public class IcebergPurgeJobStore implements AutoCloseable {
 
   private static final String INSERT_SQL =
       "INSERT INTO iceberg_cleanup_job (metalake_name, catalog_name, namespace, table_name,"
@@ -274,6 +274,11 @@ public class IcebergPurgeJobStore {
             return ps.executeUpdate();
           }
         });
+  }
+
+  @Override
+  public void close() {
+    connections.close();
   }
 
   /**

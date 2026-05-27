@@ -157,6 +157,7 @@ public class IcebergPurgeService implements AutoCloseable {
       }
     }
     deleteExecutor.shutdownNow();
+    store.close();
   }
 
   void purgeFiles(FileIO io, String metadataLocation) {
