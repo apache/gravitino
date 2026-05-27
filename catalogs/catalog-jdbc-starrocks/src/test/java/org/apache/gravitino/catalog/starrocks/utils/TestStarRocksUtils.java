@@ -37,6 +37,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.types.Types;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestStarRocksUtils {
@@ -223,5 +224,22 @@ public class TestStarRocksUtils {
             StarRocksUtils.extractDistributionInfoFromSql(createTableSqlLowerCase);
     assertEquals(distribution5.number(), 3);
     assertEquals(distribution5.strategy(), Strategy.HASH);
+    String createTableSqlWithoutDistribution =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) PROPERTIES (\"location\" = \"hdfs://path/table\")";
+    Distribution distribution3 =
+        StarRocksUtils.extractDistributionInfoFromSql(createTableSqlWithoutDistribution);
+    assertEquals(Distributions.NONE.strategy(), distribution3.strategy());
+
+    String createTableSqlWithKeywordInColumnComment =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL COMMENT \"contains DISTRIBUTED BY in comment\"\n) PROPERTIES (\"location\" = \"hdfs://path/table\")";
+    Distribution distribution4 =
+        StarRocksUtils.extractDistributionInfoFromSql(createTableSqlWithKeywordInColumnComment);
+    assertEquals(Distributions.NONE.strategy(), distribution4.strategy());
+
+    String createTableSqlWithInvalidDistribution =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) DISTRIBUTED BY INVALID(`col1`) BUCKETS 2";
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> StarRocksUtils.extractDistributionInfoFromSql(createTableSqlWithInvalidDistribution));
   }
 }

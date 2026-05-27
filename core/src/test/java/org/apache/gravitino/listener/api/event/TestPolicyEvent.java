@@ -119,6 +119,14 @@ public class TestPolicyEvent {
     Assertions.assertEquals(ListPoliciesEvent.class, postevent.getClass());
     Assertions.assertEquals(OperationType.LIST_POLICY, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertEquals(2, ((ListPoliciesEvent) postevent).resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListPoliciesEventDeprecatedConstructorReturnsNegativeCount() {
+    ListPoliciesEvent event = new ListPoliciesEvent("user", "metalake");
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test
@@ -136,6 +144,14 @@ public class TestPolicyEvent {
     Assertions.assertEquals(ListPolicyInfosEvent.class, postevent.getClass());
     Assertions.assertEquals(OperationType.LIST_POLICY_INFO, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertEquals(2, ((ListPolicyInfosEvent) postevent).resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListPolicyInfosEventDeprecatedConstructorReturnsNegativeCount() {
+    ListPolicyInfosEvent event = new ListPolicyInfosEvent("user", "metalake");
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test
@@ -292,6 +308,16 @@ public class TestPolicyEvent {
     Assertions.assertEquals(
         OperationType.LIST_METADATA_OBJECTS_FOR_POLICY, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertEquals(1, ((ListMetadataObjectsForPolicyEvent) postevent).resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListMetadataObjectsForPolicyEventDeprecatedConstructorReturnsNegativeCount() {
+    NameIdentifier identifier = NameIdentifierUtil.ofPolicy("metalake", policy.name());
+    ListMetadataObjectsForPolicyEvent event =
+        new ListMetadataObjectsForPolicyEvent("user", identifier);
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test
@@ -317,6 +343,19 @@ public class TestPolicyEvent {
     Assertions.assertEquals(
         OperationType.LIST_POLICY_INFOS_FOR_METADATA_OBJECT, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertEquals(2, ((ListPolicyInfosForMetadataObjectEvent) postevent).resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListPolicyInfosForMetadataObjectEventDeprecatedConstructorReturnsNegativeCount() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+    ListPolicyInfosForMetadataObjectEvent event =
+        new ListPolicyInfosForMetadataObjectEvent("user", "metalake", metadataObject);
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   @Test

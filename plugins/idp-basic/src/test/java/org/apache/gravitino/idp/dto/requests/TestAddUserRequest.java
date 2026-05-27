@@ -26,16 +26,18 @@ import org.junit.jupiter.api.Test;
 
 public class TestAddUserRequest {
 
+  private static final String VALID_PASSWORD = "Passw0rd-1234";
+
   @Test
   public void testAddUserRequestSerDe() throws JsonProcessingException {
-    AddUserRequest request = new AddUserRequest("test_user", "password");
+    AddUserRequest request = new AddUserRequest("test_user", VALID_PASSWORD);
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
     AddUserRequest deserRequest = JsonUtils.objectMapper().readValue(serJson, AddUserRequest.class);
 
     Assertions.assertEquals(request, deserRequest);
     Assertions.assertEquals("test_user", deserRequest.getUser());
-    Assertions.assertEquals("password", deserRequest.getPassword());
+    Assertions.assertEquals(VALID_PASSWORD, deserRequest.getPassword());
 
     // Test with null user and password
     AddUserRequest request1 = new AddUserRequest();
@@ -51,17 +53,22 @@ public class TestAddUserRequest {
 
   @Test
   public void testAddUserRequestValidate() {
-    Assertions.assertDoesNotThrow(() -> new AddUserRequest("test_user", "password").validate());
+    Assertions.assertDoesNotThrow(() -> new AddUserRequest("test_user", VALID_PASSWORD).validate());
     Assertions.assertThrows(IllegalArgumentException.class, () -> new AddUserRequest().validate());
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new AddUserRequest(" ", "password").validate());
+        IllegalArgumentException.class, () -> new AddUserRequest(" ", VALID_PASSWORD).validate());
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new AddUserRequest("test_user", " ").validate());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new AddUserRequest("user:name", VALID_PASSWORD).validate());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new AddUserRequest("test_user", "short").validate());
   }
 
   @Test
   public void testAddUserRequestToStringDoesNotExposePassword() {
-    String requestString = new AddUserRequest("test_user", "password").toString();
+    String requestString = new AddUserRequest("test_user", VALID_PASSWORD).toString();
 
     Assertions.assertTrue(requestString.contains("test_user"));
     Assertions.assertFalse(requestString.contains("password="));

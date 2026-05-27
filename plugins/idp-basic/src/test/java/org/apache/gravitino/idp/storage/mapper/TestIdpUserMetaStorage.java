@@ -127,7 +127,7 @@ class TestIdpUserMetaStorage extends AbstractIdpMetaStorageTest {
     assertEquals("hash-a-2", idpUserMetaMapper.selectIdpUser("alice").getPasswordHash());
     assertEquals(3L, idpUserMetaMapper.selectIdpUser("alice").getCurrentVersion());
     assertEquals(2L, idpUserMetaMapper.selectIdpUser("alice").getLastVersion());
-    assertEquals(0, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
+    assertEquals(1, idpUserMetaMapper.updateIdpUserPassword("alice", "hash-a-2"));
   }
 
   @ParameterizedTest

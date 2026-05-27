@@ -38,9 +38,9 @@ Supports most DDL and DML operations in Flink SQL, except such operations:
 
 ## Requirement
 
-* Paimon 0.8
+* Paimon 1.2.0 is fully tested.
 
-Higher version like 0.9 or above may also support but have not been tested fully.
+Other Paimon versions may also work but have not been tested fully.
 
 ## Getting Started
 
@@ -48,8 +48,14 @@ Higher version like 0.9 or above may also support but have not been tested fully
 
 Place the following JAR files in the lib directory of your Flink installation:
 
-- `paimon-flink-1.18-${paimon-version}.jar`
-- `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar`
+- The Paimon Flink connector JAR that matches your Flink minor version
+- The Gravitino Flink connector runtime JAR that matches your Flink minor version
+
+| Flink version | Paimon connector artifact | Gravitino runtime artifact |
+|---------------|---------------------------|----------------------------|
+| 1.18          | `paimon-flink-1.18-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+| 1.19          | `paimon-flink-1.19-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
+| 1.20          | `paimon-flink-1.20-${paimon-version}.jar` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
 
 ### SQL Example
 
