@@ -123,7 +123,8 @@ public class IdpRestApiIT {
           IdpUserGroupManager.getInstance(serverConfig, GravitinoEnv.getInstance().idGenerator());
 
       assertEquals(200, get(apiBase, "/version", ADMIN, ADMIN_PASSWORD).statusCode());
-      assertEquals(401, get(apiBase, "/idp/users/" + USER1, null, null).statusCode());
+      // No Authorization: simple authenticator allows anonymous access; IdP filter rejects.
+      assertEquals(403, get(apiBase, "/idp/users/" + USER1, null, null).statusCode());
 
       postUser(apiBase, USER2, USER_PASSWORD);
       assertEquals(403, get(apiBase, "/idp/users/" + USER2, USER2, USER_PASSWORD).statusCode());
