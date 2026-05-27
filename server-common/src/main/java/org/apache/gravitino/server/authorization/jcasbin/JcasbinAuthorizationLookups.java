@@ -105,22 +105,31 @@ public class JcasbinAuthorizationLookups {
     return requestContext.computeOwnerIfAbsent(
         metadataId,
         id -> {
-          Optional<Optional<OwnerInfo>> cachedOwner = ownerRelCache.getIfPresent(id);
-          if (cachedOwner.isPresent()) {
-            return cachedOwner.get();
-          }
-
-          OwnerInfo ownerInfo =
-              SessionUtils.getWithoutCommit(
-                  OwnerMetaMapper.class,
-                  m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
-          if (ownerInfo == null) {
+          try {
+            // Use the cache's atomic loader so concurrent misses on the same id collapse to one DB
+            // query. The loader throws for missing owners so only positive results land in the
+            // long-lived cache; negatives are confined to the per-request map above.
+            return ownerRelCache.get(id, k -> loadOwner(k, metadataType));
+          } catch (NoSuchOwnerException e) {
             return Optional.empty();
           }
-
-          Optional<OwnerInfo> owner = Optional.of(ownerInfo);
-          ownerRelCache.put(id, owner);
-          return owner;
         });
+  }
+
+  private static Optional<OwnerInfo> loadOwner(Long id, MetadataObject.Type metadataType) {
+    OwnerInfo ownerInfo =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class,
+            m -> m.selectOwnerByMetadataObjectIdAndType(id, metadataType.name()));
+    if (ownerInfo == null) {
+      throw new NoSuchOwnerException();
+    }
+    return Optional.of(ownerInfo);
+  }
+
+  private static final class NoSuchOwnerException extends RuntimeException {
+    private NoSuchOwnerException() {
+      super(null, null, false, false);
+    }
   }
 }

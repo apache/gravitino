@@ -564,7 +564,7 @@ public class TestJcasbinAuthorizer {
       List<Long> roleIds,
       AuthorizationRequestContext requestContext)
       throws Exception {
-    java.lang.reflect.Method m =
+    Method m =
         JcasbinAuthorizer.class.getDeclaredMethod(
             "versionCheckAndLoadRoles",
             String.class,

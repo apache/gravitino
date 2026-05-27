@@ -37,6 +37,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.Namespace;
@@ -1222,7 +1223,7 @@ class TestUserMetaService extends TestJDBCBackend {
         rows.stream()
             .filter(r -> AuthSubjectVersion.Kind.GROUP == r.getSubjectType())
             .sorted(Comparator.comparing(AuthSubjectVersion::getName))
-            .collect(java.util.stream.Collectors.toList());
+            .collect(Collectors.toList());
     assertEquals(2, groupRows.size());
     assertEquals("batchGroupA", groupRows.get(0).getName());
     assertEquals(groupA.id(), groupRows.get(0).getId());

@@ -92,8 +92,8 @@ public class TestJcasbinAuthorizationLookups {
               100L, MetadataObject.Type.TABLE, new AuthorizationRequestContext()));
     }
 
-    Assertions.assertEquals(0, ownerRelCache.getCount);
-    Assertions.assertEquals(2, ownerRelCache.getIfPresentCount);
+    Assertions.assertEquals(2, ownerRelCache.getCount);
+    Assertions.assertEquals(0, ownerRelCache.getIfPresentCount);
     Assertions.assertEquals(1, ownerRelCache.putCount);
     verify(ownerMetaMapper)
         .selectOwnerByMetadataObjectIdAndType(100L, MetadataObject.Type.TABLE.name());
@@ -116,8 +116,8 @@ public class TestJcasbinAuthorizationLookups {
           lookups.resolveOwnerId(100L, MetadataObject.Type.TABLE, requestContext).isPresent());
     }
 
-    Assertions.assertEquals(0, ownerRelCache.getCount);
-    Assertions.assertEquals(1, ownerRelCache.getIfPresentCount);
+    Assertions.assertEquals(1, ownerRelCache.getCount);
+    Assertions.assertEquals(0, ownerRelCache.getIfPresentCount);
     Assertions.assertEquals(0, ownerRelCache.putCount);
   }
 
@@ -145,7 +145,17 @@ public class TestJcasbinAuthorizationLookups {
     @Override
     public V get(K key, Function<K, V> loader) {
       getCount++;
-      return value;
+      if (cachedValue.isPresent()) {
+        return cachedValue.get();
+      }
+      if (value != null) {
+        cachedValue = Optional.of(value);
+        return value;
+      }
+      V loaded = loader.apply(key);
+      putCount++;
+      cachedValue = Optional.of(loaded);
+      return loaded;
     }
 
     @Override
