@@ -1,6 +1,6 @@
 ---
 title: "Optimizer Troubleshooting"
-slug: "/table-maintenance-service/troubleshooting"
+slug: "/table-maintenance-service/optimizer-troubleshooting"
 keyword: "table maintenance, optimizer, troubleshooting, spark, strategy"
 license: "This software is licensed under the Apache License version 2."
 ---

@@ -1,6 +1,6 @@
 ---
 title: "Python Client"
-slug: "/how-to-use-gravitino-python-client"
+slug: "/how-to-use-python-client"
 date: 2024-05-09
 keyword: "Gravitino Python client"
 license: "This software is licensed under the Apache License version 2."

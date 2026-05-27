@@ -1,8 +1,8 @@
 ---
 title: "Manage Messaging Metadata"
-slug: "/manage-massaging-metadata-using-gravitino"
+slug: "/manage-messaging-metadata-using-gravitino"
 date: 2024-4-22
-keyword: "Gravitino massaging metadata manage"
+keyword: "Gravitino messaging metadata manage"
 license: "This software is licensed under the Apache License version 2."
 ---
 

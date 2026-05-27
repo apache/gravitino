@@ -1,6 +1,6 @@
 ---
 title: "Spark Connector Integration Tests"
-slug: "/spark-connector/spark-connector-integration-test"
+slug: "/spark-connector/spark-integration-test"
 keyword: "spark connector integration test"
 license: "This software is licensed under the Apache License version 2."
 ---

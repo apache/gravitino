@@ -1,6 +1,6 @@
 ---
 title: "Spark Authentication"
-slug: "/spark-connector/spark-authentication"
+slug: "/spark-connector/spark-authentication-with-gravitino"
 keyword: "spark connector authentication oauth2 kerberos"
 license: "This software is licensed under the Apache License version 2."
 ---

@@ -1,6 +1,6 @@
 ---
 title: "Delta Lake Tables"
-slug: "/delta-table-support"
+slug: "/lakehouse-generic-delta-table"
 keywords:
 - lakehouse
 - delta

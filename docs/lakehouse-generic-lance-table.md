@@ -1,6 +1,6 @@
 ---
 title: "Lance Tables"
-slug: "/lance-table-support"
+slug: "/lakehouse-generic-lance-table"
 keywords:
 - lakehouse
 - lance
