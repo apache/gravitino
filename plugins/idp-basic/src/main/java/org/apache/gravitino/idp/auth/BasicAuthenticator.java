@@ -70,11 +70,6 @@ public class BasicAuthenticator implements Authenticator {
     IdGenerator idGenerator =
         env.idGenerator() != null ? env.idGenerator() : RandomIdGenerator.INSTANCE;
     this.userGroupManager = new IdpUserGroupManager(config, idGenerator);
-    try {
-      ServiceAdminInitializer.initialize(config);
-    } catch (Exception e) {
-      throw new IllegalStateException("Failed to initialize built-in IdP service admins", e);
-    }
   }
 
   @Override

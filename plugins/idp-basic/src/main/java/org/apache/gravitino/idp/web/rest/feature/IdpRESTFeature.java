@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.idp.web.rest.feature;
 
+import java.io.IOException;
 import java.util.List;
 import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.FeatureContext;
 import javax.ws.rs.ext.Provider;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
 import org.apache.gravitino.idp.web.rest.IdpGroupOperations;
@@ -36,7 +39,8 @@ import org.apache.gravitino.idp.web.rest.IdpUserOperations;
  * <p>Configure {@link Configs#REST_API_EXTENSION_PACKAGES} to {@code
  * org.apache.gravitino.idp.web.rest.feature} so Jersey only auto-discovers this feature. IdP REST
  * resource classes remain in {@code org.apache.gravitino.idp.web.rest} and are registered here only
- * when the {@code basic} authenticator is enabled.
+ * when the {@code basic} authenticator is enabled. Also initializes configured service admins in
+ * the built-in IdP when they do not yet exist.
  */
 @Provider
 public class IdpRESTFeature implements Feature {
@@ -46,9 +50,15 @@ public class IdpRESTFeature implements Feature {
 
   @Override
   public boolean configure(FeatureContext context) {
-    if (!basicAuthenticatorEnabled(
-        GravitinoEnv.getInstance().config().get(Configs.AUTHENTICATORS))) {
+    Config config = GravitinoEnv.getInstance().config();
+    if (!basicAuthenticatorEnabled(config.get(Configs.AUTHENTICATORS))) {
       return true;
+    }
+
+    try {
+      ServiceAdminInitializer.initialize(config);
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to initialize built-in IdP service admins", e);
     }
 
     context.register(IdpBasicBinder.class);
