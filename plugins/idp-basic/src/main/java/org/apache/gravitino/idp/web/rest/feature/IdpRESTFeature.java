@@ -29,6 +29,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
+import org.apache.gravitino.idp.storage.relational.IdpGarbageCollector;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
 import org.apache.gravitino.idp.web.rest.IdpGroupOperations;
@@ -48,6 +49,8 @@ import org.slf4j.LoggerFactory;
 public class IdpRESTFeature implements Feature {
 
   private static final Logger LOG = LoggerFactory.getLogger(IdpRESTFeature.class);
+
+  private static volatile IdpGarbageCollector garbageCollector;
 
   public static final String IDP_REST_EXTENSION_PACKAGE = IdpRESTFeature.class.getPackageName();
 
@@ -78,10 +81,49 @@ public class IdpRESTFeature implements Feature {
       throw new IllegalStateException("Failed to initialize built-in IdP service admins", e);
     }
 
+    startGarbageCollector(config);
+
     context.register(IdpBasicBinder.class);
     context.register(IdpUserOperations.class);
     context.register(IdpGroupOperations.class);
     context.register(IdpAuthorizationFilter.class);
     return true;
+  }
+
+  public static void closeGarbageCollector() throws IOException {
+    synchronized (IdpRESTFeature.class) {
+      if (garbageCollector != null) {
+        garbageCollector.close();
+        garbageCollector = null;
+      }
+    }
+  }
+
+  private static void startGarbageCollector(Config config) {
+    synchronized (IdpRESTFeature.class) {
+      if (garbageCollector != null) {
+        return;
+      }
+      IdpGarbageCollector collector = new IdpGarbageCollector(config);
+      collector.start();
+      garbageCollector = collector;
+      LOG.info("Started built-in IdP garbage collector");
+      registerGarbageCollectorShutdownHook();
+    }
+  }
+
+  private static void registerGarbageCollectorShutdownHook() {
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  try {
+                    closeGarbageCollector();
+                  } catch (IOException e) {
+                    LOG.warn(
+                        "Failed to close built-in IdP garbage collector during JVM shutdown", e);
+                  }
+                },
+                "idp-garbage-collector-shutdown"));
   }
 }

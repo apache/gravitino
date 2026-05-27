@@ -40,7 +40,6 @@ import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.idp.storage.relational.IdpGarbageCollector;
 import org.apache.gravitino.idp.storage.relational.IdpRelationalStorage;
 import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
@@ -63,7 +62,6 @@ public class IdpUserGroupManager implements Closeable {
   private final PasswordHasher passwordHasher;
   private final IdpUserMetaService userMetaService;
   private final IdpGroupMetaService groupMetaService;
-  private final IdpGarbageCollector garbageCollector;
 
   public static IdpUserGroupManager getInstance(Config config, IdGenerator idGenerator) {
     IdpUserGroupManager local = instance;
@@ -71,7 +69,7 @@ public class IdpUserGroupManager implements Closeable {
       synchronized (IdpUserGroupManager.class) {
         local = instance;
         if (local == null) {
-          instance = new IdpUserGroupManager(config, idGenerator);
+          instance = createFromConfig(config, idGenerator);
           local = instance;
         }
       }
@@ -79,24 +77,26 @@ public class IdpUserGroupManager implements Closeable {
     return local;
   }
 
-  private IdpUserGroupManager(Config config, IdGenerator idGenerator) {
-    this.relationalStorage = new IdpRelationalStorage(config);
-    this.idGenerator = idGenerator;
-    this.passwordHasher = PasswordHasherFactory.create();
-    this.userMetaService = IdpUserMetaService.getInstance();
-    this.groupMetaService = IdpGroupMetaService.getInstance();
-    this.garbageCollector = new IdpGarbageCollector(config);
-    garbageCollector.start();
+  private static IdpUserGroupManager createFromConfig(Config config, IdGenerator idGenerator) {
+    return new IdpUserGroupManager(
+        new IdpRelationalStorage(config),
+        idGenerator,
+        PasswordHasherFactory.create(),
+        IdpUserMetaService.getInstance(),
+        IdpGroupMetaService.getInstance());
   }
 
   IdpUserGroupManager(
-      IdGenerator idGenerator, IdpUserMetaService userMetaService, PasswordHasher passwordHasher) {
-    this.relationalStorage = null;
+      @Nullable IdpRelationalStorage relationalStorage,
+      IdGenerator idGenerator,
+      PasswordHasher passwordHasher,
+      IdpUserMetaService userMetaService,
+      @Nullable IdpGroupMetaService groupMetaService) {
+    this.relationalStorage = relationalStorage;
     this.idGenerator = idGenerator;
     this.passwordHasher = passwordHasher;
     this.userMetaService = userMetaService;
-    this.groupMetaService = null;
-    this.garbageCollector = null;
+    this.groupMetaService = groupMetaService;
   }
 
   public void initializeConfiguredServiceAdmins(Config config, String initialAdminPassword)
@@ -250,9 +250,6 @@ public class IdpUserGroupManager implements Closeable {
   @Override
   public void close() throws IOException {
     try {
-      if (garbageCollector != null) {
-        garbageCollector.close();
-      }
       if (relationalStorage != null) {
         relationalStorage.close();
       }

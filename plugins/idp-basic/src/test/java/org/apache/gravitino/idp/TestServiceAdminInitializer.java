@@ -64,7 +64,7 @@ class TestServiceAdminInitializer {
     userMetaService = Mockito.mock(IdpUserMetaService.class);
     passwordHasher = Mockito.mock(PasswordHasher.class);
     idGenerator = Mockito.mock(IdGenerator.class);
-    manager = new IdpUserGroupManager(idGenerator, userMetaService, passwordHasher);
+    manager = new IdpUserGroupManager(null, idGenerator, passwordHasher, userMetaService, null);
   }
 
   @Test
