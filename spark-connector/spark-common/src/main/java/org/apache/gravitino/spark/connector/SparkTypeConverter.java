@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.rel.types.Types.UUIDType;
 import org.apache.spark.sql.types.ArrayType;
 import org.apache.spark.sql.types.BinaryType;
 import org.apache.spark.sql.types.BooleanType;
@@ -149,6 +150,10 @@ public class SparkTypeConverter {
     } else if (gravitinoType instanceof Types.FixedCharType) {
       Types.FixedCharType charType = (Types.FixedCharType) gravitinoType;
       return CharType.apply((charType.length()));
+    } else if (gravitinoType instanceof UUIDType) {
+      // Spark has no native UUID type. Represent UUID as StringType to align with
+      // Spark built-in PostgreSQL JDBC mapping (uuid -> StringType).
+      return DataTypes.StringType;
     } else if (gravitinoType instanceof Types.BinaryType) {
       return DataTypes.BinaryType;
     } else if (gravitinoType instanceof Types.BooleanType) {
