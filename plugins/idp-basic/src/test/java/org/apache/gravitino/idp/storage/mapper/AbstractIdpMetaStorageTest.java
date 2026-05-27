@@ -84,7 +84,7 @@ public abstract class AbstractIdpMetaStorageTest {
   }
 
   public void init(String type) throws IOException {
-    config = createBackendConfig(type);
+    config = createRelationalBackendConfig(type);
     backend = new JDBCBackend();
     backend.initialize(config);
     IdpSQLExceptionConverterFactory.initConverter(config);
@@ -119,7 +119,7 @@ public abstract class AbstractIdpMetaStorageTest {
 
   protected void initializeMappers() {}
 
-  private Config createBackendConfig(String type) throws IOException {
+  protected Config createRelationalBackendConfig(String type) throws IOException {
     Config backendConfig = new Config(false) {};
     backendConfig.set(Configs.ENTITY_STORE, Configs.RELATIONAL_ENTITY_STORE);
     backendConfig.set(Configs.ENTITY_RELATIONAL_STORE, type);

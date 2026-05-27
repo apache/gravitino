@@ -25,12 +25,13 @@ import javax.ws.rs.ext.Provider;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
 import org.apache.gravitino.idp.web.rest.IdpGroupOperations;
 import org.apache.gravitino.idp.web.rest.IdpUserOperations;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Registers built-in IdP REST resources for the idp-basic plugin.
@@ -43,15 +44,14 @@ import org.apache.gravitino.idp.web.rest.IdpUserOperations;
 @Provider
 public class IdpRESTFeature implements Feature {
 
+  private static final Logger LOG = LoggerFactory.getLogger(IdpRESTFeature.class);
+
   @Override
   public boolean configure(FeatureContext context) {
     Config config = GravitinoEnv.getInstance().config();
-    if (!IdpUserGroupManager.basicAuthenticatorEnabled(config)) {
-      return false;
-    }
-
     try {
       ServiceAdminInitializer.initialize(config);
+      LOG.info("Initialized built-in IdP service admins");
     } catch (IOException e) {
       throw new IllegalStateException("Failed to initialize built-in IdP service admins", e);
     }
