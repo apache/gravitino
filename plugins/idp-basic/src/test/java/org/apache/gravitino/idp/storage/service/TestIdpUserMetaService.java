@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
-import org.apache.gravitino.idp.exception.AlreadyExistsException;
-import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -43,7 +43,7 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
     insertUsers(1);
     IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
 
-    assertThrows(NotFoundException.class, () -> userMetaService.getIdpUserByUsername("missing"));
+    assertThrows(NoSuchUserException.class, () -> userMetaService.getIdpUserByUsername("missing"));
     assertEquals("user1", userMetaService.getIdpUserByUsername("user1").getUsername());
   }
 
@@ -65,7 +65,7 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
             .withDeletedAt(0L)
             .build();
 
-    assertThrows(NotFoundException.class, () -> userMetaService.getIdpUserByUsername("user1"));
+    assertThrows(NoSuchUserException.class, () -> userMetaService.getIdpUserByUsername("user1"));
     runServiceCall(() -> userMetaService.insertIdpUser(user1));
     runServiceCall(
         () -> groupMetaService.changeGroupMembership("group1", List.of("user1"), List.of()));
@@ -81,7 +81,8 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
             .withLastVersion(0L)
             .withDeletedAt(0L)
             .build();
-    assertThrows(AlreadyExistsException.class, () -> userMetaService.insertIdpUser(duplicateUser));
+    assertThrows(
+        UserAlreadyExistsException.class, () -> userMetaService.insertIdpUser(duplicateUser));
   }
 
   @ParameterizedTest
@@ -93,7 +94,8 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
 
     closeSession();
     assertThrows(
-        NotFoundException.class, () -> userMetaService.updateIdpUserPassword("missing", "hash-2"));
+        NoSuchUserException.class,
+        () -> userMetaService.updateIdpUserPassword("missing", "hash-2"));
     refreshSession();
 
     runServiceCall(() -> assertTrue(userMetaService.updateIdpUserPassword("user1", "hash-2")));

@@ -38,10 +38,12 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
+import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
-import org.apache.gravitino.idp.exception.AlreadyExistsException;
-import org.apache.gravitino.idp.exception.NotFoundException;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -98,7 +100,7 @@ public class TestIdpUserGroupManager {
     Assertions.assertTrue(user.groupNames().isEmpty());
 
     Assertions.assertThrows(
-        AlreadyExistsException.class, () -> manager.addUser("testAdd", ANOTHER_VALID_PASSWORD));
+        UserAlreadyExistsException.class, () -> manager.addUser("testAdd", ANOTHER_VALID_PASSWORD));
   }
 
   @Test
@@ -109,7 +111,7 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testGet", user.name());
 
     Throwable exception =
-        Assertions.assertThrows(NotFoundException.class, () -> manager.getUser("not-exist"));
+        Assertions.assertThrows(NoSuchUserException.class, () -> manager.getUser("not-exist"));
     Assertions.assertTrue(exception.getMessage().contains("IdP user not found: not-exist"));
   }
 
@@ -129,7 +131,7 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testChangePassword", manager.getUser("testChangePassword").name());
 
     Assertions.assertThrows(
-        NotFoundException.class, () -> manager.changePassword("not-exist", VALID_PASSWORD));
+        NoSuchUserException.class, () -> manager.changePassword("not-exist", VALID_PASSWORD));
   }
 
   @Test
@@ -138,7 +140,8 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testAddGroup", group.name());
     Assertions.assertTrue(group.usernames().isEmpty());
 
-    Assertions.assertThrows(AlreadyExistsException.class, () -> manager.addGroup("testAddGroup"));
+    Assertions.assertThrows(
+        GroupAlreadyExistsException.class, () -> manager.addGroup("testAddGroup"));
   }
 
   @Test
@@ -149,7 +152,7 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testGetGroup", group.name());
 
     Throwable exception =
-        Assertions.assertThrows(NotFoundException.class, () -> manager.getGroup("not-exist"));
+        Assertions.assertThrows(NoSuchGroupException.class, () -> manager.getGroup("not-exist"));
     Assertions.assertTrue(exception.getMessage().contains("IdP group not found: not-exist"));
   }
 
@@ -220,7 +223,7 @@ public class TestIdpUserGroupManager {
       throws IOException {
     loadServiceAdminConfig("simple", "initAdminSkipAuth1");
     manager.initializeConfiguredServiceAdmins(config, "short");
-    Assertions.assertThrows(NotFoundException.class, () -> manager.getUser("initAdminSkipAuth1"));
+    Assertions.assertThrows(NoSuchUserException.class, () -> manager.getUser("initAdminSkipAuth1"));
   }
 
   @Test
@@ -228,7 +231,7 @@ public class TestIdpUserGroupManager {
       throws IOException {
     loadServiceAdminConfig(BASIC_AUTHENTICATOR_CLASS, "");
     manager.initializeConfiguredServiceAdmins(config, VALID_PASSWORD);
-    Assertions.assertThrows(NotFoundException.class, () -> manager.getUser("initAdminSkipList1"));
+    Assertions.assertThrows(NoSuchUserException.class, () -> manager.getUser("initAdminSkipList1"));
   }
 
   @Test

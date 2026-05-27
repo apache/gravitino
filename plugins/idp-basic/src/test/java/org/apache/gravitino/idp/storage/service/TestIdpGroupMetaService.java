@@ -26,8 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.List;
-import org.apache.gravitino.idp.exception.AlreadyExistsException;
-import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
+import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -43,7 +43,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
     insertGroups(1);
     IdpGroupMetaService groupMetaService = IdpGroupMetaService.getInstance();
 
-    assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("missing"));
+    assertThrows(NoSuchGroupException.class, () -> groupMetaService.getIdpGroupByName("missing"));
     assertEquals("group1", groupMetaService.getIdpGroupByName("group1").getGroupName());
   }
 
@@ -63,7 +63,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
             .withDeletedAt(0L)
             .build();
 
-    assertThrows(NotFoundException.class, () -> groupMetaService.getIdpGroupByName("group1"));
+    assertThrows(NoSuchGroupException.class, () -> groupMetaService.getIdpGroupByName("group1"));
     runServiceCall(() -> groupMetaService.insertIdpGroup(group1));
     runServiceCall(
         () -> groupMetaService.changeGroupMembership("group1", List.of("user1"), List.of()));
@@ -79,7 +79,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
             .withDeletedAt(0L)
             .build();
     assertThrows(
-        AlreadyExistsException.class, () -> groupMetaService.insertIdpGroup(duplicateGroup));
+        GroupAlreadyExistsException.class, () -> groupMetaService.insertIdpGroup(duplicateGroup));
   }
 
   @ParameterizedTest
@@ -150,7 +150,7 @@ class TestIdpGroupMetaService extends AbstractIdpMetaServiceTest {
                     .build()));
 
     assertThrows(
-        NotFoundException.class,
+        NoSuchGroupException.class,
         () ->
             runServiceCall(
                 () ->

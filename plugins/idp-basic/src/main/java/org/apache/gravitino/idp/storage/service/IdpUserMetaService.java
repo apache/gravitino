@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.po.IdpUserPO;
@@ -53,7 +53,7 @@ public class IdpUserMetaService {
         SessionUtils.getWithoutCommit(
             IdpUserMetaMapper.class, mapper -> mapper.selectIdpUser(username));
     if (userPO == null) {
-      throw new NotFoundException("IdP user not found: %s", username);
+      throw new NoSuchUserException("IdP user not found: %s", username);
     }
     return userPO;
   }
@@ -107,7 +107,7 @@ public class IdpUserMetaService {
    * @param username username of the user
    * @param passwordHash new password hash to store
    * @return {@code true} if the password hash was updated
-   * @throws NotFoundException if the user does not exist or is soft-deleted
+   * @throws NoSuchUserException if the user does not exist or is soft-deleted
    */
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
@@ -118,7 +118,7 @@ public class IdpUserMetaService {
         mapper -> {
           IdpUserPO userPO = mapper.selectIdpUser(username);
           if (userPO == null) {
-            throw new NotFoundException("IdP user not found: %s", username);
+            throw new NoSuchUserException("IdP user not found: %s", username);
           }
           mapper.updateIdpUserPassword(username, passwordHash);
           return true;
@@ -165,7 +165,7 @@ public class IdpUserMetaService {
     }
     for (String username : usernames) {
       if (!userIds.containsKey(username)) {
-        throw new NotFoundException("IdP user not found: %s", username);
+        throw new NoSuchUserException("IdP user not found: %s", username);
       }
     }
     return userIds;

@@ -27,7 +27,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.gravitino.idp.exception.NotFoundException;
+import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.po.IdpGroupPO;
@@ -58,7 +58,7 @@ public class IdpGroupMetaService {
         SessionUtils.getWithoutCommit(
             IdpGroupMetaMapper.class, mapper -> mapper.selectIdpGroup(groupName));
     if (groupPO == null) {
-      throw new NotFoundException("IdP group not found: %s", groupName);
+      throw new NoSuchGroupException("IdP group not found: %s", groupName);
     }
     return groupPO;
   }
@@ -138,7 +138,7 @@ public class IdpGroupMetaService {
                   mapper -> {
                     IdpGroupPO groupPO = mapper.selectIdpGroup(groupName);
                     if (groupPO == null) {
-                      throw new NotFoundException("IdP group not found: %s", groupName);
+                      throw new NoSuchGroupException("IdP group not found: %s", groupName);
                     }
                     return groupPO;
                   });
