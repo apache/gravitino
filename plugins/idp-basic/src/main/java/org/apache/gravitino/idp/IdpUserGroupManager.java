@@ -89,7 +89,7 @@ public class IdpUserGroupManager implements Closeable {
 
     for (String serviceAdmin : serviceAdmins) {
       IdpCredentialValidator.validateUsername(serviceAdmin);
-      if (userExists(serviceAdmin)) {
+      if (checkUserExistence(serviceAdmin)) {
         continue;
       }
 
@@ -236,7 +236,7 @@ public class IdpUserGroupManager implements Closeable {
         .build();
   }
 
-  private boolean userExists(String username) {
+  private boolean checkUserExistence(String username) {
     try {
       USER_SERVICE.getIdpUserByUsername(username);
       return true;

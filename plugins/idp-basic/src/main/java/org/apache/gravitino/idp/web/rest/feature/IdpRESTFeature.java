@@ -24,11 +24,12 @@ import java.util.List;
 import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.FeatureContext;
 import javax.ws.rs.ext.Provider;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
-import org.apache.gravitino.idp.auth.ServiceAdminInitializer;
 import org.apache.gravitino.idp.storage.relational.IdpGarbageCollector;
 import org.apache.gravitino.idp.web.rest.IdpAuthorizationFilter;
 import org.apache.gravitino.idp.web.rest.IdpBasicBinder;
@@ -55,6 +56,9 @@ public class IdpRESTFeature implements Feature {
   public static final String BASIC_AUTHENTICATOR_CLASS =
       BasicAuthenticator.class.getCanonicalName();
 
+  /** Environment variable for the initial password of configured service admins. */
+  public static final String INITIAL_ADMIN_PASSWORD_ENV = "GRAVITINO_INITIAL_ADMIN_PASSWORD";
+
   public static void apply(Config config) {
     List<String> extensionPackages = config.get(Configs.REST_API_EXTENSION_PACKAGES);
     if (extensionPackages == null || !extensionPackages.contains(IDP_REST_EXTENSION_PACKAGE)) {
@@ -71,9 +75,13 @@ public class IdpRESTFeature implements Feature {
 
   @Override
   public boolean configure(FeatureContext context) {
-    Config config = GravitinoEnv.getInstance().config();
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    Config config = env.config();
     try {
-      ServiceAdminInitializer.initialize(config);
+      try (IdpUserGroupManager manager = new IdpUserGroupManager(config, env.idGenerator())) {
+        manager.initializeConfiguredServiceAdmins(
+            config, StringUtils.defaultString(System.getenv(INITIAL_ADMIN_PASSWORD_ENV)));
+      }
       LOG.info("Initialized built-in IdP service admins");
     } catch (IOException e) {
       throw new IllegalStateException("Failed to initialize built-in IdP service admins", e);

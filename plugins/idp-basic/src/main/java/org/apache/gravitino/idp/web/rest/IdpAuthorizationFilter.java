@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.function.Supplier;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.web.IdpManagement;
@@ -37,7 +36,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * filter after the servlet {@code AuthenticationFilter} has authenticated the caller and populated
  * the current user principal.
  *
- * <p>Scoped to resources annotated with {@link IdpManagement} via Jersey name binding.
+ * <p>Registered only when {@code basic} is configured in {@link Configs#AUTHENTICATORS}. Scoped to
+ * resources annotated with {@link IdpManagement} via Jersey name binding.
  */
 @IdpManagement
 public class IdpAuthorizationFilter implements ContainerRequestFilter {
@@ -70,8 +70,6 @@ public class IdpAuthorizationFilter implements ContainerRequestFilter {
   }
 
   static boolean isServiceAdmin(List<String> serviceAdmins, String currentUser) {
-    return StringUtils.isNotBlank(currentUser)
-        && serviceAdmins != null
-        && serviceAdmins.contains(currentUser);
+    return currentUser != null && serviceAdmins != null && serviceAdmins.contains(currentUser);
   }
 }
