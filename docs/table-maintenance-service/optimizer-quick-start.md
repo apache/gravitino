@@ -5,7 +5,9 @@ keyword: "table maintenance, optimizer, quick start, compaction, update stats"
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Before Running Quick Start
+The walkthrough is a manual end-to-end sequence that produces one compacted instance of a demo Iceberg table. Each step is a command you run by hand. The optimizer does not include a built-in scheduler; to operationalize compaction in production, trigger `submit-strategy-jobs` on a schedule from cron, Airflow, or your existing job scheduler.
+
+## Prerequisites
 
 - **Gravitino server.** A running Gravitino server is required at `http://localhost:8090` (the default). Start one if needed before continuing.
 - **Iceberg REST catalog endpoint.** The walkthrough uses `http://localhost:9001/iceberg`. Gravitino's default installation runs an in-memory Iceberg REST service at that endpoint, so no extra setup is needed. Avoid restarting Gravitino during the walkthrough because the in-memory backend resets on restart. To use an external Iceberg REST catalog (Lakekeeper, Apache Polaris, Snowflake Open Catalog), substitute its URI in the catalog creation in Step 2 and in the `catalog_uri` fields in Steps 5 and 6.
@@ -13,13 +15,13 @@ license: "This software is licensed under the Apache License version 2."
 - **Spark.** The Spark templates need Spark binaries on the server. Either set `SPARK_HOME` in the environment that started the Gravitino server, or set `gravitino.jobExecutor.local.sparkHome` in `${GRAVITINO_HOME}/conf/gravitino.conf` and restart. See [Optimizer Configuration](./optimizer-configuration.md) for related server config keys.
 - **Faster status feedback (optional).** Gravitino pulls job status every `gravitino.job.statusPullIntervalInMs` milliseconds (default `300000`, about 5 minutes). To see status changes faster during the walkthrough, set this key to `10000` in `${GRAVITINO_HOME}/conf/gravitino.conf` and restart.
 
-## Quick Start a: Built-in Table Maintenance Workflow
+## Workflow
 
-This workflow uses:
+The walkthrough uses these built-in capabilities:
 
-- Built-in policy type: `system_iceberg_compaction`
-- Built-in update stats job template: `builtin-iceberg-update-stats`
-- Built-in rewrite data files job template: `builtin-iceberg-rewrite-data-files`
+- Policy type: `system_iceberg_compaction`
+- Update-stats job template: `builtin-iceberg-update-stats`
+- Compaction job template: `builtin-iceberg-rewrite-data-files`
 
 ### Step 1: Preflight Checks
 
@@ -80,7 +82,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 **Success check:** each curl returns a JSON response describing the created object. If a curl returns an "already exists" error, the object was created on a previous run; safe to proceed.
 
-### Step 3: Seed Demo Data (Recommended)
+### Step 3: Seed Demo Data
 
 Use Spark SQL to create enough small files so compaction has visible effect:
 
