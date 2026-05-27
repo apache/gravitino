@@ -54,6 +54,30 @@ public class IcebergPurgeJobStore {
 
   private static final String SELECT_SQL = "SELECT * FROM iceberg_cleanup_job WHERE id = ?";
 
+  private static final String SUCCEED_SQL =
+      "UPDATE iceberg_cleanup_job SET state = 'SUCCEEDED', heartbeat_at = NULL, updated_at = ?"
+          + " WHERE id = ? AND state = 'RUNNING'";
+
+  private static final String FAIL_SQL =
+      "UPDATE iceberg_cleanup_job SET state = 'FAILED', last_error = ?, heartbeat_at = NULL,"
+          + " updated_at = ? WHERE id = ?";
+
+  private static final String RECORD_FAILURE_SQL =
+      "UPDATE iceberg_cleanup_job SET attempts = attempts + 1, last_error = ?,"
+          + " state = CASE WHEN attempts + 1 >= ? THEN 'FAILED' ELSE 'PENDING' END,"
+          + " heartbeat_at = NULL, updated_at = ? WHERE id = ? AND state = 'RUNNING'";
+
+  private static final String HEARTBEAT_SQL =
+      "UPDATE iceberg_cleanup_job SET heartbeat_at = ?, updated_at = ?"
+          + " WHERE id = ? AND state = 'RUNNING' AND heartbeat_at = ?";
+
+  private static final String HAS_ACTIVE_SQL =
+      "SELECT 1 FROM iceberg_cleanup_job WHERE catalog_name = ? AND namespace = ?"
+          + " AND table_name = ? AND state IN ('PENDING', 'RUNNING') LIMIT 1";
+
+  private static final String PRUNE_SQL =
+      "DELETE FROM iceberg_cleanup_job WHERE state IN ('SUCCEEDED', 'FAILED') AND updated_at < ?";
+
   private final JdbcClientPool connections;
 
   /**
@@ -135,6 +159,124 @@ public class IcebergPurgeJobStore {
   }
 
   /**
+   * Marks a RUNNING job SUCCEEDED.
+   *
+   * @param id job id
+   */
+  public void markSucceeded(long id) {
+    long now = System.currentTimeMillis();
+    run(
+        conn -> {
+          try (PreparedStatement ps = conn.prepareStatement(SUCCEED_SQL)) {
+            ps.setLong(1, now);
+            ps.setLong(2, id);
+            return ps.executeUpdate();
+          }
+        });
+  }
+
+  /**
+   * Marks a job FAILED immediately.
+   *
+   * @param id job id
+   * @param reason failure text
+   */
+  public void markFailed(long id, String reason) {
+    long now = System.currentTimeMillis();
+    String err = truncate(reason);
+    run(
+        conn -> {
+          try (PreparedStatement ps = conn.prepareStatement(FAIL_SQL)) {
+            ps.setString(1, err);
+            ps.setLong(2, now);
+            ps.setLong(3, id);
+            return ps.executeUpdate();
+          }
+        });
+  }
+
+  /**
+   * Records a transient failure: {@code attempts++}, then FAILED at the ceiling else PENDING.
+   *
+   * @param id job id
+   * @param reason failure text
+   * @param maxAttempts ceiling from config
+   */
+  public void recordFailure(long id, String reason, int maxAttempts) {
+    long now = System.currentTimeMillis();
+    String err = truncate(reason);
+    run(
+        conn -> {
+          try (PreparedStatement ps = conn.prepareStatement(RECORD_FAILURE_SQL)) {
+            ps.setString(1, err);
+            ps.setInt(2, maxAttempts);
+            ps.setLong(3, now);
+            ps.setLong(4, id);
+            return ps.executeUpdate();
+          }
+        });
+  }
+
+  /**
+   * Refreshes a heartbeat with compare-and-swap ownership check.
+   *
+   * @param id job id
+   * @param lastWritten previous heartbeat value
+   * @param now new heartbeat value
+   * @return {@code true} iff the row was still owned by the caller
+   */
+  public boolean heartbeat(long id, long lastWritten, long now) {
+    return run(
+        conn -> {
+          try (PreparedStatement ps = conn.prepareStatement(HEARTBEAT_SQL)) {
+            ps.setLong(1, now);
+            ps.setLong(2, now);
+            ps.setLong(3, id);
+            ps.setLong(4, lastWritten);
+            return ps.executeUpdate() == 1;
+          }
+        });
+  }
+
+  /**
+   * Checks whether a PENDING or RUNNING job occupies the identifier.
+   *
+   * @param catalog catalog name
+   * @param namespace table namespace
+   * @param table table name
+   * @return true iff an active purge job exists for the identifier
+   */
+  public boolean hasActiveJob(String catalog, String namespace, String table) {
+    return run(
+        conn -> {
+          try (PreparedStatement ps = conn.prepareStatement(HAS_ACTIVE_SQL)) {
+            ps.setString(1, catalog);
+            ps.setString(2, namespace);
+            ps.setString(3, table);
+            try (ResultSet rs = ps.executeQuery()) {
+              return rs.next();
+            }
+          }
+        });
+  }
+
+  /**
+   * Deletes terminal rows older than the cutoff.
+   *
+   * @param updatedBefore cutoff epoch millis
+   * @return rows pruned
+   */
+  public int pruneTerminalBefore(long updatedBefore) {
+    return run(
+        conn -> {
+          try (PreparedStatement ps = conn.prepareStatement(PRUNE_SQL)) {
+            ps.setLong(1, updatedBefore);
+            return ps.executeUpdate();
+          }
+        });
+  }
+
+  /**
    * Reads a job state for tests.
    *
    * @param id job id
@@ -156,6 +298,10 @@ public class IcebergPurgeJobStore {
             }
           }
         });
+  }
+
+  private static String truncate(String value) {
+    return value == null || value.length() <= 2048 ? value : value.substring(0, 2048);
   }
 
   private static IcebergPurgeJob readJob(Connection conn, long id) throws SQLException {

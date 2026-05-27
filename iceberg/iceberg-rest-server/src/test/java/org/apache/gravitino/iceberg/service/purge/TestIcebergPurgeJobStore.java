@@ -95,4 +95,61 @@ class TestIcebergPurgeJobStore {
     Assertions.assertEquals(id, store.claimNext(t0, 300_000L, 10).id());
     Assertions.assertEquals(id, store.claimNext(t0 + 400_000L, 300_000L, 10).id());
   }
+
+  @Test
+  void testSucceed() {
+    long id = store.enqueue(sampleJob());
+    store.claimNext(System.currentTimeMillis(), 300_000L, 10);
+    store.markSucceeded(id);
+    Assertions.assertEquals(IcebergPurgeJob.State.SUCCEEDED, store.stateOf(id));
+  }
+
+  @Test
+  void testTransientFailureReleasesThenFailsAtCeiling() {
+    long id = store.enqueue(sampleJob());
+    for (int i = 0; i < 2; i++) {
+      store.claimNext(System.currentTimeMillis(), 300_000L, 10);
+      store.recordFailure(id, "boom " + i, 3);
+      Assertions.assertEquals(IcebergPurgeJob.State.PENDING, store.stateOf(id));
+    }
+    store.claimNext(System.currentTimeMillis(), 300_000L, 10);
+    store.recordFailure(id, "boom 2", 3);
+    Assertions.assertEquals(IcebergPurgeJob.State.FAILED, store.stateOf(id));
+  }
+
+  @Test
+  void testMarkFailedTerminal() {
+    long id = store.enqueue(sampleJob());
+    store.claimNext(System.currentTimeMillis(), 300_000L, 10);
+    store.markFailed(id, "corrupt metadata");
+    Assertions.assertEquals(IcebergPurgeJob.State.FAILED, store.stateOf(id));
+  }
+
+  @Test
+  void testHeartbeatCasOnLastValue() {
+    long id = store.enqueue(sampleJob());
+    long t0 = System.currentTimeMillis();
+    store.claimNext(t0, 300_000L, 10);
+    Assertions.assertTrue(store.heartbeat(id, t0, t0 + 1000));
+    Assertions.assertFalse(store.heartbeat(id, t0, t0 + 2000));
+  }
+
+  @Test
+  void testHasActiveJob() {
+    Assertions.assertFalse(store.hasActiveJob("cat", "db", "t"));
+    long id = store.enqueue(sampleJob());
+    Assertions.assertTrue(store.hasActiveJob("cat", "db", "t"));
+    store.claimNext(System.currentTimeMillis(), 300_000L, 10);
+    Assertions.assertTrue(store.hasActiveJob("cat", "db", "t"));
+    store.markSucceeded(id);
+    Assertions.assertFalse(store.hasActiveJob("cat", "db", "t"));
+  }
+
+  @Test
+  void testPrune() {
+    long id = store.enqueue(sampleJob());
+    store.claimNext(System.currentTimeMillis(), 300_000L, 10);
+    store.markSucceeded(id);
+    Assertions.assertEquals(1, store.pruneTerminalBefore(System.currentTimeMillis() + 1));
+  }
 }
