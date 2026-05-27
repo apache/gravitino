@@ -93,5 +93,10 @@ tasks {
   test {
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")
+
+    val skipITs = project.hasProperty("skipITs")
+    if (skipITs) {
+      exclude("**/integration/test/**")
+    }
   }
 }

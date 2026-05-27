@@ -60,11 +60,22 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Run idp-basic tests
+      - name: Run idp-basic unit tests
+        run: |
+          ./gradlew :plugins:idp-basic:test -PskipITs -PskipDockerTests=true -PskipWeb=true
+
+      - name: Run idp-basic REST API integration tests
         env:
           dockerTest: true
         run: |
-          ./gradlew :plugins:idp-basic:test -PskipITs -PskipDockerTests=false -PskipWeb=true
+          for backend in h2 mysql postgresql; do
+            ./gradlew :plugins:idp-basic:test \
+              -PtestMode=embedded \
+              -PjdbcBackend="${backend}" \
+              -PskipDockerTests=false \
+              -PskipWeb=true \
+              --tests "org.apache.gravitino.idp.integration.test.IdpRESTApiIT"
+          done
 
       - name: Upload idp-basic test reports
         uses: actions/upload-artifact@v7
