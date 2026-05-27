@@ -47,6 +47,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecu
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
+import org.apache.gravitino.iceberg.service.purge.IcebergPurgeService;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
@@ -121,7 +122,7 @@ public class RESTService implements GravitinoAuxiliaryService {
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
     // Table: HookDispatcher -> EventDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
-        new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
+        new IcebergTableOperationExecutor(icebergCatalogWrapperManager, (IcebergPurgeService) null);
     IcebergTableOperationDispatcher icebergTableEventDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
     if (authorizationContext.isAuthorizationEnabled()) {

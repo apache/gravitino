@@ -27,12 +27,16 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.purge.IcebergPurgeJob;
+import org.apache.gravitino.iceberg.service.purge.IcebergPurgeService;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -50,10 +54,13 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergTableOperationExecutor.class);
 
-  private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
+  private final IcebergCatalogWrapperManager icebergCatalogWrapperManager;
+  private final IcebergPurgeService purgeService;
 
-  public IcebergTableOperationExecutor(IcebergCatalogWrapperManager icebergCatalogWrapperManager) {
+  public IcebergTableOperationExecutor(
+      IcebergCatalogWrapperManager icebergCatalogWrapperManager, IcebergPurgeService purgeService) {
     this.icebergCatalogWrapperManager = icebergCatalogWrapperManager;
+    this.purgeService = purgeService;
   }
 
   @Override
@@ -109,15 +116,31 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
-    if (purgeRequested) {
-      icebergCatalogWrapperManager
-          .getCatalogWrapper(context.catalogName())
-          .purgeTable(tableIdentifier);
-    } else {
-      icebergCatalogWrapperManager
-          .getCatalogWrapper(context.catalogName())
-          .dropTable(tableIdentifier);
+    IcebergCatalogWrapper wrapper =
+        icebergCatalogWrapperManager.getCatalogWrapper(context.catalogName());
+    if (!purgeRequested) {
+      wrapper.dropTable(tableIdentifier);
+      return;
     }
+
+    if (!context.asyncPurge()) {
+      wrapper.purgeTable(tableIdentifier);
+      return;
+    }
+
+    TableMetadata metadata = wrapper.loadTableMetadata(tableIdentifier);
+    wrapper.dropTable(tableIdentifier);
+    purgeService.enqueue(
+        new IcebergPurgeJob(
+            0L,
+            IcebergRESTServerContext.getInstance().metalakeName(),
+            context.catalogName(),
+            tableIdentifier.namespace().toString(),
+            tableIdentifier.name(),
+            metadata.metadataFileLocation(),
+            wrapper.fileIoImpl(),
+            wrapper.fileIoProperties(),
+            context.userName()));
   }
 
   @Override
