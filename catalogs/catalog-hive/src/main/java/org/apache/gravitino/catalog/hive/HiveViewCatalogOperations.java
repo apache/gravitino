@@ -363,18 +363,19 @@ class HiveViewCatalogOperations implements ViewCatalog {
         Maps.newHashMap(properties != null ? properties : ImmutableMap.of());
     String representationSql = viewOriginalText;
     String detectedDialect = HiveView.detectDialect(representationSql, params);
-    if (!Dialects.HIVE.equalsIgnoreCase(detectedDialect)) {
+    if (!Dialects.HIVE.equalsIgnoreCase(detectedDialect)
+        && !Dialects.FLINK.equalsIgnoreCase(detectedDialect)) {
       // TODO(design-docs/gravitino-logical-view-management.md): support loading trino/spark HMS
       // views.
       throw new UnsupportedOperationException(
           String.format(
-              "Hive catalog currently supports only '%s' view dialect, but found '%s' for view %s",
-              Dialects.HIVE, detectedDialect, ident));
+              "Hive catalog currently supports only '%s' and '%s' view dialects, but found '%s' for view %s",
+              Dialects.HIVE, Dialects.FLINK, detectedDialect, ident));
     }
 
     SQLRepresentation rep =
         SQLRepresentation.builder()
-            .withDialect(Dialects.HIVE)
+            .withDialect(detectedDialect)
             .withSql(StringUtils.defaultString(representationSql))
             .build();
 
@@ -405,34 +406,37 @@ class HiveViewCatalogOperations implements ViewCatalog {
         firstRepresentation == null ? "null" : firstRepresentation.getClass().getSimpleName());
 
     SQLRepresentation selected = (SQLRepresentation) firstRepresentation;
-    boolean isHiveDialect = Dialects.HIVE.equalsIgnoreCase(selected.dialect());
-    if (isHiveDialect) {
-      Preconditions.checkArgument(
-          defaultCatalog == null && defaultSchema == null,
-          "Hive dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
-              + "defaultCatalog=%s, defaultSchema=%s for view %s",
-          Dialects.HIVE,
-          defaultCatalog,
-          defaultSchema,
-          ident);
-      return selected;
+    switch (selected.dialect().toLowerCase(java.util.Locale.ROOT)) {
+      case Dialects.HIVE:
+      case Dialects.FLINK:
+        Preconditions.checkArgument(
+            defaultCatalog == null && defaultSchema == null,
+            "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
+                + "defaultCatalog=%s, defaultSchema=%s for view %s",
+            selected.dialect(),
+            defaultCatalog,
+            defaultSchema,
+            ident);
+        return selected;
+      default:
+        // TODO(design-docs/gravitino-logical-view-management.md): support creating trino/spark HMS
+        // views.
+        throw new UnsupportedOperationException(
+            String.format(
+                "Hive catalog currently supports only '%s' and '%s' view dialects, but got '%s' for view %s",
+                Dialects.HIVE, Dialects.FLINK, selected.dialect(), ident));
     }
-    // TODO(design-docs/gravitino-logical-view-management.md): support creating trino/spark HMS
-    // views.
-    throw new UnsupportedOperationException(
-        String.format(
-            "Hive catalog currently supports only '%s' view dialect, but got '%s' for view %s",
-            Dialects.HIVE, selected.dialect(), ident));
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
-    if (!Dialects.HIVE.equalsIgnoreCase(representation.dialect())) {
+    if (!Dialects.HIVE.equalsIgnoreCase(representation.dialect())
+        && !Dialects.FLINK.equalsIgnoreCase(representation.dialect())) {
       // TODO(design-docs/gravitino-logical-view-management.md): support serializing trino/spark HMS
       // view definitions.
       throw new UnsupportedOperationException(
           String.format(
-              "Hive catalog currently supports only '%s' view dialect, but got '%s' for view %s",
-              Dialects.HIVE, representation.dialect(), ident));
+              "Hive catalog currently supports only '%s' and '%s' view dialects, but got '%s' for view %s",
+              Dialects.HIVE, Dialects.FLINK, representation.dialect(), ident));
     }
     return representation.sql();
   }
