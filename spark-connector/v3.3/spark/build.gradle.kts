@@ -30,8 +30,7 @@ repositories {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark33.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val connectorIcebergVersion: String = libs.versions.iceberg4spark33.get()
-val gravitinoIcebergVersion: String = connectorIcebergVersion
+val icebergVersion: String = libs.versions.iceberg4spark33.get()
 val paimonVersion: String = libs.versions.paimon.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
@@ -59,7 +58,7 @@ dependencies {
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
     exclude("com.fasterxml.jackson")
   }
-  compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$connectorIcebergVersion")
+  compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
   if (scalaVersion == "2.12") {
     compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
       exclude("org.apache.spark")
@@ -145,9 +144,9 @@ dependencies {
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 
-  testImplementation("org.apache.iceberg:iceberg-core:$gravitinoIcebergVersion")
-  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$connectorIcebergVersion")
-  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$gravitinoIcebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  testImplementation("org.apache.iceberg:iceberg-hive-metastore:$icebergVersion")
   if (scalaVersion == "2.12") {
     testImplementation("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
       exclude("org.apache.spark")
