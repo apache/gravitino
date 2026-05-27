@@ -328,10 +328,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         newDatabase.equals(oldDatabase), "Doesn't support rename table to different database");
     org.apache.gravitino.rel.TableChange rename =
         org.apache.gravitino.rel.TableChange.rename(newIdent.name());
-    NameIdentifier ident = NameIdentifier.of(getDatabase(oldIdent), oldIdent.name());
     try {
       sparkCatalog.invalidateTable(oldIdent);
-      gravitinoCatalogClient.asTableCatalog().alterTable(ident, rename);
+      gravitinoCatalogClient
+          .asTableCatalog()
+          .alterTable(NameIdentifier.of(getDatabase(oldIdent), oldIdent.name()), rename);
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(oldIdent);
     }
@@ -513,15 +514,6 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     throw new NoSuchFunctionException(ident);
   }
 
-  /**
-   * Loads a table for the Spark write path. Subclasses may override to route write operations to a
-   * different backend (e.g., Iceberg GlueCatalog instead of HiveTableCatalog).
-   *
-   * @param ident the table identifier
-   * @return the Spark table
-   * @throws NoSuchTableException if the table does not exist
-   * @throws ForbiddenException if the caller lacks permission
-   */
   protected Table loadTableForWriting(Identifier ident)
       throws NoSuchTableException, ForbiddenException {
     org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTableForWriting(ident);
