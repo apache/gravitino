@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_CREATE_EMPTY;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
@@ -68,8 +68,8 @@ public class LanceTableDelegator implements LakehouseTableDelegator {
             false /* hidden */,
             false /* reserved */),
         PropertyEntry.booleanPropertyEntry(
-            LANCE_TABLE_CREATE_EMPTY,
-            "Whether this is a lance create empty table (declare table) operation.",
+            LANCE_TABLE_DECLARED,
+            "Whether this is a Lance metadata-only declare table operation.",
             false,
             false /* immutable */,
             false /* defaultValue */,

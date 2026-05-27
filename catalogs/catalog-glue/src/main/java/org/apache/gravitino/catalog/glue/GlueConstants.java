@@ -64,6 +64,13 @@ public final class GlueConstants {
   /** Default value for {@link #TABLE_FORMAT_FILTER}: expose all table formats. */
   public static final String DEFAULT_TABLE_FORMAT_FILTER = "all";
 
+  /**
+   * Base storage path used as a warehouse when no explicit {@code location} is given at table
+   * creation time. The table location is derived as {@code warehouse/database/table}. Example:
+   * {@code s3://my-bucket/gravitino-warehouse}.
+   */
+  public static final String WAREHOUSE = "warehouse";
+
   // -------------------------------------------------------------------------
   // Glue Table.parameters() keys (passthrough properties)
   // -------------------------------------------------------------------------
@@ -133,11 +140,8 @@ public final class GlueConstants {
    */
   public static final String SERDE_PARAMETER_PREFIX = "serde.parameter.";
 
-  /**
-   * Glue table type from {@code Table.tableType()}. Common values: {@code EXTERNAL_TABLE}, {@code
-   * MANAGED_TABLE}.
-   */
-  public static final String TABLE_TYPE = "table-type";
+  /** Glue {@code tableType} value for external tables. */
+  public static final String EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
 
   private GlueConstants() {}
 }

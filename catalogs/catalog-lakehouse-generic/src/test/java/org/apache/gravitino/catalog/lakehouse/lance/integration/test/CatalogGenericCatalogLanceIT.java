@@ -19,7 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.lance.integration.test;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_CREATE_EMPTY;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
@@ -82,7 +82,7 @@ import org.junit.jupiter.api.Test;
 import org.lance.Dataset;
 import org.lance.Fragment;
 import org.lance.FragmentMetadata;
-import org.lance.Transaction;
+import org.lance.SourcedTransaction;
 import org.lance.WriteParams;
 import org.lance.ipc.LanceScanner;
 import org.lance.ipc.ScanOptions;
@@ -162,7 +162,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     String tableLocation = tempDirectory + "/" + tableName;
     properties.put("format", "lance");
     properties.put("location", tableLocation);
-    properties.put(LANCE_TABLE_CREATE_EMPTY, "true");
+    properties.put(LANCE_TABLE_DECLARED, "true");
     properties.put(Table.PROPERTY_EXTERNAL, "true");
 
     Table createdTable =
@@ -367,7 +367,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
       }
 
       // Now try to write some data to the dataset
-      Transaction trans =
+      SourcedTransaction trans =
           dataset
               .newTransactionBuilder()
               .operation(
@@ -381,10 +381,10 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
                                   new LanceDataValue(3, 300L, "third")),
                               lanceSchema))
                       .build())
-              .writeParams(ImmutableMap.of())
+              .transactionProperties(ImmutableMap.of())
               .build();
 
-      Dataset newDataset = dataset.commitTransaction(trans);
+      Dataset newDataset = trans.commit();
       try (LanceScanner scanner =
           newDataset.newScan(
               new ScanOptions.Builder()

@@ -110,8 +110,8 @@ public class ViewMetaSQLProviderFactory {
     return getProvider().softDeleteViewMetasByCatalogId(catalogId);
   }
 
-  public static String softDeleteViewMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteViewMetasBySchemaId(schemaId);
+  public static String softDeleteViewMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteViewMetasBySchemaIds(schemaIds);
   }
 
   public static String deleteViewMetasByLegacyTimeline(
