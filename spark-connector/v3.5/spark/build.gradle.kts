@@ -30,7 +30,7 @@ repositories {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val connectorIcebergVersion: String = libs.versions.iceberg4connector.get()
+val connectorIcebergVersion: String = libs.versions.iceberg4spark35.get()
 val gravitinoIcebergVersion: String = libs.versions.iceberg.get()
 val paimonVersion: String = libs.versions.paimon.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
@@ -138,8 +138,6 @@ dependencies {
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
 
-  // RESTSerializers signatures differ between iceberg-core and iceberg-spark-runtime; use
-  // gravitinoIcebergVersion for core/hive-metastore (MiniGravitino) and connectorIcebergVersion for Spark.
   testImplementation("org.apache.iceberg:iceberg-core:$gravitinoIcebergVersion")
   testImplementation("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$connectorIcebergVersion")
   testImplementation("org.apache.iceberg:iceberg-hive-metastore:$gravitinoIcebergVersion")

@@ -30,7 +30,7 @@ repositories {
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark33.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val connectorIcebergVersion: String = libs.versions.iceberg4connector.get()
+val connectorIcebergVersion: String = libs.versions.iceberg4spark33.get()
 val gravitinoIcebergVersion: String = libs.versions.iceberg.get()
 val paimonVersion: String = libs.versions.paimon.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
