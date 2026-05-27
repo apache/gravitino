@@ -19,184 +19,169 @@
 
 package org.apache.gravitino.idp;
 
+import static org.apache.gravitino.Configs.AUTHENTICATORS;
+import static org.apache.gravitino.Configs.CACHE_ENABLED;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
+import static org.apache.gravitino.Configs.ENTITY_STORE;
+import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
+import static org.apache.gravitino.Configs.SERVICE_ADMINS;
+import static org.apache.gravitino.Configs.STORE_DELETE_AFTER_TIME;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.util.List;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
 import org.apache.gravitino.idp.auth.BasicAuthenticator;
-import org.apache.gravitino.idp.basic.password.PasswordHasher;
 import org.apache.gravitino.idp.exception.NotFoundException;
-import org.apache.gravitino.idp.storage.po.IdpUserPO;
-import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
-import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.apache.gravitino.storage.RandomIdGenerator;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestServiceAdminInitializer {
   private static final String BASIC_AUTHENTICATOR_CLASS =
       BasicAuthenticator.class.getCanonicalName();
+  private static final String VALID_PASSWORD = "Passw0rd-For-Admin1";
 
+  private Path h2Path;
   private Config config;
-  private IdpUserMetaService userMetaService;
-  private PasswordHasher passwordHasher;
-  private IdGenerator idGenerator;
   private IdpUserGroupManager manager;
 
   @BeforeEach
-  void setUp() {
-    config = new Config(false) {};
-    userMetaService = Mockito.mock(IdpUserMetaService.class);
-    passwordHasher = Mockito.mock(PasswordHasher.class);
-    idGenerator = Mockito.mock(IdGenerator.class);
-    manager = new IdpUserGroupManager(null, idGenerator, passwordHasher, userMetaService, null);
+  void setUp() throws IOException {
+    h2Path = Files.createTempDirectory("gravitino_idp_service_admin_h2_");
+    config = createH2Config(h2Path);
+    manager = new IdpUserGroupManager(config, RandomIdGenerator.INSTANCE);
+  }
+
+  @AfterEach
+  void tearDown() throws IOException {
+    if (manager != null) {
+      manager.close();
+      manager = null;
+    }
+    if (h2Path != null && Files.exists(h2Path)) {
+      try (Stream<Path> paths = Files.walk(h2Path)) {
+        paths.sorted(Comparator.reverseOrder()).forEach(TestServiceAdminInitializer::deletePath);
+      }
+    }
   }
 
   @Test
   void testInitializeCreatesMissingServiceAdmin() throws IOException {
     loadConfig(BASIC_AUTHENTICATOR_CLASS, "admin1,admin2");
-    when(userMetaService.getIdpUserByUsername("admin1"))
-        .thenThrow(new NotFoundException("IdP user not found: %s", "admin1"));
-    when(userMetaService.getIdpUserByUsername("admin2")).thenReturn(existingUser("admin2"));
-    when(passwordHasher.hash("Passw0rd-For-Admin1")).thenReturn("hashed-password");
-    when(idGenerator.nextId()).thenReturn(42L);
+    manager.addUser("admin2", VALID_PASSWORD);
 
-    initializeWithPayload("Passw0rd-For-Admin1");
+    manager.initializeConfiguredServiceAdmins(config, VALID_PASSWORD);
 
-    ArgumentCaptor<IdpUserPO> userCaptor = ArgumentCaptor.forClass(IdpUserPO.class);
-    verify(userMetaService).insertIdpUser(userCaptor.capture());
-    IdpUserPO userPO = userCaptor.getValue();
-    assertEquals("admin1", userPO.getUsername());
-    assertEquals("hashed-password", userPO.getPasswordHash());
-    assertEquals(42L, userPO.getUserId());
-    assertEquals(POConverters.INIT_VERSION, userPO.getCurrentVersion());
-    verify(passwordHasher).hash("Passw0rd-For-Admin1");
+    assertEquals("admin1", manager.getUser("admin1").name());
+    assertEquals("admin2", manager.getUser("admin2").name());
   }
 
   @Test
   void testInitializeSkipsWhenBasicAuthenticatorDisabledEvenIfPayloadInvalid() throws IOException {
     loadConfig("simple", "admin1");
-    initializeWithPayload("short");
-    verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
+    manager.initializeConfiguredServiceAdmins(config, "short");
+    assertThrows(NotFoundException.class, () -> manager.getUser("admin1"));
   }
 
   @Test
   void testInitializeSkipsWhenNoServiceAdminsConfigured() throws IOException {
     loadConfig(BASIC_AUTHENTICATOR_CLASS, "");
-    initializeWithPayload("Passw0rd-For-Admin1");
-    verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
+    manager.initializeConfiguredServiceAdmins(config, VALID_PASSWORD);
+    assertThrows(NotFoundException.class, () -> manager.getUser("admin1"));
   }
 
   @Test
   void testInitializeSkipsWhenAllServiceAdminsAlreadyExist() throws IOException {
     loadConfig(BASIC_AUTHENTICATOR_CLASS, "admin1,admin2");
-    when(userMetaService.getIdpUserByUsername("admin1")).thenReturn(existingUser("admin1"));
-    when(userMetaService.getIdpUserByUsername("admin2")).thenReturn(existingUser("admin2"));
+    manager.addUser("admin1", VALID_PASSWORD);
+    manager.addUser("admin2", VALID_PASSWORD);
 
-    initializeWithoutPayload();
+    manager.initializeConfiguredServiceAdmins(config, "");
 
-    verify(userMetaService).getIdpUserByUsername("admin1");
-    verify(userMetaService).getIdpUserByUsername("admin2");
-    verify(userMetaService, never()).insertIdpUser(any());
-    verifyNoInteractions(passwordHasher, idGenerator);
+    assertEquals("admin1", manager.getUser("admin1").name());
+    assertEquals("admin2", manager.getUser("admin2").name());
   }
 
   @Test
-  void testInitializeFailsWhenRequiredPasswordMissing() throws IOException {
+  void testInitializeFailsWhenRequiredPasswordMissing() {
     loadConfig(BASIC_AUTHENTICATOR_CLASS, "admin1");
-    when(userMetaService.getIdpUserByUsername("admin1"))
-        .thenThrow(new NotFoundException("IdP user not found: %s", "admin1"));
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, this::initializeWithoutPayload);
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> manager.initializeConfiguredServiceAdmins(config, ""));
 
     assertEquals(
         "Missing initial password for configured service admin admin1; declare"
             + " GRAVITINO_INITIAL_ADMIN_PASSWORD",
         exception.getMessage());
-    verify(userMetaService, never()).insertIdpUser(any());
   }
 
   @ParameterizedTest
-  @MethodSource("invalidPasswordPayloads")
-  void testInitializeFailsOnInvalidPasswordPayload(String payload, String expectedMessage) {
+  @ValueSource(strings = {"short"})
+  void testInitializeFailsOnInvalidPasswordPayload(String payload) {
     loadConfig(BASIC_AUTHENTICATOR_CLASS, "admin1");
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> initializeWithPayload(payload));
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> manager.initializeConfiguredServiceAdmins(config, payload));
 
-    assertEquals(expectedMessage, exception.getMessage());
-    verifyNoInteractions(userMetaService, passwordHasher, idGenerator);
+    assertEquals(
+        "Password must be at least 12 characters long and at most 64 characters long",
+        exception.getMessage());
   }
 
   @Test
   void testInitializeUsesSamePasswordForAllMissingServiceAdmins() throws IOException {
     loadConfig(BASIC_AUTHENTICATOR_CLASS, "admin1,admin2");
-    when(userMetaService.getIdpUserByUsername("admin1"))
-        .thenThrow(new NotFoundException("IdP user not found: %s", "admin1"));
-    when(userMetaService.getIdpUserByUsername("admin2"))
-        .thenThrow(new NotFoundException("IdP user not found: %s", "admin2"));
-    when(passwordHasher.hash("Passw0rd-For-Admin1")).thenReturn("hashed-password");
-    when(idGenerator.nextId()).thenReturn(42L, 43L);
 
-    initializeWithPayload("Passw0rd-For-Admin1");
+    manager.initializeConfiguredServiceAdmins(config, VALID_PASSWORD);
 
-    ArgumentCaptor<IdpUserPO> userCaptor = ArgumentCaptor.forClass(IdpUserPO.class);
-    verify(userMetaService, Mockito.times(2)).insertIdpUser(userCaptor.capture());
-    assertEquals(
-        List.of("admin1", "admin2"),
-        userCaptor.getAllValues().stream().map(IdpUserPO::getUsername).toList());
-    verify(passwordHasher, Mockito.times(2)).hash("Passw0rd-For-Admin1");
+    assertEquals("admin1", manager.authenticate("admin1", VALID_PASSWORD).name());
+    assertEquals("admin2", manager.authenticate("admin2", VALID_PASSWORD).name());
   }
 
-  private static Stream<Arguments> invalidPasswordPayloads() {
-    return Stream.of(
-        Arguments.of(
-            "short",
-            "Password must be at least 12 characters long and at most 64 characters long"));
+  private static Config createH2Config(Path h2Path) {
+    Config backendConfig = new Config(false) {};
+    backendConfig.set(ENTITY_STORE, RELATIONAL_ENTITY_STORE);
+    backendConfig.set(ENTITY_RELATIONAL_STORE, "h2");
+    backendConfig.set(
+        ENTITY_RELATIONAL_JDBC_BACKEND_URL,
+        String.format("jdbc:h2:file:%s;DB_CLOSE_DELAY=-1;MODE=MYSQL", h2Path));
+    backendConfig.set(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER, "org.h2.Driver");
+    backendConfig.set(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS, 100);
+    backendConfig.set(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS, 1000L);
+    backendConfig.set(STORE_DELETE_AFTER_TIME, 20 * 60 * 1000L);
+    backendConfig.set(CACHE_ENABLED, false);
+    return backendConfig;
   }
 
-  private static IdpUserPO existingUser(String username) {
-    return IdpUserPO.builder()
-        .withUserId(1L)
-        .withUsername(username)
-        .withPasswordHash("hash")
-        .withCurrentVersion(POConverters.INIT_VERSION)
-        .withLastVersion(POConverters.INIT_VERSION)
-        .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
-        .build();
+  private static void deletePath(Path path) {
+    try {
+      Files.deleteIfExists(path);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private void loadConfig(String authenticators, String serviceAdmins) {
     config.loadFromMap(
         ImmutableMap.of(
-            Configs.AUTHENTICATORS.getKey(),
-            authenticators,
-            Configs.SERVICE_ADMINS.getKey(),
-            serviceAdmins),
+            AUTHENTICATORS.getKey(), authenticators, SERVICE_ADMINS.getKey(), serviceAdmins),
         t -> true);
-  }
-
-  private void initializeWithoutPayload() throws IOException {
-    manager.initializeConfiguredServiceAdmins(config, "");
-  }
-
-  private void initializeWithPayload(String initialAdminPassword) throws IOException {
-    manager.initializeConfiguredServiceAdmins(config, initialAdminPassword);
   }
 }

@@ -53,13 +53,14 @@ public class IdpUserGroupManager implements Closeable {
   private static final String BASIC_AUTHENTICATOR_CLASS_NAME =
       BasicAuthenticator.class.getCanonicalName();
 
+  private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
+  private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
+
   private static volatile IdpUserGroupManager instance;
 
   private final IdpRelationalStorage relationalStorage;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
-  private final IdpUserMetaService userMetaService;
-  private final IdpGroupMetaService groupMetaService;
 
   public static IdpUserGroupManager getInstance(Config config, IdGenerator idGenerator) {
     IdpUserGroupManager local = instance;
@@ -67,7 +68,7 @@ public class IdpUserGroupManager implements Closeable {
       synchronized (IdpUserGroupManager.class) {
         local = instance;
         if (local == null) {
-          instance = createFromConfig(config, idGenerator);
+          instance = new IdpUserGroupManager(config, idGenerator);
           local = instance;
         }
       }
@@ -75,26 +76,16 @@ public class IdpUserGroupManager implements Closeable {
     return local;
   }
 
-  private static IdpUserGroupManager createFromConfig(Config config, IdGenerator idGenerator) {
-    return new IdpUserGroupManager(
-        new IdpRelationalStorage(config),
-        idGenerator,
-        PasswordHasherFactory.create(),
-        IdpUserMetaService.getInstance(),
-        IdpGroupMetaService.getInstance());
-  }
-
-  IdpUserGroupManager(
-      @Nullable IdpRelationalStorage relationalStorage,
-      IdGenerator idGenerator,
-      PasswordHasher passwordHasher,
-      IdpUserMetaService userMetaService,
-      @Nullable IdpGroupMetaService groupMetaService) {
-    this.relationalStorage = relationalStorage;
+  /**
+   * Creates a built-in IdP user and group manager.
+   *
+   * @param config The server configuration.
+   * @param idGenerator The id generator.
+   */
+  public IdpUserGroupManager(Config config, IdGenerator idGenerator) {
+    this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
-    this.passwordHasher = passwordHasher;
-    this.userMetaService = userMetaService;
-    this.groupMetaService = groupMetaService;
+    this.passwordHasher = PasswordHasherFactory.create();
   }
 
   public void initializeConfiguredServiceAdmins(Config config, String initialAdminPassword)
@@ -123,8 +114,8 @@ public class IdpUserGroupManager implements Closeable {
           "Missing initial password for configured service admin %s; declare"
               + " GRAVITINO_INITIAL_ADMIN_PASSWORD",
           serviceAdmin);
-      userMetaService.insertIdpUser(
-          buildUserPO(idGenerator, serviceAdmin, passwordHasher.hash(initialAdminPassword)));
+      USER_SERVICE.insertIdpUser(
+          newUserPO(serviceAdmin, passwordHasher.hash(initialAdminPassword)));
     }
   }
 
@@ -141,7 +132,7 @@ public class IdpUserGroupManager implements Closeable {
    * @return The created built-in IdP user.
    */
   public IdpUser addUser(String username, String password) throws IOException {
-    userMetaService.insertIdpUser(newUserPO(username, passwordHasher.hash(password)));
+    USER_SERVICE.insertIdpUser(newUserPO(username, passwordHasher.hash(password)));
     return new IdpUser(username, Collections.emptyList());
   }
 
@@ -152,7 +143,7 @@ public class IdpUserGroupManager implements Closeable {
    * @return True if the user was removed, false if it did not exist.
    */
   public boolean removeUser(String username) {
-    return userMetaService.deleteIdpUser(username);
+    return USER_SERVICE.deleteIdpUser(username);
   }
 
   /**
@@ -162,18 +153,18 @@ public class IdpUserGroupManager implements Closeable {
    * @return The built-in IdP user.
    */
   public IdpUser getUser(String username) {
-    IdpUserPO userPO = userMetaService.getIdpUserByUsername(username);
-    return new IdpUser(userPO.getUsername(), userMetaService.listGroupNamesByUsername(username));
+    IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
+    return new IdpUser(userPO.getUsername(), USER_SERVICE.listGroupNamesByUsername(username));
   }
 
   public IdpUser authenticate(String username, String password) {
     try {
-      IdpUserPO userPO = userMetaService.getIdpUserByUsername(username);
+      IdpUserPO userPO = USER_SERVICE.getIdpUserByUsername(username);
       if (!passwordHasher.verify(password, userPO.getPasswordHash())) {
         throw new UnauthorizedException(
             "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
       }
-      return new IdpUser(username, userMetaService.listGroupNamesByUsername(username));
+      return new IdpUser(username, USER_SERVICE.listGroupNamesByUsername(username));
     } catch (NotFoundException e) {
       throw new UnauthorizedException(
           "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
@@ -189,7 +180,7 @@ public class IdpUserGroupManager implements Closeable {
    * @throws NotFoundException if the user does not exist
    */
   public boolean changePassword(String username, String password) {
-    return userMetaService.updateIdpUserPassword(username, passwordHasher.hash(password));
+    return USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password));
   }
 
   /**
@@ -199,7 +190,7 @@ public class IdpUserGroupManager implements Closeable {
    * @return The created built-in IdP group.
    */
   public IdpGroup addGroup(String groupName) throws IOException {
-    groupMetaService.insertIdpGroup(newGroupPO(groupName));
+    GROUP_SERVICE.insertIdpGroup(newGroupPO(groupName));
     return new IdpGroup(groupName, Collections.emptyList());
   }
 
@@ -211,7 +202,7 @@ public class IdpUserGroupManager implements Closeable {
    * @return True if the group was removed, false if it did not exist.
    */
   public boolean removeGroup(String groupName, boolean force) {
-    return groupMetaService.deleteIdpGroup(groupName, force);
+    return GROUP_SERVICE.deleteIdpGroup(groupName, force);
   }
 
   /**
@@ -221,9 +212,8 @@ public class IdpUserGroupManager implements Closeable {
    * @return The built-in IdP group.
    */
   public IdpGroup getGroup(String groupName) {
-    IdpGroupPO groupPO = groupMetaService.getIdpGroupByName(groupName);
-    return new IdpGroup(
-        groupPO.getGroupName(), groupMetaService.listUsernamesByGroupName(groupName));
+    IdpGroupPO groupPO = GROUP_SERVICE.getIdpGroupByName(groupName);
+    return new IdpGroup(groupPO.getGroupName(), GROUP_SERVICE.listUsernamesByGroupName(groupName));
   }
 
   /**
@@ -242,31 +232,21 @@ public class IdpUserGroupManager implements Closeable {
     Preconditions.checkArgument(
         !usersToAddList.isEmpty() || !usersToRemoveList.isEmpty(),
         "usersToAdd and usersToRemove cannot both be empty");
-    groupMetaService.changeGroupMembership(groupName, usersToAddList, usersToRemoveList);
+    GROUP_SERVICE.changeGroupMembership(groupName, usersToAddList, usersToRemoveList);
     return getGroup(groupName);
   }
 
   @Override
   public void close() throws IOException {
-    try {
-      if (relationalStorage != null) {
-        relationalStorage.close();
-      }
-    } finally {
-      synchronized (IdpUserGroupManager.class) {
-        if (instance == this) {
-          instance = null;
-        }
+    relationalStorage.close();
+    synchronized (IdpUserGroupManager.class) {
+      if (instance == this) {
+        instance = null;
       }
     }
   }
 
   private IdpUserPO newUserPO(String username, String passwordHash) {
-    return buildUserPO(idGenerator, username, passwordHash);
-  }
-
-  private static IdpUserPO buildUserPO(
-      IdGenerator idGenerator, String username, String passwordHash) {
     return IdpUserPO.builder()
         .withUserId(idGenerator.nextId())
         .withUsername(username)
@@ -279,7 +259,7 @@ public class IdpUserGroupManager implements Closeable {
 
   private boolean userExists(String username) {
     try {
-      userMetaService.getIdpUserByUsername(username);
+      USER_SERVICE.getIdpUserByUsername(username);
       return true;
     } catch (NotFoundException e) {
       return false;
