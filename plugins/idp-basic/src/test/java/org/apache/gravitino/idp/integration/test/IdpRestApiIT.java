@@ -69,6 +69,8 @@ public class IdpRestApiIT extends BaseIT {
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String IDP_REST_EXTENSION_PACKAGE =
       "org.apache.gravitino.idp.web.rest.feature";
+  private static final String BASIC_AUTHENTICATOR_CLASS =
+      "org.apache.gravitino.idp.auth.BasicAuthenticator";
   private static final String INITIAL_ADMIN_PASSWORD_ENV = "GRAVITINO_INITIAL_ADMIN_PASSWORD";
   private static final String ADMIN = "admin";
   private static final String ADMIN_PASSWORD = "Passw0rd-For-Admin1";
@@ -177,7 +179,7 @@ public class IdpRestApiIT extends BaseIT {
             .put(Configs.STORE_DELETE_AFTER_TIME.getKey(), String.valueOf(20 * 60 * 1000L))
             .put(Configs.CACHE_ENABLED.getKey(), "false")
             .put(Configs.ENABLE_AUTHORIZATION.getKey(), "false")
-            .put(Configs.AUTHENTICATORS.getKey(), "basic")
+            .put(Configs.AUTHENTICATORS.getKey(), BASIC_AUTHENTICATOR_CLASS)
             .put(Configs.SERVICE_ADMINS.getKey(), ADMIN)
             .put(Configs.REST_API_EXTENSION_PACKAGES.getKey(), IDP_REST_EXTENSION_PACKAGE)
             .build();

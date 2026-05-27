@@ -24,7 +24,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -56,7 +55,7 @@ public final class ServiceAdminInitializer {
         IdpUserMetaService.getInstance(),
         PasswordHasherFactory.create(),
         GravitinoEnv.getInstance().idGenerator(),
-        System.getenv(INITIAL_ADMIN_PASSWORD_ENV));
+        StringUtils.defaultString(System.getenv(INITIAL_ADMIN_PASSWORD_ENV)));
   }
 
   static void initialize(
@@ -64,7 +63,7 @@ public final class ServiceAdminInitializer {
       IdpUserMetaService userMetaService,
       PasswordHasher passwordHasher,
       IdGenerator idGenerator,
-      @Nullable String initialAdminPasswords)
+      String initialAdminPassword)
       throws IOException {
     List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
     if (serviceAdmins == null || serviceAdmins.isEmpty()) {
@@ -72,7 +71,7 @@ public final class ServiceAdminInitializer {
     }
 
     Map<String, String> passwordsByAdmin =
-        parseInitialAdminPasswords(serviceAdmins, initialAdminPasswords);
+        parseInitialAdminPasswords(serviceAdmins, initialAdminPassword);
     for (String serviceAdmin : serviceAdmins) {
       IdpCredentialValidator.validateUsername(serviceAdmin);
       if (userExists(userMetaService, serviceAdmin)) {
@@ -112,7 +111,7 @@ public final class ServiceAdminInitializer {
   }
 
   private static Map<String, String> parseInitialAdminPasswords(
-      List<String> serviceAdmins, @Nullable String initialAdminPassword) {
+      List<String> serviceAdmins, String initialAdminPassword) {
     if (StringUtils.isBlank(initialAdminPassword)) {
       return ImmutableMap.of();
     }

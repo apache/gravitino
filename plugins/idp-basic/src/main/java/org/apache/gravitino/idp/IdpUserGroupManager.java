@@ -53,6 +53,7 @@ public class IdpUserGroupManager implements Closeable {
   private final IdpRelationalStorage relationalStorage;
   private final IdGenerator idGenerator;
   private final PasswordHasher passwordHasher;
+  private final IdpGarbageCollector garbageCollector;
 
   /**
    * Returns the process-wide built-in IdP user and group manager, creating it on first use.
@@ -85,13 +86,14 @@ public class IdpUserGroupManager implements Closeable {
       instance.close();
       instance = null;
     }
-    IdpGarbageCollector.closeInstance();
   }
 
   private IdpUserGroupManager(Config config, IdGenerator idGenerator) {
     this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
     this.passwordHasher = PasswordHasherFactory.create();
+    this.garbageCollector = new IdpGarbageCollector(config);
+    garbageCollector.start();
   }
 
   /**
@@ -215,6 +217,7 @@ public class IdpUserGroupManager implements Closeable {
 
   @Override
   public void close() throws IOException {
+    garbageCollector.close();
     relationalStorage.close();
   }
 

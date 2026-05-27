@@ -174,7 +174,7 @@ class TestServiceAdminInitializer {
   }
 
   private void initializeWithoutPayload() throws IOException {
-    ServiceAdminInitializer.initialize(config, userMetaService, passwordHasher, idGenerator, null);
+    ServiceAdminInitializer.initialize(config, userMetaService, passwordHasher, idGenerator, "");
   }
 
   private void initializeWithPayload(String initialAdminPasswords) throws IOException {

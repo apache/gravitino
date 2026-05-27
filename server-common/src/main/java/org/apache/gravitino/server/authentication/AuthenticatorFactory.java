@@ -40,9 +40,7 @@ public class AuthenticatorFactory {
           AuthenticatorType.OAUTH.name().toLowerCase(),
           OAuth2TokenAuthenticator.class.getCanonicalName(),
           AuthenticatorType.KERBEROS.name().toLowerCase(),
-          KerberosAuthenticator.class.getCanonicalName(),
-          AuthenticatorType.BASIC.name().toLowerCase(),
-          "org.apache.gravitino.idp.auth.BasicAuthenticator");
+          KerberosAuthenticator.class.getCanonicalName());
 
   private AuthenticatorFactory() {}
 
