@@ -19,11 +19,17 @@
 
 package org.apache.gravitino.spark.connector.glue;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
+import java.util.Map;
 import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.rel.Column;
@@ -33,6 +39,11 @@ import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
+import org.apache.spark.sql.catalyst.analysis.TableAlreadyExistsException;
+import org.apache.spark.sql.connector.catalog.Identifier;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.expressions.Transform;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -40,6 +51,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class TestGravitinoGlueCatalog {
@@ -173,62 +186,148 @@ public class TestGravitinoGlueCatalog {
   }
 
   // -------------------------------------------------------------------------
-  // Test createSparkTable routing for non-Iceberg tables
+  // Test renameTable Derby cleanup
   // -------------------------------------------------------------------------
 
   @Test
-  void testCreateSparkTableRoutingForNonIcebergTable() {
-    // Test that createSparkTable correctly routes non-Iceberg tables.
-    // We verify the routing decision by checking isIcebergTable returns false
-    // and the table properties don't contain ICEBERG format.
+  void testRenameTableDropsDerbyEntryForOldIdentifier()
+      throws NoSuchTableException, TableAlreadyExistsException {
+    TableCatalog mockCatalog = mock(TableCatalog.class);
+    Identifier oldIdent = Identifier.of(new String[] {"db"}, "old_table");
+    Identifier newIdent = Identifier.of(new String[] {"db"}, "new_table");
+
+    // Subclass that bypasses the Gravitino API call to isolate Derby cleanup behavior.
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockCatalog;
+          }
+
+          @Override
+          public void renameTable(Identifier old, Identifier next)
+              throws NoSuchTableException, TableAlreadyExistsException {
+            // Simulate a successful Gravitino rename, then run Derby cleanup.
+            dropFromDerby(old);
+          }
+        };
+
+    catalog.renameTable(oldIdent, newIdent);
+
+    InOrder order = inOrder(mockCatalog);
+    order.verify(mockCatalog).invalidateTable(oldIdent);
+    order.verify(mockCatalog).dropTable(oldIdent);
+    org.mockito.Mockito.verify(mockCatalog, never()).invalidateTable(newIdent);
+    org.mockito.Mockito.verify(mockCatalog, never()).dropTable(newIdent);
+  }
+
+  @Test
+  void testRenameTableDoesNotCleanDerbyWhenRenameFails() {
+    TableCatalog mockCatalog = mock(TableCatalog.class);
+    Identifier oldIdent = Identifier.of(new String[] {"db"}, "old_table");
+    Identifier newIdent = Identifier.of(new String[] {"db"}, "new_table");
+
+    // Subclass that simulates a failed Gravitino rename (throws before Derby cleanup).
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockCatalog;
+          }
+
+          @Override
+          public void renameTable(Identifier old, Identifier next)
+              throws NoSuchTableException, TableAlreadyExistsException {
+            throw new RuntimeException("Simulated Gravitino rename failure");
+          }
+        };
+
+    Assertions.assertThrows(RuntimeException.class, () -> catalog.renameTable(oldIdent, newIdent));
+    org.mockito.Mockito.verify(mockCatalog, never()).invalidateTable(oldIdent);
+    org.mockito.Mockito.verify(mockCatalog, never()).dropTable(oldIdent);
+  }
+
+  // -------------------------------------------------------------------------
+  // Test Derby sync: loadSparkTable retries after Derby miss
+  // -------------------------------------------------------------------------
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testLoadSparkTableSyncsDerbyOnTableMiss() throws Exception {
+    TableCatalog mockCatalog = mock(TableCatalog.class);
+    org.apache.spark.sql.connector.catalog.Table mockSparkTable =
+        mock(org.apache.spark.sql.connector.catalog.Table.class);
     Table mockGravitinoTable = createMockGravitinoTable(ImmutableMap.of());
 
-    // isIcebergTable should return false for non-Iceberg tables
-    Assertions.assertFalse(GravitinoGlueCatalog.isIcebergTable(mockGravitinoTable));
+    Identifier ident = Identifier.of(new String[] {"db"}, "tbl");
+    // First loadTable call simulates Derby miss; second returns the table.
+    when(mockCatalog.loadTable(any()))
+        .thenThrow(new NoSuchTableException(ident))
+        .thenReturn(mockSparkTable);
 
-    // Properties should be empty (non-Iceberg)
-    Assertions.assertFalse(mockGravitinoTable.properties().containsKey(GlueConstants.TABLE_FORMAT));
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockCatalog;
+          }
+
+          @Override
+          protected Table loadGravitinoTable(Identifier ident) throws NoSuchTableException {
+            return mockGravitinoTable;
+          }
+        };
+
+    org.apache.spark.sql.connector.catalog.Table result = catalog.loadSparkTable(ident);
+
+    Assertions.assertSame(mockSparkTable, result);
+    // createTable must be called exactly once to sync the Derby miss.
+    verify(mockCatalog).createTable(eq(ident), any(), any(Transform[].class), any(Map.class));
   }
 
   @Test
-  void testCreateSparkTableRoutingForIcebergTable() {
-    // Test that createSparkTable correctly identifies Iceberg tables.
+  @SuppressWarnings("unchecked")
+  void testSyncTableToDerbyPassesStorageDescriptorProperties() throws Exception {
+    TableCatalog mockCatalog = mock(TableCatalog.class);
+    org.apache.spark.sql.connector.catalog.Table mockSparkTable =
+        mock(org.apache.spark.sql.connector.catalog.Table.class);
     Table mockGravitinoTable =
         createMockGravitinoTable(
-            ImmutableMap.of(GlueConstants.TABLE_FORMAT, GlueConstants.TABLE_FORMAT_ICEBERG));
+            ImmutableMap.of(
+                GlueConstants.LOCATION, "s3://bucket/table",
+                GlueConstants.INPUT_FORMAT_CLASS, "org.apache.hadoop.mapred.TextInputFormat",
+                GlueConstants.OUTPUT_FORMAT,
+                    "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+                GlueConstants.SERDE_LIB, "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"));
 
-    // isIcebergTable should return true for Iceberg tables
-    Assertions.assertTrue(GravitinoGlueCatalog.isIcebergTable(mockGravitinoTable));
-  }
+    Identifier ident = Identifier.of(new String[] {"db"}, "tbl");
+    when(mockCatalog.loadTable(any()))
+        .thenThrow(new NoSuchTableException(ident))
+        .thenReturn(mockSparkTable);
 
-  @Test
-  void testCreateSparkTableRoutingForHiveTable() {
-    // Test that createSparkTable correctly identifies Hive format tables.
-    Table mockGravitinoTable =
-        createMockGravitinoTable(ImmutableMap.of(GlueConstants.TABLE_FORMAT, "HIVE"));
+    GravitinoGlueCatalog catalog =
+        new GravitinoGlueCatalog() {
+          {
+            sparkCatalog = mockCatalog;
+          }
 
-    // isIcebergTable should return false for Hive format
-    Assertions.assertFalse(GravitinoGlueCatalog.isIcebergTable(mockGravitinoTable));
-  }
+          @Override
+          protected Table loadGravitinoTable(Identifier ident) throws NoSuchTableException {
+            return mockGravitinoTable;
+          }
+        };
 
-  @Test
-  void testCreateSparkTableRoutingForDeltaTable() {
-    // Test that createSparkTable correctly identifies Delta format tables.
-    Table mockGravitinoTable =
-        createMockGravitinoTable(ImmutableMap.of(GlueConstants.TABLE_FORMAT, "DELTA"));
+    catalog.loadSparkTable(ident);
 
-    // isIcebergTable should return false for Delta format
-    Assertions.assertFalse(GravitinoGlueCatalog.isIcebergTable(mockGravitinoTable));
-  }
-
-  @Test
-  void testCreateSparkTableRoutingWithNullProperties() {
-    // Test that null properties are handled correctly.
-    Table mockGravitinoTable = mock(Table.class);
-    when(mockGravitinoTable.properties()).thenReturn(null);
-
-    // isIcebergTable should return false for null properties
-    Assertions.assertFalse(GravitinoGlueCatalog.isIcebergTable(mockGravitinoTable));
+    ArgumentCaptor<Map<String, String>> propsCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(mockCatalog)
+        .createTable(eq(ident), any(), any(Transform[].class), propsCaptor.capture());
+    Map<String, String> captured = propsCaptor.getValue();
+    Assertions.assertEquals("s3://bucket/table", captured.get("location"));
+    Assertions.assertEquals(
+        "org.apache.hadoop.mapred.TextInputFormat", captured.get("hive.input-format"));
+    Assertions.assertEquals(
+        "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+        captured.get("hive.output-format"));
+    Assertions.assertEquals(
+        "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe", captured.get("hive.serde"));
   }
 
   // -------------------------------------------------------------------------

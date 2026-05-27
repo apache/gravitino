@@ -135,17 +135,33 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   /**
    * Overrides dropTable to also remove the table from Derby. Without this, Derby accumulates stale
    * entries that cause TableAlreadyExistsException on the next createTable call for the same name.
+   * Iceberg tables are never registered in Derby, so Derby cleanup is skipped for them.
    */
   @Override
   public boolean dropTable(Identifier ident) {
-    dropFromDerby(ident);
+    try {
+      if (!isIcebergTable(loadGravitinoTable(ident))) {
+        dropFromDerby(ident);
+      }
+    } catch (NoSuchTableException e) {
+      return false;
+    }
     return super.dropTable(ident);
   }
 
-  /** Overrides purgeTable to also remove the table from Derby. */
+  /**
+   * Overrides purgeTable to also remove the table from Derby. Iceberg tables are never registered
+   * in Derby, so Derby cleanup is skipped for them.
+   */
   @Override
   public boolean purgeTable(Identifier ident) {
-    dropFromDerby(ident);
+    try {
+      if (!isIcebergTable(loadGravitinoTable(ident))) {
+        dropFromDerby(ident);
+      }
+    } catch (NoSuchTableException e) {
+      return false;
+    }
     return super.purgeTable(ident);
   }
 
@@ -160,6 +176,10 @@ public class GravitinoGlueCatalog extends BaseCatalog {
     dropFromDerby(oldIdent);
   }
 
+  /**
+   * Routes table creation to the appropriate Spark wrapper based on the Gravitino table type.
+   * Iceberg tables are wrapped in {@link SparkIcebergTable}; all others in {@link SparkHiveTable}.
+   */
   @Override
   protected Table createSparkTable(
       Identifier identifier,
@@ -171,6 +191,11 @@ public class GravitinoGlueCatalog extends BaseCatalog {
       SparkTypeConverter sparkTypeConverter) {
 
     if (isIcebergTable(gravitinoTable)) {
+      Preconditions.checkArgument(
+          sparkTable instanceof SparkTable,
+          "Iceberg table %s expected SparkTable from Iceberg backend, got %s",
+          identifier,
+          sparkTable.getClass().getName());
       return new SparkIcebergTable(
           identifier,
           gravitinoTable,
@@ -181,6 +206,15 @@ public class GravitinoGlueCatalog extends BaseCatalog {
           sparkTypeConverter);
     }
 
+    Preconditions.checkArgument(
+        sparkTable instanceof HiveTable,
+        "Glue table %s expected HiveTable from HiveTableCatalog, got %s",
+        identifier,
+        sparkTable.getClass().getName());
+    Preconditions.checkArgument(
+        sparkHiveCatalog instanceof HiveTableCatalog,
+        "Glue catalog expected HiveTableCatalog, got %s",
+        sparkHiveCatalog.getClass().getName());
     return new SparkHiveTable(
         identifier,
         gravitinoTable,
@@ -191,16 +225,19 @@ public class GravitinoGlueCatalog extends BaseCatalog {
         sparkTypeConverter);
   }
 
+  /** {@inheritDoc} Returns the Glue-specific properties converter singleton. */
   @Override
   protected PropertiesConverter getPropertiesConverter() {
     return GluePropertiesConverter.getInstance();
   }
 
+  /** {@inheritDoc} Returns a transform converter with identity partition support disabled. */
   @Override
   protected SparkTransformConverter getSparkTransformConverter() {
     return new SparkTransformConverter(false);
   }
 
+  /** {@inheritDoc} Returns the Hive-compatible type converter used for Glue tables. */
   @Override
   protected SparkTypeConverter getSparkTypeConverter() {
     return new SparkHiveTypeConverter();
@@ -223,7 +260,8 @@ public class GravitinoGlueCatalog extends BaseCatalog {
       return true;
     }
     // Iceberg Glue catalog convention: table_type=ICEBERG stored in Glue table parameters
-    return "ICEBERG".equalsIgnoreCase(properties.get("table_type"));
+    return GlueConstants.ICEBERG_TABLE_TYPE_VALUE.equalsIgnoreCase(
+        properties.get(GlueConstants.TABLE_TYPE_PARAM));
   }
 
   /**
@@ -238,7 +276,16 @@ public class GravitinoGlueCatalog extends BaseCatalog {
           Preconditions.checkArgument(
               catalogName != null && catalogProperties != null,
               "Catalog name and properties must be set before accessing Iceberg catalog");
-          icebergGlueCatalog = createIcebergGlueCatalog();
+          try {
+            icebergGlueCatalog = createIcebergGlueCatalog();
+          } catch (Exception e) {
+            throw new RuntimeException(
+                String.format(
+                    "Failed to initialize Iceberg GlueCatalog for catalog '%s'. "
+                        + "Check aws-region, aws-access-key-id, and aws-secret-access-key properties.",
+                    catalogName),
+                e);
+          }
         }
       }
     }
@@ -273,6 +320,11 @@ public class GravitinoGlueCatalog extends BaseCatalog {
   /** Creates the namespace in Derby if it does not already exist. */
   private void syncNamespaceToDerby(String[] namespace) {
     if (!(sparkCatalog instanceof SupportsNamespaces)) {
+      LOG.warn(
+          "sparkCatalog {} does not implement SupportsNamespaces; "
+              + "skipping Derby namespace sync for {}. Derby createTable may fail.",
+          sparkCatalog.getClass().getName(),
+          Arrays.toString(namespace));
       return;
     }
     SupportsNamespaces ns = (SupportsNamespaces) sparkCatalog;
@@ -292,59 +344,74 @@ public class GravitinoGlueCatalog extends BaseCatalog {
    * the table is missing from Derby (e.g., after a JVM restart or against a pre-populated catalog).
    * The caller supplies the Gravitino table to avoid a redundant load and eliminate the TOCTOU
    * window that would exist if we re-fetched it here.
+   *
+   * @param ident the table identifier
+   * @param gravitinoTable the Gravitino table metadata
    */
   private void syncTableToDerby(Identifier ident, org.apache.gravitino.rel.Table gravitinoTable) {
+    SparkTypeConverter typeConverter = getSparkTypeConverter();
+    SparkTransformConverter transformConverter = getSparkTransformConverter();
+
+    StructField[] fields =
+        Arrays.stream(gravitinoTable.columns())
+            .map(
+                col ->
+                    DataTypes.createStructField(
+                        col.name(), typeConverter.toSparkType(col.dataType()), col.nullable()))
+            .toArray(StructField[]::new);
+    StructType schema = new StructType(fields);
+
+    Transform[] sparkPartitions =
+        transformConverter.toSparkTransform(gravitinoTable.partitioning(), null, null);
+
+    Map<String, String> props = new HashMap<>();
+    Map<String, String> gravitinoProps = gravitinoTable.properties();
+    String location = gravitinoProps.get(GlueConstants.LOCATION);
+    if (location != null) {
+      props.put(TableCatalog.PROP_LOCATION, location);
+    }
+    String inputFormat = gravitinoProps.get(GlueConstants.INPUT_FORMAT_CLASS);
+    if (inputFormat != null) {
+      props.put("hive.input-format", inputFormat);
+    }
+    String outputFormat = gravitinoProps.get(GlueConstants.OUTPUT_FORMAT);
+    if (outputFormat != null) {
+      props.put("hive.output-format", outputFormat);
+    }
+    String serdeLib = gravitinoProps.get(GlueConstants.SERDE_LIB);
+    if (serdeLib != null) {
+      props.put("hive.serde", serdeLib);
+    }
+
+    syncNamespaceToDerby(ident.namespace());
     try {
-      SparkTypeConverter typeConverter = getSparkTypeConverter();
-      SparkTransformConverter transformConverter = getSparkTransformConverter();
-
-      StructField[] fields =
-          Arrays.stream(gravitinoTable.columns())
-              .map(
-                  col ->
-                      DataTypes.createStructField(
-                          col.name(), typeConverter.toSparkType(col.dataType()), col.nullable()))
-              .toArray(StructField[]::new);
-      StructType schema = new StructType(fields);
-
-      Transform[] sparkPartitions =
-          transformConverter.toSparkTransform(gravitinoTable.partitioning(), null, null);
-
-      Map<String, String> props = new HashMap<>();
-      Map<String, String> gravitinoProps = gravitinoTable.properties();
-      String location = gravitinoProps.get(GlueConstants.LOCATION);
-      if (location != null) {
-        props.put(TableCatalog.PROP_LOCATION, location);
-      }
-      String inputFormat = gravitinoProps.get(GlueConstants.INPUT_FORMAT_CLASS);
-      if (inputFormat != null) {
-        props.put("hive.input-format", inputFormat);
-      }
-      String outputFormat = gravitinoProps.get(GlueConstants.OUTPUT_FORMAT);
-      if (outputFormat != null) {
-        props.put("hive.output-format", outputFormat);
-      }
-      String serdeLib = gravitinoProps.get(GlueConstants.SERDE_LIB);
-      if (serdeLib != null) {
-        props.put("hive.serde", serdeLib);
-      }
-
-      syncNamespaceToDerby(ident.namespace());
       sparkCatalog.createTable(ident, schema, sparkPartitions, props);
     } catch (TableAlreadyExistsException e) {
       // Race: another thread created it first — OK.
-    } catch (Exception e) {
-      LOG.warn("Failed to sync table {} to Derby", ident, e);
+    } catch (NoSuchNamespaceException e) {
+      throw new RuntimeException(
+          String.format(
+              "Failed to create Derby entry for %s.%s: namespace sync failed.",
+              getDatabase(ident), ident.name()),
+          e);
     }
   }
 
-  /** Silently removes the table from Derby. Used during drop/purge to avoid stale entries. */
-  private void dropFromDerby(Identifier ident) {
+  /**
+   * Removes the table from Derby. Used during drop/purge/rename to avoid stale entries. Failures
+   * are logged at WARN because a stale Derby entry will cause the next createTable to fail with
+   * TableAlreadyExistsException.
+   */
+  void dropFromDerby(Identifier ident) {
     try {
       sparkCatalog.invalidateTable(ident);
       sparkCatalog.dropTable(ident);
     } catch (Exception e) {
-      LOG.debug("Drop from Derby failed for {} (may not exist): {}", ident, e.getMessage());
+      LOG.warn(
+          "Failed to remove table {} from Derby local metastore. "
+              + "A subsequent createTable with the same name may fail with TableAlreadyExistsException.",
+          ident,
+          e);
     }
   }
 }

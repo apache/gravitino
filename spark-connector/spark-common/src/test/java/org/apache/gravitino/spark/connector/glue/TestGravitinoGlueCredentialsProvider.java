@@ -64,10 +64,9 @@ public class TestGravitinoGlueCredentialsProvider {
   }
 
   @Test
-  void testCreateWithMissingKeysThrowsOnResolve() {
-    // create(Map) with empty map returns a provider with null fields; resolve fails.
-    AwsCredentialsProvider provider = GravitinoGlueCredentialsProvider.create(Map.of());
-    Assertions.assertThrows(SdkClientException.class, provider::resolveCredentials);
+  void testCreateWithMissingKeysThrows() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> GravitinoGlueCredentialsProvider.create(Map.of()));
   }
 
   @Test

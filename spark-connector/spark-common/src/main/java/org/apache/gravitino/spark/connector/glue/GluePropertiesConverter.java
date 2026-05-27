@@ -26,6 +26,8 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.iceberg.CatalogProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Transform AWS Glue catalog properties between Apache Spark and Apache Gravitino.
@@ -39,19 +41,47 @@ import org.apache.iceberg.CatalogProperties;
  */
 public class GluePropertiesConverter implements PropertiesConverter {
 
+  private static final Logger LOG = LoggerFactory.getLogger(GluePropertiesConverter.class);
+
+  /** Iceberg GlueCatalog implementation class name, set as {@code catalog-impl}. */
   public static final String GLUE_CATALOG_IMPL = "org.apache.iceberg.aws.glue.GlueCatalog";
+
+  /** Iceberg property key for the AWS Glue catalog ID (account-level catalog). */
   public static final String GLUE_ID = "glue.id";
+
+  /** Iceberg property key for a custom AWS Glue service endpoint URL. */
   public static final String GLUE_ENDPOINT = "glue.endpoint";
+
+  /** Iceberg property key for the AWS region used by the Glue client. */
   public static final String CLIENT_REGION = "client.region";
+
+  /**
+   * Iceberg property key for the credentials provider class. Set to {@link
+   * #GRAVITINO_GLUE_CREDENTIALS_PROVIDER} when static credentials are configured.
+   */
   public static final String CLIENT_CREDENTIALS_PROVIDER = "client.credentials-provider";
-  // GravitinoGlueCredentialsProvider implements AwsCredentialsProvider with create(Map) so that
-  // Iceberg's AwsClientProperties can instantiate it dynamically via client.credentials-provider.
+
+  /**
+   * Fully-qualified class name of {@link GravitinoGlueCredentialsProvider}. Implements {@code
+   * AwsCredentialsProvider} with a {@code create(Map)} factory so that Iceberg's {@code
+   * AwsClientProperties} can instantiate it dynamically via {@code client.credentials-provider}.
+   */
   public static final String GRAVITINO_GLUE_CREDENTIALS_PROVIDER =
       "org.apache.gravitino.spark.connector.glue.GravitinoGlueCredentialsProvider";
+
+  /** Gravitino catalog property key for the AWS access key ID. */
   public static final String AWS_ACCESS_KEY_ID = "aws-access-key-id";
+
+  /** Gravitino catalog property key for the AWS secret access key. */
   public static final String AWS_SECRET_ACCESS_KEY = "aws-secret-access-key";
+
+  /** Gravitino catalog property key for the AWS region. */
   public static final String AWS_REGION = "aws-region";
+
+  /** Gravitino catalog property key for the AWS Glue catalog ID. */
   public static final String AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
+
+  /** Gravitino catalog property key for a custom AWS Glue endpoint URL. */
   public static final String AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
 
   private static class GluePropertiesConverterHolder {
@@ -136,6 +166,10 @@ public class GluePropertiesConverter implements PropertiesConverter {
       all.put(CLIENT_CREDENTIALS_PROVIDER, GRAVITINO_GLUE_CREDENTIALS_PROVIDER);
       all.put("client.credentials-provider.access-key-id", accessKey);
       all.put("client.credentials-provider.secret-access-key", secretKey);
+    } else {
+      LOG.debug(
+          "aws-access-key-id or aws-secret-access-key not configured; "
+              + "falling back to the default AWS credential chain (instance profile, env vars, etc.).");
     }
     return all;
   }

@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.glue;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -51,8 +52,15 @@ public class GravitinoGlueCredentialsProvider implements AwsCredentialsProvider 
    */
   public static AwsCredentialsProvider create(Map<String, String> properties) {
     Preconditions.checkArgument(properties != null, "Credentials properties must not be null");
-    return new GravitinoGlueCredentialsProvider(
-        properties.get(ACCESS_KEY_ID), properties.get(SECRET_ACCESS_KEY));
+    String accessKeyId = properties.get(ACCESS_KEY_ID);
+    String secretAccessKey = properties.get(SECRET_ACCESS_KEY);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(accessKeyId),
+        "Glue credentials provider requires 'access-key-id' in client.credentials-provider.* properties");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(secretAccessKey),
+        "Glue credentials provider requires 'secret-access-key' in client.credentials-provider.* properties");
+    return new GravitinoGlueCredentialsProvider(accessKeyId, secretAccessKey);
   }
 
   GravitinoGlueCredentialsProvider(String accessKeyId, String secretAccessKey) {

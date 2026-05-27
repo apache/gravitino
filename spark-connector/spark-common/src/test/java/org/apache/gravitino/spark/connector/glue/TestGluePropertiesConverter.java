@@ -129,6 +129,22 @@ public class TestGluePropertiesConverter {
         IllegalArgumentException.class, () -> converter.toIcebergCatalogProperties(null));
   }
 
+  @Test
+  void testToIcebergCatalogPropertiesOnlyAccessKeyOmitsCredentialsProvider() {
+    Map<String, String> props =
+        converter.toIcebergCatalogProperties(
+            ImmutableMap.of(GluePropertiesConverter.AWS_ACCESS_KEY_ID, "AKID"));
+    Assertions.assertNull(props.get(GluePropertiesConverter.CLIENT_CREDENTIALS_PROVIDER));
+  }
+
+  @Test
+  void testToIcebergCatalogPropertiesOnlySecretKeyOmitsCredentialsProvider() {
+    Map<String, String> props =
+        converter.toIcebergCatalogProperties(
+            ImmutableMap.of(GluePropertiesConverter.AWS_SECRET_ACCESS_KEY, "SECRET"));
+    Assertions.assertNull(props.get(GluePropertiesConverter.CLIENT_CREDENTIALS_PROVIDER));
+  }
+
   // --- toSparkCatalogProperties tests (single-arg version) ---
 
   @Test
