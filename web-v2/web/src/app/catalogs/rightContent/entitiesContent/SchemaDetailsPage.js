@@ -51,6 +51,7 @@ import TableActions from '@/components/TableActions'
 import PropertiesContent from '@/components/PropertiesContent'
 import {
   getCatalogDetails,
+  fetchSchemas,
   deleteFileset,
   deleteModel,
   deleteTopic,
@@ -61,6 +62,7 @@ import {
 } from '@/lib/store/metalakes'
 import Link from 'next/link'
 import { cn } from '@/lib/utils/tailwind'
+import { to } from '@/lib/utils'
 import Loading from '@/components/Loading'
 import CreateSchemaDialog from '../CreateSchemaDialog'
 import CreateFilesetDialog from '../CreateFilesetDialog'
@@ -105,6 +107,7 @@ export default function SchemaDetailsPage() {
   const [entityType, setEntityType] = useState('')
   const [tabKey, setTabKey] = useState('')
   const [nameCol, setNameCol] = useState('')
+  const [subSchemas, setSubSchemas] = useState([])
   const { ref, width } = useResizeObserver()
   const treeRef = useContext(TreeRefContext)
   const [catalogData, setCatalogData] = useState(null)
@@ -135,9 +138,48 @@ export default function SchemaDetailsPage() {
   }, [anthEnable])
 
   useEffect(() => {
+    if (!currentMetalake || !catalog || !schema) {
+      setSubSchemas([])
+      return
+    }
+
+    const loadSubSchemas = async () => {
+      const [err, res] = await to(
+        dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
+      )
+      if (err || !res) {
+        setSubSchemas([])
+        return
+      }
+
+      const { schemas = [] } = res?.payload || {}
+      const nextSubSchemas = schemas.map(item => {
+        return {
+          ...item,
+          name: item.name,
+          key: item.name,
+          title: item.name
+        }
+      })
+
+      setSubSchemas(nextSubSchemas)
+    }
+
+    loadSubSchemas()
+  }, [currentMetalake, catalog, schema])
+
+  useEffect(() => {
+    const hasSubSchemas = subSchemas.length > 0
+    const withSubSchemas = tabs => (hasSubSchemas ? [{ label: 'Subschemas', key: 'Subschemas' }, ...tabs] : tabs)
+
+    let nextTabOptions = []
+    let nextCreateBtn = ''
+    let nextNameCol = ''
+    let nextEntityType = ''
+
     switch (catalogType) {
       case 'relational':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Tables', key: 'Tables' },
@@ -151,13 +193,12 @@ export default function SchemaDetailsPage() {
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Tables')
-        setCreateBtn('Create Table')
-        setNameCol('Table Name')
-        setEntityType('table')
+        nextCreateBtn = 'Create Table'
+        nextNameCol = 'Table Name'
+        nextEntityType = 'table'
         break
       case 'messaging':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Topics', key: 'Topics' },
@@ -169,13 +210,12 @@ export default function SchemaDetailsPage() {
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Topics')
-        setCreateBtn('Create Topic')
-        setNameCol('Topic Name')
-        setEntityType('topic')
+        nextCreateBtn = 'Create Topic'
+        nextNameCol = 'Topic Name'
+        nextEntityType = 'topic'
         break
       case 'fileset':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Filesets', key: 'Filesets' },
@@ -187,13 +227,12 @@ export default function SchemaDetailsPage() {
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Filesets')
-        setCreateBtn('Create Fileset')
-        setNameCol('Fileset Name')
-        setEntityType('fileset')
+        nextCreateBtn = 'Create Fileset'
+        nextNameCol = 'Fileset Name'
+        nextEntityType = 'fileset'
         break
       case 'model':
-        setTabOptions(
+        nextTabOptions = withSubSchemas(
           anthEnable
             ? [
                 { label: 'Models', key: 'Models' },
@@ -205,17 +244,46 @@ export default function SchemaDetailsPage() {
                 { label: 'Functions', key: 'Functions' }
               ]
         )
-        setTabKey('Models')
-        setCreateBtn('Register Model')
-        setNameCol('Model Name')
-        setEntityType('model')
+        nextCreateBtn = 'Register Model'
+        nextNameCol = 'Model Name'
+        nextEntityType = 'model'
         break
       default:
-        setTabOptions([])
-        setCreateBtn('')
-        setEntityType('')
+        nextTabOptions = []
+        nextCreateBtn = ''
+        nextEntityType = ''
     }
-  }, [catalogType, anthEnable])
+
+    setTabOptions(nextTabOptions)
+    setCreateBtn(nextCreateBtn)
+    setNameCol(nextNameCol)
+    setEntityType(nextEntityType)
+  }, [catalogType, anthEnable, subSchemas])
+
+  // 独立useEffect专门处理tabKey的同步，监听hasSubSchemas和catalogType
+  useEffect(() => {
+    const hasSubSchemas = subSchemas.length > 0
+    if (hasSubSchemas) {
+      setTabKey('Subschemas')
+    } else {
+      switch (catalogType) {
+        case 'relational':
+          setTabKey('Tables')
+          break
+        case 'messaging':
+          setTabKey('Topics')
+          break
+        case 'fileset':
+          setTabKey('Filesets')
+          break
+        case 'model':
+          setTabKey('Models')
+          break
+        default:
+          setTabKey('')
+      }
+    }
+  }, [subSchemas, catalogType])
 
   const onChangeTab = key => {
     setTabKey(key)
@@ -244,6 +312,18 @@ export default function SchemaDetailsPage() {
     .map(entity => ({
       ...entity,
       key: entity.name,
+      children: undefined
+    }))
+
+  const subSchemaData = [...subSchemas]
+    .filter(item => {
+      if (search === '') return true
+
+      return item.name.includes(search)
+    })
+    .map(item => ({
+      ...item,
+      key: item.name,
       children: undefined
     }))
 
@@ -509,6 +589,28 @@ export default function SchemaDetailsPage() {
     [currentMetalake, catalogType, catalog, schema, catalogData?.provider]
   )
 
+  const subSchemaColumns = useMemo(
+    () => [
+      {
+        title: 'Schema Name',
+        dataIndex: 'name',
+        key: 'name',
+        width: 300,
+        ellipsis: true,
+        sorter: (a, b) => a?.name.toLowerCase().localeCompare(b?.name.toLowerCase()),
+        render: name => (
+          <Link
+            data-refer={`subschema-link-${name}`}
+            href={`/catalogs?metalake=${encodeURIComponent(currentMetalake)}&catalogType=${catalogType}&catalog=${encodeURIComponent(catalog)}&schema=${encodeURIComponent(name)}`}
+          >
+            {name}
+          </Link>
+        )
+      }
+    ],
+    [currentMetalake, catalogType, catalog]
+  )
+
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
     return { columns, minWidth: 100 }
   }, [columns])
@@ -520,6 +622,14 @@ export default function SchemaDetailsPage() {
   } = useAntdColumnResize(() => {
     return { columns: viewColumns, minWidth: 100 }
   }, [viewColumns])
+
+  const {
+    resizableColumns: subSchemaResizableColumns,
+    components: subSchemaComponents,
+    tableWidth: subSchemaTableWidth
+  } = useAntdColumnResize(() => {
+    return { columns: subSchemaColumns, minWidth: 100 }
+  }, [subSchemaColumns])
 
   return (
     <div ref={ref}>
@@ -611,13 +721,31 @@ export default function SchemaDetailsPage() {
           )}
         </Space>
       </Spin>
-      <Tabs data-refer='details-tabs' defaultActiveKey={tabKey} onChange={onChangeTab} items={tabOptions} />
+      <Tabs data-refer='details-tabs' activeKey={tabKey} onChange={onChangeTab} items={tabOptions} />
       {tabKey === 'Associated Roles' ? (
         <AssociatedTable
           metalake={currentMetalake}
           metadataObjectType={'schema'}
           metadataObjectFullName={`${catalog}.${schema}`}
         />
+      ) : tabKey === 'Subschemas' ? (
+        <>
+          <Flex justify='flex-end' className='mb-4'>
+            <div className='flex w-1/3 gap-4'>
+              <Search name='searchSubSchemaInput' placeholder='Search...' value={search} onChange={onSearchTable} />
+            </div>
+          </Flex>
+          <Table
+            data-refer='subschema-list-grid'
+            size='small'
+            style={{ maxHeight: 'calc(100vh - 30rem)' }}
+            scroll={{ x: subSchemaTableWidth, y: 'calc(100vh - 37rem)' }}
+            dataSource={subSchemaData}
+            pagination={{ position: ['bottomCenter'], showSizeChanger: true }}
+            columns={subSchemaResizableColumns}
+            components={subSchemaComponents}
+          />
+        </>
       ) : tabKey === 'Functions' ? (
         <Functions metalake={currentMetalake} catalog={catalog} schema={schema} />
       ) : tabKey === 'Views' ? (

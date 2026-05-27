@@ -32,7 +32,7 @@ import { nameRegex } from '@/lib/utils/regex'
 import { useResetFormOnCloseModal } from '@/lib/hooks/use-reset'
 import { genUpdates } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
-import { useAppDispatch } from '@/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { createSchema, updateSchema, getSchemaDetails } from '@/lib/store/metalakes'
 
 const { Paragraph } = Typography
@@ -71,6 +71,14 @@ export default function CreateSchemaDialog({ ...props }) {
   const dispatch = useAppDispatch()
 
   const paimonCatalogBackend = provider === 'lakehouse-paimon' && ['hive', 'jdbc'].includes(catalogBackend)
+  const isIcebergJdbcCatalog = provider === 'lakehouse-iceberg' && catalogBackend === 'jdbc'
+
+  const auth = useAppSelector(state => state.auth)
+  const { systemConfig } = auth || {}
+  const separator = (systemConfig && systemConfig['gravitino.schema.separator']) || ':'
+  const escapeForRegex = s => s.replace(/[-\\/\^$*+?.()|[\]{}]/g, '\\$&')
+  const escSep = escapeForRegex(separator)
+  const dynamicSchemaNameRegex = new RegExp(`^\\w[\\w\\/${escSep}=-]{0,63}$`)
 
   const [form] = Form.useForm()
   const values = Form.useWatch([], form)
@@ -226,8 +234,17 @@ export default function CreateSchemaDialog({ ...props }) {
                 <Form.Item
                   name='name'
                   label='Schema Name'
+                  extra={
+                    isIcebergJdbcCatalog
+                      ? `For nested schemas, separate each level with '${separator}' (for example: a${separator}b${separator}c).`
+                      : undefined
+                  }
                   data-refer='schema-name-field'
-                  rules={[{ required: true }, { type: 'string', max: 64 }, { pattern: new RegExp(nameRegex) }]}
+                  rules={[
+                    { required: true },
+                    { type: 'string', max: 64 },
+                    { pattern: isIcebergJdbcCatalog ? dynamicSchemaNameRegex : new RegExp(nameRegex) }
+                  ]}
                   messageVariables={{ label: 'schema name' }}
                 >
                   <Input placeholder={mismatchName} disabled={editSchema} />
