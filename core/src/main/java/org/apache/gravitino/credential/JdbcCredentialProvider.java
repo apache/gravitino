@@ -53,7 +53,7 @@ public class JdbcCredentialProvider implements CredentialProvider {
   @Nullable
   @Override
   public Credential getCredential(CredentialContext context) {
-    if (StringUtils.isBlank(jdbcUser) || StringUtils.isEmpty(jdbcPassword)) {
+    if (StringUtils.isBlank(jdbcUser) || StringUtils.isBlank(jdbcPassword)) {
       return null;
     }
     return new JdbcCredential(jdbcUser, jdbcPassword);
