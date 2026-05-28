@@ -499,19 +499,13 @@ public class MetalakePage extends BaseWebIT {
 
   public boolean verifyLinkInNewWindow(
       String originalWindowHandle, String expectedUrl, boolean contains) {
-    String auxiliaryWindowHandle = null;
     try {
       Set<String> allWindowHandles = driver.getWindowHandles();
       for (String windowHandle : allWindowHandles) {
         if (!windowHandle.equals(originalWindowHandle)) {
-          auxiliaryWindowHandle = windowHandle;
           driver.switchTo().window(windowHandle);
           break;
         }
-      }
-      if (auxiliaryWindowHandle == null) {
-        LOG.error("No new window opened for link verification");
-        return false;
       }
 
       String actualUrl = driver.getCurrentUrl();
@@ -525,29 +519,8 @@ public class MetalakePage extends BaseWebIT {
       LOG.error(e.getMessage(), e);
       return false;
     } finally {
-      closeAuxiliaryWindowAndSwitchBack(originalWindowHandle, auxiliaryWindowHandle);
-    }
-  }
-
-  private void closeAuxiliaryWindowAndSwitchBack(
-      String originalWindowHandle, String auxiliaryWindowHandle) {
-    try {
-      if (auxiliaryWindowHandle != null
-          && driver.getWindowHandles().contains(auxiliaryWindowHandle)) {
-        driver.switchTo().window(auxiliaryWindowHandle);
-        driver.close();
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to close auxiliary browser window: {}", e.getMessage());
-    }
-    try {
+      driver.close();
       driver.switchTo().window(originalWindowHandle);
-    } catch (Exception e) {
-      LOG.warn("Failed to switch back to original window: {}", e.getMessage());
-      Set<String> handles = driver.getWindowHandles();
-      if (!handles.isEmpty()) {
-        driver.switchTo().window(handles.iterator().next());
-      }
     }
   }
 }
