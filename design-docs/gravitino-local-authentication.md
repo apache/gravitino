@@ -62,9 +62,8 @@ username/password authentication flow.
 
 ### 3.1 Authentication Model
 
-The local authentication is introduced as a new Gravitino authenticator mode: **basic**.
-
-When enabled, Gravitino authenticates incoming requests through HTTP Basic authentication:
+Built-in IDP provides local authentication for Gravitino. Gravitino authenticates incoming requests
+through HTTP Basic authentication:
 
 ```text
 Authorization: Basic <base64(username:password)>
@@ -111,10 +110,7 @@ The recommended module name is:
 
 - `plugins:idp-basic`
 
-This naming keeps the capability grouping explicit while aligning the module name with the
-configured authenticator type. Although the module also includes the broader built-in
-authentication capability set, the entry point exposed to Gravitino is still the `basic`
-authenticator, including:
+This naming keeps the capability grouping explicit. The `plugins:idp-basic` module provides:
 
 - local user and local group management,
 - password hashing and verification,
@@ -280,7 +276,7 @@ preserving the requirement that local identity tables remain global and metalake
 
 To keep local authentication usable immediately after installation without introducing a hard-coded
 default password, Gravitino initializes service admin accounts from an environment variable during
-startup when the `basic` authenticator is enabled.
+startup.
 
 ### 6.1 Initialization Inputs
 
@@ -296,11 +292,10 @@ After Gravitino is installed, the operator should configure:
 
 The initialization process should be:
 
-1. Install Gravitino and configure the `basic` authenticator together with
-   `gravitino.authorization.serviceAdmins`.
-2. If `basic` authentication is enabled for the first startup, set the
-   `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable when any configured service admin does
-   not yet have a password configured in the gravitino.
+1. Install Gravitino and configure `gravitino.authorization.serviceAdmins` and
+   `gravitino.server.rest.extensionPackages`.
+2. Before the first startup, set the `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable when
+   any configured service admin does not yet have a password stored in `idp_user_meta`.
 3. Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD` before writing anything to the database. The password
    must satisfy the local authentication password policy.
 4. Connect to the configured JDBC backend during Gravitino startup.
@@ -324,10 +319,11 @@ the password hash rather than plaintext input.
 The following end-to-end flow shows how an operator can provision the initial service admins for a
 fresh Gravitino deployment.
 
-1. Deploy Gravitino with the `basic` authenticator enabled:
+1. Deploy Gravitino with built-in IDP enabled:
 
    ```properties
-   gravitino.authenticators=basic
+   gravitino.server.rest.extensionPackages=org.apache.gravitino.idp.web.rest.feature
+   gravitino.authorization.enable=true
    gravitino.authorization.serviceAdmins=admin1,admin2
    ```
 
@@ -408,41 +404,28 @@ credentials are otherwise exposed on the wire.
 
 ## 8. Configuration
 
-### 8.1 Authenticator Selection
-
-Add `basic` to the configurable values of `gravitino.authenticators`.
-
-| Key | New Value | Default | Optional Values |
-|---|---|---|---|
-| `gravitino.authenticators` | `basic` | `simple` | `simple`, `oauth`, `kerberos`, `basic` |
-
-This should follow Gravitino's existing multi-authenticator behavior: multiple authenticators are
-comma-separated, and if a request is supported by multiple authenticators simultaneously, the first
-matching authenticator wins.
-
-The local authentication management capability is enabled only when `basic` is included in
-`gravitino.authenticators`. If `basic` is not enabled, Gravitino does not register local
-authentication management APIs.
-
-When `basic` is enabled, `AuthenticatorFactory` loads the built-in IdP authenticator so HTTP Basic
-credentials are verified against `idp_user_meta`, and `IdpRESTFeature` registers `/api/idp/*`
-resources. Management API callers must present valid built-in IdP credentials for a username listed
-in `gravitino.authorization.serviceAdmins`.
-
-### 8.2 REST extension package
+### 8.1 Built-in IDP settings
 
 | Key | Value | Required when using built-in IdP |
 |-----|--------|----------------------------------|
 | `gravitino.server.rest.extensionPackages` | `org.apache.gravitino.idp.web.rest.feature` | Yes |
+| `gravitino.authorization.enable` | `true` | Yes |
+| `gravitino.authorization.serviceAdmins` | Comma-separated service admin usernames | Yes |
 
 Jersey discovers `IdpRESTFeature`, which registers `IdpUserOperations`, `IdpGroupOperations`,
-`IdpBasicBinder`, and `IdpAuthorizationFilter` when `basic` is present in `gravitino.authenticators`.
+`IdpBasicBinder`, and `IdpAuthorizationFilter` when
+`org.apache.gravitino.idp.web.rest.feature` is listed in `gravitino.server.rest.extensionPackages`.
+If the extension package is not configured, `/api/idp/*` routes are not registered.
 
-### 8.3 Password Algorithm
+`AuthenticatorFactory` loads the built-in IdP integration so HTTP Basic credentials are verified
+against `idp_user_meta`. Management API callers must present valid built-in IDP credentials for a
+username listed in `gravitino.authorization.serviceAdmins`.
+
+### 8.2 Password Algorithm
 
 The initial implementation uses Argon2id as the fixed password hashing algorithm.
 
-### 8.4 How Trino Accesses IRC with Basic Authentication
+### 8.3 How Trino Accesses IRC with HTTP Basic Authentication
 
 For Trino to access IRC with Basic authentication, Trino must act as an HTTP client for IRC requests
 and attach the required authentication information to the outbound REST catalog requests.
@@ -495,9 +478,9 @@ The following APIs are intended for local user, local group, and group-membershi
 Because local authentication identities are global rather than metalake-scoped, these management interfaces do
 not include `{metalake}` in their paths and use the `/api/idp` prefix.
 
-These APIs are available only when the `basic` authenticator is enabled. If `basic` is not enabled,
-requests to these local authentication management endpoints should be rejected rather than treated as available
-server APIs.
+These APIs are available only when `org.apache.gravitino.idp.web.rest.feature` is listed in
+`gravitino.server.rest.extensionPackages`. If the extension package is not configured, requests to
+these endpoints are not registered.
 
 All of the following operations are administrator-managed operations. They are intended to be called
 by the configured service admin rather than by end users.
@@ -641,7 +624,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 | Phase | Work Item | Module / Files | Notes |
 |---|---|---|---|
-| 1 | Authenticator module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `plugins:idp-basic` | Add the new module and make the server load it when `gravitino.authenticators=basic`. |
+| 1 | Built-in IDP module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `plugins:idp-basic` | Add the new module and register `IdpRESTFeature` through `gravitino.server.rest.extensionPackages`. |
 | 2 | Password hashing support | `PasswordHasher`, `Argon2idPasswordHasher`, related tests | Use Argon2id as the only supported password hashing algorithm and store PHC-style hash strings. |
 | 3 | IdP metadata schema | JDBC schema files, mapper definitions, store layer | Create `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel` with soft-delete support. |
 | 4 | Service admin initialization | startup initialization logic, validation logic | Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD`, initialize missing configured service admins during startup, and fail startup when required credentials are absent. |
@@ -654,8 +637,8 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 | Area | Checklist |
 |---|---|
-| Module wiring | The design, module name, and server wiring all consistently use `plugins:idp-basic`, while the authenticator mode remains `basic`. |
-| Configuration | All examples use `gravitino.authenticators=basic`, and no obsolete configuration keys remain in the document. |
+| Module wiring | The design, module name, and server wiring all consistently use `plugins:idp-basic`. |
+| Configuration | All examples use `gravitino.server.rest.extensionPackages` and service-admin settings, and no obsolete configuration keys remain in the document. |
 | Schema design | The document consistently uses `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel`, and the soft-delete lifecycle is clearly described. |
 | Security constraints | The document states that passwords are never stored in plaintext, Basic authentication should be used only over HTTPS, and initialization must enforce password policy. |
 | Initialization flow | The document explains how configured service admins are initialized during startup, when `GRAVITINO_INITIAL_ADMIN_PASSWORD` is required, and that only hashed passwords are written. |
