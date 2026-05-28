@@ -32,9 +32,10 @@ Before you call `/api/idp/*`, ensure the following:
    (for example `scripts/mysql/upgrade-1.2.0-to-1.3.0-mysql.sql`). See
    [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
 
-2. **Service admin** — Management APIs require an authenticated principal listed in
-   `gravitino.authorization.serviceAdmins`. `IdpAuthorizationFilter` checks that list; it does not
-   use built-in IDP passwords from `idp_user_meta` for `/api/idp/*` authorization today.
+2. **Service admin passwords** — Built-in IDP requires every username in
+   `gravitino.authorization.serviceAdmins` to have a password stored in `idp_user_meta` before you
+   can call management APIs. **Do not use `simple` authentication to bypass password checks**; that
+   mode does not validate credentials against the built-in IDP store.
 
    1. Enable authorization and set service admin usernames in `gravitino.conf` (see
       [Access control](./security/access-control.md)):
@@ -44,29 +45,30 @@ Before you call `/api/idp/*`, ensure the following:
       gravitino.authorization.serviceAdmins = admin
       ```
 
-   2. Complete [Configuration](#configuration), then restart Gravitino.
+   2. Complete [Configuration](#configuration).
 
-   3. **Call APIs as the service admin** — Use a configured authenticator (for example **simple**)
-      with a username that matches `gravitino.authorization.serviceAdmins`. With simple mode, send
-      that name in the `Authorization` header; an empty password is allowed when the server permits
-      it. See [How to authenticate](./security/how-to-authenticate.md).
-
-   4. **Set a built-in IDP password for the service admin (optional)** — To store a password hash in
-      `idp_user_meta` for a service admin username, call `POST /api/idp/users` while authenticated as
-      that service admin (see [Add a user](#add-a-user)). Example:
+   3. **Initialize service admin passwords at startup** — Before the first start (or before the
+      first start after adding a new service admin without an `idp_user_meta` record), export
+      `GRAVITINO_INITIAL_ADMIN_PASSWORD`. The value is a JSON array of `username:password` entries.
+      Each username must appear in `gravitino.authorization.serviceAdmins`, and each password must
+      satisfy the [password rules](#password-and-username-rules) below.
 
       ```shell
-      curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
-        -d '{"user":"admin","password":"Passw0rd-Admin12"}' \
-        http://localhost:8090/api/idp/users
+      export GRAVITINO_INITIAL_ADMIN_PASSWORD='["admin:Passw0rd-Admin12"]'
       ```
 
-      Automatic startup initialization via `GRAVITINO_INITIAL_ADMIN_PASSWORD` is **not implemented**
-      yet. See
+      On startup, Gravitino hashes these passwords into `idp_user_meta` for service admins that do
+      not already have a stored password. If a configured service admin has no password in the store
+      and this variable is not set, startup fails. See
       [Design of local authentication support](../design-docs/gravitino-local-authentication.md) §6
-      for the planned flow.
+      for the full initialization rules.
+
+   4. **Start or restart Gravitino** so the initialization runs.
+
+   5. **Call APIs with built-in IDP credentials** — Use HTTP Basic authentication with the service
+      admin username and the password you initialized (for example `admin` /
+      `Passw0rd-Admin12`). `IdpAuthorizationFilter` still requires the authenticated principal to be
+      listed in `gravitino.authorization.serviceAdmins`.
 
 ---
 
@@ -82,6 +84,7 @@ Add the following to `gravitino.conf` to expose built-in IDP management REST API
 Example:
 
 ```properties
+gravitino.authorization.enable = true
 gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
 gravitino.authorization.serviceAdmins = admin
 ```
@@ -89,20 +92,20 @@ gravitino.authorization.serviceAdmins = admin
 `IdpRESTFeature` registers `/api/idp/*` when `org.apache.gravitino.idp.web.rest.feature` is listed in
 `gravitino.server.rest.extensionPackages`.
 
-General authentication settings (`simple`, `oauth`, `kerberos`, and related keys) are documented in
-[How to authenticate](./security/how-to-authenticate.md).
-
 ---
 
 ## Operations
 
 The following sections show how to call built-in IDP management APIs with `curl`. Replace
-`localhost:8090` and the `Authorization` header with values that match your deployment.
+`localhost:8090`, usernames, and passwords with values that match your deployment.
 
 ### Before you call the APIs
 
-Complete [Prerequisites](#prerequisites) first. The subsections below assume you are calling the APIs
-as a configured service admin.
+Complete [Prerequisites](#prerequisites) first, including service admin password initialization.
+
+**Authentication** — Send HTTP Basic credentials for a service admin whose password exists in
+`idp_user_meta`. The examples below use `admin` / `Passw0rd-Admin12` (the same values as in the
+`GRAVITINO_INITIAL_ADMIN_PASSWORD` example above).
 
 **Base URL** — `http://<host>:<port>/api/idp`
 
@@ -113,18 +116,18 @@ as a configured service admin.
 | `Accept` | `application/vnd.gravitino.v1+json` |
 | `Content-Type` | `application/json` (for POST and PUT bodies) |
 
-Example using **simple** mode as service admin `admin` (empty password is allowed when the server
-permits it):
+Example:
 
 ```shell
 curl -s -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
   http://localhost:8090/api/idp/users/alice
 ```
 
 ### Password and username rules
 
-Add-user and change-password requests are validated by `IdpCredentialValidator`:
+Add-user, change-password, and `GRAVITINO_INITIAL_ADMIN_PASSWORD` entries are validated by
+`IdpCredentialValidator`:
 
 | Rule | Value |
 |------|--------|
@@ -142,7 +145,7 @@ Password reset is **admin-only** (request body has `password` only; no `oldPassw
 
 ```shell
 curl -s -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
   http://localhost:8090/api/idp/users/alice
 ```
 
@@ -155,7 +158,7 @@ The request body uses field `user` (not `name`):
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
   -d '{"user":"alice","password":"Passw0rd-Alice"}' \
   http://localhost:8090/api/idp/users
 ```
@@ -169,7 +172,7 @@ Administrator reset only:
 ```shell
 curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
   -d '{"password":"Passw0rd-Alice-V2"}' \
   http://localhost:8090/api/idp/users/alice
 ```
@@ -182,7 +185,7 @@ Soft-deletes the user (`deleted_at`). Physical removal is handled by the IDP gar
 
 ```shell
 curl -s -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
   http://localhost:8090/api/idp/users/alice
 ```
 
@@ -194,7 +197,7 @@ curl -s -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```shell
 curl -s -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
   http://localhost:8090/api/idp/groups/engineering
 ```
 
@@ -207,7 +210,7 @@ The request body uses field `group` (not `name`):
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
   -d '{"group":"engineering"}' \
   http://localhost:8090/api/idp/groups
 ```
@@ -220,7 +223,7 @@ If the group still has members, deletion fails unless `force=true`.
 
 ```shell
 curl -s -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
-  -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
   'http://localhost:8090/api/idp/groups/engineering?force=true'
 ```
 
@@ -233,7 +236,7 @@ Add and/or remove members in one request. At least one of `usersToAdd` or `users
 ```shell
 curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+  -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
   -d '{"usersToAdd":["alice","bob"],"usersToRemove":["carol"]}' \
   http://localhost:8090/api/idp/groups/engineering/users
 ```
@@ -250,7 +253,8 @@ across metalakes, not by a database foreign key.
 
 Typical workflow:
 
-1. Create built-in IDP users and groups with `/api/idp/*` (this guide).
+1. Initialize service admin passwords and create additional built-in IDP users and groups with
+   `/api/idp/*` (this guide).
 2. In each metalake, create matching Gravitino users and groups for authorization.
 3. Grant roles and privileges as described in [Access control](./security/access-control.md).
 
@@ -259,6 +263,5 @@ Typical workflow:
 ## Further reading
 
 - [Built-in IDP OpenAPI](./open-api/idp/openapi.yaml) — API paths, bodies, and schemas
-- [Design of local authentication support](../design-docs/gravitino-local-authentication.md) — architecture and future authentication flows
-- [How to authenticate](./security/how-to-authenticate.md) — `simple`, OAuth, and Kerberos
+- [Design of local authentication support](../design-docs/gravitino-local-authentication.md) — service admin initialization and authentication flows
 - [How to use HTTPS](./security/how-to-use-https.md) — transport security for credentials
