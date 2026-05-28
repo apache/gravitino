@@ -453,6 +453,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     } catch (NoSuchViewException | UnsupportedOperationException e) {
       throw new NoSuchTableException(ident);
     }
+    // Load the Kyuubi HiveTable for the view's HMS entry (VIRTUAL_VIEW) to reuse its
+    // catalogTable metadata when constructing SparkHiveView's parent HiveTable.
     Table sparkTable;
     try {
       sparkTable = loadSparkTable(ident);
