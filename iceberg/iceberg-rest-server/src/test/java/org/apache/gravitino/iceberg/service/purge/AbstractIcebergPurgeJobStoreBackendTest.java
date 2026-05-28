@@ -80,6 +80,8 @@ abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
 
   @TestTemplate
   void testEnqueueClaimSucceedLifecycle() {
+    Assertions.assertFalse(store.hasActiveJob("cat", "db", "t"));
+
     long id = store.enqueue(sampleJob());
     Assertions.assertTrue(id > 0);
     Assertions.assertTrue(store.hasActiveJob("cat", "db", "t"));
@@ -90,12 +92,21 @@ abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
     Assertions.assertEquals(id, claimed.id());
     Assertions.assertEquals(ImmutableMap.of("k", "v"), claimed.fileIoProperties());
     Assertions.assertEquals(IcebergPurgeJob.State.RUNNING, store.stateOf(id));
+    Assertions.assertTrue(store.hasActiveJob("cat", "db", "t"));
     Assertions.assertNull(store.claimNext(now, 300_000L, 10));
 
     store.markSucceeded(id);
     Assertions.assertEquals(IcebergPurgeJob.State.SUCCEEDED, store.stateOf(id));
     Assertions.assertFalse(store.hasActiveJob("cat", "db", "t"));
     Assertions.assertEquals(1, store.pruneTerminalBefore(System.currentTimeMillis() + 1));
+  }
+
+  @TestTemplate
+  void testMarkFailedTerminal() {
+    long id = store.enqueue(sampleJob());
+    store.claimNext(System.currentTimeMillis(), 300_000L, 10);
+    store.markFailed(id, "corrupt metadata");
+    Assertions.assertEquals(IcebergPurgeJob.State.FAILED, store.stateOf(id));
   }
 
   @TestTemplate
