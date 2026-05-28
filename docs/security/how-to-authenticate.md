@@ -78,6 +78,14 @@ client = GravitinoClient(
 )
 ```
 
+```shell
+curl -v -X GET \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Basic $(echo -n 'admin:YourSecureGravitinoPassword' | base64)" \
+  http://localhost:8090/api/version
+```
+
 ### OAuth mode
 
 Gravitino supports external OAuth 2.0 servers with two token validation methods:
