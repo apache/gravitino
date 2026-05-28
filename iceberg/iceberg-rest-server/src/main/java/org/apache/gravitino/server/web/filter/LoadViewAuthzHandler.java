@@ -81,6 +81,10 @@ public class LoadViewAuthzHandler implements AuthorizationHandler {
         NameIdentifierUtil.ofView(
             loadContext.metalakeName(), loadContext.catalog(), loadContext.schema(), viewName);
     nameIdentifierMap.put(EntityType.VIEW, viewId);
+    // Spark probes loadView(name) before falling back to loadTable(name), so the existence-check
+    // expression grants the existence probe to principals holding privileges on a like-named
+    // table. Register a TABLE identifier under the same name so that expression has a TABLE entity
+    // to evaluate against; this is what lets a table owner get 404 (not 403) for an absent view.
     nameIdentifierMap.put(
         EntityType.TABLE,
         NameIdentifierUtil.ofTable(
