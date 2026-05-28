@@ -20,7 +20,5 @@ package org.apache.gravitino.server.authorization.annotations;
 
 public enum ExpressionCondition {
   NEVER,
-  ALWAYS,
-  PREVIOUS_EXPRESSION_FORBIDDEN,
   REQUIRED_MODIFY_PRIVILEGES
 }

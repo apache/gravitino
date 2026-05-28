@@ -38,8 +38,6 @@ public @interface AuthorizationExpression {
    */
   String expression() default "";
 
-  ExpressionCondition expressionCondition() default ExpressionCondition.ALWAYS;
-
   /**
    * Used to identify the type of metadata that needs to be accessed
    *
