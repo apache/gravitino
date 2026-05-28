@@ -64,7 +64,7 @@ class TestIcebergVendedCredentials {
     Assertions.assertEquals("1234", config.get(IcebergConstants.ICEBERG_S3_TOKEN_EXPIRES_AT_MS));
     Assertions.assertEquals(
         "v1/aws/namespaces/ns/tables/tbl/credentials",
-        config.get(IcebergConstants.CLIENT_REFRESH_CREDENTIALS_ENDPOINT));
+        config.get(IcebergConstants.ICEBERG_S3_REFRESH_CREDENTIALS_ENDPOINT));
   }
 
   @Test
@@ -73,7 +73,7 @@ class TestIcebergVendedCredentials {
         IcebergVendedCredentials.toClientConfig(
             "gcs", TABLE, new GCSTokenCredential("gcs-token", 5678L));
 
-    Assertions.assertEquals("gcs-token", config.get("gcs.oauth2.token"));
+    Assertions.assertEquals("gcs-token", config.get(IcebergConstants.GCS_OAUTH2_TOKEN));
     Assertions.assertEquals("5678", config.get(IcebergConstants.GCS_OAUTH2_TOKEN_EXPIRES_AT));
     Assertions.assertEquals(
         "v1/gcs/namespaces/ns/tables/tbl/credentials",
@@ -90,7 +90,7 @@ class TestIcebergVendedCredentials {
         "9012", config.get(IcebergConstants.ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS));
     Assertions.assertEquals(
         "v1/oss/namespaces/ns/tables/tbl/credentials",
-        config.get(IcebergConstants.CLIENT_REFRESH_CREDENTIALS_ENDPOINT));
+        config.get(IcebergConstants.ICEBERG_OSS_REFRESH_CREDENTIALS_ENDPOINT));
   }
 
   @Test
@@ -114,7 +114,7 @@ class TestIcebergVendedCredentials {
             "aws", TABLE, new S3SecretKeyCredential("key", "secret"));
 
     Assertions.assertFalse(
-        config.containsKey(IcebergConstants.CLIENT_REFRESH_CREDENTIALS_ENDPOINT));
+        config.containsKey(IcebergConstants.ICEBERG_S3_REFRESH_CREDENTIALS_ENDPOINT));
   }
 
   @Test

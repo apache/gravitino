@@ -142,10 +142,11 @@ public final class IcebergVendedCredentials {
     if (credential instanceof ADLSTokenCredential) {
       return Optional.of(IcebergConstants.ADLS_REFRESH_CREDENTIALS_ENDPOINT);
     }
-    if (credential instanceof S3TokenCredential
-        || credential instanceof AwsIrsaCredential
-        || credential instanceof OSSTokenCredential) {
-      return Optional.of(IcebergConstants.CLIENT_REFRESH_CREDENTIALS_ENDPOINT);
+    if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
+      return Optional.of(IcebergConstants.ICEBERG_S3_REFRESH_CREDENTIALS_ENDPOINT);
+    }
+    if (credential instanceof OSSTokenCredential) {
+      return Optional.of(IcebergConstants.ICEBERG_OSS_REFRESH_CREDENTIALS_ENDPOINT);
     }
     return Optional.empty();
   }
