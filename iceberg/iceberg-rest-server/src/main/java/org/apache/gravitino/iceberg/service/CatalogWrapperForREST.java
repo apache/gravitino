@@ -116,10 +116,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
           IcebergConstants.ICEBERG_ACCESS_DELEGATION);
 
-  // Legacy config keys mapped to current names (see credential-vending.md).
-  private static final Map<String, String> DEPRECATED_PROPERTIES =
+  @SuppressWarnings("deprecation")
+  private static Map<String, String> deprecatedProperties =
       ImmutableMap.of(
-          "credential-provider-type",
+          CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
           CredentialConstants.CREDENTIAL_PROVIDERS,
           "gcs-credential-file-path",
           GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
@@ -128,7 +128,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     super(config);
     // To be compatible with old properties
     Map<String, String> catalogProperties =
-        checkForCompatibility(config.getAllConfig(), DEPRECATED_PROPERTIES);
+        checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
     this.scanPlanCache = loadScanPlanCache(config);
   }

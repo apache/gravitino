@@ -83,7 +83,9 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
       AuthorizationMetadata authMetadata = parameter.getAnnotation(AuthorizationMetadata.class);
       if (authMetadata != null && authMetadata.type() == EntityType.SCHEMA) {
         // Decode the raw Iceberg namespace parameter
-        namespace = RESTUtil.decodeNamespace(String.valueOf(args[i]), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
+        namespace =
+            RESTUtil.decodeNamespace(
+                String.valueOf(args[i]), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
       }
     }
 
