@@ -120,12 +120,17 @@ public class PostgreSqlSchemaOperations extends JdbcDatabaseOperations {
    *
    * <p>Database in PG corresponds to Catalog in JDBC. Schema in PG corresponds to Schema in JDBC.
    *
+   * <p>The catalog parameter is sourced from {@link Connection#getCatalog()} rather than the
+   * configured database field, because PostgreSQL JDBC driver 42.7+ strictly matches the catalog
+   * parameter against the connection's actual catalog. In PostgreSQL, a connection can only connect
+   * to a single database, and {@code setCatalog()} is effectively a no-op.
+   *
    * @param connection the connection to the database
    * @param schemaName the name of the schema
    */
   private ResultSet getSchema(Connection connection, String schemaName) throws SQLException {
     final DatabaseMetaData metaData = connection.getMetaData();
-    return metaData.getSchemas(database, schemaName);
+    return metaData.getSchemas(connection.getCatalog(), schemaName);
   }
 
   @Override
