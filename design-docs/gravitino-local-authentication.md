@@ -63,7 +63,7 @@ username/password authentication flow.
 ### 3.1 Authentication Model
 
 Built-in IDP provides local authentication for Gravitino. Gravitino authenticates incoming requests
-through HTTP Basic authentication:
+through Basic authentication:
 
 ```text
 Authorization: Basic <base64(username:password)>
@@ -383,7 +383,7 @@ The proposed behavior is:
 
 ### 7.5 Transport Security
 
-HTTP Basic authentication should be used over **HTTPS**.
+Basic authentication should be used over **HTTPS**.
 
 If Basic authentication is enabled on plain HTTP, Gravitino should emit a warning-level log because
 credentials are otherwise exposed on the wire.
@@ -400,8 +400,8 @@ credentials are otherwise exposed on the wire.
 | `gravitino.authorization.serviceAdmins` | Comma-separated service admin usernames | Yes |
 
 List `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages` so
-Jersey registers `/api/idp/*` management APIs. Callers must use HTTP Basic with a username in
-`gravitino.authorization.serviceAdmins` and a password stored in `idp_user_meta`.
+Jersey registers `/api/idp/*` management APIs. Callers must use Basic authentication with a username
+in `gravitino.authorization.serviceAdmins` and a password stored in `idp_user_meta`.
 
 ### 8.2 Password Algorithm
 
@@ -558,7 +558,7 @@ The local authentication capability is intentionally lightweight, but the follow
 This design adds local authentication support to Gravitino for environments where an external IdP is
 either unavailable or unnecessarily heavy. The key design choices are:
 
-- **HTTP Basic authentication**
+- **Basic authentication**
 - **username/password credentials**
 - **database-backed storage**
 - **Argon2id password hashing**

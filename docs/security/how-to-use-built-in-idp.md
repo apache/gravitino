@@ -50,9 +50,9 @@ Before you call `/api/idp/*`, ensure the following:
       export GRAVITINO_INITIAL_ADMIN_PASSWORD='Passw0rd-Admin12'
       ```
 
-   3. **Start or restart Gravitino**.
+   3. **Start Gravitino**.
 
-   4. **Call management APIs** — Use HTTP Basic authentication with a service admin username and
+   4. **Call management APIs** — Use Basic authentication with a service admin username and
       password (for example `admin` / `Passw0rd-Admin12`).
 
 ---
@@ -63,7 +63,7 @@ Set service admins in `gravitino.conf` (see also [Prerequisites](#prerequisites)
 
 | Configuration item                      | Description                              | Example |
 |-----------------------------------------|------------------------------------------|---------|
-| `gravitino.authorization.serviceAdmins` | Usernames allowed to manage `/api/idp/*` | `admin` |
+| `gravitino.authorization.serviceAdmins` | Comma-separated service admin usernames that can call built-in IDP management APIs | `admin` |
 
 Example:
 
@@ -77,8 +77,8 @@ gravitino.authorization.serviceAdmins = admin
 ## Operations
 
 The following sections show how to call built-in IDP management APIs with `curl`. Replace
-`localhost:8090`, usernames, and passwords with values that match your deployment. Examples use HTTP
-Basic with `admin` / `Passw0rd-Admin12` (from [Prerequisites](#prerequisites)).
+`localhost:8090`, usernames, and passwords with values that match your deployment. Examples use
+Basic authentication with `admin` / `Passw0rd-Admin12` (from [Prerequisites](#prerequisites)).
 
 **Base URL** — `http://<host>:<port>/api/idp`
 
