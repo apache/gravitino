@@ -60,7 +60,9 @@ plugins {
   alias(libs.plugins.tasktree)
   alias(libs.plugins.errorprone)
 }
-val snappyJavaVersion = "1.1.10.8"
+
+val snappyJavaVersion: String = libs.versions.snappy.java.get()
+
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
@@ -331,10 +333,12 @@ subprojects {
   apply(plugin = "maven-publish")
   apply(plugin = "java")
 
-  // Force upgrade commons-beanutils for all subprojects to resolve outdated transitive versions
-  // pulled by Hadoop, Hive, Spark, Flink, etc.
+  // Force upgrade commons-beanutils/snappy-java for all subprojects to resolve outdated transitive versions
+  // commons-beanutils: pulled by Hadoop, Hive, Spark, Flink, etc.
+  // snappy-java: pulled by Hadoop, Kafka, Iceberg, etc.
   configurations.all {
     resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
+    resolutionStrategy.force("org.xerial.snappy:snappy-java:$snappyJavaVersion")
   }
 
   repositories {
@@ -454,11 +458,6 @@ subprojects {
   apply(plugin = "net.ltgt.errorprone")
   dependencies {
     errorprone("com.google.errorprone:error_prone_core:2.10.0")
-
-    // Force upgrades for outdated transitive dependencies with known issues
-    constraints {
-      implementation("org.xerial.snappy:snappy-java:$snappyJavaVersion")
-    }
   }
 
   tasks.withType<JavaCompile>().configureEach {
