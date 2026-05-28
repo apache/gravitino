@@ -106,7 +106,7 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
         && IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
       String jdbcUser = properties.get(IcebergConstants.GRAVITINO_JDBC_USER);
       String jdbcPassword = properties.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD);
-      if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {
+      if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
         credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
       }
     }

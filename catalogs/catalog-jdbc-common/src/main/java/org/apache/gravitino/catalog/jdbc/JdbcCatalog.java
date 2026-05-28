@@ -123,7 +123,7 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
       Map<String, String> properties, List<String> credentialProviders) {
     String jdbcUser = properties.get(JdbcConfig.USERNAME.getKey());
     String jdbcPassword = properties.get(JdbcConfig.PASSWORD.getKey());
-    if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {
+    if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
       credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
     }
   }
