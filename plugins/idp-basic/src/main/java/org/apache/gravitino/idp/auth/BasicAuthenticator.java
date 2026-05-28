@@ -74,11 +74,7 @@ public class BasicAuthenticator implements Authenticator {
   }
 
   private String requireBasicAuthHeader(byte[] tokenData) {
-    if (tokenData == null) {
-      throw new UnauthorizedException("Empty token authorization header", BASIC_CHALLENGE);
-    }
-
-    String authData = new String(tokenData, StandardCharsets.UTF_8);
+    String authData = tokenData == null ? "" : new String(tokenData, StandardCharsets.UTF_8);
     if (StringUtils.isBlank(authData)) {
       throw new UnauthorizedException("Empty token authorization header", BASIC_CHALLENGE);
     }
