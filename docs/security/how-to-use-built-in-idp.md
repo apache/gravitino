@@ -1,6 +1,7 @@
 ---
 title: How to use built-in IDP (local authentication)
-slug: /how-to-use-built-in-idp
+slug: /security/how-to-use-built-in-idp
+keyword: security authentication idp
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -14,12 +15,12 @@ OAuth server.
 Built-in IDP is aimed at POC, offline, and isolated deployments. It is **not** a replacement for
 enterprise IDPs such as Okta, Azure AD, or Keycloak. Use it only where a lightweight local identity
 store is acceptable; restrict management APIs to **service admins**, store password hashes only,
-and prefer [HTTPS](./security/how-to-use-https.md) when credentials travel over the network.
+and prefer [HTTPS](how-to-use-https.md) when credentials travel over the network.
 
 This guide describes how to enable and operate the management APIs in `plugins:idp-basic`. For
 design background, see
 [Design of local authentication support](../design-docs/gravitino-local-authentication.md). For
-request and response schemas, see the [Built-in IDP OpenAPI](./open-api/idp/openapi.yaml).
+request and response schemas, see the [Built-in IDP OpenAPI](../open-api/idp/openapi.yaml).
 
 ---
 
@@ -36,14 +37,14 @@ Before you call `/api/idp/*`, ensure the following:
 2. **IDP database tables** — Run the appropriate upgrade script under `${GRAVITINO_HOME}/scripts/`
    so the relational store contains `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel`
    (for example `scripts/mysql/upgrade-1.2.0-to-1.3.0-mysql.sql`). See
-   [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
+   [How to use relational backend storage](../how-to-use-relational-backend-storage.md).
 
 3. **Service admin passwords** — Built-in IDP requires every username in
    `gravitino.authorization.serviceAdmins` to have a password stored in `idp_user_meta` before you
    can call management APIs.
 
    1. Enable authorization and set service admin usernames in `gravitino.conf` (see
-      [Access control](./security/access-control.md)):
+      [Access control](access-control.md)):
 
       ```properties
       gravitino.authorization.enable = true
@@ -223,7 +224,7 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/groups/engineering/users
 ```
 
-For full request and response definitions, see the [Built-in IDP OpenAPI](./open-api/idp/openapi.yaml).
+For full request and response definitions, see the [Built-in IDP OpenAPI](../open-api/idp/openapi.yaml).
 
 ---
 
@@ -238,12 +239,12 @@ Typical workflow:
 1. Initialize service admin passwords and create additional built-in IDP users and groups with
    `/api/idp/*` (this guide).
 2. In each metalake, create matching Gravitino users and groups for authorization.
-3. Grant roles and privileges as described in [Access control](./security/access-control.md).
+3. Grant roles and privileges as described in [Access control](access-control.md).
 
 ---
 
 ## Further reading
 
-- [Built-in IDP OpenAPI](./open-api/idp/openapi.yaml) — API paths, bodies, and schemas
+- [Built-in IDP OpenAPI](../open-api/idp/openapi.yaml) — API paths, bodies, and schemas
 - [Design of local authentication support](../design-docs/gravitino-local-authentication.md) — service admin initialization and authentication flows
-- [How to use HTTPS](./security/how-to-use-https.md) — transport security for credentials
+- [How to use HTTPS](how-to-use-https.md) — transport security for credentials
