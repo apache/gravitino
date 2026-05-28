@@ -26,6 +26,10 @@ import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.hive.ClientPropertiesMetadata;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.GCSProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 
 public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
@@ -123,6 +127,62 @@ public class HiveCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   DEFAULT_LIST_ALL_TABLES,
                   false /* hidden */,
                   false /* reserved */))
+          .put(
+              S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+                  "S3 access key ID",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+                  "S3 secret access key",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
+                  "OSS access key ID",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+                  "OSS access key secret",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+                  "Azure storage account name",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
+          .put(
+              AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+                  "Azure storage account key",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  true /* hidden */))
+          .put(
+              GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE,
+              PropertyEntry.stringOptionalPropertyEntry(
+                  GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE,
+                  "GCS service account file path",
+                  false /* immutable */,
+                  null /* defaultValue */,
+                  false /* hidden */))
           .putAll(CLIENT_PROPERTIES_METADATA.propertyEntries())
           .build();
 

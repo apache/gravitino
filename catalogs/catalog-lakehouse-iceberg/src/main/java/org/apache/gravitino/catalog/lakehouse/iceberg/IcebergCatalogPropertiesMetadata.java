@@ -35,6 +35,7 @@ import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
@@ -99,7 +100,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "s3 secret access key",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
                 "OSS access key ID",
@@ -111,7 +112,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "OSS access key secret",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
                 "Azure storage account name",
@@ -123,7 +124,25 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "Azure storage account key",
                 false /* immutable */,
                 null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE,
+                "GCS service account file path",
+                false /* immutable */,
+                null /* defaultValue */,
                 false /* hidden */),
+            stringOptionalPropertyEntry(
+                GRAVITINO_JDBC_USER,
+                "JDBC user for Iceberg JDBC backend",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                GRAVITINO_JDBC_PASSWORD,
+                "JDBC password for Iceberg JDBC backend",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_IMPL,
                 "Table metadata cache implementation. Set to empty string(\"\") if "

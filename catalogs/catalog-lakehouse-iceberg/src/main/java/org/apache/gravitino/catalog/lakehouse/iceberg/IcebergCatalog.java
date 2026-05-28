@@ -31,6 +31,9 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Implementation of an Apache Iceberg catalog in Apache Gravitino. */
@@ -93,12 +96,36 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   @Override
   @Evolving
   public Map<String, String> propertiesWithCredentialProviders() {
-    Map<String, String> properties = Maps.newHashMap(super.propertiesWithCredentialProviders());
+    // Use raw entity properties so hidden credentials are visible to the credential manager.
+    Map<String, String> properties = Maps.newHashMap(entity().getProperties());
     // Iceberg is security-first: the vended s3:ListBucket statement keeps the bare location prefix
     // disabled so a credential cannot enumerate sibling keys sharing the location prefix. This is
     // determined by the catalog type and is not meant to be configured by users.
     properties.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "false");
     return applyDefaultCredentialProviders(properties);
+  }
+
+  /**
+   * Returns catalog properties, optionally re-adding hidden credentials for backward compatibility
+   * with connectors that do not support credential vending. Controlled by server-level config
+   * {@code gravitino.catalog.credential.backfillToProperties}.
+   *
+   * @return the catalog properties map, with credentials backfilled if the server config is set
+   */
+  @Override
+  public Map<String, String> properties() {
+    Map<String, String> props = super.properties();
+    if (!shouldBackfillCredential()) {
+      return props;
+    }
+    Map<String, String> rawProps = entity().getProperties();
+    Map<String, String> result = Maps.newHashMap(props);
+    backfillIfPresent(rawProps, result, IcebergConstants.GRAVITINO_JDBC_USER);
+    backfillIfPresent(rawProps, result, IcebergConstants.GRAVITINO_JDBC_PASSWORD);
+    backfillIfPresent(rawProps, result, S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
+    backfillIfPresent(rawProps, result, OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
+    backfillIfPresent(rawProps, result, AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
+    return result;
   }
 
   private Map<String, String> applyDefaultCredentialProviders(Map<String, String> properties) {
@@ -115,7 +142,7 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
         && IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
       String jdbcUser = properties.get(IcebergConstants.GRAVITINO_JDBC_USER);
       String jdbcPassword = properties.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD);
-      if (StringUtils.isNotBlank(jdbcUser) && StringUtils.isNotBlank(jdbcPassword)) {
+      if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
         credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
       }
     }

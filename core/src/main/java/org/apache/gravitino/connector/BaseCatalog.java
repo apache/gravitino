@@ -31,18 +31,23 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogProvider;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.IsolatedClassLoader;
@@ -475,6 +480,35 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    * @param properties The catalog properties map to scan for storage credentials.
    * @param credentialProviders The list to append detected storage credential providers to.
    */
+  /**
+   * Returns whether hidden credentials should be backfilled into catalog properties for backward
+   * compatibility with connectors that do not support credential vending. Controlled by
+   * server-level config {@code gravitino.catalog.credential.backfillToProperties}.
+   *
+   * @return true if backfill is enabled
+   */
+  protected boolean shouldBackfillCredential() {
+    Config serverConfig = GravitinoEnv.getInstance().config();
+    return serverConfig != null
+        && serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES);
+  }
+
+  /**
+   * Copies a single entry from {@code source} to {@code target} if present (non-null). Used by
+   * subclass {@code properties()} overrides to backfill hidden credentials.
+   *
+   * @param source the source map (raw entity properties)
+   * @param target the target map (filtered properties copy)
+   * @param key the property key to backfill
+   */
+  protected static void backfillIfPresent(
+      Map<String, String> source, Map<String, String> target, String key) {
+    String value = source.get(key);
+    if (value != null) {
+      target.put(key, value);
+    }
+  }
+
   @Evolving
   protected void addStorageCredentialProviders(
       Map<String, String> properties, List<String> credentialProviders) {
@@ -494,6 +528,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     String azureAccountKey = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
     if (StringUtils.isNotBlank(azureAccountName) && StringUtils.isNotBlank(azureAccountKey)) {
       credentialProviders.add(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
+    }
+
+    String gcsServiceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
+    if (StringUtils.isNotBlank(gcsServiceAccountFile)) {
+      credentialProviders.add(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
     }
   }
 

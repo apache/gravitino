@@ -22,9 +22,6 @@ import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Config;
-import org.apache.gravitino.Configs;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -160,12 +157,6 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
       result.put(JdbcConfig.PASSWORD.getKey(), password);
     }
     return result;
-  }
-
-  private boolean shouldBackfillCredential() {
-    Config serverConfig = GravitinoEnv.getInstance().config();
-    return serverConfig != null
-        && serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES);
   }
 
   private Map<String, String> applyDefaultCredentialProviders(Map<String, String> properties) {
