@@ -232,6 +232,20 @@ Bucket settings are defined via Gravitino table distribution (HASH strategy). Th
 
 Please refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
+## View
+
+### View capabilities
+
+- Supports list, create, load, alter, and drop for views stored in the Paimon catalog.
+- Each view must include exactly one SQL representation with dialect `query`, which serves as the canonical view definition.
+- Additional dialect-specific SQL representations (for example, `spark` or `trino`) can be provided alongside the required `query` representation.
+- The `defaultCatalog` and `defaultSchema` fields are stored as Paimon view options and can be used to resolve unqualified identifiers in the SQL text.
+- View support depends on the selected Paimon backend and requires backend view API support.
+
+### View operations
+
+Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md) for more details.
+
 ## HDFS configuration
 
 You can place `core-site.xml` and `hdfs-site.xml` in the `catalogs/lakehouse-paimon/conf` directory to automatically load as the default HDFS configuration.

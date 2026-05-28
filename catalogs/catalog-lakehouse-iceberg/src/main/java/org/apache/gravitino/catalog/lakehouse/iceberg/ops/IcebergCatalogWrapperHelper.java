@@ -30,6 +30,7 @@ import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.converter.IcebergDataTypeConverter;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
+import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.AddColumn;
 import org.apache.gravitino.rel.TableChange.After;
@@ -44,6 +45,7 @@ import org.apache.gravitino.rel.TableChange.UpdateColumnComment;
 import org.apache.gravitino.rel.TableChange.UpdateColumnPosition;
 import org.apache.gravitino.rel.TableChange.UpdateColumnType;
 import org.apache.gravitino.rel.TableChange.UpdateComment;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.Transaction;
@@ -231,10 +233,7 @@ public class IcebergCatalogWrapperHelper {
   public IcebergTableChange buildIcebergTableChanges(
       NameIdentifier gravitinoNameIdentifier, TableChange... tableChanges) {
 
-    TableIdentifier icebergTableIdentifier =
-        TableIdentifier.of(
-            Namespace.of(gravitinoNameIdentifier.namespace().levels()),
-            gravitinoNameIdentifier.name());
+    TableIdentifier icebergTableIdentifier = buildIcebergTableIdentifier(gravitinoNameIdentifier);
 
     List<ColumnChange> gravitinoColumnChanges = Lists.newArrayList();
     List<TableChange> gravitinoPropertyChanges = Lists.newArrayList();
@@ -292,12 +291,23 @@ public class IcebergCatalogWrapperHelper {
   }
 
   public static Namespace getIcebergNamespace(String... level) {
+    // A lone string is a logical schema name that may still be joined by the separator (e.g.
+    // "A:B:C"), so it must be split; a multi-element array has already been pre-split into levels.
+    if (level.length == 1) {
+      return IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
+          level[0], HierarchicalSchemaUtil.schemaSeparator());
+    }
     return Namespace.of(level);
   }
 
   /**
-   * Gravitino only supports tables managed with a single level hierarchy, such as
-   * `{namespace}.{table}`, so we need to perform truncation here.
+   * Builds an Iceberg {@link TableIdentifier} from a Gravitino namespace and table name.
+   *
+   * <p>The last level of the Gravitino namespace is the schema name. When HierarchicalSchema is
+   * enabled, that schema name may encode multiple Iceberg namespace levels joined by the configured
+   * external separator (e.g. {@code "schema:nested"} → Iceberg namespace {@code ("schema",
+   * "nested")}); split it back into a multi-level namespace so the underlying Iceberg catalog
+   * receives the correct identifier.
    *
    * @param namespace The Gravitino name space
    * @param name The table name
@@ -306,19 +316,22 @@ public class IcebergCatalogWrapperHelper {
   public static TableIdentifier buildIcebergTableIdentifier(
       org.apache.gravitino.Namespace namespace, String name) {
     String[] levels = namespace.levels();
-    return TableIdentifier.of(levels[levels.length - 1], name);
+    return TableIdentifier.of(getIcebergNamespace(levels[levels.length - 1]), name);
   }
 
   /**
-   * Gravitino only supports tables managed with a single level hierarchy, such as
-   * `{namespace}.{table}`, so we need to perform truncation here.
+   * Builds an Iceberg {@link TableIdentifier} from a Gravitino {@link NameIdentifier}.
+   *
+   * <p>See {@link #buildIcebergTableIdentifier(org.apache.gravitino.Namespace, String)} for how the
+   * trailing schema name is converted back into a multi-level Iceberg namespace.
    *
    * @param nameIdentifier GravitinoNameIdentifier
    * @return Iceberg TableIdentifier
    */
   public static TableIdentifier buildIcebergTableIdentifier(NameIdentifier nameIdentifier) {
     String[] levels = nameIdentifier.namespace().levels();
-    return TableIdentifier.of(levels[levels.length - 1], nameIdentifier.name());
+    return TableIdentifier.of(
+        getIcebergNamespace(levels[levels.length - 1]), nameIdentifier.name());
   }
 
   @VisibleForTesting

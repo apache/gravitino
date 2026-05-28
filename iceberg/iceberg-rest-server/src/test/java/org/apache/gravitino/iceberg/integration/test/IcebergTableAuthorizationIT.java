@@ -134,6 +134,130 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   @Test
+  void testCreateTableInNestedNamespace() {
+    String nestedSchemaInGravitino = SCHEMA_NAME + ":nested";
+    String nestedSchemaInIceberg = SCHEMA_NAME + ".nested";
+    String tableName = "test_nested_create";
+
+    createNestedNamespaceViaIRC(SCHEMA_NAME, "nested");
+    grantUseSchemaRole(nestedSchemaInGravitino);
+    sql("USE %s;", nestedSchemaInIceberg);
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class, () -> sql("CREATE TABLE %s(a int)", tableName));
+
+    String roleName = grantCreateTableRole(nestedSchemaInGravitino);
+    Assertions.assertDoesNotThrow(() -> sql("CREATE TABLE %s(a int)", tableName));
+    revokeRole(roleName);
+
+    boolean exists =
+        catalogClientWithAllPrivilege
+            .asTableCatalog()
+            .tableExists(NameIdentifier.of(nestedSchemaInGravitino, tableName));
+    Assertions.assertTrue(exists);
+  }
+
+  @Test
+  void testCreateTableInNestedNamespaceWithInheritedParentPrivilege() {
+    String nestedSchemaInGravitino = SCHEMA_NAME + ":nested_inherit";
+    String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_inherit";
+    String tableName = "test_nested_inherited_create";
+
+    createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_inherit");
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () -> {
+          sql("USE %s;", nestedSchemaInIceberg);
+          sql("CREATE TABLE %s(a int)", tableName);
+        });
+
+    grantUseSchemaRole(SCHEMA_NAME);
+    grantCreateTableRole(SCHEMA_NAME);
+    Assertions.assertDoesNotThrow(
+        () -> {
+          sql("USE %s;", nestedSchemaInIceberg);
+          sql("CREATE TABLE %s(a int)", tableName);
+        },
+        "Schema-level privileges on parent namespace should be inherited by child namespace");
+
+    boolean exists =
+        catalogClientWithAllPrivilege
+            .asTableCatalog()
+            .tableExists(NameIdentifier.of(nestedSchemaInGravitino, tableName));
+    Assertions.assertTrue(exists);
+  }
+
+  @Test
+  void testLoadUpdateDropTableInNestedNamespace() {
+    String nestedSchemaInGravitino = SCHEMA_NAME + ":nested_crud";
+    String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_crud";
+    String tableName = "test_nested_crud";
+
+    createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_crud");
+    grantUseSchemaRole(nestedSchemaInGravitino);
+    String createRole = grantCreateTableRole(nestedSchemaInGravitino);
+    sql("USE %s;", nestedSchemaInIceberg);
+    sql("CREATE TABLE %s(a int)", tableName);
+    revokeRole(createRole);
+
+    // The creator becomes table owner, so read should be allowed without explicit SELECT privilege.
+    Assertions.assertDoesNotThrow(() -> sql("DESC TABLE %s", tableName));
+
+    // Transfer ownership away to verify table-level SELECT privilege still works for nested
+    // schemas.
+    MetadataObject tableMetadataObject =
+        MetadataObjects.of(
+            Arrays.asList(GRAVITINO_CATALOG_NAME, nestedSchemaInGravitino, tableName),
+            MetadataObject.Type.TABLE);
+    metalakeClientWithAllPrivilege.setOwner(tableMetadataObject, SUPER_USER, Owner.Type.USER);
+    Assertions.assertThrowsExactly(ForbiddenException.class, () -> sql("DESC TABLE %s", tableName));
+
+    String selectRole = grantSelectTableRole(nestedSchemaInGravitino, tableName);
+    Assertions.assertDoesNotThrow(() -> sql("DESC TABLE %s", tableName));
+    revokeRole(selectRole);
+
+    String modifyRole = grantModifyTableRole(nestedSchemaInGravitino, tableName);
+    Assertions.assertDoesNotThrow(
+        () -> sql("ALTER TABLE %s SET TBLPROPERTIES ('nested_key'='nested_value')", tableName));
+    revokeRole(modifyRole);
+
+    Table table =
+        catalogClientWithAllPrivilege
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(nestedSchemaInGravitino, tableName));
+    Assertions.assertEquals("nested_value", table.properties().get("nested_key"));
+
+    setTableOwner(nestedSchemaInGravitino, tableName);
+    Assertions.assertDoesNotThrow(() -> sql("DROP TABLE %s", tableName));
+
+    boolean exists =
+        catalogClientWithAllPrivilege
+            .asTableCatalog()
+            .tableExists(NameIdentifier.of(nestedSchemaInGravitino, tableName));
+    Assertions.assertFalse(exists);
+  }
+
+  @Test
+  void testListNestedNamespaceTablesWithInheritedParentPrivilege() {
+    String nestedSchemaInIceberg = SCHEMA_NAME + ".nested_list";
+
+    createNestedNamespaceViaIRC(SCHEMA_NAME, "nested_list");
+    createTableViaIRC(new String[] {SCHEMA_NAME, "nested_list"}, "nested_list_t1");
+    createTableViaIRC(new String[] {SCHEMA_NAME, "nested_list"}, "nested_list_t2");
+
+    Set<String> tableNames = listTableNames(nestedSchemaInIceberg);
+    Assertions.assertEquals(0, tableNames.size());
+
+    grantUseSchemaRole(SCHEMA_NAME);
+    setSchemaOwner(SCHEMA_NAME, NORMAL_USER);
+    tableNames = listTableNames(nestedSchemaInIceberg);
+    Assertions.assertTrue(tableNames.contains("nested_list_t1"));
+    Assertions.assertTrue(tableNames.contains("nested_list_t2"));
+    setSchemaOwner(SCHEMA_NAME, SUPER_USER);
+  }
+
+  @Test
   void testLoadTable() {
     String tableName = "test_load";
     createTable(SCHEMA_NAME, tableName);
@@ -598,6 +722,10 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   private String grantSelectTableRole(String tableName) {
+    return grantSelectTableRole(SCHEMA_NAME, tableName);
+  }
+
+  private String grantSelectTableRole(String schema, String tableName) {
     String roleName = "selectTable_" + UUID.randomUUID();
     List<SecurableObject> securableObjects = new ArrayList<>();
     SecurableObject catalogObject =
@@ -606,7 +734,7 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     securableObjects.add(catalogObject);
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
-            catalogObject, SCHEMA_NAME, ImmutableList.of(Privileges.UseSchema.allow()));
+            catalogObject, schema, ImmutableList.of(Privileges.UseSchema.allow()));
     securableObjects.add(schemaObject);
     SecurableObject tableObject =
         SecurableObjects.ofTable(
@@ -618,6 +746,10 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   private String grantModifyTableRole(String tableName) {
+    return grantModifyTableRole(SCHEMA_NAME, tableName);
+  }
+
+  private String grantModifyTableRole(String schema, String tableName) {
     String roleName = "modifyTable_" + UUID.randomUUID();
     List<SecurableObject> securableObjects = new ArrayList<>();
     SecurableObject catalogObject =
@@ -626,7 +758,7 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
     securableObjects.add(catalogObject);
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
-            catalogObject, SCHEMA_NAME, ImmutableList.of(Privileges.UseSchema.allow()));
+            catalogObject, schema, ImmutableList.of(Privileges.UseSchema.allow()));
     securableObjects.add(schemaObject);
     SecurableObject tableObject =
         SecurableObjects.ofTable(
@@ -644,10 +776,13 @@ public class IcebergTableAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   private void setTableOwner(String tableName) {
+    setTableOwner(SCHEMA_NAME, tableName);
+  }
+
+  private void setTableOwner(String schema, String tableName) {
     MetadataObject tableMetadataObject =
         MetadataObjects.of(
-            Arrays.asList(GRAVITINO_CATALOG_NAME, SCHEMA_NAME, tableName),
-            MetadataObject.Type.TABLE);
+            Arrays.asList(GRAVITINO_CATALOG_NAME, schema, tableName), MetadataObject.Type.TABLE);
     metalakeClientWithAllPrivilege.setOwner(tableMetadataObject, NORMAL_USER, Owner.Type.USER);
   }
 

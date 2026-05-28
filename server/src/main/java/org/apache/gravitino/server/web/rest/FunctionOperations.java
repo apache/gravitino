@@ -34,6 +34,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.FunctionDispatcher;
@@ -51,6 +53,10 @@ import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionChange;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -72,15 +78,18 @@ public class FunctionOperations {
     this.dispatcher = dispatcher;
   }
 
-  // TODO: Add authorization support for function operations
   @GET
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-function." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-function", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response listFunctions(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @QueryParam("details") @DefaultValue("false") boolean details) {
     try {
       LOG.info("Received list functions request for schema: {}.{}.{}", metalake, catalog, schema);
@@ -90,6 +99,13 @@ public class FunctionOperations {
             Namespace namespace = NamespaceUtil.ofFunction(metalake, catalog, schema);
             if (!details) {
               NameIdentifier[] identifiers = dispatcher.listFunctions(namespace);
+              identifiers = identifiers == null ? new NameIdentifier[0] : identifiers;
+              identifiers =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      AuthorizationExpressionConstants.FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
+                      Entity.EntityType.FUNCTION,
+                      identifiers);
               LOG.info(
                   "List {} function names under schema: {}.{}.{}",
                   identifiers.length,
@@ -100,6 +116,14 @@ public class FunctionOperations {
             }
 
             Function[] functions = dispatcher.listFunctionInfos(namespace);
+            functions = functions == null ? new Function[0] : functions;
+            functions =
+                MetadataAuthzHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
+                    Entity.EntityType.FUNCTION,
+                    functions,
+                    f -> NameIdentifier.of(namespace, f.name()));
             FunctionDTO[] functionDTOs =
                 Arrays.stream(functions)
                     .map(DTOConverters::toDTO)
@@ -122,10 +146,19 @@ public class FunctionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "register-function." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "register-function", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          """
+                      ANY(OWNER, METALAKE, CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_REGISTER_FUNCTION
+                      """,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response registerFunction(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       FunctionRegisterRequest request) {
     LOG.info(
         "Received register function request: {}.{}.{}.{}",
@@ -170,11 +203,16 @@ public class FunctionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-function." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-function", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_FUNCTION_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.FUNCTION)
   public Response getFunction(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("function") String function) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("function") @AuthorizationMetadata(type = Entity.EntityType.FUNCTION)
+          String function) {
     LOG.info("Received get function request: {}.{}.{}.{}", metalake, catalog, schema, function);
     try {
       return Utils.doAs(
@@ -197,11 +235,21 @@ public class FunctionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-function." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-function", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          """
+                      ANY(OWNER, METALAKE, CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && (FUNCTION::OWNER || ANY_MODIFY_FUNCTION)
+                      """,
+      accessMetadataType = MetadataObject.Type.FUNCTION)
   public Response alterFunction(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("function") String function,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("function") @AuthorizationMetadata(type = Entity.EntityType.FUNCTION)
+          String function,
       FunctionUpdatesRequest request) {
     LOG.info("Received alter function request: {}.{}.{}.{}", metalake, catalog, schema, function);
     try {
@@ -230,11 +278,21 @@ public class FunctionOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-function." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-function", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          """
+                      ANY(OWNER, METALAKE, CATALOG) ||
+                      SCHEMA_OWNER_WITH_USE_CATALOG ||
+                      ANY_USE_CATALOG && ANY_USE_SCHEMA && FUNCTION::OWNER
+                      """,
+      accessMetadataType = MetadataObject.Type.FUNCTION)
   public Response dropFunction(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("function") String function) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("function") @AuthorizationMetadata(type = Entity.EntityType.FUNCTION)
+          String function) {
     LOG.info("Received drop function request: {}.{}.{}.{}", metalake, catalog, schema, function);
     try {
       return Utils.doAs(

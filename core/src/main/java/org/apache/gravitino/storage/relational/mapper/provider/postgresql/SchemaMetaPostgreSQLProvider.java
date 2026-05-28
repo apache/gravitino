@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper.TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.Param;
@@ -57,6 +58,32 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   }
 
   @Override
+  public String batchInsertSchemaMetaOnDuplicateKeyUpdate(
+      @Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return "<script>"
+        + "INSERT INTO "
+        + TABLE_NAME
+        + " (schema_id, schema_name, metalake_id, catalog_id, schema_comment,"
+        + " properties, audit_info, current_version, last_version, deleted_at) VALUES "
+        + "<foreach collection='schemaMetas' item='po' separator=','>"
+        + "(#{po.schemaId}, #{po.schemaName}, #{po.metalakeId}, #{po.catalogId},"
+        + " #{po.schemaComment}, #{po.properties}, #{po.auditInfo},"
+        + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt})"
+        + "</foreach>"
+        + " ON CONFLICT(schema_id) DO UPDATE SET"
+        + " schema_name = EXCLUDED.schema_name,"
+        + " metalake_id = EXCLUDED.metalake_id,"
+        + " catalog_id = EXCLUDED.catalog_id,"
+        + " schema_comment = EXCLUDED.schema_comment,"
+        + " properties = EXCLUDED.properties,"
+        + " audit_info = EXCLUDED.audit_info,"
+        + " current_version = EXCLUDED.current_version,"
+        + " last_version = EXCLUDED.last_version,"
+        + " deleted_at = EXCLUDED.deleted_at"
+        + "</script>";
+  }
+
+  @Override
   public String updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO) {
     return "UPDATE "
@@ -85,11 +112,17 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteSchemaMetasBySchemaId(Long schemaId) {
-    return "UPDATE "
+  public String softDeleteSchemaMetasBySchemaIds(List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   @Override

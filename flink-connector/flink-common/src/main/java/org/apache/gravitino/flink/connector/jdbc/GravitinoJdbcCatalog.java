@@ -1,0 +1,178 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.gravitino.flink.connector.jdbc;
+
+import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory;
+import org.apache.flink.connector.jdbc.table.JdbcDynamicTableFactory;
+import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.factories.CatalogFactory;
+import org.apache.flink.table.factories.Factory;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
+
+/**
+ * The GravitinoJdbcCatalog class is an implementation of the BaseCatalog class that is used to
+ * proxy the JdbcCatalog class.
+ */
+public class GravitinoJdbcCatalog extends BaseCatalog {
+
+  private final CatalogFactory.Context context;
+  private AbstractCatalog jdbcCatalog;
+  // Mutable copy shared with BaseCatalog.catalogOptions so credential injection in open() is
+  // visible to toFlinkTable() and to the inner JdbcCatalogFactory context.
+  private final Map<String, String> mutableOptions;
+
+  protected GravitinoJdbcCatalog(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter) {
+    this(context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter, null);
+  }
+
+  protected GravitinoJdbcCatalog(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter,
+      AbstractCatalog jdbcCatalog) {
+    this(
+        context,
+        defaultDatabase,
+        schemaAndTablePropertiesConverter,
+        partitionConverter,
+        jdbcCatalog,
+        new HashMap<>(context.getOptions()));
+  }
+
+  private GravitinoJdbcCatalog(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter,
+      AbstractCatalog jdbcCatalog,
+      Map<String, String> mutableOptions) {
+    super(
+        context.getName(),
+        mutableOptions,
+        defaultDatabase,
+        schemaAndTablePropertiesConverter,
+        partitionConverter);
+    this.context = context;
+    this.jdbcCatalog = jdbcCatalog;
+    this.mutableOptions = mutableOptions;
+  }
+
+  @Override
+  public void open() throws CatalogException {
+    if (jdbcCatalog != null) {
+      super.open();
+      return;
+    }
+    try {
+      applyJdbcCredential(catalog(), mutableOptions);
+    } catch (NoSuchCatalogException ignored) {
+      // During CREATE CATALOG, open() is called before the catalog is stored in Gravitino.
+      // In this case credentials are already present in the user-provided options.
+    }
+    CatalogFactory.Context contextWithCredentials =
+        new CatalogFactory.Context() {
+          @Override
+          public String getName() {
+            return context.getName();
+          }
+
+          @Override
+          public Map<String, String> getOptions() {
+            return mutableOptions;
+          }
+
+          @Override
+          public ReadableConfig getConfiguration() {
+            return context.getConfiguration();
+          }
+
+          @Override
+          public ClassLoader getClassLoader() {
+            return context.getClassLoader();
+          }
+        };
+    this.jdbcCatalog = createInnerCatalog(contextWithCredentials);
+    super.open();
+  }
+
+  /**
+   * Creates the inner Flink JDBC catalog from the given context. Subclasses for different Flink
+   * versions override this to use the version-specific {@code JdbcCatalogFactory}.
+   *
+   * @param context the catalog factory context with credentials already injected
+   * @return the created inner catalog
+   */
+  protected AbstractCatalog createInnerCatalog(CatalogFactory.Context context) {
+    return (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context);
+  }
+
+  @Override
+  protected AbstractCatalog realCatalog() {
+    return jdbcCatalog;
+  }
+
+  @Override
+  public Optional<Factory> getFactory() {
+    return Optional.of(new JdbcDynamicTableFactory());
+  }
+
+  /**
+   * Overwrites the Flink JDBC user and password in {@code options} with credentials obtained from
+   * the server via credential vending, if available. Falls back to the existing options if the
+   * catalog does not support credential vending or no JDBC credential is returned.
+   *
+   * @param catalog the Gravitino catalog client
+   * @param options the mutable Flink catalog options map to update
+   */
+  @VisibleForTesting
+  static void applyJdbcCredential(Catalog catalog, Map<String, String> options) {
+    Credential[] credentials;
+    try {
+      credentials = catalog.supportsCredentials().getCredentials();
+    } catch (UnsupportedOperationException e) {
+      return;
+    }
+    for (Credential credential : credentials) {
+      if (credential instanceof JdbcCredential) {
+        JdbcCredential jdbcCredential = (JdbcCredential) credential;
+        options.put(JdbcPropertiesConstants.FLINK_JDBC_USER, jdbcCredential.jdbcUser());
+        options.put(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD, jdbcCredential.jdbcPassword());
+        return;
+      }
+    }
+  }
+}

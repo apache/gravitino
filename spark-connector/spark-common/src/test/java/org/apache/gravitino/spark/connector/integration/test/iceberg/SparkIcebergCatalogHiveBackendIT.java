@@ -41,6 +41,7 @@ public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatal
     catalogProperties.put(
         IcebergConstants.TABLE_METADATA_CACHE_IMPL,
         "org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache");
+    catalogProperties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.hadoop.HadoopFileIO");
 
     return catalogProperties;
   }

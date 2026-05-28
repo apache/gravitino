@@ -70,6 +70,11 @@ public class TrinoQueryTestTool {
           "postgresql_uri",
           true,
           "URL for PostgreSQL, if --auto is set to 'all', this option is ignored");
+      options.addOption(
+          "skip_testsets",
+          true,
+          "Comma-separated list of testsets to skip, default is 'glue'. "
+              + "Pass an empty string to skip nothing.");
 
       options.addOption(
           "test_sets_dir",
@@ -164,6 +169,15 @@ public class TrinoQueryTestTool {
 
       TrinoQueryIT.ciTestsets.clear();
 
+      String skipTestsetsArg = commandLine.getOptionValue("skip_testsets");
+      if (skipTestsetsArg != null) {
+        TrinoQueryIT.skipTestsets.clear();
+        Arrays.stream(skipTestsetsArg.split(","))
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .forEach(TrinoQueryIT.skipTestsets::add);
+      }
+
       String testHost = commandLine.getOptionValue("test_host");
       if (Strings.isNotEmpty(testHost)) {
         TrinoQueryIT.testHost = testHost;
@@ -254,8 +268,7 @@ public class TrinoQueryTestTool {
       testerRunner.setup();
 
       if (commandLine.hasOption("gen_output")) {
-        String catalogFileName = "catalog_" + catalog + "_prepare.sql";
-        testerRunner.runOneTestSetAndGenOutput(testSetDir, catalogFileName, testerId);
+        testerRunner.runOneTestSetAndGenOutput(testSetDir, catalog, testerId);
         System.out.println("The output file is generated successfully in the path " + testSetDir);
         return;
       }

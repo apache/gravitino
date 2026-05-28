@@ -565,7 +565,7 @@ public class GravitinoClient extends GravitinoClientBase
 
   @Override
   public Tag alterTag(String name, TagChange... changes)
-      throws NoSuchTagException, IllegalArgumentException {
+      throws NoSuchTagException, IllegalArgumentException, TagAlreadyExistsException {
     return getMetalake().alterTag(name, changes);
   }
 

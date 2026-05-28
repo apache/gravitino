@@ -69,21 +69,43 @@ include("iceberg:iceberg-rest-server")
 include("lance:lance-common")
 include("lance:lance-rest-server")
 include("authorizations:authorization-ranger", "authorizations:authorization-common", "authorizations:authorization-chain")
-include(
-  "trino-connector:trino-connector",
-  "trino-connector:trino-connector-435-439",
-  "trino-connector:trino-connector-440-445",
-  "trino-connector:trino-connector-446-451",
-  "trino-connector:trino-connector-452-468",
-  "trino-connector:trino-connector-469-472",
-  "trino-connector:trino-connector-473-478",
-  "trino-connector:integration-test"
-)
+val skipTrinoConnector: Boolean =
+  gradle.startParameter.projectProperties["skipTrinoConnector"]?.toBoolean() ?: false
+if (!skipTrinoConnector) {
+  include(
+    "trino-connector:trino-connector",
+    "trino-connector:trino-connector-435-439",
+    "trino-connector:trino-connector-440-445",
+    "trino-connector:trino-connector-446-451",
+    "trino-connector:trino-connector-452-468",
+    "trino-connector:trino-connector-469-472",
+    "trino-connector:trino-connector-473-478",
+    "trino-connector:integration-test"
+  )
+} else {
+  println("Skipping trino-connector modules since skipTrinoConnector is set to true")
+}
 include("spark-connector:spark-common")
 if (scalaVersion == "2.12") {
   // flink only support scala 2.12
-  include("flink-connector:flink")
-  include("flink-connector:flink-runtime")
+  include("flink-connector:flink-common")
+  include(
+    "flink-connector:flink-1.18",
+    "flink-connector:flink-runtime-1.18",
+    "flink-connector:flink-1.19",
+    "flink-connector:flink-runtime-1.19",
+    "flink-connector:flink-1.20",
+    "flink-connector:flink-runtime-1.20"
+  )
+  project(":flink-connector:flink-1.18").projectDir = file("flink-connector/v1.18/flink")
+  project(":flink-connector:flink-runtime-1.18").projectDir =
+    file("flink-connector/v1.18/flink-runtime")
+  project(":flink-connector:flink-1.19").projectDir = file("flink-connector/v1.19/flink")
+  project(":flink-connector:flink-runtime-1.19").projectDir =
+    file("flink-connector/v1.19/flink-runtime")
+  project(":flink-connector:flink-1.20").projectDir = file("flink-connector/v1.20/flink")
+  project(":flink-connector:flink-runtime-1.20").projectDir =
+    file("flink-connector/v1.20/flink-runtime")
 }
 include("spark-connector:spark-3.3", "spark-connector:spark-runtime-3.3")
 project(":spark-connector:spark-3.3").projectDir = file("spark-connector/v3.3/spark")
@@ -104,6 +126,7 @@ include(":bundles:azure", ":bundles:azure-bundle", ":bundles:iceberg-azure-bundl
 include(":catalogs:hadoop-common")
 include(":lineage")
 include(":mcp-server")
+include(":plugins:idp-basic")
 include(
   ":maintenance:optimizer-api",
   ":maintenance:updaters",

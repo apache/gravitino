@@ -40,6 +40,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -154,13 +155,16 @@ public class GravitinoInterceptionService implements InterceptionService {
               extractNameIdentifierFromParameters(parameters, args);
 
           Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
+          AuthorizationRequestContext authorizationRequestContext =
+              new AuthorizationRequestContext();
 
           // Check metalake and user existence before authorization
           NameIdentifier metalakeIdent = metadataContext.get(Entity.EntityType.METALAKE);
           if (metalakeIdent != null) {
             String currentUser = PrincipalUtils.getCurrentUserName();
             try {
-              AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
+              AuthorizationUtils.checkCurrentUser(
+                  metalakeIdent.name(), currentUser, authorizationRequestContext);
             } catch (NoSuchMetalakeException e) {
               LOG.warn(
                   "Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
@@ -200,7 +204,7 @@ public class GravitinoInterceptionService implements InterceptionService {
                     args,
                     secondaryExpression,
                     secondaryExpressionCondition);
-            boolean authorizeResult = executor.execute();
+            boolean authorizeResult = executor.execute(authorizationRequestContext);
             if (!authorizeResult) {
               return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
             }

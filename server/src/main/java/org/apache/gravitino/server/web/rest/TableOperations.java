@@ -266,19 +266,19 @@ public class TableOperations {
           () -> {
             NameIdentifier ident = NameIdentifierUtil.ofTable(metalake, catalog, schema, table);
             boolean dropped = purge ? dispatcher.purgeTable(ident) : dispatcher.dropTable(ident);
-            if (!dropped) {
+            if (dropped) {
+              LOG.info(
+                  "Table {}: {}.{}.{}.{}",
+                  purge ? "purge" : "drop",
+                  metalake,
+                  catalog,
+                  schema,
+                  table);
+            } else {
               LOG.warn("Cannot find to be dropped table {} under schema {}", table, schema);
             }
 
-            Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info(
-                "Table {}: {}.{}.{}.{}",
-                purge ? "purge" : "drop",
-                metalake,
-                catalog,
-                schema,
-                table);
-            return response;
+            return Utils.ok(new DropResponse(dropped));
           });
 
     } catch (Exception e) {

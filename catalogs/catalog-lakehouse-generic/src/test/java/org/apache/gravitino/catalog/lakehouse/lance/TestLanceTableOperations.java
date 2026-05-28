@@ -19,18 +19,14 @@
 package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
-import com.lancedb.lance.Dataset;
-import com.lancedb.lance.Version;
-import com.lancedb.lance.index.IndexParams;
-import com.lancedb.lance.index.IndexType;
 import java.util.Map;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -47,6 +43,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.lance.Dataset;
+import org.lance.Version;
+import org.lance.index.IndexOptions;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
@@ -110,7 +109,7 @@ public class TestLanceTableOperations {
     Version version = mock(Version.class);
     when(dataset.getVersion()).thenReturn(version);
     when(version.getId()).thenReturn(7L);
-    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location");
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location", Map.of());
 
     TableChange[] changes =
         new TableChange[] {
@@ -124,10 +123,49 @@ public class TestLanceTableOperations {
 
     InOrder inOrder = Mockito.inOrder(dataset);
     inOrder.verify(dataset).alterColumns(anyList());
-    inOrder
-        .verify(dataset)
-        .createIndex(anyList(), any(IndexType.class), any(), any(IndexParams.class), eq(true));
+    inOrder.verify(dataset).createIndex(any(IndexOptions.class));
     inOrder.verify(dataset).dropColumns(anyList());
     inOrder.verify(dataset).getVersion();
+  }
+
+  @Test
+  public void testHandleLanceTableChangeUsesCatalogStorageOptions() {
+    lanceTableOps.setCatalogProperties(
+        Map.of(
+            LANCE_STORAGE_OPTIONS_PREFIX + "endpoint", "http://catalog-endpoint",
+            LANCE_STORAGE_OPTIONS_PREFIX + "secret_access_key", "catalog-secret"));
+
+    Table table = mock(Table.class);
+    when(table.properties())
+        .thenReturn(
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                "location",
+                LANCE_STORAGE_OPTIONS_PREFIX + "access_key_id",
+                "table-key"));
+
+    Dataset dataset = mock(Dataset.class);
+    Version version = mock(Version.class);
+    when(dataset.getVersion()).thenReturn(version);
+    when(version.getId()).thenReturn(9L);
+    Mockito.doReturn(dataset)
+        .when(lanceTableOps)
+        .openDataset(
+            "location",
+            Map.of(
+                "endpoint",
+                "http://catalog-endpoint",
+                "secret_access_key",
+                "catalog-secret",
+                "access_key_id",
+                "table-key"));
+
+    TableChange[] changes =
+        new TableChange[] {TableChange.deleteColumn(new String[] {"col1"}, false)};
+    long returnedVersion = lanceTableOps.handleLanceTableChange(table, changes);
+
+    Assertions.assertEquals(9L, returnedVersion);
+    Mockito.verify(dataset).dropColumns(anyList());
+    Mockito.verify(dataset).getVersion();
   }
 }

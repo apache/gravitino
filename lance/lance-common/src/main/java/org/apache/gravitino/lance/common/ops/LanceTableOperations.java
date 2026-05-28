@@ -18,16 +18,14 @@
  */
 package org.apache.gravitino.lance.common.ops;
 
-import com.lancedb.lance.namespace.model.CreateEmptyTableResponse;
-import com.lancedb.lance.namespace.model.CreateTableRequest;
-import com.lancedb.lance.namespace.model.CreateTableResponse;
-import com.lancedb.lance.namespace.model.DeregisterTableResponse;
-import com.lancedb.lance.namespace.model.DescribeTableResponse;
-import com.lancedb.lance.namespace.model.DropTableResponse;
-import com.lancedb.lance.namespace.model.RegisterTableRequest;
-import com.lancedb.lance.namespace.model.RegisterTableResponse;
 import java.util.Map;
 import java.util.Optional;
+import org.lance.namespace.model.CreateTableResponse;
+import org.lance.namespace.model.DeclareTableResponse;
+import org.lance.namespace.model.DeregisterTableResponse;
+import org.lance.namespace.model.DescribeTableResponse;
+import org.lance.namespace.model.DropTableResponse;
+import org.lance.namespace.model.RegisterTableResponse;
 
 public interface LanceTableOperations {
 
@@ -37,9 +35,11 @@ public interface LanceTableOperations {
    * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
    * @param delimiter the delimiter used in the namespace
    * @param version the version of the table to describe, if null, describe the latest version
+   * @param checkDeclared whether to populate the is_only_declared response field
    * @return the table description
    */
-  DescribeTableResponse describeTable(String tableId, String delimiter, Optional<Long> version);
+  DescribeTableResponse describeTable(
+      String tableId, String delimiter, Optional<Long> version, boolean checkDeclared);
 
   /**
    * Create a new table.
@@ -54,22 +54,22 @@ public interface LanceTableOperations {
    */
   CreateTableResponse createTable(
       String tableId,
-      CreateTableRequest.ModeEnum mode,
+      String mode,
       String delimiter,
       String tableLocation,
       Map<String, String> tableProperties,
       byte[] arrowStreamBody);
 
   /**
-   * Create an new table without schema.
+   * Declare a table without touching storage.
    *
    * @param tableId table ids are in the format of "{namespace}{delimiter}{table_name}"
    * @param delimiter the delimiter used in the namespace
    * @param tableLocation the location where the table data will be stored
    * @param tableProperties the properties of the table
-   * @return the response of the create table operation
+   * @return the response of the declare table operation
    */
-  CreateEmptyTableResponse createEmptyTable(
+  DeclareTableResponse declareTable(
       String tableId, String delimiter, String tableLocation, Map<String, String> tableProperties);
 
   /**
@@ -82,10 +82,7 @@ public interface LanceTableOperations {
    * @return the response of the register table operation
    */
   RegisterTableResponse registerTable(
-      String tableId,
-      RegisterTableRequest.ModeEnum mode,
-      String delimiter,
-      Map<String, String> tableProperties);
+      String tableId, String mode, String delimiter, Map<String, String> tableProperties);
 
   /**
    * Deregister a table. It will not delete the underlying lance data.

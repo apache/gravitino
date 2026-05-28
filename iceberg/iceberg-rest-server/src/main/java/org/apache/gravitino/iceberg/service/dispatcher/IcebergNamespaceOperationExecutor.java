@@ -123,6 +123,6 @@ public class IcebergNamespaceOperationExecutor implements IcebergNamespaceOperat
       RegisterTableRequest registerTableRequest) {
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .registerTable(namespace, registerTableRequest);
+        .registerTable(namespace, registerTableRequest, context.requestCredentialVending());
   }
 }

@@ -101,6 +101,14 @@ public class TestConvertUtil extends TestBaseConvert {
   }
 
   @Test
+  public void testToIcebergSchemaWithNullColumns() {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ConvertUtil.toIcebergSchema((Column[]) null));
+    Assertions.assertEquals("columns must not be null", exception.getMessage());
+  }
+
+  @Test
   public void testToPrimitiveType() {
     ByteType byteType = ByteType.get();
     IllegalArgumentException exception =

@@ -313,6 +313,8 @@ fun excludePackagesForSparkConnector(project: Project) {
   }
 }
 
+val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
+
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
@@ -328,6 +330,12 @@ subprojects {
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
+
+  // Force upgrade commons-beanutils for all subprojects to resolve outdated transitive versions
+  // pulled by Hadoop, Hive, Spark, Flink, etc.
+  configurations.all {
+    resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
+  }
 
   repositories {
     mavenCentral()
@@ -789,7 +797,8 @@ tasks {
         ":authorizations:copyLibAndConfig",
         ":iceberg:iceberg-rest-server:copyLibAndConfigs",
         ":lance:lance-rest-server:copyLibAndConfigs",
-        ":maintenance:optimizer:copyLibAndConfigs"
+        ":maintenance:optimizer:copyLibAndConfigs",
+        ":plugins:idp-basic:copyLibAndConfigs"
       )
     if (!skipWeb) {
       dependencies.add(":web:web:build")
@@ -1103,6 +1112,7 @@ tasks {
         it.name != "integration-test" &&
         it.parent?.name != "bundles" &&
         it.parent?.name != "maintenance" &&
+        it.parent?.name != "plugins" &&
         it.name != "mcp-server"
       ) {
         from(it.configurations.runtimeClasspath) {
@@ -1153,6 +1163,7 @@ tasks {
         it.name != "web" &&
         it.name != "web-v2" &&
         it.parent?.name != "bundles" &&
+        it.parent?.name != "plugins" &&
         it.parent?.name != "maintenance" &&
         it.name != "mcp-server"
       ) {

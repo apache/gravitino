@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FunctionMetaBaseSQLProvider;
@@ -64,6 +65,10 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().listFunctionPOsBySchemaId(schemaId);
   }
 
+  public static String listFunctionPOsByFunctionIds(@Param("functionIds") List<Long> functionIds) {
+    return getProvider().listFunctionPOsByFunctionIds(functionIds);
+  }
+
   public static String listFunctionPOsByFullQualifiedName(
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
@@ -85,6 +90,11 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().selectFunctionMetaBySchemaIdAndName(schemaId, functionName);
   }
 
+  public static String selectFunctionIdBySchemaIdAndFunctionName(
+      @Param("schemaId") Long schemaId, @Param("functionName") String functionName) {
+    return getProvider().selectFunctionIdBySchemaIdAndFunctionName(schemaId, functionName);
+  }
+
   public static String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
     return getProvider().softDeleteFunctionMetaByFunctionId(functionId);
   }
@@ -97,8 +107,9 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().softDeleteFunctionMetasByMetalakeId(metalakeId);
   }
 
-  public static String softDeleteFunctionMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteFunctionMetasBySchemaId(schemaId);
+  public static String softDeleteFunctionMetasBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteFunctionMetasBySchemaIds(schemaIds);
   }
 
   public static String deleteFunctionMetasByLegacyTimeline(

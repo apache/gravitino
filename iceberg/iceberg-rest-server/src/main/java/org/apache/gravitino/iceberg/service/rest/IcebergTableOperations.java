@@ -52,6 +52,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -67,6 +68,7 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
@@ -491,7 +493,7 @@ public class IcebergTableOperations {
    * @return Response containing the scan plan with tasks
    */
   @POST
-  @Path("{table}/scan")
+  @Path("{table}/plan")
   @Produces(MediaType.APPLICATION_JSON)
   @Consumes(MediaType.APPLICATION_JSON)
   @Timed(name = "plan-table-scan." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
@@ -601,7 +603,13 @@ public class IcebergTableOperations {
     return etag.getValue().equals(clientEtag);
   }
 
-  private boolean isCredentialVending(String accessDelegation) {
+  /**
+   * Parses the {@code X-Iceberg-Access-Delegation} header value and returns whether the client is
+   * requesting credential vending. Package-private and static so that {@link
+   * IcebergNamespaceOperations#registerTable} can reuse the same parsing logic from the same
+   * package.
+   */
+  static boolean isCredentialVending(String accessDelegation) {
     if (StringUtils.isBlank(accessDelegation)) {
       return false;
     }
@@ -629,7 +637,11 @@ public class IcebergTableOperations {
       TableIdentifier identifier = identifiers.get(i);
       nameIdentifiers[i] =
           NameIdentifier.of(
-              metalake, catalogName, identifier.namespace().level(0), identifier.name());
+              metalake,
+              catalogName,
+              IcebergIdentifierUtils.icebergNamespaceToSchemaName(
+                  identifier.namespace(), HierarchicalSchemaUtil.schemaSeparator()),
+              identifier.name());
     }
     return nameIdentifiers;
   }
@@ -645,7 +657,10 @@ public class IcebergTableOperations {
     List<TableIdentifier> filteredIdentifiers = new ArrayList<>();
     for (NameIdentifier ident : idents) {
       filteredIdentifiers.add(
-          TableIdentifier.of(Namespace.of(ident.namespace().level(2)), ident.name()));
+          TableIdentifier.of(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
+                  ident.namespace().level(2), HierarchicalSchemaUtil.schemaSeparator()),
+              ident.name()));
     }
     return ListTablesResponse.builder()
         .addAll(filteredIdentifiers)

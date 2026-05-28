@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogPropertyConverter;
@@ -49,7 +50,8 @@ public class MemoryConnectorAdapter implements CatalogConnectorAdapter {
   }
 
   @Override
-  public Map<String, String> buildInternalConnectorConfig(GravitinoCatalog catalog) {
+  public Map<String, String> buildInternalConnectorConfig(
+      GravitinoCatalog catalog, Credential[] credentials) {
     return catalogConverter.gravitinoToEngineProperties(catalog.getProperties());
   }
 

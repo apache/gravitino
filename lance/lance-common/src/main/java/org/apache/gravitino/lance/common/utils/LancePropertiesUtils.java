@@ -21,25 +21,69 @@ package org.apache.gravitino.lance.common.utils;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class LancePropertiesUtils {
+/** Utility methods for Lance storage properties. */
+public final class LancePropertiesUtils {
 
   private LancePropertiesUtils() {
-    // Private constructor to prevent instantiation
+    // Utility class.
   }
 
+  /**
+   * Extracts Lance storage options from a property map.
+   *
+   * @param tableProperties the source properties
+   * @return the Lance storage options without the `lance.storage.` prefix
+   */
   public static Map<String, String> getLanceStorageOptions(Map<String, String> tableProperties) {
-    if (tableProperties == null) {
+    if (tableProperties == null || tableProperties.isEmpty()) {
       return Map.of();
     }
 
     return tableProperties.entrySet().stream()
-        .filter(e -> e.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
+        .filter(entry -> entry.getKey().startsWith(LANCE_STORAGE_OPTIONS_PREFIX))
         .collect(
             Collectors.toMap(
-                e -> e.getKey().substring(LANCE_STORAGE_OPTIONS_PREFIX.length()),
-                Map.Entry::getValue));
+                entry -> entry.getKey().substring(LANCE_STORAGE_OPTIONS_PREFIX.length()),
+                Map.Entry::getValue,
+                (left, right) -> right,
+                LinkedHashMap::new));
+  }
+
+  /**
+   * Resolves the effective Lance storage options using table properties first and catalog
+   * properties as defaults.
+   *
+   * @param catalogProperties the catalog properties
+   * @param tableProperties the table properties
+   * @return the effective storage options
+   */
+  public static Map<String, String> resolveLanceStorageOptions(
+      Map<String, String> catalogProperties, Map<String, String> tableProperties) {
+    Map<String, String> effectiveStorageOptions =
+        new LinkedHashMap<>(getLanceStorageOptions(catalogProperties));
+    effectiveStorageOptions.putAll(getLanceStorageOptions(tableProperties));
+    return effectiveStorageOptions;
+  }
+
+  /**
+   * Converts Lance storage options to table properties.
+   *
+   * <p>The input map should use unprefixed Lance storage option keys. The returned map prefixes
+   * each key with {@code lance.storage.}. A {@code null} input returns an empty map.
+   *
+   * @param storageOptions the unprefixed Lance storage options
+   * @return the table properties with Lance storage option prefixes
+   */
+  public static Map<String, String> toTableProperties(Map<String, String> storageOptions) {
+    return storageOptions == null
+        ? Map.of()
+        : storageOptions.entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    entry -> LANCE_STORAGE_OPTIONS_PREFIX + entry.getKey(), Map.Entry::getValue));
   }
 }

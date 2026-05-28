@@ -27,6 +27,8 @@ import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeCo
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BOOL;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BPCHAR;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.BYTEA;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.DEFAULT_NUMERIC_PRECISION;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.DEFAULT_NUMERIC_SCALE;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.FLOAT_4;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.FLOAT_8;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_2;
@@ -34,6 +36,7 @@ import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeCo
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.INT_8;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.JDBC_ARRAY_PREFIX;
 import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.NUMERIC;
+import static org.apache.gravitino.catalog.postgresql.converter.PostgreSqlTypeConverter.UUID;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
@@ -68,10 +71,24 @@ public class TestPostgreSqlTypeConverter {
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(3), TIMESTAMP, 23, null, 3);
     checkJdbcTypeToGravitinoType(Types.TimestampType.withoutTimeZone(6), TIMESTAMP, 26, null, 6);
     checkJdbcTypeToGravitinoType(Types.DecimalType.of(10, 2), NUMERIC, 10, 2, 0);
+    // Unconstrained NUMERIC (no precision) returns columnSize=0 from JDBC metadata;
+    // mapped to Gravitino's maximum supported decimal as a compatibility tradeoff.
+    checkJdbcTypeToGravitinoType(
+        Types.DecimalType.of(DEFAULT_NUMERIC_PRECISION, DEFAULT_NUMERIC_SCALE), NUMERIC, 0, 0, 0);
+    checkJdbcTypeToGravitinoType(
+        Types.DecimalType.of(DEFAULT_NUMERIC_PRECISION, DEFAULT_NUMERIC_SCALE),
+        NUMERIC,
+        null,
+        null,
+        0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(9, 0), NUMERIC, 9, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(18, 0), NUMERIC, 18, 0, 0);
+    checkJdbcTypeToGravitinoType(Types.DecimalType.of(20, 0), NUMERIC, 20, 0, 0);
     checkJdbcTypeToGravitinoType(Types.VarCharType.of(20), VARCHAR, 20, null, 0);
     checkJdbcTypeToGravitinoType(Types.FixedCharType.of(20), BPCHAR, 20, null, 0);
     checkJdbcTypeToGravitinoType(Types.StringType.get(), TEXT, null, null, 0);
     checkJdbcTypeToGravitinoType(Types.BinaryType.get(), BYTEA, null, null, 0);
+    checkJdbcTypeToGravitinoType(Types.UUIDType.get(), UUID, null, null, 0);
     checkJdbcTypeToGravitinoType(
         Types.ExternalType.of(USER_DEFINED_TYPE), USER_DEFINED_TYPE, null, null, 0);
   }
@@ -113,6 +130,7 @@ public class TestPostgreSqlTypeConverter {
     checkGravitinoTypeToJdbcType(BPCHAR + "(20)", Types.FixedCharType.of(20));
     checkGravitinoTypeToJdbcType(TEXT, Types.StringType.get());
     checkGravitinoTypeToJdbcType(BYTEA, Types.BinaryType.get());
+    checkGravitinoTypeToJdbcType(UUID, Types.UUIDType.get());
     checkGravitinoTypeToJdbcType(USER_DEFINED_TYPE, Types.ExternalType.of(USER_DEFINED_TYPE));
     Assertions.assertThrows(
         IllegalArgumentException.class,

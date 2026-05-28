@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -51,6 +52,12 @@ public interface GroupMetaMapper {
       method = "selectGroupMetaByMetalakeIdAndName")
   GroupPO selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
+
+  @SelectProvider(
+      type = GroupMetaSQLProviderFactory.class,
+      method = "listExtendedGroupPOsByMetalakeIdAndNames")
+  List<ExtendedGroupPO> listExtendedGroupPOsByMetalakeIdAndNames(
+      @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames);
 
   @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "listGroupPOsByMetalake")
   List<GroupPO> listGroupPOsByMetalake(@Param("metalakeName") String metalakeName);
@@ -88,4 +95,11 @@ public interface GroupMetaMapper {
       method = "deleteGroupMetasByLegacyTimeline")
   Integer deleteGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = GroupMetaSQLProviderFactory.class, method = "touchGroupUpdatedAt")
+  void touchGroupUpdatedAt(@Param("groupId") long groupId);
+
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "getGroupUpdatedAt")
+  GroupUpdatedAt getGroupUpdatedAt(
+      @Param("metalakeName") String metalakeName, @Param("groupName") String groupName);
 }

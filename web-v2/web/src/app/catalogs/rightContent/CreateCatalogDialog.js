@@ -294,6 +294,17 @@ export default function CreateCatalogDialog({ ...props }) {
         setConfirmLoading(true)
         const submitData = getSubmitData()
         if (editCatalog) {
+          // Backfill hidden default props that the form doesn't render during edit
+          const allDefaultProps =
+            (catalogType === 'model'
+              ? providerBase['model'].defaultProps
+              : providerBase[currentProvider]?.defaultProps) || []
+          allDefaultProps.forEach(prop => {
+            if (isHidden(prop) && !(prop.key in submitData.properties) && cacheData?.properties?.[prop.key] != null) {
+              submitData.properties[prop.key] = cacheData.properties[prop.key]
+            }
+          })
+
           // update catalog
           const reqData = { updates: genUpdates(cacheData, submitData) }
           if (reqData.updates.length) {

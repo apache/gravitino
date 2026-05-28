@@ -31,7 +31,9 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.RelationDatasourceMetricsSource;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.mapper.OperateTypeHandler;
 import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.JdbcUrlUtils;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
@@ -46,6 +48,10 @@ import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
  * should be initialized only once.
  */
 public class SqlSessionFactoryHelper {
+  private static final int JDBC_BACKEND_MAX_IDLE_CONNECTIONS = 10;
+  private static final int JDBC_BACKEND_MIN_IDLE_CONNECTIONS = 5;
+  private static final Duration JDBC_BACKEND_MIN_EVICTABLE_IDLE_TIME = Duration.ofSeconds(30);
+
   private static volatile SqlSessionFactory sqlSessionFactory;
   private static final SqlSessionFactoryHelper INSTANCE = new SqlSessionFactoryHelper();
 
@@ -88,15 +94,15 @@ public class SqlSessionFactoryHelper {
       dataSource.setMaxWaitMillis(
           config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS));
       dataSource.setMaxTotal(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS));
-      dataSource.setMaxIdle(5);
-      dataSource.setMinIdle(0);
+      dataSource.setMaxIdle(JDBC_BACKEND_MAX_IDLE_CONNECTIONS);
+      dataSource.setMinIdle(JDBC_BACKEND_MIN_IDLE_CONNECTIONS);
       dataSource.setLogAbandoned(true);
       dataSource.setRemoveAbandonedOnBorrow(true);
       dataSource.setRemoveAbandonedTimeout(60);
       dataSource.setTimeBetweenEvictionRunsMillis(Duration.ofMillis(10 * 60 * 1000L).toMillis());
       dataSource.setTestOnBorrow(true);
       dataSource.setTestWhileIdle(true);
-      dataSource.setMinEvictableIdleTimeMillis(1000);
+      dataSource.setMinEvictableIdleTimeMillis(JDBC_BACKEND_MIN_EVICTABLE_IDLE_TIME.toMillis());
       dataSource.setNumTestsPerEvictionRun(BaseObjectPoolConfig.DEFAULT_NUM_TESTS_PER_EVICTION_RUN);
       dataSource.setTestOnReturn(BaseObjectPoolConfig.DEFAULT_TEST_ON_RETURN);
       dataSource.setSoftMinEvictableIdleTimeMillis(
@@ -110,6 +116,7 @@ public class SqlSessionFactoryHelper {
       // Initialize the configuration
       Configuration configuration = new Configuration(environment);
       configuration.setDatabaseId(jdbcType.name().toLowerCase());
+      configuration.getTypeHandlerRegistry().register(OperateType.class, new OperateTypeHandler());
       ServiceLoader<MapperPackageProvider> loader = ServiceLoader.load(MapperPackageProvider.class);
       for (MapperPackageProvider provider : loader) {
         provider.getMapperClasses().forEach(configuration::addMapper);

@@ -15,9 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Optional, cast
+from typing import Any, Optional, cast
 
 from gravitino.api.audit import Audit
+from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.expressions.distributions.distribution import Distribution
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
@@ -25,7 +27,16 @@ from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
+from gravitino.api.stats.statistic import Statistic
+from gravitino.api.stats.statistic_value import StatisticValue
+from gravitino.api.stats.supports_statistics import SupportsStatistics
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.api.tag.tag import Tag
 from gravitino.client.generic_column import GenericColumn
+from gravitino.client.metadata_object_statistics_operations import (
+    MetadataObjectStatisticsOperations,
+)
+from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.requests.add_partitions_request import AddPartitionsRequest
@@ -44,7 +55,11 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 
-class RelationalTable(Table):
+class RelationalTable(
+    Table,
+    SupportsStatistics,
+    SupportsTags,
+):
     """Represents a relational table."""
 
     def __init__(
@@ -53,6 +68,20 @@ class RelationalTable(Table):
         self._namespace = namespace
         self._table = cast(Table, DTOConverters.from_dto(table_dto))
         self._rest_client = rest_client
+        table_object = MetadataObjects.parse(
+            RelationalTable.table_full_name(namespace, table_dto.name()),
+            MetadataObject.Type.TABLE,
+        )
+        self._object_tag_operations = MetadataObjectTagOperations(
+            namespace.level(0), table_object, rest_client
+        )
+        self._object_statistics_operations = MetadataObjectStatisticsOperations(
+            namespace.level(0), table_object, rest_client
+        )
+
+    @staticmethod
+    def table_full_name(table_ns: Namespace, table_name: str) -> str:
+        return f"{table_ns.level(1)}.{table_ns.level(2)}.{table_name}"
 
     def name(self) -> str:
         return self._table.name()
@@ -213,3 +242,32 @@ class RelationalTable(Table):
         )
         partition_list_resp.validate()
         return partition_list_resp.get_partitions()[0]
+
+    def list_tags(self) -> list[str]:
+        return self._object_tag_operations.list_tags()
+
+    def list_tags_info(self) -> list[Tag]:
+        return self._object_tag_operations.list_tags_info()
+
+    def get_tag(self, name: str) -> Tag:
+        return self._object_tag_operations.get_tag(name)
+
+    def associate_tags(
+        self, tags_to_add: list[str], tags_to_remove: list[str]
+    ) -> list[str]:
+        return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
+
+    def supports_tags(self) -> SupportsTags:
+        return self
+
+    def list_statistics(self) -> list[Statistic]:
+        return self._object_statistics_operations.list_statistics()
+
+    def update_statistics(self, statistics: dict[str, StatisticValue[Any]]) -> None:
+        self._object_statistics_operations.update_statistics(statistics)
+
+    def drop_statistics(self, statistics: list[str]) -> bool:
+        return self._object_statistics_operations.drop_statistics(statistics)
+
+    def supports_statistics(self) -> SupportsStatistics:
+        return self

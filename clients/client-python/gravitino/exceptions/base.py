@@ -205,6 +205,14 @@ class ForbiddenException(GravitinoRuntimeException):
     """An exception thrown when a user is forbidden to perform an action."""
 
 
+class IllegalStatisticNameException(IllegalArgumentException):
+    """An exception thrown when a statistic has an illegal name."""
+
+
+class UnmodifiableStatisticException(UnsupportedOperationException):
+    """An exception thrown when attempting to modify an unmodifiable statistic."""
+
+
 class NoSuchTableException(NotFoundException):
     """An exception thrown when a table with specified name is not existed."""
 
@@ -247,3 +255,19 @@ class NoSuchMetadataObjectException(NotFoundException):
 
 class RoleAlreadyExistsException(AlreadyExistsException):
     """Exception thrown when a role with specified name already exists."""
+
+
+class NoSuchUserException(NotFoundException):
+    """An exception thrown when a user is not found."""
+
+
+class UserAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a user already exists."""
+
+
+class NoSuchGroupException(NotFoundException):
+    """An exception thrown when a group is not found."""
+
+
+class GroupAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a group already exists."""

@@ -59,7 +59,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
           .put(IllegalArgumentException.class, 400)
           .put(ValidationException.class, 400)
           .put(IllegalNameIdentifierException.class, 400)
-          .put(NamespaceNotEmptyException.class, 400)
+          .put(NamespaceNotEmptyException.class, 409)
           .put(NotAuthorizedException.class, 401)
           .put(UnauthorizedException.class, 401)
           .put(AuthenticationTimeoutException.class, 419)
@@ -111,8 +111,7 @@ public class IcebergExceptionMapper implements ExceptionMapper<Exception> {
     }
     if (e instanceof IllegalArgumentException
         || e instanceof IllegalNameIdentifierException
-        || e instanceof ValidationException
-        || e instanceof NamespaceNotEmptyException) {
+        || e instanceof ValidationException) {
       return new BadRequestException("%s", message);
     }
     if (EXCEPTION_ERROR_CODES.containsKey(e.getClass())) {

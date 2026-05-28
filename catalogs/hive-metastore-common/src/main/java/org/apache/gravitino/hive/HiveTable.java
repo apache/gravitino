@@ -48,8 +48,19 @@ public class HiveTable extends BaseTable {
   public static final String TABLE_TYPE_PROP = "table_type";
   private String catalogName;
   private String databaseName;
+  private String viewOriginalText;
 
   protected HiveTable() {}
+
+  /**
+   * Returns the original SQL text for this Hive VIRTUAL_VIEW, or {@code null} if this is not a
+   * view.
+   *
+   * @return The view SQL, or {@code null}.
+   */
+  public String viewOriginalText() {
+    return viewOriginalText;
+  }
 
   public String catalogName() {
     return catalogName;
@@ -73,6 +84,7 @@ public class HiveTable extends BaseTable {
 
     private String catalogName;
     private String databaseName;
+    private String viewOriginalText;
 
     /** Creates a new instance of {@link Builder}. */
     private Builder() {}
@@ -100,6 +112,17 @@ public class HiveTable extends BaseTable {
     }
 
     /**
+     * Sets the original SQL text for views (VIRTUAL_VIEW table type).
+     *
+     * @param viewOriginalText The view SQL.
+     * @return This Builder instance.
+     */
+    public Builder withViewOriginalText(String viewOriginalText) {
+      this.viewOriginalText = viewOriginalText;
+      return this;
+    }
+
+    /**
      * Internal method to build a HiveTable instance using the provided values.
      *
      * @return A new HiveTable instance with the configured values.
@@ -118,6 +141,7 @@ public class HiveTable extends BaseTable {
       hiveTable.catalogName = catalogName;
       hiveTable.databaseName = databaseName;
       hiveTable.proxyPlugin = proxyPlugin;
+      hiveTable.viewOriginalText = viewOriginalText;
 
       // HMS put table comment in parameters
       if (comment != null) {

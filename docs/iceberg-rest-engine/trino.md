@@ -158,6 +158,24 @@ WITH (
 );
 ```
 
+## Known issues
+
+### `TIMESTAMP WITH TIME ZONE` values are not adjusted to the client session time zone
+
+For `TIMESTAMP WITH TIME ZONE` values, Trino does not adjust query results according to the client
+session time zone. Unlike Spark and Flink, Trino displays these values based on the stored
+timestamp-with-time-zone value.
+
+To convert a `TIMESTAMP WITH TIME ZONE` value to the current client session time zone, use
+`at_timezone` together with `current_timezone()`:
+
+```sql
+SELECT
+  id,
+  at_timezone(timestamp_with_timezone_column, current_timezone())
+FROM <catalog>.<namespace>.<table>;
+```
+
 ## Gravitino connector vs Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
@@ -166,6 +184,20 @@ WITH (
 | Gravitino access control | Yes                         | Yes                           |
 | Supported engines        | Trino, Spark, Flink, Daft   | Any Iceberg-compatible engine |
 | Credential vending       | Varies                      | Yes (S3, GCS, OSS, ADLS)      |
+
+## Known issues
+
+### Trino identifiers are not treated as case sensitive
+
+Trino identifiers are not treated as case sensitive. As a result, metadata names that differ
+only by letter case cannot be distinguished. See [Trino identifier
+documentation](https://trino.io/docs/current/language/reserved.html#language-identifiers). This
+limitation comes from Trino itself and is not specific to Gravitino.
+
+For the best compatibility with Trino:
+
+- Use lowercase metadata names.
+- Avoid creating objects whose names differ only by letter case.
 
 ## Related
 

@@ -29,7 +29,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,14 +49,20 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.RenameTable;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -78,11 +83,13 @@ import org.slf4j.LoggerFactory;
  * Implementation of {@link CatalogOperations} that represents operations for interacting with the
  * Apache Paimon catalog in Apache Gravitino.
  */
-public class PaimonCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+public class PaimonCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(PaimonCatalogOperations.class);
 
   @VisibleForTesting public PaimonCatalogOps paimonCatalogOps;
+  @VisibleForTesting PaimonViewCatalogOps paimonViewCatalogOps;
 
   private static final String NO_SUCH_SCHEMA_EXCEPTION =
       "Paimon schema (database) %s does not exist.";
@@ -118,6 +125,9 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     resultConf.putAll(gravitinoConfig);
 
     this.paimonCatalogOps = new PaimonCatalogOps(new PaimonConfig(resultConf));
+    this.paimonViewCatalogOps =
+        new PaimonViewCatalogOps(
+            paimonCatalogOps, this::buildPaimonNameIdentifier, this::schemaExists);
   }
 
   /**
@@ -354,7 +364,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
         sortOrders == null || sortOrders.length == 0,
         "Sort orders are not supported for Paimon in Gravitino.");
     checkPaimonIndexes(indexes);
-    validateDistribution(distribution, columns, indexes);
+    validateDistribution(distribution, columns);
     String currentUser = currentUser();
     GravitinoPaimonTable createdTable =
         GravitinoPaimonTable.builder()
@@ -466,6 +476,84 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
     return true;
   }
 
+  /**
+   * Lists all views under the specified namespace.
+   *
+   * @param namespace The namespace to list views for.
+   * @return An array of {@link NameIdentifier} representing the views in the namespace.
+   * @throws NoSuchSchemaException If the schema with the provided namespace does not exist.
+   */
+  @Override
+  public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
+    return paimonViewCatalogOps.listViews(namespace);
+  }
+
+  /**
+   * Loads the view with the provided identifier.
+   *
+   * @param identifier The identifier of the view to load.
+   * @return The loaded {@link View} instance representing the view metadata.
+   * @throws NoSuchViewException If the view with the provided identifier does not exist.
+   */
+  @Override
+  public View loadView(NameIdentifier identifier) throws NoSuchViewException {
+    return paimonViewCatalogOps.loadView(identifier);
+  }
+
+  /**
+   * Creates a new view with the provided metadata.
+   *
+   * @param identifier The identifier of the view to create.
+   * @param comment The view comment.
+   * @param columns The output columns of the view.
+   * @param representations The view SQL representations.
+   * @param defaultCatalog The default catalog for unqualified identifiers.
+   * @param defaultSchema The default schema for unqualified identifiers.
+   * @param properties The view properties.
+   * @return The created view metadata.
+   * @throws NoSuchSchemaException If the target schema does not exist.
+   * @throws ViewAlreadyExistsException If the view already exists.
+   */
+  @Override
+  public View createView(
+      NameIdentifier identifier,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties)
+      throws NoSuchSchemaException, ViewAlreadyExistsException {
+    return paimonViewCatalogOps.createView(
+        identifier, comment, columns, representations, defaultCatalog, defaultSchema, properties);
+  }
+
+  /**
+   * Alters an existing view according to the provided changes.
+   *
+   * @param identifier The identifier of the view to alter.
+   * @param changes The changes to apply.
+   * @return The updated view metadata.
+   * @throws NoSuchViewException If the view does not exist.
+   * @throws IllegalArgumentException If any change type is unsupported by Paimon.
+   */
+  @Override
+  public View alterView(NameIdentifier identifier, ViewChange... changes)
+      throws NoSuchViewException, IllegalArgumentException {
+    return paimonViewCatalogOps.alterView(identifier, changes);
+  }
+
+  /**
+   * Drops the view with the provided identifier.
+   *
+   * @param identifier The identifier of the view to drop.
+   * @return true if the view is successfully dropped, false if the view does not exist.
+   */
+  @Override
+  public boolean dropView(NameIdentifier identifier) {
+    return paimonViewCatalogOps.dropView(identifier);
+  }
+
   @Override
   public void close() {
     if (paimonCatalogOps != null) {
@@ -502,7 +590,7 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
                     "Paimon only supports primary key Index."));
   }
 
-  private void validateDistribution(Distribution distribution, Column[] columns, Index[] indexes) {
+  private void validateDistribution(Distribution distribution, Column[] columns) {
     if (distribution == null || distribution.strategy() == Distributions.NONE.strategy()) {
       return;
     }
@@ -511,30 +599,21 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
         distribution.strategy() == Strategy.HASH,
         "Paimon only supports HASH distribution strategy.");
 
-    Preconditions.checkArgument(
-        distribution.expressions() != null && distribution.expressions().length > 0,
-        "Paimon bucket keys must be specified for HASH distribution.");
-
     int bucketNumber = distribution.number();
     Preconditions.checkArgument(
         bucketNumber == Distributions.AUTO || bucketNumber > 0,
         "Paimon bucket number must be positive or AUTO.");
 
-    List<String> bucketKeys = extractBucketKeys(distribution);
-    List<String> columnNames =
-        Arrays.stream(columns).map(Column::name).collect(Collectors.toList());
-    bucketKeys.forEach(
-        bucketKey ->
-            Preconditions.checkArgument(
-                columnNames.stream().anyMatch(name -> name.equals(bucketKey)),
-                "Distribution column %s does not exist in table columns.",
-                bucketKey));
-
-    List<String> primaryKeys = extractPrimaryKeys(indexes);
-    if (!primaryKeys.isEmpty()) {
-      Preconditions.checkArgument(
-          primaryKeys.containsAll(bucketKeys),
-          "Paimon bucket keys must be a subset of primary key columns for primary key tables.");
+    if (distribution.expressions() != null && distribution.expressions().length > 0) {
+      List<String> bucketKeys = extractBucketKeys(distribution);
+      List<String> columnNames =
+          Arrays.stream(columns).map(Column::name).collect(Collectors.toList());
+      bucketKeys.forEach(
+          bucketKey ->
+              Preconditions.checkArgument(
+                  columnNames.stream().anyMatch(name -> name.equals(bucketKey)),
+                  "Distribution column %s does not exist in table columns.",
+                  bucketKey));
     }
   }
 
@@ -550,23 +629,6 @@ public class PaimonCatalogOperations implements CatalogOperations, SupportsSchem
               Preconditions.checkArgument(
                   fieldNames.length == 1, "Paimon bucket keys must be single columns.");
               return fieldNames[0];
-            })
-        .collect(Collectors.toList());
-  }
-
-  private static List<String> extractPrimaryKeys(Index[] indexes) {
-    if (indexes == null || indexes.length == 0) {
-      return Collections.emptyList();
-    }
-    // Paimon supports at most one index; this is enforced in {@code checkPaimonIndexes()}.
-    Index primaryKeyIndex = indexes[0];
-    return Arrays.stream(primaryKeyIndex.fieldNames())
-        .map(
-            fieldName -> {
-              Preconditions.checkArgument(
-                  fieldName != null && fieldName.length == 1,
-                  "Paimon primary keys must be single columns.");
-              return fieldName[0];
             })
         .collect(Collectors.toList());
   }

@@ -47,7 +47,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.ServiceLoader;
@@ -73,6 +72,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
@@ -87,6 +87,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.FilesetCatalog;
@@ -715,7 +716,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         nameIdentifierForLock,
         LockType.WRITE,
         () -> {
-          catalogCache.invalidate(ident);
           try {
             CatalogEntity updatedCatalog =
                 store.update(
@@ -734,15 +734,20 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
                       return newCatalogBuilder.build();
                     });
+            // Invalidate after store.update() so that any background thread that tries to reload
+            // the old catalog identifier from the store (after the invalidate) will get
+            // NoSuchCatalogException instead of stale data. Invalidating before the update creates
+            // a window where the background thread repopulates the cache with the old entity.
+            catalogCache.invalidate(ident);
             // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
             // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
             // after reading the catalog entity, we convert it to the new fileset catalog entity.
             CatalogEntity convertedCatalog = convertFilesetCatalogEntity(updatedCatalog);
-            return Objects.requireNonNull(
-                    catalogCache.get(
-                        convertedCatalog.nameIdentifier(),
-                        id -> createCatalogWrapper(convertedCatalog, null)))
-                .catalog;
+            // Use put() instead of get() to force the updated wrapper into the cache, preventing
+            // a background thread from overwriting it with stale data between invalidate and put.
+            CatalogWrapper newWrapper = createCatalogWrapper(convertedCatalog, null);
+            catalogCache.put(convertedCatalog.nameIdentifier(), newWrapper);
+            return newWrapper.catalog();
 
           } catch (NoSuchEntityException ne) {
             LOG.warn("Catalog {} does not exist", ident, ne);
@@ -804,8 +809,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             }
 
             // Finally, delete the catalog entity as well as all its sub-entities from the store.
+            // Invalidate after store.delete() to prevent a background thread from repopulating
+            // the cache with stale data between invalidate and delete.
+            boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             catalogCache.invalidate(ident);
-            return store.delete(ident, EntityType.CATALOG, true);
+            return deleted;
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
             return false;
@@ -877,9 +885,37 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Set<String> availableSchemaNames =
         Arrays.stream(allSchemas).map(NameIdentifier::name).collect(Collectors.toSet());
 
-    // some schemas are dropped externally, but still exist in the entity store, those schemas are
-    // invalid
-    return schemaEntities.stream().map(SchemaEntity::name).anyMatch(availableSchemaNames::contains);
+    // Some schemas are dropped externally but still exist in the entity store — those are invalid.
+    // Among schemas that exist in the underlying catalog, only those created via Gravitino carry a
+    // StringIdentifier in their external properties; imported schemas do not.
+    for (SchemaEntity schemaEntity : schemaEntities) {
+      if (!availableSchemaNames.contains(schemaEntity.name())) {
+        continue;
+      }
+
+      try {
+        Schema schema =
+            catalogWrapper.doWithSchemaOps(ops -> ops.loadSchema(schemaEntity.nameIdentifier()));
+        Map<String, String> props = schema.properties();
+        // If the backend cannot store a StringIdentifier (null or empty properties, e.g. MySQL
+        // which does not support schema comments), we cannot tell whether the schema was created
+        // by Gravitino or imported. Be conservative and treat it as user-created to avoid
+        // accidental data loss.
+        // Only skip a schema when properties are non-null, non-empty, and contain no
+        // StringIdentifier — the reliable signal that the schema was imported from an external
+        // catalog on a backend that does support identifier storage.
+        if (props == null || props.isEmpty() || StringIdentifier.fromProperties(props) != null) {
+          return true;
+        }
+      } catch (NoSuchSchemaException ex) {
+        // A race between listSchemas and loadSchema is expected; treat as non-user-created.
+        LOG.debug(
+            "Schema {} no longer exists while checking whether it is user-created",
+            schemaEntity.nameIdentifier());
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -981,7 +1017,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param propsToValidate The properties to validate.
    * @return The created catalog wrapper.
    */
-  private CatalogWrapper createCatalogWrapper(
+  CatalogWrapper createCatalogWrapper(
       CatalogEntity entity, @Nullable Map<String, String> propsToValidate) {
     Map<String, String> conf = entity.getProperties();
     String provider = entity.getProvider();

@@ -54,13 +54,12 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
   }
 
   @Override
-  public boolean execute() throws Exception {
+  public boolean execute(AuthorizationRequestContext context) throws Exception {
     Object request = extractFromParameters(parameters, args);
     if (request == null) {
       return false;
     }
 
-    AuthorizationRequestContext context = new AuthorizationRequestContext();
     context.setOriginalAuthorizationExpression(expression);
     Entity.EntityType targetType =
         Entity.EntityType.TAG; // Tags are the only supported batch target here

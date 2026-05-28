@@ -53,6 +53,14 @@ public interface SchemaMetaMapper {
 
   @SelectProvider(
       type = SchemaMetaSQLProviderFactory.class,
+      method = "listSchemaPOsByCatalogIdAndNamePrefix")
+  List<SchemaPO> listSchemaPOsByCatalogIdAndNamePrefix(
+      @Param("catalogId") Long catalogId,
+      @Param("schemaName") String schemaName,
+      @Param("descendantPrefix") String descendantPrefix);
+
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
       method = "selectSchemaIdByCatalogIdAndName")
   Long selectSchemaIdByCatalogIdAndName(
       @Param("catalogId") Long catalogId, @Param("schemaName") String name);
@@ -82,14 +90,22 @@ public interface SchemaMetaMapper {
       method = "insertSchemaMetaOnDuplicateKeyUpdate")
   void insertSchemaMetaOnDuplicateKeyUpdate(@Param("schemaMeta") SchemaPO schemaPO);
 
+  @InsertProvider(type = SchemaMetaSQLProviderFactory.class, method = "batchInsertSchemaMeta")
+  void batchInsertSchemaMeta(@Param("schemaMetas") List<SchemaPO> schemaMetas);
+
+  @InsertProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "batchInsertSchemaMetaOnDuplicateKeyUpdate")
+  void batchInsertSchemaMetaOnDuplicateKeyUpdate(@Param("schemaMetas") List<SchemaPO> schemaMetas);
+
   @UpdateProvider(type = SchemaMetaSQLProviderFactory.class, method = "updateSchemaMeta")
   Integer updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO);
 
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
-      method = "softDeleteSchemaMetasBySchemaId")
-  Integer softDeleteSchemaMetasBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteSchemaMetasBySchemaIds")
+  Integer softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,

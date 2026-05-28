@@ -21,6 +21,7 @@ package org.apache.gravitino.listener;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.listener.api.event.AlterTagEvent;
 import org.apache.gravitino.listener.api.event.AlterTagFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterTagPreEvent;
@@ -80,7 +81,11 @@ public class TagEventDispatcher implements TagDispatcher {
     eventBus.dispatchEvent(new ListTagsPreEvent(PrincipalUtils.getCurrentUserName(), metalake));
     try {
       String[] tagNames = dispatcher.listTags(metalake);
-      eventBus.dispatchEvent(new ListTagsEvent(PrincipalUtils.getCurrentUserName(), metalake));
+      eventBus.dispatchEvent(
+          new ListTagsEvent(
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              tagNames != null ? tagNames.length : -1));
       return tagNames;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -94,7 +99,9 @@ public class TagEventDispatcher implements TagDispatcher {
     eventBus.dispatchEvent(new ListTagsInfoPreEvent(PrincipalUtils.getCurrentUserName(), metalake));
     try {
       Tag[] tags = dispatcher.listTagsInfo(metalake);
-      eventBus.dispatchEvent(new ListTagsInfoEvent(PrincipalUtils.getCurrentUserName(), metalake));
+      eventBus.dispatchEvent(
+          new ListTagsInfoEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, tags != null ? tags.length : -1));
       return tags;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -141,7 +148,8 @@ public class TagEventDispatcher implements TagDispatcher {
   }
 
   @Override
-  public Tag alterTag(String metalake, String name, TagChange... changes) {
+  public Tag alterTag(String metalake, String name, TagChange... changes)
+      throws IllegalArgumentException, TagAlreadyExistsException {
     AlterTagPreEvent preEvent =
         new AlterTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name, changes);
 
@@ -188,7 +196,11 @@ public class TagEventDispatcher implements TagDispatcher {
     try {
       MetadataObject[] metadataObjects = dispatcher.listMetadataObjectsForTag(metalake, name);
       eventBus.dispatchEvent(
-          new ListMetadataObjectsForTagEvent(PrincipalUtils.getCurrentUserName(), metalake, name));
+          new ListMetadataObjectsForTagEvent(
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              name,
+              metadataObjects != null ? metadataObjects.length : -1));
       return metadataObjects;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -208,7 +220,10 @@ public class TagEventDispatcher implements TagDispatcher {
       String[] tags = dispatcher.listTagsForMetadataObject(metalake, metadataObject);
       eventBus.dispatchEvent(
           new ListTagsForMetadataObjectEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, metadataObject));
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              metadataObject,
+              tags != null ? tags.length : -1));
       return tags;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -227,7 +242,10 @@ public class TagEventDispatcher implements TagDispatcher {
       Tag[] tags = dispatcher.listTagsInfoForMetadataObject(metalake, metadataObject);
       eventBus.dispatchEvent(
           new ListTagsInfoForMetadataObjectEvent(
-              PrincipalUtils.getCurrentUserName(), metalake, metadataObject));
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              metadataObject,
+              tags != null ? tags.length : -1));
       return tags;
     } catch (Exception e) {
       eventBus.dispatchEvent(
