@@ -72,15 +72,15 @@ The result is a privilege model where granting `SELECT_VIEW` to a user has visib
 
 ## Goals
 
-1. **Complete the View Privilege Type Set**: Define `ALTER_VIEW` so that create, read, and alter operations each have a corresponding grantable privilege (`CREATE_VIEW`, `SELECT_VIEW`, `ALTER_VIEW`). Drop operations are gated by ownership rather than by a privilege (see Goal 4), consistent with every other mutable Gravitino object. The `ALTER_VIEW` name follows the parent View Management design doc.
+1. **Complete the View Privilege Type Set**: Complete the privilege management and protect against the `DROP` operation, similar to function privilege management.
 
-2. **Enforce View Privileges on Generic REST Endpoints**: Wire `@AuthorizationExpression` on all five `ViewOperations.java` endpoints so that view privilege checks occur at the server-side authorization layer, matching the `TableOperations.java` pattern. Each endpoint receives an expression appropriate to its operation (create / read / alter / drop / list-filter).
+2. **Enforce View Privileges on Generic REST Endpoints**: Enforce privilege authentication on REST endpoints.
 
-3. **Ownership Tracking for Views**: Add a `ViewHookDispatcher` that sets the creator as the view owner on `createView`, so the `VIEW::OWNER` clause in existing and new authorization expressions resolves correctly. View ownership remains transferable via Gravitino's existing owner-management API.
+3. **Ownership Tracking for Views**: Track ownership in a manner similar to the function privilege management process, inheriting the existing ownership model.
 
-4. **Hierarchical Drop Semantics**: View drops are gated by ownership at the view level **or any parent level** (schema, catalog, metalake), matching the existing `dropTable` / `dropFileset` / `dropFunction` expressions. This means platform admins (metalake/catalog owners) and domain owners (schema owners) can drop views in their scope without an explicit per-view grant, while reassigning ownership remains the path for delegating drop authority to a specific user without granting broader administrative power. No `DROP_VIEW` privilege is introduced, keeping views consistent with every other droppable object type.
+4. **View Security Mode**: Introduce Definer/Invoker security support for view privilege management, allowing owners flexibility in switching modes for new/existing views.
 
-5. **Backward Compatibility**: When authorization is disabled, all view REST endpoints behave identically to today. Existing `CREATE_VIEW` and `SELECT_VIEW` privileges retain their current bit values and semantics. No client or DTO changes. The Iceberg-REST view authorization path (`IcebergViewOperations.java`) is unchanged.
+6. **Backward Compatibility**: It should be backward compatible with existing privilege management and the underlying data engine if views have previously been defined within the sub-system.
 
 ---
 
@@ -90,7 +90,7 @@ The result is a privilege model where granting `SELECT_VIEW` to a user has visib
 
 2. **Per-User Identity Propagation in Spark and Flink Connectors**: Today's Gravitino Spark and Flink connectors authenticate to Gravitino using a singleton service identity established at catalog initialization. Consequently, we only have session context-level identity and, unlike Trino, lack per-user caller identity.
 
-3. **Unifying the Iceberg-REST and Generic View Auth Paths**: `IcebergViewOperations` will continue to use `ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION` independently of the generic path. The two paths serve different protocols (Iceberg REST spec vs. Gravitino REST); unifying them risks breaking Iceberg-REST clients and is a substantial refactor out of scope for this design.
+3. **Unifying Generic View Auth Paths**: The Data Lake/Warehouse and Database have different approaches to managing views, privileges, and security. Unifying them into a single model is out of scope.
 
 4. **Materialized Views and Temporary Views**: Out of scope per the parent design (only logical views are in scope).
 
