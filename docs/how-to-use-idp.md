@@ -127,18 +127,6 @@ curl -s -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/users/alice
 ```
 
-Example response:
-
-```json
-{
-  "code": 0,
-  "user": {
-    "name": "alice",
-    "groups": ["engineering"]
-  }
-}
-```
-
 #### Add a user
 
 `POST /api/idp/users`
