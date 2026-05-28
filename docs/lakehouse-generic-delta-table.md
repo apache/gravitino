@@ -16,39 +16,81 @@ import TabItem from '@theme/TabItem';
 
 ## Overview
 
-This document describes how to use Apache Gravitino to manage a generic lakehouse catalog with Delta Lake as the underlying table format. Gravitino supports registering and managing metadata for external Delta tables.
+[Delta Lake](https://delta.io) is an open-source storage layer that adds ACID transactions, schema enforcement, and time travel to data lakes on cloud and on-prem object storage. Use the Delta format in a Gravitino Generic Lakehouse catalog when you want to register existing Delta tables for discovery and governance through Gravitino alongside relational, dedicated-lakehouse, and fileset catalogs. Table reads, writes, and schema changes continue to go through Delta Lake's own APIs (Apache Spark with the Delta Spark connector, delta-rs, and so on).
 
-:::info
-Gravitino supports **external Delta tables only**: it stores metadata
-(schema, location, properties) for tables whose physical data lives
-elsewhere. Dropping such a table from Gravitino removes the metadata
-entry but leaves the underlying Delta data untouched.
-:::
+The guide assumes a Generic Lakehouse catalog already exists. See the [Generic Lakehouse catalog doc](./lakehouse-generic-catalog.md) for catalog creation, the catalog/schema/table location resolution model, and the corpus-level Requirements and Limitations.
+
+## Requirements and Limitations
+
+- **Catalog prerequisite.** Delta tables live inside a Generic Lakehouse catalog. See the [Generic Lakehouse catalog doc](./lakehouse-generic-catalog.md) for catalog creation and the catalog/schema/table location resolution rules.
+- **External tables only.** Gravitino stores metadata (schema, location, properties) for Delta tables whose physical data lives elsewhere. Managed Delta tables are not supported. Set `external=true` on every Delta table created through Gravitino.
+- **Drop and purge semantics.** Dropping an external Delta table from Gravitino removes the metadata entry only; the underlying Delta data is preserved at its location. The `purgeTable` operation is not supported for external Delta tables.
+- **No `alterTable`.** Schema changes go through Delta Lake APIs (Spark with the Delta Spark connector, delta-rs, and so on). After modifying the table through Delta APIs, drop and re-register the table in Gravitino with the updated schema. See [Modify Delta Tables with Spark](#modify-delta-tables-with-spark) for a worked example.
+- **Identity partitions only.** Partition transforms are limited to identity. Partition metadata is stored in Gravitino only and is not validated against the Delta transaction log; you are responsible for keeping the metadata consistent with the actual Delta table's partitioning. See [Partitioned Delta Tables](#partitioned-delta-tables).
+- **No sort orders, distributions, or indexes.** These are not accepted in `CREATE TABLE`.
+- **Time travel.** Available through Delta Lake APIs directly. Not exposed through Gravitino.
+- **Schema model.** Delta Lake uses Apache Spark data types. Gravitino maps its types to Delta/Spark types as described in [Data Type Mappings](#data-type-mappings).
+- **Schema not validated at registration.** Gravitino stores the column schema you provide as metadata but does not check it against the Delta table's actual schema in the `_delta_log`. Provide a schema that matches the actual Delta table to avoid inconsistencies.
+
+## Quick Start
+
+Register an existing external Delta table inside an existing Generic Lakehouse catalog and confirm it is reachable through Gravitino. The walkthrough assumes a Gravitino server at `http://localhost:8090`, a metalake named `test`, a Generic Lakehouse catalog named `lakehouse_catalog`, and a schema named `sales` under that catalog. The example registers a Delta table that already exists at `s3://my-bucket/delta-tables/customer_orders`; substitute a path to an existing Delta table you control.
+
+### Register the Delta Table
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "customer_orders",
+    "comment": "Customer orders Delta table",
+    "columns": [
+      {
+        "name": "order_id",
+        "type": "long",
+        "comment": "Order identifier",
+        "nullable": false
+      }
+    ],
+    "properties": {
+      "format": "delta",
+      "external": "true",
+      "location": "s3://my-bucket/delta-tables/customer_orders"
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs/lakehouse_catalog/schemas/sales/tables
+```
+
+The minimum-viable example shown here uses a single column. Provide the full column list matching the actual Delta table for an accurate registration; see [Register an External Delta Table](#register-an-external-delta-table) below for the fuller example with multiple columns and both shell and Java tabs.
+
+### Verify the Table
+
+```bash
+# List tables in the schema. customer_orders should appear.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/lakehouse_catalog/schemas/sales/tables" | jq
+
+# Load the table directly and inspect its properties and columns.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/lakehouse_catalog/schemas/sales/tables/customer_orders" | jq
+```
+
+**Success check:** the table-list response includes `customer_orders`, and the load-table response shows `"format":"delta"`, `"external":"true"`, the configured S3 location, and the column you provided. The Delta table files at the location are untouched; Gravitino has registered the metadata only.
 
 ## Table Management
 
 ### Supported Operations
 
-For Delta tables in a generic lakehouse catalog, the following operations are supported:
+For Delta tables in a Generic Lakehouse catalog, the following table operations are supported:
 
-| Operation | Support                                        |
-|-----------|------------------------------------------------|
-| List      | ✅ Full                                        |
-| Load      | ✅ Full                                        |
-| Alter     | ❌ Not supported (use Delta Lake APIs directly) |
-| Create    | ✅ Register external tables only               |
-| Drop      | ✅ Metadata only (data preserved)              |
-| Purge     | ❌ Not supported for external tables           |
+| Operation | Support                                |
+|-----------|----------------------------------------|
+| List      | Supported                              |
+| Load      | Supported                              |
+| Create    | Supported (registers an external table)|
+| Drop      | Supported (metadata only; data preserved)|
+| Alter     | Not supported                          |
+| Purge     | Not supported                          |
 
-:::note
-Feature limitations:
-
-- Only external Delta tables are supported. Set `external=true` when creating one.
-- Alter operations are not supported. Modify tables through Delta Lake APIs or Spark, then update the Gravitino metadata if needed.
-- Purge is not applicable to external tables. Use drop to remove the metadata only.
-- Only identity partitions are supported, and they are stored as metadata only. You are responsible for keeping them consistent with the actual Delta table.
-- Sort orders, distributions, and indexes are not supported in `CREATE TABLE`.
-:::
+For schema changes on a Delta table, use Delta Lake APIs (Spark with the Delta Spark connector, delta-rs, and so on); see [Modify Delta Tables with Spark](#modify-delta-tables-with-spark). For the full list of unsupported features (managed tables, non-identity partition transforms, sort orders, distributions, indexes, time travel), see [Requirements and Limitations](#requirements-and-limitations) above.
 
 ### Data Type Mappings
 
@@ -233,9 +275,9 @@ boolean dropped = tableCatalog.dropTable(
 :::tip
 Since Delta tables are external, dropping them from Gravitino:
 
-- ✅ Removes the table from Gravitino's metadata.
-- ✅ Preserves the Delta table data at its location.
-- ✅ Allows re-registering the same table later.
+- Removes the table from Gravitino's metadata.
+- Preserves the Delta table data at its location.
+- Allows re-registering the same table later.
 
 The Delta table can still be accessed directly through Delta Lake APIs, Spark, or other tools.
 :::
@@ -244,7 +286,7 @@ The Delta table can still be accessed directly through Delta Lake APIs, Spark, o
 
 ### Modify Delta Tables with Spark
 
-Since Gravitino does not support ALTER operations for Delta tables, use Apache Spark or other Delta Lake tools to modify table structure:
+To modify a Delta table's schema, use Apache Spark with the Delta Spark connector or another Delta Lake tool. The following example adds a `status` column to an existing Delta table:
 
 ```java
 import org.apache.spark.sql.SparkSession;
@@ -299,7 +341,7 @@ df.show();
 
 ### Partitioned Delta Tables
 
-Delta Lake supports partitioning, and Gravitino can store identity partition metadata for external Delta tables. The partition information is metadata-only and must match the actual Delta table's partitioning scheme defined in the Delta transaction log.
+Register a Delta table with identity partition metadata so downstream consumers can see the partitioning scheme through Gravitino. The partition metadata is stored in Gravitino only and must match the actual partitioning defined in the Delta transaction log.
 
 ```java
 // Register a partitioned Delta table
@@ -327,12 +369,7 @@ tableCatalog.createTable(
 ```
 
 :::note
-Partition information in Gravitino is **metadata only**:
-- Only **identity transforms** are supported (e.g., `Transforms.identity("column")`)
-- Non-identity transforms (bucket, truncate, year, month, etc.) will be rejected
-- The actual partitioning is managed by Delta Lake in the _delta_log
-- **User responsibility**: Ensure the partition metadata you provide matches the actual Delta table's partitioning
-- Gravitino does not validate partition metadata against the Delta transaction log
+Non-identity transforms (bucket, truncate, year, month, and so on) are rejected at create time. See [Requirements and Limitations](#requirements-and-limitations) for the broader partition-metadata constraints.
 :::
 
 ## Advanced Topics
@@ -348,25 +385,6 @@ Partition information in Gravitino is **metadata only**:
 **`ALTER TABLE operations are not supported`.** Use Delta Lake APIs (Spark, Delta-rs, and so on) to modify the table, then optionally drop and re-register it in Gravitino with the updated schema.
 
 **`Purge operation is not supported for external Delta tables`.** Use `dropTable()` to remove the metadata only. To delete the data, manually remove the files from the storage location.
-
-## Limitations and Future Work
-
-### Limitations
-
-- **Managed tables.** Not supported; only external tables are available.
-- **`ALTER` operations.** Schema changes go through Delta Lake APIs, not Gravitino.
-- **Partitioning.** Only identity partitions are supported, and they are stored as metadata only (not validated against the Delta log).
-- **Indexes.** Not supported in `CREATE TABLE`.
-- **Time travel.** Available through Delta Lake APIs directly; not exposed through Gravitino.
-
-### Planned Enhancements
-
-Future versions may include:
-
-- Support for managed Delta tables (requires Delta Lake 4.0+ `CommitCoordinator`).
-- Schema-evolution tracking.
-- Integration with Delta Lake time-travel features.
-- Enhanced metadata synchronization.
 
 ## Related
 
