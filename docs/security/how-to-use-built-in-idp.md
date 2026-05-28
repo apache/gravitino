@@ -9,8 +9,7 @@ license: "This software is licensed under the Apache License version 2."
 
 Apache Gravitino can store **built-in IDP** (identity provider) users and groups in the relational
 metadata store through the `idp-basic` plugin. This gives you a self-contained way to manage
-**global** login identities (usernames, password hashes, and group membership) without an external
-OAuth server.
+**global** login identities (usernames, password hashes, and group membership) without an external server.
 
 Built-in IDP is aimed at POC, offline, and isolated deployments. It is **not** a replacement for
 enterprise IDPs such as Okta, Azure AD, or Keycloak. Use it only where a lightweight local identity
@@ -155,8 +154,6 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 `DELETE /api/idp/users/{user}`
 
-Soft-deletes the user (`deleted_at`). Physical removal is handled by the IDP garbage collector.
-
 ```shell
 curl -s -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Authorization: Basic $(echo -n 'admin:Passw0rd-Admin12' | base64)" \
@@ -216,21 +213,6 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```
 
 For full request and response definitions, see the [Built-in IDP OpenAPI](../open-api/idp/openapi.yaml).
-
----
-
-## Use with Gravitino access control
-
-Built-in IDP tables are **global** (no `metalake_id`). Metalake-scoped `user_meta` and `group_meta`
-used by RBAC are separate objects. They are associated **by name** (`user_name` / `group_name`)
-across metalakes, not by a database foreign key.
-
-Typical workflow:
-
-1. Initialize service admin passwords and create additional built-in IDP users and groups with
-   `/api/idp/*` (this guide).
-2. In each metalake, create matching Gravitino users and groups for authorization.
-3. Grant roles and privileges as described in [Access control](access-control.md).
 
 ---
 
