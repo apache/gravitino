@@ -24,6 +24,12 @@ plugins {
 }
 
 dependencies {
+  // Force upgrade for outdated transitive libthrift pulled by Hive Metastore
+  constraints {
+    compileOnly(libs.thrift)
+    testImplementation(libs.thrift)
+  }
+
   compileOnly(project(":api"))
   compileOnly(project(":common"))
   compileOnly(project(":core"))
