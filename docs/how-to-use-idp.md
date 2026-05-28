@@ -68,7 +68,6 @@ Example (intended end state):
 
 ```properties
 gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
-gravitino.authorization.enable = true
 gravitino.authorization.serviceAdmins = admin
 ```
 
