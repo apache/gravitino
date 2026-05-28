@@ -18,9 +18,9 @@
  */
 package org.apache.gravitino.idp.storage.relational.utils;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.idp.model.IdpGroup;
@@ -40,7 +40,7 @@ public final class IdpPOConverters {
    * @return The built-in IdP user.
    */
   public static IdpUser fromIdpUserWithGroupsPO(IdpUserWithGroupsPO userPO) {
-    Objects.requireNonNull(userPO, "userPO must not be null");
+    Preconditions.checkNotNull(userPO, "userPO must not be null");
     List<String> groupNames = parseJsonStringList(userPO.getGroupNames());
     if (StringUtils.isBlank(userPO.getPasswordHash())) {
       return new IdpUser(userPO.getName(), groupNames);
@@ -55,7 +55,7 @@ public final class IdpPOConverters {
    * @return The built-in IdP group.
    */
   public static IdpGroup fromIdpGroupWithUsersPO(IdpGroupWithUsersPO groupPO) {
-    Objects.requireNonNull(groupPO, "groupPO must not be null");
+    Preconditions.checkNotNull(groupPO, "groupPO must not be null");
     return new IdpGroup(groupPO.getName(), parseJsonStringList(groupPO.getUsernames()));
   }
 
