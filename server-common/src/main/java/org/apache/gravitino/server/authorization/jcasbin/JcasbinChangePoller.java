@@ -65,6 +65,13 @@ public class JcasbinChangePoller implements AutoCloseable {
   private final long pollIntervalSecs;
 
   private ScheduledExecutorService scheduler;
+
+  // The owner poller needs two cursors because owner_meta rows can be both inserted and
+  // soft-deleted (which keeps the same id but advances updated_at):
+  //   * (ownerPollHighWaterUpdatedAt, ownerPollHighWaterUpdatedAtId) is a single logical cursor
+  //     tracking soft-delete updates. updated_at alone is millisecond-granular so multiple
+  //     updates can share the same value; the id field is the tiebreaker for that case.
+  //   * ownerPollHighWaterInsertId tracks brand-new owner_meta rows by their auto-increment id.
   private volatile long ownerPollHighWaterUpdatedAt = 0;
   private volatile long ownerPollHighWaterUpdatedAtId = 0;
   private volatile long ownerPollHighWaterInsertId = 0;
