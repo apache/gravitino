@@ -27,12 +27,19 @@ request and response schemas, see the [Built-in IDP OpenAPI](./open-api/idp/open
 
 Before you call `/api/idp/*`, ensure the following:
 
-1. **IDP database tables** — Run the appropriate upgrade script under `${GRAVITINO_HOME}/scripts/`
+1. **IDP REST API registration** — Add the IdP Jersey extension package to `gravitino.conf` so
+   Gravitino loads `IdpRESTFeature` and registers `/api/idp/*` management resources:
+
+   ```properties
+   gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
+   ```
+
+2. **IDP database tables** — Run the appropriate upgrade script under `${GRAVITINO_HOME}/scripts/`
    so the relational store contains `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel`
    (for example `scripts/mysql/upgrade-1.2.0-to-1.3.0-mysql.sql`). See
    [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
 
-2. **Service admin passwords** — Built-in IDP requires every username in
+3. **Service admin passwords** — Built-in IDP requires every username in
    `gravitino.authorization.serviceAdmins` to have a password stored in `idp_user_meta` before you
    can call management APIs.
 
@@ -64,12 +71,13 @@ Before you call `/api/idp/*`, ensure the following:
 
 ## Configuration
 
-Add the following to `gravitino.conf` to expose built-in IDP management REST APIs:
+In addition to [Prerequisites](#prerequisites) step 1 (`gravitino.server.rest.extensionPackages`),
+configure authorization and service admins in `gravitino.conf`:
 
-| Configuration item                        | Description                                    | Example                                             |
-|-------------------------------------------|------------------------------------------------|-----------------------------------------------------|
-| `gravitino.server.rest.extensionPackages` | Jersey package that discovers `IdpRESTFeature` | `org.apache.gravitino.idp.web.rest.feature`         |
-| `gravitino.authorization.serviceAdmins`   | Usernames allowed to manage `/api/idp/*`       | `admin`                                             |
+| Configuration item                      | Description                              | Example |
+|-----------------------------------------|------------------------------------------|---------|
+| `gravitino.authorization.enable`        | Enable authorization for service admins  | `true`  |
+| `gravitino.authorization.serviceAdmins` | Usernames allowed to manage `/api/idp/*` | `admin` |
 
 Example:
 
@@ -78,9 +86,6 @@ gravitino.authorization.enable = true
 gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
 gravitino.authorization.serviceAdmins = admin
 ```
-
-`IdpRESTFeature` registers `/api/idp/*` when `org.apache.gravitino.idp.web.rest.feature` is listed in
-`gravitino.server.rest.extensionPackages`.
 
 ---
 
