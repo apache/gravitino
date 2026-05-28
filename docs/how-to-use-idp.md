@@ -12,85 +12,100 @@ metadata store through the `idp-basic` plugin. This gives you a self-contained w
 OAuth server.
 
 Built-in IdP is aimed at POC, offline, and isolated deployments. It is **not** a replacement for
-enterprise IdPs such as Okta, Azure AD, or Keycloak.
+enterprise IdPs such as Okta, Azure AD, or Keycloak. Use it only where a lightweight local identity
+store is acceptable; restrict management APIs to **service admins**, store password hashes only,
+and prefer [HTTPS](./security/how-to-use-https.md) when credentials travel over the network.
 
-This guide is based on the current `plugins:idp-basic` implementation. For design background, see
+This guide describes how to enable and operate the management APIs in `plugins:idp-basic`. For
+design background, see
 [Design of local authentication support](../design-docs/gravitino-local-authentication.md). For
-the machine-readable API contract, see the [Built-in IdP OpenAPI](../open-api/idp/openapi.yaml).
+request and response schemas, see the [Built-in IdP OpenAPI](./open-api/idp/openapi.yaml).
 
 ---
 
 ## Prerequisites
 
-1. **Database schema** that includes the IdP tables. For MySQL/PostgreSQL, run the appropriate
-   upgrade script under `${GRAVITINO_HOME}/scripts/` (for example
-   `scripts/mysql/upgrade-1.2.0-to-1.3.0-mysql.sql` creates `idp_user_meta`, `idp_group_meta`, and
-   `idp_user_group_rel`). See [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
-2. **Plugin JARs** in `${GRAVITINO_HOME}/libs/`:
-   - `gravitino-idp-basic-*.jar` (from `./gradlew :plugins:idp-basic:copyLibAndConfigs`)
-   - `bcprov-jdk18on-*.jar` (Argon2id dependency; copied by the same task)
-3. **Authorization enabled** with at least one **service admin** if you call management APIs
-   (see [Access control](./security/access-control.md)).
+Before you configure the server, ensure the following:
+
+1. **IdP database tables** — Run the appropriate upgrade script under `${GRAVITINO_HOME}/scripts/`
+   so the relational store contains `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel`
+   (for example `scripts/mysql/upgrade-1.2.0-to-1.3.0-mysql.sql`). See
+   [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
+
+2. **Plugin JARs** — Copy artifacts into `${GRAVITINO_HOME}/libs/`:
+
+   - `gravitino-idp-basic-*.jar`
+   - `bcprov-jdk18on-*.jar` (Argon2id dependency)
+
+   Build and copy them with:
+
+   ```shell
+   ./gradlew :plugins:idp-basic:copyLibAndConfigs
+   ```
+
+3. **Service admin for management APIs** — Callers of `/api/idp/*` must be authenticated and listed
+   in `gravitino.authorization.serviceAdmins`. Enable authorization and define admins as described
+   in [Access control](./security/access-control.md).
 
 ---
 
-## Server configuration
+## Configuration
 
-Add the following to `gravitino.conf` when built-in IdP management is enabled (after
-authenticator wiring supports the `basic` flag without breaking startup):
+Add the following to `gravitino.conf` to expose built-in IdP management REST APIs:
 
 | Configuration item | Description | Example |
 |--------------------|-------------|---------|
 | `gravitino.server.rest.extensionPackages` | Jersey package that discovers `IdpRESTFeature` | `org.apache.gravitino.idp.web.rest.feature` |
-| `gravitino.authorization.serviceAdmins` | Usernames allowed to call `/api/idp/*` | `admin` |
+| `gravitino.authorization.serviceAdmins` | Usernames allowed to manage `/api/idp/*` | `admin` |
 
-Example (intended end state):
+Example:
 
 ```properties
 gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
 gravitino.authorization.serviceAdmins = admin
 ```
 
-`IdpRESTFeature` registers management resources only when `basic` appears in
-`gravitino.authenticators` **and** `org.apache.gravitino.idp.web.rest.feature` is listed in
-`gravitino.server.rest.extensionPackages`. If `basic` is absent, `/api/idp/*` routes are not
-registered.
+`IdpRESTFeature` registers `/api/idp/*` only when `basic` is included in `gravitino.authenticators`
+**and** `org.apache.gravitino.idp.web.rest.feature` is listed in
+`gravitino.server.rest.extensionPackages`. If `basic` is absent, those routes are not registered.
+
+General authentication settings (`simple`, `oauth`, `kerberos`, and related keys) are documented in
+[How to authenticate](./security/how-to-authenticate.md).
 
 ---
 
-## Calling management APIs
+## Operations
 
-### Authentication for `/api/idp/*`
+The following sections show how to call built-in IdP management APIs with `curl`. Replace
+`localhost:8090` and the `Authorization` header with values that match your deployment.
 
-Management APIs do **not** use built-in IdP passwords for authorization today. `IdpAuthorizationFilter`
-requires the **already authenticated** caller to be listed in `gravitino.authorization.serviceAdmins`.
+### Before you call the APIs
 
-Until HTTP Basic login against `idp_user_meta` exists, use another configured authenticator (for
-example **simple**) to authenticate as a service admin, then call IdP APIs.
+**Who can call** — `IdpAuthorizationFilter` allows only users listed in
+`gravitino.authorization.serviceAdmins`. The caller must already be authenticated through a
+configured Gravitino authenticator (for example **simple**); see
+[How to authenticate](./security/how-to-authenticate.md).
 
-Example with **simple** mode (empty password is allowed):
+**Base URL** — `http://<host>:<port>/api/idp`
+
+**Common headers**
+
+| Header | Value |
+|--------|--------|
+| `Accept` | `application/vnd.gravitino.v1+json` |
+| `Content-Type` | `application/json` (for POST and PUT bodies) |
+
+Example using **simple** mode (empty password is allowed when the server permits it):
 
 ```shell
-export GRAVITINO_USER=admin
 curl -s -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
   http://localhost:8090/api/idp/users/alice
 ```
 
-### Common headers
+### Password and username rules
 
-| Header | Value |
-|--------|--------|
-| `Accept` | `application/vnd.gravitino.v1+json` |
-| `Content-Type` | `application/json` (for POST/PUT bodies) |
-
-Base URL prefix: `http://<host>:<port>/api/idp`.
-
----
-
-## Password and username rules
-
-Enforced by `IdpCredentialValidator` on add-user and change-password requests:
+Add-user and change-password requests are validated by `IdpCredentialValidator`:
 
 | Rule | Value |
 |------|--------|
@@ -98,13 +113,11 @@ Enforced by `IdpCredentialValidator` on add-user and change-password requests:
 | Password length | 12–64 characters (inclusive) |
 | Password storage | Argon2id PHC string in `idp_user_meta.password_hash` |
 
-Password reset is **admin-only** (no `oldPassword`, no self-service).
+Password reset is **admin-only** (request body has `password` only; no `oldPassword`).
 
----
+### User operations
 
-## User APIs
-
-### Get user
+#### Get a user
 
 `GET /api/idp/users/{user}`
 
@@ -114,7 +127,7 @@ curl -s -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/users/alice
 ```
 
-Response:
+Example response:
 
 ```json
 {
@@ -126,11 +139,11 @@ Response:
 }
 ```
 
-### Add user
+#### Add a user
 
 `POST /api/idp/users`
 
-Request body uses field `user` (not `name`):
+The request body uses field `user` (not `name`):
 
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -140,9 +153,11 @@ curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/users
 ```
 
-### Change password (admin reset)
+#### Change a user password
 
 `PUT /api/idp/users/{user}`
+
+Administrator reset only:
 
 ```shell
 curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -152,11 +167,11 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/users/alice
 ```
 
-### Remove user
+#### Remove a user
 
 `DELETE /api/idp/users/{user}`
 
-Soft-deletes the user (`deleted_at`); physical removal is handled by the IdP garbage collector.
+Soft-deletes the user (`deleted_at`). Physical removal is handled by the IdP garbage collector.
 
 ```shell
 curl -s -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
@@ -164,20 +179,9 @@ curl -s -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/users/alice
 ```
 
-Response:
+### Group operations
 
-```json
-{
-  "code": 0,
-  "removed": true
-}
-```
-
----
-
-## Group APIs
-
-### Get group
+#### Get a group
 
 `GET /api/idp/groups/{group}`
 
@@ -187,7 +191,7 @@ curl -s -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/groups/engineering
 ```
 
-Response:
+Example response:
 
 ```json
 {
@@ -199,11 +203,11 @@ Response:
 }
 ```
 
-### Add group
+#### Add a group
 
 `POST /api/idp/groups`
 
-Request body uses field `group` (not `name`):
+The request body uses field `group` (not `name`):
 
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -213,7 +217,7 @@ curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/groups
 ```
 
-### Remove group
+#### Remove a group
 
 `DELETE /api/idp/groups/{group}?force={true|false}`
 
@@ -225,12 +229,11 @@ curl -s -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
   'http://localhost:8090/api/idp/groups/engineering?force=true'
 ```
 
-### Change group membership
+#### Change group membership
 
 `PUT /api/idp/groups/{group}/users`
 
-Adds and/or removes members in one request. At least one of `usersToAdd` or `usersToRemove` must be
-set (this replaces the older separate `/add` and `/remove` paths from early design drafts).
+Add and/or remove members in one request. At least one of `usersToAdd` or `usersToRemove` is required.
 
 ```shell
 curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -240,33 +243,27 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/groups/engineering/users
 ```
 
----
-
-## Relationship to Gravitino authorization users
-
-Built-in IdP tables are **global** (no `metalake_id`). Gravitino metalake-scoped `user_meta` /
-`group_meta` used by access control are separate. The link is **logical**, by matching
-`user_name` / `group_name` strings across metalakes—not a database foreign key.
-
-Typical flow after HTTP Basic auth is wired:
-
-1. Create built-in IdP users/groups via `/api/idp/*`.
-2. Create matching Gravitino users/groups in each metalake for RBAC.
-3. Assign roles and privileges using [access control](./security/access-control.md).
+For full request and response definitions, see the [Built-in IdP OpenAPI](./open-api/idp/openapi.yaml).
 
 ---
 
-## Security notes
+## Use with Gravitino access control
 
-- Store only **password hashes** in the database; never log plaintext passwords.
-- Use [HTTPS](./security/how-to-use-https.md) when sending credentials once HTTP Basic auth is enabled.
-- Restrict IdP management to **service admins**; do not expose `/api/idp/*` anonymously.
-- Built-in IdP is recommended for **POC and isolated** environments, not as a full enterprise IdP.
+Built-in IdP tables are **global** (no `metalake_id`). Metalake-scoped `user_meta` and `group_meta`
+used by RBAC are separate objects. They are associated **by name** (`user_name` / `group_name`)
+across metalakes, not by a database foreign key.
+
+Typical workflow:
+
+1. Create built-in IdP users and groups with `/api/idp/*` (this guide).
+2. In each metalake, create matching Gravitino users and groups for authorization.
+3. Grant roles and privileges as described in [Access control](./security/access-control.md).
 
 ---
 
-## OpenAPI and further reading
+## Further reading
 
-- OpenAPI: [docs/open-api/idp/openapi.yaml](./open-api/idp/openapi.yaml)
-- Design doc: [design-docs/gravitino-local-authentication.md](../design-docs/gravitino-local-authentication.md)
-- General authentication modes: [How to authenticate](./security/how-to-authenticate.md)
+- [Built-in IdP OpenAPI](./open-api/idp/openapi.yaml) — API paths, bodies, and schemas
+- [Design of local authentication support](../design-docs/gravitino-local-authentication.md) — architecture and future authentication flows
+- [How to authenticate](./security/how-to-authenticate.md) — `simple`, OAuth, and Kerberos
+- [How to use HTTPS](./security/how-to-use-https.md) — transport security for credentials
