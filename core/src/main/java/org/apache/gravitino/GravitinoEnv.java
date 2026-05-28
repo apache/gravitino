@@ -484,10 +484,10 @@ public class GravitinoEnv {
   public void start() {
     metricsSystem.start();
     eventListenerManager.start();
-    if (entityChangeLogPoller != null) {
-      entityChangeLogPoller.start();
-    }
     if (manageFullComponents) {
+      if (entityChangeLogPoller != null) {
+        entityChangeLogPoller.start();
+      }
       auxServiceManager.serviceStart();
     }
   }
