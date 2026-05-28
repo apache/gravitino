@@ -129,9 +129,4 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
       credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
     }
   }
-
-  @Override
-  protected List<String> hiddenCredentialKeys() {
-    return List.of(JdbcConfig.USERNAME.getKey(), JdbcConfig.PASSWORD.getKey());
-  }
 }
