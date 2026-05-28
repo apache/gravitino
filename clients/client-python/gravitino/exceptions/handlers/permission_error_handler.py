@@ -22,6 +22,7 @@ from gravitino.exceptions.base import (
     IllegalArgumentException,
     IllegalMetadataObjectException,
     IllegalPrivilegeException,
+    IllegalRoleException,
     MetalakeNotInUseException,
     NoSuchGroupException,
     NoSuchMetadataObjectException,
@@ -37,6 +38,7 @@ from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
 class PermissionErrorHandler(RestErrorHandler):
     """Error handler for permission operations (grant/revoke)."""
 
+    # pylint: disable=too-many-branches
     def handle(self, error_response: ErrorResponse):
         error_message = error_response.format_error_message()
         code = error_response.code()
@@ -47,6 +49,8 @@ class PermissionErrorHandler(RestErrorHandler):
                 raise IllegalPrivilegeException(error_message)
             if exception_type == IllegalMetadataObjectException.__name__:
                 raise IllegalMetadataObjectException(error_message)
+            if exception_type == IllegalRoleException.__name__:
+                raise IllegalRoleException(error_message)
             raise IllegalArgumentException(error_message)
 
         if code == ErrorConstants.NOT_FOUND_CODE:

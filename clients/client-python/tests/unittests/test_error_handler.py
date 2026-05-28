@@ -27,6 +27,7 @@ from gravitino.exceptions.base import (
     IllegalArgumentException,
     IllegalMetadataObjectException,
     IllegalPrivilegeException,
+    IllegalRoleException,
     InternalError,
     MetalakeAlreadyExistsException,
     MetalakeNotInUseException,
@@ -626,6 +627,13 @@ class TestErrorHandler(unittest.TestCase):
             PERMISSION_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(
                     IllegalMetadataObjectException, "mock error"
+                )
+            )
+
+        with self.assertRaises(IllegalRoleException):
+            PERMISSION_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalRoleException, "mock error"
                 )
             )
 
