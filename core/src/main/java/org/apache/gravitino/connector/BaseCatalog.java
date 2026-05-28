@@ -24,6 +24,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +42,7 @@ import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.credential.OSSSecretKeyCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -456,30 +459,65 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         }
       }
     }
-    return properties;
+    List<String> keys = hiddenCredentialKeys();
+    if (keys.isEmpty() || !shouldBackfillCredential()) {
+      return properties;
+    }
+    Map<String, String> rawProps = entity().getProperties();
+    Map<String, String> result = Maps.newHashMap(properties);
+    for (String key : keys) {
+      backfillIfPresent(rawProps, result, key);
+    }
+    return result;
   }
 
   /**
-   * Retrieves the properties of the catalog including credential providers. Subclasses should
-   * override this method to inject auto-detected credential provider names into the properties map
-   * before the {@link CatalogCredentialManager} is initialized. The default implementation returns
-   * {@link #properties()} unchanged.
+   * Retrieves the properties of the catalog including credential providers. Detects storage and
+   * catalog-specific credential providers from the raw entity properties (including hidden ones)
+   * and injects them before {@link CatalogCredentialManager} is initialized. Subclasses may
+   * override {@link #addCatalogSpecificCredentialProviders} to add additional providers.
    *
-   * @return A map of properties including credential providers.
+   * @return A map of raw properties with credential providers set.
    */
   public Map<String, String> propertiesWithCredentialProviders() {
-    return properties();
+    Map<String, String> props = Maps.newHashMap(entity().getProperties());
+    if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+      return props;
+    }
+    List<String> credentialProviders = new ArrayList<>();
+    addCatalogSpecificCredentialProviders(props, credentialProviders);
+    if (!credentialProviders.isEmpty()) {
+      props.put(CredentialConstants.CREDENTIAL_PROVIDERS, String.join(",", credentialProviders));
+    }
+    return props;
   }
 
   /**
-   * Detects storage credential providers (S3, OSS, Azure) from catalog properties and appends them
-   * to the provided list. Subclasses can call this method in their {@link
-   * #propertiesWithCredentialProviders()} implementation to avoid duplicating storage credential
-   * detection logic.
+   * Returns the list of hidden property keys whose values should be backfilled into the public
+   * {@link #properties()} map when the server-level credential backfill config is enabled. The
+   * default implementation returns an empty list (no backfill). Subclasses override this to declare
+   * the hidden credential keys they expose.
    *
-   * @param properties The catalog properties map to scan for storage credentials.
-   * @param credentialProviders The list to append detected storage credential providers to.
+   * @return list of property keys to backfill
    */
+  protected List<String> hiddenCredentialKeys() {
+    return Collections.emptyList();
+  }
+
+  /**
+   * Detects credential providers for this catalog type and appends them to {@code
+   * credentialProviders}. The default implementation calls {@link
+   * #addStorageCredentialProviders(Map, List)} to detect S3/OSS/Azure/GCS credentials. Subclasses
+   * override this to add catalog-specific providers (e.g., JDBC).
+   *
+   * @param properties the raw catalog properties
+   * @param credentialProviders the list to append detected provider names to
+   */
+  protected void addCatalogSpecificCredentialProviders(
+      Map<String, String> properties, List<String> credentialProviders) {
+    addStorageCredentialProviders(properties, credentialProviders);
+  }
+
   /**
    * Returns whether hidden credentials should be backfilled into catalog properties for backward
    * compatibility with connectors that do not support credential vending. Controlled by

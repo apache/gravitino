@@ -18,11 +18,10 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
-import com.google.common.collect.Maps;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -34,7 +33,6 @@ import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 
 /** Implementation of an Jdbc catalog in Gravitino. */
@@ -121,57 +119,19 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   }
 
   @Override
-  @Evolving
-  public Map<String, String> propertiesWithCredentialProviders() {
-    // Use raw entity properties so that hidden credentials (jdbc-user/jdbc-password) are visible
-    // to the credential manager even after they are marked hidden in the properties metadata.
-    Map<String, String> properties = Maps.newHashMap(entity().getProperties());
-    return applyDefaultCredentialProviders(properties);
-  }
-
-  /**
-   * Returns catalog properties, optionally re-adding hidden JDBC credentials for backward
-   * compatibility with connectors that do not support credential vending. The backfill behavior is
-   * controlled by the server-level config {@code
-   * gravitino.catalog.credential.backfillToProperties}; it is disabled by default and should only
-   * be enabled during rolling upgrades.
-   *
-   * @return the catalog properties map, with credentials backfilled if the server config is set
-   */
-  @Override
-  public Map<String, String> properties() {
-    Map<String, String> props = super.properties();
-    if (!shouldBackfillCredential()) {
-      return props;
-    }
-    // Backfill hidden credentials for backward compatibility with connectors that do not support
-    // credential vending.
-    Map<String, String> rawProps = entity().getProperties();
-    Map<String, String> result = Maps.newHashMap(props);
-    String user = rawProps.get(JdbcConfig.USERNAME.getKey());
-    String password = rawProps.get(JdbcConfig.PASSWORD.getKey());
-    if (user != null) {
-      result.put(JdbcConfig.USERNAME.getKey(), user);
-    }
-    if (password != null) {
-      result.put(JdbcConfig.PASSWORD.getKey(), password);
-    }
-    return result;
-  }
-
-  private Map<String, String> applyDefaultCredentialProviders(Map<String, String> properties) {
-    if (StringUtils.isNotBlank(properties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
-      return properties;
-    }
-
+  protected void addCatalogSpecificCredentialProviders(
+      Map<String, String> properties, List<String> credentialProviders) {
     String jdbcUser = properties.get(JdbcConfig.USERNAME.getKey());
     String jdbcPassword = properties.get(JdbcConfig.PASSWORD.getKey());
     // Register provider when user is configured; allow empty-string password (e.g. StarRocks
-    // default). Only skip when password is absent (null) entirely without a user.
+    // default). Only skip when password is absent (null) entirely.
     if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
-      properties.put(CredentialConstants.CREDENTIAL_PROVIDERS, JdbcCredential.JDBC_CREDENTIAL_TYPE);
+      credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
     }
+  }
 
-    return properties;
+  @Override
+  protected List<String> hiddenCredentialKeys() {
+    return List.of(JdbcConfig.USERNAME.getKey(), JdbcConfig.PASSWORD.getKey());
   }
 }

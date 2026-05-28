@@ -18,8 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg;
 
-import com.google.common.collect.Maps;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
@@ -96,47 +94,16 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   @Override
   @Evolving
   public Map<String, String> propertiesWithCredentialProviders() {
-    // Use raw entity properties so hidden credentials are visible to the credential manager.
-    Map<String, String> properties = Maps.newHashMap(entity().getProperties());
-    // Iceberg is security-first: the vended s3:ListBucket statement keeps the bare location prefix
-    // disabled so a credential cannot enumerate sibling keys sharing the location prefix. This is
-    // determined by the catalog type and is not meant to be configured by users.
-    properties.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "false");
-    return applyDefaultCredentialProviders(properties);
+    Map<String, String> props = super.propertiesWithCredentialProviders();
+    // Iceberg is security-first: disable s3:ListBucket on bare location prefix so a vended
+    // credential cannot enumerate sibling keys. This is catalog-type policy, not user-configurable.
+    props.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "false");
+    return props;
   }
 
-  /**
-   * Returns catalog properties, optionally re-adding hidden credentials for backward compatibility
-   * with connectors that do not support credential vending. Controlled by server-level config
-   * {@code gravitino.catalog.credential.backfillToProperties}.
-   *
-   * @return the catalog properties map, with credentials backfilled if the server config is set
-   */
   @Override
-  public Map<String, String> properties() {
-    Map<String, String> props = super.properties();
-    if (!shouldBackfillCredential()) {
-      return props;
-    }
-    Map<String, String> rawProps = entity().getProperties();
-    Map<String, String> result = Maps.newHashMap(props);
-    backfillIfPresent(rawProps, result, IcebergConstants.GRAVITINO_JDBC_USER);
-    backfillIfPresent(rawProps, result, IcebergConstants.GRAVITINO_JDBC_PASSWORD);
-    backfillIfPresent(rawProps, result, S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
-    backfillIfPresent(rawProps, result, OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
-    backfillIfPresent(rawProps, result, AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
-    return result;
-  }
-
-  private Map<String, String> applyDefaultCredentialProviders(Map<String, String> properties) {
-    // If credential providers already set, return as is
-    if (StringUtils.isNotBlank(properties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
-      return properties;
-    }
-
-    List<String> credentialProviders = new ArrayList<>();
-
-    // Add JDBC credential provider if backend is JDBC and jdbc-user/jdbc-password are set
+  protected void addCatalogSpecificCredentialProviders(
+      Map<String, String> properties, List<String> credentialProviders) {
     String catalogBackend = properties.get(IcebergConstants.CATALOG_BACKEND);
     if (catalogBackend != null
         && IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
@@ -146,14 +113,16 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
         credentialProviders.add(JdbcCredential.JDBC_CREDENTIAL_TYPE);
       }
     }
-
     addStorageCredentialProviders(properties, credentialProviders);
+  }
 
-    if (!credentialProviders.isEmpty()) {
-      properties.put(
-          CredentialConstants.CREDENTIAL_PROVIDERS, String.join(",", credentialProviders));
-    }
-
-    return properties;
+  @Override
+  protected List<String> hiddenCredentialKeys() {
+    return List.of(
+        IcebergConstants.GRAVITINO_JDBC_USER,
+        IcebergConstants.GRAVITINO_JDBC_PASSWORD,
+        S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+        OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+        AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
   }
 }
