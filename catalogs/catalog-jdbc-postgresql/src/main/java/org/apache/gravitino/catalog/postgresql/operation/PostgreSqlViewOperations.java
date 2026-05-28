@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.postgresql.operation;
 import com.google.common.base.Preconditions;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Map;
 import javax.sql.DataSource;
@@ -84,6 +85,26 @@ public class PostgreSqlViewOperations extends JdbcViewOperations {
     stmt.setString(1, schemaName);
     stmt.setString(2, viewName);
     stmt.setString(3, database);
+  }
+
+  @Override
+  protected String loadComment(Connection connection, String databaseName, String viewName)
+      throws SQLException {
+    String sql =
+        "SELECT obj_description(c.oid, 'pg_class')"
+            + " FROM pg_catalog.pg_class c"
+            + " JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid"
+            + " WHERE c.relname = ? AND n.nspname = ? AND c.relkind = 'v'";
+    try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+      stmt.setString(1, viewName);
+      stmt.setString(2, databaseName);
+      try (ResultSet rs = stmt.executeQuery()) {
+        if (rs.next()) {
+          return rs.getString(1);
+        }
+      }
+    }
+    return null;
   }
 
   @Override

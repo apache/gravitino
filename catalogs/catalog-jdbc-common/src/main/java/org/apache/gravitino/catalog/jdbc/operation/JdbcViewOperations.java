@@ -101,12 +101,14 @@ public abstract class JdbcViewOperations {
       Preconditions.checkNotNull(
           viewDefinition, "View definition is null for view %s in %s", viewName, databaseName);
       Column[] columns = discoverColumns(connection, viewName);
+      String comment = loadComment(connection, databaseName, viewName);
 
       SQLRepresentation rep =
           SQLRepresentation.builder().withDialect(dialectName()).withSql(viewDefinition).build();
 
       return JdbcView.builder()
           .withName(viewName)
+          .withComment(comment)
           .withColumns(columns)
           .withRepresentations(new SQLRepresentation[] {rep})
           .withProperties(ImmutableMap.of())
@@ -188,6 +190,22 @@ public abstract class JdbcViewOperations {
    * @return The quoted identifier.
    */
   protected abstract String quoteIdentifier(String identifier);
+
+  /**
+   * Loads the comment for a view from the database. The default implementation returns {@code null}
+   * for databases that do not support view comments (e.g., MySQL). Subclasses should override this
+   * to read comments from the backend (e.g., PostgreSQL's {@code pg_description}).
+   *
+   * @param connection The JDBC connection.
+   * @param databaseName The database or schema name.
+   * @param viewName The view name.
+   * @return The view comment, or {@code null} if not available.
+   * @throws SQLException If the comment cannot be loaded.
+   */
+  protected String loadComment(Connection connection, String databaseName, String viewName)
+      throws SQLException {
+    return null;
+  }
 
   private String loadViewDefinition(Connection connection, String databaseName, String viewName)
       throws SQLException, NoSuchViewException {

@@ -44,6 +44,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -144,9 +145,11 @@ public class CatalogMysqlViewReadIT extends BaseIT {
     Column[] columns = view.columns();
     Assertions.assertEquals(2, columns.length);
     Assertions.assertEquals("id", columns[0].name());
-    Assertions.assertNotNull(columns[0].dataType());
+    Assertions.assertEquals(Types.IntegerType.get(), columns[0].dataType());
     Assertions.assertEquals("name", columns[1].name());
-    Assertions.assertNotNull(columns[1].dataType());
+    Assertions.assertEquals(Types.VarCharType.of(255), columns[1].dataType());
+
+    Assertions.assertNull(view.comment());
 
     Assertions.assertEquals(1, view.representations().length);
     Assertions.assertInstanceOf(SQLRepresentation.class, view.representations()[0]);
