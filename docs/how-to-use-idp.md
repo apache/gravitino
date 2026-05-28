@@ -119,11 +119,11 @@ curl -s -H "Accept: application/vnd.gravitino.v1+json" \
 Add-user, change-password, and `GRAVITINO_INITIAL_ADMIN_PASSWORD` are validated by
 `IdpCredentialValidator`:
 
-| Rule             | Value                                                  |
-|------------------|--------------------------------------------------------|
-| Username         | Required; must **not** contain `:`                       |
-| Password length  | 12–64 characters (inclusive)                           |
-| Password storage | Argon2id PHC string in `idp_user_meta.password_hash`   |
+| Rule             | Value                                                |
+|------------------|------------------------------------------------------|
+| Username         | Required; must **not** contain `:`                   |
+| Password length  | 12–64 characters (inclusive)                         |
+| Password storage | Argon2id PHC string in `idp_user_meta.password_hash` |
 
 Password reset is **admin-only** (request body has `password` only; no `oldPassword`).
 
