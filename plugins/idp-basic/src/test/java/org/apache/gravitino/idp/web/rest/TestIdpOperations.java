@@ -216,7 +216,7 @@ class TestIdpOperations extends JerseyTest {
   }
 
   private IdpUser buildUser(String user) {
-    return new IdpUser(user, null, Collections.emptyList());
+    return new IdpUser(user, Collections.emptyList());
   }
 
   private IdpGroup buildGroup(String group) {

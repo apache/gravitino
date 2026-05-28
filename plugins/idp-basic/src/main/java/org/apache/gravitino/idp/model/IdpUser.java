@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.idp.model;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Objects;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.idp.dto.IdpUserDTO;
 
 /** Built-in IdP user. */
@@ -30,13 +32,26 @@ public class IdpUser {
   private final List<String> groupNames;
 
   /**
-   * Creates a built-in IdP user.
+   * Creates a built-in IdP user without a password hash.
    *
    * @param name The username.
-   * @param passwordHash The password hash, or null when not loaded or not applicable.
+   * @param groupNames The group names the user belongs to.
+   */
+  public IdpUser(String name, List<String> groupNames) {
+    this.name = name;
+    this.groupNames = groupNames;
+  }
+
+  /**
+   * Creates a built-in IdP user with a password hash loaded from storage.
+   *
+   * @param name The username.
+   * @param passwordHash The password hash.
    * @param groupNames The group names the user belongs to.
    */
   public IdpUser(String name, String passwordHash, List<String> groupNames) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(passwordHash), "passwordHash must not be blank");
     this.name = name;
     this.passwordHash = passwordHash;
     this.groupNames = groupNames;

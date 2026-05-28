@@ -127,7 +127,7 @@ public class IdpUserGroupManager implements Closeable {
   public IdpUser addUser(String username, String password) throws IOException {
     String passwordHash = passwordHasher.hash(password);
     USER_SERVICE.insertIdpUser(newUserPO(username, passwordHash));
-    return new IdpUser(username, passwordHash, Collections.emptyList());
+    return new IdpUser(username, Collections.emptyList());
   }
 
   /**

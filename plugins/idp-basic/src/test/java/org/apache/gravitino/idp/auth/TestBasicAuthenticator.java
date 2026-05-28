@@ -86,7 +86,7 @@ class TestBasicAuthenticator {
   void testValidCredentials() throws Exception {
     IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
     when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice"))
-        .thenReturn(new IdpUser("alice", null, Arrays.asList("group-a", "group-b")));
+        .thenReturn(new IdpUser("alice", Arrays.asList("group-a", "group-b")));
     BasicAuthenticator authenticator = authenticator(userGroupManager);
     String authHeader = basicAuthHeader("alice", "Passw0rd-For-Alice");
 
@@ -169,7 +169,7 @@ class TestBasicAuthenticator {
   void testTrimmedCredential() throws Exception {
     IdpUserGroupManager userGroupManager = mock(IdpUserGroupManager.class);
     when(userGroupManager.authenticate("alice", "Passw0rd-For-Alice"))
-        .thenReturn(new IdpUser("alice", null, Arrays.asList()));
+        .thenReturn(new IdpUser("alice", Arrays.asList()));
     BasicAuthenticator authenticator = authenticator(userGroupManager);
     String credential =
         "  "
