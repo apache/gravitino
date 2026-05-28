@@ -110,7 +110,7 @@ The recommended module name is:
 
 - `plugins:idp-basic`
 
-This naming keeps the capability grouping explicit. The `plugins:idp-basic` module provides:
+The `plugins:idp-basic` module provides:
 
 - local user and local group management,
 - password hashing and verification,
