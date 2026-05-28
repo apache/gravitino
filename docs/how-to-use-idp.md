@@ -53,12 +53,6 @@ Before you call `/api/idp/*`, ensure the following:
       export GRAVITINO_INITIAL_ADMIN_PASSWORD='Passw0rd-Admin12'
       ```
 
-      On startup, Gravitino hashes this password into `idp_user_meta` for each configured service
-      admin that does not already have a stored password. If any service admin has no password in the
-      store and this variable is not set, startup fails. See
-      [Design of local authentication support](../design-docs/gravitino-local-authentication.md) §6
-      for the full initialization rules.
-
    3. **Start or restart Gravitino** so the initialization runs.
 
    4. **Call APIs with built-in IDP credentials** — Use HTTP Basic authentication with the service
