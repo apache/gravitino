@@ -18,24 +18,6 @@ This guide is based on the current `plugins:idp-basic` implementation. For desig
 [Design of local authentication support](../design-docs/gravitino-local-authentication.md). For
 the machine-readable API contract, see the [Built-in IdP OpenAPI](../open-api/idp/openapi.yaml).
 
-### What is implemented today
-
-| Capability | Status |
-|----------|--------|
-| Relational tables `idp_user_meta`, `idp_group_meta`, `idp_user_group_rel` | Implemented (schema in 1.3.0 upgrade scripts) |
-| Argon2id password hashing (`password_hash` column) | Implemented |
-| REST management APIs under `/api/idp/...` | Implemented in `idp-basic` |
-| Service-admin authorization on management APIs | Implemented (`IdpAuthorizationFilter`) |
-| HTTP Basic authentication against `idp_user_meta` for all Gravitino APIs | **Not implemented** (no `basic` entry in `AuthenticatorFactory`) |
-| Startup initialization via `GRAVITINO_INITIAL_ADMIN_PASSWORD` | **Not implemented** |
-
-The value `basic` in `gravitino.authenticators` is used today only as a **feature flag** to
-register IdP management REST resources (`IdpRESTFeature`). It is **not** a working HTTP
-authenticator name yet: if you list `basic` in `gravitino.authenticators`, server startup fails
-because `AuthenticatorFactory` tries to load a Java class named `basic`. Until authenticator
-wiring is completed, treat the management APIs below as the implemented contract, not as a
-fully enabled production path.
-
 ---
 
 ## Prerequisites
