@@ -550,8 +550,8 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
                           schemaName,
                           tableName)));
       Assertions.assertTrue(
-          ex.getMessage().toUpperCase().contains("VIEW"),
-          "Expected error about CREATE VIEW, got: " + ex.getMessage());
+          ex.getMessage().contains("does not support views"),
+          "Expected error about view support, got: " + ex.getMessage());
     } finally {
       dropTableIfExists(tableName);
     }
