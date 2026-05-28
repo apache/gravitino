@@ -183,7 +183,7 @@ public class SparkHiveView extends HiveTable {
       try {
         InternalRow[] rows = spark.sql(viewSql).queryExecution().executedPlan().executeCollect();
         return new InputPartition[] {new ViewPartition(rows)};
-      } catch (Exception e) {
+      } catch (RuntimeException e) {
         throw new RuntimeException(
             String.format("Failed to execute view SQL [%s]: %s", viewSql, e.getMessage()), e);
       }

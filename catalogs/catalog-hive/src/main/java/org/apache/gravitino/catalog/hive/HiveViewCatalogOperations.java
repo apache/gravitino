@@ -363,9 +363,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
         Maps.newHashMap(properties != null ? properties : ImmutableMap.of());
     String representationSql = viewOriginalText;
     String detectedDialect = HiveView.detectDialect(representationSql, params);
-    if (!Dialects.HIVE.equalsIgnoreCase(detectedDialect)
-        && !Dialects.FLINK.equalsIgnoreCase(detectedDialect)
-        && !Dialects.SPARK.equalsIgnoreCase(detectedDialect)) {
+    if (Dialects.TRINO.equalsIgnoreCase(detectedDialect)) {
       // TODO(design-docs/gravitino-logical-view-management.md): support loading trino HMS views.
       throw new UnsupportedOperationException(
           String.format(
@@ -430,9 +428,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
-    if (!Dialects.HIVE.equalsIgnoreCase(representation.dialect())
-        && !Dialects.FLINK.equalsIgnoreCase(representation.dialect())
-        && !Dialects.SPARK.equalsIgnoreCase(representation.dialect())) {
+    if (!Dialects.TRINO.equalsIgnoreCase(representation.dialect())) {
       // TODO(design-docs/gravitino-logical-view-management.md): support serializing trino HMS
       // view definitions.
       throw new UnsupportedOperationException(

@@ -67,8 +67,6 @@ import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * BaseCatalog acts as the foundational class for Apache Spark CatalogManager registration, enabling
@@ -83,8 +81,6 @@ import org.slf4j.LoggerFactory;
  * initialization.
  */
 public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, FunctionCatalog {
-
-  private static final Logger LOG = LoggerFactory.getLogger(BaseCatalog.class);
 
   // The specific Spark catalog to do IO operations, different catalogs have different spark catalog
   // implementations, like HiveTableCatalog for Hive, JDBCTableCatalog for JDBC, SparkCatalog for
@@ -328,7 +324,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       return gravitinoCatalogClient
           .asViewCatalog()
           .viewExists(NameIdentifier.of(getDatabase(ident), ident.name()));
-    } catch (UnsupportedOperationException e) {
+    } catch (UnsupportedOperationException | ForbiddenException e) {
       return false;
     }
   }
@@ -456,8 +452,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     } catch (NoSuchViewException | UnsupportedOperationException e) {
       throw new NoSuchTableException(ident);
     } catch (RuntimeException e) {
-      LOG.warn("Failed to load Spark-side table for view {}: {}", ident, e.getMessage());
-      throw new NoSuchTableException(ident);
+      if (e.getCause() instanceof NoSuchTableException) {
+        // loadSparkTable found no HMS entry for the view identifier
+        throw new NoSuchTableException(ident);
+      }
+      throw e;
     }
   }
 
@@ -473,7 +472,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
    */
   protected Table createSparkView(Identifier ident, View gravitinoView, Table sparkTable) {
     throw new UnsupportedOperationException(
-        "View not supported by catalog: " + ident.namespace()[0]);
+        "View not supported by catalog: " + getDatabase(ident) + "." + ident.name());
   }
 
   protected org.apache.gravitino.rel.Table loadGravitinoTable(Identifier ident)
