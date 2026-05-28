@@ -60,7 +60,7 @@ plugins {
   alias(libs.plugins.tasktree)
   alias(libs.plugins.errorprone)
 }
-
+val snappyJavaVersion = "1.1.10.8"
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
@@ -454,6 +454,11 @@ subprojects {
   apply(plugin = "net.ltgt.errorprone")
   dependencies {
     errorprone("com.google.errorprone:error_prone_core:2.10.0")
+
+    // Force upgrades for outdated transitive dependencies with known issues
+    constraints {
+      implementation("org.xerial.snappy:snappy-java:$snappyJavaVersion")
+    }
   }
 
   tasks.withType<JavaCompile>().configureEach {
