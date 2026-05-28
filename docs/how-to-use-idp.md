@@ -27,8 +27,7 @@ request and response schemas, see the [Built-in IDP OpenAPI](./open-api/idp/open
 
 Before you call `/api/idp/*`, ensure the following:
 
-1. **IDP REST API registration** — Add the IdP Jersey extension package to `gravitino.conf` so
-   Gravitino loads `IdpRESTFeature` and registers `/api/idp/*` management resources:
+1. **IDP REST API registration** — In `gravitino.conf`, set:
 
    ```properties
    gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feature
