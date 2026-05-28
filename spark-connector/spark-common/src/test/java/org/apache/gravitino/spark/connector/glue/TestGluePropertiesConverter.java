@@ -215,6 +215,32 @@ public class TestGluePropertiesConverter {
   }
 
   @Test
+  void testToGravitinoTablePropertiesIcebergProviderMapped() {
+    Map<String, String> tableProps =
+        converter.toGravitinoTableProperties(
+            ImmutableMap.of("provider", "iceberg", "key1", "value1"));
+    Assertions.assertEquals("ICEBERG", tableProps.get("table-format"));
+    Assertions.assertFalse(tableProps.containsKey("provider"), "provider should be removed");
+    Assertions.assertEquals("value1", tableProps.get("key1"));
+  }
+
+  @Test
+  void testToGravitinoTablePropertiesIcebergProviderCaseInsensitive() {
+    Map<String, String> tableProps =
+        converter.toGravitinoTableProperties(ImmutableMap.of("provider", "ICEBERG"));
+    Assertions.assertEquals("ICEBERG", tableProps.get("table-format"));
+    Assertions.assertFalse(tableProps.containsKey("provider"));
+  }
+
+  @Test
+  void testToGravitinoTablePropertiesNonIcebergProviderPassthrough() {
+    Map<String, String> tableProps =
+        converter.toGravitinoTableProperties(ImmutableMap.of("provider", "parquet"));
+    Assertions.assertFalse(tableProps.containsKey("table-format"));
+    Assertions.assertFalse(tableProps.containsKey("provider"), "provider should be removed");
+  }
+
+  @Test
   void testToGravitinoTablePropertiesEmpty() {
     Map<String, String> tableProps = converter.toGravitinoTableProperties(ImmutableMap.of());
     Assertions.assertTrue(tableProps.isEmpty());

@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.aws.glue.GlueCatalog;
@@ -182,7 +183,12 @@ public class GluePropertiesConverter implements PropertiesConverter {
 
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
-    return new HashMap<>(properties);
+    HashMap<String, String> all = new HashMap<>(properties);
+    String provider = all.remove("provider");
+    if ("iceberg".equalsIgnoreCase(provider)) {
+      all.put(GlueConstants.TABLE_FORMAT, GlueConstants.TABLE_FORMAT_ICEBERG);
+    }
+    return all;
   }
 
   @Override
