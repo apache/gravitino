@@ -71,40 +71,31 @@ jobs:
         run: |
           dev/ci/util_free_space.sh
 
-      - name: Run idp-basic unit tests
-        run: |
-          ./gradlew :plugins:idp-basic:test -PskipITs -PskipDockerTests=true -PskipWeb=true
-
-      - name: Run idp-basic REST API integration tests
-        id: integrationTest
+      - name: Run idp-basic tests
+        id: idpBasicTest
         env:
           dockerTest: true
           GRAVITINO_INITIAL_ADMIN_PASSWORD: Passw0rd-For-Admin1
         run: |
-          IDP_IT_TESTS="org.apache.gravitino.idp.integration.test.**"
+          set -euo pipefail
 
-          run_idp_it() {
-            ./gradlew :plugins:idp-basic:test \
-              -PtestMode="$1" \
-              -PjdbcBackend="$2" \
-              -PskipDockerTests=false \
-              -PskipWeb=true \
-              --tests "${IDP_IT_TESTS}"
-          }
+          # Unit and in-process tests (no Docker, no REST IT).
+          ./gradlew :plugins:idp-basic:test -PskipITs -PskipDockerTests=true
 
-          # embedded: all JDBC backends; deploy: MySQL/PostgreSQL only (same as access-control IT).
-          for spec in \
-            embedded:h2 \
-            embedded:mysql \
-            embedded:postgresql \
-            deploy:mysql \
-            deploy:postgresql; do
-            run_idp_it "${spec%%:*}" "${spec#*:}"
+          # REST IT: embedded and deploy, each against h2 / MySQL / PostgreSQL.
+          for test_mode in embedded deploy; do
+            for backend in h2 mysql postgresql; do
+              ./gradlew :plugins:idp-basic:test \
+                -PtestMode="${test_mode}" \
+                -PjdbcBackend="${backend}" \
+                -PskipDockerTests=false \
+                --tests "org.apache.gravitino.idp.integration.test.**"
+            done
           done
 
       - name: Upload idp-basic test reports
         uses: actions/upload-artifact@v7
-        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
+        if: ${{ (failure() && steps.idpBasicTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: idp-basic-test-reports
           path: |
