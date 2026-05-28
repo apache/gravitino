@@ -60,7 +60,6 @@ authenticator wiring supports the `basic` flag without breaking startup):
 | Configuration item | Description | Example |
 |--------------------|-------------|---------|
 | `gravitino.server.rest.extensionPackages` | Jersey package that discovers `IdpRESTFeature` | `org.apache.gravitino.idp.web.rest.feature` |
-| `gravitino.authorization.enable` | Required for service-admin checks on IdP APIs | `true` |
 | `gravitino.authorization.serviceAdmins` | Usernames allowed to call `/api/idp/*` | `admin` |
 
 Example (intended end state):
