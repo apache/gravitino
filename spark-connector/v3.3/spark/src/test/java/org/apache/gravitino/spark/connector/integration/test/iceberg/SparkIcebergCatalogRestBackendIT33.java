@@ -24,6 +24,8 @@ import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.condition.DisabledIf;
 
+// Spark 3.3 uses Iceberg 1.8.x; lakehouse-iceberg (1.11) runs in embedded MiniGravitino in the
+// same JVM. Run REST-backend Iceberg IT in deploy mode only.
 @DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class SparkIcebergCatalogRestBackendIT33 extends SparkIcebergCatalogRestBackendIT {
   @Override

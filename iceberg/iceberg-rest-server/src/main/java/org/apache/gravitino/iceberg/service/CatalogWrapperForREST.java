@@ -418,9 +418,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * <p>This method performs server-side scan planning to optimize query performance by reducing
    * client-side metadata loading and enabling parallel task execution.
    *
-   * <p>Implementation uses synchronous scan planning (COMPLETED status) where tasks are returned
-   * immediately as serialized JSON strings. This is different from asynchronous mode (SUBMITTED
-   * status) where a plan ID is returned for later retrieval.
+   * <p>Implementation uses synchronous scan planning (COMPLETED status) and returns structured
+   * {@code file-scan-tasks} per the Iceberg 1.11 REST spec. It does not emit legacy {@code
+   * plan-tasks} JSON strings, so clients built for Iceberg &lt; 1.11 are not supported. This is
+   * different from asynchronous mode (SUBMITTED status) where a plan ID is returned for later
+   * retrieval.
    *
    * <p>Referenced from Iceberg PR #13400 for scan planning implementation.
    *
@@ -491,11 +493,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   }
 
   /**
-   * Builds a synchronous COMPLETED scan plan response for Iceberg 1.11 REST clients.
+   * Builds a synchronous COMPLETED scan plan response for Iceberg 1.11+ REST clients only.
    *
-   * <p>{@code withSpecsById} is deprecated in Iceberg 1.11 but still used by {@link
-   * org.apache.iceberg.rest.CatalogHandlers#planTableScan}. Remove when upstream provides a
-   * non-deprecated replacement (visibility change planned in 1.12).
+   * <p>Populates {@code file-scan-tasks} and does not populate legacy {@code plan-tasks}, which is
+   * incompatible with pre-1.11 REST clients that deserialize scan tasks from JSON strings.
+   *
+   * <p>{@code withSpecsById} is deprecated in Iceberg 1.11 but required for structured task
+   * encoding. Remove when upstream provides a non-deprecated replacement (planned in 1.12).
    */
   @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(

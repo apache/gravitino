@@ -575,6 +575,8 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 
 Gravitino caches scan plan results to speed up repeated queries with identical parameters. The cache uses snapshot ID as part of the cache key, so queries against different snapshots will not use stale cached data.
 
+Plan scan responses follow the Iceberg 1.11 REST API: completed plans return structured `file-scan-tasks` only. Legacy `plan-tasks` JSON strings (used by some Iceberg 1.9.x–1.10.x clients) are not emitted.
+
 | Configuration item                                         | Description                                              | Default value | Required | Since Version |
 |------------------------------------------------------------|----------------------------------------------------------|---------------|----------|---------------|
 | `gravitino.iceberg-rest.scan-plan-cache-impl`              | The implementation of the scan plan cache.               | (none)        | No       | 1.2.0         |

@@ -184,6 +184,9 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(planResponse.has("file-scan-tasks"));
     Assertions.assertTrue(planResponse.get("file-scan-tasks").isArray());
     Assertions.assertTrue(planResponse.get("file-scan-tasks").size() > 0);
+    Assertions.assertFalse(
+        planResponse.has("plan-tasks"),
+        "Iceberg 1.11+ plan scan must not emit legacy plan-tasks JSON");
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
@@ -229,6 +232,9 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(PlanStatus.COMPLETED.status(), planResponse.get("status").asText());
     Assertions.assertTrue(planResponse.has("file-scan-tasks"));
     Assertions.assertTrue(planResponse.get("file-scan-tasks").isArray());
+    Assertions.assertFalse(
+        planResponse.has("plan-tasks"),
+        "Iceberg 1.11+ plan scan must not emit legacy plan-tasks JSON");
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
