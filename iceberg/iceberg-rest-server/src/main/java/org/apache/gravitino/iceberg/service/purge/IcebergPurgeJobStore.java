@@ -66,18 +66,19 @@ public class IcebergPurgeJobStore {
   }
 
   /**
-   * Scans a small candidate window and claims the first winnable row via compare-and-swap.
+   * Scans a small candidate window and takes the first available row via compare-and-swap.
    *
-   * @param now current epoch millis, written as the claim heartbeat
+   * @param now current epoch millis, written as the initial heartbeat
    * @param heartbeatTimeoutMs age past which a RUNNING heartbeat is stale
    * @param window max candidates to consider
-   * @return the claimed job, or {@code null} if nothing was claimable
+   * @return the taken job, or {@code null} if nothing was available
    */
   public IcebergPurgeJob takePendingJob(long now, long heartbeatTimeoutMs, int window) {
     long staleBefore = now - heartbeatTimeoutMs;
     List<Long> ids =
         SessionUtils.getWithoutCommit(
-            IcebergPurgeJobMapper.class, mapper -> mapper.selectClaimableIds(staleBefore, window));
+            IcebergPurgeJobMapper.class,
+            mapper -> mapper.selectRunnableJobIds(staleBefore, window));
     for (long id : ids) {
       int marked =
           SessionUtils.doWithCommitAndFetchResult(
@@ -99,7 +100,9 @@ public class IcebergPurgeJobStore {
    */
   public void markSucceeded(long id) {
     long now = System.currentTimeMillis();
-    SessionUtils.doWithCommit(IcebergPurgeJobMapper.class, mapper -> mapper.markSucceeded(id, now));
+    SessionUtils.doWithCommit(
+        IcebergPurgeJobMapper.class,
+        mapper -> mapper.markFinished(id, IcebergPurgeJob.State.SUCCEEDED.name(), null, now));
   }
 
   /**
@@ -112,7 +115,8 @@ public class IcebergPurgeJobStore {
     long now = System.currentTimeMillis();
     String err = truncate(reason);
     SessionUtils.doWithCommit(
-        IcebergPurgeJobMapper.class, mapper -> mapper.markFailed(id, err, now));
+        IcebergPurgeJobMapper.class,
+        mapper -> mapper.markFinished(id, IcebergPurgeJob.State.FAILED.name(), err, now));
   }
 
   /**
@@ -160,14 +164,15 @@ public class IcebergPurgeJobStore {
   }
 
   /**
-   * Deletes finished (SUCCEEDED or FAILED) jobs older than the cutoff.
+   * Deletes finished (SUCCEEDED or FAILED) jobs whose last update predates the timeline.
    *
-   * @param updatedBefore cutoff epoch millis
-   * @return rows pruned
+   * @param legacyTimeline cutoff epoch millis; rows updated before this are removed
+   * @return rows deleted
    */
-  public int pruneFinishedBefore(long updatedBefore) {
+  public int deleteFinishedJobsByLegacyTimeline(long legacyTimeline) {
     return SessionUtils.doWithCommitAndFetchResult(
-        IcebergPurgeJobMapper.class, mapper -> mapper.pruneFinishedBefore(updatedBefore));
+        IcebergPurgeJobMapper.class,
+        mapper -> mapper.deleteFinishedJobsByLegacyTimeline(legacyTimeline));
   }
 
   /**

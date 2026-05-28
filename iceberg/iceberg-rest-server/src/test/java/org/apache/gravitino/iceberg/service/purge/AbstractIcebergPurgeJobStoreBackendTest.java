@@ -87,10 +87,10 @@ abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
     Assertions.assertTrue(store.hasActiveJob("cat", "db", "t"));
 
     long now = System.currentTimeMillis();
-    IcebergPurgeJob claimed = store.takePendingJob(now, 300_000L, 10);
-    Assertions.assertNotNull(claimed);
-    Assertions.assertEquals(id, claimed.id());
-    Assertions.assertEquals(ImmutableMap.of("k", "v"), claimed.fileIOProperties());
+    IcebergPurgeJob taken = store.takePendingJob(now, 300_000L, 10);
+    Assertions.assertNotNull(taken);
+    Assertions.assertEquals(id, taken.id());
+    Assertions.assertEquals(ImmutableMap.of("k", "v"), taken.fileIOProperties());
     Assertions.assertEquals(IcebergPurgeJob.State.RUNNING, store.stateOf(id));
     Assertions.assertTrue(store.hasActiveJob("cat", "db", "t"));
     Assertions.assertNull(store.takePendingJob(now, 300_000L, 10));
@@ -98,11 +98,12 @@ abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
     store.markSucceeded(id);
     Assertions.assertEquals(IcebergPurgeJob.State.SUCCEEDED, store.stateOf(id));
     Assertions.assertFalse(store.hasActiveJob("cat", "db", "t"));
-    Assertions.assertEquals(1, store.pruneFinishedBefore(System.currentTimeMillis() + 1));
+    Assertions.assertEquals(
+        1, store.deleteFinishedJobsByLegacyTimeline(System.currentTimeMillis() + 1));
   }
 
   @TestTemplate
-  void testMarkFailedTerminal() {
+  void testMarkFailed() {
     long id = store.addJob(sampleJob());
     store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
     store.markFailed(id, "corrupt metadata");
@@ -123,13 +124,13 @@ abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testHeartbeatCasAndStaleReclaim() {
+  void testHeartbeatCasAndStaleTakeover() {
     long id = store.addJob(sampleJob());
     long t0 = System.currentTimeMillis();
     store.takePendingJob(t0, 300_000L, 10);
     Assertions.assertTrue(store.heartbeat(id, t0, t0 + 1000));
     Assertions.assertFalse(store.heartbeat(id, t0, t0 + 2000));
-    // A stale RUNNING job is reclaimable once its heartbeat ages past the timeout.
+    // A stale RUNNING job can be taken again once its heartbeat ages past the timeout.
     Assertions.assertEquals(id, store.takePendingJob(t0 + 400_000L, 300_000L, 10).id());
   }
 }

@@ -45,10 +45,10 @@ class TestIcebergPurgeJob {
   }
 
   @Test
-  void testTerminalStates() {
-    Assertions.assertTrue(IcebergPurgeJob.State.SUCCEEDED.isTerminal());
-    Assertions.assertTrue(IcebergPurgeJob.State.FAILED.isTerminal());
-    Assertions.assertFalse(IcebergPurgeJob.State.PENDING.isTerminal());
-    Assertions.assertFalse(IcebergPurgeJob.State.RUNNING.isTerminal());
+  void testFinishedStates() {
+    Assertions.assertTrue(IcebergPurgeJob.State.SUCCEEDED.isFinished());
+    Assertions.assertTrue(IcebergPurgeJob.State.FAILED.isFinished());
+    Assertions.assertFalse(IcebergPurgeJob.State.PENDING.isFinished());
+    Assertions.assertFalse(IcebergPurgeJob.State.RUNNING.isFinished());
   }
 }

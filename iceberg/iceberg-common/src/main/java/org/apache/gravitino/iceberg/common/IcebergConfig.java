@@ -353,7 +353,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<Integer> ASYNC_PURGE_HEARTBEAT_TIMEOUT_SECS =
       new ConfigBuilder("async-purge.heartbeat-timeout-secs")
-          .doc("Age in seconds after which a job with no heartbeat is reclaimable.")
+          .doc("Age in seconds after which a stale-heartbeat job can be taken over by a worker.")
           .version(ConfigConstants.VERSION_1_3_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
@@ -369,7 +369,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<Integer> ASYNC_PURGE_RETENTION_HOURS =
       new ConfigBuilder("async-purge.retention-hours")
-          .doc("How long terminal (SUCCEEDED/FAILED) purge rows are retained before pruning.")
+          .doc("How long finished (SUCCEEDED/FAILED) purge rows are retained before pruning.")
           .version(ConfigConstants.VERSION_1_3_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)

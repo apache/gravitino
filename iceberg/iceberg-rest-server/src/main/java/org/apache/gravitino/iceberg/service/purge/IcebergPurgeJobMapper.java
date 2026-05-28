@@ -39,8 +39,8 @@ public interface IcebergPurgeJobMapper {
   @InsertProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "insertPurgeJob")
   void insertPurgeJob(@Param("po") IcebergPurgeJobPO po);
 
-  @SelectProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "selectClaimableIds")
-  List<Long> selectClaimableIds(
+  @SelectProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "selectRunnableJobIds")
+  List<Long> selectRunnableJobIds(
       @Param("staleBefore") long staleBefore, @Param("window") int window);
 
   @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "markRunning")
@@ -50,11 +50,12 @@ public interface IcebergPurgeJobMapper {
   @SelectProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "selectById")
   IcebergPurgeJobPO selectById(@Param("id") long id);
 
-  @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "markSucceeded")
-  int markSucceeded(@Param("id") long id, @Param("now") long now);
-
-  @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "markFailed")
-  int markFailed(@Param("id") long id, @Param("reason") String reason, @Param("now") long now);
+  @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "markFinished")
+  int markFinished(
+      @Param("id") long id,
+      @Param("state") String state,
+      @Param("reason") String reason,
+      @Param("now") long now);
 
   @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "recordFailure")
   int recordFailure(
@@ -73,8 +74,10 @@ public interface IcebergPurgeJobMapper {
       @Param("namespace") String namespace,
       @Param("table") String table);
 
-  @DeleteProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "pruneFinishedBefore")
-  int pruneFinishedBefore(@Param("updatedBefore") long updatedBefore);
+  @DeleteProvider(
+      type = IcebergPurgeJobSQLProviderFactory.class,
+      method = "deleteFinishedJobsByLegacyTimeline")
+  int deleteFinishedJobsByLegacyTimeline(@Param("legacyTimeline") long legacyTimeline);
 
   @SelectProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "selectState")
   String selectState(@Param("id") long id);

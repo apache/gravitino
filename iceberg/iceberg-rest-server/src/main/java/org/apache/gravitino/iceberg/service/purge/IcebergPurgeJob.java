@@ -39,21 +39,21 @@ public class IcebergPurgeJob {
     /** Awaiting a worker; also the state a transiently-failed job returns to. */
     PENDING,
 
-    /** Claimed by a worker that is actively deleting files. */
+    /** Taken by a worker that is actively deleting files. */
     RUNNING,
 
     /** Every reachable file was deleted or already gone. */
     SUCCEEDED,
 
-    /** Retries exhausted or a terminal failure; some files may remain undeleted. */
+    /** Retries exhausted or a non-retryable failure; some files may remain undeleted. */
     FAILED;
 
     /**
-     * Whether this state is terminal.
+     * Whether the job has finished, i.e. reached a final state that a worker no longer acts on.
      *
      * @return {@code true} for {@link #SUCCEEDED} and {@link #FAILED}
      */
-    public boolean isTerminal() {
+    public boolean isFinished() {
       return this == SUCCEEDED || this == FAILED;
     }
   }

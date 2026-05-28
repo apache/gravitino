@@ -58,9 +58,9 @@ public class IcebergPurgeJobSQLProviderFactory {
     return getProvider().insertPurgeJob(po);
   }
 
-  public static String selectClaimableIds(
+  public static String selectRunnableJobIds(
       @Param("staleBefore") long staleBefore, @Param("window") int window) {
-    return getProvider().selectClaimableIds(staleBefore, window);
+    return getProvider().selectRunnableJobIds(staleBefore, window);
   }
 
   public static String markRunning(
@@ -72,13 +72,12 @@ public class IcebergPurgeJobSQLProviderFactory {
     return getProvider().selectById(id);
   }
 
-  public static String markSucceeded(@Param("id") long id, @Param("now") long now) {
-    return getProvider().markSucceeded(id, now);
-  }
-
-  public static String markFailed(
-      @Param("id") long id, @Param("reason") String reason, @Param("now") long now) {
-    return getProvider().markFailed(id, reason, now);
+  public static String markFinished(
+      @Param("id") long id,
+      @Param("state") String state,
+      @Param("reason") String reason,
+      @Param("now") long now) {
+    return getProvider().markFinished(id, state, reason, now);
   }
 
   public static String recordFailure(
@@ -101,8 +100,9 @@ public class IcebergPurgeJobSQLProviderFactory {
     return getProvider().selectActiveJobId(catalog, namespace, table);
   }
 
-  public static String pruneFinishedBefore(@Param("updatedBefore") long updatedBefore) {
-    return getProvider().pruneFinishedBefore(updatedBefore);
+  public static String deleteFinishedJobsByLegacyTimeline(
+      @Param("legacyTimeline") long legacyTimeline) {
+    return getProvider().deleteFinishedJobsByLegacyTimeline(legacyTimeline);
   }
 
   public static String selectState(@Param("id") long id) {
@@ -123,7 +123,12 @@ public class IcebergPurgeJobSQLProviderFactory {
           + " #{po.updatedAt})";
     }
 
-    String selectClaimableIds(@Param("staleBefore") long staleBefore, @Param("window") int window) {
+    String selectRunnableJobIds(
+        @Param("staleBefore") long staleBefore, @Param("window") int window) {
+      // A runnable row is PENDING, or RUNNING whose owner has gone silent. markRunning always
+      // writes a heartbeat, so "heartbeat_at IS NULL" should not arise in normal operation; it is
+      // kept as a guard because "NULL < #{staleBefore}" is UNKNOWN in SQL, which would otherwise
+      // leave a RUNNING row that somehow lost its heartbeat stuck and never picked up again.
       return "SELECT id FROM "
           + TABLE_NAME
           + " WHERE state = 'PENDING'"
@@ -150,19 +155,16 @@ public class IcebergPurgeJobSQLProviderFactory {
           + " WHERE id = #{id}";
     }
 
-    String markSucceeded(@Param("id") long id, @Param("now") long now) {
+    String markFinished(
+        @Param("id") long id,
+        @Param("state") String state,
+        @Param("reason") String reason,
+        @Param("now") long now) {
+      // Shared transition to a final state: SUCCEEDED (reason null) or FAILED (reason set).
       return "UPDATE "
           + TABLE_NAME
-          + " SET state = 'SUCCEEDED', heartbeat_at = NULL, updated_at = #{now}"
-          + " WHERE id = #{id} AND state = 'RUNNING'";
-    }
-
-    String markFailed(
-        @Param("id") long id, @Param("reason") String reason, @Param("now") long now) {
-      return "UPDATE "
-          + TABLE_NAME
-          + " SET state = 'FAILED', last_error = #{reason}, heartbeat_at = NULL, updated_at = #{now}"
-          + " WHERE id = #{id} AND state = 'RUNNING'";
+          + " SET state = #{state}, last_error = #{reason}, heartbeat_at = NULL,"
+          + " updated_at = #{now} WHERE id = #{id} AND state = 'RUNNING'";
     }
 
     String recordFailure(
@@ -201,10 +203,10 @@ public class IcebergPurgeJobSQLProviderFactory {
           + " AND table_name = #{table} AND state IN ('PENDING', 'RUNNING') LIMIT 1";
     }
 
-    String pruneFinishedBefore(@Param("updatedBefore") long updatedBefore) {
+    String deleteFinishedJobsByLegacyTimeline(@Param("legacyTimeline") long legacyTimeline) {
       return "DELETE FROM "
           + TABLE_NAME
-          + " WHERE state IN ('SUCCEEDED', 'FAILED') AND updated_at < #{updatedBefore}";
+          + " WHERE state IN ('SUCCEEDED', 'FAILED') AND updated_at < #{legacyTimeline}";
     }
 
     String selectState(@Param("id") long id) {
