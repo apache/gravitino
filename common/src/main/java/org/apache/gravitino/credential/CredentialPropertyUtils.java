@@ -51,7 +51,9 @@ public class CredentialPropertyUtils {
 
   // GCS Iceberg property names
   @VisibleForTesting static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
-  private static final String GCS_OAUTH_2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+
+  @VisibleForTesting
+  static final String ICEBERG_GCS_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
 
   // ADLS Iceberg property names
   @VisibleForTesting static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
@@ -65,9 +67,8 @@ public class CredentialPropertyUtils {
   @VisibleForTesting
   static final String ICEBERG_ADLS_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
 
-  private static final Map<String, String> icebergCredentialPropertyMap =
+  private static final Map<String, String> ICEBERG_S3_CREDENTIAL_PROPERTY_MAP =
       ImmutableMap.<String, String>builder()
-          // S3 secret key and session token (including IRSA)
           .put(S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
           .put(
               S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
@@ -76,21 +77,36 @@ public class CredentialPropertyUtils {
           .put(AwsIrsaCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
           .put(AwsIrsaCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
           .put(AwsIrsaCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
-          // OSS session token (static keys share Gravitino property names with token)
+          .build();
+
+  private static final Map<String, String> ICEBERG_OSS_CREDENTIAL_PROPERTY_MAP =
+      ImmutableMap.<String, String>builder()
           .put(OSSTokenCredential.GRAVITINO_OSS_TOKEN, ICEBERG_OSS_SECURITY_TOKEN)
           .put(OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID, ICEBERG_OSS_ACCESS_KEY_ID)
           .put(
               OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY,
               ICEBERG_OSS_ACCESS_KEY_SECRET)
-          // GCS token
-          .put(GCSTokenCredential.GCS_TOKEN_NAME, ICEBERG_GCS_TOKEN)
-          // ADLS account key
+          .build();
+
+  private static final Map<String, String> ICEBERG_GCS_CREDENTIAL_PROPERTY_MAP =
+      ImmutableMap.of(GCSTokenCredential.GCS_TOKEN_NAME, ICEBERG_GCS_TOKEN);
+
+  private static final Map<String, String> ICEBERG_ADLS_CREDENTIAL_PROPERTY_MAP =
+      ImmutableMap.<String, String>builder()
           .put(
               AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
               ICEBERG_ADLS_ACCOUNT_NAME)
           .put(
               AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
               ICEBERG_ADLS_ACCOUNT_KEY)
+          .build();
+
+  private static final Map<String, String> icebergCredentialPropertyMap =
+      ImmutableMap.<String, String>builder()
+          .putAll(ICEBERG_S3_CREDENTIAL_PROPERTY_MAP)
+          .putAll(ICEBERG_OSS_CREDENTIAL_PROPERTY_MAP)
+          .putAll(ICEBERG_GCS_CREDENTIAL_PROPERTY_MAP)
+          .putAll(ICEBERG_ADLS_CREDENTIAL_PROPERTY_MAP)
           .build();
 
   /**
@@ -106,7 +122,6 @@ public class CredentialPropertyUtils {
           ICEBERG_S3_TOKEN_EXPIRES_AT_MS,
           credential.expireTimeInMs());
     }
-
     if (credential instanceof S3SecretKeyCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
@@ -117,7 +132,6 @@ public class CredentialPropertyUtils {
           ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS,
           credential.expireTimeInMs());
     }
-
     if (credential instanceof OSSSecretKeyCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
@@ -125,14 +139,13 @@ public class CredentialPropertyUtils {
     if (credential instanceof GCSTokenCredential) {
       return withExpireAt(
           transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap),
-          GCS_OAUTH_2_TOKEN_EXPIRES_AT,
+          ICEBERG_GCS_TOKEN_EXPIRES_AT,
           credential.expireTimeInMs());
     }
 
     if (credential instanceof ADLSTokenCredential) {
       return toAdlsTokenProperties((ADLSTokenCredential) credential);
     }
-
     if (credential instanceof AzureAccountKeyCredential) {
       return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
     }
@@ -175,7 +188,7 @@ public class CredentialPropertyUtils {
     Set<String> credentialPropertyKeys = Sets.newHashSet(icebergCredentialPropertyMap.values());
     credentialPropertyKeys.add(ICEBERG_S3_TOKEN_EXPIRES_AT_MS);
     credentialPropertyKeys.add(ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS);
-    credentialPropertyKeys.add(GCS_OAUTH_2_TOKEN_EXPIRES_AT);
+    credentialPropertyKeys.add(ICEBERG_GCS_TOKEN_EXPIRES_AT);
     Map<String, String> filteredProperties = Maps.newHashMap(properties);
     filteredProperties
         .entrySet()
