@@ -50,32 +50,29 @@ Before you call `/api/idp/*`, ensure the following:
       gravitino.authorization.serviceAdmins = admin
       ```
 
-   2. **Initialize service admin passwords at startup** — Before the first start, export
-      `GRAVITINO_INITIAL_ADMIN_PASSWORD` with the initial password plaintext. Usernames come from
-      `gravitino.authorization.serviceAdmins`; the environment variable supplies only the password,
-      which must satisfy the [password rules](#password-and-username-rules) below.
+   2. **Initialize service admin passwords at startup** — Before the first start, set
+      `GRAVITINO_INITIAL_ADMIN_PASSWORD` to the initial password. Usernames come from
+      `gravitino.authorization.serviceAdmins`. The value must satisfy the
+      [password rules](#password-and-username-rules) below.
 
       ```shell
       export GRAVITINO_INITIAL_ADMIN_PASSWORD='Passw0rd-Admin12'
       ```
 
-   3. **Start or restart Gravitino** so the initialization runs.
+   3. **Start or restart Gravitino**.
 
-   4. **Call APIs with built-in IDP credentials** — Use HTTP Basic authentication with the service
-      admin username and the password you initialized (for example `admin` /
-      `Passw0rd-Admin12`). `IdpAuthorizationFilter` still requires the authenticated principal to be
-      listed in `gravitino.authorization.serviceAdmins`.
+   4. **Call management APIs** — Use HTTP Basic authentication with a service admin username and
+      password (for example `admin` / `Passw0rd-Admin12`).
 
 ---
 
 ## Configuration
 
-In addition to [Prerequisites](#prerequisites) step 1 (`gravitino.server.rest.extensionPackages`),
-configure authorization and service admins in `gravitino.conf`:
+Set authorization and service admins in `gravitino.conf` (see also [Prerequisites](#prerequisites)):
 
 | Configuration item                      | Description                              | Example |
 |-----------------------------------------|------------------------------------------|---------|
-| `gravitino.authorization.enable`        | Enable authorization for service admins  | `true`  |
+| `gravitino.authorization.enable`        | Enable Gravitino authorization           | `true`  |
 | `gravitino.authorization.serviceAdmins` | Usernames allowed to manage `/api/idp/*` | `admin` |
 
 Example:
@@ -91,15 +88,8 @@ gravitino.authorization.serviceAdmins = admin
 ## Operations
 
 The following sections show how to call built-in IDP management APIs with `curl`. Replace
-`localhost:8090`, usernames, and passwords with values that match your deployment.
-
-### Before you call the APIs
-
-Complete [Prerequisites](#prerequisites) first, including service admin password initialization.
-
-**Authentication** — Send HTTP Basic credentials for a service admin whose password exists in
-`idp_user_meta`. The examples below use `admin` / `Passw0rd-Admin12` (the same values as in the
-`GRAVITINO_INITIAL_ADMIN_PASSWORD` example above).
+`localhost:8090`, usernames, and passwords with values that match your deployment. Examples use HTTP
+Basic with `admin` / `Passw0rd-Admin12` (from [Prerequisites](#prerequisites)).
 
 **Base URL** — `http://<host>:<port>/api/idp`
 
@@ -120,14 +110,12 @@ curl -s -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### Password and username rules
 
-Add-user, change-password, and `GRAVITINO_INITIAL_ADMIN_PASSWORD` are validated by
-`IdpCredentialValidator`:
+Password rules apply to add-user, change-password, and `GRAVITINO_INITIAL_ADMIN_PASSWORD`:
 
-| Rule             | Value                                                |
-|------------------|------------------------------------------------------|
-| Username         | Required; must **not** contain `:`                   |
-| Password length  | 12–64 characters (inclusive)                         |
-| Password storage | Argon2id PHC string in `idp_user_meta.password_hash` |
+| Rule            | Value                              |
+|-----------------|------------------------------------|
+| Username        | Required; must **not** contain `:` |
+| Password length | 12–64 characters (inclusive)       |
 
 Password reset is **admin-only** (request body has `password` only; no `oldPassword`).
 
