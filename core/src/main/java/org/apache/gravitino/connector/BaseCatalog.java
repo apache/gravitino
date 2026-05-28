@@ -509,7 +509,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   protected boolean shouldBackfillCredential() {
     Config serverConfig = GravitinoEnv.getInstance().config();
     return serverConfig != null
-        && serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES);
+        && Boolean.TRUE.equals(serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES));
   }
 
   @Evolving
