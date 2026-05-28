@@ -40,15 +40,14 @@ fully enabled production path.
 
 ## Prerequisites
 
-1. **Gravitino server** with **relational** entity store (`gravitino.entity.store = relational`).
-2. **Database schema** that includes the IdP tables. For MySQL/PostgreSQL, run the appropriate
+1. **Database schema** that includes the IdP tables. For MySQL/PostgreSQL, run the appropriate
    upgrade script under `${GRAVITINO_HOME}/scripts/` (for example
    `scripts/mysql/upgrade-1.2.0-to-1.3.0-mysql.sql` creates `idp_user_meta`, `idp_group_meta`, and
    `idp_user_group_rel`). See [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
-3. **Plugin JARs** in `${GRAVITINO_HOME}/libs/`:
+2. **Plugin JARs** in `${GRAVITINO_HOME}/libs/`:
    - `gravitino-idp-basic-*.jar` (from `./gradlew :plugins:idp-basic:copyLibAndConfigs`)
    - `bcprov-jdk18on-*.jar` (Argon2id dependency; copied by the same task)
-4. **Authorization enabled** with at least one **service admin** if you call management APIs
+3. **Authorization enabled** with at least one **service admin** if you call management APIs
    (see [Access control](./security/access-control.md)).
 
 ---
