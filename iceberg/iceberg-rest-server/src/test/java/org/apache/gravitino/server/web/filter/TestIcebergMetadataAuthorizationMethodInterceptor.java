@@ -193,7 +193,9 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
             "testTableOperation", String.class, String.class, String.class);
     Parameter[] parameters = testMethod.getParameters();
 
-    String encodedNamespace = IcebergRESTUtils.encodeNamespace(Namespace.of("A", "B", "C"));
+    String encodedNamespace =
+        RESTUtil.encodeNamespace(
+            Namespace.of("A", "B", "C"), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
 
     Config mockConfig = Mockito.mock(Config.class);
@@ -223,7 +225,9 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
             "testTableOperation", String.class, String.class, String.class);
     Parameter[] parameters = testMethod.getParameters();
 
-    String encodedNamespace = IcebergRESTUtils.encodeNamespace(Namespace.of("my_schema"));
+    String encodedNamespace =
+        RESTUtil.encodeNamespace(
+            Namespace.of("my_schema"), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     Object[] args = new Object[] {TEST_CATALOG + "/", encodedNamespace, "my_table"};
 
     Config mockConfig = Mockito.mock(Config.class);

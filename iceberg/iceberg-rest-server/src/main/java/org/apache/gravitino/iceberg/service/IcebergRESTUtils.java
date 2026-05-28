@@ -56,9 +56,8 @@ public class IcebergRESTUtils {
   /**
    * URL-encoded UTF-8 namespace separator ({@code 0x1F}) required by the Iceberg REST catalog spec.
    *
-   * <p>Iceberg 1.11 allows a configurable separator in {@link RESTUtil#encodeNamespace} and {@link
-   * RESTUtil#decodeNamespace}; use this value so encoding and decoding stay aligned with the wire
-   * format used in existing deployments and tests.
+   * <p>Iceberg 1.11 allows a configurable separator in {@link RESTUtil#decodeNamespace}; use this
+   * value so decoding stays aligned with the wire format used in existing deployments and tests.
    */
   public static final String NAMESPACE_SEPARATOR_URLENCODED_UTF_8 = "%1F";
 
@@ -83,16 +82,6 @@ public class IcebergRESTUtils {
   }
 
   private IcebergRESTUtils() {}
-
-  /**
-   * Encodes a namespace for use as a URL path or query parameter per the Iceberg REST catalog spec.
-   *
-   * @param namespace the namespace to encode
-   * @return the encoded namespace string
-   */
-  public static String encodeNamespace(Namespace namespace) {
-    return RESTUtil.encodeNamespace(namespace, NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
-  }
 
   public static <T> Response ok(T t) {
     return Response.status(Response.Status.OK).entity(t).type(MediaType.APPLICATION_JSON).build();

@@ -497,7 +497,7 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     String path =
         IcebergRestTestUtil.NAMESPACE_PATH
             + "/"
-            + IcebergRESTUtils.encodeNamespace(ns)
+            + RESTUtil.encodeNamespace(ns, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8)
             + "/tables/"
             + name;
     Map<String, String> queryParams = ImmutableMap.of("snapshots", snapshots);

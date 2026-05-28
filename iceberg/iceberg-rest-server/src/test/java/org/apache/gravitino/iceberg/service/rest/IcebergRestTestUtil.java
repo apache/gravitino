@@ -55,6 +55,7 @@ import org.apache.gravitino.iceberg.service.provider.StaticIcebergConfigProvider
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.rest.RESTUtil;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.logging.LoggingFeature;
@@ -74,7 +75,11 @@ public class IcebergRestTestUtil {
       Namespace.of("gravitino-test-2", "nested");
 
   public static final String VIEW_PATH =
-      NAMESPACE_PATH + "/" + IcebergRESTUtils.encodeNamespace(TEST_NAMESPACE_NAME) + "/views";
+      NAMESPACE_PATH
+          + "/"
+          + RESTUtil.encodeNamespace(
+              TEST_NAMESPACE_NAME, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8)
+          + "/views";
   public static final String RENAME_TABLE_PATH = V_1 + "/tables/rename";
 
   public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";
