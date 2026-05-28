@@ -29,6 +29,9 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Implementation of an Apache Iceberg catalog in Apache Gravitino. */
@@ -111,5 +114,15 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
       }
     }
     addStorageCredentialProviders(properties, credentialProviders);
+  }
+
+  @Override
+  protected List<String> hiddenCredentialKeys() {
+    return List.of(
+        IcebergConstants.GRAVITINO_JDBC_USER,
+        IcebergConstants.GRAVITINO_JDBC_PASSWORD,
+        S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+        OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+        AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
   }
 }

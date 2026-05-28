@@ -25,6 +25,7 @@ import com.google.common.collect.Maps;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -458,19 +459,30 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         }
       }
     }
-    if (!shouldBackfillCredential()) {
+    List<String> keys = hiddenCredentialKeys();
+    if (keys.isEmpty() || !shouldBackfillCredential()) {
       return properties;
     }
+    Map<String, String> rawProps = entity().getProperties();
     Map<String, String> result = Maps.newHashMap(properties);
-    entity()
-        .getProperties()
-        .forEach(
-            (k, v) -> {
-              if (catalogPropertiesMetadata().isHiddenProperty(k)) {
-                result.put(k, v);
-              }
-            });
+    for (String key : keys) {
+      String value = rawProps.get(key);
+      if (value != null) {
+        result.put(key, value);
+      }
+    }
     return result;
+  }
+
+  /**
+   * Returns the list of hidden credential property keys to backfill into {@link #properties()} when
+   * server-level credential backfill is enabled. The default returns an empty list. Subclasses
+   * override this to declare their specific credential keys.
+   *
+   * @return list of credential property keys to backfill
+   */
+  protected List<String> hiddenCredentialKeys() {
+    return Collections.emptyList();
   }
 
   /**

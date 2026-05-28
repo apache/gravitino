@@ -18,11 +18,15 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 
 /** Implementation of an Apache Hive catalog in Apache Gravitino. */
 public class HiveCatalog extends BaseCatalog<HiveCatalog> {
@@ -76,5 +80,13 @@ public class HiveCatalog extends BaseCatalog<HiveCatalog> {
   @Override
   public PropertiesMetadata tablePropertiesMetadata() throws UnsupportedOperationException {
     return TABLE_PROPERTIES_METADATA;
+  }
+
+  @Override
+  protected List<String> hiddenCredentialKeys() {
+    return List.of(
+        S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+        OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+        AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
   }
 }
