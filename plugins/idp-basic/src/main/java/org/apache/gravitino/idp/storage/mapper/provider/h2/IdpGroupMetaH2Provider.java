@@ -32,12 +32,7 @@ public class IdpGroupMetaH2Provider extends IdpGroupMetaBaseSQLProvider {
   public String selectIdpGroupWithUsers(@Param("groupName") String groupName) {
     return "SELECT g.group_name as name,"
         + " '['"
-        + " || COALESCE(GROUP_CONCAT("
-        + " CASE"
-        + " WHEN u.user_name IS NOT NULL AND u.user_name <> ''"
-        + " THEN '\"' || u.user_name || '\"'"
-        + " ELSE NULL"
-        + " END), '')"
+        + " || COALESCE(GROUP_CONCAT('\"' || u.user_name || '\"'), '')"
         + " || ']' as usernames"
         + " FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME

@@ -39,6 +39,7 @@ public class IdpUser {
    */
   public IdpUser(String name, List<String> groupNames) {
     this.name = name;
+    this.passwordHash = null;
     this.groupNames = groupNames;
   }
 

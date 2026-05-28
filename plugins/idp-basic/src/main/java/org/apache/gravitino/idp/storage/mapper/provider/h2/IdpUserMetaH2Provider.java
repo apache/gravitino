@@ -32,12 +32,7 @@ public class IdpUserMetaH2Provider extends IdpUserMetaBaseSQLProvider {
   public String selectIdpUserWithGroups(@Param("username") String username) {
     return "SELECT u.user_name as name, u.password_hash as passwordHash,"
         + " '['"
-        + " || COALESCE(GROUP_CONCAT("
-        + " CASE"
-        + " WHEN g.group_name IS NOT NULL AND g.group_name <> ''"
-        + " THEN '\"' || g.group_name || '\"'"
-        + " ELSE NULL"
-        + " END), '')"
+        + " || COALESCE(GROUP_CONCAT('\"' || g.group_name || '\"'), '')"
         + " || ']' as groupNames"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME

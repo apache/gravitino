@@ -30,7 +30,7 @@ public class IdpGroupMetaPostgreSQLProvider extends IdpGroupMetaBaseSQLProvider 
   @Override
   public String selectIdpGroupWithUsers(@Param("groupName") String groupName) {
     return "SELECT g.group_name as name,"
-        + " COALESCE(JSON_AGG(u.user_name) FILTER (WHERE u.user_name IS NOT NULL), '[]'::json) as usernames"
+        + " COALESCE(JSON_AGG(u.user_name), '[]'::json) as usernames"
         + " FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g LEFT JOIN "
