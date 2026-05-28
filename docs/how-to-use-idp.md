@@ -45,17 +45,17 @@ Before you call `/api/idp/*`, ensure the following:
       ```
 
    2. **Initialize service admin passwords at startup** — Before the first start, export
-      `GRAVITINO_INITIAL_ADMIN_PASSWORD`. The value is a JSON array of `username:password` entries.
-      Each username must appear in `gravitino.authorization.serviceAdmins`, and each password must
-      satisfy the [password rules](#password-and-username-rules) below.
+      `GRAVITINO_INITIAL_ADMIN_PASSWORD` with the initial password plaintext. Usernames come from
+      `gravitino.authorization.serviceAdmins`; the environment variable supplies only the password,
+      which must satisfy the [password rules](#password-and-username-rules) below.
 
       ```shell
-      export GRAVITINO_INITIAL_ADMIN_PASSWORD='["admin:Passw0rd-Admin12"]'
+      export GRAVITINO_INITIAL_ADMIN_PASSWORD='Passw0rd-Admin12'
       ```
 
-      On startup, Gravitino hashes these passwords into `idp_user_meta` for service admins that do
-      not already have a stored password. If a configured service admin has no password in the store
-      and this variable is not set, startup fails. See
+      On startup, Gravitino hashes this password into `idp_user_meta` for each configured service
+      admin that does not already have a stored password. If any service admin has no password in the
+      store and this variable is not set, startup fails. See
       [Design of local authentication support](../design-docs/gravitino-local-authentication.md) §6
       for the full initialization rules.
 
@@ -122,7 +122,7 @@ curl -s -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### Password and username rules
 
-Add-user, change-password, and `GRAVITINO_INITIAL_ADMIN_PASSWORD` entries are validated by
+Add-user, change-password, and `GRAVITINO_INITIAL_ADMIN_PASSWORD` are validated by
 `IdpCredentialValidator`:
 
 | Rule | Value |

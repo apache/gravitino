@@ -288,11 +288,9 @@ After Gravitino is installed, the operator should configure:
 
 - `gravitino.authorization.serviceAdmins`, which remains the source of truth for service admin
   usernames
-- `GRAVITINO_INITIAL_ADMIN_PASSWORD`, a JSON array of `username:password` strings used only when a
-  configured service admin does not already have a password configured in the gravitino
-
-Each username in `GRAVITINO_INITIAL_ADMIN_PASSWORD` should match a user configured in
-`gravitino.authorization.serviceAdmins`.
+- `GRAVITINO_INITIAL_ADMIN_PASSWORD`, the initial password plaintext used when a configured service
+  admin does not already have a password stored in `idp_user_meta`. Usernames come from
+  `gravitino.authorization.serviceAdmins`; the environment variable supplies only the password.
 
 ### 6.2 Initialization Process
 
@@ -303,22 +301,18 @@ The initialization process should be:
 2. If `basic` authentication is enabled for the first startup, set the
    `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable when any configured service admin does
    not yet have a password configured in the gravitino.
-3. Parse `GRAVITINO_INITIAL_ADMIN_PASSWORD` as a JSON array of `username:password` strings.
-4. Validate the input before writing anything to the database:
-   - the value must be valid JSON
-   - every entry must use the format `username:password`
-   - the service admin name must not contain a colon (`:`)
-   - the password must satisfy the local authentication password policy
-5. Connect to the configured JDBC backend during Gravitino startup.
-6. For each user configured in `gravitino.authorization.serviceAdmins`, check whether that service
-   admin already has a password configured in the gravitino.
-7. If the service admin already has a password configured, continue startup without modifying the
+3. Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD` before writing anything to the database. The password
+   must satisfy the local authentication password policy.
+4. Connect to the configured JDBC backend during Gravitino startup.
+5. For each user configured in `gravitino.authorization.serviceAdmins`, check whether that service
+   admin already has a password stored in `idp_user_meta`.
+6. If the service admin already has a password configured, continue startup without modifying the
    stored password.
-8. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is configured and the service admin does not yet have a
-   password configured in the gravitino, hash the supplied password with Argon2id and initialize that
-   service admin account.
-9. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is not configured and any configured service admin does not
-   yet have a password configured in the gravitino, fail startup immediately and prompt the user to
+7. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is configured and the service admin does not yet have a
+   password stored in `idp_user_meta`, hash the supplied password with Argon2id and create that
+   service admin account in `idp_user_meta`.
+8. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is not configured and any configured service admin does not
+   yet have a password stored in `idp_user_meta`, fail startup immediately and prompt the user to
    declare `GRAVITINO_INITIAL_ADMIN_PASSWORD`.
 
 This design keeps the first-use flow explicit while avoiding any built-in default credential. The
@@ -337,17 +331,17 @@ fresh Gravitino deployment.
    gravitino.authorization.serviceAdmins=admin1,admin2
    ```
 
-2. Export the initial service admin passwords before starting Gravitino:
+2. Export the initial service admin password before starting Gravitino:
 
    ```bash
-   export GRAVITINO_INITIAL_ADMIN_PASSWORD='["admin1:passwordForAdmin1","admin2:passwordForAdmin2"]'
+   export GRAVITINO_INITIAL_ADMIN_PASSWORD='passwordForServiceAdmins'
    ```
 
 3. Start Gravitino.
 
-4. During startup, Gravitino validates the JSON payload, initializes passwords only for service
-   admins that do not yet have one configured in the gravitino, and leaves existing service admin
-   passwords unchanged.
+4. During startup, Gravitino validates the password, applies it to each username in
+   `gravitino.authorization.serviceAdmins` that does not yet have a stored password, and leaves
+   existing service admin passwords unchanged.
 
 ---
 
