@@ -29,6 +29,7 @@ import org.apache.gravitino.catalog.glue.GlueConstants;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.aws.glue.GlueCatalog;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,6 +87,8 @@ public class GluePropertiesConverter implements PropertiesConverter {
 
   /** Gravitino catalog property key for a custom AWS Glue endpoint URL. */
   public static final String AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
+
+  private static final String SPARK_PROVIDER_ICEBERG = "iceberg";
 
   /** Maps Gravitino property keys to Spark HiveTableCatalog property keys. */
   private static final Map<String, String> GRAVITINO_TO_SPARK_KEYS =
@@ -184,8 +187,8 @@ public class GluePropertiesConverter implements PropertiesConverter {
   @Override
   public Map<String, String> toGravitinoTableProperties(Map<String, String> properties) {
     HashMap<String, String> all = new HashMap<>(properties);
-    String provider = all.remove("provider");
-    if ("iceberg".equalsIgnoreCase(provider)) {
+    String provider = all.remove(TableCatalog.PROP_PROVIDER);
+    if (SPARK_PROVIDER_ICEBERG.equalsIgnoreCase(provider)) {
       all.put(GlueConstants.TABLE_FORMAT, GlueConstants.TABLE_FORMAT_ICEBERG);
     }
     return all;
