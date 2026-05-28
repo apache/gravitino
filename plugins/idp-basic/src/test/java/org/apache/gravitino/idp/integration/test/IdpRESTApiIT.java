@@ -21,11 +21,15 @@ package org.apache.gravitino.idp.integration.test;
 import static org.apache.gravitino.integration.test.util.BaseIT.setEnv;
 
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +46,7 @@ import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -73,6 +78,7 @@ public class IdpRESTApiIT extends BaseIT {
   @BeforeAll
   public void startIntegrationTest() throws Exception {
     setEnv(IdpRESTFeature.INITIAL_ADMIN_PASSWORD_ENV, ADMIN_PASSWORD);
+    ensureDeployInitialAdminPasswordInDistributionEnv();
     Map<String, String> configs = Maps.newHashMap();
     configs.put(Configs.ENABLE_AUTHORIZATION.getKey(), String.valueOf(false));
     configs.put(Configs.CACHE_ENABLED.getKey(), String.valueOf(false));
@@ -83,6 +89,29 @@ public class IdpRESTApiIT extends BaseIT {
     registerCustomConfigs(configs);
     super.startIntegrationTest();
     apiBase = serverUri + "/api";
+  }
+
+  private static void ensureDeployInitialAdminPasswordInDistributionEnv() throws IOException {
+    if (!ITUtils.DEPLOY_TEST_MODE.equals(System.getProperty(ITUtils.TEST_MODE))) {
+      return;
+    }
+    String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    if (StringUtils.isBlank(gravitinoHome)) {
+      return;
+    }
+    Path envFile = Paths.get(gravitinoHome, "conf", "gravitino-env.sh");
+    String exportLine =
+        "export GRAVITINO_INITIAL_ADMIN_PASSWORD='" + ADMIN_PASSWORD.replace("'", "'\\''") + "'";
+    String existing =
+        Files.exists(envFile) ? Files.readString(envFile, StandardCharsets.UTF_8) : "";
+    if (existing.contains("GRAVITINO_INITIAL_ADMIN_PASSWORD")) {
+      return;
+    }
+    String separator = existing.endsWith(System.lineSeparator()) ? "" : System.lineSeparator();
+    Files.writeString(
+        envFile,
+        existing + separator + exportLine + System.lineSeparator(),
+        StandardCharsets.UTF_8);
   }
 
   @Test

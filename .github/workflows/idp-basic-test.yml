@@ -79,6 +79,7 @@ jobs:
         id: integrationTest
         env:
           dockerTest: true
+          GRAVITINO_INITIAL_ADMIN_PASSWORD: Passw0rd-For-Admin1
         run: |
           IDP_IT_TESTS="org.apache.gravitino.idp.integration.test.**"
 
@@ -109,5 +110,7 @@ jobs:
           path: |
             plugins/idp-basic/build/reports
             plugins/idp-basic/build/test-results
+            distribution/package-all/logs/gravitino-server.out
+            distribution/package-all/logs/gravitino-server.log
             distribution/package/logs/gravitino-server.out
             distribution/package/logs/gravitino-server.log
