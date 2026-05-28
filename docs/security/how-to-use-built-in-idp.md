@@ -217,5 +217,4 @@ For full request and response definitions, see the [Built-in IDP OpenAPI](../ope
 ## Further reading
 
 - [Built-in IDP OpenAPI](../open-api/idp/openapi.yaml) — API paths, bodies, and schemas
-- [Design of local authentication support](../design-docs/gravitino-local-authentication.md) — service admin initialization and authentication flows
 - [How to use HTTPS](how-to-use-https.md) — transport security for credentials
