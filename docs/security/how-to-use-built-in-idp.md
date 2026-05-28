@@ -61,9 +61,9 @@ Before you call `/api/idp/*`, ensure the following:
 
 Set service admins in `gravitino.conf` (see also [Prerequisites](#prerequisites)):
 
-| Configuration item                      | Description                              | Example |
-|-----------------------------------------|------------------------------------------|---------|
-| `gravitino.authorization.serviceAdmins` | Comma-separated service admin usernames that can call built-in IDP management APIs | `admin` |
+| Configuration item                      | Description                                                                         | Example |
+|-----------------------------------------|-------------------------------------------------------------------------------------|---------|
+| `gravitino.authorization.serviceAdmins` | Comma-separated service admin that can call built-in IDP management APIs          | `admin` |
 
 Example:
 

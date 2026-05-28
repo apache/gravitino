@@ -394,10 +394,10 @@ credentials are otherwise exposed on the wire.
 
 ### 8.1 Built-in IDP settings
 
-| Key | Value | Required when using built-in IDP |
-|-----|--------|----------------------------------|
-| `gravitino.server.rest.extensionPackages` | `org.apache.gravitino.idp.web.rest.feature` | Yes |
-| `gravitino.authorization.serviceAdmins` | Comma-separated service admin usernames | Yes |
+| Key                                         | Value                                           | Required when using built-in IDP |
+|---------------------------------------------|-------------------------------------------------|----------------------------------|
+| `gravitino.server.rest.extensionPackages`   | `org.apache.gravitino.idp.web.rest.feature`     | Yes                              |
+| `gravitino.authorization.serviceAdmins`     | Comma-separated service admin                   | Yes                              |
 
 List `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages` so
 Jersey registers `/api/idp/*` management APIs. Callers must use Basic authentication with a username
