@@ -13,13 +13,62 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage [Hologres](https://help.aliyun.com/zh/hologres) metadata.
-
-Hologres is a real-time data warehouse service provided by Alibaba Cloud, designed for high-concurrency and low-latency online analytical processing (OLAP). Hologres is fully compatible with the PostgreSQL protocol and uses the PostgreSQL JDBC Driver for connections.
+The Hologres catalog enables Apache Gravitino to manage [Hologres](https://help.aliyun.com/zh/hologres) metadata. Hologres is Alibaba Cloud's real-time data warehouse service designed for high-concurrency, low-latency OLAP. Hologres is PostgreSQL-protocol compatible and connects through the PostgreSQL JDBC driver. Use the catalog when you want a single Gravitino-managed access surface that covers Hologres alongside other relational, lakehouse, and fileset catalogs.
 
 :::caution
 Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
 :::
+
+### Requirements and Limitations
+
+- **PostgreSQL JDBC driver required.** Hologres uses the PostgreSQL JDBC driver (`org.postgresql.Driver`). Place version 42.3.2 or higher in `catalogs/jdbc-hologres/libs` on the Gravitino server. Gravitino does not bundle the driver.
+- **One Hologres database per catalog.** The `jdbc-database` property is required. A Gravitino schema maps to a Hologres (PostgreSQL) schema inside that database.
+- **System schemas filtered.** The following system schemas are hidden from `listSchemas`: `pg_toast`, `pg_catalog`, `information_schema`, `hologres`, `hg_internal`, `hg_recyclebin`, `hologres_object_table`, `hologres_sample`, `hologres_streaming_mv`, `hologres_statistic`.
+- **Authentication.** Connect with either an AccessKey ID and Secret or a database username and password through `jdbc-user` and `jdbc-password`.
+- **LIST partitioning is supported.** Both physical and logical Hologres partition tables can be created through Gravitino.
+- **Hologres-specific table properties.** The `orientation`, `clustering_key`, `distribution_key`, and other Hologres WITH-clause properties are accepted as Gravitino table properties.
+- **No auto-increment columns.**
+- **No schema properties.** Hologres schemas do not accept Gravitino-managed schema properties.
+
+## Quick Start
+
+Create a minimum-viable Hologres catalog and confirm it is reachable. The example assumes a Gravitino server at `http://localhost:8090`, a metalake named `test`, and a Hologres instance at the endpoint shown. Substitute the actual Hologres endpoint, database name, and credentials for your deployment.
+
+### Create the Catalog
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "hologres_catalog",
+    "type": "RELATIONAL",
+    "comment": "Hologres catalog",
+    "provider": "jdbc-hologres",
+    "properties": {
+      "jdbc-url": "jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database",
+      "jdbc-driver": "org.postgresql.Driver",
+      "jdbc-database": "my_database",
+      "jdbc-user": "<accesskey-id-or-user>",
+      "jdbc-password": "<accesskey-secret-or-password>"
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs
+```
+
+### Verify the Catalog
+
+```bash
+# List catalogs in the metalake. hologres_catalog should appear.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs" | jq
+
+# Load the catalog directly and inspect its properties.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/hologres_catalog" | jq
+
+# List schemas. System schemas are filtered out; the response typically includes at least `public`.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/hologres_catalog/schemas" | jq
+```
+
+**Success check:** the catalog-list response includes `hologres_catalog`, the load-catalog response shows `"provider":"jdbc-hologres"` with the configured `jdbc-url` and `jdbc-database`, and the schema-list response includes at least the `public` schema. If the schema-list call returns a connection error, verify the `jdbc-url`, `jdbc-database`, `jdbc-user`, and `jdbc-password` values, and confirm the PostgreSQL JDBC driver is present in `catalogs/jdbc-hologres/libs` on the Gravitino server.
 
 ## Catalog
 
@@ -67,7 +116,9 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 ### Schema Capabilities
 
-A Gravitino schema corresponds to a Hologres (PostgreSQL) schema. The Hologres catalog supports creating schemas with comments and dropping schemas. The following system schemas are automatically filtered out: `pg_toast`, `pg_catalog`, `information_schema`, `hologres`, `hg_internal`, `hg_recyclebin`, `hologres_object_table`, `hologres_sample`, `hologres_streaming_mv`, and `hologres_statistic`.
+- A Gravitino schema corresponds to a Hologres (PostgreSQL) schema in the configured database.
+- Supports creating schemas with comments.
+- Supports dropping schemas.
 
 ### Schema Properties
 

@@ -13,12 +13,59 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino provides the ability to manage [StarRocks](https://www.starrocks.io/) metadata through JDBC connection.
+The StarRocks catalog enables Apache Gravitino to manage [StarRocks](https://www.starrocks.io/) metadata through a JDBC connection, including databases (mapped to Gravitino schemas), tables, columns, and column-level defaults. Use it when you want a single Gravitino-managed access surface that covers StarRocks alongside other relational, lakehouse, and fileset catalogs.
 
 :::caution
 Gravitino saves some system information in table comments, like
 `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
 :::
+
+### Requirements and Limitations
+
+- **Supported StarRocks versions:** 3.3.x.
+- **JDBC driver required.** StarRocks uses the MySQL JDBC driver. Place the driver in `catalogs/jdbc-starrocks/libs` on the Gravitino server. Use `mysql-connector-java-8.0.16` or higher to get accurate datetime precision values; see [Driver Version Compatibility](#driver-version-compatibility) below.
+- **One StarRocks instance per catalog.** A Gravitino schema maps to a StarRocks database on the instance.
+- **No schema properties.** StarRocks does not expose schema properties after they are set, so the catalog does not accept them.
+- **Column defaults are supported.** Table indexes and other table-level features are not exposed through Gravitino.
+
+## Quick Start
+
+Create a minimum-viable StarRocks catalog and confirm it is reachable. The example assumes a Gravitino server at `http://localhost:8090`, a metalake named `test`, and a StarRocks instance with the MySQL-compatible frontend at `localhost:9030`. Adjust the values for your environment.
+
+### Create the Catalog
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "starrocks_catalog",
+    "type": "RELATIONAL",
+    "comment": "StarRocks catalog",
+    "provider": "jdbc-starrocks",
+    "properties": {
+      "jdbc-url": "jdbc:mysql://localhost:9030",
+      "jdbc-driver": "com.mysql.cj.jdbc.Driver",
+      "jdbc-user": "<your-user>",
+      "jdbc-password": "<your-password>"
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs
+```
+
+### Verify the Catalog
+
+```bash
+# List catalogs in the metalake. starrocks_catalog should appear.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs" | jq
+
+# Load the catalog directly and inspect its properties.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/starrocks_catalog" | jq
+
+# List schemas (StarRocks databases). The response includes at least `information_schema`.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/starrocks_catalog/schemas" | jq
+```
+
+**Success check:** the catalog-list response includes `starrocks_catalog`, the load-catalog response shows `"provider":"jdbc-starrocks"` with the configured `jdbc-url`, and the schema-list response includes at least the `information_schema` database. If the schema-list call returns a connection error, verify the `jdbc-url`, `jdbc-user`, and `jdbc-password` values, and confirm the MySQL JDBC driver is present in `catalogs/jdbc-starrocks/libs` on the Gravitino server.
 
 ## Catalog
 
@@ -56,28 +103,20 @@ Gravitino doesn't package the JDBC driver for StarRocks due to licensing issues.
 
 ### Driver Version Compatibility
 
-The StarRocks catalog includes driver version compatibility checks for datetime precision calculation:
+Datetime precision calculation for `DATETIME(p)` columns depends on the MySQL Connector/J driver version:
 
-- **MySQL Connector/J versions >= 8.0.16**: Full support for datetime precision calculation
-- **MySQL Connector/J versions < 8.0.16**: Limited support - datetime precision calculation returns `null` with a warning log
+- **MySQL Connector/J 8.0.16 and later:** Full support. Precision is read from the driver and round-trips correctly through Gravitino.
+- **MySQL Connector/J earlier than 8.0.16:** Limited support. Gravitino logs a warning and returns `null` for the precision value rather than risk reporting an incorrect one. All other catalog operations continue to work; only the reported precision for the `DATETIME(p)` type above is affected.
 
-This limitation affects the following datetime types:
-- `DATETIME(p)` - datetime precision
+Use `mysql-connector-java-8.0.16` or higher to avoid the limitation.
 
-When using an unsupported driver version, the system will:
-1. Continue to work normally with default precision (0)
-2. Log a warning message indicating the driver version limitation
-3. Return `null` for precision calculations to avoid incorrect results
+Example warning log:
 
-**Example warning log:**
 ```
-WARN: MySQL driver version mysql-connector-java-8.0.11 is below 8.0.16, 
-columnSize may not be accurate for precision calculation. 
+WARN: MySQL driver version mysql-connector-java-8.0.11 is below 8.0.16,
+columnSize may not be accurate for precision calculation.
 Returning null for DATETIME type precision. Driver version: mysql-connector-java-8.0.11
 ```
-
-**Recommended driver versions:**
-- `mysql-connector-java-8.0.16` or higher
 
 ### Catalog Operations
 
@@ -102,7 +141,9 @@ Refer to
 
 ### Table Capabilities
 
-A Gravitino table corresponds to a StarRocks table and supports [column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- A Gravitino table corresponds to a StarRocks table in the configured database.
+- Supports DDL operations on StarRocks tables.
+- Supports [column default values](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
 
 #### Table Column Types
 
