@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.credential;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -33,38 +32,26 @@ import java.util.Set;
 public class CredentialPropertyUtils {
 
   // S3 / AWS Iceberg property names
-  @VisibleForTesting static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
-  @VisibleForTesting static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
-  @VisibleForTesting static final String ICEBERG_S3_TOKEN = "s3.session-token";
-
-  @VisibleForTesting
+  static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
+  static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
+  static final String ICEBERG_S3_TOKEN = "s3.session-token";
   static final String ICEBERG_S3_TOKEN_EXPIRES_AT_MS = "s3.session-token-expires-at-ms";
 
   // OSS Iceberg property names
-  @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
-  @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
-  @VisibleForTesting static final String ICEBERG_OSS_SECURITY_TOKEN = "client.security-token";
-
-  @VisibleForTesting
+  static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
+  static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
+  static final String ICEBERG_OSS_SECURITY_TOKEN = "client.security-token";
   static final String ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS =
       "client.security-token-expires-at-ms";
 
   // GCS Iceberg property names
-  @VisibleForTesting static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
-
-  @VisibleForTesting
+  static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
   static final String ICEBERG_GCS_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
 
   // ADLS Iceberg property names
-  @VisibleForTesting static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
-
-  @VisibleForTesting
+  static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
   static final String ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX = "adls.sas-token-expires-at-ms.";
-
-  @VisibleForTesting
   static final String ICEBERG_ADLS_ACCOUNT_NAME = "adls.auth.shared-key.account.name";
-
-  @VisibleForTesting
   static final String ICEBERG_ADLS_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
 
   private static final Map<String, String> ICEBERG_S3_CREDENTIAL_PROPERTY_MAP =
