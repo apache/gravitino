@@ -52,9 +52,9 @@ class View(Auditable, ABC):
         return {}
 
     @abstractmethod
-    def view_definition(self) -> Optional[str]:
-        """Get the SQL definition of the view.
+    def representations(self) -> list[dict]:
+        """Get the view representations.
 
         Returns:
-            Optional[str]: The view definition.
+            list[dict]: The view representations.
         """

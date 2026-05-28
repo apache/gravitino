@@ -80,7 +80,7 @@ class ViewCatalog(ABC):
         identifier: NameIdentifier,
         comment: Optional[str] = None,
         properties: Optional[dict[str, str]] = None,
-        view_definition: Optional[str] = None,
+        representations: Optional[list[dict]] = None,
     ) -> View:
         """Create a view in the catalog.
 
