@@ -313,6 +313,8 @@ fun excludePackagesForSparkConnector(project: Project) {
   }
 }
 
+val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
+
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
@@ -328,6 +330,12 @@ subprojects {
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
+
+  // Force upgrade commons-beanutils for all subprojects to resolve outdated transitive versions
+  // pulled by Hadoop, Hive, Spark, Flink, etc.
+  configurations.all {
+    resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
+  }
 
   repositories {
     mavenCentral()
