@@ -120,7 +120,7 @@ If you need to debug the Gravitino server, enable the `GRAVITINO_DEBUG_OPTS` env
 
 ### Run the Iceberg REST Server
 
-Run the Iceberg REST server as either a standalone server or as an auxiliary service embedded in the Gravitino server. To start it as a standalone server, use the command `./bin/gravitino-iceberg-rest-server.sh start` with configurations specified in `./conf/gravitino-iceberg-rest-server.conf`. Alternatively, use `./bin/gravitino.sh start` to launch a Gravitino server that integrates both the Iceberg REST service and the Gravitino service, with all configurations centralized in `conf/gravitino.conf`. 
+Run the Iceberg REST server in any of the three deployment modes documented in [Iceberg REST Catalog Service > Deployment Modes](./iceberg-rest-service.md#deployment-modes). For Governed IRC (the recommended mode), start the Gravitino server itself with `./bin/gravitino.sh start`; the Iceberg REST service runs inside the Gravitino JVM as an auxiliary service, with all configurations centralized in `conf/gravitino.conf`. For Ungoverned IRC or Bare IRC, start the standalone IRC process with `./bin/gravitino-iceberg-rest-server.sh start`; configurations live in `./conf/gravitino-iceberg-rest-server.conf`.
 
 For more detailed information about the Gravitino Iceberg REST server, refer to [Iceberg REST server document](./iceberg-rest-service.md).
 
