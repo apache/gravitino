@@ -17,8 +17,6 @@ store is acceptable; restrict management APIs to **service admins**, store passw
 and prefer [HTTPS](how-to-use-https.md) when credentials travel over the network.
 
 This guide describes how to enable and operate the management APIs in `plugins:idp-basic`. For
-design background, see
-[Design of local authentication support](../design-docs/gravitino-local-authentication.md). For
 request and response schemas, see the [Built-in IDP OpenAPI](../open-api/idp/openapi.yaml).
 
 ---
