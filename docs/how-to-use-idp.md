@@ -66,10 +66,10 @@ Before you call `/api/idp/*`, ensure the following:
 
 Add the following to `gravitino.conf` to expose built-in IDP management REST APIs:
 
-| Configuration item | Description | Example |
-|--------------------|-------------|---------|
-| `gravitino.server.rest.extensionPackages` | Jersey package that discovers `IdpRESTFeature` | `org.apache.gravitino.idp.web.rest.feature` |
-| `gravitino.authorization.serviceAdmins` | Usernames allowed to manage `/api/idp/*` | `admin` |
+| Configuration item                        | Description                                    | Example                                             |
+|-------------------------------------------|------------------------------------------------|-----------------------------------------------------|
+| `gravitino.server.rest.extensionPackages` | Jersey package that discovers `IdpRESTFeature` | `org.apache.gravitino.idp.web.rest.feature`         |
+| `gravitino.authorization.serviceAdmins`   | Usernames allowed to manage `/api/idp/*`       | `admin`                                             |
 
 Example:
 
@@ -101,9 +101,9 @@ Complete [Prerequisites](#prerequisites) first, including service admin password
 
 **Common headers**
 
-| Header | Value |
-|--------|--------|
-| `Accept` | `application/vnd.gravitino.v1+json` |
+| Header         | Value                                        |
+|----------------|----------------------------------------------|
+| `Accept`       | `application/vnd.gravitino.v1+json`          |
 | `Content-Type` | `application/json` (for POST and PUT bodies) |
 
 Example:
@@ -119,11 +119,11 @@ curl -s -H "Accept: application/vnd.gravitino.v1+json" \
 Add-user, change-password, and `GRAVITINO_INITIAL_ADMIN_PASSWORD` are validated by
 `IdpCredentialValidator`:
 
-| Rule | Value |
-|------|--------|
-| Username | Required; must **not** contain `:` |
-| Password length | 12–64 characters (inclusive) |
-| Password storage | Argon2id PHC string in `idp_user_meta.password_hash` |
+| Rule             | Value                                                  |
+|------------------|--------------------------------------------------------|
+| Username         | Required; must **not** contain `:`                       |
+| Password length  | 12–64 characters (inclusive)                           |
+| Password storage | Argon2id PHC string in `idp_user_meta.password_hash`   |
 
 Password reset is **admin-only** (request body has `password` only; no `oldPassword`).
 
