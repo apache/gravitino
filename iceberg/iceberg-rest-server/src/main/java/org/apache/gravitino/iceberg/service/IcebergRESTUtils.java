@@ -57,10 +57,10 @@ public class IcebergRESTUtils {
    * URL-encoded UTF-8 namespace separator ({@code 0x1F}) required by the Iceberg REST catalog spec.
    *
    * <p>Iceberg 1.11 allows a configurable separator in {@link RESTUtil#encodeNamespace} and {@link
-   * RESTUtil#decodeNamespace}; Gravitino passes this value explicitly so server-side decoding and
-   * client-side encoding stay aligned with the wire format used in existing deployments and tests.
+   * RESTUtil#decodeNamespace}; use this value so encoding and decoding stay aligned with the wire
+   * format used in existing deployments and tests.
    */
-  private static final String NAMESPACE_SEPARATOR_URLENCODED_UTF_8 = "%1F";
+  public static final String NAMESPACE_SEPARATOR_URLENCODED_UTF_8 = "%1F";
 
   public static final String SNAPSHOT_ALL = "all";
 
@@ -83,16 +83,6 @@ public class IcebergRESTUtils {
   }
 
   private IcebergRESTUtils() {}
-
-  /**
-   * Decodes a URL path or query parameter into an Iceberg {@link Namespace}.
-   *
-   * @param encodedNamespace the encoded namespace from the REST request
-   * @return the decoded namespace
-   */
-  public static Namespace decodeNamespace(String encodedNamespace) {
-    return RESTUtil.decodeNamespace(encodedNamespace, NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
-  }
 
   /**
    * Encodes a namespace for use as a URL path or query parameter per the Iceberg REST catalog spec.

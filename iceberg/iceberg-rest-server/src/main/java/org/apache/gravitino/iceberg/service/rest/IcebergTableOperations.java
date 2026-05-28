@@ -125,7 +125,7 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info("List Iceberg tables, catalog: {}, namespace: {}", catalogName, icebergNS);
     try {
       return Utils.doAs(
@@ -167,7 +167,7 @@ public class IcebergTableOperations {
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     LOG.info(
         "Create Iceberg table, catalog: {}, namespace: {}, create table request: {}, "
             + "accessDelegation: {}, isCredentialVending: {}",
@@ -210,7 +210,7 @@ public class IcebergTableOperations {
           String table,
       UpdateTableRequest updateTableRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     if (LOG.isInfoEnabled()) {
       LOG.info(
@@ -255,7 +255,7 @@ public class IcebergTableOperations {
           String table,
       @DefaultValue("false") @QueryParam("purgeRequested") boolean purgeRequested) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Drop Iceberg table, catalog: {}, namespace: {}, table: {}, purgeRequested: {}",
@@ -297,7 +297,7 @@ public class IcebergTableOperations {
       @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
       @HeaderParam(IF_NONE_MATCH) String ifNoneMatch) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     boolean isCredentialVending = isCredentialVending(accessDelegation);
     LOG.info(
@@ -363,7 +363,7 @@ public class IcebergTableOperations {
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Check Iceberg table exists, catalog: {}, namespace: {}, table: {}",
@@ -400,7 +400,7 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("table") String table,
       ReportMetricsRequest request) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Report Iceberg table metrics, catalog: {}, namespace: {}, table: {}",
@@ -458,7 +458,7 @@ public class IcebergTableOperations {
           String namespace,
       @AuthorizationMetadata(type = EntityType.TABLE) @Encoded() @PathParam("table") String table) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Get Iceberg table credentials, catalog: {}, namespace: {}, table: {}",
@@ -513,7 +513,7 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
       PlanTableScanRequest scanRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
-    Namespace icebergNS = IcebergRESTUtils.decodeNamespace(namespace);
+    Namespace icebergNS = RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
         "Plan table scan, catalog: {}, namespace: {}, table: {}",

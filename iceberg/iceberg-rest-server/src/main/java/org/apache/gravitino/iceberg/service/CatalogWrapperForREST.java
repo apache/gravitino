@@ -472,7 +472,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             tableIdentifier);
       }
 
-      PlanTableScanResponse response = buildCompletedPlanTableScanResponse(fileScanTasksList);
+      PlanTableScanResponse response =
+          buildCompletedPlanTableScanResponse(table, fileScanTasksList);
 
       // Cache the scan plan response
       scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
@@ -494,14 +495,17 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   /**
    * Builds a synchronous COMPLETED scan plan response for Iceberg 1.11+ REST clients only.
    *
-   * <p>Populates {@code file-scan-tasks} and does not populate legacy {@code plan-tasks}, which is
-   * incompatible with pre-1.11 REST clients that deserialize scan tasks from JSON strings.
+   * <p>Matches {@link CatalogHandlers#planTableScan}: {@code file-scan-tasks} plus {@code
+   * specs-by-id} from {@link Table#specs()}. Does not populate legacy {@code plan-tasks} JSON
+   * strings.
    */
+  @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
-      List<FileScanTask> fileScanTasks) {
+      Table table, List<FileScanTask> fileScanTasks) {
     return PlanTableScanResponse.builder()
         .withPlanStatus(PlanStatus.COMPLETED)
         .withFileScanTasks(fileScanTasks)
+        .withSpecsById(table.specs())
         .build();
   }
 
