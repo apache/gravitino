@@ -21,11 +21,13 @@ package org.apache.gravitino.spark.connector.glue;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.aws.glue.GlueCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +46,7 @@ public class GluePropertiesConverter implements PropertiesConverter {
   private static final Logger LOG = LoggerFactory.getLogger(GluePropertiesConverter.class);
 
   /** Iceberg GlueCatalog implementation class name, set as {@code catalog-impl}. */
-  public static final String GLUE_CATALOG_IMPL = "org.apache.iceberg.aws.glue.GlueCatalog";
+  public static final String GLUE_CATALOG_IMPL = GlueCatalog.class.getName();
 
   /** Iceberg property key for the AWS Glue catalog ID (account-level catalog). */
   public static final String GLUE_ID = "glue.id";
@@ -84,6 +86,20 @@ public class GluePropertiesConverter implements PropertiesConverter {
   /** Gravitino catalog property key for a custom AWS Glue endpoint URL. */
   public static final String AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
 
+  /** Maps Gravitino property keys to Spark HiveTableCatalog property keys. */
+  private static final Map<String, String> GRAVITINO_TO_SPARK_KEYS =
+      ImmutableMap.of(
+          AWS_REGION, "aws.region",
+          AWS_GLUE_CATALOG_ID, "aws.glue.catalog.id",
+          AWS_GLUE_ENDPOINT, "aws.glue.endpoint");
+
+  /** Maps Gravitino property keys to Iceberg GlueCatalog property keys. */
+  private static final Map<String, String> GRAVITINO_TO_ICEBERG_KEYS =
+      ImmutableMap.of(
+          AWS_REGION, CLIENT_REGION,
+          AWS_GLUE_CATALOG_ID, GLUE_ID,
+          AWS_GLUE_ENDPOINT, GLUE_ENDPOINT);
+
   private static class GluePropertiesConverterHolder {
     private static final GluePropertiesConverter INSTANCE = new GluePropertiesConverter();
   }
@@ -109,18 +125,13 @@ public class GluePropertiesConverter implements PropertiesConverter {
   public Map<String, String> toSparkCatalogProperties(Map<String, String> properties) {
     Preconditions.checkArgument(properties != null, "Glue Catalog properties should not be null");
     HashMap<String, String> all = new HashMap<>();
-    String region = properties.get(AWS_REGION);
-    if (StringUtils.isNotBlank(region)) {
-      all.put("aws.region", region);
-    }
-    String catalogId = properties.get(AWS_GLUE_CATALOG_ID);
-    if (StringUtils.isNotBlank(catalogId)) {
-      all.put("aws.glue.catalog.id", catalogId);
-    }
-    String endpoint = properties.get(AWS_GLUE_ENDPOINT);
-    if (StringUtils.isNotBlank(endpoint)) {
-      all.put("aws.glue.endpoint", endpoint);
-    }
+    GRAVITINO_TO_SPARK_KEYS.forEach(
+        (gravitinoKey, sparkKey) -> {
+          String value = properties.get(gravitinoKey);
+          if (StringUtils.isNotBlank(value)) {
+            all.put(sparkKey, value);
+          }
+        });
     return all;
   }
 
@@ -144,18 +155,13 @@ public class GluePropertiesConverter implements PropertiesConverter {
     Preconditions.checkArgument(properties != null, "Glue Catalog properties should not be null");
     HashMap<String, String> all = new HashMap<>();
     all.put(CatalogProperties.CATALOG_IMPL, GLUE_CATALOG_IMPL);
-    String region = properties.get(AWS_REGION);
-    if (StringUtils.isNotBlank(region)) {
-      all.put(CLIENT_REGION, region);
-    }
-    String catalogId = properties.get(AWS_GLUE_CATALOG_ID);
-    if (StringUtils.isNotBlank(catalogId)) {
-      all.put(GLUE_ID, catalogId);
-    }
-    String endpoint = properties.get(AWS_GLUE_ENDPOINT);
-    if (StringUtils.isNotBlank(endpoint)) {
-      all.put(GLUE_ENDPOINT, endpoint);
-    }
+    GRAVITINO_TO_ICEBERG_KEYS.forEach(
+        (gravitinoKey, icebergKey) -> {
+          String value = properties.get(gravitinoKey);
+          if (StringUtils.isNotBlank(value)) {
+            all.put(icebergKey, value);
+          }
+        });
     String accessKey = properties.get(AWS_ACCESS_KEY_ID);
     String secretKey = properties.get(AWS_SECRET_ACCESS_KEY);
     if (StringUtils.isNotBlank(accessKey) && StringUtils.isNotBlank(secretKey)) {
