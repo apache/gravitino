@@ -1,6 +1,6 @@
 ---
 title: How to use built-in IDP (local authentication)
-slug: /how-to-use-idp
+slug: /how-to-use-built-in-idp
 license: "This software is licensed under the Apache License version 2."
 ---
 
