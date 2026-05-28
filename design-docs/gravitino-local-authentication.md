@@ -532,17 +532,6 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/idp/users/alice
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "user": {
-    "name": "alice",
-    "groups": ["engineering", "devops"]
-  }
-}
-```
 
 #### 9.1.2 Add a local user
 
@@ -559,17 +548,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/idp/users
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "user": {
-    "name": "alice",
-    "groups": []
-  }
-}
-```
 
 #### 9.1.3 Remove a local user
 
@@ -583,14 +561,6 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/idp/users/alice
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "removed": true
-}
-```
 
 #### 9.1.4 Reset a local user password
 
@@ -606,17 +576,6 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/idp/users/alice
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "user": {
-    "name": "alice",
-    "groups": ["engineering", "devops"]
-  }
-}
-```
 
 The password reset API follows these rules:
 
@@ -645,17 +604,6 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/idp/groups/engineering
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "group": {
-    "name": "engineering",
-    "users": ["alice", "bob"]
-  }
-}
-```
 
 #### 9.1.6 Add a local group
 
@@ -670,17 +618,6 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/idp/groups
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "group": {
-    "name": "engineering",
-    "users": []
-  }
-}
-```
 
 #### 9.1.7 Remove a local group
 
@@ -697,14 +634,6 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 'http://localhost:8090/api/idp/groups/engineering?force=true'
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "removed": true
-}
-```
 
 #### 9.1.8 Change local group membership
 
@@ -721,17 +650,6 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/idp/groups/engineering/users
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "group": {
-    "name": "engineering",
-    "users": ["alice", "bob"]
-  }
-}
-```
 
 ---
 
