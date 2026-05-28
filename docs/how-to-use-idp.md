@@ -44,8 +44,7 @@ Before you call `/api/idp/*`, ensure the following:
       gravitino.authorization.serviceAdmins = admin
       ```
 
-   2. **Initialize service admin passwords at startup** — Before the first start (or before the
-      first start after adding a new service admin without an `idp_user_meta` record), export
+   2. **Initialize service admin passwords at startup** — Before the first start, export
       `GRAVITINO_INITIAL_ADMIN_PASSWORD`. The value is a JSON array of `username:password` entries.
       Each username must appear in `gravitino.authorization.serviceAdmins`, and each password must
       satisfy the [password rules](#password-and-username-rules) below.
