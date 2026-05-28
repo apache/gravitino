@@ -44,8 +44,7 @@ Before you call `/api/idp/*`, ensure the following:
       gravitino.authorization.serviceAdmins = admin
       ```
 
-   2. Complete [Configuration](#configuration) (including `basic` in `gravitino.authenticators` and
-      `gravitino.server.rest.extensionPackages`), then restart Gravitino.
+   2. Complete [Configuration](#configuration), then restart Gravitino.
 
    3. **Call APIs as the service admin** — Use a configured authenticator (for example **simple**)
       with a username that matches `gravitino.authorization.serviceAdmins`. With simple mode, send
@@ -87,9 +86,8 @@ gravitino.server.rest.extensionPackages = org.apache.gravitino.idp.web.rest.feat
 gravitino.authorization.serviceAdmins = admin
 ```
 
-`IdpRESTFeature` registers `/api/idp/*` only when `basic` is included in `gravitino.authenticators`
-**and** `org.apache.gravitino.idp.web.rest.feature` is listed in
-`gravitino.server.rest.extensionPackages`. If `basic` is absent, those routes are not registered.
+`IdpRESTFeature` registers `/api/idp/*` when `org.apache.gravitino.idp.web.rest.feature` is listed in
+`gravitino.server.rest.extensionPackages`.
 
 General authentication settings (`simple`, `oauth`, `kerberos`, and related keys) are documented in
 [How to authenticate](./security/how-to-authenticate.md).
