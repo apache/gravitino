@@ -17,7 +17,7 @@ Gravitino has supported the following security features:
 
 ### [Authentication](how-to-authenticate.md)
 
-### [Built-in IDP (local authentication)](how-to-use-built-in-idp.md)
+### [Built-in IDP](how-to-use-built-in-idp.md)
 
 ### [HTTPS](how-to-use-https.md)
 

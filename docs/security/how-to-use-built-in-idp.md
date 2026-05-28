@@ -1,5 +1,5 @@
 ---
-title: How to use built-in IDP (local authentication)
+title: How to use built-in IDP
 slug: /security/how-to-use-built-in-idp
 keyword: security authentication idp
 license: "This software is licensed under the Apache License version 2."
