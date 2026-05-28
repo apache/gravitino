@@ -46,7 +46,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true' && needs.changes.outputs.module_exists == 'true'
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -55,6 +55,17 @@ jobs:
           java-version: 17
           distribution: "temurin"
           cache: "gradle"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+
+      - name: Check required command
+        run: |
+          dev/ci/check_commands.sh
+
+      - name: Package Gravitino
+        run: |
+          ./gradlew compileDistribution -PskipWeb=true -x test
 
       - name: Free up disk space
         run: |
@@ -65,23 +76,38 @@ jobs:
           ./gradlew :plugins:idp-basic:test -PskipITs -PskipDockerTests=true -PskipWeb=true
 
       - name: Run idp-basic REST API integration tests
+        id: integrationTest
         env:
           dockerTest: true
         run: |
-          for backend in h2 mysql postgresql; do
+          IDP_IT_TESTS="org.apache.gravitino.idp.integration.test.**"
+
+          run_idp_it() {
             ./gradlew :plugins:idp-basic:test \
-              -PtestMode=embedded \
-              -PjdbcBackend="${backend}" \
+              -PtestMode="$1" \
+              -PjdbcBackend="$2" \
               -PskipDockerTests=false \
               -PskipWeb=true \
-              --tests "org.apache.gravitino.idp.integration.test.IdpRESTApiIT"
+              --tests "${IDP_IT_TESTS}"
+          }
+
+          # embedded: all JDBC backends; deploy: MySQL/PostgreSQL only (same as access-control IT).
+          for spec in \
+            embedded:h2 \
+            embedded:mysql \
+            embedded:postgresql \
+            deploy:mysql \
+            deploy:postgresql; do
+            run_idp_it "${spec%%:*}" "${spec#*:}"
           done
 
       - name: Upload idp-basic test reports
         uses: actions/upload-artifact@v7
-        if: failure()
+        if: ${{ (failure() && steps.integrationTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: idp-basic-test-reports
           path: |
             plugins/idp-basic/build/reports
             plugins/idp-basic/build/test-results
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
