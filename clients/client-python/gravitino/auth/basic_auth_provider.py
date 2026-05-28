@@ -25,17 +25,15 @@ from gravitino.exceptions.base import IllegalArgumentException
 class BasicAuthProvider(AuthDataProvider):
     """Provides HTTP Basic credentials for Gravitino built-in IdP authentication."""
 
+    _token: bytes
+
     def __init__(self, username: str, password: str):
         if username is None or not username.strip():
             raise IllegalArgumentException("username can't be blank")
         if password is None or not password.strip():
             raise IllegalArgumentException("password can't be blank")
 
-        user_information = f"{username}:{password}"
-        self._token = (
-            AuthConstants.AUTHORIZATION_BASIC_HEADER
-            + base64.b64encode(user_information.encode("utf-8")).decode("utf-8")
-        ).encode("utf-8")
+        self._token = self._build_basic_auth_token(username, password)
 
     def has_token_data(self) -> bool:
         return True
@@ -45,3 +43,14 @@ class BasicAuthProvider(AuthDataProvider):
 
     def close(self):
         pass
+
+    @staticmethod
+    def _build_basic_auth_token(username: str, password: str) -> bytes:
+        credentials = f"{username}:{password}"
+        encoded_credentials = base64.b64encode(credentials.encode("utf-8")).decode(
+            "utf-8"
+        )
+        authorization_header = (
+            AuthConstants.AUTHORIZATION_BASIC_HEADER + encoded_credentials
+        )
+        return authorization_header.encode("utf-8")
