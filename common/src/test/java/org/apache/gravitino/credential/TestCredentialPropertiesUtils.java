@@ -38,7 +38,9 @@ public class TestCredentialPropertiesUtils {
             CredentialPropertyUtils.ICEBERG_S3_SECRET_ACCESS_KEY,
             "secret",
             CredentialPropertyUtils.ICEBERG_S3_TOKEN,
-            "token");
+            "token",
+            CredentialPropertyUtils.ICEBERG_S3_TOKEN_EXPIRES_AT_MS,
+            "100");
     Assertions.assertEquals(expectedProperties, icebergProperties);
 
     S3SecretKeyCredential secretKeyCredential = new S3SecretKeyCredential("key", "secret");
@@ -65,7 +67,9 @@ public class TestCredentialPropertiesUtils {
             CredentialPropertyUtils.ICEBERG_OSS_ACCESS_KEY_SECRET,
             "secret",
             CredentialPropertyUtils.ICEBERG_OSS_SECURITY_TOKEN,
-            "security-token");
+            "security-token",
+            CredentialPropertyUtils.ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS,
+            "100");
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }
 
@@ -87,7 +91,27 @@ public class TestCredentialPropertiesUtils {
             storageAccountName,
             ADLSTokenCredential.ADLS_DOMAIN);
 
-    Map<String, String> expectedProperties = ImmutableMap.of(sasTokenKey, sasToken);
+    Map<String, String> expectedProperties =
+        ImmutableMap.of(
+            sasTokenKey,
+            sasToken,
+            CredentialPropertyUtils.ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX
+                + storageAccountName,
+            String.valueOf(expireTimeInMS));
+    Assertions.assertEquals(expectedProperties, icebergProperties);
+  }
+
+  @Test
+  void testToIcebergPropertiesForGcsToken() {
+    GCSTokenCredential gcsTokenCredential = new GCSTokenCredential("gcs-token", 200);
+    Map<String, String> icebergProperties =
+        CredentialPropertyUtils.toIcebergProperties(gcsTokenCredential);
+    Map<String, String> expectedProperties =
+        ImmutableMap.of(
+            CredentialPropertyUtils.ICEBERG_GCS_TOKEN,
+            "gcs-token",
+            "gcs.oauth2.token-expires-at",
+            "200");
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }
 }

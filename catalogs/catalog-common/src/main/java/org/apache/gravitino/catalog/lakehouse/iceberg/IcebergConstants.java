@@ -49,8 +49,29 @@ public class IcebergConstants {
   public static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
   public static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
   public static final String ICEBERG_S3_TOKEN = "s3.session-token";
+  public static final String ICEBERG_S3_TOKEN_EXPIRES_AT_MS = "s3.session-token-expires-at-ms";
   public static final String ICEBERG_S3_PATH_STYLE_ACCESS = "s3.path-style-access";
   public static final String AWS_S3_REGION = "client.region";
+
+  // Vended credential refresh (Iceberg 1.11 REST catalog / FileIO property names)
+  /** S3 and OSS: {@code client.refresh-credentials-endpoint}. */
+  public static final String CLIENT_REFRESH_CREDENTIALS_ENDPOINT =
+      "client.refresh-credentials-endpoint";
+
+  /** GCS OAuth2 token expiry: {@code gcs.oauth2.token-expires-at}. */
+  public static final String GCS_OAUTH2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+
+  /** GCS refresh endpoint: {@code gcs.oauth2.refresh-credentials-endpoint}. */
+  public static final String GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
+      "gcs.oauth2.refresh-credentials-endpoint";
+
+  /** ADLS refresh endpoint: {@code adls.refresh-credentials-endpoint}. */
+  public static final String ADLS_REFRESH_CREDENTIALS_ENDPOINT =
+      "adls.refresh-credentials-endpoint";
+
+  /** OSS STS token expiry: {@code client.security-token-expires-at-ms}. */
+  public static final String ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS =
+      "client.security-token-expires-at-ms";
 
   public static final String ICEBERG_OSS_ENDPOINT = "oss.endpoint";
   public static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";

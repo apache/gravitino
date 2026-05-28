@@ -36,6 +36,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -96,6 +97,7 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private static final String FORMAT_VERSION = "format-version";
+  private final String catalogName;
   private final CatalogCredentialManager catalogCredentialManager;
 
   private volatile Map<String, String> catalogConfigToClients;
@@ -106,6 +108,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
   private static final Schema EMPTY_SCHEMA = new Schema();
+  private static final String CLIENT_CREDENTIALS_PROVIDER_PREFIX = "client.credentials-provider.";
 
   private static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
@@ -126,6 +129,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   public CatalogWrapperForREST(String catalogName, IcebergConfig config) {
     super(config);
+    this.catalogName = catalogName;
     // To be compatible with old properties
     Map<String, String> catalogProperties =
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
@@ -201,23 +205,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
       Credential credential = getCredential(loadTableResponse, privilege);
-      org.apache.iceberg.rest.credentials.Credential icebergCredential =
-          new org.apache.iceberg.rest.credentials.Credential() {
-            @Override
-            public String prefix() {
-              return "";
-            }
-
-            @Override
-            public Map<String, String> config() {
-              // Convert Gravitino credentials to the Iceberg REST credential payload format.
-              return CredentialPropertyUtils.toIcebergProperties(credential);
-            }
-
-            @Override
-            public void validate() {}
-          };
-      return ImmutableLoadCredentialsResponse.builder().addCredentials(icebergCredential).build();
+      return ImmutableLoadCredentialsResponse.builder()
+          .addCredentials(
+              IcebergVendedCredentials.toRestCredential(
+                  catalogName, identifier, credential, loadTableResponse.tableMetadata()))
+          .build();
     } catch (ServiceUnavailableException e) {
       LOG.warn("Service unavailable when loading table credentials for table: {}", identifier, e);
       return ImmutableLoadCredentialsResponse.builder().build();
@@ -278,7 +270,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
 
     Map<String, String> filtered =
-        MapUtils.getFilteredMap(sourceProps, key -> catalogPropertiesToClientKeys.contains(key));
+        MapUtils.getFilteredMap(sourceProps, key -> shouldExposeCatalogProperty((String) key));
     filtered = new HashMap<>(filtered);
     validateAndNormalizeDataAccessProperty(filtered);
 
@@ -327,7 +319,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     // Merge temporary credential fields as Iceberg client config entries in the load-table
     // response.
-    Map<String, String> credentialConfig = CredentialPropertyUtils.toIcebergProperties(credential);
+    Map<String, String> credentialConfig =
+        IcebergVendedCredentials.toClientConfig(catalogName, tableIdentifier, credential);
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
         .addAllConfig(loadTableResponse.config())
@@ -338,7 +331,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
   private Credential getCredential(
       LoadTableResponse loadTableResponse, CredentialPrivilege privilege) {
-    TableMetadata tableMetadata = loadTableResponse.tableMetadata();
+    return getCredential(loadTableResponse.tableMetadata(), privilege);
+  }
+
+  private Credential getCredential(TableMetadata tableMetadata, CredentialPrivilege privilege) {
     String[] path =
         Stream.of(
                 tableMetadata.location(),
@@ -419,9 +415,10 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    *
    * <p>Implementation uses synchronous scan planning (COMPLETED status) and returns structured
    * {@code file-scan-tasks} per the Iceberg 1.11 REST spec. It does not emit legacy {@code
-   * plan-tasks} JSON strings, so clients built for Iceberg &lt; 1.11 are not supported. This is
-   * different from asynchronous mode (SUBMITTED status) where a plan ID is returned for later
-   * retrieval.
+   * plan-tasks} JSON strings, so clients built for Iceberg &lt; 1.11 are not supported. The
+   * completed response also includes a plan ID and any read credentials needed to refresh
+   * plan-scoped storage access. This is different from asynchronous mode (SUBMITTED status) where a
+   * plan ID is returned for later retrieval.
    *
    * <p>Referenced from Iceberg PR #13400 for scan planning implementation.
    *
@@ -473,7 +470,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       }
 
       PlanTableScanResponse response =
-          buildCompletedPlanTableScanResponse(table, fileScanTasksList);
+          buildCompletedPlanTableScanResponse(tableIdentifier, table, fileScanTasksList);
 
       // Cache the scan plan response
       scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
@@ -500,13 +497,21 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * strings.
    */
   @SuppressWarnings("deprecation")
-  private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
-      Table table, List<FileScanTask> fileScanTasks) {
-    return PlanTableScanResponse.builder()
-        .withPlanStatus(PlanStatus.COMPLETED)
-        .withFileScanTasks(fileScanTasks)
-        .withSpecsById(table.specs())
-        .build();
+  private PlanTableScanResponse buildCompletedPlanTableScanResponse(
+      TableIdentifier tableIdentifier, Table table, List<FileScanTask> fileScanTasks) {
+    PlanTableScanResponse.Builder responseBuilder =
+        PlanTableScanResponse.builder()
+            .withPlanStatus(PlanStatus.COMPLETED)
+            .withPlanId(newPlanId())
+            .withFileScanTasks(fileScanTasks)
+            .withSpecsById(table.specs());
+
+    List<org.apache.iceberg.rest.credentials.Credential> credentials =
+        planTableScanCredentials(tableIdentifier, table);
+    if (!credentials.isEmpty()) {
+      responseBuilder.withCredentials(credentials);
+    }
+    return responseBuilder.build();
   }
 
   /**
@@ -520,7 +525,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * @param scanRequest The scan request parameters
    * @return CloseableIterable of FileScanTask
    */
-  private CloseableIterable<FileScanTask> createFilePlanScanTasks(
+  @VisibleForTesting
+  protected CloseableIterable<FileScanTask> createFilePlanScanTasks(
       Table table, TableIdentifier tableIdentifier, PlanTableScanRequest scanRequest) {
     Long startSnapshotId = scanRequest.startSnapshotId();
     Long endSnapshotId = scanRequest.endSnapshotId();
@@ -674,8 +680,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return LoadTableResponse.builder()
           .withTableMetadata(((BaseTable) table).operations().current())
           .addAllConfig(
-              MapUtils.getFilteredMap(
-                  properties, key -> catalogPropertiesToClientKeys.contains(key)))
+              MapUtils.getFilteredMap(properties, key -> shouldExposeCatalogProperty((String) key)))
           // Keep only credential fields from FileIO properties before returning them to the client.
           .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
           .build();
@@ -713,8 +718,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     Map<String, String> tableProperties = retrieveFileIOProperties(table.io());
     config.putAll(
-        MapUtils.getFilteredMap(
-            tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
+        MapUtils.getFilteredMap(tableProperties, key -> shouldExposeCatalogProperty((String) key)));
     config.putAll(CredentialPropertyUtils.filterCredentialProperties(tableProperties));
 
     TableMetadata metadata =
@@ -782,8 +786,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return LoadTableResponse.builder()
           .withTableMetadata(((BaseTable) table).operations().current())
           .addAllConfig(
-              MapUtils.getFilteredMap(
-                  properties, key -> catalogPropertiesToClientKeys.contains(key)))
+              MapUtils.getFilteredMap(properties, key -> shouldExposeCatalogProperty((String) key)))
           // Keep only credential fields from FileIO properties before returning them to the client.
           .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
           .build();
@@ -894,5 +897,41 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return fileIO instanceof InMemoryFileIO
         ? Maps.newHashMap()
         : new HashMap<>(fileIO.properties());
+  }
+
+  @VisibleForTesting
+  protected String newPlanId() {
+    return UUID.randomUUID().toString();
+  }
+
+  @VisibleForTesting
+  protected List<org.apache.iceberg.rest.credentials.Credential> planTableScanCredentials(
+      TableIdentifier tableIdentifier, Table table) {
+    if (getCatalog() instanceof RESTCatalog || !(table instanceof BaseTable)) {
+      return Collections.emptyList();
+    }
+
+    TableMetadata metadata = ((BaseTable) table).operations().current();
+    if (metadata == null || isLocalOrHdfsTable(metadata)) {
+      return Collections.emptyList();
+    }
+
+    try {
+      return Collections.singletonList(
+          IcebergVendedCredentials.toRestCredential(
+              catalogName,
+              tableIdentifier,
+              getCredential(metadata, CredentialPrivilege.READ),
+              metadata));
+    } catch (ServiceUnavailableException e) {
+      LOG.warn(
+          "Service unavailable when generating scan planning credentials for {}", table.name(), e);
+      return Collections.emptyList();
+    }
+  }
+
+  private static boolean shouldExposeCatalogProperty(String key) {
+    return catalogPropertiesToClientKeys.contains(key)
+        || key.startsWith(CLIENT_CREDENTIALS_PROVIDER_PREFIX);
   }
 }
