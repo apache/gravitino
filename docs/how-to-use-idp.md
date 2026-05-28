@@ -25,27 +25,49 @@ request and response schemas, see the [Built-in IDP OpenAPI](./open-api/idp/open
 
 ## Prerequisites
 
-Before you configure the server, ensure the following:
+Before you call `/api/idp/*`, ensure the following:
 
 1. **IDP database tables** — Run the appropriate upgrade script under `${GRAVITINO_HOME}/scripts/`
    so the relational store contains `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel`
    (for example `scripts/mysql/upgrade-1.2.0-to-1.3.0-mysql.sql`). See
    [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
 
-2. **Plugin JARs** — Copy artifacts into `${GRAVITINO_HOME}/libs/`:
+2. **Service admin** — Management APIs require an authenticated principal listed in
+   `gravitino.authorization.serviceAdmins`. `IdpAuthorizationFilter` checks that list; it does not
+   use built-in IDP passwords from `idp_user_meta` for `/api/idp/*` authorization today.
 
-   - `gravitino-idp-basic-*.jar`
-   - `bcprov-jdk18on-*.jar` (Argon2id dependency)
+   1. Enable authorization and set service admin usernames in `gravitino.conf` (see
+      [Access control](./security/access-control.md)):
 
-   Build and copy them with:
+      ```properties
+      gravitino.authorization.enable = true
+      gravitino.authorization.serviceAdmins = admin
+      ```
 
-   ```shell
-   ./gradlew :plugins:idp-basic:copyLibAndConfigs
-   ```
+   2. Complete [Configuration](#configuration) (including `basic` in `gravitino.authenticators` and
+      `gravitino.server.rest.extensionPackages`), then restart Gravitino.
 
-3. **Service admin for management APIs** — Callers of `/api/idp/*` must be authenticated and listed
-   in `gravitino.authorization.serviceAdmins`. Enable authorization and define admins as described
-   in [Access control](./security/access-control.md).
+   3. **Call APIs as the service admin** — Use a configured authenticator (for example **simple**)
+      with a username that matches `gravitino.authorization.serviceAdmins`. With simple mode, send
+      that name in the `Authorization` header; an empty password is allowed when the server permits
+      it. See [How to authenticate](./security/how-to-authenticate.md).
+
+   4. **Set a built-in IDP password for the service admin (optional)** — To store a password hash in
+      `idp_user_meta` for a service admin username, call `POST /api/idp/users` while authenticated as
+      that service admin (see [Add a user](#add-a-user)). Example:
+
+      ```shell
+      curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
+        -d '{"user":"admin","password":"Passw0rd-Admin12"}' \
+        http://localhost:8090/api/idp/users
+      ```
+
+      Automatic startup initialization via `GRAVITINO_INITIAL_ADMIN_PASSWORD` is **not implemented**
+      yet. See
+      [Design of local authentication support](../design-docs/gravitino-local-authentication.md) §6
+      for the planned flow.
 
 ---
 
@@ -81,40 +103,8 @@ The following sections show how to call built-in IDP management APIs with `curl`
 
 ### Before you call the APIs
 
-#### Set up service admins
-
-Management APIs are allowed only for usernames in `gravitino.authorization.serviceAdmins`.
-`IdpAuthorizationFilter` compares the **authenticated principal** to that list; it does not read
-built-in IDP passwords from `idp_user_meta` for `/api/idp/*` authorization today.
-
-1. **Enable authorization** and define service admins in `gravitino.conf` (see
-   [Access control](./security/access-control.md)):
-
-   ```properties
-   gravitino.authorization.enable = true
-   gravitino.authorization.serviceAdmins = admin
-   ```
-
-2. **Expose `/api/idp/*`** — Include `basic` in `gravitino.authenticators` and set
-   `gravitino.server.rest.extensionPackages` as described in [Configuration](#configuration).
-
-3. **Restart Gravitino** so the settings take effect.
-
-4. **Call APIs as a service admin** — Authenticate with a configured Gravitino authenticator (for
-   example **simple**) using a username that appears in `gravitino.authorization.serviceAdmins`.
-   With simple mode, the principal comes from the `Authorization` header (or `GRAVITINO_USER` on
-   clients). See [How to authenticate](./security/how-to-authenticate.md).
-
-5. **Create built-in IDP users (optional at this step)** — Use `POST /api/idp/users` in
-   [User operations](#user-operations) to add rows in `idp_user_meta`. That is separate from the
-   service-admin allow list: service admins are configuration identities; built-in IDP users are
-   stored credentials for future local login.
-
-Automatic startup initialization via `GRAVITINO_INITIAL_ADMIN_PASSWORD` is **not implemented**
-yet. See [Design of local authentication support](../design-docs/gravitino-local-authentication.md)
-§6 for the planned flow.
-
-#### Request format
+Complete [Prerequisites](#prerequisites) first. The subsections below assume you are calling the APIs
+as a configured service admin.
 
 **Base URL** — `http://<host>:<port>/api/idp`
 
