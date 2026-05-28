@@ -26,6 +26,8 @@ plugins {
 dependencies {
   annotationProcessor(libs.lombok)
 
+  implementation(project(":api"))
+  implementation(project(":server-common"))
   implementation(project(":common"))
   implementation(project(":core"))
 
@@ -42,6 +44,7 @@ dependencies {
   compileOnly(libs.lombok)
   compileOnly(libs.slf4j.api)
 
+  testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
@@ -89,6 +92,10 @@ tasks {
 
   test {
     environment("GRAVITINO_HOME", rootDir.path)
-    environment("GRAVITINO_TEST", "true")
+
+    val skipITs = project.hasProperty("skipITs")
+    if (skipITs) {
+      exclude("**/integration/test/**")
+    }
   }
 }
