@@ -57,7 +57,6 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.BaseTransaction;
-import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.MetadataUpdate;
@@ -117,19 +116,24 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
           IcebergConstants.ICEBERG_ACCESS_DELEGATION);
 
-  @SuppressWarnings("deprecation")
-  private static Map<String, String> deprecatedProperties =
+  /** @deprecated config key; use {@link CredentialConstants#CREDENTIAL_PROVIDERS}. */
+  private static final String DEPRECATED_CREDENTIAL_PROVIDER_TYPE = "credential-provider-type";
+
+  /** @deprecated config key; use {@link GCSProperties#GRAVITINO_GCS_SERVICE_ACCOUNT_FILE}. */
+  private static final String DEPRECATED_GCS_CREDENTIAL_FILE_PATH = "gcs-credential-file-path";
+
+  private static final Map<String, String> DEPRECATED_PROPERTIES =
       ImmutableMap.of(
-          CredentialConstants.CREDENTIAL_PROVIDER_TYPE,
+          DEPRECATED_CREDENTIAL_PROVIDER_TYPE,
           CredentialConstants.CREDENTIAL_PROVIDERS,
-          "gcs-credential-file-path",
+          DEPRECATED_GCS_CREDENTIAL_FILE_PATH,
           GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
 
   public CatalogWrapperForREST(String catalogName, IcebergConfig config) {
     super(config);
     // To be compatible with old properties
     Map<String, String> catalogProperties =
-        checkForCompatibility(config.getAllConfig(), deprecatedProperties);
+        checkForCompatibility(config.getAllConfig(), DEPRECATED_PROPERTIES);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
     this.scanPlanCache = loadScanPlanCache(config);
   }
@@ -497,37 +501,13 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    *
    * <p>Populates {@code file-scan-tasks} and does not populate legacy {@code plan-tasks}, which is
    * incompatible with pre-1.11 REST clients that deserialize scan tasks from JSON strings.
-   *
-   * <p>{@code withSpecsById} is deprecated in Iceberg 1.11 but required for structured task
-   * encoding. Remove when upstream provides a non-deprecated replacement (planned in 1.12).
    */
-  @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
       List<FileScanTask> fileScanTasks) {
-    Map<Integer, PartitionSpec> specsById = new HashMap<>();
-    List<DeleteFile> deleteFiles = new ArrayList<>();
-
-    for (FileScanTask fileScanTask : fileScanTasks) {
-      specsById.putIfAbsent(fileScanTask.spec().specId(), fileScanTask.spec());
-      if (!fileScanTask.deletes().isEmpty()) {
-        deleteFiles.addAll(fileScanTask.deletes());
-      }
-    }
-
-    List<DeleteFile> uniqueDeleteFiles =
-        deleteFiles.stream().distinct().collect(Collectors.toList());
-
-    PlanTableScanResponse.Builder responseBuilder =
-        PlanTableScanResponse.builder()
-            .withPlanStatus(PlanStatus.COMPLETED)
-            .withFileScanTasks(fileScanTasks)
-            .withSpecsById(specsById);
-
-    if (!uniqueDeleteFiles.isEmpty()) {
-      responseBuilder.withDeleteFiles(uniqueDeleteFiles);
-    }
-
-    return responseBuilder.build();
+    return PlanTableScanResponse.builder()
+        .withPlanStatus(PlanStatus.COMPLETED)
+        .withFileScanTasks(fileScanTasks)
+        .build();
   }
 
   /**
