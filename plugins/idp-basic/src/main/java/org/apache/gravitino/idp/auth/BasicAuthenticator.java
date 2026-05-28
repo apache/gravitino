@@ -92,31 +92,33 @@ public class BasicAuthenticator implements Authenticator {
     }
     credential = credential.trim();
 
+    final byte[] decodedBytes;
     try {
-      String decodedCredential =
-          new String(Base64.getDecoder().decode(credential), StandardCharsets.UTF_8);
-      String[] parts = decodedCredential.split(":", 2);
-      if (parts.length != 2) {
-        throw new UnauthorizedException(
-            "Malformed Basic authorization header: credentials must be in username:password format",
-            BASIC_CHALLENGE);
-      }
-
-      String username = parts[0];
-      if (StringUtils.isBlank(username)) {
-        throw new UnauthorizedException(
-            "Malformed Basic authorization header: username must not be blank", BASIC_CHALLENGE);
-      }
-
-      String password = parts[1];
-      if (StringUtils.isBlank(password)) {
-        throw new UnauthorizedException("Invalid username or password", BASIC_CHALLENGE);
-      }
-      return new BasicCredentials(username, password);
+      decodedBytes = Base64.getDecoder().decode(credential);
     } catch (IllegalArgumentException e) {
       throw new UnauthorizedException(
           "Malformed Basic authorization header: invalid base64", BASIC_CHALLENGE);
     }
+
+    String decodedCredential = new String(decodedBytes, StandardCharsets.UTF_8);
+    String[] parts = decodedCredential.split(":", 2);
+    if (parts.length != 2) {
+      throw new UnauthorizedException(
+          "Malformed Basic authorization header: credentials must be in username:password format",
+          BASIC_CHALLENGE);
+    }
+
+    String username = parts[0];
+    if (StringUtils.isBlank(username)) {
+      throw new UnauthorizedException(
+          "Malformed Basic authorization header: username must not be blank", BASIC_CHALLENGE);
+    }
+
+    String password = parts[1];
+    if (StringUtils.isBlank(password)) {
+      throw new UnauthorizedException("Invalid username or password", BASIC_CHALLENGE);
+    }
+    return new BasicCredentials(username, password);
   }
 
   private UserPrincipal authenticate(BasicCredentials credentials, String authData) {
