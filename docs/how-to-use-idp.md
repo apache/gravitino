@@ -34,8 +34,7 @@ Before you call `/api/idp/*`, ensure the following:
 
 2. **Service admin passwords** — Built-in IDP requires every username in
    `gravitino.authorization.serviceAdmins` to have a password stored in `idp_user_meta` before you
-   can call management APIs. **Do not use `simple` authentication to bypass password checks**; that
-   mode does not validate credentials against the built-in IDP store.
+   can call management APIs.
 
    1. Enable authorization and set service admin usernames in `gravitino.conf` (see
       [Access control](./security/access-control.md)):
