@@ -86,9 +86,6 @@ Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspa
 
 Changelog
 
-- apache/gravitino-iceberg-rest:1.3.0
-  - Upgrade Iceberg to 1.11.0
-
 - apache/gravitino-iceberg-rest:1.2.0
   - Upgrade Iceberg to 1.10.1
   - Support view management and authorization
