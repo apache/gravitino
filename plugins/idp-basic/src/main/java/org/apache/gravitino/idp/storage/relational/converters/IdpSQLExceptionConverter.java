@@ -20,7 +20,7 @@ package org.apache.gravitino.idp.storage.relational.converters;
 
 import java.io.IOException;
 import java.sql.SQLException;
-import org.apache.gravitino.idp.exception.AlreadyExistsException;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
 
 /** Converts JDBC SQL exceptions to built-in IdP exceptions. */
 public final class IdpSQLExceptionConverter {

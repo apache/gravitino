@@ -16,19 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.idp.web.rest;
+package org.apache.gravitino.idp.storage.po;
 
-import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.idp.IdpUserGroupManager;
-import org.glassfish.hk2.utilities.binding.AbstractBinder;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
 
-/** Registers built-in IdP REST dependencies for Jersey/HK2 injection. */
-public class IdpBasicBinder extends AbstractBinder {
-
-  @Override
-  protected void configure() {
-    GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    bind(IdpUserGroupManager.getInstance(gravitinoEnv.config(), gravitinoEnv.idGenerator()))
-        .to(IdpUserGroupManager.class);
-  }
+/**
+ * Read-only PO for built-in IdP group rows joined with aggregated usernames. This PO is not written
+ * to the database.
+ */
+@Getter
+@EqualsAndHashCode
+@ToString
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder(setterPrefix = "with")
+public class IdpGroupWithUsersPO {
+  private String name;
+  private String usernames;
 }
