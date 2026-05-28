@@ -278,6 +278,12 @@ preserving the requirement that local identity tables remain global and metalake
 
 ## 6. Service Admin Initialization
 
+> **Implementation status (current codebase):** Not implemented. There is no startup logic that
+> reads `GRAVITINO_INITIAL_ADMIN_PASSWORD` or auto-creates built-in IdP users for
+> `gravitino.authorization.serviceAdmins`. Operators must create the first built-in IdP users through
+> the management REST APIs (once those APIs are deployable) or direct database operations. The
+> section below remains the target design.
+
 To keep local authentication usable immediately after installation without introducing a hard-coded
 default password, Gravitino should initialize service admin accounts from an environment variable
 during startup when the `basic` authenticator is enabled.
@@ -352,6 +358,12 @@ fresh Gravitino deployment.
 ---
 
 ## 7. Authentication Flow
+
+> **Implementation status (current codebase):** Not implemented. `AuthenticatorFactory` only
+> registers `simple`, `oauth`, and `kerberos`. Listing `basic` in `gravitino.authenticators`
+> causes startup failure because no `Authenticator` class is bound to that name. The flows below
+> describe the intended HTTP Basic authentication behavior once a built-in IdP authenticator is
+> added.
 
 ### 7.1 User Verification
 
@@ -430,11 +442,25 @@ The local authentication management capability is enabled only when `basic` is i
 `gravitino.authenticators`. If `basic` is not enabled, Gravitino should not allow local authentication
 management APIs to be used.
 
-### 8.2 Password Algorithm
+> **Implementation note:** Today, `basic` is only checked by `IdpRESTFeature` to register
+> `/api/idp/*` resources. It is not yet skipped or mapped in `AuthenticatorFactory`, so production
+> configs must not list `basic` until authenticator wiring is completed. Management API callers
+> currently authenticate with another mode (for example `simple`) and must be service admins.
+
+### 8.2 REST extension package
+
+| Key | Value | Required when using built-in IdP |
+|-----|--------|----------------------------------|
+| `gravitino.server.rest.extensionPackages` | `org.apache.gravitino.idp.web.rest.feature` | Yes |
+
+Jersey discovers `IdpRESTFeature`, which registers `IdpUserOperations`, `IdpGroupOperations`,
+`IdpBasicBinder`, and `IdpAuthorizationFilter` when `basic` is present in `gravitino.authenticators`.
+
+### 8.3 Password Algorithm
 
 The initial implementation uses Argon2id as the fixed password hashing algorithm.
 
-### 8.3 How Trino Accesses IRC with Basic Authentication
+### 8.4 How Trino Accesses IRC with Basic Authentication
 
 For Trino to access IRC with Basic authentication, Trino must act as an HTTP client for IRC requests
 and attach the required authentication information to the outbound REST catalog requests.
@@ -680,18 +706,19 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 }
 ```
 
-#### 9.1.8 Add users to a local group
+#### 9.1.8 Change local group membership
 
-You can add users to a local group by providing the group name in the path and the target user
-names in the request body.
+Add and/or remove users from a local group in a single request. At least one of `usersToAdd` or
+`usersToRemove` must be provided.
 
-The request path for REST API is `/api/idp/groups/{group}/add`.
+The request path for REST API is `/api/idp/groups/{group}/users`.
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "users": ["alice", "bob"]
-}' http://localhost:8090/api/idp/groups/engineering/add
+  "usersToAdd": ["alice", "bob"],
+  "usersToRemove": ["carol"]
+}' http://localhost:8090/api/idp/groups/engineering/users
 ```
 
 **Response:**
@@ -706,31 +733,6 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }
 ```
 
-#### 9.1.9 Remove users from a local group
-
-You can remove users from a local group by providing the group name in the path and the target
-user names in the request body.
-
-The request path for REST API is `/api/idp/groups/{group}/remove`.
-
-```shell
-curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "users": ["alice"]
-}' http://localhost:8090/api/idp/groups/engineering/remove
-```
-
-**Response:**
-
-```json
-{
-  "code": 0,
-  "group": {
-    "name": "engineering",
-    "users": ["bob"]
-  }
-}
-```
 ---
 
 ## 10. Work Plan and Checklist
