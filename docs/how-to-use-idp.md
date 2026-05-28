@@ -1,25 +1,25 @@
 ---
-title: How to use built-in IdP (local authentication)
+title: How to use built-in IDP (local authentication)
 slug: /how-to-use-idp
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-Apache Gravitino can store **built-in IdP** (identity provider) users and groups in the relational
+Apache Gravitino can store **built-in IDP** (identity provider) users and groups in the relational
 metadata store through the `idp-basic` plugin. This gives you a self-contained way to manage
 **global** login identities (usernames, password hashes, and group membership) without an external
 OAuth server.
 
-Built-in IdP is aimed at POC, offline, and isolated deployments. It is **not** a replacement for
-enterprise IdPs such as Okta, Azure AD, or Keycloak. Use it only where a lightweight local identity
+Built-in IDP is aimed at POC, offline, and isolated deployments. It is **not** a replacement for
+enterprise IDPs such as Okta, Azure AD, or Keycloak. Use it only where a lightweight local identity
 store is acceptable; restrict management APIs to **service admins**, store password hashes only,
 and prefer [HTTPS](./security/how-to-use-https.md) when credentials travel over the network.
 
 This guide describes how to enable and operate the management APIs in `plugins:idp-basic`. For
 design background, see
 [Design of local authentication support](../design-docs/gravitino-local-authentication.md). For
-request and response schemas, see the [Built-in IdP OpenAPI](./open-api/idp/openapi.yaml).
+request and response schemas, see the [Built-in IDP OpenAPI](./open-api/idp/openapi.yaml).
 
 ---
 
@@ -27,7 +27,7 @@ request and response schemas, see the [Built-in IdP OpenAPI](./open-api/idp/open
 
 Before you configure the server, ensure the following:
 
-1. **IdP database tables** — Run the appropriate upgrade script under `${GRAVITINO_HOME}/scripts/`
+1. **IDP database tables** — Run the appropriate upgrade script under `${GRAVITINO_HOME}/scripts/`
    so the relational store contains `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel`
    (for example `scripts/mysql/upgrade-1.2.0-to-1.3.0-mysql.sql`). See
    [How to use relational backend storage](./how-to-use-relational-backend-storage.md).
@@ -51,7 +51,7 @@ Before you configure the server, ensure the following:
 
 ## Configuration
 
-Add the following to `gravitino.conf` to expose built-in IdP management REST APIs:
+Add the following to `gravitino.conf` to expose built-in IDP management REST APIs:
 
 | Configuration item | Description | Example |
 |--------------------|-------------|---------|
@@ -76,7 +76,7 @@ General authentication settings (`simple`, `oauth`, `kerberos`, and related keys
 
 ## Operations
 
-The following sections show how to call built-in IdP management APIs with `curl`. Replace
+The following sections show how to call built-in IDP management APIs with `curl`. Replace
 `localhost:8090` and the `Authorization` header with values that match your deployment.
 
 ### Before you call the APIs
@@ -159,7 +159,7 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 `DELETE /api/idp/users/{user}`
 
-Soft-deletes the user (`deleted_at`). Physical removal is handled by the IdP garbage collector.
+Soft-deletes the user (`deleted_at`). Physical removal is handled by the IDP garbage collector.
 
 ```shell
 curl -s -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
@@ -177,18 +177,6 @@ curl -s -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 curl -s -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
   http://localhost:8090/api/idp/groups/engineering
-```
-
-Example response:
-
-```json
-{
-  "code": 0,
-  "group": {
-    "name": "engineering",
-    "users": ["alice", "bob"]
-  }
-}
 ```
 
 #### Add a group
@@ -231,19 +219,19 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/groups/engineering/users
 ```
 
-For full request and response definitions, see the [Built-in IdP OpenAPI](./open-api/idp/openapi.yaml).
+For full request and response definitions, see the [Built-in IDP OpenAPI](./open-api/idp/openapi.yaml).
 
 ---
 
 ## Use with Gravitino access control
 
-Built-in IdP tables are **global** (no `metalake_id`). Metalake-scoped `user_meta` and `group_meta`
+Built-in IDP tables are **global** (no `metalake_id`). Metalake-scoped `user_meta` and `group_meta`
 used by RBAC are separate objects. They are associated **by name** (`user_name` / `group_name`)
 across metalakes, not by a database foreign key.
 
 Typical workflow:
 
-1. Create built-in IdP users and groups with `/api/idp/*` (this guide).
+1. Create built-in IDP users and groups with `/api/idp/*` (this guide).
 2. In each metalake, create matching Gravitino users and groups for authorization.
 3. Grant roles and privileges as described in [Access control](./security/access-control.md).
 
@@ -251,7 +239,7 @@ Typical workflow:
 
 ## Further reading
 
-- [Built-in IdP OpenAPI](./open-api/idp/openapi.yaml) — API paths, bodies, and schemas
+- [Built-in IDP OpenAPI](./open-api/idp/openapi.yaml) — API paths, bodies, and schemas
 - [Design of local authentication support](../design-docs/gravitino-local-authentication.md) — architecture and future authentication flows
 - [How to authenticate](./security/how-to-authenticate.md) — `simple`, OAuth, and Kerberos
 - [How to use HTTPS](./security/how-to-use-https.md) — transport security for credentials
