@@ -25,7 +25,6 @@ import com.google.common.collect.Maps;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -459,15 +458,18 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         }
       }
     }
-    List<String> keys = hiddenCredentialKeys();
-    if (keys.isEmpty() || !shouldBackfillCredential()) {
+    if (!shouldBackfillCredential()) {
       return properties;
     }
-    Map<String, String> rawProps = entity().getProperties();
     Map<String, String> result = Maps.newHashMap(properties);
-    for (String key : keys) {
-      backfillIfPresent(rawProps, result, key);
-    }
+    entity()
+        .getProperties()
+        .forEach(
+            (k, v) -> {
+              if (catalogPropertiesMetadata().isHiddenProperty(k)) {
+                result.put(k, v);
+              }
+            });
     return result;
   }
 
@@ -490,18 +492,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
       props.put(CredentialConstants.CREDENTIAL_PROVIDERS, String.join(",", credentialProviders));
     }
     return props;
-  }
-
-  /**
-   * Returns the list of hidden property keys whose values should be backfilled into the public
-   * {@link #properties()} map when the server-level credential backfill config is enabled. The
-   * default implementation returns an empty list (no backfill). Subclasses override this to declare
-   * the hidden credential keys they expose.
-   *
-   * @return list of property keys to backfill
-   */
-  protected List<String> hiddenCredentialKeys() {
-    return Collections.emptyList();
   }
 
   /**
@@ -529,22 +519,6 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     Config serverConfig = GravitinoEnv.getInstance().config();
     return serverConfig != null
         && serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES);
-  }
-
-  /**
-   * Copies a single entry from {@code source} to {@code target} if present (non-null). Used by
-   * subclass {@code properties()} overrides to backfill hidden credentials.
-   *
-   * @param source the source map (raw entity properties)
-   * @param target the target map (filtered properties copy)
-   * @param key the property key to backfill
-   */
-  protected static void backfillIfPresent(
-      Map<String, String> source, Map<String, String> target, String key) {
-    String value = source.get(key);
-    if (value != null) {
-      target.put(key, value);
-    }
   }
 
   @Evolving
