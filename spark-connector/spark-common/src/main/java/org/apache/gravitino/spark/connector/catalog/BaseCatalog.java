@@ -444,27 +444,19 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
    * @throws NoSuchTableException if no view exists or views are not supported by this catalog
    */
   protected Table loadViewAsTable(Identifier ident) throws NoSuchTableException {
-    View gravitinoView;
     try {
-      gravitinoView =
+      View gravitinoView =
           gravitinoCatalogClient
               .asViewCatalog()
               .loadView(NameIdentifier.of(getDatabase(ident), ident.name()));
+      // Load the Kyuubi HiveTable for the view's HMS entry (VIRTUAL_VIEW) to reuse its
+      // catalogTable metadata when constructing SparkHiveView's parent HiveTable.
+      Table sparkTable = loadSparkTable(ident);
+      return createSparkView(ident, gravitinoView, sparkTable);
     } catch (NoSuchViewException | UnsupportedOperationException e) {
       throw new NoSuchTableException(ident);
-    }
-    // Load the Kyuubi HiveTable for the view's HMS entry (VIRTUAL_VIEW) to reuse its
-    // catalogTable metadata when constructing SparkHiveView's parent HiveTable.
-    Table sparkTable;
-    try {
-      sparkTable = loadSparkTable(ident);
     } catch (RuntimeException e) {
       LOG.warn("Failed to load Spark-side table for view {}: {}", ident, e.getMessage());
-      throw new NoSuchTableException(ident);
-    }
-    try {
-      return createSparkView(ident, gravitinoView, sparkTable);
-    } catch (UnsupportedOperationException e) {
       throw new NoSuchTableException(ident);
     }
   }
