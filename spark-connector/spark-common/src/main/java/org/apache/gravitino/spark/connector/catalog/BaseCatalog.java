@@ -329,7 +329,6 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
           .asViewCatalog()
           .viewExists(NameIdentifier.of(getDatabase(ident), ident.name()));
     } catch (UnsupportedOperationException e) {
-      LOG.debug("Catalog does not support views for {}, treating viewExists as false", ident);
       return false;
     }
   }
