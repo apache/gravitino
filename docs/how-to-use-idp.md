@@ -74,7 +74,7 @@ gravitino.authorization.serviceAdmins = admin
 `IdpRESTFeature` registers management resources only when `basic` appears in
 `gravitino.authenticators` **and** `org.apache.gravitino.idp.web.rest.feature` is listed in
 `gravitino.server.rest.extensionPackages`. If `basic` is absent, `/api/idp/*` routes are not
-registered (HTTP 404).
+registered.
 
 ---
 
@@ -96,9 +96,6 @@ curl -s -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Authorization: Basic $(echo -n 'admin:' | base64)" \
   http://localhost:8090/api/idp/users/alice
 ```
-
-If the caller is not a service admin, the server returns **403** with a message like
-`Only service admins can manage built-in IdP users and groups.`
 
 ### Common headers
 
@@ -163,13 +160,6 @@ curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/idp/users
 ```
 
-| HTTP status | Meaning |
-|-------------|---------|
-| 200 | User created |
-| 400 | Invalid username/password |
-| 403 | Not a service admin |
-| 409 | User already exists |
-
 ### Change password (admin reset)
 
 `PUT /api/idp/users/{user}`
@@ -181,10 +171,6 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -d '{"password":"Passw0rd-Alice-V2"}' \
   http://localhost:8090/api/idp/users/alice
 ```
-
-| HTTP status | Meaning |
-|-------------|---------|
-| 404 | User does not exist |
 
 ### Remove user
 
@@ -251,8 +237,7 @@ curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 `DELETE /api/idp/groups/{group}?force={true|false}`
 
-If the group still has members, deletion fails unless `force=true` (**405** /
-`IllegalStateException` in the implementation).
+If the group still has members, deletion fails unless `force=true`.
 
 ```shell
 curl -s -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
@@ -274,10 +259,6 @@ curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -d '{"usersToAdd":["alice","bob"],"usersToRemove":["carol"]}' \
   http://localhost:8090/api/idp/groups/engineering/users
 ```
-
-| HTTP status | Meaning |
-|-------------|---------|
-| 404 | Group or referenced user does not exist |
 
 ---
 
