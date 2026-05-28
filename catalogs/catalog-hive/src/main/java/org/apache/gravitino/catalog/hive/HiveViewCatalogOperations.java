@@ -364,13 +364,13 @@ class HiveViewCatalogOperations implements ViewCatalog {
     String representationSql = viewOriginalText;
     String detectedDialect = HiveView.detectDialect(representationSql, params);
     if (!Dialects.HIVE.equalsIgnoreCase(detectedDialect)
-        && !Dialects.FLINK.equalsIgnoreCase(detectedDialect)) {
-      // TODO(design-docs/gravitino-logical-view-management.md): support loading trino/spark HMS
-      // views.
+        && !Dialects.FLINK.equalsIgnoreCase(detectedDialect)
+        && !Dialects.SPARK.equalsIgnoreCase(detectedDialect)) {
+      // TODO(design-docs/gravitino-logical-view-management.md): support loading trino HMS views.
       throw new UnsupportedOperationException(
           String.format(
-              "Hive catalog currently supports only '%s' and '%s' view dialects, but found '%s' for view %s",
-              Dialects.HIVE, Dialects.FLINK, detectedDialect, ident));
+              "Hive catalog currently supports only '%s', '%s' and '%s' view dialects, but found '%s' for view %s",
+              Dialects.HIVE, Dialects.FLINK, Dialects.SPARK, detectedDialect, ident));
     }
 
     SQLRepresentation rep =
@@ -418,25 +418,27 @@ class HiveViewCatalogOperations implements ViewCatalog {
             defaultSchema,
             ident);
         return selected;
+      case Dialects.SPARK:
+        return selected;
       default:
-        // TODO(design-docs/gravitino-logical-view-management.md): support creating trino/spark HMS
-        // views.
+        // TODO(design-docs/gravitino-logical-view-management.md): support creating trino HMS views.
         throw new UnsupportedOperationException(
             String.format(
-                "Hive catalog currently supports only '%s' and '%s' view dialects, but got '%s' for view %s",
-                Dialects.HIVE, Dialects.FLINK, selected.dialect(), ident));
+                "Hive catalog currently supports only '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
+                Dialects.HIVE, Dialects.FLINK, Dialects.SPARK, selected.dialect(), ident));
     }
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
     if (!Dialects.HIVE.equalsIgnoreCase(representation.dialect())
-        && !Dialects.FLINK.equalsIgnoreCase(representation.dialect())) {
-      // TODO(design-docs/gravitino-logical-view-management.md): support serializing trino/spark HMS
+        && !Dialects.FLINK.equalsIgnoreCase(representation.dialect())
+        && !Dialects.SPARK.equalsIgnoreCase(representation.dialect())) {
+      // TODO(design-docs/gravitino-logical-view-management.md): support serializing trino HMS
       // view definitions.
       throw new UnsupportedOperationException(
           String.format(
-              "Hive catalog currently supports only '%s' and '%s' view dialects, but got '%s' for view %s",
-              Dialects.HIVE, Dialects.FLINK, representation.dialect(), ident));
+              "Hive catalog currently supports only '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
+              Dialects.HIVE, Dialects.FLINK, Dialects.SPARK, representation.dialect(), ident));
     }
     return representation.sql();
   }
