@@ -92,8 +92,6 @@ tasks {
 
   test {
     environment("GRAVITINO_HOME", rootDir.path)
-    // GRAVITINO_TEST is set by the root build for embedded IT only. Deploy IT starts the server
-    // via gravitino.sh without main() args; setting it here breaks deploy mode.
 
     val skipITs = project.hasProperty("skipITs")
     if (skipITs) {
