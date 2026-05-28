@@ -51,7 +51,6 @@ public class CredentialPropertyUtils {
 
   // GCS Iceberg property names
   @VisibleForTesting static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
-
   private static final String GCS_OAUTH_2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
 
   // ADLS Iceberg property names

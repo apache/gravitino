@@ -56,6 +56,7 @@ public class IcebergConstants {
       "client.refresh-credentials-endpoint";
   public static final String ICEBERG_S3_PATH_STYLE_ACCESS = "s3.path-style-access";
   public static final String AWS_S3_REGION = "client.region";
+
   // OSS IO properties
   public static final String ICEBERG_OSS_ENDPOINT = "oss.endpoint";
   public static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
@@ -65,11 +66,13 @@ public class IcebergConstants {
       "client.security-token-expires-at-ms";
   public static final String ICEBERG_OSS_REFRESH_CREDENTIALS_ENDPOINT =
       "client.refresh-credentials-endpoint";
+
   // GCS IO properties
   public static final String GCS_OAUTH2_TOKEN = "gcs.oauth2.token";
   public static final String GCS_OAUTH2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
   public static final String GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
       "gcs.oauth2.refresh-credentials-endpoint";
+
   // ADLS IO properties
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_NAME =
       "adls.auth.shared-key.account.name";
