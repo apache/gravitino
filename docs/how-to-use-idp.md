@@ -44,9 +44,7 @@ Before you call `/api/idp/*`, ensure the following:
       gravitino.authorization.serviceAdmins = admin
       ```
 
-   2. Complete [Configuration](#configuration).
-
-   3. **Initialize service admin passwords at startup** — Before the first start (or before the
+   2. **Initialize service admin passwords at startup** — Before the first start (or before the
       first start after adding a new service admin without an `idp_user_meta` record), export
       `GRAVITINO_INITIAL_ADMIN_PASSWORD`. The value is a JSON array of `username:password` entries.
       Each username must appear in `gravitino.authorization.serviceAdmins`, and each password must
@@ -62,9 +60,9 @@ Before you call `/api/idp/*`, ensure the following:
       [Design of local authentication support](../design-docs/gravitino-local-authentication.md) §6
       for the full initialization rules.
 
-   4. **Start or restart Gravitino** so the initialization runs.
+   3. **Start or restart Gravitino** so the initialization runs.
 
-   5. **Call APIs with built-in IDP credentials** — Use HTTP Basic authentication with the service
+   4. **Call APIs with built-in IDP credentials** — Use HTTP Basic authentication with the service
       admin username and the password you initialized (for example `admin` /
       `Passw0rd-Admin12`). `IdpAuthorizationFilter` still requires the authenticated principal to be
       listed in `gravitino.authorization.serviceAdmins`.
