@@ -20,9 +20,13 @@
 package org.apache.gravitino.iceberg.service.purge;
 
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -34,6 +38,27 @@ import org.junit.jupiter.api.TestTemplate;
 abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
 
   private IcebergPurgeJobStore store;
+
+  // TestJDBCBackend's BackendTestExtension overwrites GravitinoEnv's singleton "config" and
+  // "idGenerator" fields with a backend-only Mockito mock and never restores them. Because the
+  // whole iceberg-rest-server module runs in one JVM, that mock would leak into later test classes
+  // (e.g. credential vending), where MetadataAuthzHelper.enableAuthorization() unboxes the
+  // unstubbed config.get(ENABLE_AUTHORIZATION) -> null and NPEs. Snapshot the pre-test fields and
+  // restore them after this class so it leaves GravitinoEnv exactly as it found it.
+  private Object originalConfig;
+  private Object originalIdGenerator;
+
+  @BeforeAll
+  public void snapshotGravitinoEnv() throws IllegalAccessException {
+    originalConfig = FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
+    originalIdGenerator = FieldUtils.readField(GravitinoEnv.getInstance(), "idGenerator", true);
+  }
+
+  @AfterAll
+  public void restoreGravitinoEnv() throws IllegalAccessException {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", originalConfig, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", originalIdGenerator, true);
+  }
 
   @BeforeEach
   public void preparePurgeJobStore() {
