@@ -31,10 +31,9 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /**
  * Persistence for {@code iceberg_cleanup_job}, layered on the Gravitino entity store's shared
- * relational backend. All access goes through {@link IcebergPurgeJobMapper} and {@link
- * SessionUtils}, so async purge reuses the entity store's connection pool, transaction management,
- * and per-backend SQL dispatch rather than opening its own JDBC connections. Row ids are generated
- * by the application {@link IdGenerator}, matching the rest of the relational store.
+ * relational backend. Async purge reuses the entity store's connection pool, transaction management,
+ * and per-backend SQL dispatch instead of opening its own JDBC connections. Row ids and timestamps
+ * are supplied by the application, keeping the SQL portable across H2, MySQL, and PostgreSQL.
  */
 public class IcebergPurgeJobStore {
 

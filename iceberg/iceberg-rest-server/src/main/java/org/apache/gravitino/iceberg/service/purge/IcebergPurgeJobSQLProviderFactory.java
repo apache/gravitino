@@ -125,10 +125,10 @@ public class IcebergPurgeJobSQLProviderFactory {
 
     String selectRunnableJobIds(
         @Param("staleBefore") long staleBefore, @Param("window") int window) {
-      // A runnable row is PENDING, or RUNNING whose owner has gone silent. markRunning always
-      // writes a heartbeat, so "heartbeat_at IS NULL" should not arise in normal operation; it is
-      // kept as a guard because "NULL < #{staleBefore}" is UNKNOWN in SQL, which would otherwise
-      // leave a RUNNING row that somehow lost its heartbeat stuck and never picked up again.
+      // A runnable row is PENDING, or RUNNING whose worker has gone silent. markRunning always
+      // writes a heartbeat, so RUNNING with heartbeat_at IS NULL is not produced by normal
+      // transitions. Keep the NULL branch as a defensive guard: without it, SQL three-valued
+      // logic makes NULL < #{staleBefore} UNKNOWN, leaving such a row stuck forever.
       return "SELECT id FROM "
           + TABLE_NAME
           + " WHERE state = 'PENDING'"
