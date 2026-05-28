@@ -292,15 +292,14 @@ The initialization process should be:
    any configured service admin does not yet have a password stored in `idp_user_meta`.
 3. Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD` before writing anything to the database. The password
    must satisfy the local authentication password policy.
-4. Connect to the configured JDBC backend during Gravitino startup.
-5. For each user configured in `gravitino.authorization.serviceAdmins`, check whether that service
+4. For each user configured in `gravitino.authorization.serviceAdmins`, check whether that service
    admin already has a password stored in `idp_user_meta`.
-6. If the service admin already has a password in `idp_user_meta`, continue startup without
+5. If the service admin already has a password in `idp_user_meta`, continue startup without
    modifying the stored password.
-7. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is configured and the service admin does not yet have a
+6. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is configured and the service admin does not yet have a
    password stored in `idp_user_meta`, hash the supplied password with Argon2id and create that
    service admin account in `idp_user_meta`.
-8. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is not configured and any configured service admin does not
+7. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is not configured and any configured service admin does not
    yet have a password stored in `idp_user_meta`, fail startup immediately and prompt the user to
    declare `GRAVITINO_INITIAL_ADMIN_PASSWORD`.
 
