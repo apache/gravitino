@@ -13,11 +13,60 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Apache Gravitino can manage ClickHouse metadata through a JDBC catalog. This document describes the capabilities and limitations of the ClickHouse catalog, as well as the supported operations and properties for catalogs, schemas, and tables.
+The ClickHouse catalog enables Apache Gravitino to manage ClickHouse metadata through a JDBC connection, including databases (mapped to Gravitino schemas), tables, columns, engines (MergeTree family, Log family, Distributed, and others), partitioning, sort orders, indexes, and `ON CLUSTER` execution against ClickHouse clusters. Use it when you want a single Gravitino-managed access surface that covers ClickHouse alongside other relational, lakehouse, and fileset catalogs.
 
-:::caution
-ClickHouse catalog is not included in the standard Gravitino server distribution due to the large size of the ClickHouse JDBC driver and potential licensing issues. To use the ClickHouse catalog, you can build from source code, and refer to document [how-to-build](./how-to-build.md) for more details.
-:::
+## Requirements and Limitations
+
+- **ClickHouse catalog is not bundled.** The ClickHouse catalog is not included in the standard Gravitino server distribution due to the large size of the ClickHouse JDBC driver and licensing considerations. Build the catalog from source; see [How to Build](./how-to-build.md).
+- **Supported ClickHouse versions.** All code is tested against ClickHouse `24.8.14`. Other `24.8.x` releases work with the same driver bundle. Newer ClickHouse versions (`25.x` and later) may work but are not thoroughly tested; report compatibility issues to the community.
+- **JDBC driver required.** Place the ClickHouse JDBC driver in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs` on the Gravitino server. For ClickHouse `24.8.x`, use driver versions `0.7.1` through `0.8.4`. For other ClickHouse versions, refer to the official ClickHouse JDBC documentation; the JAR is available from the [ClickHouse JDBC Maven repository](https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/).
+- **One ClickHouse instance per catalog.** A Gravitino ClickHouse catalog corresponds to one ClickHouse server instance. To manage multiple instances, create one Gravitino catalog per instance.
+- **Schema-to-database mapping.** A Gravitino schema maps to a ClickHouse database. Schema comments and `ON CLUSTER` creation are supported through schema properties.
+- **Engine constraints.** MergeTree-family, Log-family, `Null`, `Set`, `Memory`, and `Distributed` engines are creatable through Gravitino. Engines that require parameterized ENGINE clauses or external dependencies (`Join`, `Buffer`, `View`, `KeeperMap`, `File`) are not creatable through Gravitino. The `engine` property is immutable after creation.
+- **`Memory` engine is volatile.** Tables created with `engine=Memory` lose all data on a ClickHouse server restart. The table definition persists and Gravitino's `loadTable` continues to succeed, but data does not. Use `TinyLog`, `StripeLog`, or a MergeTree-family engine if durability is required.
+- **ORDER BY, PARTITION BY constrained.** MergeTree-family engines require `ORDER BY` and accept only column-identity expressions: `id`, `(id, name)`, `(func(id), name)`, or `func(id)`. Composite expressions such as `(id + 1)` are rejected. `PARTITION BY` accepts single-column identity (`PARTITION BY column_name`) and a small set of functions (`toDate`, `toYear`, `toYYYYMM`); other functions and composite expressions such as `PARTITION BY (column_name + 1)` are rejected. ClickHouse itself supports arbitrary partition expressions; the Gravitino layer is intentionally more restrictive.
+- **No custom distribution.** Distribution is fixed to `Distributions.NONE`. For sharded layouts, use the `Distributed` engine with the related cluster properties (`cluster-name`, `cluster-remote-database`, `cluster-remote-table`, `cluster-sharding-key`).
+- **Cluster metadata is Gravitino-managed only.** ClickHouse does not persist `ON CLUSTER` information in `SHOW CREATE DATABASE` or `SHOW CREATE TABLE` output for non-Replicated objects, so Gravitino embeds the cluster name in the object's `COMMENT` at creation. Databases and tables created outside Gravitino will have `on-cluster=false` and no `cluster-name` when loaded, and Gravitino-issued `DROP` statements against such objects will not include `ON CLUSTER`. Recreate the object through Gravitino if you need accurate cluster metadata.
+- **Alter limitations.** `engine` cannot be changed after creation; arbitrary `ALTER TABLE ... SETTINGS` and removal of table properties are not supported; auto-increment columns are not supported; primary key indexes cannot be added or dropped after creation (data-skipping indexes can be added and dropped).
+
+## Quick Start
+
+Create a minimum-viable ClickHouse catalog and confirm it is reachable. The example assumes a Gravitino server at `http://localhost:8090`, a metalake named `test`, and a ClickHouse instance at `localhost:8123`. Adjust the values for your environment. For a fuller create-catalog example with both shell and Java tabs, see [Create a ClickHouse Catalog](#create-a-clickhouse-catalog) below.
+
+### Create the Catalog
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "clickhouse_catalog",
+    "type": "RELATIONAL",
+    "comment": "ClickHouse catalog",
+    "provider": "jdbc-clickhouse",
+    "properties": {
+      "jdbc-url": "jdbc:clickhouse://localhost:8123",
+      "jdbc-driver": "com.clickhouse.jdbc.ClickHouseDriver",
+      "jdbc-user": "default",
+      "jdbc-password": "<your-password>"
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs
+```
+
+### Verify the Catalog
+
+```bash
+# List catalogs in the metalake. clickhouse_catalog should appear.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs" | jq
+
+# Load the catalog directly and inspect its properties.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/clickhouse_catalog" | jq
+
+# List schemas (ClickHouse databases). The response includes at least `default` and `system`.
+curl -sS "http://localhost:8090/api/metalakes/test/catalogs/clickhouse_catalog/schemas" | jq
+```
+
+**Success check:** the catalog-list response includes `clickhouse_catalog`, the load-catalog response shows `"provider":"jdbc-clickhouse"` with the configured `jdbc-url`, and the schema-list response includes at least the `system` database. If the schema-list call returns a connection error, verify the `jdbc-url`, `jdbc-user`, and `jdbc-password`, and confirm the ClickHouse JDBC driver is present in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs` on the Gravitino server.
 
 ## Catalog
 
@@ -25,22 +74,9 @@ ClickHouse catalog is not included in the standard Gravitino server distribution
 
 | Item              | Description                                                                                                                                                                                                   |
 |-------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Scope             | One catalog maps to one ClickHouse instance                                                                                                                                                                   |
-| Metadata/DDL      | Supports JDBC-based metadata management and DDL                                                                                                                                                               |
-| Column defaults   | Supports column default values                                                                                                                                                                                |
-| Drivers           | Requires a user-provided ClickHouse JDBC driver in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`. Download the JAR from the [ClickHouse JDBC Maven repository](https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/).                |
-| Supported version | All code is tested against ClickHouse `24.8.14`. Newer versions such as `25.x` may also work but are not thoroughly tested. Report any compatibility issues to the community.                                                                          |
-
-### ClickHouse Server and JDBC Driver Compatibility Matrix
-
-| ClickHouse version             | Supported ClickHouse JDBC driver versions |
-|--------------------------------|-------------------------------------------|
-| `24.8.x` (including `24.8.14`) | `0.7.1 ~ 0.8.4`                           |
-
-:::tip
-For other ClickHouse versions (not 24.8.x), the required JDBC driver version may be different.
-Use your staging validation results and the official ClickHouse documentation as the final reference.
-:::
+| Scope             | One catalog maps to one ClickHouse instance.                                                                                                                                                                  |
+| Metadata/DDL      | Supports JDBC-based metadata management and DDL.                                                                                                                                                              |
+| Column defaults   | Supports column default values.                                                                                                                                                                               |
 
 ### Catalog Properties
 
@@ -60,10 +96,7 @@ When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-us
 
 ### Create a ClickHouse Catalog
 
-The following example creates a ClickHouse catalog with the required JDBC properties and optional connection pool settings. Note that the `jdbc-driver` class must be available in the Gravitino classpath (for example by placing the ClickHouse JDBC driver JAR in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs`).
-Description about some of the properties:
-- provider: must be `jdbc-clickhouse` for Gravitino to recognize the catalog as ClickHouse;
-- type: must be `RELATIONAL` since ClickHouse is a relational database; 
+The example below creates a ClickHouse catalog with the required JDBC properties. The `provider` value must be `jdbc-clickhouse` for Gravitino to recognize the catalog as ClickHouse, and `type` must be `RELATIONAL`. The `jdbc-driver` class must be available on the Gravitino classpath; place the ClickHouse JDBC driver JAR in `${GRAVITINO_HOME}/catalogs/jdbc-clickhouse/libs` on the Gravitino server.
 
 
 <Tabs groupId="language" queryString>
@@ -167,15 +200,26 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 ### Table Capabilities
 
-| Area                | Details                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Engines             | **MergeTree family** (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`): fully supported, data persists across restarts. **Log family** (`TinyLog`, `StripeLog`, `Log`): supported, data and table definition persist across restarts. **`Null`**: supported, table persists, data is always discarded by design. **`Set`**: supported, table definition persists. **`Memory`**: ⚠️ table definition persists but data is lost on ClickHouse restart (volatile). **Distributed**: cluster mode with remote database/table and sharding key. **Not directly creatable via Gravitino** (`Join`, `Buffer`, `View`, `KeeperMap`, `File`): require parameterized ENGINE clauses or external dependencies not supported by the CREATE TABLE API. |
-| Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY`/`PARTITION BY`.                                                                                                                                                                                                                                                                                    |
-| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` (fixed granularities).                                                                                                                                                                                                                                                                                                                                                         |
-| Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                                                                                                                               |
-| Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                                                                                                                                                                                                                                                                          |
+| Area                | Details                                                                                                                                                                                                       |
+|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Mapping             | Gravitino table maps to a ClickHouse table.                                                                                                                                                                   |
+| Engines             | See [Supported Engines](#supported-engines) below.                                                                                                                                                            |
+| Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY` and `PARTITION BY`.                    |
+| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` with fixed granularities.                                                                                         |
+| Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                   |
+| Column defaults     | Supported.                                                                                                                                                                                                    |
+
+#### Supported Engines
+
+| Engine family or engine | Support |
+|---|---|
+| MergeTree family: `MergeTree` (default), `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree` | Supported. Data and table definition persist across restarts. |
+| Log family: `TinyLog`, `StripeLog`, `Log` | Supported. Data and table definition persist across restarts. |
+| `Null` | Supported. Table definition persists; data is always discarded by design. |
+| `Set` | Supported. Table definition persists. |
+| `Memory` | Supported but volatile. Table definition persists; all data is lost on ClickHouse restart. See the warning under [Create a Table](#create-a-table). |
+| `Distributed` | Supported. Cluster mode with remote database/table and sharding key configured through table properties. |
+| `Join`, `Buffer`, `View`, `KeeperMap`, `File` | Not directly creatable through Gravitino; these engines require parameterized ENGINE clauses or external dependencies that the CREATE TABLE API does not expose. |
 
 ### Table Column Types
 
@@ -245,32 +289,37 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 
 ### Partitioning, Sorting, and Distribution
 
-- `ORDER BY`: required for MergeTree-family engines and only columns identity are supported;
-   - Accept format: `id`, `(id, name)`, `(func(id), name)`, `func(id)`;
-   - Reject format: `(id + 1)`, `(func(id) + 1)`, etc.
+`ORDER BY` is required on MergeTree-family engines and accepts only column-identity expressions:
 
-- `PARTITION BY`: single-column identity and some functions are supported only, and only for MergeTree-family engines. For example `PARTITION BY created_at` or `PARTITION BY toYYYYMM(created_at)` are supported, but `PARTITION BY (created_at + 1)` are not supported.
-   In all, the following partitioning expressions are supported:
-   - Identity: `PARTITION BY column_name`
-   - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`. Other functions are not supported.
-   - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc. (Note: ClickHouse itself does support arbitrary partitioning expressions, but Gravitino supports only the above patterns for partitioning). 
+- Accepted: `id`, `(id, name)`, `(func(id), name)`, `func(id)`.
+- Rejected: composite expressions such as `(id + 1)` or `(func(id) + 1)`.
 
-- Distribution: fixed to `Distributions.NONE`. For a `Distributed` engine table, you can specify the sharding key and remote database/table through table properties to fulfill the same use cases. We will later consider adding more flexible distribution strategies if there is demand.
+`PARTITION BY` is supported only on MergeTree-family engines and accepts single-column identity or a small set of functions:
+
+- Identity: `PARTITION BY column_name`.
+- Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`. Other functions are not supported.
+- Rejected: composite expressions such as `PARTITION BY (column_name + 1)` or `PARTITION BY (toYear(column_name) + 1)`.
+
+ClickHouse itself supports arbitrary partition expressions. The Gravitino layer is intentionally more restrictive.
+
+Distribution is fixed to `Distributions.NONE`. To shard data across nodes, use the `Distributed` engine and configure the sharding key and remote database/table through table properties (`cluster-sharding-key`, `cluster-remote-database`, `cluster-remote-table`).
 
 ### Create a Table
 
 The following example creates a `MergeTree` table with `ORDER BY`, partitioning, indexes, comments, and properties including `ON CLUSTER`. Note that the `engine` property is required for MergeTree-family tables, and that the cluster properties must align with the schema-level cluster settings if `on-cluster=true`.
 
-This is a create table statement that would be executed in ClickHouse to create the corresponding table:
+The equivalent ClickHouse SQL statement is:
+
 ```sql
 CREATE TABLE sales.orders ON CLUSTER ck_cluster (
   order_id Int32,
   user_id Int32,
   amount Decimal(18,2),
   created_at DateTime,
-  primary key (order_id),
-) ENGINE = MergeTree order BY order_id PARTITION BY created_at;
-
+  PRIMARY KEY (order_id)
+) ENGINE = MergeTree
+ORDER BY order_id
+PARTITION BY created_at;
 ```
 
 The same table can be created through the API as follows:
@@ -342,16 +391,19 @@ tableCatalog.createTable(
 ### Table Operations
 
 Supported:
-- Create table with engine, `ORDER BY`, optional partition, indexes, comments, default values, and `SETTINGS`.
-- Add column (with nullable flag, default, comment, position).
-- Rename column.
-- Update column type/comment/default/position/nullability.
-- Delete columns (with `IF EXISTS` support).
-- Add data-skipping indexes; drop data-skipping indexes. Adding/dropping primary key is not supported.
-- Update table comment.
+
+- Creating a table with engine, `ORDER BY`, optional partition, indexes, comments, default values, and `SETTINGS`.
+- Adding a column with nullable flag, default, comment, and position.
+- Renaming a column.
+- Updating a column's type, comment, default, position, or nullability.
+- Deleting columns.
+- Adding and dropping data-skipping indexes.
+- Updating the table comment.
 
 Unsupported:
-- Changing engine after creation.
+
+- Changing the engine after creation.
+- Adding or dropping the primary key after creation.
 - Removing table properties or arbitrary `ALTER TABLE ... SETTINGS`.
 - Auto-increment columns.
 
