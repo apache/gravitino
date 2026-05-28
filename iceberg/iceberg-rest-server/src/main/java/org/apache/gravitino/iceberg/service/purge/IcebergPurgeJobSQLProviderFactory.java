@@ -170,10 +170,16 @@ public class IcebergPurgeJobSQLProviderFactory {
         @Param("reason") String reason,
         @Param("maxAttempts") int maxAttempts,
         @Param("now") long now) {
+      // The state CASE must observe the pre-increment attempts value, so it MUST precede
+      // "attempts = attempts + 1" in the SET list. MySQL evaluates SET assignments left to
+      // right and later clauses see already-updated columns; if the increment came first the
+      // CASE would compare attempts + 2 and fail one attempt early. H2 and PostgreSQL evaluate
+      // every right-hand side against the original row, so state-first is correct there too,
+      // keeping this statement portable across all backends.
       return "UPDATE "
           + TABLE_NAME
-          + " SET attempts = attempts + 1, last_error = #{reason},"
-          + " state = CASE WHEN attempts + 1 >= #{maxAttempts} THEN 'FAILED' ELSE 'PENDING' END,"
+          + " SET state = CASE WHEN attempts + 1 >= #{maxAttempts} THEN 'FAILED' ELSE 'PENDING' END,"
+          + " attempts = attempts + 1, last_error = #{reason},"
           + " heartbeat_at = NULL, updated_at = #{now} WHERE id = #{id} AND state = 'RUNNING'";
     }
 
