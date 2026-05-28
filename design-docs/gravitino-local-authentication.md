@@ -316,7 +316,6 @@ fresh Gravitino deployment.
 
    ```properties
    gravitino.server.rest.extensionPackages=org.apache.gravitino.idp.web.rest.feature
-   gravitino.authorization.enable=true
    gravitino.authorization.serviceAdmins=admin1,admin2
    ```
 
@@ -398,7 +397,6 @@ credentials are otherwise exposed on the wire.
 | Key | Value | Required when using built-in IDP |
 |-----|--------|----------------------------------|
 | `gravitino.server.rest.extensionPackages` | `org.apache.gravitino.idp.web.rest.feature` | Yes |
-| `gravitino.authorization.enable` | `true` | Yes |
 | `gravitino.authorization.serviceAdmins` | Comma-separated service admin usernames | Yes |
 
 List `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages` so
