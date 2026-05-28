@@ -278,15 +278,9 @@ preserving the requirement that local identity tables remain global and metalake
 
 ## 6. Service Admin Initialization
 
-> **Implementation status (current codebase):** Not implemented. There is no startup logic that
-> reads `GRAVITINO_INITIAL_ADMIN_PASSWORD` or auto-creates built-in IdP users for
-> `gravitino.authorization.serviceAdmins`. Operators must create the first built-in IdP users through
-> the management REST APIs (once those APIs are deployable) or direct database operations. The
-> section below remains the target design.
-
 To keep local authentication usable immediately after installation without introducing a hard-coded
-default password, Gravitino should initialize service admin accounts from an environment variable
-during startup when the `basic` authenticator is enabled.
+default password, Gravitino initializes service admin accounts from an environment variable during
+startup when the `basic` authenticator is enabled.
 
 ### 6.1 Initialization Inputs
 
@@ -358,12 +352,6 @@ fresh Gravitino deployment.
 ---
 
 ## 7. Authentication Flow
-
-> **Implementation status (current codebase):** Not implemented. `AuthenticatorFactory` only
-> registers `simple`, `oauth`, and `kerberos`. Listing `basic` in `gravitino.authenticators`
-> causes startup failure because no `Authenticator` class is bound to that name. The flows below
-> describe the intended HTTP Basic authentication behavior once a built-in IdP authenticator is
-> added.
 
 ### 7.1 User Verification
 
@@ -439,13 +427,13 @@ comma-separated, and if a request is supported by multiple authenticators simult
 matching authenticator wins.
 
 The local authentication management capability is enabled only when `basic` is included in
-`gravitino.authenticators`. If `basic` is not enabled, Gravitino should not allow local authentication
-management APIs to be used.
+`gravitino.authenticators`. If `basic` is not enabled, Gravitino does not register local
+authentication management APIs.
 
-> **Implementation note:** Today, `basic` is only checked by `IdpRESTFeature` to register
-> `/api/idp/*` resources. It is not yet skipped or mapped in `AuthenticatorFactory`, so production
-> configs must not list `basic` until authenticator wiring is completed. Management API callers
-> currently authenticate with another mode (for example `simple`) and must be service admins.
+When `basic` is enabled, `AuthenticatorFactory` loads the built-in IdP authenticator so HTTP Basic
+credentials are verified against `idp_user_meta`, and `IdpRESTFeature` registers `/api/idp/*`
+resources. Management API callers must present valid built-in IdP credentials for a username listed
+in `gravitino.authorization.serviceAdmins`.
 
 ### 8.2 REST extension package
 
