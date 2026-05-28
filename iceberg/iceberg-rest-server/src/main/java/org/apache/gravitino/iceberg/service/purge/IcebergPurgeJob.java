@@ -45,7 +45,7 @@ public class IcebergPurgeJob {
     /** Every reachable file was deleted or already gone. */
     SUCCEEDED,
 
-    /** Retries exhausted or a terminal failure; files may be leaked. */
+    /** Retries exhausted or a terminal failure; some files may remain undeleted. */
     FAILED;
 
     /**
@@ -64,8 +64,8 @@ public class IcebergPurgeJob {
   private final String namespace;
   private final String tableName;
   private final String metadataLocation;
-  private final String fileIoImpl;
-  private final Map<String, String> fileIoProperties;
+  private final String fileIOImpl;
+  private final Map<String, String> fileIOProperties;
   private final String createdBy;
 
   /**
@@ -77,8 +77,8 @@ public class IcebergPurgeJob {
    * @param namespace table namespace (dotted)
    * @param tableName table name
    * @param metadataLocation the dropped table's {@code metadata.json} location
-   * @param fileIoImpl FileIO implementation class to reconstruct in the worker
-   * @param fileIoProperties properties to reconstruct the FileIO, snapshotted at enqueue
+   * @param fileIOImpl FileIO implementation class to reconstruct in the worker
+   * @param fileIOProperties properties to reconstruct the FileIO, snapshotted at enqueue
    * @param createdBy principal that requested the drop
    */
   public IcebergPurgeJob(
@@ -88,8 +88,8 @@ public class IcebergPurgeJob {
       String namespace,
       String tableName,
       String metadataLocation,
-      String fileIoImpl,
-      Map<String, String> fileIoProperties,
+      String fileIOImpl,
+      Map<String, String> fileIOProperties,
       String createdBy) {
     this.id = id;
     this.metalakeName = metalakeName;
@@ -97,8 +97,8 @@ public class IcebergPurgeJob {
     this.namespace = namespace;
     this.tableName = tableName;
     this.metadataLocation = metadataLocation;
-    this.fileIoImpl = fileIoImpl;
-    this.fileIoProperties = ImmutableMap.copyOf(fileIoProperties);
+    this.fileIOImpl = fileIOImpl;
+    this.fileIOProperties = ImmutableMap.copyOf(fileIOProperties);
     this.createdBy = createdBy;
   }
 }

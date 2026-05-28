@@ -40,7 +40,7 @@ class TestIcebergPurgeJob {
             "alice");
     Assertions.assertEquals("cat", job.catalogName());
     Assertions.assertEquals("db", job.namespace());
-    Assertions.assertEquals(ImmutableMap.of("k", "v"), job.fileIoProperties());
+    Assertions.assertEquals(ImmutableMap.of("k", "v"), job.fileIOProperties());
     Assertions.assertEquals("alice", job.createdBy());
   }
 

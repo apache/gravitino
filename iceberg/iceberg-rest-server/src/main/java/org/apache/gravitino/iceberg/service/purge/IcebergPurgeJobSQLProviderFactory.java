@@ -63,9 +63,9 @@ public class IcebergPurgeJobSQLProviderFactory {
     return getProvider().selectClaimableIds(staleBefore, window);
   }
 
-  public static String claim(
+  public static String markRunning(
       @Param("id") long id, @Param("now") long now, @Param("staleBefore") long staleBefore) {
-    return getProvider().claim(id, now, staleBefore);
+    return getProvider().markRunning(id, now, staleBefore);
   }
 
   public static String selectById(@Param("id") long id) {
@@ -101,8 +101,8 @@ public class IcebergPurgeJobSQLProviderFactory {
     return getProvider().selectActiveJobId(catalog, namespace, table);
   }
 
-  public static String pruneTerminalBefore(@Param("updatedBefore") long updatedBefore) {
-    return getProvider().pruneTerminalBefore(updatedBefore);
+  public static String pruneFinishedBefore(@Param("updatedBefore") long updatedBefore) {
+    return getProvider().pruneFinishedBefore(updatedBefore);
   }
 
   public static String selectState(@Param("id") long id) {
@@ -118,7 +118,7 @@ public class IcebergPurgeJobSQLProviderFactory {
           + " (id, metalake_name, catalog_name, namespace, table_name, metadata_location,"
           + " file_io_impl, file_io_props, state, attempts, last_error, heartbeat_at, created_by,"
           + " updated_at) VALUES (#{po.id}, #{po.metalakeName}, #{po.catalogName}, #{po.namespace},"
-          + " #{po.tableName}, #{po.metadataLocation}, #{po.fileIoImpl}, #{po.fileIoProps},"
+          + " #{po.tableName}, #{po.metadataLocation}, #{po.fileIOImpl}, #{po.fileIOProps},"
           + " #{po.state}, #{po.attempts}, #{po.lastError}, #{po.heartbeatAt}, #{po.createdBy},"
           + " #{po.updatedAt})";
     }
@@ -131,7 +131,7 @@ public class IcebergPurgeJobSQLProviderFactory {
           + " ORDER BY updated_at LIMIT #{window}";
     }
 
-    String claim(
+    String markRunning(
         @Param("id") long id, @Param("now") long now, @Param("staleBefore") long staleBefore) {
       return "UPDATE "
           + TABLE_NAME
@@ -143,7 +143,7 @@ public class IcebergPurgeJobSQLProviderFactory {
     String selectById(@Param("id") long id) {
       return "SELECT id, metalake_name AS metalakeName, catalog_name AS catalogName, namespace,"
           + " table_name AS tableName, metadata_location AS metadataLocation,"
-          + " file_io_impl AS fileIoImpl, file_io_props AS fileIoProps, state, attempts,"
+          + " file_io_impl AS fileIOImpl, file_io_props AS fileIOProps, state, attempts,"
           + " last_error AS lastError, heartbeat_at AS heartbeatAt, created_by AS createdBy,"
           + " updated_at AS updatedAt FROM "
           + TABLE_NAME
@@ -201,7 +201,7 @@ public class IcebergPurgeJobSQLProviderFactory {
           + " AND table_name = #{table} AND state IN ('PENDING', 'RUNNING') LIMIT 1";
     }
 
-    String pruneTerminalBefore(@Param("updatedBefore") long updatedBefore) {
+    String pruneFinishedBefore(@Param("updatedBefore") long updatedBefore) {
       return "DELETE FROM "
           + TABLE_NAME
           + " WHERE state IN ('SUCCEEDED', 'FAILED') AND updated_at < #{updatedBefore}";

@@ -37,8 +37,8 @@ public class IcebergPurgeJobPO {
   private String namespace;
   private String tableName;
   private String metadataLocation;
-  private String fileIoImpl;
-  private String fileIoProps;
+  private String fileIOImpl;
+  private String fileIOProps;
   private String state;
   private Integer attempts;
   private String lastError;

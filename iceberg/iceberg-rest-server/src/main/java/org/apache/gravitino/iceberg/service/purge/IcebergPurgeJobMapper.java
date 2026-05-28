@@ -43,8 +43,9 @@ public interface IcebergPurgeJobMapper {
   List<Long> selectClaimableIds(
       @Param("staleBefore") long staleBefore, @Param("window") int window);
 
-  @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "claim")
-  int claim(@Param("id") long id, @Param("now") long now, @Param("staleBefore") long staleBefore);
+  @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "markRunning")
+  int markRunning(
+      @Param("id") long id, @Param("now") long now, @Param("staleBefore") long staleBefore);
 
   @SelectProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "selectById")
   IcebergPurgeJobPO selectById(@Param("id") long id);
@@ -72,8 +73,8 @@ public interface IcebergPurgeJobMapper {
       @Param("namespace") String namespace,
       @Param("table") String table);
 
-  @DeleteProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "pruneTerminalBefore")
-  int pruneTerminalBefore(@Param("updatedBefore") long updatedBefore);
+  @DeleteProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "pruneFinishedBefore")
+  int pruneFinishedBefore(@Param("updatedBefore") long updatedBefore);
 
   @SelectProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "selectState")
   String selectState(@Param("id") long id);

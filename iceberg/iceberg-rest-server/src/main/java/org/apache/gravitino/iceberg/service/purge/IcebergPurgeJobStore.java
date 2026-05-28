@@ -57,7 +57,7 @@ public class IcebergPurgeJobStore {
    * @param job job to persist
    * @return generated id
    */
-  public long enqueue(IcebergPurgeJob job) {
+  public long addJob(IcebergPurgeJob job) {
     long id = idGenerator.nextId();
     long now = System.currentTimeMillis();
     IcebergPurgeJobPO po = toPO(job, id, now);
@@ -73,16 +73,16 @@ public class IcebergPurgeJobStore {
    * @param window max candidates to consider
    * @return the claimed job, or {@code null} if nothing was claimable
    */
-  public IcebergPurgeJob claimNext(long now, long heartbeatTimeoutMs, int window) {
+  public IcebergPurgeJob takePendingJob(long now, long heartbeatTimeoutMs, int window) {
     long staleBefore = now - heartbeatTimeoutMs;
     List<Long> ids =
         SessionUtils.getWithoutCommit(
             IcebergPurgeJobMapper.class, mapper -> mapper.selectClaimableIds(staleBefore, window));
     for (long id : ids) {
-      int claimed =
+      int marked =
           SessionUtils.doWithCommitAndFetchResult(
-              IcebergPurgeJobMapper.class, mapper -> mapper.claim(id, now, staleBefore));
-      if (claimed == 1) {
+              IcebergPurgeJobMapper.class, mapper -> mapper.markRunning(id, now, staleBefore));
+      if (marked == 1) {
         IcebergPurgeJobPO po =
             SessionUtils.getWithoutCommit(
                 IcebergPurgeJobMapper.class, mapper -> mapper.selectById(id));
@@ -160,14 +160,14 @@ public class IcebergPurgeJobStore {
   }
 
   /**
-   * Deletes terminal rows older than the cutoff.
+   * Deletes finished (SUCCEEDED or FAILED) jobs older than the cutoff.
    *
    * @param updatedBefore cutoff epoch millis
    * @return rows pruned
    */
-  public int pruneTerminalBefore(long updatedBefore) {
+  public int pruneFinishedBefore(long updatedBefore) {
     return SessionUtils.doWithCommitAndFetchResult(
-        IcebergPurgeJobMapper.class, mapper -> mapper.pruneTerminalBefore(updatedBefore));
+        IcebergPurgeJobMapper.class, mapper -> mapper.pruneFinishedBefore(updatedBefore));
   }
 
   /**
@@ -196,8 +196,8 @@ public class IcebergPurgeJobStore {
     po.setNamespace(job.namespace());
     po.setTableName(job.tableName());
     po.setMetadataLocation(job.metadataLocation());
-    po.setFileIoImpl(job.fileIoImpl());
-    po.setFileIoProps(writeProps(job.fileIoProperties()));
+    po.setFileIOImpl(job.fileIOImpl());
+    po.setFileIOProps(propertiesToJson(job.fileIOProperties()));
     po.setState(IcebergPurgeJob.State.PENDING.name());
     po.setAttempts(0);
     po.setLastError(null);
@@ -215,8 +215,8 @@ public class IcebergPurgeJobStore {
         po.getNamespace(),
         po.getTableName(),
         po.getMetadataLocation(),
-        po.getFileIoImpl(),
-        readProps(po.getFileIoProps()),
+        po.getFileIOImpl(),
+        jsonToProperties(po.getFileIOProps()),
         po.getCreatedBy());
   }
 
@@ -226,19 +226,19 @@ public class IcebergPurgeJobStore {
         : value.substring(0, MAX_ERROR_LENGTH);
   }
 
-  private static String writeProps(Map<String, String> props) {
+  private static String propertiesToJson(Map<String, String> props) {
     try {
       return JsonUtils.objectMapper().writeValueAsString(props);
     } catch (IOException e) {
-      throw new UncheckedIOException("Failed to serialize fileIoProperties", e);
+      throw new UncheckedIOException("Failed to serialize fileIOProperties", e);
     }
   }
 
-  private static Map<String, String> readProps(String json) {
+  private static Map<String, String> jsonToProperties(String json) {
     try {
       return JsonUtils.objectMapper().readValue(json, new TypeReference<Map<String, String>>() {});
     } catch (IOException e) {
-      throw new UncheckedIOException("Failed to deserialize fileIoProperties", e);
+      throw new UncheckedIOException("Failed to deserialize fileIOProperties", e);
     }
   }
 }
