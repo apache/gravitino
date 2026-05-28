@@ -462,7 +462,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       LOG.warn("Failed to load Spark-side table for view {}: {}", ident, e.getMessage());
       throw new NoSuchTableException(ident);
     }
-    return createSparkView(ident, gravitinoView, sparkTable);
+    try {
+      return createSparkView(ident, gravitinoView, sparkTable);
+    } catch (UnsupportedOperationException e) {
+      throw new NoSuchTableException(ident);
+    }
   }
 
   /**
