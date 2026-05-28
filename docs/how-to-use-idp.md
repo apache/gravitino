@@ -81,10 +81,40 @@ The following sections show how to call built-in IDP management APIs with `curl`
 
 ### Before you call the APIs
 
-**Who can call** — `IdpAuthorizationFilter` allows only users listed in
-`gravitino.authorization.serviceAdmins`. The caller must already be authenticated through a
-configured Gravitino authenticator (for example **simple**); see
-[How to authenticate](./security/how-to-authenticate.md).
+#### Set up service admins
+
+Management APIs are allowed only for usernames in `gravitino.authorization.serviceAdmins`.
+`IdpAuthorizationFilter` compares the **authenticated principal** to that list; it does not read
+built-in IDP passwords from `idp_user_meta` for `/api/idp/*` authorization today.
+
+1. **Enable authorization** and define service admins in `gravitino.conf` (see
+   [Access control](./security/access-control.md)):
+
+   ```properties
+   gravitino.authorization.enable = true
+   gravitino.authorization.serviceAdmins = admin
+   ```
+
+2. **Expose `/api/idp/*`** — Include `basic` in `gravitino.authenticators` and set
+   `gravitino.server.rest.extensionPackages` as described in [Configuration](#configuration).
+
+3. **Restart Gravitino** so the settings take effect.
+
+4. **Call APIs as a service admin** — Authenticate with a configured Gravitino authenticator (for
+   example **simple**) using a username that appears in `gravitino.authorization.serviceAdmins`.
+   With simple mode, the principal comes from the `Authorization` header (or `GRAVITINO_USER` on
+   clients). See [How to authenticate](./security/how-to-authenticate.md).
+
+5. **Create built-in IDP users (optional at this step)** — Use `POST /api/idp/users` in
+   [User operations](#user-operations) to add rows in `idp_user_meta`. That is separate from the
+   service-admin allow list: service admins are configuration identities; built-in IDP users are
+   stored credentials for future local login.
+
+Automatic startup initialization via `GRAVITINO_INITIAL_ADMIN_PASSWORD` is **not implemented**
+yet. See [Design of local authentication support](../design-docs/gravitino-local-authentication.md)
+§6 for the planned flow.
+
+#### Request format
 
 **Base URL** — `http://<host>:<port>/api/idp`
 
@@ -95,7 +125,8 @@ configured Gravitino authenticator (for example **simple**); see
 | `Accept` | `application/vnd.gravitino.v1+json` |
 | `Content-Type` | `application/json` (for POST and PUT bodies) |
 
-Example using **simple** mode (empty password is allowed when the server permits it):
+Example using **simple** mode as service admin `admin` (empty password is allowed when the server
+permits it):
 
 ```shell
 curl -s -H "Accept: application/vnd.gravitino.v1+json" \
