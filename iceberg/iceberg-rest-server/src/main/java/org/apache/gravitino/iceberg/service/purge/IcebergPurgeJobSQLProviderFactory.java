@@ -125,14 +125,14 @@ public class IcebergPurgeJobSQLProviderFactory {
 
     String selectRunnableJobIds(
         @Param("staleBefore") long staleBefore, @Param("window") int window) {
-      // A runnable row is PENDING, or RUNNING whose worker has gone silent. markRunning always
-      // writes a heartbeat, so RUNNING with heartbeat_at IS NULL is not produced by normal
-      // transitions. Keep the NULL branch as a defensive guard: without it, SQL three-valued
-      // logic makes NULL < #{staleBefore} UNKNOWN, leaving such a row stuck forever.
+      // A runnable row is PENDING, or RUNNING whose worker has gone silent. heartbeat_at is
+      // NOT NULL (it defaults to 0 and markRunning always writes the current time), so the
+      // staleness test is a plain comparison with no NULL branch and no three-valued-logic
+      // trap, which also keeps the predicate index-friendly.
       return "SELECT id FROM "
           + TABLE_NAME
           + " WHERE state = 'PENDING'"
-          + " OR (state = 'RUNNING' AND (heartbeat_at IS NULL OR heartbeat_at < #{staleBefore}))"
+          + " OR (state = 'RUNNING' AND heartbeat_at < #{staleBefore})"
           + " ORDER BY updated_at LIMIT #{window}";
     }
 
@@ -142,7 +142,7 @@ public class IcebergPurgeJobSQLProviderFactory {
           + TABLE_NAME
           + " SET state = 'RUNNING', heartbeat_at = #{now}, updated_at = #{now}"
           + " WHERE id = #{id} AND (state = 'PENDING'"
-          + " OR (state = 'RUNNING' AND (heartbeat_at IS NULL OR heartbeat_at < #{staleBefore})))";
+          + " OR (state = 'RUNNING' AND heartbeat_at < #{staleBefore}))";
     }
 
     String selectById(@Param("id") long id) {
@@ -163,7 +163,7 @@ public class IcebergPurgeJobSQLProviderFactory {
       // Shared transition to a final state: SUCCEEDED (reason null) or FAILED (reason set).
       return "UPDATE "
           + TABLE_NAME
-          + " SET state = #{state}, last_error = #{reason}, heartbeat_at = NULL,"
+          + " SET state = #{state}, last_error = #{reason}, heartbeat_at = 0,"
           + " updated_at = #{now} WHERE id = #{id} AND state = 'RUNNING'";
     }
 
@@ -182,7 +182,7 @@ public class IcebergPurgeJobSQLProviderFactory {
           + TABLE_NAME
           + " SET state = CASE WHEN attempts + 1 >= #{maxAttempts} THEN 'FAILED' ELSE 'PENDING' END,"
           + " attempts = attempts + 1, last_error = #{reason},"
-          + " heartbeat_at = NULL, updated_at = #{now} WHERE id = #{id} AND state = 'RUNNING'";
+          + " heartbeat_at = 0, updated_at = #{now} WHERE id = #{id} AND state = 'RUNNING'";
     }
 
     String heartbeat(

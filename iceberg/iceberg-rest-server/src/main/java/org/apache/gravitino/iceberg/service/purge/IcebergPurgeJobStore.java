@@ -206,7 +206,7 @@ public class IcebergPurgeJobStore {
     po.setState(IcebergPurgeJob.State.PENDING.name());
     po.setAttempts(0);
     po.setLastError(null);
-    po.setHeartbeatAt(null);
+    po.setHeartbeatAt(0L);
     po.setCreatedBy(job.createdBy());
     po.setUpdatedAt(now);
     return po;

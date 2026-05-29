@@ -164,7 +164,7 @@ CREATE TABLE IF NOT EXISTS iceberg_cleanup_job (
   state             VARCHAR(16)   NOT NULL,
   attempts          INT           NOT NULL DEFAULT 0,
   last_error        VARCHAR(2048),
-  heartbeat_at      BIGINT,
+  heartbeat_at      BIGINT        NOT NULL DEFAULT 0,
   created_by        VARCHAR(128)  NOT NULL,
   updated_at        BIGINT        NOT NULL
 );

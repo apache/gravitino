@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|FAILED',
   `attempts`          INT(10)       NOT NULL DEFAULT 0,
   `last_error`        VARCHAR(2048) NULL COMMENT 'truncated reason for the most recent failure, NULL until a job fails',
-  `heartbeat_at`      BIGINT(20)    NULL COMMENT 'last heartbeat from the worker, NULL when not running',
+  `heartbeat_at`      BIGINT(20)    NOT NULL DEFAULT 0 COMMENT 'last heartbeat from the worker, 0 when not running',
   `created_by`        VARCHAR(128)  NOT NULL COMMENT 'principal that requested the drop (audit)',
   `updated_at`        BIGINT(20)    NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`),
