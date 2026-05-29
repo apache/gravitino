@@ -44,8 +44,6 @@ import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.rest.RESTResponse;
 import org.apache.hc.client5.http.config.ConnectionConfig;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
-import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -67,18 +65,6 @@ public class TestHTTPClient {
 
   private static ClientAndServer mockServer;
   private static RESTClient restClient;
-
-  public static class DefaultTLSConfigurer implements TLSConfigurer {
-    public static int count = 0;
-
-    public DefaultTLSConfigurer() {
-      count++;
-    }
-  }
-
-  public static class TLSConfigurerMissingNoArgCtor implements TLSConfigurer {
-    TLSConfigurerMissingNoArgCtor(String str) {}
-  }
 
   @BeforeAll
   public static void beforeClass() {
@@ -368,90 +354,21 @@ public class TestHTTPClient {
   }
 
   @Test
-  public void testLoadTLSConfigurer() {
-    DefaultTLSConfigurer.count = 0;
-    Map<String, String> properties =
-        ImmutableMap.of(HTTPClient.REST_TLS_CONFIGURER, DefaultTLSConfigurer.class.getName());
+  public void testBuildWithoutTLSConfigurer() {
+    HTTPClient client = HTTPClient.builder(ImmutableMap.of()).uri("http://localhost").build();
 
-    GravitinoClientConfiguration clientConfiguration =
-        GravitinoClientConfiguration.buildFromProperties(ImmutableMap.of());
-
-    HttpClientConnectionManager connectionManager =
-        HTTPClient.configureConnectionManager(clientConfiguration, properties);
-
-    Assertions.assertTrue(connectionManager instanceof PoolingHttpClientConnectionManager);
-    Assertions.assertEquals(1, DefaultTLSConfigurer.count);
+    Assertions.assertNotNull(client);
   }
 
   @Test
-  public void testLoadTLSConfigurerNoArgConstructorNotFound() {
-    Map<String, String> properties =
-        ImmutableMap.of(
-            HTTPClient.REST_TLS_CONFIGURER, TLSConfigurerMissingNoArgCtor.class.getName());
+  public void testBuildWithTLSConfigurer() {
+    HTTPClient client =
+        HTTPClient.builder(ImmutableMap.of())
+            .uri("https://localhost")
+            .withTlsConfigurer(new TLSConfigurer() {})
+            .build();
 
-    GravitinoClientConfiguration clientConfiguration =
-        GravitinoClientConfiguration.buildFromProperties(ImmutableMap.of());
-
-    try {
-      HTTPClient.configureConnectionManager(clientConfiguration, properties);
-      Assertions.fail("Expected IllegalArgumentException");
-    } catch (IllegalArgumentException e) {
-      Assertions.assertTrue(
-          e.getMessage().startsWith("Cannot initialize TLSConfigurer implementation"));
-      Assertions.assertTrue(
-          e.getMessage()
-              .contains(
-                  "NoSuchMethodException: org.apache.gravitino.client.TestHTTPClient$TLSConfigurerMissingNoArgCtor.<init>()"));
-    }
-  }
-
-  @Test
-  public void testLoadTLSConfigurerClassNotFound() {
-    Map<String, String> properties =
-        ImmutableMap.of(HTTPClient.REST_TLS_CONFIGURER, "TLSConfigurerDoesNotExist");
-
-    GravitinoClientConfiguration clientConfiguration =
-        GravitinoClientConfiguration.buildFromProperties(ImmutableMap.of());
-
-    try {
-      HTTPClient.configureConnectionManager(clientConfiguration, properties);
-      Assertions.fail("Expected IllegalArgumentException");
-    } catch (IllegalArgumentException e) {
-      Assertions.assertTrue(
-          e.getMessage().startsWith("Cannot initialize TLSConfigurer implementation"));
-      Assertions.assertTrue(
-          e.getMessage().contains("java.lang.ClassNotFoundException: TLSConfigurerDoesNotExist"));
-    }
-  }
-
-  @Test
-  public void testLoadTLSConfigurerNotImplementTLSConfigurer() {
-    Map<String, String> properties =
-        ImmutableMap.of(HTTPClient.REST_TLS_CONFIGURER, Object.class.getName());
-
-    GravitinoClientConfiguration clientConfiguration =
-        GravitinoClientConfiguration.buildFromProperties(ImmutableMap.of());
-
-    try {
-      HTTPClient.configureConnectionManager(clientConfiguration, properties);
-      Assertions.fail("Expected IllegalArgumentException");
-    } catch (IllegalArgumentException e) {
-      Assertions.assertTrue(e.getMessage().startsWith("Cannot initialize TLSConfigurer"));
-      Assertions.assertTrue(e.getMessage().contains("does not implement TLSConfigurer"));
-    }
-  }
-
-  @Test
-  public void testNoTLSConfigurerProperty() {
-    Map<String, String> properties = ImmutableMap.of();
-
-    GravitinoClientConfiguration clientConfiguration =
-        GravitinoClientConfiguration.buildFromProperties(ImmutableMap.of());
-
-    HttpClientConnectionManager connectionManager =
-        HTTPClient.configureConnectionManager(clientConfiguration, properties);
-
-    Assertions.assertTrue(connectionManager instanceof PoolingHttpClientConnectionManager);
+    Assertions.assertNotNull(client);
   }
 
   public static void testHttpMethodOnSuccess(

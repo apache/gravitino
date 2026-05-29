@@ -84,7 +84,8 @@ public class GravitinoClient extends GravitinoClientBase
   private final GravitinoMetalake metalake;
 
   /**
-   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
+   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider, but a
+   * default null TLS configurer.
    *
    * @param uri The base URI for the Gravitino API.
    * @param metalakeName The specified metalake name.
@@ -102,7 +103,31 @@ public class GravitinoClient extends GravitinoClientBase
       boolean checkVersion,
       Map<String, String> headers,
       Map<String, String> properties) {
-    super(uri, authDataProvider, checkVersion, headers, properties);
+    this(uri, metalakeName, authDataProvider, checkVersion, headers, properties, null);
+  }
+
+  /**
+   * Constructs a new GravitinoClient with the given URI, authenticator and AuthDataProvider.
+   *
+   * @param uri The base URI for the Gravitino API.
+   * @param metalakeName The specified metalake name.
+   * @param authDataProvider The provider of the data which is used for authentication.
+   * @param checkVersion Whether to check the version of the Gravitino server. Gravitino does not
+   *     support the case that the client-side version is higher than the server-side version.
+   * @param headers The base header for Gravitino API.
+   * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
+   * @param tlsConfigurer The TLS configurer for the Gravitino client.
+   * @throws NoSuchMetalakeException if the metalake with specified name does not exist.
+   */
+  private GravitinoClient(
+      String uri,
+      String metalakeName,
+      AuthDataProvider authDataProvider,
+      boolean checkVersion,
+      Map<String, String> headers,
+      Map<String, String> properties,
+      TLSConfigurer tlsConfigurer) {
+    super(uri, authDataProvider, checkVersion, headers, properties, tlsConfigurer);
     this.metalake = loadMetalake(metalakeName);
   }
 
@@ -697,6 +722,17 @@ public class GravitinoClient extends GravitinoClientBase
     }
 
     /**
+     * Optional, set the TLS configurer for this client.
+     *
+     * @param tlsConfigurer The TLS configurer for the Gravitino client.
+     * @return This Builder instance for method chaining.
+     */
+    public ClientBuilder withTlsConfigurer(TLSConfigurer tlsConfigurer) {
+      this.tlsConfigurer = tlsConfigurer;
+      return this;
+    }
+
+    /**
      * Builds a new GravitinoClient instance.
      *
      * @return A new instance of GravitinoClient with the specified base URI.
@@ -712,7 +748,7 @@ public class GravitinoClient extends GravitinoClientBase
           "The argument 'metalakeName' must be a valid name");
 
       return new GravitinoClient(
-          uri, metalakeName, authDataProvider, isVersionCheckEnabled(), headers, properties);
+          uri, metalakeName, authDataProvider, isVersionCheckEnabled(), headers, properties, tlsConfigurer);
     }
   }
 }

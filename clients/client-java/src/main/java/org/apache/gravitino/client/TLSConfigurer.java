@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.client;
 
-import java.util.Map;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
 import org.apache.hc.client5.http.ssl.HttpsSupport;
@@ -26,13 +25,6 @@ import org.apache.hc.core5.ssl.SSLContexts;
 
 /** Configures TLS settings for the HTTP client. */
 public interface TLSConfigurer {
-
-  /**
-   * Initializes the TLS configurer with client properties.
-   *
-   * @param properties client configuration properties
-   */
-  default void initialize(Map<String, String> properties) {}
 
   /**
    * Returns the SSL context used for TLS connections.
