@@ -60,6 +60,7 @@ dependencies {
   testImplementation(libs.mockito.core)
   testImplementation(libs.mockserver.netty)
   testImplementation(libs.mockserver.client.java)
+  testImplementation(libs.h2db)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
@@ -86,6 +87,10 @@ tasks.test {
     dependsOn(":catalogs:catalog-model:jar", ":catalogs:catalog-model:runtimeJars")
     dependsOn(":catalogs:catalog-hive:jar", ":catalogs:catalog-hive:runtimeJars")
     dependsOn(":catalogs:catalog-kafka:jar", ":catalogs:catalog-kafka:runtimeJars")
+    dependsOn(
+      ":catalogs:catalog-lakehouse-iceberg:jar",
+      ":catalogs:catalog-lakehouse-iceberg:runtimeJars"
+    )
   }
 }
 

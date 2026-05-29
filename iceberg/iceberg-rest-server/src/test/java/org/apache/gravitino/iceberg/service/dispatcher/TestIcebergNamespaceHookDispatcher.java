@@ -19,21 +19,34 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.TreeLock;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
@@ -43,6 +56,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 public class TestIcebergNamespaceHookDispatcher {
 
@@ -53,6 +67,8 @@ public class TestIcebergNamespaceHookDispatcher {
   private IcebergNamespaceHookDispatcher hookDispatcher;
   private IcebergNamespaceOperationDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
+  private EntityStore mockEntityStore;
+  private LockManager mockLockManager;
   private IcebergRequestContext mockContext;
 
   @BeforeEach
@@ -66,6 +82,14 @@ public class TestIcebergNamespaceHookDispatcher {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "schemaDispatcher", mockSchemaDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", mockTableDispatcher, true);
+
+    mockEntityStore = mock(EntityStore.class);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", mockEntityStore, true);
+
+    mockLockManager = mock(LockManager.class);
+    TreeLock mockTreeLock = mock(TreeLock.class);
+    when(mockLockManager.createTreeLock(any())).thenReturn(mockTreeLock);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", mockLockManager, true);
 
     IcebergConfigProvider mockConfigProvider = mock(IcebergConfigProvider.class);
     when(mockConfigProvider.getMetalakeName()).thenReturn(TEST_METALAKE);
@@ -84,6 +108,8 @@ public class TestIcebergNamespaceHookDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", null, true);
 
     Class<?> holderClass =
         Arrays.stream(IcebergRESTServerContext.class.getDeclaredClasses())
@@ -104,7 +130,7 @@ public class TestIcebergNamespaceHookDispatcher {
 
     doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
-        .setOwner(any(), any(), any(), any());
+        .setOwners(any(), any(), any(), any());
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -154,7 +180,7 @@ public class TestIcebergNamespaceHookDispatcher {
             RuntimeException.class, () -> hookDispatcher.createNamespace(mockContext, mockRequest));
 
     Assertions.assertEquals("Import failed", thrown.getMessage());
-    verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+    verify(mockOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
   }
 
   @Test
@@ -179,5 +205,98 @@ public class TestIcebergNamespaceHookDispatcher {
 
     Assertions.assertEquals("Import failed", thrown.getMessage());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testCreateNamespaceLocksTopLevelBranchRoot() {
+    // Lock target must be the top-level branch root (metalake.catalog.A), not the catalog —
+    // that's what lets disjoint top-level branches create in parallel.
+    Namespace leaf = Namespace.of("A", "B", "C");
+    CreateNamespaceRequest request = mock(CreateNamespaceRequest.class);
+    when(request.namespace()).thenReturn(leaf);
+    when(mockDispatcher.createNamespace(mockContext, request))
+        .thenReturn(mock(CreateNamespaceResponse.class));
+
+    hookDispatcher.createNamespace(mockContext, request);
+
+    ArgumentCaptor<NameIdentifier> lockId = ArgumentCaptor.forClass(NameIdentifier.class);
+    verify(mockLockManager).createTreeLock(lockId.capture());
+    Assertions.assertArrayEquals(
+        new String[] {TEST_METALAKE, TEST_CATALOG}, lockId.getValue().namespace().levels());
+    Assertions.assertEquals("A", lockId.getValue().name());
+  }
+
+  @Test
+  public void testCreateNestedNamespaceOwnsMissingAncestorsAndLeaf() {
+    // Depth-4 leaf, only A exists. Expect setOwners with [A:B, A:B:C, A:B:C:D] —
+    // missing ancestors (outermost first) + leaf; existing A is not re-owned.
+    Namespace leaf = Namespace.of("A", "B", "C", "D");
+    Set<String> existing = ImmutableSet.of("A");
+    when(mockDispatcher.namespaceExists(eq(mockContext), any(Namespace.class)))
+        .thenAnswer(
+            inv -> {
+              Namespace ns = inv.getArgument(1, Namespace.class);
+              return existing.contains(String.join(":", ns.levels()));
+            });
+
+    CreateNamespaceRequest request = mock(CreateNamespaceRequest.class);
+    when(request.namespace()).thenReturn(leaf);
+    when(mockDispatcher.createNamespace(mockContext, request))
+        .thenReturn(mock(CreateNamespaceResponse.class));
+
+    hookDispatcher.createNamespace(mockContext, request);
+
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<MetadataObject>> captor = ArgumentCaptor.forClass(List.class);
+    verify(mockOwnerDispatcher)
+        .setOwners(eq(TEST_METALAKE), captor.capture(), eq(TEST_USER), eq(Owner.Type.USER));
+    List<String> names =
+        captor.getValue().stream().map(MetadataObject::fullName).collect(Collectors.toList());
+    Assertions.assertEquals(
+        Arrays.asList(TEST_CATALOG + ".A:B", TEST_CATALOG + ".A:B:C", TEST_CATALOG + ".A:B:C:D"),
+        names);
+  }
+
+  @Test
+  public void testDropNamespaceDeletesTargetAndPhantomAncestors() throws Exception {
+    Namespace leaf = Namespace.of("A", "B", "C");
+    Namespace parent = Namespace.of("A", "B");
+    Namespace grandparent = Namespace.of("A");
+
+    hookDispatcher.dropNamespace(mockContext, leaf);
+
+    verify(mockDispatcher).dropNamespace(mockContext, leaf);
+    verify(mockDispatcher, never()).dropNamespace(mockContext, parent);
+    verify(mockDispatcher, never()).dropNamespace(mockContext, grandparent);
+
+    // The leaf and both phantom ancestors are stale, so a single cascade delete of the outermost
+    // empty ancestor (A) removes the whole stale chain in one batched operation.
+    ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
+    verify(mockEntityStore, times(1))
+        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
+    Assertions.assertEquals("A", captor.getValue().name());
+  }
+
+  @Test
+  public void testDropNamespaceDeletesTargetWhenAncestorsExist() throws Exception {
+    Namespace leaf = Namespace.of("A", "B", "C");
+    Namespace parent = Namespace.of("A", "B");
+    Namespace grandparent = Namespace.of("A");
+
+    when(mockDispatcher.namespaceExists(mockContext, parent)).thenReturn(true);
+
+    hookDispatcher.dropNamespace(mockContext, leaf);
+
+    verify(mockDispatcher).dropNamespace(mockContext, leaf);
+    verify(mockDispatcher, never()).dropNamespace(mockContext, parent);
+    verify(mockDispatcher, never()).dropNamespace(mockContext, grandparent);
+    verify(mockDispatcher).namespaceExists(mockContext, parent);
+    verify(mockDispatcher, never()).namespaceExists(mockContext, grandparent);
+
+    // The parent still exists, so only the leaf is stale; it is cascade-deleted on its own.
+    ArgumentCaptor<NameIdentifier> captor = ArgumentCaptor.forClass(NameIdentifier.class);
+    verify(mockEntityStore, times(1))
+        .delete(captor.capture(), eq(Entity.EntityType.SCHEMA), eq(true));
+    Assertions.assertEquals("A:B:C", captor.getValue().name());
   }
 }

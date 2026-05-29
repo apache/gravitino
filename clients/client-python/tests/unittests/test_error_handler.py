@@ -25,6 +25,8 @@ from gravitino.exceptions.base import (
     ConnectionFailedException,
     ForbiddenException,
     IllegalArgumentException,
+    IllegalMetadataObjectException,
+    IllegalPrivilegeException,
     InternalError,
     MetalakeAlreadyExistsException,
     MetalakeNotInUseException,
@@ -33,8 +35,10 @@ from gravitino.exceptions.base import (
     NoSuchCredentialException,
     NoSuchFilesetException,
     NoSuchMetalakeException,
+    NoSuchMetadataObjectException,
     NoSuchPartitionException,
     NoSuchRoleException,
+    NoSuchGroupException,
     NoSuchSchemaException,
     NoSuchTableException,
     NoSuchUserException,
@@ -43,21 +47,25 @@ from gravitino.exceptions.base import (
     NotInUseException,
     PartitionAlreadyExistsException,
     RESTException,
+    RoleAlreadyExistsException,
     SchemaAlreadyExistsException,
     TableAlreadyExistsException,
     UnsupportedOperationException,
     UserAlreadyExistsException,
+    GroupAlreadyExistsException,
 )
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 from gravitino.exceptions.handlers.credential_error_handler import (
     CREDENTIAL_ERROR_HANDLER,
 )
 from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HANDLER
+from gravitino.exceptions.handlers.group_error_handler import GROUP_ERROR_HANDLER
 from gravitino.exceptions.handlers.metalake_error_handler import METALAKE_ERROR_HANDLER
 from gravitino.exceptions.handlers.partition_error_handler import (
     PARTITION_ERROR_HANDLER,
 )
 from gravitino.exceptions.handlers.rest_error_handler import REST_ERROR_HANDLER
+from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HANDLER
 from gravitino.exceptions.handlers.table_error_handler import TABLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
@@ -474,5 +482,131 @@ class TestErrorHandler(unittest.TestCase):
 
         with self.assertRaises(RESTException):
             USER_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(Exception, "mock error")
+            )
+
+    def test_group_error_handler(self):
+        with self.assertRaises(NoSuchMetalakeException):
+            GROUP_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchMetalakeException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchGroupException):
+            GROUP_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchGroupException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchRoleException):
+            GROUP_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NoSuchRoleException, "mock error")
+            )
+
+        with self.assertRaises(GroupAlreadyExistsException):
+            GROUP_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    GroupAlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(IllegalArgumentException):
+            GROUP_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalArgumentException, "mock error"
+                )
+            )
+
+        with self.assertRaises(MetalakeNotInUseException):
+            GROUP_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    MetalakeNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NotFoundException):
+            GROUP_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NotFoundException, "mock error")
+            )
+
+        with self.assertRaises(RuntimeError):
+            GROUP_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(InternalError, "mock error")
+            )
+
+        with self.assertRaises(RESTException):
+            GROUP_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(Exception, "mock error")
+            )
+
+    def test_role_error_handler(self):
+        with self.assertRaises(IllegalPrivilegeException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalPrivilegeException, "mock error"
+                )
+            )
+
+        with self.assertRaises(IllegalMetadataObjectException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    IllegalMetadataObjectException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchMetalakeException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchMetalakeException, "mock error"
+                )
+            )
+
+        with self.assertRaises(NoSuchRoleException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(NoSuchRoleException, "mock error")
+            )
+
+        with self.assertRaises(NoSuchMetadataObjectException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    NoSuchMetadataObjectException, "mock error"
+                )
+            )
+
+        with self.assertRaises(RoleAlreadyExistsException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    RoleAlreadyExistsException, "mock error"
+                )
+            )
+
+        with self.assertRaises(UnsupportedOperationException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    UnsupportedOperationException, "mock error"
+                )
+            )
+
+        with self.assertRaises(ForbiddenException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(ForbiddenException, "mock error")
+            )
+
+        with self.assertRaises(MetalakeNotInUseException):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(
+                    MetalakeNotInUseException, "mock error"
+                )
+            )
+
+        with self.assertRaises(RuntimeError):
+            ROLE_ERROR_HANDLER.handle(
+                ErrorResponse.generate_error_response(InternalError, "mock error")
+            )
+
+        with self.assertRaises(RESTException):
+            ROLE_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(Exception, "mock error")
             )

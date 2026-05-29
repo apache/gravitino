@@ -100,6 +100,7 @@ public enum OperationType {
   // View event
   CREATE_VIEW,
   ALTER_VIEW,
+  REPLACE_VIEW,
   DROP_VIEW,
   LOAD_VIEW,
   VIEW_EXISTS,

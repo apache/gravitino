@@ -132,7 +132,11 @@ public class PartitionEventDispatcher implements PartitionDispatcher {
     eventBus.dispatchEvent(new ListPartitionPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
       Partition[] listPartitions = dispatcher.listPartitions(ident);
-      eventBus.dispatchEvent(new ListPartitionEvent(PrincipalUtils.getCurrentUserName(), ident));
+      eventBus.dispatchEvent(
+          new ListPartitionEvent(
+              PrincipalUtils.getCurrentUserName(),
+              ident,
+              listPartitions != null ? listPartitions.length : -1));
       return listPartitions;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -148,7 +152,10 @@ public class PartitionEventDispatcher implements PartitionDispatcher {
     try {
       String[] listPartitionNames = dispatcher.listPartitionNames(ident);
       eventBus.dispatchEvent(
-          new ListPartitionNamesEvent(PrincipalUtils.getCurrentUserName(), ident));
+          new ListPartitionNamesEvent(
+              PrincipalUtils.getCurrentUserName(),
+              ident,
+              listPartitionNames != null ? listPartitionNames.length : -1));
       return listPartitionNames;
     } catch (Exception e) {
       eventBus.dispatchEvent(

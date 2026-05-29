@@ -52,6 +52,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -67,6 +68,7 @@ import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizatio
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.SnapshotRef;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
@@ -198,7 +200,7 @@ public class IcebergTableOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_MODIFY_TABLE)",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response updateTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -243,7 +245,7 @@ public class IcebergTableOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && TABLE::OWNER ",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER ",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -281,10 +283,11 @@ public class IcebergTableOperations {
   @Produces(MediaType.APPLICATION_JSON)
   @Timed(name = "load-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-table", absolute = true)
-  // SCHEMA-level authorization; TABLE-specific authorization is handled in LoadTableAuthzHandler
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
-      accessMetadataType = MetadataObject.Type.SCHEMA)
+      expression = AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+      allowCheckExistence =
+          AuthorizationExpressionConstants.ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.TABLE)
   public Response loadTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
@@ -349,10 +352,7 @@ public class IcebergTableOperations {
   @Timed(name = "table-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "table-exists", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)",
+      expression = AuthorizationExpressionConstants.ICEBERG_TABLE_EXISTS_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response tableExists(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -448,7 +448,7 @@ public class IcebergTableOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response getTableCredentials(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -502,7 +502,7 @@ public class IcebergTableOperations {
       expression =
           "ANY(OWNER, METALAKE, CATALOG) || "
               + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE|| ANY_MODIFY_TABLE)",
+              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)",
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response planTableScan(
       @PathParam("prefix") @AuthorizationMetadata(type = EntityType.CATALOG) String prefix,
@@ -637,7 +637,11 @@ public class IcebergTableOperations {
       TableIdentifier identifier = identifiers.get(i);
       nameIdentifiers[i] =
           NameIdentifier.of(
-              metalake, catalogName, identifier.namespace().level(0), identifier.name());
+              metalake,
+              catalogName,
+              IcebergIdentifierUtils.icebergNamespaceToSchemaName(
+                  identifier.namespace(), HierarchicalSchemaUtil.schemaSeparator()),
+              identifier.name());
     }
     return nameIdentifiers;
   }
@@ -653,7 +657,10 @@ public class IcebergTableOperations {
     List<TableIdentifier> filteredIdentifiers = new ArrayList<>();
     for (NameIdentifier ident : idents) {
       filteredIdentifiers.add(
-          TableIdentifier.of(Namespace.of(ident.namespace().level(2)), ident.name()));
+          TableIdentifier.of(
+              IcebergIdentifierUtils.getIcebergNamespaceFromSchemaName(
+                  ident.namespace().level(2), HierarchicalSchemaUtil.schemaSeparator()),
+              ident.name()));
     }
     return ListTablesResponse.builder()
         .addAll(filteredIdentifiers)

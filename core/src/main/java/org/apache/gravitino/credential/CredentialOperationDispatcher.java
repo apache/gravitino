@@ -58,7 +58,7 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
         NoSuchCatalogException.class);
   }
 
-  private List<Credential> getCredentials(
+  List<Credential> getCredentials(
       BaseCatalog baseCatalog, NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
     Map<String, CredentialContext> contexts =
         getCredentialContexts(baseCatalog, nameIdentifier, privilege);
@@ -76,11 +76,10 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
         continue;
       }
 
-      Credential credential =
-          baseCatalog
-              .catalogCredentialManager()
-              .getCredential(entry.getKey(), contextOptional.get());
-      credentials.add(credential);
+      baseCatalog
+          .catalogCredentialManager()
+          .getCredential(entry.getKey(), contextOptional.get())
+          .ifPresent(credentials::add);
     }
     return credentials;
   }
@@ -88,7 +87,7 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
   private Map<String, CredentialContext> getCredentialContexts(
       BaseCatalog baseCatalog, NameIdentifier nameIdentifier, CredentialPrivilege privilege) {
     if (nameIdentifier.equals(NameIdentifierUtil.getCatalogIdentifier(nameIdentifier))) {
-      return getCatalogCredentialContexts(baseCatalog.properties());
+      return getCatalogCredentialContexts(baseCatalog.propertiesWithCredentialProviders());
     }
 
     if (baseCatalog.ops() instanceof SupportsPathBasedCredentials) {

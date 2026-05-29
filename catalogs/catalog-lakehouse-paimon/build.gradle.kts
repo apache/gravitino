@@ -103,6 +103,11 @@ dependencies {
   }
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+
+  constraints {
+    implementation(libs.snakeyaml)
+  }
+
   implementation(libs.hadoop3.common) {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")
@@ -123,6 +128,39 @@ dependencies {
   implementation(libs.hadoop3.hdfs.client)
   implementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
+  }
+
+  // Required by Paimon HiveCatalog#createView, which calls hive ql metadata Table APIs.
+  runtimeOnly(libs.hive2.exec) {
+    // Use the lightweight core artifact instead of the shaded hive-exec fat jar.
+    artifact {
+      classifier = "core"
+    }
+    // Keep hive-exec footprint minimal for catalog runtime packaging.
+    exclude("com.google.code.findbugs", "jsr305")
+    exclude("com.google.protobuf")
+    exclude("org.apache.ant")
+    exclude("org.apache.avro")
+    exclude("org.apache.calcite")
+    exclude("org.apache.calcite.avatica")
+    exclude("org.apache.curator")
+    exclude("org.apache.hadoop")
+    exclude("org.apache.hive", "hive-llap-tez")
+    exclude("org.apache.hive", "hive-vector-code-gen")
+    exclude("org.apache.ivy")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.zookeeper")
+    exclude("org.codehaus.groovy")
+    exclude("org.datanucleus")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.openjdk.jol")
+    // Avoid resolving non-Central transitive artifacts (e.g. pentaho-aggdesigner-algorithm).
+    exclude("org.pentaho")
+    exclude("org.codehaus.janino")
+    exclude("net.hydromatic", "eigenbase-properties")
+    exclude("org.slf4j")
+    exclude("stax", "stax-api")
   }
 
   annotationProcessor(libs.lombok)
@@ -152,7 +190,6 @@ dependencies {
     exclude("io.dropwizard.metrics")
     exclude("org.rocksdb")
   }
-  testImplementation(libs.awaitility)
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.h2db)
