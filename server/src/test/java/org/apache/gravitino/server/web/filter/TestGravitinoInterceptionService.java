@@ -313,7 +313,10 @@ public class TestGravitinoInterceptionService {
     }
 
     @Override
-    public boolean isSelf(Entity.EntityType type, NameIdentifier nameIdentifier) {
+    public boolean isSelf(
+        Entity.EntityType type,
+        NameIdentifier nameIdentifier,
+        AuthorizationRequestContext requestContext) {
       return true;
     }
 
