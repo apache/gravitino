@@ -618,4 +618,4 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   PRIMARY KEY (`id`),
   KEY `idx_state_updated` (`state`, `updated_at`),
   KEY `idx_object` (`catalog_name`, `namespace`(255), `table_name`(255), `state`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'async Iceberg table purge jobs';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'async Iceberg table cleanup jobs';
