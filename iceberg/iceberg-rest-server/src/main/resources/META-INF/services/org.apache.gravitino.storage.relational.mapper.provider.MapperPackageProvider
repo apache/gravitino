@@ -16,4 +16,4 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-org.apache.gravitino.iceberg.service.purge.IcebergPurgeMapperPackageProvider
+org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupMapperPackageProvider

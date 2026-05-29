@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.iceberg.service.purge;
+package org.apache.gravitino.iceberg.service.cleanup;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -25,14 +25,14 @@ import lombok.Getter;
 import lombok.experimental.Accessors;
 
 /**
- * Immutable description of a table to purge. Carries exactly the fields the request path supplies
+ * Immutable description of a table to cleanup. Carries exactly the fields the request path supplies
  * at enqueue and the worker reads back to delete files. Mutable progress (state, attempts,
  * heartbeat) lives only in the {@code iceberg_cleanup_job} row, managed by {@link
- * IcebergPurgeJobStore}; the {@link State} enum here names those row states.
+ * IcebergCleanupJobStore}; the {@link State} enum here names those row states.
  */
 @Getter
 @Accessors(fluent = true)
-public class IcebergPurgeJob {
+public class IcebergCleanupJob {
 
   /** Lifecycle states of an {@code iceberg_cleanup_job} row. */
   public enum State {
@@ -69,7 +69,7 @@ public class IcebergPurgeJob {
   private final String createdBy;
 
   /**
-   * Creates a purge job description.
+   * Creates a cleanup job description.
    *
    * @param id row id, or {@code 0} before persistence
    * @param metalakeName owning metalake
@@ -81,7 +81,7 @@ public class IcebergPurgeJob {
    * @param fileIOProperties properties to reconstruct the FileIO, snapshotted at enqueue
    * @param createdBy principal that requested the drop
    */
-  public IcebergPurgeJob(
+  public IcebergCleanupJob(
       long id,
       String metalakeName,
       String catalogName,

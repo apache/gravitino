@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.iceberg.service.purge;
+package org.apache.gravitino.iceberg.service.cleanup;
 
 import java.util.List;
 import org.apache.ibatis.annotations.DeleteProvider;
@@ -28,57 +28,59 @@ import org.apache.ibatis.annotations.UpdateProvider;
 
 /**
  * MyBatis mapper for the {@code iceberg_cleanup_job} table. SQL is supplied per backend by {@link
- * IcebergPurgeJobSQLProviderFactory} and executed through the Gravitino entity store's shared
- * {@code SqlSessionFactory}, so async purge reuses the relational backend's connection pool and
+ * IcebergCleanupJobSQLProviderFactory} and executed through the Gravitino entity store's shared
+ * {@code SqlSessionFactory}, so async cleanup reuses the relational backend's connection pool and
  * multi-backend handling instead of opening its own JDBC connections.
  */
-public interface IcebergPurgeJobMapper {
+public interface IcebergCleanupJobMapper {
 
   String TABLE_NAME = "iceberg_cleanup_job";
 
-  @InsertProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "insertPurgeJob")
-  void insertPurgeJob(@Param("po") IcebergPurgeJobPO po);
+  @InsertProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "insertCleanupJob")
+  void insertCleanupJob(@Param("po") IcebergCleanupJobPO po);
 
-  @SelectProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "selectRunnableJobIds")
-  List<Long> selectRunnableJobIds(
-      @Param("staleBefore") long staleBefore, @Param("window") int window);
+  @SelectProvider(
+      type = IcebergCleanupJobSQLProviderFactory.class,
+      method = "selectCandidateJobIds")
+  List<Long> selectCandidateJobIds(
+      @Param("heartbeatExpiry") long heartbeatExpiry, @Param("window") int window);
 
-  @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "markRunning")
+  @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "markRunning")
   int markRunning(
-      @Param("id") long id, @Param("now") long now, @Param("staleBefore") long staleBefore);
+      @Param("id") long id, @Param("now") long now, @Param("heartbeatExpiry") long heartbeatExpiry);
 
-  @SelectProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "selectById")
-  IcebergPurgeJobPO selectById(@Param("id") long id);
+  @SelectProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "selectById")
+  IcebergCleanupJobPO selectById(@Param("id") long id);
 
-  @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "markFinished")
+  @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "markFinished")
   int markFinished(
       @Param("id") long id,
       @Param("state") String state,
       @Param("reason") String reason,
       @Param("now") long now);
 
-  @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "recordFailure")
+  @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "recordFailure")
   int recordFailure(
       @Param("id") long id,
       @Param("reason") String reason,
       @Param("maxAttempts") int maxAttempts,
       @Param("now") long now);
 
-  @UpdateProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "heartbeat")
+  @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "heartbeat")
   int heartbeat(
-      @Param("id") long id, @Param("lastWritten") long lastWritten, @Param("now") long now);
+      @Param("id") long id, @Param("lastHeartbeat") long lastHeartbeat, @Param("now") long now);
 
-  @SelectProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "selectActiveJobId")
+  @SelectProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "selectActiveJobId")
   Long selectActiveJobId(
       @Param("catalog") String catalog,
       @Param("namespace") String namespace,
       @Param("table") String table);
 
   @DeleteProvider(
-      type = IcebergPurgeJobSQLProviderFactory.class,
+      type = IcebergCleanupJobSQLProviderFactory.class,
       method = "deleteFinishedJobsByLegacyTimeline")
   int deleteFinishedJobsByLegacyTimeline(@Param("legacyTimeline") long legacyTimeline);
 
-  @SelectProvider(type = IcebergPurgeJobSQLProviderFactory.class, method = "selectState")
+  @SelectProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "selectState")
   String selectState(@Param("id") long id);
 }

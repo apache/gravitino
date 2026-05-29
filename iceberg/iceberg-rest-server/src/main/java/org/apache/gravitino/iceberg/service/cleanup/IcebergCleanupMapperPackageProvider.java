@@ -17,21 +17,21 @@
  * under the License.
  */
 
-package org.apache.gravitino.iceberg.service.purge;
+package org.apache.gravitino.iceberg.service.cleanup;
 
 import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.MapperPackageProvider;
 
 /**
- * Registers the Iceberg async-purge mapper into the Gravitino entity store's MyBatis configuration
- * via {@link java.util.ServiceLoader}, so the purge job store reuses the shared relational backend
- * rather than opening its own JDBC connections.
+ * Registers the Iceberg async-cleanup mapper into the Gravitino entity store's MyBatis
+ * configuration via {@link java.util.ServiceLoader}, so the cleanup job store reuses the shared
+ * relational backend rather than opening its own JDBC connections.
  */
-public class IcebergPurgeMapperPackageProvider implements MapperPackageProvider {
+public class IcebergCleanupMapperPackageProvider implements MapperPackageProvider {
 
   @Override
   public List<Class<?>> getMapperClasses() {
-    return ImmutableList.of(IcebergPurgeJobMapper.class);
+    return ImmutableList.of(IcebergCleanupJobMapper.class);
   }
 }

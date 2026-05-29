@@ -17,19 +17,26 @@
  * under the License.
  */
 
-package org.apache.gravitino.iceberg.service.purge;
+package org.apache.gravitino.iceberg.service.cleanup;
 
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
-import lombok.Setter;
+import lombok.NoArgsConstructor;
 
 /**
  * Persistence object for one {@code iceberg_cleanup_job} row. Mirrors the table columns and is
- * mapped by {@link IcebergPurgeJobMapper}; {@link IcebergPurgeJobStore} converts it to and from the
- * {@link IcebergPurgeJob} domain object.
+ * mapped by {@link IcebergCleanupJobMapper}; {@link IcebergCleanupJobStore} converts it to and from
+ * the {@link IcebergCleanupJob} domain object. Instances are created through the generated {@code
+ * builder()} (or populated by MyBatis via field reflection through the private no-arg constructor)
+ * and expose no setters, so they are effectively immutable once built.
  */
 @Getter
-@Setter
-public class IcebergPurgeJobPO {
+@Builder(setterPrefix = "with")
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+public class IcebergCleanupJobPO {
 
   private Long id;
   private String metalakeName;

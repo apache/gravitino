@@ -89,14 +89,14 @@ public class TestIcebergConfig {
   }
 
   @Test
-  public void testAsyncPurgeDefaults() {
+  public void testAsyncCleanupDefaults() {
     IcebergConfig config = new IcebergConfig(ImmutableMap.of());
-    Assertions.assertEquals(2, config.get(IcebergConfig.ASYNC_PURGE_WORKER_THREADS));
-    Assertions.assertEquals(4, config.get(IcebergConfig.ASYNC_PURGE_DELETE_THREADS));
-    Assertions.assertEquals(1000, config.get(IcebergConfig.ASYNC_PURGE_DELETE_BATCH_SIZE));
-    Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_PURGE_POLL_INTERVAL_SECS));
-    Assertions.assertEquals(300, config.get(IcebergConfig.ASYNC_PURGE_HEARTBEAT_TIMEOUT_SECS));
-    Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_PURGE_MAX_ATTEMPTS));
-    Assertions.assertEquals(720, config.get(IcebergConfig.ASYNC_PURGE_RETENTION_HOURS));
+    Assertions.assertEquals(2, config.get(IcebergConfig.ASYNC_CLEANUP_WORKER_THREADS));
+    Assertions.assertEquals(4, config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_THREADS));
+    Assertions.assertEquals(1000, config.get(IcebergConfig.ASYNC_CLEANUP_DELETE_BATCH_SIZE));
+    Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_CLEANUP_POLL_INTERVAL_SECS));
+    Assertions.assertEquals(300, config.get(IcebergConfig.ASYNC_CLEANUP_HEARTBEAT_TIMEOUT_SECS));
+    Assertions.assertEquals(5, config.get(IcebergConfig.ASYNC_CLEANUP_MAX_ATTEMPTS));
+    Assertions.assertEquals(720, config.get(IcebergConfig.ASYNC_CLEANUP_RETENTION_HOURS));
   }
 }

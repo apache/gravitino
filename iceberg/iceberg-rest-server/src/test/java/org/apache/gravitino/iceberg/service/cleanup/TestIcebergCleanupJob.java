@@ -17,18 +17,18 @@
  * under the License.
  */
 
-package org.apache.gravitino.iceberg.service.purge;
+package org.apache.gravitino.iceberg.service.cleanup;
 
 import com.google.common.collect.ImmutableMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestIcebergPurgeJob {
+class TestIcebergCleanupJob {
 
   @Test
   void testConstructorAndAccessors() {
-    IcebergPurgeJob job =
-        new IcebergPurgeJob(
+    IcebergCleanupJob job =
+        new IcebergCleanupJob(
             0L,
             "ml",
             "cat",
@@ -46,9 +46,9 @@ class TestIcebergPurgeJob {
 
   @Test
   void testFinishedStates() {
-    Assertions.assertTrue(IcebergPurgeJob.State.SUCCEEDED.isFinished());
-    Assertions.assertTrue(IcebergPurgeJob.State.FAILED.isFinished());
-    Assertions.assertFalse(IcebergPurgeJob.State.PENDING.isFinished());
-    Assertions.assertFalse(IcebergPurgeJob.State.RUNNING.isFinished());
+    Assertions.assertTrue(IcebergCleanupJob.State.SUCCEEDED.isFinished());
+    Assertions.assertTrue(IcebergCleanupJob.State.FAILED.isFinished());
+    Assertions.assertFalse(IcebergCleanupJob.State.PENDING.isFinished());
+    Assertions.assertFalse(IcebergCleanupJob.State.RUNNING.isFinished());
   }
 }

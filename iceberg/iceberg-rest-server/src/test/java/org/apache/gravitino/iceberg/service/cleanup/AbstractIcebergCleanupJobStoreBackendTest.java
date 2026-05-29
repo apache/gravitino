@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.iceberg.service.purge;
+package org.apache.gravitino.iceberg.service.cleanup;
 
 import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -31,13 +31,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
 /**
- * Shared purge-store test logic exercised against the same relational backend matrix as core
+ * Shared cleanup-store test logic exercised against the same relational backend matrix as core
  * metadata service tests. {@link TestJDBCBackend} initializes H2 by default, adds MySQL and
  * PostgreSQL when {@code dockerTest=true}, and truncates all backend tables before each invocation.
  */
-abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
+abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend {
 
-  private IcebergPurgeJobStore store;
+  private IcebergCleanupJobStore store;
 
   // TestJDBCBackend's BackendTestExtension overwrites GravitinoEnv's singleton "config" and
   // "idGenerator" fields with a backend-only Mockito mock and never restores them. Because the
@@ -61,12 +61,12 @@ abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
   }
 
   @BeforeEach
-  public void preparePurgeJobStore() {
-    store = new IcebergPurgeJobStore(new RandomIdGenerator());
+  public void prepareCleanupJobStore() {
+    store = new IcebergCleanupJobStore(new RandomIdGenerator());
   }
 
-  private static IcebergPurgeJob sampleJob() {
-    return new IcebergPurgeJob(
+  private static IcebergCleanupJob sampleJob() {
+    return new IcebergCleanupJob(
         0L,
         "ml",
         "cat",
@@ -87,16 +87,16 @@ abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
     Assertions.assertTrue(store.hasActiveJob("cat", "db", "t"));
 
     long now = System.currentTimeMillis();
-    IcebergPurgeJob taken = store.takePendingJob(now, 300_000L, 10);
+    IcebergCleanupJob taken = store.takePendingJob(now, 300_000L, 10);
     Assertions.assertNotNull(taken);
     Assertions.assertEquals(id, taken.id());
     Assertions.assertEquals(ImmutableMap.of("k", "v"), taken.fileIOProperties());
-    Assertions.assertEquals(IcebergPurgeJob.State.RUNNING, store.stateOf(id));
+    Assertions.assertEquals(IcebergCleanupJob.State.RUNNING, store.stateOf(id));
     Assertions.assertTrue(store.hasActiveJob("cat", "db", "t"));
     Assertions.assertNull(store.takePendingJob(now, 300_000L, 10));
 
     store.markSucceeded(id);
-    Assertions.assertEquals(IcebergPurgeJob.State.SUCCEEDED, store.stateOf(id));
+    Assertions.assertEquals(IcebergCleanupJob.State.SUCCEEDED, store.stateOf(id));
     Assertions.assertFalse(store.hasActiveJob("cat", "db", "t"));
     Assertions.assertEquals(
         1, store.deleteFinishedJobsByLegacyTimeline(System.currentTimeMillis() + 1));
@@ -107,7 +107,7 @@ abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
     long id = store.addJob(sampleJob());
     store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
     store.markFailed(id, "corrupt metadata");
-    Assertions.assertEquals(IcebergPurgeJob.State.FAILED, store.stateOf(id));
+    Assertions.assertEquals(IcebergCleanupJob.State.FAILED, store.stateOf(id));
   }
 
   @TestTemplate
@@ -116,11 +116,11 @@ abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
     for (int i = 0; i < 2; i++) {
       store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
       store.recordFailure(id, "boom " + i, 3);
-      Assertions.assertEquals(IcebergPurgeJob.State.PENDING, store.stateOf(id));
+      Assertions.assertEquals(IcebergCleanupJob.State.PENDING, store.stateOf(id));
     }
     store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
     store.recordFailure(id, "boom final", 3);
-    Assertions.assertEquals(IcebergPurgeJob.State.FAILED, store.stateOf(id));
+    Assertions.assertEquals(IcebergCleanupJob.State.FAILED, store.stateOf(id));
   }
 
   @TestTemplate
@@ -135,4 +135,4 @@ abstract class AbstractIcebergPurgeJobStoreBackendTest extends TestJDBCBackend {
   }
 }
 
-class TestIcebergPurgeJobStoreBackend extends AbstractIcebergPurgeJobStoreBackendTest {}
+class TestIcebergCleanupJobStoreBackend extends AbstractIcebergCleanupJobStoreBackendTest {}

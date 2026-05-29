@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.iceberg.service.purge;
+package org.apache.gravitino.iceberg.service.cleanup;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.annotations.VisibleForTesting;
@@ -31,23 +31,23 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /**
  * Persistence for {@code iceberg_cleanup_job}, layered on the Gravitino entity store's shared
- * relational backend. Async purge reuses the entity store's connection pool, transaction
+ * relational backend. Async cleanup reuses the entity store's connection pool, transaction
  * management, and per-backend SQL dispatch instead of opening its own JDBC connections. Row ids and
  * timestamps are supplied by the application, keeping the SQL portable across H2, MySQL, and
  * PostgreSQL.
  */
-public class IcebergPurgeJobStore {
+public class IcebergCleanupJobStore {
 
   private static final int MAX_ERROR_LENGTH = 2048;
 
   private final IdGenerator idGenerator;
 
   /**
-   * Creates a purge job store.
+   * Creates a cleanup job store.
    *
    * @param idGenerator generator for new row ids
    */
-  public IcebergPurgeJobStore(IdGenerator idGenerator) {
+  public IcebergCleanupJobStore(IdGenerator idGenerator) {
     this.idGenerator = idGenerator;
   }
 
@@ -57,11 +57,11 @@ public class IcebergPurgeJobStore {
    * @param job job to persist
    * @return generated id
    */
-  public long addJob(IcebergPurgeJob job) {
+  public long addJob(IcebergCleanupJob job) {
     long id = idGenerator.nextId();
     long now = System.currentTimeMillis();
-    IcebergPurgeJobPO po = toPO(job, id, now);
-    SessionUtils.doWithCommit(IcebergPurgeJobMapper.class, mapper -> mapper.insertPurgeJob(po));
+    IcebergCleanupJobPO po = toPO(job, id, now);
+    SessionUtils.doWithCommit(IcebergCleanupJobMapper.class, mapper -> mapper.insertCleanupJob(po));
     return id;
   }
 
@@ -73,20 +73,21 @@ public class IcebergPurgeJobStore {
    * @param window max candidates to consider
    * @return the taken job, or {@code null} if nothing was available
    */
-  public IcebergPurgeJob takePendingJob(long now, long heartbeatTimeoutMs, int window) {
-    long staleBefore = now - heartbeatTimeoutMs;
+  public IcebergCleanupJob takePendingJob(long now, long heartbeatTimeoutMs, int window) {
+    long heartbeatExpiry = now - heartbeatTimeoutMs;
     List<Long> ids =
         SessionUtils.getWithoutCommit(
-            IcebergPurgeJobMapper.class,
-            mapper -> mapper.selectRunnableJobIds(staleBefore, window));
+            IcebergCleanupJobMapper.class,
+            mapper -> mapper.selectCandidateJobIds(heartbeatExpiry, window));
     for (long id : ids) {
       int marked =
           SessionUtils.doWithCommitAndFetchResult(
-              IcebergPurgeJobMapper.class, mapper -> mapper.markRunning(id, now, staleBefore));
+              IcebergCleanupJobMapper.class,
+              mapper -> mapper.markRunning(id, now, heartbeatExpiry));
       if (marked == 1) {
-        IcebergPurgeJobPO po =
+        IcebergCleanupJobPO po =
             SessionUtils.getWithoutCommit(
-                IcebergPurgeJobMapper.class, mapper -> mapper.selectById(id));
+                IcebergCleanupJobMapper.class, mapper -> mapper.selectById(id));
         return fromPO(po);
       }
     }
@@ -101,8 +102,8 @@ public class IcebergPurgeJobStore {
   public void markSucceeded(long id) {
     long now = System.currentTimeMillis();
     SessionUtils.doWithCommit(
-        IcebergPurgeJobMapper.class,
-        mapper -> mapper.markFinished(id, IcebergPurgeJob.State.SUCCEEDED.name(), null, now));
+        IcebergCleanupJobMapper.class,
+        mapper -> mapper.markFinished(id, IcebergCleanupJob.State.SUCCEEDED.name(), null, now));
   }
 
   /**
@@ -115,8 +116,8 @@ public class IcebergPurgeJobStore {
     long now = System.currentTimeMillis();
     String err = truncate(reason);
     SessionUtils.doWithCommit(
-        IcebergPurgeJobMapper.class,
-        mapper -> mapper.markFinished(id, IcebergPurgeJob.State.FAILED.name(), err, now));
+        IcebergCleanupJobMapper.class,
+        mapper -> mapper.markFinished(id, IcebergCleanupJob.State.FAILED.name(), err, now));
   }
 
   /**
@@ -130,20 +131,20 @@ public class IcebergPurgeJobStore {
     long now = System.currentTimeMillis();
     String err = truncate(reason);
     SessionUtils.doWithCommit(
-        IcebergPurgeJobMapper.class, mapper -> mapper.recordFailure(id, err, maxAttempts, now));
+        IcebergCleanupJobMapper.class, mapper -> mapper.recordFailure(id, err, maxAttempts, now));
   }
 
   /**
    * Refreshes a heartbeat with compare-and-swap ownership check.
    *
    * @param id job id
-   * @param lastWritten previous heartbeat value
+   * @param lastHeartbeat previous heartbeat value
    * @param now new heartbeat value
    * @return {@code true} iff the row was still owned by the caller
    */
-  public boolean heartbeat(long id, long lastWritten, long now) {
+  public boolean heartbeat(long id, long lastHeartbeat, long now) {
     return SessionUtils.doWithCommitAndFetchResult(
-            IcebergPurgeJobMapper.class, mapper -> mapper.heartbeat(id, lastWritten, now))
+            IcebergCleanupJobMapper.class, mapper -> mapper.heartbeat(id, lastHeartbeat, now))
         == 1;
   }
 
@@ -153,12 +154,12 @@ public class IcebergPurgeJobStore {
    * @param catalog catalog name
    * @param namespace table namespace
    * @param table table name
-   * @return true iff an active purge job exists for the identifier
+   * @return true iff an active cleanup job exists for the identifier
    */
   public boolean hasActiveJob(String catalog, String namespace, String table) {
     Long id =
         SessionUtils.getWithoutCommit(
-            IcebergPurgeJobMapper.class,
+            IcebergCleanupJobMapper.class,
             mapper -> mapper.selectActiveJobId(catalog, namespace, table));
     return id != null;
   }
@@ -171,7 +172,7 @@ public class IcebergPurgeJobStore {
    */
   public int deleteFinishedJobsByLegacyTimeline(long legacyTimeline) {
     return SessionUtils.doWithCommitAndFetchResult(
-        IcebergPurgeJobMapper.class,
+        IcebergCleanupJobMapper.class,
         mapper -> mapper.deleteFinishedJobsByLegacyTimeline(legacyTimeline));
   }
 
@@ -183,37 +184,37 @@ public class IcebergPurgeJobStore {
    * @throws IllegalStateException if the row is gone
    */
   @VisibleForTesting
-  public IcebergPurgeJob.State stateOf(long id) {
+  public IcebergCleanupJob.State stateOf(long id) {
     String state =
         SessionUtils.getWithoutCommit(
-            IcebergPurgeJobMapper.class, mapper -> mapper.selectState(id));
+            IcebergCleanupJobMapper.class, mapper -> mapper.selectState(id));
     if (state == null) {
-      throw new IllegalStateException("No purge job " + id);
+      throw new IllegalStateException("No cleanup job " + id);
     }
-    return IcebergPurgeJob.State.valueOf(state);
+    return IcebergCleanupJob.State.valueOf(state);
   }
 
-  private IcebergPurgeJobPO toPO(IcebergPurgeJob job, long id, long now) {
-    IcebergPurgeJobPO po = new IcebergPurgeJobPO();
-    po.setId(id);
-    po.setMetalakeName(job.metalakeName());
-    po.setCatalogName(job.catalogName());
-    po.setNamespace(job.namespace());
-    po.setTableName(job.tableName());
-    po.setMetadataLocation(job.metadataLocation());
-    po.setFileIOImpl(job.fileIOImpl());
-    po.setFileIOProps(propertiesToJson(job.fileIOProperties()));
-    po.setState(IcebergPurgeJob.State.PENDING.name());
-    po.setAttempts(0);
-    po.setLastError(null);
-    po.setHeartbeatAt(0L);
-    po.setCreatedBy(job.createdBy());
-    po.setUpdatedAt(now);
-    return po;
+  private IcebergCleanupJobPO toPO(IcebergCleanupJob job, long id, long now) {
+    return IcebergCleanupJobPO.builder()
+        .withId(id)
+        .withMetalakeName(job.metalakeName())
+        .withCatalogName(job.catalogName())
+        .withNamespace(job.namespace())
+        .withTableName(job.tableName())
+        .withMetadataLocation(job.metadataLocation())
+        .withFileIOImpl(job.fileIOImpl())
+        .withFileIOProps(propertiesToJson(job.fileIOProperties()))
+        .withState(IcebergCleanupJob.State.PENDING.name())
+        .withAttempts(0)
+        .withLastError(null)
+        .withHeartbeatAt(0L)
+        .withCreatedBy(job.createdBy())
+        .withUpdatedAt(now)
+        .build();
   }
 
-  private IcebergPurgeJob fromPO(IcebergPurgeJobPO po) {
-    return new IcebergPurgeJob(
+  private IcebergCleanupJob fromPO(IcebergCleanupJobPO po) {
+    return new IcebergCleanupJob(
         po.getId(),
         po.getMetalakeName(),
         po.getCatalogName(),
