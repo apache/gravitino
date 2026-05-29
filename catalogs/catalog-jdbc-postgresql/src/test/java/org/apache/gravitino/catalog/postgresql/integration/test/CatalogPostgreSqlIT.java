@@ -1115,6 +1115,9 @@ public class CatalogPostgreSqlIT extends BaseIT {
               Literals.decimalLiteral(Decimal.of("1.2", 6, 2)), column.defaultValue());
           break;
         case "uuid":
+          Assertions.assertEquals(Types.UUIDType.get(), column.dataType());
+          Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
         case "character_col_1":
         case "jsonb":
           Assertions.assertEquals(Column.DEFAULT_VALUE_NOT_SET, column.defaultValue());

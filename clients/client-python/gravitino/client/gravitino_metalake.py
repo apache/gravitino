@@ -15,11 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+# pylint: disable=too-many-lines
 import logging
 from typing import Dict, List, Optional
 
 from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
+from gravitino.api.authorization.role import Role
+from gravitino.api.authorization.securable_objects import SecurableObject
 from gravitino.api.authorization.user import User
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
@@ -49,6 +52,7 @@ from gravitino.dto.requests.tag_create_request import TagCreateRequest
 from gravitino.dto.requests.tag_updates_request import TagUpdatesRequest
 from gravitino.dto.requests.user_add_request import UserAddRequest
 from gravitino.dto.requests.group_add_request import GroupAddRequest
+from gravitino.dto.requests.role_create_request import RoleCreateRequest
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
@@ -75,8 +79,13 @@ from gravitino.dto.responses.group_response import (
     GroupNamesListResponse,
     GroupResponse,
 )
+from gravitino.dto.responses.role_response import (
+    RoleNamesListResponse,
+    RoleResponse,
+)
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 from gravitino.exceptions.handlers.group_error_handler import GROUP_ERROR_HANDLER
+from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
 from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
 from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLER
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
@@ -114,6 +123,8 @@ class GravitinoMetalake(
     API_METALAKES_USER_PATH = "api/metalakes/{}/users/{}"
     API_METALAKES_GROUPS_PATH = "api/metalakes/{}/groups"
     API_METALAKES_GROUP_PATH = "api/metalakes/{}/groups/{}"
+    API_METALAKES_ROLES_PATH = "api/metalakes/{}/roles"
+    API_METALAKES_ROLE_PATH = "api/metalakes/{}/roles/{}"
 
     def __init__(self, metalake: MetalakeDTO = None, client: HTTPClient = None):
         super().__init__(
@@ -1000,5 +1011,108 @@ class GravitinoMetalake(
         url = self.API_METALAKES_GROUPS_PATH.format(encode_string(self.name()))
         response = self.rest_client.get(url, error_handler=GROUP_ERROR_HANDLER)
         resp = GroupNamesListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return resp.names()
+
+    #####################
+    # Role operations
+    #####################
+
+    def create_role(
+        self,
+        role_name: str,
+        properties: Optional[Dict[str, str]] = None,
+        securable_objects: Optional[List[SecurableObject]] = None,
+    ) -> Role:
+        """Create a new role under this metalake.
+
+        Args:
+            role_name: The name of the role.
+            properties: The properties of the role.
+            securable_objects: The securable objects of the role.
+
+        Returns:
+            The created Role object.
+
+        Raises:
+            RoleAlreadyExistsException: If a role with the same name already exists.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        Precondition.check_string_not_empty(
+            role_name, "role name must not be null or empty"
+        )
+        securable_object_dtos = [
+            DTOConverters.to_securable_object_dto(obj)
+            for obj in (securable_objects or [])
+        ]
+        req = RoleCreateRequest(role_name, properties, securable_object_dtos)
+        req.validate()
+        url = self.API_METALAKES_ROLES_PATH.format(encode_string(self.name()))
+        response = self.rest_client.post(
+            url, json=req, error_handler=ROLE_ERROR_HANDLER
+        )
+        resp = RoleResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return resp.role()
+
+    def get_role(self, role_name: str) -> Role:
+        """Get a role by name from this metalake.
+
+        Args:
+            role_name: The name of the role.
+
+        Returns:
+            The Role object.
+
+        Raises:
+            NoSuchRoleException: If the role does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        Precondition.check_string_not_empty(
+            role_name, "role name must not be null or empty"
+        )
+        url = self.API_METALAKES_ROLE_PATH.format(
+            encode_string(self.name()), encode_string(role_name)
+        )
+        response = self.rest_client.get(url, error_handler=ROLE_ERROR_HANDLER)
+        resp = RoleResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return resp.role()
+
+    def delete_role(self, role_name: str) -> bool:
+        """Delete a role from this metalake.
+
+        Args:
+            role_name: The name of the role.
+
+        Returns:
+            True if the role was deleted, False otherwise.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        Precondition.check_string_not_empty(
+            role_name, "role name must not be null or empty"
+        )
+        url = self.API_METALAKES_ROLE_PATH.format(
+            encode_string(self.name()), encode_string(role_name)
+        )
+        response = self.rest_client.delete(url, error_handler=ROLE_ERROR_HANDLER)
+        drop_response = DropResponse.from_json(response.body, infer_missing=True)
+        drop_response.validate()
+        return drop_response.dropped()
+
+    def list_role_names(self) -> list[str]:
+        """List all role names under this metalake.
+
+        Returns:
+            A list of role name strings.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        url = self.API_METALAKES_ROLES_PATH.format(encode_string(self.name()))
+        response = self.rest_client.get(url, error_handler=ROLE_ERROR_HANDLER)
+        resp = RoleNamesListResponse.from_json(response.body, infer_missing=True)
         resp.validate()
         return resp.names()

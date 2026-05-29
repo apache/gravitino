@@ -30,6 +30,7 @@ import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogPropertiesUtil;
 import org.apache.flink.table.catalog.CatalogTable;
+import org.apache.flink.table.catalog.CatalogView;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogBaseTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
@@ -40,6 +41,7 @@ import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.flink.table.catalog.hive.HiveCatalog;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -54,12 +56,15 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The GravitinoHiveCatalog class is an implementation of the BaseCatalog class that is used to
  * proxy the HiveCatalog class.
  */
 public class GravitinoHiveCatalog extends BaseCatalog {
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoHiveCatalog.class);
 
   private HiveCatalog hiveCatalog;
 
@@ -99,6 +104,11 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       throws TableAlreadyExistException, DatabaseNotExistException, CatalogException {
     Preconditions.checkArgument(
         table instanceof ResolvedCatalogBaseTable, "table should be resolved");
+
+    if (table instanceof CatalogView) {
+      super.createTable(tablePath, table, ignoreIfExists);
+      return;
+    }
 
     if (!FlinkGenericTableUtil.isGenericTableWhenCreate(table.getOptions())) {
       super.createTable(tablePath, table, ignoreIfExists);
@@ -150,15 +160,24 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       }
       return super.toFlinkTable(table, tablePath);
     } catch (NoSuchTableException e) {
+      // Fall through to check views.
+    } catch (ForbiddenException e) {
       throw new TableNotExistException(catalogName(), tablePath, e);
     } catch (Exception e) {
+      LOG.warn("Failed to load table {} from catalog {}", tablePath, catalogName(), e);
       throw new CatalogException(e);
     }
+
+    return loadViewOrThrow(tablePath);
   }
 
   @Override
   public void alterTable(ObjectPath tablePath, CatalogBaseTable newTable, boolean ignoreIfNotExists)
       throws TableNotExistException, CatalogException {
+    if (newTable instanceof CatalogView) {
+      super.alterTable(tablePath, newTable, ignoreIfNotExists);
+      return;
+    }
     Table table = loadGravitinoTable(tablePath, ignoreIfNotExists);
     if (table == null) {
       return;
@@ -183,6 +202,10 @@ public class GravitinoHiveCatalog extends BaseCatalog {
       java.util.List<org.apache.flink.table.catalog.TableChange> tableChanges,
       boolean ignoreIfNotExists)
       throws TableNotExistException, CatalogException {
+    if (newTable instanceof CatalogView) {
+      super.alterTable(tablePath, newTable, tableChanges, ignoreIfNotExists);
+      return;
+    }
     Table table = loadGravitinoTable(tablePath, ignoreIfNotExists);
     if (table == null) {
       return;

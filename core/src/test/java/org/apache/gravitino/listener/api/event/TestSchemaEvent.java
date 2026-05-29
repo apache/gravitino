@@ -113,6 +113,7 @@ public class TestSchemaEvent {
     Assertions.assertEquals(namespace.toString(), event.identifier().toString());
     Assertions.assertEquals(ListSchemaEvent.class, event.getClass());
     Assertions.assertEquals(namespace, ((ListSchemaEvent) event).namespace());
+    Assertions.assertEquals(3, ((ListSchemaEvent) event).resultCount());
     Assertions.assertEquals(OperationType.LIST_SCHEMA, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
@@ -234,6 +235,14 @@ public class TestSchemaEvent {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
+  void testListSchemaEventDeprecatedConstructorReturnsNegativeCount() {
+    Namespace namespace = Namespace.of("metalake", "catalog");
+    ListSchemaEvent event = new ListSchemaEvent("user", namespace);
+    Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @Test
   void testListSchemaFailureEvent() {
     Namespace namespace = Namespace.of("metalake", "catalog");
     Assertions.assertThrowsExactly(
@@ -269,7 +278,13 @@ public class TestSchemaEvent {
         .thenReturn(schema);
     when(dispatcher.loadSchema(any(NameIdentifier.class))).thenReturn(schema);
     when(dispatcher.dropSchema(any(NameIdentifier.class), eq(true))).thenReturn(false);
-    when(dispatcher.listSchemas(any(Namespace.class))).thenReturn(null);
+    when(dispatcher.listSchemas(any(Namespace.class)))
+        .thenReturn(
+            new NameIdentifier[] {
+              NameIdentifier.of("metalake", "catalog", "schema1"),
+              NameIdentifier.of("metalake", "catalog", "schema2"),
+              NameIdentifier.of("metalake", "catalog", "schema3")
+            });
     when(dispatcher.alterSchema(any(NameIdentifier.class), any(SchemaChange.class)))
         .thenReturn(schema);
     return dispatcher;

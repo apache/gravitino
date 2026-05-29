@@ -265,9 +265,9 @@ class GenericPrivilege(Privilege):
         return hash((self._condition, self._name))
 
     def __eq__(self, value: object) -> bool:
-        if not isinstance(value, GenericPrivilege):
+        if not isinstance(value, Privilege):
             return False
-        return self._condition == value._condition and self._name == value._name
+        return self._condition == value.condition() and self._name == value.name()
 
 
 class CreateCatalog(GenericPrivilege):

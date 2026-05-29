@@ -112,7 +112,8 @@ public class AuthorizationExpressionConverter {
             } else if (AuthConstants.SELF.equals(privilegeOrExpression)) {
               replacement =
                   String.format(
-                      "authorizer.isSelf(@org.apache.gravitino.Entity\\$EntityType@%s,%s_NAME_IDENT)",
+                      "authorizer.isSelf(@org.apache.gravitino.Entity\\$EntityType@%s,"
+                          + "%s_NAME_IDENT,authorizationContext)",
                       type, type);
             } else {
               replacement =

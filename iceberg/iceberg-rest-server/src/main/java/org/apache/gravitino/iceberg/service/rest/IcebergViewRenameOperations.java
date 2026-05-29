@@ -42,6 +42,7 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.slf4j.Logger;
@@ -67,10 +68,7 @@ public class IcebergViewRenameOperations {
   @Timed(name = "rename-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "rename-view", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && VIEW::OWNER",
+      expression = AuthorizationExpressionConstants.ICEBERG_VIEW_OWNER_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.VIEW)
   public Response renameView(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,

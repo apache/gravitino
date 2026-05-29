@@ -20,13 +20,15 @@ package org.apache.gravitino.listener.api.event.stats;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.stats.PartitionRange;
 
 /** Event fired when listing partition statistics. */
 @DeveloperApi
-public class ListPartitionStatisticsEvent extends StatisticsEvent {
+public class ListPartitionStatisticsEvent extends StatisticsEvent implements ListEvent {
   private final PartitionRange partitionRange;
+  private final int count;
 
   /**
    * Creates a new ListPartitionStatisticsEvent.
@@ -34,11 +36,35 @@ public class ListPartitionStatisticsEvent extends StatisticsEvent {
    * @param user the user performing the operation
    * @param identifier the identifier of the metadata object
    * @param partitionRange the partition range for which statistics are being listed
+   * @param count the number of partition statistics returned by the list operation
    */
   public ListPartitionStatisticsEvent(
-      String user, NameIdentifier identifier, PartitionRange partitionRange) {
+      String user, NameIdentifier identifier, PartitionRange partitionRange, int count) {
     super(user, identifier);
     this.partitionRange = partitionRange;
+    this.count = count;
+  }
+
+  /**
+   * Creates a new ListPartitionStatisticsEvent without a count.
+   *
+   * @param user the user performing the operation
+   * @param identifier the identifier of the metadata object
+   * @param partitionRange the partition range for which statistics are being listed
+   * @deprecated Use {@link #ListPartitionStatisticsEvent(String, NameIdentifier, PartitionRange,
+   *     int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListPartitionStatisticsEvent(
+      String user, NameIdentifier identifier, PartitionRange partitionRange) {
+    this(user, identifier, partitionRange, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return count;
   }
 
   /**

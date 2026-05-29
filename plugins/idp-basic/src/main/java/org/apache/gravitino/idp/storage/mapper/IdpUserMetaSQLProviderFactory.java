@@ -49,6 +49,10 @@ public class IdpUserMetaSQLProviderFactory {
     return currentProvider().selectIdpUser(username);
   }
 
+  public static String selectIdpUserWithGroups(@Param("username") String username) {
+    return currentProvider().selectIdpUserWithGroups(username);
+  }
+
   public static String selectIdpUsersByUsernames(@Param("usernames") List<String> usernames) {
     return currentProvider().selectIdpUsersByUsernames(usernames);
   }

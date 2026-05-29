@@ -25,18 +25,34 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event that is triggered upon the successful list of topics within a namespace. */
 @DeveloperApi
-public final class ListTopicEvent extends TopicEvent {
+public final class ListTopicEvent extends TopicEvent implements ListEvent {
   private final Namespace namespace;
+  private final int topicCount;
 
   /**
    * Constructs an instance of {@code ListTopicEvent}.
    *
    * @param user The username of the individual who initiated the topic listing.
    * @param namespace The namespace from which topics were listed.
+   * @param topicCount The number of topics returned by the list operation.
    */
-  public ListTopicEvent(String user, Namespace namespace) {
+  public ListTopicEvent(String user, Namespace namespace, int topicCount) {
     super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
+    this.topicCount = topicCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListTopicEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the topic listing.
+   * @param namespace The namespace from which topics were listed.
+   * @deprecated Use {@link #ListTopicEvent(String, Namespace, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListTopicEvent(String user, Namespace namespace) {
+    this(user, namespace, -1);
   }
 
   /**
@@ -46,6 +62,12 @@ public final class ListTopicEvent extends TopicEvent {
    */
   public Namespace namespace() {
     return namespace;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return topicCount;
   }
 
   /**
