@@ -169,3 +169,11 @@ CREATE TABLE IF NOT EXISTS iceberg_cleanup_job (
 );
 CREATE INDEX IF NOT EXISTS idx_state_updated ON iceberg_cleanup_job (state, updated_at);
 CREATE INDEX IF NOT EXISTS idx_object ON iceberg_cleanup_job (catalog_id, namespace, table_name, state);
+COMMENT ON TABLE iceberg_cleanup_job IS 'async Iceberg table cleanup jobs';
+COMMENT ON COLUMN iceberg_cleanup_job.catalog_id IS 'globally unique id of the owning catalog, stable across catalog rename';
+COMMENT ON COLUMN iceberg_cleanup_job.file_io_props IS 'JSON';
+COMMENT ON COLUMN iceberg_cleanup_job.state IS 'PENDING | RUNNING | SUCCEEDED | FAILED';
+COMMENT ON COLUMN iceberg_cleanup_job.last_error IS 'truncated reason for the most recent failure, NULL until a job fails';
+COMMENT ON COLUMN iceberg_cleanup_job.heartbeat_at IS 'last heartbeat from the worker, 0 when not running';
+COMMENT ON COLUMN iceberg_cleanup_job.created_by IS 'principal that requested the drop (audit)';
+COMMENT ON COLUMN iceberg_cleanup_job.updated_at IS 'last state change, drives poll ordering and old finished-job cleanup';

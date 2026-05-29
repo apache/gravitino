@@ -103,19 +103,19 @@ CREATE TABLE IF NOT EXISTS `idp_user_group_rel` (
 
 CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `id`                BIGINT        NOT NULL,
-  `catalog_id`        BIGINT        NOT NULL,
+  `catalog_id`        BIGINT        NOT NULL COMMENT 'globally unique id of the owning catalog, stable across catalog rename',
   `namespace`         VARCHAR(512)  NOT NULL,
   `table_name`        VARCHAR(256)  NOT NULL,
   `metadata_location` CLOB          NOT NULL,
   `file_io_impl`      VARCHAR(256)  NOT NULL,
-  `file_io_props`     CLOB          NOT NULL,
-  `state`             VARCHAR(16)   NOT NULL,
+  `file_io_props`     CLOB          NOT NULL COMMENT 'JSON',
+  `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|FAILED',
   `attempts`          INT           NOT NULL DEFAULT 0,
-  `last_error`        VARCHAR(2048) NULL,
-  `heartbeat_at`      BIGINT        NOT NULL DEFAULT 0,
-  `created_by`        VARCHAR(128)  NOT NULL,
-  `updated_at`        BIGINT        NOT NULL,
+  `last_error`        VARCHAR(2048) NULL COMMENT 'truncated reason for the most recent failure, NULL until a job fails',
+  `heartbeat_at`      BIGINT        NOT NULL DEFAULT 0 COMMENT 'last heartbeat from the worker, 0 when not running',
+  `created_by`        VARCHAR(128)  NOT NULL COMMENT 'principal that requested the drop (audit)',
+  `updated_at`        BIGINT        NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`)
-);
+) COMMENT='async Iceberg table cleanup jobs';
 CREATE INDEX IF NOT EXISTS `idx_state_updated` ON `iceberg_cleanup_job` (`state`, `updated_at`);
 CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`catalog_id`, `namespace`, `table_name`, `state`);

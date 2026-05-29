@@ -191,7 +191,7 @@ public class IcebergCleanupJobStore {
    * @throws IllegalStateException if the row is gone
    */
   @VisibleForTesting
-  public IcebergCleanupJob.State stateOf(long id) {
+  IcebergCleanupJob.State stateOf(long id) {
     String state =
         SessionUtils.getWithoutCommit(
             IcebergCleanupJobMapper.class, mapper -> mapper.selectState(id));
