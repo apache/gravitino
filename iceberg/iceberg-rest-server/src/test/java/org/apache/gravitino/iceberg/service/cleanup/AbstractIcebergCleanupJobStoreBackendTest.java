@@ -80,11 +80,14 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
 
   @TestTemplate
   void testAddTakeSucceedLifecycle() {
-    Assertions.assertFalse(store.hasActiveJob("cat", "db", "t"));
+    Assertions.assertFalse(store.findUnfinishedJobId("ml", "cat", "db", "t").isPresent());
 
     long id = store.addJob(sampleJob());
     Assertions.assertTrue(id > 0);
-    Assertions.assertTrue(store.hasActiveJob("cat", "db", "t"));
+    Assertions.assertTrue(store.findUnfinishedJobId("ml", "cat", "db", "t").isPresent());
+    // Catalog names are unique only within a metalake, so the same triple under another metalake
+    // must not match.
+    Assertions.assertFalse(store.findUnfinishedJobId("other_ml", "cat", "db", "t").isPresent());
 
     long now = System.currentTimeMillis();
     IcebergCleanupJob taken = store.takePendingJob(now, 300_000L, 10);
@@ -92,12 +95,14 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
     Assertions.assertEquals(id, taken.id());
     Assertions.assertEquals(ImmutableMap.of("k", "v"), taken.fileIOProperties());
     Assertions.assertEquals(IcebergCleanupJob.State.RUNNING, store.stateOf(id));
-    Assertions.assertTrue(store.hasActiveJob("cat", "db", "t"));
+    Assertions.assertTrue(store.findUnfinishedJobId("ml", "cat", "db", "t").isPresent());
     Assertions.assertNull(store.takePendingJob(now, 300_000L, 10));
 
-    store.markSucceeded(id);
+    Assertions.assertTrue(store.markSucceeded(id));
     Assertions.assertEquals(IcebergCleanupJob.State.SUCCEEDED, store.stateOf(id));
-    Assertions.assertFalse(store.hasActiveJob("cat", "db", "t"));
+    // A second transition no longer owns the (now terminal) row, so it reports no update.
+    Assertions.assertFalse(store.markSucceeded(id));
+    Assertions.assertFalse(store.findUnfinishedJobId("ml", "cat", "db", "t").isPresent());
     Assertions.assertEquals(
         1, store.deleteFinishedJobsByLegacyTimeline(System.currentTimeMillis() + 1));
   }
@@ -106,7 +111,7 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
   void testMarkFailed() {
     long id = store.addJob(sampleJob());
     store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
-    store.markFailed(id, "corrupt metadata");
+    Assertions.assertTrue(store.markFailed(id, "corrupt metadata"));
     Assertions.assertEquals(IcebergCleanupJob.State.FAILED, store.stateOf(id));
   }
 
@@ -115,11 +120,11 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
     long id = store.addJob(sampleJob());
     for (int i = 0; i < 2; i++) {
       store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
-      store.recordFailure(id, "boom " + i, 3);
+      Assertions.assertTrue(store.recordFailure(id, "boom " + i, 3));
       Assertions.assertEquals(IcebergCleanupJob.State.PENDING, store.stateOf(id));
     }
     store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
-    store.recordFailure(id, "boom final", 3);
+    Assertions.assertTrue(store.recordFailure(id, "boom final", 3));
     Assertions.assertEquals(IcebergCleanupJob.State.FAILED, store.stateOf(id));
   }
 

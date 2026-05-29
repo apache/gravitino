@@ -17,12 +17,13 @@
  * under the License.
  */
 
-package org.apache.gravitino.iceberg.service.cleanup;
+package org.apache.gravitino.iceberg.service.cleanup.mapper;
 
-import static org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobMapper.TABLE_NAME;
+import static org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper.TABLE_NAME;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
@@ -58,9 +59,9 @@ public class IcebergCleanupJobSQLProviderFactory {
     return getProvider().insertCleanupJob(po);
   }
 
-  public static String selectCandidateJobIds(
+  public static String selectCandidateJobs(
       @Param("heartbeatExpiry") long heartbeatExpiry, @Param("window") int window) {
-    return getProvider().selectCandidateJobIds(heartbeatExpiry, window);
+    return getProvider().selectCandidateJobs(heartbeatExpiry, window);
   }
 
   public static String markRunning(
@@ -68,10 +69,6 @@ public class IcebergCleanupJobSQLProviderFactory {
       @Param("now") long now,
       @Param("heartbeatExpiry") long heartbeatExpiry) {
     return getProvider().markRunning(id, now, heartbeatExpiry);
-  }
-
-  public static String selectById(@Param("id") long id) {
-    return getProvider().selectById(id);
   }
 
   public static String markFinished(
@@ -95,11 +92,12 @@ public class IcebergCleanupJobSQLProviderFactory {
     return getProvider().heartbeat(id, lastHeartbeat, now);
   }
 
-  public static String selectActiveJobId(
+  public static String selectUnfinishedJobId(
+      @Param("metalake") String metalake,
       @Param("catalog") String catalog,
       @Param("namespace") String namespace,
       @Param("table") String table) {
-    return getProvider().selectActiveJobId(catalog, namespace, table);
+    return getProvider().selectUnfinishedJobId(metalake, catalog, namespace, table);
   }
 
   public static String deleteFinishedJobsByLegacyTimeline(
@@ -125,13 +123,19 @@ public class IcebergCleanupJobSQLProviderFactory {
           + " #{po.updatedAt})";
     }
 
-    String selectCandidateJobIds(
+    String selectCandidateJobs(
         @Param("heartbeatExpiry") long heartbeatExpiry, @Param("window") int window) {
       // A candidate row is PENDING, or RUNNING whose worker has gone silent. heartbeat_at is
       // NOT NULL (it defaults to 0 and markRunning always writes the current time), so the
       // staleness test is a plain comparison with no NULL branch and no three-valued-logic
-      // trap, which also keeps the predicate index-friendly.
-      return "SELECT id FROM "
+      // trap, which also keeps the predicate index-friendly. Full rows are returned so a winning
+      // claimer can build the job directly: the columns the job needs are immutable after enqueue,
+      // so the pre-claim snapshot stays accurate without a re-read.
+      return "SELECT id, metalake_name AS metalakeName, catalog_name AS catalogName, namespace,"
+          + " table_name AS tableName, metadata_location AS metadataLocation,"
+          + " file_io_impl AS fileIOImpl, file_io_props AS fileIOProps, state, attempts,"
+          + " last_error AS lastError, heartbeat_at AS heartbeatAt, created_by AS createdBy,"
+          + " updated_at AS updatedAt FROM "
           + TABLE_NAME
           + " WHERE state = 'PENDING'"
           + " OR (state = 'RUNNING' AND heartbeat_at < #{heartbeatExpiry})"
@@ -147,16 +151,6 @@ public class IcebergCleanupJobSQLProviderFactory {
           + " SET state = 'RUNNING', heartbeat_at = #{now}, updated_at = #{now}"
           + " WHERE id = #{id} AND (state = 'PENDING'"
           + " OR (state = 'RUNNING' AND heartbeat_at < #{heartbeatExpiry}))";
-    }
-
-    String selectById(@Param("id") long id) {
-      return "SELECT id, metalake_name AS metalakeName, catalog_name AS catalogName, namespace,"
-          + " table_name AS tableName, metadata_location AS metadataLocation,"
-          + " file_io_impl AS fileIOImpl, file_io_props AS fileIOProps, state, attempts,"
-          + " last_error AS lastError, heartbeat_at AS heartbeatAt, created_by AS createdBy,"
-          + " updated_at AS updatedAt FROM "
-          + TABLE_NAME
-          + " WHERE id = #{id}";
     }
 
     String markFinished(
@@ -197,14 +191,18 @@ public class IcebergCleanupJobSQLProviderFactory {
           + " WHERE id = #{id} AND state = 'RUNNING' AND heartbeat_at = #{lastHeartbeat}";
     }
 
-    String selectActiveJobId(
+    String selectUnfinishedJobId(
+        @Param("metalake") String metalake,
         @Param("catalog") String catalog,
         @Param("namespace") String namespace,
         @Param("table") String table) {
+      // Catalog names are unique only within a metalake, so the identifier must be scoped by
+      // metalake_name to avoid colliding with a same-named table in another metalake.
       return "SELECT id FROM "
           + TABLE_NAME
-          + " WHERE catalog_name = #{catalog} AND namespace = #{namespace}"
-          + " AND table_name = #{table} AND state IN ('PENDING', 'RUNNING') LIMIT 1";
+          + " WHERE metalake_name = #{metalake} AND catalog_name = #{catalog}"
+          + " AND namespace = #{namespace} AND table_name = #{table}"
+          + " AND state IN ('PENDING', 'RUNNING') LIMIT 1";
     }
 
     String deleteFinishedJobsByLegacyTimeline(@Param("legacyTimeline") long legacyTimeline) {

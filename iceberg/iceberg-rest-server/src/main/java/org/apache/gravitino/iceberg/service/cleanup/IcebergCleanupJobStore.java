@@ -25,6 +25,9 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper;
+import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -75,19 +78,19 @@ public class IcebergCleanupJobStore {
    */
   public IcebergCleanupJob takePendingJob(long now, long heartbeatTimeoutMs, int window) {
     long heartbeatExpiry = now - heartbeatTimeoutMs;
-    List<Long> ids =
+    List<IcebergCleanupJobPO> candidates =
         SessionUtils.getWithoutCommit(
             IcebergCleanupJobMapper.class,
-            mapper -> mapper.selectCandidateJobIds(heartbeatExpiry, window));
-    for (long id : ids) {
+            mapper -> mapper.selectCandidateJobs(heartbeatExpiry, window));
+    for (IcebergCleanupJobPO po : candidates) {
+      long id = po.getId();
       int marked =
           SessionUtils.doWithCommitAndFetchResult(
               IcebergCleanupJobMapper.class,
               mapper -> mapper.markRunning(id, now, heartbeatExpiry));
       if (marked == 1) {
-        IcebergCleanupJobPO po =
-            SessionUtils.getWithoutCommit(
-                IcebergCleanupJobMapper.class, mapper -> mapper.selectById(id));
+        // The claim only flips mutable columns (state, heartbeat_at, updated_at); everything
+        // fromPO reads was fixed at enqueue, so the candidate snapshot is still accurate.
         return fromPO(po);
       }
     }
@@ -98,12 +101,15 @@ public class IcebergCleanupJobStore {
    * Marks a RUNNING job SUCCEEDED.
    *
    * @param id job id
+   * @return {@code true} iff the row was still RUNNING and was updated (i.e. the caller still owned
+   *     the job)
    */
-  public void markSucceeded(long id) {
+  public boolean markSucceeded(long id) {
     long now = System.currentTimeMillis();
-    SessionUtils.doWithCommit(
-        IcebergCleanupJobMapper.class,
-        mapper -> mapper.markFinished(id, IcebergCleanupJob.State.SUCCEEDED.name(), null, now));
+    return SessionUtils.doWithCommitAndFetchResult(
+            IcebergCleanupJobMapper.class,
+            mapper -> mapper.markFinished(id, IcebergCleanupJob.State.SUCCEEDED.name(), null, now))
+        == 1;
   }
 
   /**
@@ -111,13 +117,16 @@ public class IcebergCleanupJobStore {
    *
    * @param id job id
    * @param reason failure text
+   * @return {@code true} iff the row was still RUNNING and was updated (i.e. the caller still owned
+   *     the job)
    */
-  public void markFailed(long id, String reason) {
+  public boolean markFailed(long id, String reason) {
     long now = System.currentTimeMillis();
     String err = truncate(reason);
-    SessionUtils.doWithCommit(
-        IcebergCleanupJobMapper.class,
-        mapper -> mapper.markFinished(id, IcebergCleanupJob.State.FAILED.name(), err, now));
+    return SessionUtils.doWithCommitAndFetchResult(
+            IcebergCleanupJobMapper.class,
+            mapper -> mapper.markFinished(id, IcebergCleanupJob.State.FAILED.name(), err, now))
+        == 1;
   }
 
   /**
@@ -126,12 +135,16 @@ public class IcebergCleanupJobStore {
    * @param id job id
    * @param reason failure text
    * @param maxAttempts ceiling from config
+   * @return {@code true} iff the row was still RUNNING and was updated (i.e. the caller still owned
+   *     the job)
    */
-  public void recordFailure(long id, String reason, int maxAttempts) {
+  public boolean recordFailure(long id, String reason, int maxAttempts) {
     long now = System.currentTimeMillis();
     String err = truncate(reason);
-    SessionUtils.doWithCommit(
-        IcebergCleanupJobMapper.class, mapper -> mapper.recordFailure(id, err, maxAttempts, now));
+    return SessionUtils.doWithCommitAndFetchResult(
+            IcebergCleanupJobMapper.class,
+            mapper -> mapper.recordFailure(id, err, maxAttempts, now))
+        == 1;
   }
 
   /**
@@ -149,19 +162,20 @@ public class IcebergCleanupJobStore {
   }
 
   /**
-   * Checks whether a PENDING or RUNNING job occupies the identifier.
+   * Finds the id of an unfinished (PENDING or RUNNING) cleanup job for the identifier, if any.
    *
+   * @param metalake metalake name (catalog names are unique only within a metalake)
    * @param catalog catalog name
    * @param namespace table namespace
    * @param table table name
-   * @return true iff an active cleanup job exists for the identifier
+   * @return the unfinished job id, or {@link Optional#empty()} if none exists
    */
-  public boolean hasActiveJob(String catalog, String namespace, String table) {
-    Long id =
+  public Optional<Long> findUnfinishedJobId(
+      String metalake, String catalog, String namespace, String table) {
+    return Optional.ofNullable(
         SessionUtils.getWithoutCommit(
             IcebergCleanupJobMapper.class,
-            mapper -> mapper.selectActiveJobId(catalog, namespace, table));
-    return id != null;
+            mapper -> mapper.selectUnfinishedJobId(metalake, catalog, namespace, table)));
   }
 
   /**

@@ -169,4 +169,4 @@ CREATE TABLE IF NOT EXISTS iceberg_cleanup_job (
   updated_at        BIGINT        NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_state_updated ON iceberg_cleanup_job (state, updated_at);
-CREATE INDEX IF NOT EXISTS idx_object ON iceberg_cleanup_job (catalog_name, namespace, table_name, state);
+CREATE INDEX IF NOT EXISTS idx_object ON iceberg_cleanup_job (metalake_name, catalog_name, namespace, table_name, state);

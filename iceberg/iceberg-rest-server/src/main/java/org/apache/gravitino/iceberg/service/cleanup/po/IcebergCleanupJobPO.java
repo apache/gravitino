@@ -17,13 +17,16 @@
  * under the License.
  */
 
-package org.apache.gravitino.iceberg.service.cleanup;
+package org.apache.gravitino.iceberg.service.cleanup.po;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJob;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobStore;
+import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper;
 
 /**
  * Persistence object for one {@code iceberg_cleanup_job} row. Mirrors the table columns and is

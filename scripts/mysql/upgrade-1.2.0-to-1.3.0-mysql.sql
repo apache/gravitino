@@ -136,5 +136,5 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `updated_at`        BIGINT(20)    NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`),
   KEY `idx_state_updated` (`state`, `updated_at`),
-  KEY `idx_object` (`catalog_name`, `namespace`(255), `table_name`(255), `state`)
+  KEY `idx_object` (`metalake_name`, `catalog_name`, `namespace`(255), `table_name`(255), `state`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'async Iceberg table cleanup jobs';

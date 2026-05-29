@@ -17,9 +17,10 @@
  * under the License.
  */
 
-package org.apache.gravitino.iceberg.service.cleanup;
+package org.apache.gravitino.iceberg.service.cleanup.mapper;
 
 import java.util.List;
+import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -39,18 +40,13 @@ public interface IcebergCleanupJobMapper {
   @InsertProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "insertCleanupJob")
   void insertCleanupJob(@Param("po") IcebergCleanupJobPO po);
 
-  @SelectProvider(
-      type = IcebergCleanupJobSQLProviderFactory.class,
-      method = "selectCandidateJobIds")
-  List<Long> selectCandidateJobIds(
+  @SelectProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "selectCandidateJobs")
+  List<IcebergCleanupJobPO> selectCandidateJobs(
       @Param("heartbeatExpiry") long heartbeatExpiry, @Param("window") int window);
 
   @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "markRunning")
   int markRunning(
       @Param("id") long id, @Param("now") long now, @Param("heartbeatExpiry") long heartbeatExpiry);
-
-  @SelectProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "selectById")
-  IcebergCleanupJobPO selectById(@Param("id") long id);
 
   @UpdateProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "markFinished")
   int markFinished(
@@ -70,8 +66,11 @@ public interface IcebergCleanupJobMapper {
   int heartbeat(
       @Param("id") long id, @Param("lastHeartbeat") long lastHeartbeat, @Param("now") long now);
 
-  @SelectProvider(type = IcebergCleanupJobSQLProviderFactory.class, method = "selectActiveJobId")
-  Long selectActiveJobId(
+  @SelectProvider(
+      type = IcebergCleanupJobSQLProviderFactory.class,
+      method = "selectUnfinishedJobId")
+  Long selectUnfinishedJobId(
+      @Param("metalake") String metalake,
       @Param("catalog") String catalog,
       @Param("namespace") String namespace,
       @Param("table") String table);
