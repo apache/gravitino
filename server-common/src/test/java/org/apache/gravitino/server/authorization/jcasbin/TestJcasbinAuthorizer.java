@@ -80,7 +80,7 @@ import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
-import org.apache.gravitino.storage.relational.po.auth.AuthSubjectVersion;
+import org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
@@ -180,8 +180,7 @@ public class TestJcasbinAuthorizer {
     ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
     when(ownerMetaMapper.selectMaxChangedOwner()).thenReturn(null);
-    when(ownerMetaMapper.selectMaxChangeId()).thenReturn(0L);
-    when(ownerMetaMapper.selectChangedOwners(anyLong(), anyLong(), anyLong()))
+    when(ownerMetaMapper.selectChangedOwners(anyLong(), anyLong()))
         .thenReturn(Collections.emptyList());
     when(entityChangeLogMapper.selectMaxChangeId()).thenReturn(0L);
     when(entityChangeLogMapper.selectEntityChanges(anyLong(), anyInt()))
@@ -225,28 +224,18 @@ public class TestJcasbinAuthorizer {
               String mlk = invocation.getArgument(0);
               String uname = invocation.getArgument(1);
               List<String> gNames = invocation.getArgument(2);
-              List<AuthSubjectVersion> rows = new ArrayList<>();
+              List<AuthPrefetchRow> rows = new ArrayList<>();
               UserUpdatedAt u = userMetaMapper.getUserUpdatedAt(mlk, uname);
               if (u != null) {
-                rows.add(
-                    new AuthSubjectVersion(
-                        AuthSubjectVersion.Kind.USER,
-                        u.getUserId(),
-                        uname,
-                        u.getUpdatedAt(),
-                        null));
+                rows.add(AuthPrefetchRow.forUser(u.getUserId(), uname, u.getUpdatedAt()));
                 List<RolePO> directRoles = roleMetaMapper.listRolesByUserId(u.getUserId());
                 if (directRoles != null) {
                   for (RolePO rp : directRoles) {
                     RoleUpdatedAt rv = mockedRoleVersions.get(rp.getRoleId());
                     long roleUpdatedAt = rv != null ? rv.getUpdatedAt() : 0L;
                     rows.add(
-                        new AuthSubjectVersion(
-                            AuthSubjectVersion.Kind.USER_ROLE,
-                            rp.getRoleId(),
-                            rp.getRoleName(),
-                            roleUpdatedAt,
-                            u.getUserId()));
+                        AuthPrefetchRow.forUserRole(
+                            rp.getRoleId(), rp.getRoleName(), roleUpdatedAt, u.getUserId()));
                   }
                 }
               }
@@ -254,25 +243,15 @@ public class TestJcasbinAuthorizer {
                 for (String gn : gNames) {
                   GroupUpdatedAt g = groupMetaMapper.getGroupUpdatedAt(mlk, gn);
                   if (g != null) {
-                    rows.add(
-                        new AuthSubjectVersion(
-                            AuthSubjectVersion.Kind.GROUP,
-                            g.getGroupId(),
-                            gn,
-                            g.getUpdatedAt(),
-                            null));
+                    rows.add(AuthPrefetchRow.forGroup(g.getGroupId(), gn, g.getUpdatedAt()));
                     List<RolePO> groupRoles = roleMetaMapper.listRolesByGroupId(g.getGroupId());
                     if (groupRoles != null) {
                       for (RolePO rp : groupRoles) {
                         RoleUpdatedAt rv = mockedRoleVersions.get(rp.getRoleId());
                         long roleUpdatedAt = rv != null ? rv.getUpdatedAt() : 0L;
                         rows.add(
-                            new AuthSubjectVersion(
-                                AuthSubjectVersion.Kind.GROUP_ROLE,
-                                rp.getRoleId(),
-                                rp.getRoleName(),
-                                roleUpdatedAt,
-                                g.getGroupId()));
+                            AuthPrefetchRow.forGroupRole(
+                                rp.getRoleId(), rp.getRoleName(), roleUpdatedAt, g.getGroupId()));
                       }
                     }
                   }

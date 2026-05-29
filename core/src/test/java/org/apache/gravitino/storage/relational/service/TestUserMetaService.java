@@ -58,7 +58,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
-import org.apache.gravitino.storage.relational.po.auth.AuthSubjectVersion;
+import org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -1204,54 +1204,54 @@ class TestUserMetaService extends TestJDBCBackend {
     groupMetaService.insertGroup(groupB, false);
 
     // Case 1: user + multiple groups, no role bindings → one row per subject.
-    List<AuthSubjectVersion> rows =
+    List<AuthPrefetchRow> rows =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
             m ->
                 m.batchGetAuthSubjectsForUser(
                     metalakeName, "batchUser", Lists.newArrayList("batchGroupA", "batchGroupB")));
     assertEquals(3, rows.size());
-    AuthSubjectVersion userRow =
+    AuthPrefetchRow userRow =
         rows.stream()
-            .filter(r -> AuthSubjectVersion.Kind.USER == r.getSubjectType())
+            .filter(r -> AuthPrefetchRow.Kind.USER == r.getSubjectType())
             .findFirst()
             .orElseThrow();
-    assertEquals(user.id(), userRow.getId());
-    assertEquals("batchUser", userRow.getName());
+    assertEquals(user.id(), userRow.getEntityId());
+    assertEquals("batchUser", userRow.getEntityName());
     assertTrue(userRow.getUpdatedAt() >= 0);
-    List<AuthSubjectVersion> groupRows =
+    List<AuthPrefetchRow> groupRows =
         rows.stream()
-            .filter(r -> AuthSubjectVersion.Kind.GROUP == r.getSubjectType())
-            .sorted(Comparator.comparing(AuthSubjectVersion::getName))
+            .filter(r -> AuthPrefetchRow.Kind.GROUP == r.getSubjectType())
+            .sorted(Comparator.comparing(AuthPrefetchRow::getEntityName))
             .collect(Collectors.toList());
     assertEquals(2, groupRows.size());
-    assertEquals("batchGroupA", groupRows.get(0).getName());
-    assertEquals(groupA.id(), groupRows.get(0).getId());
-    assertEquals("batchGroupB", groupRows.get(1).getName());
-    assertEquals(groupB.id(), groupRows.get(1).getId());
+    assertEquals("batchGroupA", groupRows.get(0).getEntityName());
+    assertEquals(groupA.id(), groupRows.get(0).getEntityId());
+    assertEquals("batchGroupB", groupRows.get(1).getEntityName());
+    assertEquals(groupB.id(), groupRows.get(1).getEntityId());
 
     // Case 2: empty group list → user-only branch (no GROUP / GROUP_ROLE UNION).
-    List<AuthSubjectVersion> userOnly =
+    List<AuthPrefetchRow> userOnly =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
             m -> m.batchGetAuthSubjectsForUser(metalakeName, "batchUser", Collections.emptyList()));
     assertEquals(1, userOnly.size());
-    assertEquals(AuthSubjectVersion.Kind.USER, userOnly.get(0).getSubjectType());
-    assertEquals(user.id(), userOnly.get(0).getId());
+    assertEquals(AuthPrefetchRow.Kind.USER, userOnly.get(0).getSubjectType());
+    assertEquals(user.id(), userOnly.get(0).getEntityId());
 
     // Case 3: missing user + missing group → only the present group row is returned.
-    List<AuthSubjectVersion> missing =
+    List<AuthPrefetchRow> missing =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
             m ->
                 m.batchGetAuthSubjectsForUser(
                     metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup", "batchGroupA")));
     assertEquals(1, missing.size(), "Only the existing group should be returned");
-    assertEquals(AuthSubjectVersion.Kind.GROUP, missing.get(0).getSubjectType());
-    assertEquals("batchGroupA", missing.get(0).getName());
+    assertEquals(AuthPrefetchRow.Kind.GROUP, missing.get(0).getSubjectType());
+    assertEquals("batchGroupA", missing.get(0).getEntityName());
 
     // Case 4: both user and groups missing → empty result.
-    List<AuthSubjectVersion> none =
+    List<AuthPrefetchRow> none =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
             m ->

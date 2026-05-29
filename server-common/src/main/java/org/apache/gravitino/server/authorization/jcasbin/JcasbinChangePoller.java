@@ -66,15 +66,12 @@ public class JcasbinChangePoller implements AutoCloseable {
 
   private ScheduledExecutorService scheduler;
 
-  // The owner poller needs two cursors because owner_meta rows can be both inserted and
-  // soft-deleted (which keeps the same id but advances updated_at):
-  //   * (ownerPollHighWaterUpdatedAt, ownerPollHighWaterUpdatedAtId) is a single logical cursor
-  //     tracking soft-delete updates. updated_at alone is millisecond-granular so multiple
-  //     updates can share the same value; the id field is the tiebreaker for that case.
-  //   * ownerPollHighWaterInsertId tracks brand-new owner_meta rows by their auto-increment id.
+  // (ownerPollHighWaterUpdatedAt, ownerPollHighWaterUpdatedAtId) is a single logical keyset cursor
+  // over owner_meta. Inserts set updated_at = now (in POConverters) and soft-deletes set it via
+  // SQL, so every write advances updated_at — one cursor catches both. id is the tiebreaker for
+  // batch soft-deletes (softDeleteOwnerRelByCatalogId etc.) where many rows share the same ms.
   private volatile long ownerPollHighWaterUpdatedAt = 0;
   private volatile long ownerPollHighWaterUpdatedAtId = 0;
-  private volatile long ownerPollHighWaterInsertId = 0;
   private volatile long entityPollHighWaterId = 0;
 
   /**
@@ -96,9 +93,9 @@ public class JcasbinChangePoller implements AutoCloseable {
    * Initializes the high-water cursors to the current DB tail (so startup does not scan historical
    * changes) and schedules periodic polling.
    *
-   * <p>The owner poller tracks inserts by id and updates by {@code (updated_at, id)} because owner
-   * deletion paths soft-delete existing {@code owner_meta} rows. Those updates keep the same id but
-   * advance {@code updated_at}; an id-only cursor would miss them on peer nodes.
+   * <p>The owner poller advances a single {@code (updated_at, id)} keyset cursor. {@code id} alone
+   * would miss soft-delete updates (which reuse the row id), and {@code updated_at} alone would
+   * miss same-millisecond rows from batch soft-deletes (which all share one {@code updated_at}).
    */
   public void start() {
     ChangedOwnerInfo maxOwnerChange =
@@ -108,10 +105,6 @@ public class JcasbinChangePoller implements AutoCloseable {
       ownerPollHighWaterUpdatedAt = maxOwnerChange.getUpdatedAt();
       ownerPollHighWaterUpdatedAtId = maxOwnerChange.getId();
     }
-    ownerPollHighWaterInsertId =
-        getOrDefault(
-            SessionUtils.getWithoutCommit(
-                OwnerMetaMapper.class, OwnerMetaMapper::selectMaxChangeId));
     entityPollHighWaterId =
         getOrDefault(
             SessionUtils.getWithoutCommit(
@@ -133,10 +126,9 @@ public class JcasbinChangePoller implements AutoCloseable {
   void pollChanges() {
     try {
       LOG.debug(
-          "Polling for owner changes after updated_at {}, updated_at_id {}, insert_id {}",
+          "Polling for owner changes after (updated_at={}, id={})",
           ownerPollHighWaterUpdatedAt,
-          ownerPollHighWaterUpdatedAtId,
-          ownerPollHighWaterInsertId);
+          ownerPollHighWaterUpdatedAtId);
       pollOwnerChanges();
     } catch (Exception e) {
       if (handleInterruptIfAny(e, "Owner change poll")) {
@@ -180,9 +172,9 @@ public class JcasbinChangePoller implements AutoCloseable {
 
   /**
    * Drains owner-change rows past {@link #ownerPollHighWaterUpdatedAt}/{@link
-   * #ownerPollHighWaterUpdatedAtId} and {@link #ownerPollHighWaterInsertId}, then invalidates the
-   * affected {@code ownerRelCache} entries. Each row carries {@code metadataObjectId}, so
-   * invalidation is a direct key removal — no name resolution needed.
+   * #ownerPollHighWaterUpdatedAtId} and invalidates the affected {@code ownerRelCache} entries.
+   * Each row carries {@code metadataObjectId}, so invalidation is a direct key removal — no name
+   * resolution needed.
    *
    * <p>The {@code synchronized} modifier is defensive. In production this method is only invoked
    * from the single-threaded scheduler started in {@link #start()}, and {@link
@@ -198,18 +190,13 @@ public class JcasbinChangePoller implements AutoCloseable {
     List<ChangedOwnerInfo> changes =
         SessionUtils.getWithoutCommit(
             OwnerMetaMapper.class,
-            m ->
-                m.selectChangedOwners(
-                    ownerPollHighWaterUpdatedAt,
-                    ownerPollHighWaterUpdatedAtId,
-                    ownerPollHighWaterInsertId));
+            m -> m.selectChangedOwners(ownerPollHighWaterUpdatedAt, ownerPollHighWaterUpdatedAtId));
     if (changes.isEmpty()) {
       return;
     }
 
     long[] maxSeenUpdatedAt = {ownerPollHighWaterUpdatedAt};
     long[] maxSeenUpdatedAtId = {ownerPollHighWaterUpdatedAtId};
-    long[] maxSeenInsertId = {ownerPollHighWaterInsertId};
     // Hold the cache's exclusive invalidation lock for the whole batch so readers never observe
     // a half-applied state where some of this batch's entries have been evicted and others are
     // still hot.
@@ -223,14 +210,10 @@ public class JcasbinChangePoller implements AutoCloseable {
               maxSeenUpdatedAt[0] = change.getUpdatedAt();
               maxSeenUpdatedAtId[0] = change.getId();
             }
-            if (change.getId() > maxSeenInsertId[0]) {
-              maxSeenInsertId[0] = change.getId();
-            }
           }
         });
     ownerPollHighWaterUpdatedAt = maxSeenUpdatedAt[0];
     ownerPollHighWaterUpdatedAtId = maxSeenUpdatedAtId[0];
-    ownerPollHighWaterInsertId = maxSeenInsertId[0];
   }
 
   /**

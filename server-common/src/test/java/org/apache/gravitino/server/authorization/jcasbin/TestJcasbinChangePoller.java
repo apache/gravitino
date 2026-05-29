@@ -98,7 +98,7 @@ public class TestJcasbinChangePoller {
     EntityChangeLogMapper entityChangeLogMapper = mock(EntityChangeLogMapper.class);
     OwnerMetaMapper ownerMetaMapper = mock(OwnerMetaMapper.class);
 
-    when(ownerMetaMapper.selectChangedOwners(0L, 0L, 0L)).thenReturn(Collections.emptyList());
+    when(ownerMetaMapper.selectChangedOwners(0L, 0L)).thenReturn(Collections.emptyList());
     when(entityChangeLogMapper.selectEntityChanges(0L, 500))
         .thenReturn(
             List.of(

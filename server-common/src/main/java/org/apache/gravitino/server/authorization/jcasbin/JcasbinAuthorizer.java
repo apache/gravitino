@@ -62,7 +62,7 @@ import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
-import org.apache.gravitino.storage.relational.po.auth.AuthSubjectVersion;
+import org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
@@ -774,7 +774,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       return loadUserInfo(metalake, username, requestContext);
     }
 
-    List<AuthSubjectVersion> rows =
+    // Single round-trip pulls the request user, its groups, and both direct + inherited role
+    // bindings as one flat polymorphic list. See AuthPrefetchRow for the per-Kind field layout.
+    List<AuthPrefetchRow> rows =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
             m -> m.batchGetAuthSubjectsForUser(metalake, username, groupNames));
@@ -785,28 +787,40 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     LinkedHashSet<Long> userRoleIds = new LinkedHashSet<>();
     Map<Long, LinkedHashSet<Long>> groupRoleIdsByGroupId = new HashMap<>();
 
-    for (AuthSubjectVersion row : rows) {
+    // Pivot the flat row list into per-Kind buckets. Each branch reads exactly the fields the
+    // class-level Javadoc of AuthPrefetchRow documents as meaningful for that Kind.
+    for (AuthPrefetchRow row : rows) {
       switch (row.getSubjectType()) {
         case USER:
-          foundUser = new UserUpdatedAt(row.getId(), row.getUpdatedAt());
+          // entityId = user_id, updatedAt = user_meta.updated_at. At most one row.
+          foundUser = new UserUpdatedAt(row.getEntityId(), row.getUpdatedAt());
           break;
         case GROUP:
-          foundGroups.put(row.getName(), new GroupUpdatedAt(row.getId(), row.getUpdatedAt()));
+          // entityId = group_id, entityName = group_name, updatedAt = group_meta.updated_at.
+          foundGroups.put(
+              row.getEntityName(), new GroupUpdatedAt(row.getEntityId(), row.getUpdatedAt()));
           break;
         case USER_ROLE:
-          userRoleIds.add(row.getId());
+          // entityId = role_id, entityName = role_name, updatedAt = role_meta.updated_at.
+          // bindingOwnerId is the user this role is bound to; not needed here because the user is
+          // implicit (we already know `username`).
+          userRoleIds.add(row.getEntityId());
           roleVersions.put(
-              row.getId(), new RoleUpdatedAt(row.getId(), row.getName(), row.getUpdatedAt()));
+              row.getEntityId(),
+              new RoleUpdatedAt(row.getEntityId(), row.getEntityName(), row.getUpdatedAt()));
           break;
         case GROUP_ROLE:
-          Long parentGroupId = row.getParentId();
+          // entityId = role_id, entityName = role_name, updatedAt = role_meta.updated_at.
+          // bindingOwnerId = owning group_id — used to bucket roles back to their group.
+          Long parentGroupId = row.getBindingOwnerId();
           if (parentGroupId != null) {
             groupRoleIdsByGroupId
                 .computeIfAbsent(parentGroupId, p -> new LinkedHashSet<>())
-                .add(row.getId());
+                .add(row.getEntityId());
           }
           roleVersions.put(
-              row.getId(), new RoleUpdatedAt(row.getId(), row.getName(), row.getUpdatedAt()));
+              row.getEntityId(),
+              new RoleUpdatedAt(row.getEntityId(), row.getEntityName(), row.getUpdatedAt()));
           break;
         default:
           break;

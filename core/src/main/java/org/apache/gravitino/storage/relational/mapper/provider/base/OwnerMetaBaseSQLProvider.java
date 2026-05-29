@@ -341,11 +341,11 @@ public class OwnerMetaBaseSQLProvider {
 
   public String selectChangedOwners(
       @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
-      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId,
-      @Param("lastConsumedInsertId") long lastConsumedInsertId) {
-    // Owner changes are broadcast to every server instance because owner caches are local. Track
-    // inserts by id and soft-deletes by (updated_at, id), because deleting an owner updates an
-    // existing owner_meta row without allocating a new id.
+      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId) {
+    // Owner changes are broadcast to every server instance because owner caches are local. Both
+    // inserts and soft-deletes advance owner_meta.updated_at, so a single (updated_at, id) keyset
+    // cursor catches every change; id is the tiebreaker when multiple rows share an updated_at
+    // millisecond (batch soft-deletes do that).
     return "SELECT id,"
         + " metadata_object_id as metadataObjectId,"
         + " metadata_object_type as metadataObjectType,"
@@ -354,7 +354,6 @@ public class OwnerMetaBaseSQLProvider {
         + OWNER_TABLE_NAME
         + " WHERE updated_at > #{lastConsumedUpdatedAt}"
         + " OR (updated_at = #{lastConsumedUpdatedAt} AND id > #{lastConsumedUpdatedAtId})"
-        + " OR id > #{lastConsumedInsertId}"
         + " ORDER BY updated_at, id LIMIT 1000";
   }
 
@@ -368,9 +367,5 @@ public class OwnerMetaBaseSQLProvider {
         + " FROM "
         + OWNER_TABLE_NAME
         + " ORDER BY updated_at DESC, id DESC LIMIT 1";
-  }
-
-  public String selectMaxChangeId() {
-    return "SELECT COALESCE(MAX(id), 0) FROM " + OWNER_TABLE_NAME;
   }
 }

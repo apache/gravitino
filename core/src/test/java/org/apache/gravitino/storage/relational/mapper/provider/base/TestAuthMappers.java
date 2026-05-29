@@ -364,7 +364,7 @@ public class TestAuthMappers {
       throw new RuntimeException("Update failed", e);
     }
 
-    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(0L, 0L, 0L);
+    List<ChangedOwnerInfo> changed = ownerMetaMapper.selectChangedOwners(0L, 0L);
     Assertions.assertEquals(2, changed.size());
     Assertions.assertEquals(200L, changed.get(0).getMetadataObjectId());
     Assertions.assertEquals("SCHEMA", changed.get(0).getMetadataObjectType());
@@ -373,16 +373,14 @@ public class TestAuthMappers {
     Assertions.assertEquals("SCHEMA", changed.get(1).getMetadataObjectType());
     Assertions.assertEquals(200L, changed.get(1).getUpdatedAt());
 
-    // Polling after the last seen id should not return the same row again.
+    // Polling after the last seen tuple should not return the same row again.
     List<ChangedOwnerInfo> sameTimestamp =
-        ownerMetaMapper.selectChangedOwners(
-            changed.get(1).getUpdatedAt(), changed.get(1).getId(), changed.get(1).getId());
+        ownerMetaMapper.selectChangedOwners(changed.get(1).getUpdatedAt(), changed.get(1).getId());
     Assertions.assertTrue(sameTimestamp.isEmpty());
 
     ownerMetaMapper.softDeleteOwnerRelByOwnerIdAndType(60L, "USER");
     List<ChangedOwnerInfo> softDeleted =
-        ownerMetaMapper.selectChangedOwners(
-            changed.get(1).getUpdatedAt(), changed.get(1).getId(), changed.get(1).getId());
+        ownerMetaMapper.selectChangedOwners(changed.get(1).getUpdatedAt(), changed.get(1).getId());
     Assertions.assertEquals(1, softDeleted.size());
     Assertions.assertEquals(200L, softDeleted.get(0).getMetadataObjectId());
     Assertions.assertEquals("SCHEMA", softDeleted.get(0).getMetadataObjectType());

@@ -22,7 +22,7 @@ package org.apache.gravitino.storage.relational.mapper;
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
-import org.apache.gravitino.storage.relational.po.auth.AuthSubjectVersion;
+import org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -99,25 +99,34 @@ public interface UserMetaMapper {
       @Param("metalakeName") String metalakeName, @Param("userName") String userName);
 
   /**
-   * Fat UNION ALL probe that returns every version sentinel the JCasbin authorize hot path needs:
-   * the user, the requested groups, the user's direct {@code user_role_rel} role ids (joined to
-   * {@code role_meta} for their {@code updated_at}), and the group-inherited {@code group_role_rel}
-   * role ids (also joined for versions).
+   * Single-round-trip auth prefetch for the JCasbin authorize hot path. Returns every version
+   * sentinel the request needs:
    *
-   * <p>Each result row's {@link AuthSubjectVersion.Kind} discriminator + {@code parentId} let the
-   * caller pivot a flat list into a per-subject bucket — see that POJO's javadoc.
+   * <ul>
+   *   <li>the request user's {@code user_meta} row,
+   *   <li>each requested group's {@code group_meta} row,
+   *   <li>the user's direct {@code user_role_rel} role ids (joined to {@code role_meta} for their
+   *       {@code updated_at}),
+   *   <li>the group-inherited {@code group_role_rel} role ids (also joined for versions).
+   * </ul>
    *
-   * <p>Empty {@code groupNames} skips the GROUP and GROUP_ROLE branches so the query degrades to a
-   * 2-branch UNION (user + user_role) for users without group membership.
+   * <p>Implementation is up to four {@code UNION ALL} branches that map 1:1 to {@link
+   * AuthPrefetchRow.Kind} values — see {@link AuthPrefetchRow}'s class-level Javadoc for the row
+   * shape and how its fields are interpreted per Kind. Consumers switch on {@code subjectType} and
+   * bucket each row into the matching collection.
+   *
+   * <p>Empty {@code groupNames} skips the {@code GROUP} and {@code GROUP_ROLE} branches so the
+   * query degrades to a 2-branch UNION ({@code USER} + {@code USER_ROLE}) for users without group
+   * membership.
    *
    * @param metalakeName the metalake the user and groups belong to
    * @param userName the user to probe
    * @param groupNames the group names to probe; may be empty (never null)
-   * @return rows for the user, each present group, the user's direct roles, and each group's
-   *     inherited roles
+   * @return polymorphic rows for the user, each present group, the user's direct roles, and each
+   *     group's inherited roles
    */
   @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "batchGetAuthSubjectsForUser")
-  List<AuthSubjectVersion> batchGetAuthSubjectsForUser(
+  List<AuthPrefetchRow> batchGetAuthSubjectsForUser(
       @Param("metalakeName") String metalakeName,
       @Param("userName") String userName,
       @Param("groupNames") List<String> groupNames);

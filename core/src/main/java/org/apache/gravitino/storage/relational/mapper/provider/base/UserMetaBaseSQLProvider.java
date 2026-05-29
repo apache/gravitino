@@ -212,14 +212,43 @@ public class UserMetaBaseSQLProvider {
         + " AND um.deleted_at = 0";
   }
 
+  /**
+   * Builds the single-round-trip auth prefetch query for {@code (metalake, userName, groupNames)}.
+   *
+   * <p>The SQL is up to four {@code UNION ALL} branches that map 1:1 to the four {@code
+   * org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow.Kind} values:
+   *
+   * <ul>
+   *   <li>{@code 'USER'} branch — the request user's {@code user_meta} row.
+   *   <li>{@code 'USER_ROLE'} branch — roles bound directly to the request user via {@code
+   *       user_role_rel}; {@code parentId} carries the owning {@code user_id}.
+   *   <li>{@code 'GROUP'} branch — the request user's groups (one row per name in {@code
+   *       groupNames}).
+   *   <li>{@code 'GROUP_ROLE'} branch — roles inherited via group membership through {@code
+   *       group_role_rel}; {@code parentId} carries the owning {@code group_id}.
+   * </ul>
+   *
+   * <p>The {@code GROUP} / {@code GROUP_ROLE} branches are appended only when {@code groupNames} is
+   * non-empty, leaving a 2-branch query in the no-group case.
+   *
+   * <p>All branches must SELECT the same column list and aliases ({@code subjectType}, {@code
+   * entityId}, {@code entityName}, {@code updatedAt}, {@code bindingOwnerId}) because {@code UNION
+   * ALL} requires a uniform row shape. The aliases match {@code AuthPrefetchRow}'s field names so
+   * MyBatis can reflectively map each row.
+   *
+   * @param metalakeName the metalake the user belongs to
+   * @param userName the request user's name
+   * @param groupNames the user's group memberships; may be empty
+   * @return the SQL string
+   */
   public String batchGetAuthSubjectsForUser(
       @Param("metalakeName") String metalakeName,
       @Param("userName") String userName,
       @Param("groupNames") List<String> groupNames) {
-    // USER row.
+    // 'USER' branch → AuthPrefetchRow.Kind.USER.
     String userBranch =
-        "SELECT 'USER' AS subjectType, um.user_id AS id, um.user_name AS name,"
-            + " um.updated_at AS updatedAt, NULL AS parentId"
+        "SELECT 'USER' AS subjectType, um.user_id AS entityId, um.user_name AS entityName,"
+            + " um.updated_at AS updatedAt, NULL AS bindingOwnerId"
             + " FROM "
             + USER_TABLE_NAME
             + " um"
@@ -229,11 +258,12 @@ public class UserMetaBaseSQLProvider {
             + " WHERE mm.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
             + " AND um.deleted_at = 0";
 
-    // USER_ROLE rows: direct user-role bindings with each role's updated_at.
+    // 'USER_ROLE' branch → AuthPrefetchRow.Kind.USER_ROLE.
+    // bindingOwnerId carries the owning user_id so consumers can bucket roles back to that user.
     String userRoleBranch =
         " UNION ALL "
-            + "SELECT 'USER_ROLE' AS subjectType, rm.role_id AS id, rm.role_name AS name,"
-            + " rm.updated_at AS updatedAt, ur.user_id AS parentId"
+            + "SELECT 'USER_ROLE' AS subjectType, rm.role_id AS entityId, rm.role_name AS entityName,"
+            + " rm.updated_at AS updatedAt, ur.user_id AS bindingOwnerId"
             + " FROM "
             + USER_TABLE_NAME
             + " um"
@@ -250,15 +280,15 @@ public class UserMetaBaseSQLProvider {
             + " AND um.deleted_at = 0";
 
     if (groupNames == null || groupNames.isEmpty()) {
-      // No groups -> 2-branch UNION (user + direct user roles).
+      // No group memberships → 2-branch query (USER + USER_ROLE only).
       return "<script>" + userBranch + userRoleBranch + "</script>";
     }
 
-    // GROUP rows.
+    // 'GROUP' branch → AuthPrefetchRow.Kind.GROUP.
     String groupBranch =
         " UNION ALL "
-            + "SELECT 'GROUP' AS subjectType, gm.group_id AS id, gm.group_name AS name,"
-            + " gm.updated_at AS updatedAt, NULL AS parentId"
+            + "SELECT 'GROUP' AS subjectType, gm.group_id AS entityId, gm.group_name AS entityName,"
+            + " gm.updated_at AS updatedAt, NULL AS bindingOwnerId"
             + " FROM "
             + GROUP_TABLE_NAME
             + " gm"
@@ -270,11 +300,12 @@ public class UserMetaBaseSQLProvider {
             + " <foreach item='g' collection='groupNames' open='(' separator=',' close=')'>#{g}</foreach>"
             + " AND gm.deleted_at = 0";
 
-    // GROUP_ROLE rows: group-inherited bindings with each role's updated_at.
+    // 'GROUP_ROLE' branch → AuthPrefetchRow.Kind.GROUP_ROLE.
+    // bindingOwnerId carries the owning group_id so consumers can bucket roles by group.
     String groupRoleBranch =
         " UNION ALL "
-            + "SELECT 'GROUP_ROLE' AS subjectType, rm.role_id AS id, rm.role_name AS name,"
-            + " rm.updated_at AS updatedAt, gr.group_id AS parentId"
+            + "SELECT 'GROUP_ROLE' AS subjectType, rm.role_id AS entityId, rm.role_name AS entityName,"
+            + " rm.updated_at AS updatedAt, gr.group_id AS bindingOwnerId"
             + " FROM "
             + GROUP_TABLE_NAME
             + " gm"

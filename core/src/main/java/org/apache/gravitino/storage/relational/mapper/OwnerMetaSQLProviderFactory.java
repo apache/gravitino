@@ -123,17 +123,11 @@ public class OwnerMetaSQLProviderFactory {
 
   public static String selectChangedOwners(
       @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
-      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId,
-      @Param("lastConsumedInsertId") long lastConsumedInsertId) {
-    return getProvider()
-        .selectChangedOwners(lastConsumedUpdatedAt, lastConsumedUpdatedAtId, lastConsumedInsertId);
+      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId) {
+    return getProvider().selectChangedOwners(lastConsumedUpdatedAt, lastConsumedUpdatedAtId);
   }
 
   public static String selectMaxChangedOwner() {
     return getProvider().selectMaxChangedOwner();
-  }
-
-  public static String selectMaxChangeId() {
-    return getProvider().selectMaxChangeId();
   }
 }
