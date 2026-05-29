@@ -66,11 +66,13 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
     store = new IcebergCleanupJobStore(new RandomIdGenerator());
   }
 
+  private static final long CATALOG_ID = 100L;
+  private static final long OTHER_CATALOG_ID = 200L;
+
   private static IcebergCleanupJob sampleJob() {
     return new IcebergCleanupJob(
         0L,
-        "ml",
-        "cat",
+        CATALOG_ID,
         "db",
         "t",
         "s3://b/db/t/metadata/0.json",
@@ -81,14 +83,13 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
 
   @TestTemplate
   void testAddTakeSucceedLifecycle() {
-    Assertions.assertFalse(store.findUnfinishedJobId("ml", "cat", "db", "t").isPresent());
+    Assertions.assertFalse(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
 
     long id = store.addJob(sampleJob());
     Assertions.assertTrue(id > 0);
-    Assertions.assertTrue(store.findUnfinishedJobId("ml", "cat", "db", "t").isPresent());
-    // Catalog names are unique only within a metalake, so the same triple under another metalake
-    // must not match.
-    Assertions.assertFalse(store.findUnfinishedJobId("other_ml", "cat", "db", "t").isPresent());
+    Assertions.assertTrue(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
+    // The same namespace/table under a different catalog must not match.
+    Assertions.assertFalse(store.findUnfinishedJobId(OTHER_CATALOG_ID, "db", "t").isPresent());
 
     long now = System.currentTimeMillis();
     Optional<IcebergCleanupJob> taken = store.takePendingJob(now, 300_000L, 10);
@@ -96,14 +97,14 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
     Assertions.assertEquals(id, taken.get().id());
     Assertions.assertEquals(ImmutableMap.of("k", "v"), taken.get().fileIOProperties());
     Assertions.assertEquals(IcebergCleanupJob.State.RUNNING, store.stateOf(id));
-    Assertions.assertTrue(store.findUnfinishedJobId("ml", "cat", "db", "t").isPresent());
+    Assertions.assertTrue(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
     Assertions.assertFalse(store.takePendingJob(now, 300_000L, 10).isPresent());
 
     Assertions.assertTrue(store.markSucceeded(id));
     Assertions.assertEquals(IcebergCleanupJob.State.SUCCEEDED, store.stateOf(id));
     // A second transition no longer owns the (now terminal) row, so it reports no update.
     Assertions.assertFalse(store.markSucceeded(id));
-    Assertions.assertFalse(store.findUnfinishedJobId("ml", "cat", "db", "t").isPresent());
+    Assertions.assertFalse(store.findUnfinishedJobId(CATALOG_ID, "db", "t").isPresent());
     Assertions.assertEquals(
         1, store.deleteFinishedJobsByLegacyTimeline(System.currentTimeMillis() + 1));
   }

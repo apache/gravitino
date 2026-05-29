@@ -602,8 +602,7 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
 
 CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `id`                BIGINT(20)    UNSIGNED NOT NULL,
-  `metalake_name`     VARCHAR(128)  NOT NULL,
-  `catalog_name`      VARCHAR(128)  NOT NULL,
+  `catalog_id`        BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique id of the owning catalog; stable across catalog rename',
   `namespace`         VARCHAR(512)  NOT NULL,
   `table_name`        VARCHAR(256)  NOT NULL,
   `metadata_location` MEDIUMTEXT   NOT NULL,
@@ -617,5 +616,5 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `updated_at`        BIGINT(20)    NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`),
   KEY `idx_state_updated` (`state`, `updated_at`),
-  KEY `idx_object` (`metalake_name`, `catalog_name`, `namespace`(255), `table_name`(128), `state`)
+  KEY `idx_object` (`catalog_id`, `namespace`(255), `table_name`(128), `state`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'async Iceberg table cleanup jobs';

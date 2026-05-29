@@ -93,11 +93,10 @@ public class IcebergCleanupJobSQLProviderFactory {
   }
 
   public static String selectUnfinishedJobId(
-      @Param("metalake") String metalake,
-      @Param("catalog") String catalog,
+      @Param("catalogId") long catalogId,
       @Param("namespace") String namespace,
       @Param("table") String table) {
-    return getProvider().selectUnfinishedJobId(metalake, catalog, namespace, table);
+    return getProvider().selectUnfinishedJobId(catalogId, namespace, table);
   }
 
   public static String deleteFinishedJobsByLegacyTimeline(

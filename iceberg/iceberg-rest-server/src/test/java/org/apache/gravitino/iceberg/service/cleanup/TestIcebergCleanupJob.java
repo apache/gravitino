@@ -30,15 +30,14 @@ class TestIcebergCleanupJob {
     IcebergCleanupJob job =
         new IcebergCleanupJob(
             0L,
-            "ml",
-            "cat",
+            42L,
             "db",
             "t",
             "s3://b/db/t/metadata/0.json",
             "org.apache.iceberg.aws.s3.S3FileIO",
             ImmutableMap.of("k", "v"),
             "alice");
-    Assertions.assertEquals("cat", job.catalogName());
+    Assertions.assertEquals(42L, job.catalogId());
     Assertions.assertEquals("db", job.namespace());
     Assertions.assertEquals(ImmutableMap.of("k", "v"), job.fileIOProperties());
     Assertions.assertEquals("alice", job.createdBy());

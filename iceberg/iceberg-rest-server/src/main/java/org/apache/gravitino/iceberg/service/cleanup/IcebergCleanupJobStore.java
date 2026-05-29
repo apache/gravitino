@@ -159,18 +159,16 @@ public class IcebergCleanupJobStore {
   /**
    * Finds the id of an unfinished (PENDING or RUNNING) cleanup job for the identifier, if any.
    *
-   * @param metalake metalake name (catalog names are unique only within a metalake)
-   * @param catalog catalog name
+   * @param catalogId globally unique id of the owning catalog
    * @param namespace table namespace
    * @param table table name
    * @return the unfinished job id, or {@link Optional#empty()} if none exists
    */
-  public Optional<Long> findUnfinishedJobId(
-      String metalake, String catalog, String namespace, String table) {
+  public Optional<Long> findUnfinishedJobId(long catalogId, String namespace, String table) {
     return Optional.ofNullable(
         SessionUtils.getWithoutCommit(
             IcebergCleanupJobMapper.class,
-            mapper -> mapper.selectUnfinishedJobId(metalake, catalog, namespace, table)));
+            mapper -> mapper.selectUnfinishedJobId(catalogId, namespace, table)));
   }
 
   /**

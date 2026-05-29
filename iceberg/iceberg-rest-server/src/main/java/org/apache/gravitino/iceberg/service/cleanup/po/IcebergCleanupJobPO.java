@@ -46,8 +46,7 @@ import org.apache.gravitino.json.JsonUtils;
 public class IcebergCleanupJobPO {
 
   private Long id;
-  private String metalakeName;
-  private String catalogName;
+  private Long catalogId;
   private String namespace;
   private String tableName;
   private String metadataLocation;
@@ -71,8 +70,7 @@ public class IcebergCleanupJobPO {
   public static IcebergCleanupJobPO fromCleanupJob(IcebergCleanupJob job, long id, long now) {
     return builder()
         .withId(id)
-        .withMetalakeName(job.metalakeName())
-        .withCatalogName(job.catalogName())
+        .withCatalogId(job.catalogId())
         .withNamespace(job.namespace())
         .withTableName(job.tableName())
         .withMetadataLocation(job.metadataLocation())
@@ -97,8 +95,7 @@ public class IcebergCleanupJobPO {
   public IcebergCleanupJob toCleanupJob() {
     return new IcebergCleanupJob(
         id,
-        metalakeName,
-        catalogName,
+        catalogId,
         namespace,
         tableName,
         metadataLocation,

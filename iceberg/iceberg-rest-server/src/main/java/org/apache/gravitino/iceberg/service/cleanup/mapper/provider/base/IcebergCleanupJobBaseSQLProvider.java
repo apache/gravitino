@@ -39,9 +39,9 @@ public class IcebergCleanupJobBaseSQLProvider {
   public String insertCleanupJob(@Param("po") IcebergCleanupJobPO po) {
     return "INSERT INTO "
         + TABLE_NAME
-        + " (id, metalake_name, catalog_name, namespace, table_name, metadata_location,"
+        + " (id, catalog_id, namespace, table_name, metadata_location,"
         + " file_io_impl, file_io_props, state, attempts, last_error, heartbeat_at, created_by,"
-        + " updated_at) VALUES (#{po.id}, #{po.metalakeName}, #{po.catalogName}, #{po.namespace},"
+        + " updated_at) VALUES (#{po.id}, #{po.catalogId}, #{po.namespace},"
         + " #{po.tableName}, #{po.metadataLocation}, #{po.fileIOImpl}, #{po.fileIOProps},"
         + " #{po.state}, #{po.attempts}, #{po.lastError}, #{po.heartbeatAt}, #{po.createdBy},"
         + " #{po.updatedAt})";
@@ -60,7 +60,7 @@ public class IcebergCleanupJobBaseSQLProvider {
     // trap, which also keeps the predicate index-friendly. Full rows are returned so a winning
     // claimer can build the job directly: the columns the job needs are immutable after enqueue,
     // so the pre-claim snapshot stays accurate without a re-read.
-    return "SELECT id, metalake_name AS metalakeName, catalog_name AS catalogName, namespace,"
+    return "SELECT id, catalog_id AS catalogId, namespace,"
         + " table_name AS tableName, metadata_location AS metadataLocation,"
         + " file_io_impl AS fileIOImpl, file_io_props AS fileIOProps, state, attempts,"
         + " last_error AS lastError, heartbeat_at AS heartbeatAt, created_by AS createdBy,"
@@ -147,22 +147,20 @@ public class IcebergCleanupJobBaseSQLProvider {
   }
 
   /**
-   * @param metalake metalake name (catalog names are unique only within a metalake)
-   * @param catalog catalog name
+   * @param catalogId globally unique id of the owning catalog
    * @param namespace table namespace
    * @param table table name
    * @return the unfinished-job lookup SELECT statement
    */
   public String selectUnfinishedJobId(
-      @Param("metalake") String metalake,
-      @Param("catalog") String catalog,
+      @Param("catalogId") long catalogId,
       @Param("namespace") String namespace,
       @Param("table") String table) {
-    // Catalog names are unique only within a metalake, so the identifier must be scoped by
-    // metalake_name to avoid colliding with a same-named table in another metalake.
+    // catalog_id is globally unique (catalog_meta's primary key), so it identifies the catalog
+    // without scoping by metalake, and it is stable across catalog rename unlike a name.
     return "SELECT id FROM "
         + TABLE_NAME
-        + " WHERE metalake_name = #{metalake} AND catalog_name = #{catalog}"
+        + " WHERE catalog_id = #{catalogId}"
         + " AND namespace = #{namespace} AND table_name = #{table}"
         + " AND state IN ('PENDING', 'RUNNING') LIMIT 1";
   }

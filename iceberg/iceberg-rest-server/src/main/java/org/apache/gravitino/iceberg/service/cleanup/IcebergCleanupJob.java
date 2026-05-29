@@ -59,8 +59,7 @@ public class IcebergCleanupJob {
   }
 
   private final long id;
-  private final String metalakeName;
-  private final String catalogName;
+  private final long catalogId;
   private final String namespace;
   private final String tableName;
   private final String metadataLocation;
@@ -72,8 +71,7 @@ public class IcebergCleanupJob {
    * Creates a cleanup job description.
    *
    * @param id row id, or {@code 0} before persistence
-   * @param metalakeName owning metalake
-   * @param catalogName Iceberg catalog name
+   * @param catalogId globally unique id of the owning catalog; stable across catalog rename
    * @param namespace table namespace (dotted)
    * @param tableName table name
    * @param metadataLocation the dropped table's {@code metadata.json} location
@@ -83,8 +81,7 @@ public class IcebergCleanupJob {
    */
   public IcebergCleanupJob(
       long id,
-      String metalakeName,
-      String catalogName,
+      long catalogId,
       String namespace,
       String tableName,
       String metadataLocation,
@@ -92,8 +89,7 @@ public class IcebergCleanupJob {
       Map<String, String> fileIOProperties,
       String createdBy) {
     this.id = id;
-    this.metalakeName = metalakeName;
-    this.catalogName = catalogName;
+    this.catalogId = catalogId;
     this.namespace = namespace;
     this.tableName = tableName;
     this.metadataLocation = metadataLocation;

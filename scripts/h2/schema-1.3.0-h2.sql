@@ -615,8 +615,7 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
 
 CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `id`                BIGINT        NOT NULL,
-  `metalake_name`     VARCHAR(128)  NOT NULL,
-  `catalog_name`      VARCHAR(128)  NOT NULL,
+  `catalog_id`        BIGINT        NOT NULL,
   `namespace`         VARCHAR(512)  NOT NULL,
   `table_name`        VARCHAR(256)  NOT NULL,
   `metadata_location` CLOB          NOT NULL,
@@ -631,4 +630,4 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   PRIMARY KEY (`id`)
 );
 CREATE INDEX IF NOT EXISTS `idx_state_updated` ON `iceberg_cleanup_job` (`state`, `updated_at`);
-CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`metalake_name`, `catalog_name`, `namespace`, `table_name`, `state`);
+CREATE INDEX IF NOT EXISTS `idx_object` ON `iceberg_cleanup_job` (`catalog_id`, `namespace`, `table_name`, `state`);

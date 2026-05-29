@@ -70,8 +70,7 @@ public interface IcebergCleanupJobMapper {
       type = IcebergCleanupJobSQLProviderFactory.class,
       method = "selectUnfinishedJobId")
   Long selectUnfinishedJobId(
-      @Param("metalake") String metalake,
-      @Param("catalog") String catalog,
+      @Param("catalogId") long catalogId,
       @Param("namespace") String namespace,
       @Param("table") String table);
 
