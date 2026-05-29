@@ -65,6 +65,7 @@ commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 iceberg = '1.11.0'
+# Last Iceberg release compatible with Spark 3.3; Spark 3.3 deploy ITs cover basic CRUD only.
 iceberg4spark33 = "1.8.1"
 iceberg4spark34 = "1.11.0"
 iceberg4spark35 = "1.11.0"

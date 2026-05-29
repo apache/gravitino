@@ -26,8 +26,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIf;
 
-// Spark 3.3 uses Iceberg 1.8.x; lakehouse-iceberg (1.11) runs in embedded MiniGravitino in the
-// same JVM. Run Hive-backend Iceberg IT in deploy mode only.
+/**
+ * Spark 3.3 integration tests for the Iceberg Hive catalog backend.
+ *
+ * <p>Spark 3.3 pins Iceberg to 1.8.x ({@code iceberg4spark33}); Gravitino's lakehouse Iceberg stack
+ * is 1.11. {@link DisabledIf} skips embedded mode to avoid classpath conflicts. Deploy-mode tests
+ * run a 1.8.x client against Gravitino with Iceberg 1.11 on the server and cover basic catalog CRUD
+ * only; they do not validate Iceberg 1.11 REST changes such as {@code file-scan-tasks} scan
+ * planning or the configurable multi-level namespace separator contract.
+ */
 @DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class SparkIcebergCatalogHiveBackendIT33 extends SparkIcebergCatalogHiveBackendIT {
   @Test

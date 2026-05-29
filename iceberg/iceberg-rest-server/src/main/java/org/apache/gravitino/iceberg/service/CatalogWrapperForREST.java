@@ -472,7 +472,17 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
             tableIdentifier);
       }
 
-      PlanTableScanResponse response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
+      PlanTableScanResponse response;
+      try {
+        response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
+      } catch (Exception e) {
+        LOG.error("Failed to build scan plan response for table: {}", tableIdentifier, e);
+        throw new RuntimeException(
+            String.format(
+                "Failed to build scan plan response for table: %s. Error: %s",
+                tableIdentifier, e.getMessage()),
+            e);
+      }
 
       // Cache the scan plan response
       scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
@@ -497,6 +507,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * <p>Matches {@link CatalogHandlers#planTableScan}: {@code file-scan-tasks} plus {@code
    * specs-by-id} from {@link Table#specs()}. Does not populate legacy {@code plan-tasks} JSON
    * strings.
+   *
+   * <p>{@code specs-by-id} uses the table's full spec map ({@link Table#specs()}), not only
+   * partition specs referenced by the returned {@code fileScanTasks}. That matches Iceberg 1.11
+   * REST behavior and may include historical specs from prior partition evolution, including when a
+   * filtered scan returns zero tasks.
    */
   @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
