@@ -22,6 +22,8 @@ import static org.apache.gravitino.integration.test.util.TestDatabaseName.MYSQL_
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.spark.connector.integration.test.SparkCommonIT;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkTableInfoChecker;
@@ -108,6 +110,8 @@ public abstract class SparkJdbcMysqlCatalogIT extends SparkCommonIT {
     catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_USER, mysqlUsername);
     catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD, mysqlPassword);
     catalogProperties.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DRIVER, mysqlDriver);
+    catalogProperties.put(
+        CredentialConstants.CREDENTIAL_PROVIDERS, JdbcCredential.JDBC_CREDENTIAL_TYPE);
     return catalogProperties;
   }
 }

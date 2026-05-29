@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.catalog.glue;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -37,7 +38,8 @@ class TestGlueConnectorAdapter {
             "test_glue", "glue", "test catalog", Catalog.Type.RELATIONAL, properties);
     GlueConnectorAdapter adapter = new GlueConnectorAdapter();
     Map<String, String> config =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
+        adapter.buildInternalConnectorConfig(
+            new GravitinoCatalog("test", mockCatalog), new Credential[0]);
 
     Assertions.assertEquals("glue", config.get("hive.metastore"));
     Assertions.assertEquals("us-east-1", config.get("hive.metastore.glue.region"));
@@ -63,7 +65,8 @@ class TestGlueConnectorAdapter {
             "test_glue", "glue", "test catalog", Catalog.Type.RELATIONAL, properties);
     GlueConnectorAdapter adapter = new GlueConnectorAdapter();
     Map<String, String> config =
-        adapter.buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog));
+        adapter.buildInternalConnectorConfig(
+            new GravitinoCatalog("test", mockCatalog), new Credential[0]);
 
     Assertions.assertEquals("123456789", config.get("hive.metastore.glue.catalogid"));
     Assertions.assertEquals("test-access-key", config.get("hive.metastore.glue.aws-access-key"));

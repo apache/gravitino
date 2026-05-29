@@ -24,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
@@ -78,6 +80,7 @@ import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
+import org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
@@ -96,6 +99,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 /** Test of {@link JcasbinAuthorizer} */
 public class TestJcasbinAuthorizer {
@@ -175,8 +179,9 @@ public class TestJcasbinAuthorizer {
     OwnerMetaService ownerMetaService = mock(OwnerMetaService.class);
     ownerMetaServiceMockedStatic = mockStatic(OwnerMetaService.class);
     ownerMetaServiceMockedStatic.when(OwnerMetaService::getInstance).thenReturn(ownerMetaService);
-    when(ownerMetaMapper.selectMaxChangeId()).thenReturn(0L);
-    when(ownerMetaMapper.selectChangedOwners(anyLong())).thenReturn(Collections.emptyList());
+    when(ownerMetaMapper.selectMaxChangedOwner()).thenReturn(null);
+    when(ownerMetaMapper.selectChangedOwners(anyLong(), anyLong()))
+        .thenReturn(Collections.emptyList());
     when(entityChangeLogMapper.selectMaxChangeId()).thenReturn(0L);
     when(entityChangeLogMapper.selectEntityChanges(anyLong(), anyInt()))
         .thenReturn(Collections.emptyList());
@@ -209,6 +214,51 @@ public class TestJcasbinAuthorizer {
     // Default mock: getUserInfo returns a valid user
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, 1000L));
+
+    // Fat-JOIN variant used by the cache-warm path: assemble user + groups + direct user roles
+    // + group-inherited roles + role versions from the existing per-subject mocks. Lets tests
+    // continue stubbing at the per-subject granularity.
+    when(userMetaMapper.batchGetAuthSubjectsForUser(anyString(), anyString(), anyList()))
+        .thenAnswer(
+            invocation -> {
+              String mlk = invocation.getArgument(0);
+              String uname = invocation.getArgument(1);
+              List<String> gNames = invocation.getArgument(2);
+              List<AuthPrefetchRow> rows = new ArrayList<>();
+              UserUpdatedAt u = userMetaMapper.getUserUpdatedAt(mlk, uname);
+              if (u != null) {
+                rows.add(AuthPrefetchRow.forUser(u.getUserId(), uname, u.getUpdatedAt()));
+                List<RolePO> directRoles = roleMetaMapper.listRolesByUserId(u.getUserId());
+                if (directRoles != null) {
+                  for (RolePO rp : directRoles) {
+                    RoleUpdatedAt rv = mockedRoleVersions.get(rp.getRoleId());
+                    long roleUpdatedAt = rv != null ? rv.getUpdatedAt() : 0L;
+                    rows.add(
+                        AuthPrefetchRow.forUserRole(
+                            rp.getRoleId(), rp.getRoleName(), roleUpdatedAt, u.getUserId()));
+                  }
+                }
+              }
+              if (gNames != null) {
+                for (String gn : gNames) {
+                  GroupUpdatedAt g = groupMetaMapper.getGroupUpdatedAt(mlk, gn);
+                  if (g != null) {
+                    rows.add(AuthPrefetchRow.forGroup(g.getGroupId(), gn, g.getUpdatedAt()));
+                    List<RolePO> groupRoles = roleMetaMapper.listRolesByGroupId(g.getGroupId());
+                    if (groupRoles != null) {
+                      for (RolePO rp : groupRoles) {
+                        RoleUpdatedAt rv = mockedRoleVersions.get(rp.getRoleId());
+                        long roleUpdatedAt = rv != null ? rv.getUpdatedAt() : 0L;
+                        rows.add(
+                            AuthPrefetchRow.forGroupRole(
+                                rp.getRoleId(), rp.getRoleName(), roleUpdatedAt, g.getGroupId()));
+                      }
+                    }
+                  }
+                }
+              }
+              return rows;
+            });
 
     // Default: no roles assigned initially
     when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of());
@@ -431,6 +481,79 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testVersionCheckEvictsPoliciesOfRolesMissingFromDb() throws Exception {
+    // Regression test for the cross-instance role-delete invalidation gap. The
+    // happy path is already handled by the fat-JOIN inside prefetchUserAndGroupInfo,
+    // which excludes soft-/hard-deleted roles via "role_meta.deleted_at = 0" and
+    // re-primes userRoleCache before the next loadUserRoles call. This test covers
+    // the defence-in-depth tier: if versionCheckAndLoadRoles is ever invoked with
+    // a roleId whose version probe row is missing (e.g. cache window race, future
+    // code path bypassing the fat-JOIN), the fix must still clear that role's
+    // p-rows from both enforcers and evict its loadedRoles entry so that any
+    // residual user → deleted-role g-row grants nothing on subsequent enforce()s.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    // 1. Authorize once via the normal flow to populate loadedRoles + enforcer p-rows
+    //    for allowRole.
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    long userVersion = nextUserVersion();
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, userVersion));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(ALLOW_ROLE_ID, allowRole.name())));
+    assertTrue(doAuthorize(currentPrincipal));
+
+    // Sanity: loadedRoles now has an entry for ALLOW_ROLE_ID and the allowEnforcer
+    // contains a p-row whose subject (column 0) equals the role id.
+    Assertions.assertTrue(
+        getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent(),
+        "loadedRoles must be primed before the test");
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    Assertions.assertFalse(
+        allowEnforcer.getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID)).isEmpty(),
+        "allowEnforcer must hold p-rows for allowRole before the test");
+
+    // 2. Simulate the bug-trigger: batchGetRoleUpdatedAt returns NO row for the role
+    //    (i.e. the role row is gone from role_meta), even though something is still
+    //    asking us to version-check it.
+    when(roleMetaMapper.batchGetRoleUpdatedAt(any())).thenReturn(ImmutableList.of());
+
+    // Invoke versionCheckAndLoadRoles directly with the "deleted" role id and a
+    // fresh AuthorizationRequestContext that has NO prefetched role versions, so
+    // the method falls through to the batch probe and observes the empty result.
+    AuthorizationRequestContext freshCtx = new AuthorizationRequestContext();
+    invokeVersionCheckAndLoadRoles(
+        jcasbinAuthorizer, METALAKE, ImmutableList.of(ALLOW_ROLE_ID), freshCtx);
+
+    // 3. The fix must have cleared the role's p-rows and evicted loadedRoles.
+    Assertions.assertTrue(
+        allowEnforcer.getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID)).isEmpty(),
+        "allowEnforcer p-rows for the deleted role must be cleared");
+    Assertions.assertFalse(
+        getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent(),
+        "loadedRoles entry for the deleted role must be evicted");
+  }
+
+  /** Reflectively invoke the private versionCheckAndLoadRoles. */
+  private static void invokeVersionCheckAndLoadRoles(
+      JcasbinAuthorizer authorizer,
+      String metalake,
+      List<Long> roleIds,
+      AuthorizationRequestContext requestContext)
+      throws Exception {
+    Method m =
+        JcasbinAuthorizer.class.getDeclaredMethod(
+            "versionCheckAndLoadRoles",
+            String.class,
+            List.class,
+            AuthorizationRequestContext.class);
+    m.setAccessible(true);
+    m.invoke(authorizer, metalake, roleIds, requestContext);
+  }
+
+  @Test
   public void testAuthorizeByOwner() throws Exception {
     Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
     // No owner set — should fail
@@ -460,6 +583,30 @@ public class TestJcasbinAuthorizer {
     jcasbinAuthorizer.handleMetadataOwnerChange(
         METALAKE, USER_ID, catalogIdent, Entity.EntityType.CATALOG);
     assertFalse(doAuthorizeOwner(currentPrincipal));
+  }
+
+  @Test
+  public void testPrefetchRunsAfterOwnerUserInfoLookup() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(allowRole);
+
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(USER_ID + 1L, "USER"));
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+    MetadataObject catalog = MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG);
+
+    assertFalse(jcasbinAuthorizer.isOwner(currentPrincipal, METALAKE, catalog, requestContext));
+    Mockito.clearInvocations(userMetaMapper, roleMetaMapper);
+
+    assertTrue(
+        jcasbinAuthorizer.authorize(
+            currentPrincipal, METALAKE, catalog, USE_CATALOG, requestContext));
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
+    verify(roleMetaMapper, Mockito.never()).batchGetRoleUpdatedAt(any());
   }
 
   @Test
@@ -613,11 +760,67 @@ public class TestJcasbinAuthorizer {
     mockGroupWithRoles(GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of(groupRoleName));
 
     // isSelf should return true -- role is assigned to user's group
-    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+    assertTrue(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.ROLE, roleIdent, new AuthorizationRequestContext()));
 
     // A principal with no groups should fail
     setCurrentPrincipalWithGroup(null);
-    assertFalse(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent));
+    assertFalse(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.ROLE, roleIdent, new AuthorizationRequestContext()));
+
+    restoreDefaultPrincipal();
+  }
+
+  @Test
+  public void testIsSelfRoleReusesCacheAcrossCalls() throws Exception {
+    // Acceptance criterion for #11088: repeated isSelf(ROLE) calls in the same logical request
+    // must not re-issue the role-list DB queries (listRolesByUserId / listRolesByGroupId).
+    // The version-validated userRoleCache / groupRoleCache are process-wide, so the second call
+    // hits cache even though each isSelf creates a fresh AuthorizationRequestContext.
+    //
+    // Use CATALOG_ID so the role id matches the catch-all MetadataIdConverter.getID mock.
+    Long directRoleId = CATALOG_ID;
+    String directRoleName = "selfDedupRole";
+    NameIdentifier roleIdent = NameIdentifierUtil.ofRole(METALAKE, directRoleName);
+
+    // Direct user-role assignment via the version-validated cache path.
+    mockUserRoles(directRoleId, directRoleName);
+
+    // Use a fresh authorizer + principal to ensure the userRoleCache starts cold.
+    setCurrentPrincipalWithGroup(null);
+    Mockito.clearInvocations(roleMetaMapper);
+
+    // 1st call: miss → listRolesByUserId; 2nd call: cache hit → no extra listRolesByUserId.
+    AuthorizationRequestContext ctx1 = new AuthorizationRequestContext();
+    AuthorizationRequestContext ctx2 = new AuthorizationRequestContext();
+    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent, ctx1));
+    assertTrue(jcasbinAuthorizer.isSelf(Entity.EntityType.ROLE, roleIdent, ctx2));
+
+    Mockito.verify(roleMetaMapper, Mockito.times(1)).listRolesByUserId(eq(USER_ID));
+
+    restoreDefaultPrincipal();
+  }
+
+  @Test
+  public void testIsSelfRoleDoesNotCallListEntitiesByRelation() throws Exception {
+    // #11088: isSelf(ROLE) must not bypass the cache by going straight to
+    // entityStore.relationOperations().listEntitiesByRelation(ROLE_USER_REL, ...).
+    Long directRoleId = CATALOG_ID;
+    String directRoleName = "noBypassRole";
+    NameIdentifier roleIdent = NameIdentifierUtil.ofRole(METALAKE, directRoleName);
+
+    mockUserRoles(directRoleId, directRoleName);
+    setCurrentPrincipalWithGroup(null);
+    Mockito.clearInvocations(supportsRelationOperations);
+
+    assertTrue(
+        jcasbinAuthorizer.isSelf(
+            Entity.EntityType.ROLE, roleIdent, new AuthorizationRequestContext()));
+
+    Mockito.verify(supportsRelationOperations, Mockito.never())
+        .listEntitiesByRelation(any(), any(), any());
 
     restoreDefaultPrincipal();
   }
@@ -767,6 +970,63 @@ public class TestJcasbinAuthorizer {
     jcasbinAuthorizer.handleRolePrivilegeChange(sharedRoleId);
 
     // Authorization should still succeed -- role is retained via group inheritance
+    assertTrue(doAuthorize(groupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  @Test
+  public void testUserRoleRelChangeInvalidatesUserRoleCache() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal noGroupPrincipal = setCurrentPrincipalWithGroup(null);
+    long userVersion = nextUserVersion();
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, userVersion));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID))).thenReturn(ImmutableList.of());
+
+    assertFalse(doAuthorize(noGroupPrincipal));
+
+    Long grantedRoleId = 20L;
+    RoleEntity grantedRole =
+        mockRoleInStore(
+            grantedRoleId, "userRelGrantedRole", ImmutableList.of(getAllowSecurableObject()));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(grantedRoleId, grantedRole.name())));
+
+    jcasbinAuthorizer.handleUserRoleRelChange(METALAKE, USERNAME);
+
+    assertTrue(doAuthorize(noGroupPrincipal));
+
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  @Test
+  public void testGroupRoleRelChangeInvalidatesGroupRoleCache() throws Exception {
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+    mockNoDirectUserRoles();
+    long groupVersion = groupVersionCounter.incrementAndGet();
+    when(groupMetaMapper.getGroupUpdatedAt(eq(METALAKE), eq(GROUP_NAME)))
+        .thenReturn(new GroupUpdatedAt(GROUP_ID, groupVersion));
+    when(roleMetaMapper.listRolesByGroupId(eq(GROUP_ID))).thenReturn(ImmutableList.of());
+
+    assertFalse(doAuthorize(groupPrincipal));
+
+    Long grantedRoleId = 21L;
+    RoleEntity grantedRole =
+        mockRoleInStore(
+            grantedRoleId, "groupRelGrantedRole", ImmutableList.of(getAllowSecurableObject()));
+    when(roleMetaMapper.listRolesByGroupId(eq(GROUP_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(grantedRoleId, grantedRole.name())));
+
+    jcasbinAuthorizer.handleGroupRoleRelChange(METALAKE, GROUP_NAME);
+
     assertTrue(doAuthorize(groupPrincipal));
 
     restoreDefaultPrincipal();
@@ -1444,6 +1704,10 @@ public class TestJcasbinAuthorizer {
         .thenReturn(ImmutableList.of(buildRolePO(roleId, roleName)));
     when(roleMetaMapper.batchGetRoleUpdatedAt(any()))
         .thenReturn(ImmutableList.of(new RoleUpdatedAt(roleId, roleName, roleVersion)));
+    // Also register the role in mockedRoleVersions so the fat-JOIN test stub for
+    // batchGetAuthSubjectsForUser surfaces it; otherwise prefetch's role-version map would
+    // miss this role and downstream loadPolicyByRoleEntity would never run.
+    mockedRoleVersions.put(roleId, new RoleUpdatedAt(roleId, roleName, roleVersion));
     when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
         .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
   }

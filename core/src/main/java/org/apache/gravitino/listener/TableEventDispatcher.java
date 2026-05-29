@@ -83,7 +83,11 @@ public class TableEventDispatcher implements TableDispatcher {
     eventBus.dispatchEvent(new ListTablePreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listTables(namespace);
-      eventBus.dispatchEvent(new ListTableEvent(PrincipalUtils.getCurrentUserName(), namespace));
+      eventBus.dispatchEvent(
+          new ListTableEvent(
+              PrincipalUtils.getCurrentUserName(),
+              namespace,
+              nameIdentifiers != null ? nameIdentifiers.length : -1));
       return nameIdentifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(

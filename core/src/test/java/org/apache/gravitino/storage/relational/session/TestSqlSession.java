@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.SQLException;
+import java.time.Duration;
 import java.util.UUID;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.io.FileUtils;
@@ -107,6 +108,7 @@ public class TestSqlSession {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
   public void testInit() throws SQLException {
     SqlSessionFactoryHelper.getInstance().close();
     SqlSessionFactoryHelper.getInstance().init(config);
@@ -120,6 +122,9 @@ public class TestSqlSession {
                 .getDataSource();
     assertEquals("org.h2.Driver", dataSource.getDriverClassName());
     assertEquals(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_URL), dataSource.getUrl());
+    assertEquals(10, dataSource.getMaxIdle());
+    assertEquals(5, dataSource.getMinIdle());
+    assertEquals(Duration.ofSeconds(30).toMillis(), dataSource.getMinEvictableIdleTimeMillis());
   }
 
   @Test

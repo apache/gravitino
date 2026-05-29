@@ -61,6 +61,8 @@ plugins {
   alias(libs.plugins.errorprone)
 }
 
+val snappyJavaVersion: String = libs.versions.snappy.java.get()
+
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 if (scalaVersion !in listOf("2.12", "2.13")) {
   throw GradleException("Scala version $scalaVersion is not supported.")
@@ -313,6 +315,8 @@ fun excludePackagesForSparkConnector(project: Project) {
   }
 }
 
+val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
+
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
   if (project.name == "client-python") {
@@ -328,6 +332,14 @@ subprojects {
   apply(plugin = "jacoco")
   apply(plugin = "maven-publish")
   apply(plugin = "java")
+
+  // Force upgrade commons-beanutils/snappy-java for all subprojects to resolve outdated transitive versions
+  // commons-beanutils: pulled by Hadoop, Hive, Spark, Flink, etc.
+  // snappy-java: pulled by Hadoop, Kafka, Iceberg, etc.
+  configurations.all {
+    resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
+    resolutionStrategy.force("org.xerial.snappy:snappy-java:$snappyJavaVersion")
+  }
 
   repositories {
     mavenCentral()

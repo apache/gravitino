@@ -24,16 +24,40 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event triggered after successfully listing usernames from a specific metalake. */
 @DeveloperApi
-public class ListUserNamesEvent extends UserEvent {
+public class ListUserNamesEvent extends UserEvent implements ListEvent {
+
+  private final int userNameCount;
+
   /**
-   * Constructs a new {@link ListUserNamesEvent} instance with the specified initiator and metalake
-   * name.
+   * Constructs a new {@link ListUserNamesEvent} instance with the specified initiator, metalake
+   * name and count.
    *
    * @param initiator the user who initiated the request to list usernames.
    * @param metalake the name of the metalake from which the usernames are listed.
+   * @param userNameCount the number of usernames returned by the list operation.
    */
-  public ListUserNamesEvent(String initiator, String metalake) {
+  public ListUserNamesEvent(String initiator, String metalake, int userNameCount) {
     super(initiator, NameIdentifier.of(metalake));
+    this.userNameCount = userNameCount;
+  }
+
+  /**
+   * Constructs a new {@link ListUserNamesEvent} instance without a count.
+   *
+   * @param initiator the user who initiated the request to list usernames.
+   * @param metalake the name of the metalake from which the usernames are listed.
+   * @deprecated Use {@link #ListUserNamesEvent(String, String, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListUserNamesEvent(String initiator, String metalake) {
+    this(initiator, metalake, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return userNameCount;
   }
 
   /**

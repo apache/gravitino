@@ -46,7 +46,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true' && needs.changes.outputs.module_exists == 'true'
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -56,21 +56,52 @@ jobs:
           distribution: "temurin"
           cache: "gradle"
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
+
+      - name: Check required command
+        run: |
+          dev/ci/check_commands.sh
+
+      - name: Package Gravitino
+        run: |
+          ./gradlew compileDistribution -PskipWeb=true -x test
+
       - name: Free up disk space
         run: |
           dev/ci/util_free_space.sh
 
       - name: Run idp-basic tests
+        id: idpBasicTest
         env:
           dockerTest: true
+          GRAVITINO_INITIAL_ADMIN_PASSWORD: Passw0rd-For-Admin1
         run: |
-          ./gradlew :plugins:idp-basic:test -PskipITs -PskipDockerTests=false -PskipWeb=true
+          set -euo pipefail
+
+          # Unit and in-process tests (no Docker, no REST IT).
+          ./gradlew :plugins:idp-basic:test -PskipITs -PskipDockerTests=true
+
+          # REST IT: embedded and deploy, each against h2 / MySQL / PostgreSQL.
+          for test_mode in embedded deploy; do
+            for backend in h2 mysql postgresql; do
+              ./gradlew :plugins:idp-basic:test \
+                -PtestMode="${test_mode}" \
+                -PjdbcBackend="${backend}" \
+                -PskipDockerTests=false \
+                --tests "org.apache.gravitino.idp.integration.test.**"
+            done
+          done
 
       - name: Upload idp-basic test reports
         uses: actions/upload-artifact@v7
-        if: failure()
+        if: ${{ (failure() && steps.idpBasicTest.outcome == 'failure') || contains(github.event.pull_request.labels.*.name, 'upload log') }}
         with:
           name: idp-basic-test-reports
           path: |
             plugins/idp-basic/build/reports
             plugins/idp-basic/build/test-results
+            distribution/package-all/logs/gravitino-server.out
+            distribution/package-all/logs/gravitino-server.log
+            distribution/package/logs/gravitino-server.out
+            distribution/package/logs/gravitino-server.log
