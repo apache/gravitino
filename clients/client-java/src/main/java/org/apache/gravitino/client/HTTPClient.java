@@ -888,7 +888,13 @@ public class HTTPClient implements RESTClient {
      */
     public HTTPClient build() {
       return new HTTPClient(
-          uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler, properties, tlsConfigurer);
+          uri,
+          baseHeaders,
+          mapper,
+          authDataProvider,
+          beforeConnectHandler,
+          properties,
+          tlsConfigurer);
     }
   }
 
