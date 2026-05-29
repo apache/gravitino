@@ -606,7 +606,7 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `catalog_name`      VARCHAR(128)  NOT NULL,
   `namespace`         VARCHAR(512)  NOT NULL,
   `table_name`        VARCHAR(256)  NOT NULL,
-  `metadata_location` VARCHAR(1024) NOT NULL,
+  `metadata_location` MEDIUMTEXT   NOT NULL,
   `file_io_impl`      VARCHAR(256)  NOT NULL,
   `file_io_props`     MEDIUMTEXT    NOT NULL COMMENT 'JSON',
   `state`             VARCHAR(16)   NOT NULL COMMENT 'PENDING|RUNNING|SUCCEEDED|FAILED',
@@ -617,5 +617,5 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `updated_at`        BIGINT(20)    NOT NULL COMMENT 'last state change, drives poll ordering and old finished-job cleanup',
   PRIMARY KEY (`id`),
   KEY `idx_state_updated` (`state`, `updated_at`),
-  KEY `idx_object` (`metalake_name`, `catalog_name`, `namespace`(255), `table_name`(255), `state`)
+  KEY `idx_object` (`metalake_name`, `catalog_name`, `namespace`(255), `table_name`(128), `state`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'async Iceberg table cleanup jobs';

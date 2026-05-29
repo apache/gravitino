@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.service.cleanup;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -90,13 +91,13 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
     Assertions.assertFalse(store.findUnfinishedJobId("other_ml", "cat", "db", "t").isPresent());
 
     long now = System.currentTimeMillis();
-    IcebergCleanupJob taken = store.takePendingJob(now, 300_000L, 10);
-    Assertions.assertNotNull(taken);
-    Assertions.assertEquals(id, taken.id());
-    Assertions.assertEquals(ImmutableMap.of("k", "v"), taken.fileIOProperties());
+    Optional<IcebergCleanupJob> taken = store.takePendingJob(now, 300_000L, 10);
+    Assertions.assertTrue(taken.isPresent());
+    Assertions.assertEquals(id, taken.get().id());
+    Assertions.assertEquals(ImmutableMap.of("k", "v"), taken.get().fileIOProperties());
     Assertions.assertEquals(IcebergCleanupJob.State.RUNNING, store.stateOf(id));
     Assertions.assertTrue(store.findUnfinishedJobId("ml", "cat", "db", "t").isPresent());
-    Assertions.assertNull(store.takePendingJob(now, 300_000L, 10));
+    Assertions.assertFalse(store.takePendingJob(now, 300_000L, 10).isPresent());
 
     Assertions.assertTrue(store.markSucceeded(id));
     Assertions.assertEquals(IcebergCleanupJob.State.SUCCEEDED, store.stateOf(id));
@@ -136,7 +137,8 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
     Assertions.assertTrue(store.heartbeat(id, t0, t0 + 1000));
     Assertions.assertFalse(store.heartbeat(id, t0, t0 + 2000));
     // A stale RUNNING job can be taken again once its heartbeat ages past the timeout.
-    Assertions.assertEquals(id, store.takePendingJob(t0 + 400_000L, 300_000L, 10).id());
+    Assertions.assertEquals(
+        id, store.takePendingJob(t0 + 400_000L, 300_000L, 10).orElseThrow().id());
   }
 }
 

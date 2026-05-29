@@ -1061,7 +1061,7 @@ CREATE TABLE IF NOT EXISTS iceberg_cleanup_job (
   catalog_name      VARCHAR(128)  NOT NULL,
   namespace         VARCHAR(512)  NOT NULL,
   table_name        VARCHAR(256)  NOT NULL,
-  metadata_location VARCHAR(1024) NOT NULL,
+  metadata_location TEXT          NOT NULL,
   file_io_impl      VARCHAR(256)  NOT NULL,
   file_io_props     TEXT          NOT NULL,
   state             VARCHAR(16)   NOT NULL,

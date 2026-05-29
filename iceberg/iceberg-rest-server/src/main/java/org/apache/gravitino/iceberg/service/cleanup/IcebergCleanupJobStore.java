@@ -74,9 +74,9 @@ public class IcebergCleanupJobStore {
    * @param now current epoch millis, written as the initial heartbeat
    * @param heartbeatTimeoutMs age past which a RUNNING heartbeat is stale
    * @param window max candidates to consider
-   * @return the taken job, or {@code null} if nothing was available
+   * @return the taken job, or {@link Optional#empty()} if nothing was available
    */
-  public IcebergCleanupJob takePendingJob(long now, long heartbeatTimeoutMs, int window) {
+  public Optional<IcebergCleanupJob> takePendingJob(long now, long heartbeatTimeoutMs, int window) {
     long heartbeatExpiry = now - heartbeatTimeoutMs;
     List<IcebergCleanupJobPO> candidates =
         SessionUtils.getWithoutCommit(
@@ -91,10 +91,10 @@ public class IcebergCleanupJobStore {
       if (marked == 1) {
         // The claim only flips mutable columns (state, heartbeat_at, updated_at); everything
         // fromPO reads was fixed at enqueue, so the candidate snapshot is still accurate.
-        return fromPO(po);
+        return Optional.of(fromPO(po));
       }
     }
-    return null;
+    return Optional.empty();
   }
 
   /**
@@ -109,7 +109,7 @@ public class IcebergCleanupJobStore {
     return SessionUtils.doWithCommitAndFetchResult(
             IcebergCleanupJobMapper.class,
             mapper -> mapper.markFinished(id, IcebergCleanupJob.State.SUCCEEDED.name(), null, now))
-        == 1;
+        > 0;
   }
 
   /**
@@ -126,7 +126,7 @@ public class IcebergCleanupJobStore {
     return SessionUtils.doWithCommitAndFetchResult(
             IcebergCleanupJobMapper.class,
             mapper -> mapper.markFinished(id, IcebergCleanupJob.State.FAILED.name(), err, now))
-        == 1;
+        > 0;
   }
 
   /**
@@ -144,7 +144,7 @@ public class IcebergCleanupJobStore {
     return SessionUtils.doWithCommitAndFetchResult(
             IcebergCleanupJobMapper.class,
             mapper -> mapper.recordFailure(id, err, maxAttempts, now))
-        == 1;
+        > 0;
   }
 
   /**
@@ -158,7 +158,7 @@ public class IcebergCleanupJobStore {
   public boolean heartbeat(long id, long lastHeartbeat, long now) {
     return SessionUtils.doWithCommitAndFetchResult(
             IcebergCleanupJobMapper.class, mapper -> mapper.heartbeat(id, lastHeartbeat, now))
-        == 1;
+        > 0;
   }
 
   /**
