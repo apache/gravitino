@@ -90,6 +90,19 @@ dependencies {
   jcstressImplementation(libs.aspectj.aspectjrt)
 }
 
+val testJar by tasks.registering(Jar::class) {
+  archiveClassifier.set("tests")
+  from(sourceSets["test"].output)
+}
+
+configurations {
+  create("testArtifacts")
+}
+
+artifacts {
+  add("testArtifacts", testJar)
+}
+
 tasks.test {
   val testMode = project.properties["testMode"] as? String ?: "embedded"
   if (testMode == "embedded") {
