@@ -31,6 +31,21 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 - `DELETE` clause
 - `CREATE TABLE LIKE` clause
 
+## Getting Started
+
+### Prerequisites
+
+Place the following JAR files in the lib directory of your Flink installation:
+
+- The Iceberg Flink runtime JAR that matches your Flink minor version
+- The Gravitino Flink connector runtime JAR that matches your Flink minor version
+
+| Flink version | Iceberg runtime artifact | Gravitino runtime artifact |
+|---------------|--------------------------|----------------------------|
+| 1.18          | `iceberg-flink-runtime-1.18-${iceberg-version}.jar` | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+| 1.19          | `iceberg-flink-runtime-1.19-${iceberg-version}.jar` | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
+| 1.20          | `iceberg-flink-runtime-1.20-${iceberg-version}.jar` | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
+
 ## SQL example
 
 ```sql
@@ -62,7 +77,7 @@ The Gravitino Flink connector transforms the following properties in a catalog t
 
 | Gravitino catalog property name | Flink Iceberg connector configuration | Description                                                                                                   | Since Version    |
 |---------------------------------|---------------------------------------|---------------------------------------------------------------------------------------------------------------|------------------|
-| `catalog-backend`               | `catalog-type`                        | Catalog backend type, currently, only `Hive` Catalog is supported, `JDBC` and `Rest` in Continuous Validation | 0.8.0-incubating |
+| `catalog-backend`               | `catalog-type`                        | Catalog backend type, currently, `Hive` and `REST` catalogs are supported, and `JDBC` is in continuous validation | 0.8.0-incubating |
 | `uri`                           | `uri`                                 | Catalog backend URI                                                                                           | 0.8.0-incubating |
 | `warehouse`                     | `warehouse`                           | Catalog backend warehouse                                                                                     | 0.8.0-incubating |
 | `io-impl`                       | `io-impl`                             | The IO implementation for `FileIO` in Iceberg.                                                                | 0.8.0-incubating |

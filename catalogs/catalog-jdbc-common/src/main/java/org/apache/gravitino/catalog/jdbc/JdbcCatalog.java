@@ -22,6 +22,9 @@ import com.google.common.collect.Maps;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -123,8 +126,46 @@ public abstract class JdbcCatalog extends BaseCatalog<JdbcCatalog> {
   @Override
   @Evolving
   public Map<String, String> propertiesWithCredentialProviders() {
-    Map<String, String> properties = Maps.newHashMap(super.propertiesWithCredentialProviders());
+    // Use raw entity properties so that hidden credentials (jdbc-user/jdbc-password) are visible
+    // to the credential manager even after they are marked hidden in the properties metadata.
+    Map<String, String> properties = Maps.newHashMap(entity().getProperties());
     return applyDefaultCredentialProviders(properties);
+  }
+
+  /**
+   * Returns catalog properties, optionally re-adding hidden JDBC credentials for backward
+   * compatibility with connectors that do not support credential vending. The backfill behavior is
+   * controlled by the server-level config {@code
+   * gravitino.catalog.credential.backfillToProperties}; it is disabled by default and should only
+   * be enabled during rolling upgrades.
+   *
+   * @return the catalog properties map, with credentials backfilled if the server config is set
+   */
+  @Override
+  public Map<String, String> properties() {
+    Map<String, String> props = super.properties();
+    if (!shouldBackfillCredential()) {
+      return props;
+    }
+    // Backfill hidden credentials for backward compatibility with connectors that do not support
+    // credential vending.
+    Map<String, String> rawProps = entity().getProperties();
+    Map<String, String> result = Maps.newHashMap(props);
+    String user = rawProps.get(JdbcConfig.USERNAME.getKey());
+    String password = rawProps.get(JdbcConfig.PASSWORD.getKey());
+    if (user != null) {
+      result.put(JdbcConfig.USERNAME.getKey(), user);
+    }
+    if (password != null) {
+      result.put(JdbcConfig.PASSWORD.getKey(), password);
+    }
+    return result;
+  }
+
+  private boolean shouldBackfillCredential() {
+    Config serverConfig = GravitinoEnv.getInstance().config();
+    return serverConfig != null
+        && serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES);
   }
 
   private Map<String, String> applyDefaultCredentialProviders(Map<String, String> properties) {

@@ -67,7 +67,7 @@ public class CatalogConnectorMetadataAdapter {
    * @param dataTypeTransformer The data type transformer used to convert between Gravitino and
    *     Trino types
    */
-  protected CatalogConnectorMetadataAdapter(
+  public CatalogConnectorMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,
       List<PropertyMetadata<?>> columnProperties,

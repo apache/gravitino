@@ -18,6 +18,7 @@
 
 include requirements.txt
 include requirements-dev.txt
+include requirements-lance.txt
 include README.md
 include LICENSE
 include NOTICE

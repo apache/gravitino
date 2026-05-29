@@ -110,8 +110,10 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
   }
 
   @Override
-  public String softDeletePolicyMetadataObjectRelsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeletePolicyMetadataObjectRelsBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
         + " pe SET deleted_at ="
         + DELETED_AT_NOW_EXPRESSION
@@ -134,9 +136,28 @@ public class PolicyMetadataObjectRelPostgreSQLProvider
         + ModelMetaMapper.TABLE_NAME
         + " mt ON pe_alias.metadata_object_id = mt.model_id AND pe_alias.metadata_object_type = 'MODEL'"
         + " WHERE pe.id = pe_alias.id AND pe.deleted_at = 0 AND ("
-        + "   st.schema_id = #{schemaId} OR tt.schema_id = #{schemaId} OR tat.schema_id = #{schemaId}"
-        + "   OR ft.schema_id = #{schemaId} OR mt.schema_id = #{schemaId}"
-        + " )";
+        + "   st.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "   OR tt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "   OR tat.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "   OR ft.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + "   OR mt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " )"
+        + "</script>";
   }
 
   @Override

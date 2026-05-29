@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.event.policy;
 
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -28,16 +29,39 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  * metalake.
  */
 @DeveloperApi
-public class ListPoliciesEvent extends PolicyEvent {
+public class ListPoliciesEvent extends PolicyEvent implements ListEvent {
+
+  private final int count;
 
   /**
    * Constructs an instance of {@code ListPoliciesEvent}.
    *
    * @param initiator The username of the individual who initiated the list-policies request.
    * @param metalake The name of the metalake from which the policies were listed.
+   * @param count The number of policies returned by the list operation.
    */
-  public ListPoliciesEvent(String initiator, String metalake) {
+  public ListPoliciesEvent(String initiator, String metalake, int count) {
     super(initiator, NameIdentifierUtil.ofMetalake(metalake));
+    this.count = count;
+  }
+
+  /**
+   * Constructs an instance of {@code ListPoliciesEvent} without a count.
+   *
+   * @param initiator The username of the individual who initiated the list-policies request.
+   * @param metalake The name of the metalake from which the policies were listed.
+   * @deprecated Use {@link #ListPoliciesEvent(String, String, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListPoliciesEvent(String initiator, String metalake) {
+    this(initiator, metalake, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return count;
   }
 
   /**

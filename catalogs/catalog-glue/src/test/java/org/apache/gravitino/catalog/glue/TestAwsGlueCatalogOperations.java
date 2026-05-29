@@ -82,6 +82,7 @@ class TestAwsGlueCatalogOperations {
     if (catalogId != null) {
       config.put(GlueConstants.AWS_GLUE_CATALOG_ID, catalogId);
     }
+    config.put(GlueConstants.WAREHOUSE, "s3://" + s3TestBucket + "/warehouse");
 
     ops = new GlueCatalogOperations();
     ops.initialize(config, null, null);
@@ -118,7 +119,7 @@ class TestAwsGlueCatalogOperations {
         ident,
         new Column[] {col},
         "test table",
-        Map.of(),
+        Map.of(GlueConstants.FORMAT, "parquet"),
         Transforms.EMPTY_TRANSFORM,
         Distributions.NONE,
         SortOrders.NONE,

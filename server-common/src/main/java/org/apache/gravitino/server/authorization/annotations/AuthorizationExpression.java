@@ -64,5 +64,16 @@ public @interface AuthorizationExpression {
    *
    * @return the condition for evaluating the secondary expression.
    */
-  String secondaryExpressionCondition() default "";
+  ExpressionCondition secondaryExpressionCondition() default ExpressionCondition.NEVER;
+
+  /**
+   * Optional expression evaluated after the primary {@link #expression()} denies authorization, to
+   * decide whether the caller may probe object existence (for example Iceberg REST load probes that
+   * distinguish 403 from 404). This is separate from {@link #secondaryExpression()} so load paths
+   * do not overload secondary for unrelated semantics (such as MODIFY_TABLE privilege switching on
+   * the Gravitino core server).
+   *
+   * @return expression that permits existence checks when primary denies
+   */
+  String allowCheckExistence() default "";
 }

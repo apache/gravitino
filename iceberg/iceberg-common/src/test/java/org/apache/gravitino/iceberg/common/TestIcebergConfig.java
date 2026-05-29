@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.common;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -61,6 +62,21 @@ public class TestIcebergConfig {
     jettyServerConfig = JettyServerConfig.fromConfig(icebergConfig);
     Assertions.assertEquals(1000, jettyServerConfig.getHttpPort());
     Assertions.assertEquals(1001, jettyServerConfig.getHttpsPort());
+  }
+
+  @Test
+  public void testTableMetadataCacheDefaults() {
+    IcebergConfig icebergConfig = new IcebergConfig(ImmutableMap.of());
+    Assertions.assertEquals(
+        LocalTableMetadataCache.class.getName(),
+        icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_IMPL));
+    Assertions.assertEquals(1000, icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_CAPACITY));
+    Assertions.assertEquals(
+        IcebergConfig.TABLE_METADATA_CACHE_IMPL.getDefaultValue(),
+        icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_IMPL));
+    Assertions.assertEquals(
+        IcebergConfig.TABLE_METADATA_CACHE_CAPACITY.getDefaultValue(),
+        icebergConfig.get(IcebergConfig.TABLE_METADATA_CACHE_CAPACITY));
   }
 
   @Test
