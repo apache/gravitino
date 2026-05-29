@@ -52,7 +52,7 @@ import org.apache.gravitino.rel.View;
 @ToString
 public class HiveView implements View {
 
-  private static final String SPARK_VERSION_KEY = "spark.sql.create.version";
+  static final String SPARK_VERSION_KEY = "spark.sql.create.version";
   private static final String TRINO_VIEW_MARKER_KEY = "presto_view";
   private static final String TRINO_VIEW_PREFIX = "/* Presto View:";
 
