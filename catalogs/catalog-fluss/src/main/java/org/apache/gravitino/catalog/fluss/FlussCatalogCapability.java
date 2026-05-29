@@ -27,7 +27,26 @@ import org.apache.fluss.utils.StringUtils;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 
-/** Capability declarations for the Apache Fluss catalog connector. */
+/**
+ * Capability declarations for the Apache Fluss catalog connector.
+ *
+ * <p>Fluss constraints that deviate from Gravitino defaults:
+ *
+ * <ul>
+ *   <li><b>Database and table names</b>: Fluss validates database/table names through {@link
+ *       TablePath}: non-empty, not {@code "."}/{@code ".."}, at most 200 characters, ASCII
+ *       alphanumerics plus {@code _} and {@code -}, and not prefixed with {@code "__"}. See Fluss
+ *       {@code TablePath#detectInvalidName} and {@code TablePath#validatePrefix}.
+ *   <li><b>Column names</b>: Fluss row fields reject null/blank names, while table validation
+ *       reserves system column names such as {@link TableDescriptor#OFFSET_COLUMN_NAME}. See Fluss
+ *       {@code RowType#validateFields} and {@code TableDescriptorValidation#checkSystemColumns}.
+ *   <li><b>NOT NULL constraints</b>: Fluss data types carry nullability, so column nullability can
+ *       be expressed. The Fluss 0.9.x limitation that added columns must be nullable is enforced in
+ *       {@link FlussCatalogOperations}.
+ *   <li><b>No DEFAULT values</b>: Fluss {@code Schema.Column} has no default-value field; defaults
+ *       cannot be expressed in Fluss metadata.
+ * </ul>
+ */
 public class FlussCatalogCapability implements Capability {
 
   private static final Set<String> RESERVED_COLUMN_NAMES =
@@ -51,12 +70,6 @@ public class FlussCatalogCapability implements Capability {
     }
 
     return Capability.super.specificationOnName(scope, name);
-  }
-
-  /** {@inheritDoc} */
-  @Override
-  public CapabilityResult columnNotNull() {
-    return CapabilityResult.SUPPORTED;
   }
 
   /** {@inheritDoc} */
