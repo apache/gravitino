@@ -1,0 +1,216 @@
+name: Multi-Instance Consistency Test
+
+# Verifies that authorization state (owners, roles, role privileges, user-role
+# grants) propagates correctly between two Gravitino instances backed by the
+# same MySQL entity store. Both instances run with the entity cache disabled
+# and authorization enabled, so the only consistency contracts under test are
+# the JcasbinAuthorizer caches and the JcasbinChangePoller invalidation paths.
+#
+# The test plan and assertions live in dev/test_multi_instance_consistency.sh.
+
+on:
+  push:
+    branches: [ "main", "branch-*" ]
+  pull_request:
+    branches: [ "main", "branch-*" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36
+        id: filter
+        with:
+          filters: |
+            authz_changes:
+              - .github/workflows/multi-instance-consistency-test.yml
+              - api/**
+              - common/**
+              - core/**
+              - server/**
+              - server-common/**
+              - conf/**
+              - scripts/mysql/**
+              - dev/ci/test_multi_instance_consistency.sh
+              - build.gradle.kts
+              - gradle.properties
+              - gradle/**
+              - settings.gradle.kts
+    outputs:
+      authz_changes: ${{ steps.filter.outputs.authz_changes }}
+
+  multi-instance-consistency:
+    needs: changes
+    if: needs.changes.outputs.authz_changes == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mysql:
+        image: mysql:8.0.33
+        env:
+          MYSQL_ROOT_PASSWORD: gravitino
+          MYSQL_DATABASE: gravitino
+          MYSQL_USER: gravitino
+          MYSQL_PASSWORD: gravitino
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -uroot -pgravitino --silent"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Free disk space
+        run: dev/ci/util_free_space.sh
+
+      - name: Apply Gravitino MySQL schema
+        run: |
+          mysql -h 127.0.0.1 -P 3306 -ugravitino -pgravitino gravitino \
+            < scripts/mysql/schema-1.3.0-mysql.sql
+
+      - name: Build Gravitino distribution
+        run: ./gradlew compileDistribution -PskipWeb=true -x test
+
+      - name: Stage two instances (A=8090, B=8190)
+        run: |
+          set -euo pipefail
+          # MySQL JDBC driver: the entity store needs the connector in libs/, not
+          # only under catalogs/jdbc-mysql/libs/ (which is for the JDBC catalog
+          # backend, not the entity store).
+          curl -fsSL \
+            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.14/mysql-connector-java-8.0.14.jar \
+            -o distribution/package/libs/mysql-connector-java-8.0.14.jar
+
+          # Second instance is a full copy with its own conf/, logs/, data/.
+          cp -a distribution/package distribution/package-b
+
+          configure_instance() {
+            local conf="$1" http="$2" iceberg="$3" lance="$4"
+            python3 - "$conf" "$http" "$iceberg" "$lance" <<'PY'
+          import sys, re, pathlib
+          conf, http, iceberg, lance = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+          p = pathlib.Path(conf)
+          src = p.read_text()
+          subs = [
+            (r'^gravitino\.entity\.store\.relational\.jdbcUrl\s*=.*$',
+             'gravitino.entity.store.relational.jdbcUrl = '
+             'jdbc:mysql://127.0.0.1:3306/gravitino?useSSL=false&allowPublicKeyRetrieval=true'),
+            (r'^gravitino\.entity\.store\.relational\.jdbcDriver\s*=.*$',
+             'gravitino.entity.store.relational.jdbcDriver = com.mysql.cj.jdbc.Driver'),
+            (r'^gravitino\.entity\.store\.relational\.jdbcUser\s*=.*$',
+             'gravitino.entity.store.relational.jdbcUser = gravitino'),
+            (r'^gravitino\.entity\.store\.relational\.jdbcPassword\s*=.*$',
+             'gravitino.entity.store.relational.jdbcPassword = gravitino'),
+            (r'^gravitino\.cache\.enabled\s*=.*$',
+             'gravitino.cache.enabled = false'),
+            (r'^gravitino\.authorization\.enable\s*=.*$',
+             'gravitino.authorization.enable = true'),
+            (r'^gravitino\.authorization\.serviceAdmins\s*=.*$',
+             'gravitino.authorization.serviceAdmins = admin'),
+            (r'^gravitino\.server\.webserver\.httpPort\s*=.*$',
+             f'gravitino.server.webserver.httpPort = {http}'),
+            (r'^gravitino\.iceberg-rest\.httpPort\s*=.*$',
+             f'gravitino.iceberg-rest.httpPort = {iceberg}'),
+            (r'^gravitino\.lance-rest\.httpPort\s*=.*$',
+             f'gravitino.lance-rest.httpPort = {lance}'),
+          ]
+          for pat, repl in subs:
+            src = re.sub(pat, repl, src, flags=re.MULTILINE)
+          p.write_text(src)
+          PY
+          }
+          configure_instance distribution/package/conf/gravitino.conf   8090 9001 9101
+          configure_instance distribution/package-b/conf/gravitino.conf 8190 9011 9111
+
+          # Instance B also needs the JDBC driver.
+          cp distribution/package/libs/mysql-connector-java-8.0.14.jar \
+             distribution/package-b/libs/
+
+          # bin/gravitino.sh's found_gravitino_server_pid() greps `ps` only by
+          # the "GravitinoServer" process name. When two installs share a host
+          # the second `start` invocation sees the first install's JVM and
+          # short-circuits with "Gravitino Server is already running" — B never
+          # actually starts. Add an install-path filter so each install only
+          # matches its own JVM.
+          patch_pid_grep() {
+            python3 - "$1" <<'PY'
+          import sys, pathlib
+          p = pathlib.Path(sys.argv[1])
+          src = p.read_text()
+          # If the script already scopes the PID lookup by GRAVITINO_HOME
+          # (the template was updated upstream), no patching is needed.
+          if '${GRAVITINO_HOME}' in src:
+            sys.exit(0)
+          old = ("RUNNING_PIDS=$(ps x | grep ${process_name} | "
+                 "grep -v grep | awk '{print $1}');")
+          new = ("RUNNING_PIDS=$(ps x | grep ${process_name} | "
+                 'grep "${GRAVITINO_HOME}" | '
+                 "grep -v grep | awk '{print $1}');")
+          assert old in src, f"pid-grep line not found in {p}"
+          p.write_text(src.replace(old, new))
+          PY
+          }
+          patch_pid_grep distribution/package/bin/gravitino.sh
+          patch_pid_grep distribution/package-b/bin/gravitino.sh
+
+      - name: Start both Gravitino instances
+        run: |
+          set -euo pipefail
+          distribution/package/bin/gravitino.sh   start
+          distribution/package-b/bin/gravitino.sh start
+          wait_ready() {
+            local url=$1
+            for i in $(seq 1 60); do
+              if curl -fsS --max-time 2 "$url/api/version" >/dev/null 2>&1; then
+                echo "$url ready"
+                return 0
+              fi
+              sleep 2
+            done
+            echo "$url did NOT become ready in time"
+            cat distribution/package/logs/*.log
+            cat distribution/package-b/logs/*.log 
+            return 1
+          }
+          wait_ready http://localhost:8090
+          wait_ready http://localhost:8190
+
+      - name: Run multi-instance consistency tests
+        id: consistency
+        env:
+          INSTANCE_A: http://localhost:8090
+          INSTANCE_B: http://localhost:8190
+          ADMIN_USER: admin
+          POLL_WAIT_SECS: 6
+        run: bash dev/ci/test_multi_instance_consistency.sh
+
+      - name: Stop Gravitino servers
+        if: always()
+        run: |
+          distribution/package/bin/gravitino.sh   stop || true
+          distribution/package-b/bin/gravitino.sh stop || true
+
+      - name: Upload logs on failure
+        if: ${{ failure() || cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: multi-instance-consistency-logs
+          path: |
+            distribution/package/logs/
+            distribution/package-b/logs/
+            distribution/package/conf/gravitino.conf
+            distribution/package-b/conf/gravitino.conf
