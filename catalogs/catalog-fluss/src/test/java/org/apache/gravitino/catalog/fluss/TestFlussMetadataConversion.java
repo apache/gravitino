@@ -52,10 +52,12 @@ import org.junit.jupiter.api.Test;
 
 class TestFlussMetadataConversion {
 
+  private static final String STRING_ID = "gravitino.v1.uid1";
+
   @Test
   void testFlussSchemaConvertsDatabaseInfo() {
     DatabaseDescriptor descriptor =
-        FlussSchema.toDatabaseDescriptor("database comment", Map.of(ID_KEY, "1", "k", "v"));
+        FlussSchema.toDatabaseDescriptor("database comment", Map.of(ID_KEY, STRING_ID, "k", "v"));
     DatabaseInfo databaseInfo = new DatabaseInfo("db", descriptor, 10L, 20L);
 
     FlussSchema schema = FlussSchema.fromDatabaseInfo(databaseInfo);
@@ -63,10 +65,10 @@ class TestFlussMetadataConversion {
     assertEquals("db", schema.name());
     assertEquals("database comment", schema.comment());
     assertEquals("v", schema.properties().get("k"));
+    assertEquals(STRING_ID, schema.properties().get(ID_KEY));
     assertEquals(Instant.ofEpochMilli(10L), schema.auditInfo().createTime());
     assertEquals(Instant.ofEpochMilli(20L), schema.auditInfo().lastModifiedTime());
-    assertEquals(Map.of("k", "v"), descriptor.getCustomProperties());
-    assertFalse(descriptor.getCustomProperties().containsKey(ID_KEY));
+    assertEquals(Map.of(ID_KEY, STRING_ID, "k", "v"), descriptor.getCustomProperties());
   }
 
   @Test
@@ -117,7 +119,7 @@ class TestFlussMetadataConversion {
         FlussTable.toTableDescriptor(
             columns(),
             "orders comment",
-            Map.of(ID_KEY, "1", "table.log.ttl", "1d"),
+            Map.of(ID_KEY, STRING_ID, "table.log.ttl", "1d"),
             new Transform[] {Transforms.identity("event_day")},
             Distributions.hash(3, NamedReference.field("site_id")),
             SortOrders.NONE,
@@ -125,6 +127,8 @@ class TestFlussMetadataConversion {
 
     assertEquals("orders comment", descriptor.getComment().orElse(null));
     assertEquals("1d", descriptor.getProperties().get("table.log.ttl"));
+    assertFalse(descriptor.getProperties().containsKey(ID_KEY));
+    assertEquals(STRING_ID, descriptor.getCustomProperties().get(ID_KEY));
     assertEquals("event_day", descriptor.getPartitionKeys().get(0));
     assertEquals(List.of("site_id"), descriptor.getBucketKeys());
     assertTrue(descriptor.getSchema().getPrimaryKey().isPresent());
@@ -298,6 +302,24 @@ class TestFlussMetadataConversion {
   }
 
   @Test
+  void testToGravitinoTablePreservesStoredStringIdentifier() {
+    TableDescriptor descriptor =
+        FlussTable.toTableDescriptor(
+            columns(),
+            "orders comment",
+            Map.of(ID_KEY, STRING_ID, "table.log.ttl", "1d"),
+            new Transform[0],
+            Distributions.hash(1),
+            null,
+            Indexes.EMPTY_INDEXES);
+    TableInfo tableInfo = TableInfo.of(TablePath.of("db", "orders"), 2L, 1, descriptor, 10L, 20L);
+
+    Table table = FlussTable.fromTableInfo(tableInfo);
+
+    assertEquals(STRING_ID, table.properties().get(ID_KEY));
+  }
+
+  @Test
   void testToGravitinoTableReportsPrimaryKeyIndexAndUnknownId() {
     TableDescriptor descriptor =
         FlussTable.toTableDescriptor(
@@ -316,7 +338,7 @@ class TestFlussMetadataConversion {
 
     assertEquals(1, table.index().length);
     assertEquals("pk", table.index()[0].name());
-    assertTrue(table.properties().containsKey(ID_KEY));
+    assertFalse(table.properties().containsKey(ID_KEY));
   }
 
   private static Column[] columns() {

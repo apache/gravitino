@@ -19,10 +19,8 @@
 
 package org.apache.gravitino.catalog.fluss;
 
-import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
-import static org.apache.gravitino.StringIdentifier.newPropertiesWithId;
-
 import java.util.Map;
+import java.util.Optional;
 import lombok.ToString;
 import org.apache.fluss.metadata.DatabaseDescriptor;
 import org.apache.fluss.metadata.DatabaseInfo;
@@ -55,7 +53,7 @@ public class FlussSchema extends BaseSchema {
       String comment, Map<String, String> properties) {
     DatabaseDescriptor.Builder builder =
         DatabaseDescriptor.builder()
-            .customProperties(FlussMetadataUtils.removeInternalProperties(properties));
+            .customProperties(Optional.ofNullable(properties).orElse(Map.of()));
     if (comment != null) {
       builder.comment(comment);
     }
@@ -73,7 +71,7 @@ public class FlussSchema extends BaseSchema {
     return FlussSchema.builder()
         .withName(databaseInfo.getDatabaseName())
         .withComment(descriptor.getComment().orElse(null))
-        .withProperties(newPropertiesWithId(DUMMY_ID, descriptor.getCustomProperties()))
+        .withProperties(Optional.ofNullable(descriptor.getCustomProperties()).orElse(Map.of()))
         .withAuditInfo(
             FlussMetadataUtils.toAuditInfo(
                 databaseInfo.getCreatedTime(), databaseInfo.getModifiedTime()))

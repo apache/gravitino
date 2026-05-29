@@ -30,7 +30,7 @@ import org.apache.gravitino.meta.AuditInfo;
 
 final class FlussMetadataUtils {
 
-  static Map<String, String> removeInternalProperties(Map<String, String> properties) {
+  static Map<String, String> tableOptions(Map<String, String> properties) {
     if (properties == null || properties.isEmpty()) {
       return new LinkedHashMap<>();
     }
@@ -43,6 +43,16 @@ final class FlussMetadataUtils {
                 Map.Entry::getValue,
                 (left, right) -> right,
                 LinkedHashMap::new));
+  }
+
+  static Map<String, String> internalProperties(Map<String, String> properties) {
+    if (properties == null || !properties.containsKey(ID_KEY)) {
+      return new LinkedHashMap<>();
+    }
+
+    Map<String, String> internalProperties = new LinkedHashMap<>();
+    internalProperties.put(ID_KEY, properties.get(ID_KEY));
+    return internalProperties;
   }
 
   /**

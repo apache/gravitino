@@ -19,9 +19,6 @@
 
 package org.apache.gravitino.catalog.fluss;
 
-import static org.apache.gravitino.StringIdentifier.DUMMY_ID;
-import static org.apache.gravitino.StringIdentifier.newPropertiesWithId;
-
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,7 +32,6 @@ import org.apache.fluss.metadata.Schema;
 import org.apache.fluss.metadata.TableDescriptor;
 import org.apache.fluss.metadata.TableInfo;
 import org.apache.fluss.metadata.TablePath;
-import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.TableOperations;
 import org.apache.gravitino.rel.Column;
@@ -95,7 +91,8 @@ public class FlussTable extends BaseTable {
 
     TableDescriptor.Builder builder = TableDescriptor.builder();
     builder.schema(toFlussSchema(columns, indexes));
-    builder.properties(FlussMetadataUtils.removeInternalProperties(properties));
+    builder.properties(FlussMetadataUtils.tableOptions(properties));
+    builder.customProperties(FlussMetadataUtils.internalProperties(properties));
 
     if (comment != null) {
       builder.comment(comment);
@@ -144,15 +141,11 @@ public class FlussTable extends BaseTable {
 
     Map<String, String> properties = new LinkedHashMap<>(tableInfo.getProperties().toMap());
     properties.putAll(tableInfo.getCustomProperties().toMap());
-    StringIdentifier stringId =
-        tableInfo.getTableId() == TableInfo.UNKNOWN_TABLE_ID
-            ? DUMMY_ID
-            : StringIdentifier.fromId(tableInfo.getTableId());
 
     return FlussTable.builder()
         .withName(tableInfo.getTablePath().getTableName())
         .withComment(tableInfo.getComment().orElse(null))
-        .withProperties(newPropertiesWithId(stringId, properties))
+        .withProperties(properties)
         .withColumns(columns)
         .withPartitioning(partitioning)
         .withDistribution(distribution)
