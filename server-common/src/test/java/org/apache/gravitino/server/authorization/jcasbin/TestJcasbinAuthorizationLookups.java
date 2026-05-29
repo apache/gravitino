@@ -21,6 +21,7 @@ package org.apache.gravitino.server.authorization.jcasbin;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -124,16 +125,15 @@ public class TestJcasbinAuthorizationLookups {
 
   @Test
   void testResolveOwnerIdCachesMissingOwnerInSharedCache() {
-    OwnerMetaMapper ownerMetaMapper = Mockito.mock(OwnerMetaMapper.class);
-    Mockito.when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(100L, "TABLE"))
-        .thenReturn(null);
+    OwnerMetaMapper ownerMetaMapper = mock(OwnerMetaMapper.class);
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(100L, "TABLE")).thenReturn(null);
 
     CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
     try (CaffeineGravitinoCache<Long, Optional<OwnerInfo>> ownerRelCache =
             new CaffeineGravitinoCache<>(60_000L, 100L);
-        MockedStatic<SessionUtils> sessionUtils = Mockito.mockStatic(SessionUtils.class)) {
+        MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
       sessionUtils
-          .when(() -> SessionUtils.getWithoutCommit(Mockito.any(), Mockito.any()))
+          .when(() -> SessionUtils.getWithoutCommit(any(), any()))
           .thenAnswer(
               invocation -> {
                 Function<Object, Object> func = invocation.getArgument(1);
@@ -152,8 +152,7 @@ public class TestJcasbinAuthorizationLookups {
               .isPresent());
     }
 
-    Mockito.verify(ownerMetaMapper, Mockito.times(1))
-        .selectOwnerByMetadataObjectIdAndType(100L, "TABLE");
+    verify(ownerMetaMapper, times(1)).selectOwnerByMetadataObjectIdAndType(100L, "TABLE");
   }
 
   private static class CountingCache<K, V> implements GravitinoCache<K, V> {
