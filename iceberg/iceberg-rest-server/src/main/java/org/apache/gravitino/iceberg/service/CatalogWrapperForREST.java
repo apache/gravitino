@@ -208,7 +208,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       TableMetadata tableMetadata = loadTableResponse.tableMetadata();
       Map<String, String> credentialConfig =
           new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
-      IcebergVendedCredentials.appendVendedRefreshProperties(
+      IcebergVendedCredentials.appendRefreshEndpoint(
           credentialConfig, catalogName, identifier, credential);
       String location = tableMetadata.location();
       String prefix = location.endsWith("/") ? location : location + "/";
@@ -340,7 +340,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     // response.
     Map<String, String> credentialConfig =
         new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
-    IcebergVendedCredentials.appendVendedRefreshProperties(
+    IcebergVendedCredentials.appendRefreshEndpoint(
         credentialConfig, catalogName, tableIdentifier, credential);
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
