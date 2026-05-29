@@ -211,6 +211,7 @@ Gravitino provides security configurations for Gravitino, including HTTPS, authe
 
 * [HTTPS](./security/how-to-use-https.md): provides HTTPS configurations.
 * [Authentication](./security/how-to-authenticate.md): provides authentication configurations including simple, basic, OAuth, and Kerberos.
+* [Built-in IDP](./security/how-to-use-built-in-idp.md): operator guide for the built-in identity provider (`idp-basic` plugin), including service admin setup and `/api/idp` management APIs.
 * [Access Control](./security/access-control.md): provides access control configurations.
 * [CORS](./security/how-to-use-cors.md): provides CORS configurations.
 

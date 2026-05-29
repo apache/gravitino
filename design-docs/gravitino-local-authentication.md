@@ -62,16 +62,15 @@ username/password authentication flow.
 
 ### 3.1 Authentication Model
 
-The local authentication is introduced as a new Gravitino authenticator mode: **basic**.
-
-When enabled, Gravitino authenticates incoming requests through HTTP Basic authentication:
+Built-in IDP provides local authentication for Gravitino. Gravitino authenticates incoming requests
+through Basic authentication:
 
 ```text
 Authorization: Basic <base64(username:password)>
 ```
 
-This mode is intended for quick-start deployments and isolated environments. It should work out of
-the box with a minimal configuration and without any dependency on an external identity system.
+Built-in IDP targets quick-start and isolated deployments with minimal configuration and no
+external identity system.
 
 ### 3.2 Why Basic Authentication
 
@@ -111,20 +110,12 @@ The recommended module name is:
 
 - `plugins:idp-basic`
 
-This naming keeps the capability grouping explicit while aligning the module name with the
-configured authenticator type. Although the module also includes the broader built-in
-authentication capability set, the entry point exposed to Gravitino is still the `basic`
-authenticator, including:
+The `plugins:idp-basic` module provides:
 
 - local user and local group management,
 - password hashing and verification,
 - service admin initialization support,
 - and the local authentication management API wiring.
-
-The local authentication-specific logic should be owned by
-`plugins:idp-basic`, including storage access, authenticator logic, service admin
-initialization logic, password hashing, and management API exposure, so that the feature has a
-clear packaging boundary and can evolve independently.
 
 ---
 
@@ -279,8 +270,8 @@ preserving the requirement that local identity tables remain global and metalake
 ## 6. Service Admin Initialization
 
 To keep local authentication usable immediately after installation without introducing a hard-coded
-default password, Gravitino should initialize service admin accounts from an environment variable
-during startup when the `basic` authenticator is enabled.
+default password, Gravitino initializes service admin accounts from an environment variable during
+startup.
 
 ### 6.1 Initialization Inputs
 
@@ -288,66 +279,57 @@ After Gravitino is installed, the operator should configure:
 
 - `gravitino.authorization.serviceAdmins`, which remains the source of truth for service admin
   usernames
-- `GRAVITINO_INITIAL_ADMIN_PASSWORD`, a JSON array of `username:password` strings used only when a
-  configured service admin does not already have a password configured in the gravitino
-
-Each username in `GRAVITINO_INITIAL_ADMIN_PASSWORD` should match a user configured in
-`gravitino.authorization.serviceAdmins`.
+- `GRAVITINO_INITIAL_ADMIN_PASSWORD`, the initial password for service admins that do not yet have a
+  row in `idp_user_meta`. Usernames come from `gravitino.authorization.serviceAdmins`.
 
 ### 6.2 Initialization Process
 
 The initialization process should be:
 
-1. Install Gravitino and configure the `basic` authenticator together with
-   `gravitino.authorization.serviceAdmins`.
-2. If `basic` authentication is enabled for the first startup, set the
-   `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable when any configured service admin does
-   not yet have a password configured in the gravitino.
-3. Parse `GRAVITINO_INITIAL_ADMIN_PASSWORD` as a JSON array of `username:password` strings.
-4. Validate the input before writing anything to the database:
-   - the value must be valid JSON
-   - every entry must use the format `username:password`
-   - the service admin name must not contain a colon (`:`)
-   - the password must satisfy the local authentication password policy
-5. Connect to the configured JDBC backend during Gravitino startup.
-6. For each user configured in `gravitino.authorization.serviceAdmins`, check whether that service
-   admin already has a password configured in the gravitino.
-7. If the service admin already has a password configured, continue startup without modifying the
-   stored password.
-8. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is configured and the service admin does not yet have a
-   password configured in the gravitino, hash the supplied password with Argon2id and initialize that
-   service admin account.
-9. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is not configured and any configured service admin does not
-   yet have a password configured in the gravitino, fail startup immediately and prompt the user to
+1. Install Gravitino and configure `gravitino.authorization.serviceAdmins` and
+   `gravitino.server.rest.extensionPackages`.
+2. Before the first startup, set the `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable when
+   any configured service admin does not yet have a password stored in `idp_user_meta`.
+3. Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD` before writing anything to the database. The password
+   must satisfy the local authentication password policy.
+4. For each user configured in `gravitino.authorization.serviceAdmins`, check whether that service
+   admin already has a password stored in `idp_user_meta`.
+5. If the service admin already has a password in `idp_user_meta`, continue startup without
+   modifying the stored password.
+6. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is configured and the service admin does not yet have a
+   password stored in `idp_user_meta`, hash the supplied password with Argon2id and create that
+   service admin account in `idp_user_meta`.
+7. If `GRAVITINO_INITIAL_ADMIN_PASSWORD` is not configured and any configured service admin does not
+   yet have a password stored in `idp_user_meta`, fail startup immediately and prompt the user to
    declare `GRAVITINO_INITIAL_ADMIN_PASSWORD`.
 
 This design keeps the first-use flow explicit while avoiding any built-in default credential. The
-service admin exists before the first authenticated request is served, and the database stores only
-the password hash rather than plaintext input.
+service admin exists before the first authenticated request is served, and only password hashes are
+written to the database.
 
 ### 6.3 Example Initialization Flow
 
 The following end-to-end flow shows how an operator can provision the initial service admins for a
 fresh Gravitino deployment.
 
-1. Deploy Gravitino with the `basic` authenticator enabled:
+1. Deploy Gravitino with built-in IDP enabled:
 
    ```properties
-   gravitino.authenticators=basic
+   gravitino.server.rest.extensionPackages=org.apache.gravitino.idp.web.rest.feature
    gravitino.authorization.serviceAdmins=admin1,admin2
    ```
 
-2. Export the initial service admin passwords before starting Gravitino:
+2. Export the initial service admin password before starting Gravitino:
 
    ```bash
-   export GRAVITINO_INITIAL_ADMIN_PASSWORD='["admin1:passwordForAdmin1","admin2:passwordForAdmin2"]'
+   export GRAVITINO_INITIAL_ADMIN_PASSWORD='passwordForServiceAdmins'
    ```
 
 3. Start Gravitino.
 
-4. During startup, Gravitino validates the JSON payload, initializes passwords only for service
-   admins that do not yet have one configured in the gravitino, and leaves existing service admin
-   passwords unchanged.
+4. During startup, Gravitino validates the password, applies it to each username in
+   `gravitino.authorization.serviceAdmins` that does not yet have a stored password, and leaves
+   existing service admin passwords unchanged.
 
 ---
 
@@ -399,13 +381,9 @@ The proposed behavior is:
 7. If authentication is challenged, include a `WWW-Authenticate: Basic` response header.
 8. If all checks pass, continue request processing as the authenticated principal.
 
-> The exact HTTP status mapping should be aligned with Gravitino's existing authentication and
-> exception handling conventions during implementation. A better default is:
-> malformed Basic header → `400`; missing user or invalid password → `401`.
-
 ### 7.5 Transport Security
 
-HTTP Basic authentication should be used over **HTTPS**.
+Basic authentication should be used over **HTTPS**.
 
 If Basic authentication is enabled on plain HTTP, Gravitino should emit a warning-level log because
 credentials are otherwise exposed on the wire.
@@ -414,116 +392,44 @@ credentials are otherwise exposed on the wire.
 
 ## 8. Configuration
 
-### 8.1 Authenticator Selection
+### 8.1 Built-in IDP settings
 
-Add `basic` to the configurable values of `gravitino.authenticators`.
+| Key                                         | Value                                           | Required when using built-in IDP |
+|---------------------------------------------|-------------------------------------------------|----------------------------------|
+| `gravitino.server.rest.extensionPackages`   | `org.apache.gravitino.idp.web.rest.feature`     | Yes                              |
+| `gravitino.authorization.serviceAdmins`     | Comma-separated service admin                   | Yes                              |
 
-| Key | New Value | Default | Optional Values |
-|---|---|---|---|
-| `gravitino.authenticators` | `basic` | `simple` | `simple`, `oauth`, `kerberos`, `basic` |
-
-This should follow Gravitino's existing multi-authenticator behavior: multiple authenticators are
-comma-separated, and if a request is supported by multiple authenticators simultaneously, the first
-matching authenticator wins.
-
-The local authentication management capability is enabled only when `basic` is included in
-`gravitino.authenticators`. If `basic` is not enabled, Gravitino should not allow local authentication
-management APIs to be used.
+List `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages` so
+Jersey registers `/api/idp/*` management APIs. Callers must use Basic authentication with a username
+in `gravitino.authorization.serviceAdmins` and a password stored in `idp_user_meta`.
 
 ### 8.2 Password Algorithm
 
 The initial implementation uses Argon2id as the fixed password hashing algorithm.
 
-### 8.3 How Trino Accesses IRC with Basic Authentication
-
-For Trino to access IRC with Basic authentication, Trino must act as an HTTP client for IRC requests
-and attach the required authentication information to the outbound REST catalog requests.
-
-The current Trino version used here does not support this path out of the box, so users cannot
-directly configure Trino to access IRC through Basic authentication in the current baseline.
-
-If a user needs this capability, they can merge
-[`trinodb/trino#29132`](https://github.com/trinodb/trino/pull/29132) first, and then use the
-extended REST catalog header passing capability introduced by that change as the foundation for the
-IRC access path.
-
 ---
 
 ## 9. Administrative Operations
 
-Local authentication must support the following administrator-managed operations:
-
-- get user
-- add user
-- remove user
-- change user password
-- get group
-- add group
-- remove group
-- add user to group
-- remove user from group
-
-These operations are expected to be performed by the service admin. After membership changes,
-administrators should be able to inspect group information and user information to verify the
-result.
-
-At a high level:
-
-1. **Get user**: read the local user information and its current group memberships.
-2. **Add user**: create a new local user with a hashed password.
-3. **Remove user**: soft-delete the user record.
-4. **Change user password**: reset the password hash for an existing local user through an
-   administrator-managed operation.
-5. **Get group**: read the local group information and its current user memberships.
-6. **Add group**: create a new local group.
-7. **Remove group**: soft-delete the group record.
-8. **Add user to group**: create a row in `idp_user_group_rel`.
-9. **Remove user from group**: soft-delete the corresponding relation row.
+Service admins manage local users and groups under `/api/idp` (global paths, no `{metalake}`).
+Operations are available when `org.apache.gravitino.idp.web.rest.feature` is listed in
+`gravitino.server.rest.extensionPackages`.
 
 ### 9.1 HTTP Interface Design
 
-The following APIs are intended for local user, local group, and group-membership management.
-
-Because local authentication identities are global rather than metalake-scoped, these management interfaces do
-not include `{metalake}` in their paths and use the `/api/idp` prefix.
-
-These APIs are available only when the `basic` authenticator is enabled. If `basic` is not enabled,
-requests to these local authentication management endpoints should be rejected rather than treated as available
-server APIs.
-
-All of the following operations are administrator-managed operations. They are intended to be called
-by the configured service admin rather than by end users.
-
 #### 9.1.1 Get a local user
 
-You can get a local user by its name. The response should include the user name and current group
-memberships.
-
-The request path for REST API is `/api/idp/users/{user}`.
+`GET /api/idp/users/{user}`
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/idp/users/alice
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "user": {
-    "name": "alice",
-    "groups": ["engineering", "devops"]
-  }
-}
-```
 
 #### 9.1.2 Add a local user
 
-You can add a local user by providing a user name and password. The password must be stored as a
-hash rather than plaintext.
-
-The request path for REST API is `/api/idp/users`.
+`POST /api/idp/users`
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -533,45 +439,21 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/idp/users
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "user": {
-    "name": "alice",
-    "groups": []
-  }
-}
-```
 
 #### 9.1.3 Remove a local user
 
-You can remove a local user by its name. This operation should soft-delete the user record rather
-than physically remove it immediately.
-
-The request path for REST API is `/api/idp/users/{user}`.
+`DELETE /api/idp/users/{user}` (soft-delete)
 
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/idp/users/alice
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "removed": true
-}
-```
 
 #### 9.1.4 Reset a local user password
 
-You can reset the password of an existing local user by providing a new password. This API is an
-administrator-managed password reset API rather than an end-user self-service password change API.
-
-The request path for REST API is `/api/idp/users/{user}`.
+`PUT /api/idp/users/{user}` — administrator-only reset (`password` only; no `oldPassword`). Usernames
+must not contain `:`. Password length is 12–64 characters.
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
@@ -580,62 +462,19 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/idp/users/alice
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "user": {
-    "name": "alice",
-    "groups": ["engineering", "devops"]
-  }
-}
-```
-
-The password reset API follows these rules:
-
-- it does not support end-user self-service password changes
-- it does not accept `oldPassword`
-- only the service admin can reset account passwords
-- the user name cannot contain a colon (`:`); the Basic credential should be parsed by splitting on
-  the first colon, so the password may contain additional colons (RFC 7617)
-- the password must be at least 12 characters long and at most 64 characters long
-
-The password reset API should return:
-
-| Error case | HTTP status |
-|---|---|
-| Account doesn't exist | `404` |
-
 #### 9.1.5 Get a local group
 
-You can get a local group by its name. The response should include the group name and current user
-memberships.
-
-The request path for REST API is `/api/idp/groups/{group}`.
+`GET /api/idp/groups/{group}`
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 http://localhost:8090/api/idp/groups/engineering
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "group": {
-    "name": "engineering",
-    "users": ["alice", "bob"]
-  }
-}
-```
 
 #### 9.1.6 Add a local group
 
-You can add a local group by providing a group name.
-
-The request path for REST API is `/api/idp/groups`.
+`POST /api/idp/groups`
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -644,93 +483,31 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/idp/groups
 ```
 
-**Response:**
-
-```json
-{
-  "code": 0,
-  "group": {
-    "name": "engineering",
-    "users": []
-  }
-}
-```
 
 #### 9.1.7 Remove a local group
 
-You can remove a local group by its name. This operation should soft-delete the group record rather
-than physically remove it immediately.
-
-Note that removing a local group will also remove all relationships between that group and its
-users. If the group still has users, the caller must explicitly set `force=true`.
-
-The request path for REST API is `/api/idp/groups/{group}`.
+`DELETE /api/idp/groups/{group}?force={true|false}` — soft-delete. Use `force=true` when the group
+still has members.
 
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 'http://localhost:8090/api/idp/groups/engineering?force=true'
 ```
 
-**Response:**
 
-```json
-{
-  "code": 0,
-  "removed": true
-}
-```
+#### 9.1.8 Change local group membership
 
-#### 9.1.8 Add users to a local group
-
-You can add users to a local group by providing the group name in the path and the target user
-names in the request body.
-
-The request path for REST API is `/api/idp/groups/{group}/add`.
+`PUT /api/idp/groups/{group}/users` — at least one of `usersToAdd` or `usersToRemove` is required.
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "users": ["alice", "bob"]
-}' http://localhost:8090/api/idp/groups/engineering/add
+  "usersToAdd": ["alice", "bob"],
+  "usersToRemove": ["carol"]
+}' http://localhost:8090/api/idp/groups/engineering/users
 ```
 
-**Response:**
 
-```json
-{
-  "code": 0,
-  "group": {
-    "name": "engineering",
-    "users": ["alice", "bob"]
-  }
-}
-```
-
-#### 9.1.9 Remove users from a local group
-
-You can remove users from a local group by providing the group name in the path and the target
-user names in the request body.
-
-The request path for REST API is `/api/idp/groups/{group}/remove`.
-
-```shell
-curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "users": ["alice"]
-}' http://localhost:8090/api/idp/groups/engineering/remove
-```
-
-**Response:**
-
-```json
-{
-  "code": 0,
-  "group": {
-    "name": "engineering",
-    "users": ["bob"]
-  }
-}
-```
 ---
 
 ## 10. Work Plan and Checklist
@@ -739,7 +516,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 | Phase | Work Item | Module / Files | Notes |
 |---|---|---|---|
-| 1 | Authenticator module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `plugins:idp-basic` | Add the new module and make the server load it when `gravitino.authenticators=basic`. |
+| 1 | Built-in IDP module wiring | `settings.gradle.kts`, `server/build.gradle.kts`, `plugins:idp-basic` | Add the new module and register `IdpRESTFeature` through `gravitino.server.rest.extensionPackages`. |
 | 2 | Password hashing support | `PasswordHasher`, `Argon2idPasswordHasher`, related tests | Use Argon2id as the only supported password hashing algorithm and store PHC-style hash strings. |
 | 3 | IdP metadata schema | JDBC schema files, mapper definitions, store layer | Create `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel` with soft-delete support. |
 | 4 | Service admin initialization | startup initialization logic, validation logic | Validate `GRAVITINO_INITIAL_ADMIN_PASSWORD`, initialize missing configured service admins during startup, and fail startup when required credentials are absent. |
@@ -752,13 +529,13 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 | Area | Checklist |
 |---|---|
-| Module wiring | The design, module name, and server wiring all consistently use `plugins:idp-basic`, while the authenticator mode remains `basic`. |
-| Configuration | All examples use `gravitino.authenticators=basic`, and no obsolete configuration keys remain in the document. |
+| Module wiring | The design, module name, and server wiring all consistently use `plugins:idp-basic`. |
+| Configuration | All examples use `gravitino.server.rest.extensionPackages` and service-admin settings, and no obsolete configuration keys remain in the document. |
 | Schema design | The document consistently uses `idp_user_meta`, `idp_group_meta`, and `idp_user_group_rel`, and the soft-delete lifecycle is clearly described. |
 | Security constraints | The document states that passwords are never stored in plaintext, Basic authentication should be used only over HTTPS, and initialization must enforce password policy. |
 | Initialization flow | The document explains how configured service admins are initialized during startup, when `GRAVITINO_INITIAL_ADMIN_PASSWORD` is required, and that only hashed passwords are written. |
 | Authentication flow | The Basic authentication flow is described end-to-end, including username/password parsing, user lookup, hash verification, and group resolution. |
-| API contract | The request paths, request bodies, and response bodies for all `/api/idp` APIs are defined consistently across the document. |
+| API contract | Request paths and bodies for `/api/idp` APIs match the [Built-in IDP OpenAPI](../docs/open-api/idp/openapi.yaml). |
 | Implementation alignment | The proposed work items are specific enough that reviewers and AI tools can map each part of the design to code changes and tests. |
 
 ---
@@ -781,7 +558,7 @@ The local authentication capability is intentionally lightweight, but the follow
 This design adds local authentication support to Gravitino for environments where an external IdP is
 either unavailable or unnecessarily heavy. The key design choices are:
 
-- **HTTP Basic authentication**
+- **Basic authentication**
 - **username/password credentials**
 - **database-backed storage**
 - **Argon2id password hashing**
