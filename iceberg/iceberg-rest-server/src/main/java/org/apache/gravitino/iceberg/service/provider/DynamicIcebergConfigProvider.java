@@ -101,6 +101,10 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
+    // In auxiliary mode the catalog is a BaseCatalog instance running in the same JVM.
+    // Use propertiesWithCredentialProviders() to include hidden credentials (e.g. jdbc-password)
+    // that are filtered out by properties(). In standalone mode the catalog is a client-side
+    // object; fall back to properties() which is the only available API.
     Map<String, String> catalogProperties =
         catalog instanceof BaseCatalog
             ? ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders()
