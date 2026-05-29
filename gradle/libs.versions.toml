@@ -25,6 +25,7 @@ reactor-netty-core = "1.2.1"
 junit = "5.8.1"
 jackson = "2.15.2"
 snakeyaml = "2.0"
+gson = "2.11.0"
 guava = "32.1.3-jre"
 lombok = "1.18.20"
 slf4j = "2.0.16"
@@ -177,6 +178,7 @@ jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "
 snakeyaml = { group = "org.yaml", name = "snakeyaml", version.ref = "snakeyaml" }
 jackson-jaxrs-json-provider = { group = "com.fasterxml.jackson.jaxrs", name = "jackson-jaxrs-json-provider", version.ref = "jackson" }
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 kerby-core = { group = "org.apache.kerby", name = "kerb-core", version.ref = "kerby"}
 kerby-simplekdc = { group = "org.apache.kerby", name = "kerb-simplekdc", version.ref = "kerby"}
 lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
