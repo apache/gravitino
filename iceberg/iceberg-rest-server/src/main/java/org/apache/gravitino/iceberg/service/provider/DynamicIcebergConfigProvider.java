@@ -104,10 +104,16 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    // In auxiliary mode the catalog is a BaseCatalog instance running in the same JVM.
-    // Use propertiesWithCredentialProviders() to include hidden credentials (e.g. jdbc-password)
-    // that are filtered out by properties(). In standalone mode the catalog is a client-side
-    // object; use properties() then enrich with credentials fetched via the credential API.
+    // Sensitive credentials (e.g. jdbc-password) are marked hidden in PropertiesMetadata and
+    // filtered out of catalog.properties(). We need two different strategies to recover them:
+    //
+    // Auxiliary mode: the catalog is a BaseCatalog running in the same JVM as the Gravitino
+    // server. Call propertiesWithCredentialProviders() which returns the raw entity properties
+    // including all hidden fields.
+    //
+    // Standalone mode: the catalog is a client-side object obtained via the Gravitino REST API.
+    // Call getCredentials() to retrieve vended credentials, then inject any JdbcCredential
+    // fields into the properties map so the JDBC backend can connect.
     Map<String, String> catalogProperties;
     if (catalog instanceof BaseCatalog) {
       catalogProperties = ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders();
