@@ -454,26 +454,25 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         return cachedResponse.get();
       }
 
-      List<FileScanTask> fileScanTasksList = new ArrayList<>();
+      List<FileScanTask> fileScanTasks = new ArrayList<>();
 
-      try (CloseableIterable<FileScanTask> fileScanTasks =
+      try (CloseableIterable<FileScanTask> scanTasks =
           createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
-        for (FileScanTask fileScanTask : fileScanTasks) {
-          fileScanTasksList.add(fileScanTask);
+        for (FileScanTask fileScanTask : scanTasks) {
+          fileScanTasks.add(fileScanTask);
         }
       } catch (IOException e) {
         LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
         throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
       }
 
-      if (fileScanTasksList.isEmpty()) {
+      if (fileScanTasks.isEmpty()) {
         LOG.info(
             "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
             tableIdentifier);
       }
 
-      PlanTableScanResponse response =
-          buildCompletedPlanTableScanResponse(table, fileScanTasksList);
+      PlanTableScanResponse response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
 
       // Cache the scan plan response
       scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
