@@ -19,16 +19,11 @@
 
 package org.apache.gravitino.iceberg.service.cleanup;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.annotations.VisibleForTesting;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.iceberg.service.cleanup.mapper.IcebergCleanupJobMapper;
 import org.apache.gravitino.iceberg.service.cleanup.po.IcebergCleanupJobPO;
-import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
@@ -63,7 +58,7 @@ public class IcebergCleanupJobStore {
   public long addJob(IcebergCleanupJob job) {
     long id = idGenerator.nextId();
     long now = System.currentTimeMillis();
-    IcebergCleanupJobPO po = toPO(job, id, now);
+    IcebergCleanupJobPO po = IcebergCleanupJobPO.fromCleanupJob(job, id, now);
     SessionUtils.doWithCommit(IcebergCleanupJobMapper.class, mapper -> mapper.insertCleanupJob(po));
     return id;
   }
@@ -90,8 +85,8 @@ public class IcebergCleanupJobStore {
               mapper -> mapper.markRunning(id, now, heartbeatExpiry));
       if (marked == 1) {
         // The claim only flips mutable columns (state, heartbeat_at, updated_at); everything
-        // fromPO reads was fixed at enqueue, so the candidate snapshot is still accurate.
-        return Optional.of(fromPO(po));
+        // toCleanupJob reads was fixed at enqueue, so the candidate snapshot is still accurate.
+        return Optional.of(po.toCleanupJob());
       }
     }
     return Optional.empty();
@@ -208,57 +203,9 @@ public class IcebergCleanupJobStore {
     return IcebergCleanupJob.State.valueOf(state);
   }
 
-  private IcebergCleanupJobPO toPO(IcebergCleanupJob job, long id, long now) {
-    return IcebergCleanupJobPO.builder()
-        .withId(id)
-        .withMetalakeName(job.metalakeName())
-        .withCatalogName(job.catalogName())
-        .withNamespace(job.namespace())
-        .withTableName(job.tableName())
-        .withMetadataLocation(job.metadataLocation())
-        .withFileIOImpl(job.fileIOImpl())
-        .withFileIOProps(propertiesToJson(job.fileIOProperties()))
-        .withState(IcebergCleanupJob.State.PENDING.name())
-        .withAttempts(0)
-        .withLastError(null)
-        .withHeartbeatAt(0L)
-        .withCreatedBy(job.createdBy())
-        .withUpdatedAt(now)
-        .build();
-  }
-
-  private IcebergCleanupJob fromPO(IcebergCleanupJobPO po) {
-    return new IcebergCleanupJob(
-        po.getId(),
-        po.getMetalakeName(),
-        po.getCatalogName(),
-        po.getNamespace(),
-        po.getTableName(),
-        po.getMetadataLocation(),
-        po.getFileIOImpl(),
-        jsonToProperties(po.getFileIOProps()),
-        po.getCreatedBy());
-  }
-
   private static String truncate(String value) {
     return value == null || value.length() <= MAX_ERROR_LENGTH
         ? value
         : value.substring(0, MAX_ERROR_LENGTH);
-  }
-
-  private static String propertiesToJson(Map<String, String> props) {
-    try {
-      return JsonUtils.objectMapper().writeValueAsString(props);
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to serialize fileIOProperties", e);
-    }
-  }
-
-  private static Map<String, String> jsonToProperties(String json) {
-    try {
-      return JsonUtils.objectMapper().readValue(json, new TypeReference<Map<String, String>>() {});
-    } catch (IOException e) {
-      throw new UncheckedIOException("Failed to deserialize fileIOProperties", e);
-    }
   }
 }
