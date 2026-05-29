@@ -278,7 +278,19 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
         dispatch(setLoadedNodes(loaded))
       }
     } else if (pathArr.length === 4) {
-      const childSchemasPromise = getSchemasApi({ metalake, catalog, parentSchema: schema })
+      // Only fetch subschemas for iceberg catalog with jdbc backend
+      const catalogNode = findInTree(
+        getState().metalakes.metalakeTree,
+        'key',
+        `{{${metalake}}}{{${catalog}}}{{${type}}}`
+      )
+      const provider = catalogNode?.provider || catalogNode?.catalogType || null
+      const catalogBackend = catalogNode?.properties?.['catalog-backend']
+      const isIcebergJdbcCatalog = provider === 'lakehouse-iceberg' && catalogBackend === 'jdbc'
+
+      const childSchemasPromise = isIcebergJdbcCatalog
+        ? getSchemasApi({ metalake, catalog, parentSchema: schema })
+        : Promise.resolve(null)
       let entityPromise = Promise.resolve(null)
       switch (type) {
         case 'relational':

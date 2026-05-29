@@ -78,7 +78,7 @@ export default function CreateSchemaDialog({ ...props }) {
   const separator = (systemConfig && systemConfig['gravitino.schema.separator']) || ':'
   const escapeForRegex = s => s.replace(/[-\\/\^$*+?.()|[\]{}]/g, '\\$&')
   const escSep = escapeForRegex(separator)
-  const dynamicSchemaNameRegex = new RegExp(`^\\w[\\w\\/${escSep}=-]{0,63}$`)
+  const dynamicSchemaNameRegex = new RegExp(`^\\w(?!.*${escSep}${escSep})(?!.*${escSep}$)[\\w\\/${escSep}=-]{0,63}$`)
 
   const [form] = Form.useForm()
   const values = Form.useWatch([], form)

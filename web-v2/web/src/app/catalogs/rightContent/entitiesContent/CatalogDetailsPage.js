@@ -268,6 +268,7 @@ export default function CatalogDetailsPage() {
 
   return (
     <div ref={ref}>
+      {contextHolder}
       <Spin spinning={store.activatedDetailsLoading}>
         <Flex className='mb-2' gap='small' align='flex-start'>
           <div className='size-8'>{renderIcon(store.activatedDetails)}</div>

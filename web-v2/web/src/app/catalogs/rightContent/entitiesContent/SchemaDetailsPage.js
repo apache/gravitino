@@ -116,6 +116,7 @@ export default function SchemaDetailsPage() {
   const treeRef = useContext(TreeRefContext)
   const [catalogData, setCatalogData] = useState(null)
   const [ownerData, setOwnerData] = useState(null)
+  const [modal, contextHolder] = Modal.useModal()
 
   useEffect(() => {
     if (!currentMetalake || !catalog) return
@@ -148,6 +149,17 @@ export default function SchemaDetailsPage() {
       return
     }
 
+    const provider = catalogData?.provider
+    const catalogBackend = catalogData?.properties?.['catalog-backend']
+    const isIcebergJdbcCatalog = provider === 'lakehouse-iceberg' && catalogBackend === 'jdbc'
+
+    if (!isIcebergJdbcCatalog) {
+      // only iceberg jdbc catalogs support subschemas
+      setSubSchemas([])
+
+      return
+    }
+
     const loadSubSchemas = async () => {
       const [err, res] = await to(
         dispatch(fetchSchemas({ metalake: currentMetalake, catalog, catalogType, parentSchema: schema }))
@@ -173,7 +185,7 @@ export default function SchemaDetailsPage() {
     }
 
     loadSubSchemas()
-  }, [currentMetalake, catalog, schema])
+  }, [currentMetalake, catalog, schema, catalogData?.provider, catalogData?.properties?.['catalog-backend']])
 
   useEffect(() => {
     const hasSubSchemas = subSchemas.length > 0
@@ -295,7 +307,7 @@ export default function SchemaDetailsPage() {
     setTabKey(key)
   }
 
-  const showDeleteSchemaConfirm = (modal, name) => {
+  const showDeleteSchemaConfirm = name => {
     modal.confirm({
       title: `Are you sure to delete the schema ${name}?`,
       icon: <ExclamationCircleFilled />,
@@ -445,7 +457,20 @@ export default function SchemaDetailsPage() {
     setOpenOwner(true)
   }
 
-  const showDeleteConfirm = async (modal, entityObj, type) => {
+  const showDeleteConfirm = async (maybeModalOrEntityObj, maybeEntityObj, maybeType) => {
+    // support two call signatures:
+    // 1) showDeleteConfirm(modalInstance, entityObj, type)
+    // 2) showDeleteConfirm(entityObj, type)
+    let modalToUse = modal
+    let entityObj = maybeModalOrEntityObj
+    let type = maybeEntityObj
+
+    if (maybeModalOrEntityObj && typeof maybeModalOrEntityObj.confirm === 'function') {
+      modalToUse = maybeModalOrEntityObj
+      entityObj = maybeEntityObj
+      type = maybeType
+    }
+
     const { name: entity, storageLocation, type: managedOrExtenalType } = entityObj
     let isManaged = false
     let location = ''
@@ -471,7 +496,7 @@ export default function SchemaDetailsPage() {
       validateFn = fn
     }
 
-    modal.confirm({
+    modalToUse.confirm({
       title: `Are you sure to delete the ${type} ${entity}?`,
       icon: <ExclamationCircleFilled />,
       content: (
@@ -611,7 +636,7 @@ export default function SchemaDetailsPage() {
         render: (_, record) => (
           <a data-refer={`delete-view-${record.name}`}>
             <Tooltip title='Delete'>
-              <Icons.Trash2Icon className='size-4' onClick={() => showDeleteConfirm(Modal, record, 'view')} />
+              <Icons.Trash2Icon className='size-4' onClick={() => showDeleteConfirm(record, 'view')} />
             </Tooltip>
           </a>
         )
@@ -632,7 +657,7 @@ export default function SchemaDetailsPage() {
         setEditSchemaInit(false)
         setOpenSchema(true)
       },
-      showDeleteConfirm: name => showDeleteSchemaConfirm(Modal, name),
+      showDeleteConfirm: name => showDeleteSchemaConfirm(name),
       handleSetOwner
     })
   }, [currentMetalake, catalog, catalogType, anthEnable, catalogData?.provider])
@@ -659,6 +684,7 @@ export default function SchemaDetailsPage() {
 
   return (
     <div ref={ref}>
+      {contextHolder}
       <Spin spinning={store.activatedDetailsLoading}>
         <Flex className='mb-2' gap='small' align='flex-start'>
           <div className='size-8'>
