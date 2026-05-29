@@ -205,11 +205,27 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
       Credential credential = getCredential(loadTableResponse, privilege);
-      return ImmutableLoadCredentialsResponse.builder()
-          .addCredentials(
-              IcebergVendedCredentials.toRestCredential(
-                  catalogName, identifier, credential, loadTableResponse.tableMetadata()))
-          .build();
+      TableMetadata tableMetadata = loadTableResponse.tableMetadata();
+      Map<String, String> credentialConfig =
+          IcebergVendedCredentials.toClientConfig(catalogName, identifier, credential);
+      String prefix = IcebergVendedCredentials.tableLocationPrefix(tableMetadata);
+      org.apache.iceberg.rest.credentials.Credential icebergCredential =
+          new org.apache.iceberg.rest.credentials.Credential() {
+            @Override
+            public String prefix() {
+              return prefix;
+            }
+
+            @Override
+            public Map<String, String> config() {
+              // Convert Gravitino credentials to the Iceberg REST credential payload format.
+              return credentialConfig;
+            }
+
+            @Override
+            public void validate() {}
+          };
+      return ImmutableLoadCredentialsResponse.builder().addCredentials(icebergCredential).build();
     } catch (ServiceUnavailableException e) {
       LOG.warn("Service unavailable when loading table credentials for table: {}", identifier, e);
       return ImmutableLoadCredentialsResponse.builder().build();
