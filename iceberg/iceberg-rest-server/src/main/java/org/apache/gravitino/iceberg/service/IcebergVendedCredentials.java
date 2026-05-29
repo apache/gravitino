@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.Credential;
@@ -45,26 +44,48 @@ import org.apache.iceberg.rest.RESTUtil;
  */
 public final class IcebergVendedCredentials {
 
+  @VisibleForTesting static final String S3_TOKEN_EXPIRES_AT_MS = "s3.session-token-expires-at-ms";
+
+  @VisibleForTesting
+  static final String S3_REFRESH_CREDENTIALS_ENDPOINT = "client.refresh-credentials-endpoint";
+
+  @VisibleForTesting
+  static final String OSS_SECURITY_TOKEN_EXPIRES_AT_MS = "client.security-token-expires-at-ms";
+
+  @VisibleForTesting
+  static final String OSS_REFRESH_CREDENTIALS_ENDPOINT = "client.refresh-credentials-endpoint";
+
+  @VisibleForTesting
+  static final String GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
+      "gcs.oauth2.refresh-credentials-endpoint";
+
+  @VisibleForTesting
+  static final String ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX = "adls.sas-token-expires-at-ms.";
+
+  @VisibleForTesting
+  static final String ADLS_REFRESH_CREDENTIALS_ENDPOINT = "adls.refresh-credentials-endpoint";
+
   private IcebergVendedCredentials() {}
 
   /**
-   * Builds Iceberg client configuration for a vended credential, including token expiry and the
-   * table-scoped refresh path when the credential type supports refresh.
+   * Appends Iceberg REST vended-credential refresh properties to {@code config}.
    *
+   * <p>Callers should start from {@link CredentialPropertyUtils#toIcebergProperties(Credential)}.
+   *
+   * @param config mutable Iceberg client config map
    * @param catalogName IRC catalog name used in the refresh path
    * @param tableIdentifier table receiving the credential
    * @param credential Gravitino credential to vend
-   * @return mutable map of Iceberg table-load / credential config entries
    */
-  public static Map<String, String> toClientConfig(
-      String catalogName, TableIdentifier tableIdentifier, Credential credential) {
-    Map<String, String> config =
-        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+  public static void appendVendedRefreshProperties(
+      Map<String, String> config,
+      String catalogName,
+      TableIdentifier tableIdentifier,
+      Credential credential) {
     appendVendedTokenExpiry(credential, config);
     refreshEndpointProperty(credential)
         .ifPresent(
             property -> config.put(property, tableCredentialsPath(catalogName, tableIdentifier)));
-    return config;
   }
 
   /**
@@ -82,7 +103,9 @@ public final class IcebergVendedCredentials {
       TableIdentifier tableIdentifier,
       Credential credential,
       TableMetadata tableMetadata) {
-    Map<String, String> config = toClientConfig(catalogName, tableIdentifier, credential);
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+    appendVendedRefreshProperties(config, catalogName, tableIdentifier, credential);
     String location = tableMetadata.location();
     String prefix = location.endsWith("/") ? location : location + "/";
     return new org.apache.iceberg.rest.credentials.Credential() {
@@ -129,33 +152,29 @@ public final class IcebergVendedCredentials {
   @VisibleForTesting
   static Optional<String> refreshEndpointProperty(Credential credential) {
     if (credential instanceof GCSTokenCredential) {
-      return Optional.of(IcebergConstants.GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT);
+      return Optional.of(GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT);
     }
     if (credential instanceof ADLSTokenCredential) {
-      return Optional.of(IcebergConstants.ADLS_REFRESH_CREDENTIALS_ENDPOINT);
+      return Optional.of(ADLS_REFRESH_CREDENTIALS_ENDPOINT);
     }
     if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
-      return Optional.of(IcebergConstants.ICEBERG_S3_REFRESH_CREDENTIALS_ENDPOINT);
+      return Optional.of(S3_REFRESH_CREDENTIALS_ENDPOINT);
     }
     if (credential instanceof OSSTokenCredential) {
-      return Optional.of(IcebergConstants.ICEBERG_OSS_REFRESH_CREDENTIALS_ENDPOINT);
+      return Optional.of(OSS_REFRESH_CREDENTIALS_ENDPOINT);
     }
     return Optional.empty();
   }
 
   private static void appendVendedTokenExpiry(Credential credential, Map<String, String> config) {
     if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
-      config.put(
-          IcebergConstants.ICEBERG_S3_TOKEN_EXPIRES_AT_MS,
-          String.valueOf(credential.expireTimeInMs()));
+      config.put(S3_TOKEN_EXPIRES_AT_MS, String.valueOf(credential.expireTimeInMs()));
     } else if (credential instanceof OSSTokenCredential) {
-      config.put(
-          IcebergConstants.ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS,
-          String.valueOf(credential.expireTimeInMs()));
+      config.put(OSS_SECURITY_TOKEN_EXPIRES_AT_MS, String.valueOf(credential.expireTimeInMs()));
     } else if (credential instanceof ADLSTokenCredential) {
       ADLSTokenCredential adlsCredential = (ADLSTokenCredential) credential;
       config.put(
-          IcebergConstants.ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsCredential.accountName(),
+          ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsCredential.accountName(),
           String.valueOf(adlsCredential.expireTimeInMs()));
     }
   }

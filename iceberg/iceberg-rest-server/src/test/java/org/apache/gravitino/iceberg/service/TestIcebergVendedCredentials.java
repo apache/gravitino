@@ -21,9 +21,12 @@ package org.apache.gravitino.iceberg.service;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.ADLSTokenCredential;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.GCSTokenCredential;
 import org.apache.gravitino.credential.OSSTokenCredential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
@@ -48,65 +51,59 @@ class TestIcebergVendedCredentials {
   @Test
   void testS3TokenClientConfig() {
     Map<String, String> config =
-        IcebergVendedCredentials.toClientConfig(
-            "aws", TABLE, new S3TokenCredential("key", "secret", "token", 1234L));
+        vendedConfig("aws", new S3TokenCredential("key", "secret", "token", 1234L));
 
     Assertions.assertEquals("key", config.get(IcebergConstants.ICEBERG_S3_ACCESS_KEY_ID));
-    Assertions.assertEquals("1234", config.get(IcebergConstants.ICEBERG_S3_TOKEN_EXPIRES_AT_MS));
+    Assertions.assertEquals("1234", config.get(IcebergVendedCredentials.S3_TOKEN_EXPIRES_AT_MS));
     Assertions.assertEquals(
         "v1/aws/namespaces/ns/tables/tbl/credentials",
-        config.get(IcebergConstants.ICEBERG_S3_REFRESH_CREDENTIALS_ENDPOINT));
+        config.get(IcebergVendedCredentials.S3_REFRESH_CREDENTIALS_ENDPOINT));
   }
 
   @Test
   void testGcsTokenClientConfig() {
-    Map<String, String> config =
-        IcebergVendedCredentials.toClientConfig(
-            "gcs", TABLE, new GCSTokenCredential("gcs-token", 5678L));
+    Map<String, String> config = vendedConfig("gcs", new GCSTokenCredential("gcs-token", 5678L));
 
     Assertions.assertEquals("gcs-token", config.get(IcebergConstants.GCS_OAUTH2_TOKEN));
     Assertions.assertEquals("5678", config.get(IcebergConstants.GCS_OAUTH2_TOKEN_EXPIRES_AT));
     Assertions.assertEquals(
         "v1/gcs/namespaces/ns/tables/tbl/credentials",
-        config.get(IcebergConstants.GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT));
+        config.get(IcebergVendedCredentials.GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT));
   }
 
   @Test
   void testOssTokenClientConfig() {
     Map<String, String> config =
-        IcebergVendedCredentials.toClientConfig(
-            "oss", TABLE, new OSSTokenCredential("key", "secret", "oss-token", 9012L));
+        vendedConfig("oss", new OSSTokenCredential("key", "secret", "oss-token", 9012L));
 
     Assertions.assertEquals(
-        "9012", config.get(IcebergConstants.ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS));
+        "9012", config.get(IcebergVendedCredentials.OSS_SECURITY_TOKEN_EXPIRES_AT_MS));
     Assertions.assertEquals(
         "v1/oss/namespaces/ns/tables/tbl/credentials",
-        config.get(IcebergConstants.ICEBERG_OSS_REFRESH_CREDENTIALS_ENDPOINT));
+        config.get(IcebergVendedCredentials.OSS_REFRESH_CREDENTIALS_ENDPOINT));
   }
 
   @Test
   void testAdlsTokenClientConfig() {
     Map<String, String> config =
-        IcebergVendedCredentials.toClientConfig(
-            "adls", TABLE, new ADLSTokenCredential("storageacct", "sas-token", 3456L));
+        vendedConfig("adls", new ADLSTokenCredential("storageacct", "sas-token", 3456L));
 
     Assertions.assertEquals(
         "sas-token", config.get("adls.sas-token.storageacct.dfs.core.windows.net"));
     Assertions.assertEquals(
-        "3456", config.get(IcebergConstants.ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + "storageacct"));
+        "3456",
+        config.get(IcebergVendedCredentials.ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + "storageacct"));
     Assertions.assertEquals(
         "v1/adls/namespaces/ns/tables/tbl/credentials",
-        config.get(IcebergConstants.ADLS_REFRESH_CREDENTIALS_ENDPOINT));
+        config.get(IcebergVendedCredentials.ADLS_REFRESH_CREDENTIALS_ENDPOINT));
   }
 
   @Test
   void testStaticSecretKeyOmitsRefreshEndpoint() {
-    Map<String, String> config =
-        IcebergVendedCredentials.toClientConfig(
-            "aws", TABLE, new S3SecretKeyCredential("key", "secret"));
+    Map<String, String> config = vendedConfig("aws", new S3SecretKeyCredential("key", "secret"));
 
     Assertions.assertFalse(
-        config.containsKey(IcebergConstants.ICEBERG_S3_REFRESH_CREDENTIALS_ENDPOINT));
+        config.containsKey(IcebergVendedCredentials.S3_REFRESH_CREDENTIALS_ENDPOINT));
   }
 
   @Test
@@ -118,7 +115,7 @@ class TestIcebergVendedCredentials {
             "cat", TABLE, new S3TokenCredential("k", "s", "t", 99L), metadataWithSlash);
     Assertions.assertEquals("s3://bucket/t/", credentialWithSlash.prefix());
     Assertions.assertEquals(
-        "99", credentialWithSlash.config().get(IcebergConstants.ICEBERG_S3_TOKEN_EXPIRES_AT_MS));
+        "99", credentialWithSlash.config().get(IcebergVendedCredentials.S3_TOKEN_EXPIRES_AT_MS));
 
     TableMetadata metadataWithoutSlash = mock(TableMetadata.class);
     when(metadataWithoutSlash.location()).thenReturn("s3://bucket/path/to/table");
@@ -126,5 +123,12 @@ class TestIcebergVendedCredentials {
         IcebergVendedCredentials.toRestCredential(
             "cat", TABLE, new S3TokenCredential("k", "s", "t", 99L), metadataWithoutSlash);
     Assertions.assertEquals("s3://bucket/path/to/table/", credentialWithoutSlash.prefix());
+  }
+
+  private static Map<String, String> vendedConfig(String catalogName, Credential credential) {
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+    IcebergVendedCredentials.appendVendedRefreshProperties(config, catalogName, TABLE, credential);
+    return config;
   }
 }

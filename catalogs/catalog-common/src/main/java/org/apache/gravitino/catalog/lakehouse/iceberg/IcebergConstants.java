@@ -51,9 +51,6 @@ public class IcebergConstants {
   public static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
   public static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
   public static final String ICEBERG_S3_TOKEN = "s3.session-token";
-  public static final String ICEBERG_S3_TOKEN_EXPIRES_AT_MS = "s3.session-token-expires-at-ms";
-  public static final String ICEBERG_S3_REFRESH_CREDENTIALS_ENDPOINT =
-      "client.refresh-credentials-endpoint";
   public static final String ICEBERG_S3_PATH_STYLE_ACCESS = "s3.path-style-access";
   public static final String AWS_S3_REGION = "client.region";
 
@@ -62,24 +59,15 @@ public class IcebergConstants {
   public static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
   public static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
   public static final String ICEBERG_OSS_SECURITY_TOKEN = "client.security-token";
-  public static final String ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS =
-      "client.security-token-expires-at-ms";
-  public static final String ICEBERG_OSS_REFRESH_CREDENTIALS_ENDPOINT =
-      "client.refresh-credentials-endpoint";
 
   // GCS IO properties
   public static final String GCS_OAUTH2_TOKEN = "gcs.oauth2.token";
   public static final String GCS_OAUTH2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
-  public static final String GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
-      "gcs.oauth2.refresh-credentials-endpoint";
 
   // ADLS IO properties
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_NAME =
       "adls.auth.shared-key.account.name";
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
-  public static final String ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX = "adls.sas-token-expires-at-ms.";
-  public static final String ADLS_REFRESH_CREDENTIALS_ENDPOINT =
-      "adls.refresh-credentials-endpoint";
 
   // Iceberg Table properties constants
 

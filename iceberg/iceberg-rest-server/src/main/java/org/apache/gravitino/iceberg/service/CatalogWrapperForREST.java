@@ -207,7 +207,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       Credential credential = getCredential(loadTableResponse, privilege);
       TableMetadata tableMetadata = loadTableResponse.tableMetadata();
       Map<String, String> credentialConfig =
-          IcebergVendedCredentials.toClientConfig(catalogName, identifier, credential);
+          new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+      IcebergVendedCredentials.appendVendedRefreshProperties(
+          credentialConfig, catalogName, identifier, credential);
       String location = tableMetadata.location();
       String prefix = location.endsWith("/") ? location : location + "/";
       org.apache.iceberg.rest.credentials.Credential icebergCredential =
@@ -337,7 +339,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     // Merge temporary credential fields as Iceberg client config entries in the load-table
     // response.
     Map<String, String> credentialConfig =
-        IcebergVendedCredentials.toClientConfig(catalogName, tableIdentifier, credential);
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+    IcebergVendedCredentials.appendVendedRefreshProperties(
+        credentialConfig, catalogName, tableIdentifier, credential);
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
         .addAllConfig(loadTableResponse.config())
