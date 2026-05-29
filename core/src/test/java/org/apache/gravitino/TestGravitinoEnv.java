@@ -34,19 +34,35 @@ public class TestGravitinoEnv {
   @Test
   void testBaseComponentsStartDoesNotStartStaleEntityChangeLogPoller() throws Exception {
     GravitinoEnv env = GravitinoEnv.getInstance();
+    MetricsSystem originalMetricsSystem =
+        (MetricsSystem) FieldUtils.readField(env, "metricsSystem", true);
+    EventListenerManager originalEventListenerManager =
+        (EventListenerManager) FieldUtils.readField(env, "eventListenerManager", true);
+    EntityChangeLogPoller originalEntityChangeLogPoller =
+        (EntityChangeLogPoller) FieldUtils.readField(env, "entityChangeLogPoller", true);
+    boolean originalManageFullComponents =
+        (boolean) FieldUtils.readField(env, "manageFullComponents", true);
+
     MetricsSystem metricsSystem = mock(MetricsSystem.class);
     EventListenerManager eventListenerManager = mock(EventListenerManager.class);
     EntityChangeLogPoller entityChangeLogPoller = mock(EntityChangeLogPoller.class);
 
-    FieldUtils.writeField(env, "metricsSystem", metricsSystem, true);
-    FieldUtils.writeField(env, "eventListenerManager", eventListenerManager, true);
-    FieldUtils.writeField(env, "entityChangeLogPoller", entityChangeLogPoller, true);
-    FieldUtils.writeField(env, "manageFullComponents", false, true);
+    try {
+      FieldUtils.writeField(env, "metricsSystem", metricsSystem, true);
+      FieldUtils.writeField(env, "eventListenerManager", eventListenerManager, true);
+      FieldUtils.writeField(env, "entityChangeLogPoller", entityChangeLogPoller, true);
+      FieldUtils.writeField(env, "manageFullComponents", false, true);
 
-    env.start();
+      env.start();
 
-    verify(metricsSystem).start();
-    verify(eventListenerManager).start();
-    verify(entityChangeLogPoller, never()).start();
+      verify(metricsSystem).start();
+      verify(eventListenerManager).start();
+      verify(entityChangeLogPoller, never()).start();
+    } finally {
+      FieldUtils.writeField(env, "metricsSystem", originalMetricsSystem, true);
+      FieldUtils.writeField(env, "eventListenerManager", originalEventListenerManager, true);
+      FieldUtils.writeField(env, "entityChangeLogPoller", originalEntityChangeLogPoller, true);
+      FieldUtils.writeField(env, "manageFullComponents", originalManageFullComponents, true);
+    }
   }
 }
