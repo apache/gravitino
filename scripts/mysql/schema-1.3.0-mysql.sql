@@ -602,7 +602,7 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
 
 CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   `id`                BIGINT(20)    UNSIGNED NOT NULL,
-  `catalog_id`        BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique id of the owning catalog; stable across catalog rename',
+  `catalog_id`        BIGINT(20)    UNSIGNED NOT NULL COMMENT 'globally unique id of the owning catalog, stable across catalog rename',
   `namespace`         VARCHAR(512)  NOT NULL,
   `table_name`        VARCHAR(256)  NOT NULL,
   `metadata_location` MEDIUMTEXT   NOT NULL,
