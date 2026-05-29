@@ -90,18 +90,4 @@ public class TestCredentialPropertiesUtils {
     Map<String, String> expectedProperties = ImmutableMap.of(sasTokenKey, sasToken);
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }
-
-  @Test
-  void testToIcebergPropertiesForGcsToken() {
-    GCSTokenCredential gcsTokenCredential = new GCSTokenCredential("gcs-token", 200);
-    Map<String, String> icebergProperties =
-        CredentialPropertyUtils.toIcebergProperties(gcsTokenCredential);
-    Map<String, String> expectedProperties =
-        ImmutableMap.of(
-            CredentialPropertyUtils.ICEBERG_GCS_TOKEN,
-            "gcs-token",
-            "gcs.oauth2.token-expires-at",
-            "200");
-    Assertions.assertEquals(expectedProperties, icebergProperties);
-  }
 }

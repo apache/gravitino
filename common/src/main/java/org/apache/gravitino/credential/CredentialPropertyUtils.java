@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.credential;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -31,69 +32,47 @@ import java.util.Set;
  */
 public class CredentialPropertyUtils {
 
-  // S3 / AWS Iceberg property names
-  static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
-  static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
-  static final String ICEBERG_S3_TOKEN = "s3.session-token";
-  static final String ICEBERG_S3_TOKEN_EXPIRES_AT_MS = "s3.session-token-expires-at-ms";
+  @VisibleForTesting static final String ICEBERG_S3_ACCESS_KEY_ID = "s3.access-key-id";
+  @VisibleForTesting static final String ICEBERG_S3_SECRET_ACCESS_KEY = "s3.secret-access-key";
+  @VisibleForTesting static final String ICEBERG_S3_TOKEN = "s3.session-token";
+  @VisibleForTesting static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
 
-  // OSS Iceberg property names
-  static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
-  static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
-  static final String ICEBERG_OSS_SECURITY_TOKEN = "client.security-token";
-  static final String ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS =
-      "client.security-token-expires-at-ms";
+  @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_ID = "client.access-key-id";
+  @VisibleForTesting static final String ICEBERG_OSS_ACCESS_KEY_SECRET = "client.access-key-secret";
+  @VisibleForTesting static final String ICEBERG_OSS_SECURITY_TOKEN = "client.security-token";
 
-  // GCS Iceberg property names
-  static final String ICEBERG_GCS_TOKEN = "gcs.oauth2.token";
-  private static final String GCS_OAUTH_2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+  @VisibleForTesting static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
 
-  // ADLS Iceberg property names
-  static final String ICEBERG_ADLS_TOKEN = "adls.sas-token";
-  static final String ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX = "adls.sas-token-expires-at-ms.";
+  @VisibleForTesting
   static final String ICEBERG_ADLS_ACCOUNT_NAME = "adls.auth.shared-key.account.name";
+
+  @VisibleForTesting
   static final String ICEBERG_ADLS_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
 
-  private static final Map<String, String> ICEBERG_S3_CREDENTIAL_PROPERTY_MAP =
+  private static final String GCS_OAUTH_2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+
+  private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
+          .put(GCSTokenCredential.GCS_TOKEN_NAME, ICEBERG_GCS_TOKEN)
           .put(S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
           .put(
               S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
               ICEBERG_S3_SECRET_ACCESS_KEY)
           .put(S3TokenCredential.GRAVITINO_S3_TOKEN, ICEBERG_S3_TOKEN)
-          .put(AwsIrsaCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
-          .put(AwsIrsaCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
-          .put(AwsIrsaCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
-          .build();
-
-  private static final Map<String, String> ICEBERG_OSS_CREDENTIAL_PROPERTY_MAP =
-      ImmutableMap.<String, String>builder()
           .put(OSSTokenCredential.GRAVITINO_OSS_TOKEN, ICEBERG_OSS_SECURITY_TOKEN)
           .put(OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID, ICEBERG_OSS_ACCESS_KEY_ID)
           .put(
               OSSTokenCredential.GRAVITINO_OSS_SESSION_SECRET_ACCESS_KEY,
               ICEBERG_OSS_ACCESS_KEY_SECRET)
-          .build();
-
-  private static final Map<String, String> ICEBERG_GCS_CREDENTIAL_PROPERTY_MAP =
-      ImmutableMap.of(GCSTokenCredential.GCS_TOKEN_NAME, ICEBERG_GCS_TOKEN);
-
-  private static final Map<String, String> ICEBERG_ADLS_CREDENTIAL_PROPERTY_MAP =
-      ImmutableMap.<String, String>builder()
           .put(
               AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
               ICEBERG_ADLS_ACCOUNT_NAME)
           .put(
               AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
               ICEBERG_ADLS_ACCOUNT_KEY)
-          .build();
-
-  private static final Map<String, String> icebergCredentialPropertyMap =
-      ImmutableMap.<String, String>builder()
-          .putAll(ICEBERG_S3_CREDENTIAL_PROPERTY_MAP)
-          .putAll(ICEBERG_OSS_CREDENTIAL_PROPERTY_MAP)
-          .putAll(ICEBERG_GCS_CREDENTIAL_PROPERTY_MAP)
-          .putAll(ICEBERG_ADLS_CREDENTIAL_PROPERTY_MAP)
+          .put(AwsIrsaCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
+          .put(AwsIrsaCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
+          .put(AwsIrsaCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
           .build();
 
   /**
@@ -147,8 +126,6 @@ public class CredentialPropertyUtils {
    */
   public static Map<String, String> filterCredentialProperties(Map<String, String> properties) {
     Set<String> credentialPropertyKeys = Sets.newHashSet(icebergCredentialPropertyMap.values());
-    credentialPropertyKeys.add(ICEBERG_S3_TOKEN_EXPIRES_AT_MS);
-    credentialPropertyKeys.add(ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS);
     credentialPropertyKeys.add(GCS_OAUTH_2_TOKEN_EXPIRES_AT);
     Map<String, String> filteredProperties = Maps.newHashMap(properties);
     filteredProperties
@@ -156,8 +133,7 @@ public class CredentialPropertyUtils {
         .removeIf(
             entry ->
                 !credentialPropertyKeys.contains(entry.getKey())
-                    && !entry.getKey().startsWith(ICEBERG_ADLS_TOKEN)
-                    && !entry.getKey().startsWith(ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX));
+                    && !entry.getKey().startsWith(ICEBERG_ADLS_TOKEN));
     return filteredProperties;
   }
 
