@@ -370,7 +370,7 @@ public class HiveCatalogOperations
   @Override
   public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
-    if (!schemaExists(schemaIdent)) {
+    if (!schemaExists(schemaIdent)) {   
       throw new NoSuchSchemaException("Schema (database) does not exist %s", namespace);
     }
 
@@ -675,12 +675,21 @@ public class HiveCatalogOperations
       String newComment = currentTable.comment();
       Map<String, String> updatedProperties = new HashMap<>(currentTable.properties());
       List<Column> updatedColumns = new ArrayList<>(Arrays.asList(currentTable.columns()));
+      String targetDatabaseName = schemaIdent.name();  // Define a separate variable to track the target database name.
+      
 
       for (TableChange change : changes) {
         if (change instanceof TableChange.RenameTable) {
           TableChange.RenameTable rename = (TableChange.RenameTable) change;
-          Preconditions.checkArgument(
-              rename.getNewSchemaName().isEmpty(), "Does not support rename schema yet");
+          if (rename.getNewSchemaName().isPresent()) {    // Check if a new schema is specified for the table rename
+            String newSchemaName = rename.getNewSchemaName().get();
+            if (!schemaExists(   // Validate that the target schema exists before moving the table
+                NameIdentifier.of(tableIdent.namespace().levels()[0], newSchemaName))) {
+              throw new NoSuchSchemaException("Schema %s does not exist", newSchemaName);
+            }
+            // Move table to the new schema
+            targetDatabaseName = newSchemaName;
+          }
           newTableName = rename.getNewName();
         } else if (change instanceof TableChange.UpdateComment) {
           newComment = ((TableChange.UpdateComment) change).getNewComment();
@@ -701,7 +710,8 @@ public class HiveCatalogOperations
 
       HiveTable updatedTable =
           buildAlteredHiveTable(
-              currentTable, newTableName, newComment, updatedProperties, updatedColumns);
+              currentTable, newTableName, newComment, updatedProperties, updatedColumns,
+              targetDatabaseName);
 
       HiveTable finalUpdatedTable = updatedTable;
       clientPool.run(
@@ -735,7 +745,8 @@ public class HiveCatalogOperations
       String tableName,
       String comment,
       Map<String, String> properties,
-      List<Column> columns) {
+      List<Column> columns,
+      String databaseName) {
     HiveTable.Builder builder =
         HiveTable.builder()
             .withName(tableName)
@@ -746,7 +757,7 @@ public class HiveCatalogOperations
             .withSortOrders(original.sortOrder())
             .withPartitioning(original.partitioning())
             .withCatalogName(original.catalogName())
-            .withDatabaseName(original.databaseName());
+            .withDatabaseName(databaseName);
 
     if (comment != null) {
       builder.withComment(comment);
