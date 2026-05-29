@@ -101,7 +101,8 @@ class TestIcebergVendedCredentials {
 
     Assertions.assertEquals(
         "sas-token", config.get("adls.sas-token.storageacct.dfs.core.windows.net"));
-    Assertions.assertEquals("3456", config.get("adls.sas-token-expires-at-ms.storageacct"));
+    Assertions.assertEquals(
+        "3456", config.get(IcebergConstants.ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + "storageacct"));
     Assertions.assertEquals(
         "v1/adls/namespaces/ns/tables/tbl/credentials",
         config.get(IcebergConstants.ADLS_REFRESH_CREDENTIALS_ENDPOINT));

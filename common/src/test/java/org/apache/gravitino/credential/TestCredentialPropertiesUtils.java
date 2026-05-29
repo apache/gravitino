@@ -38,9 +38,7 @@ public class TestCredentialPropertiesUtils {
             CredentialPropertyUtils.ICEBERG_S3_SECRET_ACCESS_KEY,
             "secret",
             CredentialPropertyUtils.ICEBERG_S3_TOKEN,
-            "token",
-            CredentialPropertyUtils.ICEBERG_S3_TOKEN_EXPIRES_AT_MS,
-            "100");
+            "token");
     Assertions.assertEquals(expectedProperties, icebergProperties);
 
     S3SecretKeyCredential secretKeyCredential = new S3SecretKeyCredential("key", "secret");
@@ -67,9 +65,7 @@ public class TestCredentialPropertiesUtils {
             CredentialPropertyUtils.ICEBERG_OSS_ACCESS_KEY_SECRET,
             "secret",
             CredentialPropertyUtils.ICEBERG_OSS_SECURITY_TOKEN,
-            "security-token",
-            CredentialPropertyUtils.ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS,
-            "100");
+            "security-token");
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }
 
@@ -91,13 +87,7 @@ public class TestCredentialPropertiesUtils {
             storageAccountName,
             ADLSTokenCredential.ADLS_DOMAIN);
 
-    Map<String, String> expectedProperties =
-        ImmutableMap.of(
-            sasTokenKey,
-            sasToken,
-            CredentialPropertyUtils.ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX
-                + storageAccountName,
-            String.valueOf(expireTimeInMS));
+    Map<String, String> expectedProperties = ImmutableMap.of(sasTokenKey, sasToken);
     Assertions.assertEquals(expectedProperties, icebergProperties);
   }
 

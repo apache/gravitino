@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.service;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -57,7 +58,9 @@ public final class IcebergVendedCredentials {
    */
   public static Map<String, String> toClientConfig(
       String catalogName, TableIdentifier tableIdentifier, Credential credential) {
-    Map<String, String> config = CredentialPropertyUtils.toIcebergProperties(credential);
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+    appendVendedTokenExpiry(credential, config);
     refreshEndpointProperty(credential)
         .ifPresent(
             property -> config.put(property, tableCredentialsPath(catalogName, tableIdentifier)));
@@ -149,5 +152,22 @@ public final class IcebergVendedCredentials {
       return Optional.of(IcebergConstants.ICEBERG_OSS_REFRESH_CREDENTIALS_ENDPOINT);
     }
     return Optional.empty();
+  }
+
+  private static void appendVendedTokenExpiry(Credential credential, Map<String, String> config) {
+    if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
+      config.put(
+          IcebergConstants.ICEBERG_S3_TOKEN_EXPIRES_AT_MS,
+          String.valueOf(credential.expireTimeInMs()));
+    } else if (credential instanceof OSSTokenCredential) {
+      config.put(
+          IcebergConstants.ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS,
+          String.valueOf(credential.expireTimeInMs()));
+    } else if (credential instanceof ADLSTokenCredential) {
+      ADLSTokenCredential adlsCredential = (ADLSTokenCredential) credential;
+      config.put(
+          IcebergConstants.ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsCredential.accountName(),
+          String.valueOf(adlsCredential.expireTimeInMs()));
+    }
   }
 }

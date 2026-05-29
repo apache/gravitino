@@ -77,6 +77,7 @@ public class IcebergConstants {
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_NAME =
       "adls.auth.shared-key.account.name";
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
+  public static final String ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX = "adls.sas-token-expires-at-ms.";
   public static final String ADLS_REFRESH_CREDENTIALS_ENDPOINT =
       "adls.refresh-credentials-endpoint";
 
