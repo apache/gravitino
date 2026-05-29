@@ -1,0 +1,117 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino iceberg rest server service
+templates:
+  - service.yaml
+tests:
+  - it: renders the default ClusterIP service
+    release:
+      name: iceberg-rest
+      namespace: iceberg-system
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.name
+          value: gravitino-iceberg-rest-server
+      - equal:
+          path: metadata.namespace
+          value: iceberg-system
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - contains:
+          path: spec.ports
+          content:
+            name: http
+            port: 9001
+            protocol: TCP
+            targetPort: 9001
+          any: true
+      - equal:
+          path: spec.selector.release
+          value: iceberg-rest
+
+  - it: renders NodePort when requested
+    set:
+      service:
+        type: NodePort
+        nodePort: 30091
+    asserts:
+      - equal:
+          path: spec.type
+          value: NodePort
+      - equal:
+          path: spec.ports[0].nodePort
+          value: 30091
+
+  - it: renders LoadBalancer options
+    set:
+      service:
+        type: LoadBalancer
+        loadBalancerClass: service.k8s.aws/nlb
+        loadBalancerIP: 10.0.0.10
+        loadBalancerSourceRanges:
+          - 10.0.0.0/24
+        externalIPs:
+          - 192.168.0.10
+        labels:
+          exposure: public
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    asserts:
+      - equal:
+          path: spec.type
+          value: LoadBalancer
+      - equal:
+          path: spec.loadBalancerClass
+          value: service.k8s.aws/nlb
+      - equal:
+          path: spec.loadBalancerIP
+          value: 10.0.0.10
+      - contains:
+          path: spec.loadBalancerSourceRanges
+          content: 10.0.0.0/24
+      - contains:
+          path: spec.externalIPs
+          content: 192.168.0.10
+      - equal:
+          path: metadata.labels.exposure
+          value: public
+      - equal:
+          path: metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-type"]
+          value: nlb
+
+  - it: renders extra exposed ports
+    set:
+      extraExposePorts:
+        - name: metrics
+          port: 9090
+          protocol: TCP
+          targetPort: 9090
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: metrics
+            port: 9090
+            protocol: TCP
+            targetPort: 9090
+          any: true
