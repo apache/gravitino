@@ -36,6 +36,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -100,7 +101,11 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    return Optional.of(getIcebergConfigFromCatalogProperties(catalog.properties()));
+    Map<String, String> catalogProperties =
+        catalog instanceof BaseCatalog
+            ? ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders()
+            : catalog.properties();
+    return Optional.of(getIcebergConfigFromCatalogProperties(catalogProperties));
   }
 
   /**
