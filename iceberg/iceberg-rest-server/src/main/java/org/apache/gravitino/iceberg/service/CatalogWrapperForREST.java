@@ -208,7 +208,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       TableMetadata tableMetadata = loadTableResponse.tableMetadata();
       Map<String, String> credentialConfig =
           IcebergVendedCredentials.toClientConfig(catalogName, identifier, credential);
-      String prefix = IcebergVendedCredentials.tableLocationPrefix(tableMetadata);
+      String location = tableMetadata.location();
+      String prefix = location.endsWith("/") ? location : location + "/";
       org.apache.iceberg.rest.credentials.Credential icebergCredential =
           new org.apache.iceberg.rest.credentials.Credential() {
             @Override

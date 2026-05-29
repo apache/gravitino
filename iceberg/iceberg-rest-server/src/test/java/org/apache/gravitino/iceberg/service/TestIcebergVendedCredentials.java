@@ -46,15 +46,6 @@ class TestIcebergVendedCredentials {
   }
 
   @Test
-  void testTableLocationPrefix() {
-    TableMetadata metadata = mock(TableMetadata.class);
-    when(metadata.location()).thenReturn("s3://bucket/path/to/table");
-
-    Assertions.assertEquals(
-        "s3://bucket/path/to/table/", IcebergVendedCredentials.tableLocationPrefix(metadata));
-  }
-
-  @Test
   void testS3TokenClientConfig() {
     Map<String, String> config =
         IcebergVendedCredentials.toClientConfig(
@@ -120,15 +111,20 @@ class TestIcebergVendedCredentials {
 
   @Test
   void testToRestCredential() {
-    TableMetadata metadata = mock(TableMetadata.class);
-    when(metadata.location()).thenReturn("s3://bucket/t/");
-
-    org.apache.iceberg.rest.credentials.Credential credential =
+    TableMetadata metadataWithSlash = mock(TableMetadata.class);
+    when(metadataWithSlash.location()).thenReturn("s3://bucket/t/");
+    org.apache.iceberg.rest.credentials.Credential credentialWithSlash =
         IcebergVendedCredentials.toRestCredential(
-            "cat", TABLE, new S3TokenCredential("k", "s", "t", 99L), metadata);
-
-    Assertions.assertEquals("s3://bucket/t/", credential.prefix());
+            "cat", TABLE, new S3TokenCredential("k", "s", "t", 99L), metadataWithSlash);
+    Assertions.assertEquals("s3://bucket/t/", credentialWithSlash.prefix());
     Assertions.assertEquals(
-        "99", credential.config().get(IcebergConstants.ICEBERG_S3_TOKEN_EXPIRES_AT_MS));
+        "99", credentialWithSlash.config().get(IcebergConstants.ICEBERG_S3_TOKEN_EXPIRES_AT_MS));
+
+    TableMetadata metadataWithoutSlash = mock(TableMetadata.class);
+    when(metadataWithoutSlash.location()).thenReturn("s3://bucket/path/to/table");
+    org.apache.iceberg.rest.credentials.Credential credentialWithoutSlash =
+        IcebergVendedCredentials.toRestCredential(
+            "cat", TABLE, new S3TokenCredential("k", "s", "t", 99L), metadataWithoutSlash);
+    Assertions.assertEquals("s3://bucket/path/to/table/", credentialWithoutSlash.prefix());
   }
 }

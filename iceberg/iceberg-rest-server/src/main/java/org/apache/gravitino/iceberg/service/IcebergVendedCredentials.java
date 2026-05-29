@@ -83,7 +83,8 @@ public final class IcebergVendedCredentials {
       Credential credential,
       TableMetadata tableMetadata) {
     Map<String, String> config = toClientConfig(catalogName, tableIdentifier, credential);
-    String prefix = tableLocationPrefix(tableMetadata);
+    String location = tableMetadata.location();
+    String prefix = location.endsWith("/") ? location : location + "/";
     return new org.apache.iceberg.rest.credentials.Credential() {
       @Override
       public String prefix() {
@@ -116,18 +117,6 @@ public final class IcebergVendedCredentials {
         RESTUtil.encodeNamespace(
             tableIdentifier.namespace(), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
         RESTUtil.encodeString(tableIdentifier.name()));
-  }
-
-  /**
-   * Storage location prefix for an Iceberg REST credential (table location with trailing slash).
-   *
-   * @param tableMetadata table metadata
-   * @return location prefix for credential scoping
-   */
-  @VisibleForTesting
-  static String tableLocationPrefix(TableMetadata tableMetadata) {
-    String location = tableMetadata.location();
-    return location.endsWith("/") ? location : location + "/";
   }
 
   /**
