@@ -23,7 +23,9 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoClient;
 import org.slf4j.Logger;
@@ -36,12 +38,15 @@ public class GravitinoCatalogManager {
 
   private volatile boolean isClosed = false;
   private final Cache<String, Catalog> gravitinoCatalogs;
+  private final Cache<String, Map<String, String>> gravitinoCatalogCredentials;
   private final GravitinoClient gravitinoClient;
 
   private GravitinoCatalogManager(Supplier<GravitinoClient> clientBuilder) {
     this.gravitinoClient = clientBuilder.get();
     // Will not evict catalog by default
     this.gravitinoCatalogs = Caffeine.newBuilder().build();
+    this.gravitinoCatalogCredentials =
+        Caffeine.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).build();
   }
 
   public static GravitinoCatalogManager create(Supplier<GravitinoClient> clientBuilder) {
@@ -84,6 +89,37 @@ public class GravitinoCatalogManager {
 
   public Map<String, Catalog> getCatalogs() {
     return gravitinoCatalogs.asMap();
+  }
+
+  /**
+   * Returns the catalog properties merged with credential properties for the specified catalog.
+   * Credential properties (e.g. {@code jdbc-password}) are intentionally absent from the standard
+   * catalog properties response; this method fetches them from the dedicated credentials endpoint
+   * and merges them so that engine connectors (Spark JDBC, Paimon) can build their connections.
+   *
+   * @param catalogName The catalog name.
+   * @return A merged map of catalog properties and credentials.
+   */
+  public Map<String, String> getCatalogPropertiesWithCredentials(String catalogName) {
+    Catalog catalog = getGravitinoCatalogInfo(catalogName);
+    Map<String, String> credentials =
+        gravitinoCatalogCredentials.get(
+            catalogName,
+            name -> {
+              try {
+                return gravitinoClient.loadCatalogCredentials(name);
+              } catch (Exception e) {
+                LOG.warn(
+                    "Could not load catalog credentials for {}, credential-dependent "
+                        + "operations may fail: {}",
+                    name,
+                    e.getMessage());
+                return new HashMap<>();
+              }
+            });
+    Map<String, String> merged = new HashMap<>(catalog.properties());
+    merged.putAll(credentials);
+    return merged;
   }
 
   private Catalog loadCatalog(String catalogName) {

@@ -99,7 +99,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "s3 secret access key",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
                 "OSS access key ID",
@@ -111,7 +111,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "OSS access key secret",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
                 "Azure storage account name",
@@ -123,7 +123,13 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "Azure storage account key",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                GRAVITINO_JDBC_PASSWORD,
+                "Iceberg catalog JDBC password",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 IcebergConstants.TABLE_METADATA_CACHE_IMPL,
                 "Table metadata cache implementation. Set to empty string(\"\") if "

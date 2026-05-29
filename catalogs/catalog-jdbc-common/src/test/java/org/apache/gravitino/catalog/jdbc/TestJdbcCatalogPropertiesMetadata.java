@@ -40,6 +40,44 @@ import org.junit.jupiter.api.Test;
 public class TestJdbcCatalogPropertiesMetadata {
 
   @Test
+  public void testPasswordIsHidden() {
+    JdbcCatalogPropertiesMetadata propertiesMetadata = new JdbcCatalogPropertiesMetadata();
+
+    Assertions.assertTrue(propertiesMetadata.isHiddenProperty(JdbcConfig.PASSWORD.getKey()));
+  }
+
+  @Test
+  public void testPasswordIsNotReturnedInCatalogProperties() {
+    Map<String, String> createProperties =
+        ImmutableMap.<String, String>builder()
+            .put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:")
+            .put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC")
+            .put(JdbcConfig.USERNAME.getKey(), "user")
+            .put(JdbcConfig.PASSWORD.getKey(), "secret")
+            .build();
+
+    CatalogEntity catalogEntity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("jdbc_catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("jdbc-test")
+            .withComment("test")
+            .withProperties(createProperties)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JdbcCatalog catalog =
+        new TestJdbcCatalog()
+            .withCatalogConf(catalogEntity.getProperties())
+            .withCatalogEntity(catalogEntity);
+
+    Assertions.assertFalse(catalog.properties().containsKey(JdbcConfig.PASSWORD.getKey()));
+  }
+
+  @Test
   public void testPoolSizePropertiesAreNotHidden() {
     JdbcCatalogPropertiesMetadata propertiesMetadata = new JdbcCatalogPropertiesMetadata();
 

@@ -100,6 +100,6 @@ public class PaimonS3FileSystemConfig extends Config {
                   "The secret key of the AWS s3",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .build();
 }

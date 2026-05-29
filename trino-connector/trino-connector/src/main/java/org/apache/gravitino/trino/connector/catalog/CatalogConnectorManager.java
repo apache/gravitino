@@ -23,6 +23,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -250,7 +251,19 @@ public class CatalogConnectorManager {
             (String catalogName) -> {
               try {
                 Catalog catalog = metalake.loadCatalog(catalogName);
-                GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalake.name(), catalog);
+                Map<String, String> credentials = new HashMap<>();
+                try {
+                  credentials.putAll(metalake.loadCatalogCredentials(catalogName));
+                } catch (Exception credEx) {
+                  LOG.warn(
+                      "Could not load catalog credentials for {} in metalake {}, "
+                          + "credential-dependent operations may fail: {}",
+                      catalogName,
+                      metalake.name(),
+                      credEx.getMessage());
+                }
+                GravitinoCatalog gravitinoCatalog =
+                    new GravitinoCatalog(metalake.name(), catalog, credentials);
                 if (catalogConnectors.containsKey(getTrinoCatalogName(gravitinoCatalog))) {
                   // Reload catalogs that have been updated in Gravitino server.
                   reloadCatalog(gravitinoCatalog);

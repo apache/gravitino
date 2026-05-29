@@ -126,7 +126,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   "The bear token for REST catalog authentication",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID,
               stringOptionalPropertyEntry(
@@ -142,7 +142,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   "The access key secret for Aliyun DLF",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_SECURITY_TOKEN,
               stringOptionalPropertyEntry(
@@ -150,7 +150,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   "The security token for Aliyun DLF",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_TOKEN_PATH,
               stringOptionalPropertyEntry(
@@ -203,7 +203,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                 "Gravitino Paimon catalog jdbc password",
                 false /* immutable */,
                 null /* defaultValue */,
-                false /* hidden */),
+                true /* hidden */),
             stringOptionalPropertyEntry(
                 GRAVITINO_JDBC_DRIVER,
                 "The driver of the Jdbc connection",

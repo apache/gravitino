@@ -114,6 +114,12 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public Map<String, String> getCatalogCredentials(NameIdentifier ident)
+      throws NoSuchCatalogException {
+    return dispatcher.getCatalogCredentials(ident);
+  }
+
+  @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     eventBus.dispatchEvent(new LoadCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {

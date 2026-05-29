@@ -19,10 +19,28 @@
 
 package org.apache.gravitino.catalog;
 
+import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+
 /**
  * {@code CatalogDispatcher} interface acts as a specialization of the {@link SupportsCatalogs}
  * interface. This interface is designed to potentially add custom behaviors or operations related
  * to dispatching or handling catalog-related events or actions that are not covered by the standard
  * {@code SupportsCatalogs} operations.
  */
-public interface CatalogDispatcher extends SupportsCatalogs {}
+public interface CatalogDispatcher extends SupportsCatalogs {
+
+  /**
+   * Returns only the credential (hidden) properties of a catalog. These properties are
+   * intentionally excluded from the standard {@link org.apache.gravitino.Catalog#properties()}
+   * response to prevent exposure of sensitive values (passwords, secret keys, tokens) to end-users.
+   * Engine connectors (Trino, Spark) that require these credentials must call this method through
+   * the dedicated credentials endpoint.
+   *
+   * @param ident The catalog identifier.
+   * @return A map of credential property key-value pairs.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   */
+  Map<String, String> getCatalogCredentials(NameIdentifier ident) throws NoSuchCatalogException;
+}
