@@ -34,6 +34,7 @@ class TestFlussCatalog {
     FlussCatalog catalog = new FlussCatalog();
 
     assertEquals("fluss", catalog.shortName());
+    assertInstanceOf(FlussCatalogCapability.class, catalog.capability());
     assertSame(FlussCatalog.CATALOG_PROPERTIES_METADATA, catalog.catalogPropertiesMetadata());
     assertSame(FlussCatalog.SCHEMA_PROPERTIES_METADATA, catalog.schemaPropertiesMetadata());
     assertSame(FlussCatalog.TABLE_PROPERTIES_METADATA, catalog.tablePropertiesMetadata());

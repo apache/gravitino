@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.capability.Capability;
 
 /** Implementation of an Apache Fluss catalog in Apache Gravitino. */
 public class FlussCatalog extends BaseCatalog<FlussCatalog> {
@@ -51,6 +52,11 @@ public class FlussCatalog extends BaseCatalog<FlussCatalog> {
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     return new FlussCatalogOperations();
+  }
+
+  @Override
+  public Capability capability() {
+    return new FlussCatalogCapability();
   }
 
   @Override
