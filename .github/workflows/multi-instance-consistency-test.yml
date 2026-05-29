@@ -151,6 +151,10 @@ jobs:
           import sys, pathlib
           p = pathlib.Path(sys.argv[1])
           src = p.read_text()
+          # If the script already scopes the PID lookup by GRAVITINO_HOME
+          # (the template was updated upstream), no patching is needed.
+          if '${GRAVITINO_HOME}' in src:
+            sys.exit(0)
           old = ("RUNNING_PIDS=$(ps x | grep ${process_name} | "
                  "grep -v grep | awk '{print $1}');")
           new = ("RUNNING_PIDS=$(ps x | grep ${process_name} | "
