@@ -1215,12 +1215,10 @@ export const getTableDetails = createAsyncThunk(
       }
     ]
 
-    resTable.columns.forEach(col => {
-      return {
-        ...col,
-        node: 'tableColumn'
-      }
-    })
+    resTable.columns = (resTable.columns || []).map(col => ({
+      ...col,
+      node: 'tableColumn'
+    }))
 
     dispatch(setTableProps(tableProps))
 
