@@ -156,6 +156,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   private void checkTrinoSpiVersion(ConnectorContext context, GravitinoConfig config) {
+    String spiVersion = context.getSpiVersion();
     String numericSpiVersion = spiVersion.split("[^0-9]")[0];
     trinoVersion = Integer.parseInt(numericSpiVersion);
 
