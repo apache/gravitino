@@ -22,3 +22,4 @@ Apache Gravitino Trino connector index:
   - [Supported SQL](sql-support.md)
   - [UDF support](udf-support.md)
   - [Development](development.md)
+  - [Starburst compatibility](starburst-compatibility.md)
