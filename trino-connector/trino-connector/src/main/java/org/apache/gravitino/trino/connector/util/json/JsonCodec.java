@@ -122,9 +122,9 @@ public class JsonCodec {
    * Instantiate BlockEncodingManager across Trino/Starburst variants. OSS Trino exposes a public
    * no-arg constructor; Starburst replaces it with BlockEncodingManager(FeaturesConfig) (used to
    * gate type-specific encodings via feature flags). Newer Trino branches additionally publish a
-   * Set<BlockEncoding> variant for Guice multibindings. We probe each known signature in order,
-   * then fall back to a generic constructor scan that fills unknown reference parameters with null
-   * as a last resort, for a very agnostic.
+   * {@code Set<BlockEncoding>} variant for Guice multibindings. We probe each known signature in
+   * order, then fall back to a generic constructor scan that fills unknown reference parameters
+   * with null as a last resort, for a very agnostic.
    */
   private static Object instantiateBlockEncodingManager(
       Class<?> blockEncodingManagerClass, ClassLoader classLoader) throws Exception {
