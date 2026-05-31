@@ -23,6 +23,7 @@ There are some key difference between Gravitino Iceberg REST server and Gravitin
   - multi table transaction
   - pagination
   - register view
+- Supports hierarchical (multi-level) namespaces.
 - Works as a catalog proxy, supporting `Hive` and `JDBC` as catalog backend.
 - Supports credential vending for `S3`、`GCS`、`OSS` and `ADLS`.
 - Supports different storages like `S3`, `HDFS`, `OSS`, `GCS`, `ADLS` and provides the capability to support other storages.
@@ -563,11 +564,11 @@ You must download the corresponding JDBC driver to the `iceberg-rest-server/libs
 
 Gravitino features a pluggable cache system for updating or retrieving table metadata in the cache. It validates the location of table metadata against the catalog backend to ensure the correctness of cached data.
 
-| Configuration item                                           | Description                                 | Default value | Required | Since Version |
-|--------------------------------------------------------------|---------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.table-metadata-cache-impl`           | The implement of the cache.                 | (none)        | No       | 1.1.0         |
-| `gravitino.iceberg-rest.table-metadata-cache-capacity`       | The capacity of table metadata cache.       | 200           | No       | 1.1.0         |
-| `gravitino.iceberg-rest.table-metadata-cache-expire-minutes` | The expire minutes of table metadata cache. | 60            | No       | 1.1.0         |
+| Configuration item                                           | Description                                                                                                                                                                           | Default value                                                       | Required | Since Version |
+|--------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|----------|---------------|
+| `gravitino.iceberg-rest.table-metadata-cache-impl`           | The implementation of the table metadata cache. Set to empty string("") if `catalog-backend` is `rest` catalog, or `custom` catalog without the `SupportsMetadataLocation` interface. | `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` | No       | 1.1.0         |
+| `gravitino.iceberg-rest.table-metadata-cache-capacity`       | The capacity of the table metadata cache.                                                                                                                                             | 1000                                                                | No       | 1.1.0         |
+| `gravitino.iceberg-rest.table-metadata-cache-expire-minutes` | The expiration time (in minutes) of the table metadata cache.                                                                                                                         | 60                                                                  | No       | 1.1.0         |
 
 Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
 
@@ -592,6 +593,55 @@ Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.Loca
 | Configuration item                          | Description                                                  | Default value | Required | Since Version    |
 |---------------------------------------------|--------------------------------------------------------------|---------------|----------|------------------|
 | `gravitino.iceberg-rest.extension-packages` | Comma-separated list of Iceberg REST API packages to expand. | (none)        | No       | 0.7.0-incubating |
+
+### Health check endpoints
+
+The Iceberg REST server exposes three health check endpoints following the same [MicroProfile Health](https://microprofile.io/project/eclipse/microprofile-health) semantics as the main Gravitino server. All endpoints are exempt from authentication. The readiness probe checks whether the `IcebergCatalogWrapperManager` has been initialized — it performs no I/O and has no configurable timeout.
+
+| Endpoint                     | Description                                                                                                                | HTTP status |
+|------------------------------|----------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /iceberg/health/live`   | Liveness probe. Returns 200 as long as the HTTP server thread can respond.                                                 | 200         |
+| `GET /iceberg/health/ready`  | Readiness probe. Returns 200 when the catalog wrapper manager is initialized; 503 when initialization is not yet complete. | 200 / 503   |
+| `GET /iceberg/health`        | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                              | 200 / 503   |
+
+Root-level aliases are also available for global traffic managers that require probes at well-known root paths:
+
+| Alias               | Forwards to                 |
+|---------------------|-----------------------------|
+| `GET /health`       | `GET /iceberg/health`       |
+| `GET /health/live`  | `GET /iceberg/health/live`  |
+| `GET /health/ready` | `GET /iceberg/health/ready` |
+| `GET /health.html`  | `GET /iceberg/health`       |
+
+**Response format:**
+
+All endpoints return a JSON body with the same shape as the main Gravitino server. The `code` field is always `0`. `status` is `UP` or `DOWN`. Liveness reports `httpServer` and readiness reports `catalogWrapperManager`.
+
+Healthy response (HTTP 200):
+
+```json
+{
+  "code": 0,
+  "status": "UP",
+  "checks": [
+    { "name": "httpServer", "status": "UP", "details": {} },
+    { "name": "catalogWrapperManager", "status": "UP", "details": {} }
+  ]
+}
+```
+
+Unhealthy response (HTTP 503):
+
+```json
+{
+  "code": 0,
+  "status": "DOWN",
+  "checks": [
+    { "name": "httpServer", "status": "UP", "details": {} },
+    { "name": "catalogWrapperManager", "status": "DOWN", "details": { "reason": "catalog wrapper manager not initialized" } }
+  ]
+}
+```
 
 ### Memory settings
 

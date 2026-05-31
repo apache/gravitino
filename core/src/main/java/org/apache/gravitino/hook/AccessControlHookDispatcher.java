@@ -121,7 +121,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public User grantRolesToUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     User grantedUser = dispatcher.grantRolesToUser(metalake, roles, user);
-    notifyRoleUserRelChange(metalake, roles);
+    notifyUserRoleBindingChange(metalake, roles, user);
     return grantedUser;
   }
 
@@ -129,7 +129,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public Group grantRolesToGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     Group grantedGroup = dispatcher.grantRolesToGroup(metalake, roles, group);
-    notifyRoleGroupRelChange(metalake, roles);
+    notifyGroupRoleBindingChange(metalake, roles, group);
     return grantedGroup;
   }
 
@@ -137,7 +137,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public Group revokeRolesFromGroup(String metalake, List<String> roles, String group)
       throws NoSuchGroupException, IllegalRoleException, NoSuchMetalakeException {
     Group revokedGroup = dispatcher.revokeRolesFromGroup(metalake, roles, group);
-    notifyRoleGroupRelChange(metalake, roles);
+    notifyGroupRoleBindingChange(metalake, roles, group);
     return revokedGroup;
   }
 
@@ -145,7 +145,7 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public User revokeRolesFromUser(String metalake, List<String> roles, String user)
       throws NoSuchUserException, IllegalRoleException, NoSuchMetalakeException {
     User revokedUser = dispatcher.revokeRolesFromUser(metalake, roles, user);
-    notifyRoleUserRelChange(metalake, roles);
+    notifyUserRoleBindingChange(metalake, roles, user);
     return revokedUser;
   }
 
@@ -236,13 +236,36 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     return overriddenRole;
   }
 
-  private static void notifyRoleUserRelChange(String metalake, List<String> roles) {
+  /**
+   * Invalidates both the role-side cache for each of {@code roles} and the user-side cache for
+   * {@code user}. Used by grant/revoke flows that change the user→roles binding.
+   */
+  private static void notifyUserRoleBindingChange(
+      String metalake, List<String> roles, String user) {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
-    if (gravitinoAuthorizer != null) {
-      for (String role : roles) {
-        gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
-      }
+    if (gravitinoAuthorizer == null) {
+      return;
     }
+    for (String role : roles) {
+      gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
+    }
+    gravitinoAuthorizer.handleUserRoleRelChange(metalake, user);
+  }
+
+  /**
+   * Invalidates both the role-side cache for each of {@code roles} and the group-side cache for
+   * {@code group}. Used by grant/revoke flows that change the group→roles binding.
+   */
+  private static void notifyGroupRoleBindingChange(
+      String metalake, List<String> roles, String group) {
+    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    if (gravitinoAuthorizer == null) {
+      return;
+    }
+    for (String role : roles) {
+      gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
+    }
+    gravitinoAuthorizer.handleGroupRoleRelChange(metalake, group);
   }
 
   private static void notifyRoleUserRelChange(String metalake, String role) {
@@ -256,15 +279,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer != null) {
       gravitinoAuthorizer.handleRolePrivilegeChange(role);
-    }
-  }
-
-  private static void notifyRoleGroupRelChange(String metalake, List<String> roles) {
-    GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
-    if (gravitinoAuthorizer != null) {
-      for (String role : roles) {
-        gravitinoAuthorizer.handleRolePrivilegeChange(metalake, role);
-      }
     }
   }
 }

@@ -436,10 +436,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    *
    * <p>Implementation uses synchronous scan planning (COMPLETED status) and returns structured
    * {@code file-scan-tasks} per the Iceberg 1.11 REST spec. It does not emit legacy {@code
-   * plan-tasks} JSON strings, so clients built for Iceberg &lt; 1.11 are not supported. The
-   * completed response also includes a plan ID and any read credentials needed to refresh
-   * plan-scoped storage access. This is different from asynchronous mode (SUBMITTED status) where a
-   * plan ID is returned for later retrieval.
+   * plan-tasks} JSON strings, so clients built for Iceberg &lt; 1.11 are not supported. This is
+   * different from asynchronous mode (SUBMITTED status) where a plan ID is returned for later
+   * retrieval.
    *
    * <p>Referenced from Iceberg PR #13400 for scan planning implementation.
    *
@@ -472,26 +471,35 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         return cachedResponse.get();
       }
 
-      List<FileScanTask> fileScanTasksList = new ArrayList<>();
+      List<FileScanTask> fileScanTasks = new ArrayList<>();
 
-      try (CloseableIterable<FileScanTask> fileScanTasks =
+      try (CloseableIterable<FileScanTask> scanTasks =
           createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
-        for (FileScanTask fileScanTask : fileScanTasks) {
-          fileScanTasksList.add(fileScanTask);
+        for (FileScanTask fileScanTask : scanTasks) {
+          fileScanTasks.add(fileScanTask);
         }
       } catch (IOException e) {
         LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
         throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
       }
 
-      if (fileScanTasksList.isEmpty()) {
+      if (fileScanTasks.isEmpty()) {
         LOG.info(
             "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
             tableIdentifier);
       }
 
-      PlanTableScanResponse response =
-          buildCompletedPlanTableScanResponse(tableIdentifier, table, fileScanTasksList);
+      PlanTableScanResponse response;
+      try {
+        response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
+      } catch (Exception e) {
+        LOG.error("Failed to build scan plan response for table: {}", tableIdentifier, e);
+        throw new RuntimeException(
+            String.format(
+                "Failed to build scan plan response for table: %s. Error: %s",
+                tableIdentifier, e.getMessage()),
+            e);
+      }
 
       // Cache the scan plan response
       scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, table, scanRequest), response);
@@ -516,23 +524,20 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * <p>Matches {@link CatalogHandlers#planTableScan}: {@code file-scan-tasks} plus {@code
    * specs-by-id} from {@link Table#specs()}. Does not populate legacy {@code plan-tasks} JSON
    * strings.
+   *
+   * <p>{@code specs-by-id} uses the table's full spec map ({@link Table#specs()}), not only
+   * partition specs referenced by the returned {@code fileScanTasks}. That matches Iceberg 1.11
+   * REST behavior and may include historical specs from prior partition evolution, including when a
+   * filtered scan returns zero tasks.
    */
   @SuppressWarnings("deprecation")
-  private PlanTableScanResponse buildCompletedPlanTableScanResponse(
-      TableIdentifier tableIdentifier, Table table, List<FileScanTask> fileScanTasks) {
-    PlanTableScanResponse.Builder responseBuilder =
-        PlanTableScanResponse.builder()
-            .withPlanStatus(PlanStatus.COMPLETED)
-            .withPlanId(newPlanId())
-            .withFileScanTasks(fileScanTasks)
-            .withSpecsById(table.specs());
-
-    List<org.apache.iceberg.rest.credentials.Credential> credentials =
-        planTableScanCredentials(tableIdentifier, table);
-    if (!credentials.isEmpty()) {
-      responseBuilder.withCredentials(credentials);
-    }
-    return responseBuilder.build();
+  private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
+      Table table, List<FileScanTask> fileScanTasks) {
+    return PlanTableScanResponse.builder()
+        .withPlanStatus(PlanStatus.COMPLETED)
+        .withFileScanTasks(fileScanTasks)
+        .withSpecsById(table.specs())
+        .build();
   }
 
   /**

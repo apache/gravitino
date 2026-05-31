@@ -81,8 +81,7 @@ The Lance REST service provides comprehensive support for namespace management, 
 | TableExists       | Check whether a table exists                                                                                                                                                       | POST        | `/lance/v1/table/{id}/exists`         | 1.1.0         |
 | RegisterTable     | Register an existing Lance table to a namespace                                                                                                                                    | POST        | `/lance/v1/table/{id}/register`       | 1.1.0         |
 | DeregisterTable   | Unregister a table from a namespace (metadata only, data remains)                                                                                                                  | POST        | `/lance/v1/table/{id}/deregister`     | 1.1.0         |
-| CreateEmptyTable  | **Deprecated**: Use `DeclareTable` instead. Declare a table and store the metadata without touching lance table data, for more, please refer to [doc](https://docs.lancedb.com/api-reference/rest/table/create-an-empty-table) | POST        | `/lance/v1/table/{id}/create-empty`   | 1.1.0         |
-| DeclareTable      | Declare a table and store the metadata without touching lance table data. This is the preferred replacement for `CreateEmptyTable`.                                                | POST        | `/lance/v1/table/{id}/declare`        | 1.3.0         |
+| DeclareTable      | Declare a table and store the metadata without touching lance table data.                                                                                                           | POST        | `/lance/v1/table/{id}/declare`        | 1.3.0         |
 
 More details, please refer to the [Lance REST API specification](https://lance.org/format/namespace/rest/catalog-spec/)
 
@@ -280,17 +279,7 @@ curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table
     "mode": "create"
   }'
 
-# Create a new empty table
-# x-lance-table-properties is optional; if omitted, it defaults to an empty map.
-curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table02/create-empty \
-  -H 'Content-Type: application/json' \
-  -H "x-lance-table-properties: {\"description\":\"This is table02\"}" \
-  -d '{
-    "id": ["lance_catalog", "schema", "table02"],
-    "location": "/tmp/lance_catalog/schema/table02"
-  }'  
-
-# Declare a table (preferred replacement for create-empty)
+# Declare a table
 curl -X POST http://localhost:9101/lance/v1/table/lance_catalog%24schema%24table04/declare \
   -H 'Content-Type: application/json' \
   -d '{
@@ -350,11 +339,11 @@ registerTableRequest.setId(Arrays.asList("lance_catalog", "schema", "table01"));
 registerTableRequest.setMode("create");
 ns.registerTable(registerTableRequest);
 
-// Create an empty table
-CreateEmptyTableRequest createEmptyTableRequest = new CreateEmptyTableRequest();
-createEmptyTableRequest.setLocation("/tmp/lance_catalog/schema/table02");
-createEmptyTableRequest.setId(Arrays.asList("lance_catalog", "schema", "table02"));
-ns.createEmptyTable(createEmptyTableRequest);
+// Declare a table
+DeclareTableRequest declareTableRequest = new DeclareTableRequest();
+declareTableRequest.setLocation("/tmp/lance_catalog/schema/table02");
+declareTableRequest.setId(Arrays.asList("lance_catalog", "schema", "table02"));
+ns.declareTable(declareTableRequest);
 
 // Create a table with schema inferred from Arrow IPC file.
 // For REST create API, location/properties are passed via headers.
@@ -400,12 +389,12 @@ register_table_request = ln.RegisterTableRequest(
 )
 ns.register_table(register_table_request)
 
-# Create an empty table
-create_empty_table_request = ln.CreateEmptyTableRequest(
+# Declare a table
+declare_table_request = ln.DeclareTableRequest(
     id=['lance_catalog', 'schema', 'table02'],
     location='/tmp/lance_catalog/schema/table02'
 )
-ns.create_empty_table(create_empty_table_request)
+ns.declare_table(declare_table_request)
 
 # Create a table with schema inferred from Arrow IPC file.
 # For REST create API, location/properties are passed via headers.

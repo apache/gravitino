@@ -103,6 +103,12 @@ dependencies {
   }
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+
+  constraints {
+    implementation(libs.snakeyaml)
+    implementation(libs.woodstox.core)
+  }
+
   implementation(libs.hadoop3.common) {
     exclude("com.github.spotbugs")
     exclude("com.sun.jersey")

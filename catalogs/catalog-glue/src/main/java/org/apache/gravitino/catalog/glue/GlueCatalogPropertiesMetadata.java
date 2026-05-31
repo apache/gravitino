@@ -27,6 +27,7 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORM
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT_FILTER;
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
 import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_FORMAT_FILTER;
+import static org.apache.gravitino.catalog.glue.GlueConstants.WAREHOUSE;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringRequiredPropertyEntry;
 
@@ -98,6 +99,15 @@ public class GlueCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata
                   "Comma-separated table formats exposed by listTables() and loadTable().",
                   false /* immutable */,
                   DEFAULT_TABLE_FORMAT_FILTER,
+                  false /* hidden */))
+          .put(
+              WAREHOUSE,
+              stringRequiredPropertyEntry(
+                  WAREHOUSE,
+                  "Base storage path used as warehouse when no explicit location is set"
+                      + " at table creation time (e.g. s3://my-bucket/warehouse)."
+                      + " Table location is derived as warehouse/database/table.",
+                  false /* immutable */,
                   false /* hidden */))
           .build();
 

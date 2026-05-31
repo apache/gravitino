@@ -27,6 +27,7 @@ import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORM
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT_FILTER;
 import static org.apache.gravitino.catalog.glue.GlueConstants.DEFAULT_TABLE_FORMAT_VALUE;
 import static org.apache.gravitino.catalog.glue.GlueConstants.TABLE_FORMAT_FILTER;
+import static org.apache.gravitino.catalog.glue.GlueConstants.WAREHOUSE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,6 +47,11 @@ class TestGlueCatalogPropertiesMetadata {
   @Test
   void testAwsRegionIsRequired() {
     assertTrue(metadata.isRequiredProperty(AWS_REGION));
+  }
+
+  @Test
+  void testWarehouseIsRequired() {
+    assertTrue(metadata.isRequiredProperty(WAREHOUSE));
   }
 
   @Test

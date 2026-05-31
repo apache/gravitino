@@ -27,18 +27,35 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * Represents an event that is triggered upon the successful listing of filesets within a system.
  */
 @DeveloperApi
-public final class ListFilesetEvent extends FilesetEvent {
+public final class ListFilesetEvent extends FilesetEvent implements ListEvent {
   private final Namespace namespace;
+  private final int filesetCount;
+
   /**
    * Constructs a new {@code ListFilesetEvent}.
    *
    * @param user The user who initiated the listing of filesets.
    * @param namespace The namespace within which the filesets are listed. The namespace provides
    *     contextual information, identifying the scope and boundaries of the listing operation.
+   * @param filesetCount The number of filesets returned by the list operation.
    */
-  public ListFilesetEvent(String user, Namespace namespace) {
+  public ListFilesetEvent(String user, Namespace namespace, int filesetCount) {
     super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
+    this.filesetCount = filesetCount;
+  }
+
+  /**
+   * Constructs a new {@code ListFilesetEvent} without a count.
+   *
+   * @param user The user who initiated the listing of filesets.
+   * @param namespace The namespace within which the filesets are listed.
+   * @deprecated Use {@link #ListFilesetEvent(String, Namespace, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListFilesetEvent(String user, Namespace namespace) {
+    this(user, namespace, -1);
   }
 
   /**
@@ -48,6 +65,12 @@ public final class ListFilesetEvent extends FilesetEvent {
    */
   public Namespace namespace() {
     return namespace;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return filesetCount;
   }
 
   /**

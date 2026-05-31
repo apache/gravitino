@@ -28,7 +28,7 @@ val scalaVersion: String =
   project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
-val lanceSparkBundleVersion = "0.2.0"
+val lanceSparkBundleVersion = "0.4.0"
 val lanceSparkBundleJarPathProperty = "gravitino.lance.spark.bundle.jar"
 val lanceSparkBundleDir = layout.buildDirectory.dir("lance-spark-bundle")
 val lanceSparkBundle by configurations.creating {
@@ -56,6 +56,10 @@ dependencies {
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
+
+  constraints {
+    implementation(libs.gson)
+  }
   implementation(libs.commons.lang3)
   implementation(libs.lance.namespace.core) {
     exclude(group = "org.lance", module = "lance-core")

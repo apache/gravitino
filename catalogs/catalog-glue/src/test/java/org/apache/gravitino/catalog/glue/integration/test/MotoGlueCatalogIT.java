@@ -75,6 +75,8 @@ class MotoGlueCatalogIT extends AbstractGlueCatalogIT {
         GlueConstants.AWS_SECRET_ACCESS_KEY,
         "test",
         GlueConstants.AWS_GLUE_ENDPOINT,
-        endpoint);
+        endpoint,
+        GlueConstants.WAREHOUSE,
+        "s3://gravitino-moto-test/warehouse");
   }
 }

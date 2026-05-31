@@ -99,8 +99,8 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().softDeleteOwnerRelByCatalogId(catalogId);
   }
 
-  public static String softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteOwnerRelBySchemaId(schemaId);
+  public static String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteOwnerRelBySchemaIds(schemaIds);
   }
 
   public static String deleteOwnerMetasByLegacyTimeline(
@@ -121,11 +121,13 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().selectOwnerByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
 
-  public static String selectChangedOwners(@Param("lastConsumedId") long lastConsumedId) {
-    return getProvider().selectChangedOwners(lastConsumedId);
+  public static String selectChangedOwners(
+      @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
+      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId) {
+    return getProvider().selectChangedOwners(lastConsumedUpdatedAt, lastConsumedUpdatedAtId);
   }
 
-  public static String selectMaxChangeId() {
-    return getProvider().selectMaxChangeId();
+  public static String selectMaxChangedOwner() {
+    return getProvider().selectMaxChangedOwner();
   }
 }

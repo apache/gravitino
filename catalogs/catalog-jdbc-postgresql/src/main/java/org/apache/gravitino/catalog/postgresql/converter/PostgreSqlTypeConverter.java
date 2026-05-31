@@ -39,6 +39,7 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   static final String NUMERIC = "numeric";
   static final String BPCHAR = "bpchar";
   static final String BYTEA = "bytea";
+  static final String UUID = "uuid";
   @VisibleForTesting static final String JDBC_ARRAY_PREFIX = "_";
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
   @VisibleForTesting static final int DEFAULT_NUMERIC_PRECISION = 38;
@@ -97,6 +98,8 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
         return Types.StringType.get();
       case BYTEA:
         return Types.BinaryType.get();
+      case UUID:
+        return Types.UUIDType.get();
       default:
         return Types.ExternalType.of(typeBean.getTypeName());
     }
@@ -141,6 +144,8 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
       return BPCHAR + "(" + ((Types.FixedCharType) type).length() + ")";
     } else if (type instanceof Types.BinaryType) {
       return BYTEA;
+    } else if (type instanceof Types.UUIDType) {
+      return UUID;
     } else if (type instanceof Types.ListType) {
       return fromGravitinoArrayType((ListType) type);
     } else if (type instanceof Types.ExternalType) {

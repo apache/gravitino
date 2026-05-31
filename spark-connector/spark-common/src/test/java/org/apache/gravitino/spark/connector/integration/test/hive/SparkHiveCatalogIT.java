@@ -166,6 +166,17 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p1=2)");
     Assertions.assertEquals(0, partitionInfo.size());
 
+    String nullPartitionTableName = "hive_null_partition_ops_table";
+    dropTableIfExists(nullPartitionTableName);
+    sql(
+        "CREATE TABLE "
+            + nullPartitionTableName
+            + " (id INT, name STRING) PARTITIONED BY (dt INT) STORED AS PARQUET");
+    sql("INSERT INTO " + nullPartitionTableName + " (id, name, dt) SELECT 1, 'test', null");
+    List<Object[]> nullPartitionInfo = getTablePartitions(nullPartitionTableName);
+    Assertions.assertEquals(1, nullPartitionInfo.size());
+    Assertions.assertTrue(String.valueOf(nullPartitionInfo.get(0)[0]).startsWith("dt="));
+
     Exception exception =
         Assertions.assertThrows(
             Exception.class,

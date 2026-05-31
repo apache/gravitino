@@ -20,115 +20,82 @@
 package org.apache.gravitino.server.web.filter;
 
 import java.lang.reflect.Parameter;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
-import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
-import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
-import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
-import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
-import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
+import org.apache.gravitino.server.web.filter.IcebergLoadAuthzHandlerHelper.LoadContext;
+import org.apache.gravitino.server.web.filter.IcebergLoadAuthzHandlerHelper.LoadTarget;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.MetadataTableType;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
-import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
-import org.apache.iceberg.rest.RESTUtil;
 
 /**
- * Handler for LOAD_TABLE operations. Validates that the requested entity is not a metadata table or
- * a view, and extracts the table identifier for authorization checks.
+ * Handler for LOAD_TABLE operations. Validates that the requested entity is not a metadata table,
+ * rejects identifiers that resolve to views (so clients can fall back to {@code /views/}), and
+ * performs authorization aligned with the REST {@link AuthorizationExpression} on {@code
+ * loadTable}.
  *
- * <p>Per Iceberg REST spec, the /tables/ endpoint should only serve tables. If the identifier
- * refers to a view, this handler throws NoSuchTableException (404), triggering Spark to retry with
- * the /views/ endpoint.
+ * <p>Authorization follows {@link
+ * org.apache.gravitino.iceberg.service.rest.IcebergTableOperations#loadTable}: primary {@code
+ * LOAD_TABLE} expression from {@link AuthorizationExpression#expression()}, then {@link
+ * AuthorizationExpression#allowCheckExistence()} when the primary denies (existence-probe path for
+ * clients such as Trino/Spark).
  */
 public class LoadTableAuthzHandler implements AuthorizationHandler {
+  private final AuthorizationExpression authorizationExpression;
   private final Parameter[] parameters;
   private final Object[] args;
 
-  public LoadTableAuthzHandler(Parameter[] parameters, Object[] args) {
+  public LoadTableAuthzHandler(
+      AuthorizationExpression authorizationExpression, Parameter[] parameters, Object[] args) {
+    this.authorizationExpression = authorizationExpression;
     this.parameters = parameters;
     this.args = args;
   }
 
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
-    // Find the table name and namespace from parameters
-    String tableName = null;
-    Namespace namespace = null;
+    LoadTarget loadTarget =
+        IcebergLoadAuthzHandlerHelper.extractLoadTarget(parameters, args, RequestType.LOAD_TABLE);
 
-    for (int i = 0; i < parameters.length; i++) {
-      Parameter parameter = parameters[i];
-
-      IcebergAuthorizationMetadata icebergMetadata =
-          parameter.getAnnotation(IcebergAuthorizationMetadata.class);
-      if (icebergMetadata != null && icebergMetadata.type() == RequestType.LOAD_TABLE) {
-        // TODO: Refactor to move decode logic to interceptor in a generic way
-        // See: https://docs.google.com/document/d/18yx88tBbU3S9LB8hhL7xUVzSWHIWkXJ7sRNmLh2v_kQ/
-        // Consider consolidating custom authorization handlers and standardizing parameter decoding
-        tableName = RESTUtil.decodeString(String.valueOf(args[i]));
-      }
-
-      AuthorizationMetadata authMetadata = parameter.getAnnotation(AuthorizationMetadata.class);
-      if (authMetadata != null && authMetadata.type() == EntityType.SCHEMA) {
-        // Decode the raw Iceberg namespace parameter
-        namespace =
-            RESTUtil.decodeNamespace(
-                String.valueOf(args[i]), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
-      }
-    }
-
-    if (tableName == null || namespace == null) {
+    if (loadTarget.hasMissingPart()) {
       throw new NoSuchTableException("Table not found - missing table name or namespace");
     }
+
+    String tableName = loadTarget.name();
+    Namespace namespace = loadTarget.namespace();
 
     // Validate that this is not a metadata table access
     if (isMetadataTable(tableName, namespace)) {
       throw new NoSuchTableException("Table %s not found", tableName);
     }
 
-    NameIdentifier catalogId = nameIdentifierMap.get(EntityType.CATALOG);
-    NameIdentifier schemaId = nameIdentifierMap.get(EntityType.SCHEMA);
-
-    if (catalogId == null || schemaId == null) {
-      throw new NoSuchTableException("Missing catalog or schema context for table authorization");
-    }
-
-    String metalakeName = catalogId.namespace().level(0);
-    String catalog = catalogId.name();
-    String schema = schemaId.name();
+    LoadContext loadContext =
+        IcebergLoadAuthzHandlerHelper.extractLoadContext(
+            nameIdentifierMap,
+            () ->
+                new NoSuchTableException(
+                    "Missing catalog or schema context for table authorization"));
 
     // Per Iceberg REST spec, /tables/ endpoint should only serve tables, not views.
-    // 1. Check if it's a view first -> 404 (enables Spark fallback to /views/)
-    // 2. Authorize the table access -> 403 if unauthorized
-    // 3. Let request proceed - the actual loadTable() call will handle non-existence
-    IcebergCatalogWrapperManager wrapperManager =
-        IcebergRESTServerContext.getInstance().catalogWrapperManager();
-    IcebergCatalogWrapper catalogWrapper = wrapperManager.getCatalogWrapper(catalog);
+    // 1. Authorize the table access (see performTableAuthorization) -> 403 if unauthorized
+    // 2. Let request proceed - the actual loadTable() call will handle non-existence
+    IcebergCatalogWrapper catalogWrapper =
+        IcebergLoadAuthzHandlerHelper.getCatalogWrapper(loadContext.catalog());
     TableIdentifier tableIdentifier = TableIdentifier.of(namespace, tableName);
 
-    // Only check view existence when the catalog supports view operations. Catalogs backed by
-    // JDBC without jdbc.schema-version=V1 throw UnsupportedOperationException from viewExists(),
-    // which would surface as a 500 error. When view operations are unsupported the identifier
-    // cannot be a view, so we skip the check entirely.
-    if (catalogWrapper.supportsViewOperations() && catalogWrapper.viewExists(tableIdentifier)) {
-      throw new NoSuchTableException("Table %s not found", tableName);
-    }
-
-    nameIdentifierMap.put(
-        EntityType.TABLE, NameIdentifierUtil.ofTable(metalakeName, catalog, schema, tableName));
-    performTableAuthorization(nameIdentifierMap);
+    NameIdentifier tableId =
+        NameIdentifierUtil.ofTable(
+            loadContext.metalakeName(), loadContext.catalog(), loadContext.schema(), tableName);
+    nameIdentifierMap.put(EntityType.TABLE, tableId);
+    performTableAuthorization(nameIdentifierMap, catalogWrapper, tableIdentifier, tableId);
   }
 
   @Override
@@ -138,27 +105,36 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
   }
 
   /**
-   * Perform TABLE-level authorization check using ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION. This
-   * enforces table-specific privileges including ANY_CREATE_TABLE for Iceberg REST.
+   * Perform TABLE-level authorization aligned with {@link
+   * org.apache.gravitino.iceberg.service.rest.IcebergTableOperations#loadTable}: evaluate the
+   * primary expression first; if it denies, evaluate {@link
+   * AuthorizationExpression#allowCheckExistence()} when non-blank. Before primary expression
+   * evaluation, if the catalog supports views and the identifier resolves to a view, throws {@link
+   * NoSuchTableException} so clients can fall back to {@code /views/} (see Iceberg REST spec for
+   * {@code /tables/}).
    */
-  private void performTableAuthorization(Map<EntityType, NameIdentifier> nameIdentifierMap) {
-    AuthorizationExpressionEvaluator evaluator =
-        new AuthorizationExpressionEvaluator(
-            AuthorizationExpressionConstants.ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION);
-
-    boolean authorized =
-        evaluator.evaluate(
-            nameIdentifierMap,
-            new HashMap<>(),
-            new AuthorizationRequestContext(),
-            Optional.empty());
-
-    if (!authorized) {
-      String currentUser = PrincipalUtils.getCurrentUserName();
-      NameIdentifier tableId = nameIdentifierMap.get(EntityType.TABLE);
-      throw new ForbiddenException(
-          "User '%s' is not authorized to load table '%s'", currentUser, tableId);
+  private void performTableAuthorization(
+      Map<EntityType, NameIdentifier> nameIdentifierMap,
+      IcebergCatalogWrapper catalogWrapper,
+      TableIdentifier tableIdentifier,
+      NameIdentifier tableId) {
+    if (catalogWrapper.supportsViewOperations() && catalogWrapper.viewExists(tableIdentifier)) {
+      throw new NoSuchTableException("Table %s not found", tableIdentifier.name());
     }
+
+    IcebergLoadAuthzHandlerHelper.authorizeLoadEntity(
+        nameIdentifierMap,
+        IcebergLoadAuthzHandlerHelper.resolveExpression(
+            authorizationExpression,
+            AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION),
+        IcebergLoadAuthzHandlerHelper.resolveAllowCheckExistenceExpression(
+            authorizationExpression,
+            AuthorizationExpressionConstants
+                .ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION),
+        () -> catalogWrapper.tableExists(tableIdentifier),
+        () -> new NoSuchTableException("Table %s not found", tableIdentifier.name()),
+        "table",
+        tableId);
   }
 
   /**
@@ -176,11 +152,8 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
       return false;
     }
 
-    // Metadata tables have namespace length > 1 (e.g., catalog.db.table has 3 levels)
-    // Regular tables have namespace length = 1 (e.g., catalog.db has 2 levels, but we get "db")
-    if (namespace.levels().length > 1) {
-      return true;
-    }
-    return false;
+    // Metadata tables have namespace length > 1 (e.g., catalog.db.table has 3 levels).
+    // Regular tables have namespace length = 1 (e.g., catalog.db has 2 levels, but we get "db").
+    return namespace.levels().length > 1;
   }
 }

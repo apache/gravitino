@@ -20,7 +20,6 @@ package org.apache.gravitino.trino.connector.integration.test;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -58,10 +57,14 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Map<String, TestStatus> allTestStatus = new TreeMap<>();
 
   private static final int testParallelism = 2;
+  private static final Pattern PARAM_PATTERN = Pattern.compile("\\$\\{(\\??[\\w_]+)\\}");
+  private static final Pattern QUERY_FAILED_PATTERN = Pattern.compile("^Query \\w+ failed:");
 
   static Map<String, String> queryParams = new HashMap<>();
 
   static Set<String> ciTestsets = new HashSet<>();
+
+  static Set<String> skipTestsets = new HashSet<>(Arrays.asList("glue"));
 
   static TrinoQueryITBase trinoQueryITBase;
 
@@ -190,22 +193,28 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   private static String resolveParameters(String sql) throws Exception {
-    Matcher sqlMatcher = Pattern.compile("\\$\\{([\\w_]+)\\}").matcher(sql);
+    // ${?param} is optional (resolves to empty string when not provided); ${param} is required.
+    Matcher sqlMatcher = PARAM_PATTERN.matcher(sql);
     StringBuffer replacedString = new StringBuffer();
     while (sqlMatcher.find()) {
-      String parameter = sqlMatcher.group(1);
+      String token = sqlMatcher.group(1);
+      boolean optional = token.startsWith("?");
+      String parameter = optional ? token.substring(1) : token;
       String value = queryParams.get(parameter);
       if (Strings.isEmpty(value)) {
-        throw new Exception("Parameter " + parameter + " is not defined in test parameters");
+        if (!optional) {
+          throw new Exception("Parameter " + parameter + " is not defined in test parameters");
+        }
+        value = "";
       }
-      sqlMatcher.appendReplacement(replacedString, queryParams.get(parameter));
+      sqlMatcher.appendReplacement(replacedString, Matcher.quoteReplacement(value));
     }
     sqlMatcher.appendTail(replacedString);
     return replacedString.toString();
   }
 
   private static boolean isQueryFailed(String result) {
-    return Pattern.compile("^Query \\w+ failed:").matcher(result).find();
+    return QUERY_FAILED_PATTERN.matcher(result).find();
   }
 
   void executeSqlFileWithCheckResult(
@@ -341,6 +350,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
         Arrays.stream(TrinoQueryITBase.listTestSetDirectory(testsetsDir))
             .filter(s -> new File(ITUtils.joinPath(testsetsDir, s)).isDirectory())
             .filter(s -> ciTestsets.isEmpty() || ciTestsets.contains(s))
+            .filter(s -> !skipTestsets.contains(s))
             .toArray(String[]::new);
     List<Future<Integer>> allFutures = new ArrayList<>();
     for (String testSetName : testSetNames) {
@@ -450,7 +460,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     }
     catalog = catalogNames[0];
 
-    String catalogPrefix = catalog.replace("prepare.sql", "");
+    String catalogPrefix = "catalog_" + catalog + "_";
     TrinoQueryRunner queryRunner = new TrinoQueryRunner(TrinoQueryITBase.trinoUri);
     executeSqlFile(testSetDirName, catalogPrefix + "prepare.sql", queryRunner, catalog);
 
@@ -464,7 +474,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
   }
 
   void executeSqlFileWithGenOutput(
-      String testSetDirName, String filename, TrinoQueryRunner queryRunner) throws IOException {
+      String testSetDirName, String filename, TrinoQueryRunner queryRunner) throws Exception {
     String path = ITUtils.joinPath(testSetDirName, filename);
     String sqls = TrinoQueryITBase.readFileToString(path);
     String resultFileName = path.replace(".sql", ".txt");
@@ -480,18 +490,9 @@ public class TrinoQueryIT extends TrinoQueryITBase {
       }
       firstLine = false;
 
-      String sql = sqlMatcher.group(1);
+      String sql = resolveParameters(sqlMatcher.group(1));
       String result = queryRunner.runQuery(sql).trim();
       LOG.info("Execute sql:\n{}\nResult:\n{}", sql, result);
-      if (isQueryFailed(result)) {
-        throw new RuntimeException(
-            "Failed to execute sql in the test set. "
-                + simpleTesterName(path)
-                + ":\n"
-                + sql
-                + "\nresult:\n"
-                + result);
-      }
       outputStream.write(result.getBytes(StandardCharsets.UTF_8));
       outputStream.write("\n".getBytes(StandardCharsets.UTF_8));
     }

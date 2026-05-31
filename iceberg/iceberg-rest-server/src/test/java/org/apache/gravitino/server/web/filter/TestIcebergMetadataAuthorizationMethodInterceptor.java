@@ -273,7 +273,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         new IcebergMetadataAuthorizationMethodInterceptor() {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
-              Parameter[] parameters, Object[] args) {
+              Method method, Parameter[] parameters, Object[] args) {
             return Optional.of(
                 new AuthorizationHandler() {
                   @Override
@@ -321,7 +321,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         new IcebergMetadataAuthorizationMethodInterceptor() {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
-              Parameter[] parameters, Object[] args) {
+              Method method, Parameter[] parameters, Object[] args) {
             return Optional.of(
                 new AuthorizationHandler() {
                   @Override
@@ -399,7 +399,7 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
         new IcebergMetadataAuthorizationMethodInterceptor() {
           @Override
           protected Optional<AuthorizationHandler> createAuthorizationHandler(
-              Parameter[] parameters, Object[] args) {
+              Method method, Parameter[] parameters, Object[] args) {
             throw new RuntimeException("test");
           }
         };
