@@ -95,10 +95,10 @@ jobs:
           curl -fsSL \
             https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.14/mysql-connector-java-8.0.14.jar \
             -o "$JDBC_JAR"
-          # Verify integrity against Maven Central's published SHA-256.
-          EXPECTED_SHA256="$(curl -fsSL \
-            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.14/mysql-connector-java-8.0.14.jar.sha256)"
-          echo "${EXPECTED_SHA256}  ${JDBC_JAR}" | sha256sum --check
+          # Verify integrity against Maven Central's published SHA-1.
+          EXPECTED_SHA1="$(curl -fsSL \
+            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.14/mysql-connector-java-8.0.14.jar.sha1)"
+          echo "${EXPECTED_SHA1}  ${JDBC_JAR}" | sha1sum --check
 
           # Second instance is a full copy with its own conf/, logs/, data/.
           cp -a distribution/package distribution/package-b
