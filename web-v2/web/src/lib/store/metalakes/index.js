@@ -879,11 +879,16 @@ export const fetchSchemas = createAsyncThunk(
 
       if (isCanceledRequest) {
         const catalogKey = `{{${metalake}}}{{${catalog}}}{{${catalogType}}}`
-        const catalogNode = findInTree(getState().metalakes.metalakeTree, 'key', catalogKey)
-        const cachedSchemas = (catalogNode?.children || []).filter(item => item?.node === 'schema')
+        const parentKey = parentSchema
+          ? `{{${metalake}}}{{${catalog}}}{{${catalogType}}}{{${parentSchema}}}`
+          : catalogKey
+        const parentNode = findInTree(getState().metalakes.metalakeTree, 'key', parentKey)
+        const cachedSchemas = (parentNode?.children || []).filter(item => item?.node === 'schema')
 
         if (cachedSchemas.length > 0) {
-          dispatch(setExpandedNodes([`{{${metalake}}}`, catalogKey]))
+          const expanded =
+            parentKey === catalogKey ? [`{{${metalake}}}`, catalogKey] : [`{{${metalake}}}`, catalogKey, parentKey]
+          dispatch(setExpandedNodes(expanded))
 
           return { schemas: cachedSchemas, page, init }
         }
