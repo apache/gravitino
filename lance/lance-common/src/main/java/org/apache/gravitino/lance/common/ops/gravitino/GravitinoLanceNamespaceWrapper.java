@@ -24,6 +24,7 @@ import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BAC
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -36,13 +37,13 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.CatalogDispatcher;
-import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -73,7 +74,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoLanceNamespaceWrapper.class);
 
   private String metalakeName;
-  private CatalogFetcher catalogFetcher;
+  private CatalogOperator catalogOperator;
   private LanceNamespaceOperations namespaceOperations;
   private LanceTableOperations tableOperations;
 
@@ -93,7 +94,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
         StringUtils.isNotBlank(metalakeName),
         "Metalake name must be provided for Lance Gravitino namespace backend");
 
-    this.catalogFetcher = createCatalogFetcher(metalakeName);
+    this.catalogOperator = createCatalogOperator(metalakeName);
 
     this.namespaceOperations = new GravitinoLanceNameSpaceOperations(this);
     this.tableOperations = new GravitinoLanceTableOperations(this);
@@ -111,21 +112,21 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
   @Override
   public void close() {
-    if (catalogFetcher != null) {
+    if (catalogOperator != null) {
       try {
-        catalogFetcher.close();
+        catalogOperator.close();
       } catch (Exception e) {
-        LOG.warn("Error closing Lance catalog fetcher", e);
+        LOG.warn("Error closing Lance catalog operator", e);
       }
     }
   }
 
   Catalog[] listCatalogsInfo() throws NoSuchMetalakeException {
-    return catalogFetcher.listCatalogsInfo();
+    return catalogOperator.listCatalogsInfo();
   }
 
   Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
-    return catalogFetcher.loadCatalog(catalogName);
+    return catalogOperator.loadCatalog(catalogName);
   }
 
   Catalog createCatalog(
@@ -135,16 +136,16 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    return catalogFetcher.createCatalog(catalogName, type, provider, comment, properties);
+    return catalogOperator.createCatalog(catalogName, type, provider, comment, properties);
   }
 
   Catalog alterCatalog(String catalogName, CatalogChange... changes) throws NoSuchCatalogException {
-    return catalogFetcher.alterCatalog(catalogName, changes);
+    return catalogOperator.alterCatalog(catalogName, changes);
   }
 
   boolean dropCatalog(String catalogName, boolean force)
       throws NonEmptyEntityException, CatalogInUseException {
-    return catalogFetcher.dropCatalog(catalogName, force);
+    return catalogOperator.dropCatalog(catalogName, force);
   }
 
   public boolean isLakehouseCatalog(Catalog catalog) {
@@ -172,17 +173,15 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
   String[] listSchemas(Catalog catalog) throws NoSuchCatalogException {
     SchemaDispatcher schemaDispatcher = currentSchemaDispatcher();
     if (schemaDispatcher != null) {
-      return java.util.Arrays.stream(
-              schemaDispatcher.listSchemas(Namespace.of(metalakeName, catalog.name())))
+      return Arrays.stream(schemaDispatcher.listSchemas(Namespace.of(metalakeName, catalog.name())))
           .map(NameIdentifier::name)
           .toArray(String[]::new);
     }
 
     if (catalog instanceof BaseCatalog) {
       CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof org.apache.gravitino.connector.SupportsSchemas) {
-        return java.util.Arrays.stream(
-                ((org.apache.gravitino.connector.SupportsSchemas) ops).listSchemas(Namespace.of()))
+      if (ops instanceof SupportsSchemas) {
+        return Arrays.stream(((SupportsSchemas) ops).listSchemas(Namespace.of()))
             .map(NameIdentifier::name)
             .toArray(String[]::new);
       }
@@ -199,9 +198,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
     if (catalog instanceof BaseCatalog) {
       CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof org.apache.gravitino.connector.SupportsSchemas) {
-        return ((org.apache.gravitino.connector.SupportsSchemas) ops)
-            .schemaExists(NameIdentifier.of(schemaName));
+      if (ops instanceof SupportsSchemas) {
+        return ((SupportsSchemas) ops).schemaExists(NameIdentifier.of(schemaName));
       }
     }
 
@@ -216,9 +214,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
     if (catalog instanceof BaseCatalog) {
       CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof org.apache.gravitino.connector.SupportsSchemas) {
-        return ((org.apache.gravitino.connector.SupportsSchemas) ops)
-            .loadSchema(NameIdentifier.of(schemaName));
+      if (ops instanceof SupportsSchemas) {
+        return ((SupportsSchemas) ops).loadSchema(NameIdentifier.of(schemaName));
       }
     }
 
@@ -235,8 +232,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
     if (catalog instanceof BaseCatalog) {
       CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof org.apache.gravitino.connector.SupportsSchemas) {
-        return ((org.apache.gravitino.connector.SupportsSchemas) ops)
+      if (ops instanceof SupportsSchemas) {
+        return ((SupportsSchemas) ops)
             .createSchema(NameIdentifier.of(schemaName), comment, properties);
       }
     }
@@ -252,9 +249,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
     if (catalog instanceof BaseCatalog) {
       CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof org.apache.gravitino.connector.SupportsSchemas) {
-        return ((org.apache.gravitino.connector.SupportsSchemas) ops)
-            .alterSchema(NameIdentifier.of(schemaName), changes);
+      if (ops instanceof SupportsSchemas) {
+        return ((SupportsSchemas) ops).alterSchema(NameIdentifier.of(schemaName), changes);
       }
     }
 
@@ -269,9 +265,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
     if (catalog instanceof BaseCatalog) {
       CatalogOperations ops = ((BaseCatalog<?>) catalog).ops();
-      if (ops instanceof org.apache.gravitino.connector.SupportsSchemas) {
-        return ((org.apache.gravitino.connector.SupportsSchemas) ops)
-            .dropSchema(NameIdentifier.of(schemaName), cascade);
+      if (ops instanceof SupportsSchemas) {
+        return ((SupportsSchemas) ops).dropSchema(NameIdentifier.of(schemaName), cascade);
       }
     }
 
@@ -324,16 +319,16 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
   }
 
   @VisibleForTesting
-  CatalogFetcher createCatalogFetcher(String metalakeName) {
+  CatalogOperator createCatalogOperator(String metalakeName) {
     return config().isAuxMode()
-        ? new InternalCatalogFetcher(metalakeName)
-        : new HttpCatalogFetcher(
+        ? new InternalCatalogOperator(metalakeName)
+        : new HttpCatalogOperator(
             config().get(NAMESPACE_BACKEND_URI), metalakeName, config(), extractClientProperties());
   }
 
   @VisibleForTesting
-  void setCatalogFetcher(CatalogFetcher catalogFetcher) {
-    this.catalogFetcher = catalogFetcher;
+  void setCatalogOperator(CatalogOperator catalogOperator) {
+    this.catalogOperator = catalogOperator;
   }
 
   private Map<String, String> extractClientProperties() {
@@ -358,7 +353,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return builder.build();
   }
 
-  interface CatalogFetcher extends Closeable {
+  interface CatalogOperator extends Closeable {
 
     Catalog[] listCatalogsInfo() throws NoSuchMetalakeException;
 
@@ -445,19 +440,17 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     }
   }
 
-  private static class InternalCatalogFetcher implements CatalogFetcher {
+  private static class InternalCatalogOperator implements CatalogOperator {
     private final String metalakeName;
     private final CatalogDispatcher catalogDispatcher;
-    private final CatalogManager catalogManager;
 
-    private InternalCatalogFetcher(String metalakeName) {
+    private InternalCatalogOperator(String metalakeName) {
       this.metalakeName = metalakeName;
       CatalogDispatcher dispatcher = GravitinoEnv.getInstance().catalogDispatcher();
       Preconditions.checkState(
           dispatcher != null,
-          "CatalogDispatcher is not available. Internal catalog fetcher requires Gravitino server mode.");
+          "CatalogDispatcher is not available. Internal catalog operator requires Gravitino server mode.");
       this.catalogDispatcher = dispatcher;
-      this.catalogManager = GravitinoEnv.getInstance().catalogManager();
     }
 
     @Override
@@ -467,12 +460,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
     @Override
     public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
-      NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-      if (catalogManager != null) {
-        return catalogManager.loadCatalog(catalogIdent);
-      }
-
-      return catalogDispatcher.loadCatalog(catalogIdent);
+      return catalogDispatcher.loadCatalog(NameIdentifierUtil.ofCatalog(metalakeName, catalogName));
     }
 
     @Override
@@ -506,14 +494,14 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     }
   }
 
-  private static class HttpCatalogFetcher implements CatalogFetcher {
+  private static class HttpCatalogOperator implements CatalogOperator {
     private final String uri;
     private final String metalakeName;
     private final LanceConfig config;
     private final Map<String, String> clientProperties;
     private volatile GravitinoClient client;
 
-    private HttpCatalogFetcher(
+    private HttpCatalogOperator(
         String uri, String metalakeName, LanceConfig config, Map<String, String> clientProperties) {
       this.uri = uri;
       this.metalakeName = metalakeName;

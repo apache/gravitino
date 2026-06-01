@@ -65,6 +65,7 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
       new ConfigBuilder(CONFIG_INTERNAL_AUX_MODE)
           .doc("Internal runtime flag indicating whether Lance REST runs as an auxiliary service")
           .version(ConfigConstants.VERSION_1_1_0)
+          .internal()
           .booleanConf()
           .createWithDefault(false);
 
