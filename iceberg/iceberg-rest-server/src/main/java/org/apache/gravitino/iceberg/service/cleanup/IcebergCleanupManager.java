@@ -244,11 +244,16 @@ public class IcebergCleanupManager implements AutoCloseable {
 
         ownedHeartbeats.put(job.get().id(), now);
         runJob(job.get());
-      } catch (RuntimeException e) {
-        // takePendingJob (and any unexpected error) must never terminate the worker: a transient
-        // backend failure would otherwise permanently remove this thread from the pool. Log and
-        // back off.
-        LOG.warn("Cleanup worker loop hit an unexpected error; backing off", e);
+      } catch (Throwable t) {
+        // A worker task is submitted exactly once in start(), so if this loop ever exits the
+        // thread is gone for good and the pool shrinks permanently. Catch every Throwable --
+        // including Errors and anything takePendingJob/runJob may surface -- so a fault only backs
+        // the loop off instead of killing the worker. Re-assert the interrupt flag so shutdown
+        // still unwinds promptly.
+        if (t instanceof InterruptedException) {
+          Thread.currentThread().interrupt();
+        }
+        LOG.warn("Cleanup worker loop hit an unexpected error; backing off", t);
         sleep(pollIntervalMs);
       }
     }
@@ -280,8 +285,11 @@ public class IcebergCleanupManager implements AutoCloseable {
           LOG.warn("Lost ownership of cleanup job {}", entry.getKey());
           ownedHeartbeats.remove(entry.getKey());
         }
-      } catch (RuntimeException e) {
-        LOG.warn("Heartbeat update failed for job {}", entry.getKey(), e);
+      } catch (Throwable t) {
+        // scheduleAtFixedRate suppresses all future runs if a task ever throws, which would stop
+        // heartbeat renewal for the whole process. Swallow per-job faults (including Errors) so one
+        // bad job neither halts this pass nor the recurring task.
+        LOG.warn("Heartbeat update failed for job {}", entry.getKey(), t);
       }
     }
   }
@@ -289,8 +297,10 @@ public class IcebergCleanupManager implements AutoCloseable {
   private void prune() {
     try {
       store.deleteFinishedJobsByLegacyTimeline(System.currentTimeMillis() - retentionMs);
-    } catch (RuntimeException e) {
-      LOG.warn("Cleanup-row pruning failed", e);
+    } catch (Throwable t) {
+      // As above: never let a Throwable escape a scheduleAtFixedRate task, or pruning silently
+      // stops for the life of the process and finished rows accumulate without bound.
+      LOG.warn("Cleanup-row pruning failed", t);
     }
   }
 
