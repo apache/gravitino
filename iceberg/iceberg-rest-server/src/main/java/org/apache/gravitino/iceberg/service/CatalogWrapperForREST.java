@@ -200,7 +200,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       TableIdentifier identifier, CredentialPrivilege privilege) {
     try {
       LoadTableResponse loadTableResponse = super.loadTable(identifier);
-      Credential credential = getCredential(loadTableResponse, privilege);
+      Credential credential = getCredential(loadTableResponse.tableMetadata(), privilege);
       return ImmutableLoadCredentialsResponse.builder()
           .addCredentials(
               IcebergRESTUtils.toRestCredential(
@@ -309,7 +309,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       TableIdentifier tableIdentifier,
       LoadTableResponse loadTableResponse,
       CredentialPrivilege privilege) {
-    final Credential credential = getCredential(loadTableResponse, privilege);
+    final Credential credential = getCredential(loadTableResponse.tableMetadata(), privilege);
 
     LOG.info(
         "Generate credential: {} for Iceberg table: {}",
@@ -331,11 +331,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         .addAllConfig(getCatalogConfigToClient())
         .addAllConfig(credentialConfig)
         .build();
-  }
-
-  private Credential getCredential(
-      LoadTableResponse loadTableResponse, CredentialPrivilege privilege) {
-    return getCredential(loadTableResponse.tableMetadata(), privilege);
   }
 
   private Credential getCredential(TableMetadata tableMetadata, CredentialPrivilege privilege) {
