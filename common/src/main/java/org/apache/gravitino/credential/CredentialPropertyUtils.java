@@ -100,23 +100,19 @@ public class CredentialPropertyUtils {
       icebergProperties.put(
           ICEBERG_S3_TOKEN_EXPIRES_AT_MS, String.valueOf(credential.expireTimeInMs()));
       return icebergProperties;
-    }
-
-    if (credential instanceof S3SecretKeyCredential
-        || credential instanceof OSSSecretKeyCredential
-        || credential instanceof AzureAccountKeyCredential) {
-      return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
-    }
-
-    if (credential instanceof OSSTokenCredential) {
+    } else if (credential instanceof OSSTokenCredential) {
       Map<String, String> icebergProperties =
           transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
       icebergProperties.put(
           ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS, String.valueOf(credential.expireTimeInMs()));
       return icebergProperties;
-    }
-
-    if (credential instanceof ADLSTokenCredential) {
+    } else if (credential instanceof GCSTokenCredential) {
+      Map<String, String> icebergGCSCredentialProperties =
+          transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
+      icebergGCSCredentialProperties.put(
+          GCS_OAUTH_2_TOKEN_EXPIRES_AT, String.valueOf(credential.expireTimeInMs()));
+      return icebergGCSCredentialProperties;
+    } else if (credential instanceof ADLSTokenCredential) {
       ADLSTokenCredential adlsCredential = (ADLSTokenCredential) credential;
       String sasTokenKey =
           String.format(
@@ -129,17 +125,13 @@ public class CredentialPropertyUtils {
           ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX + adlsCredential.accountName(),
           String.valueOf(adlsCredential.expireTimeInMs()));
       return icebergADLSCredentialProperties;
+    } else if (credential instanceof S3SecretKeyCredential
+        || credential instanceof OSSSecretKeyCredential
+        || credential instanceof AzureAccountKeyCredential) {
+      return transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
+    } else {
+      return credential.toProperties();
     }
-
-    if (credential instanceof GCSTokenCredential) {
-      Map<String, String> icebergGCSCredentialProperties =
-          transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
-      icebergGCSCredentialProperties.put(
-          GCS_OAUTH_2_TOKEN_EXPIRES_AT, String.valueOf(credential.expireTimeInMs()));
-      return icebergGCSCredentialProperties;
-    }
-
-    return credential.toProperties();
   }
 
   /**
