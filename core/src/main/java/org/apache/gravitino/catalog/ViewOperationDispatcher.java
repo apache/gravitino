@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -60,6 +61,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
   private static final Logger LOG = LoggerFactory.getLogger(ViewOperationDispatcher.class);
 
+  private final Supplier<SchemaDispatcher> schemaDispatcherSupplier;
+
   /**
    * Creates a new ViewOperationDispatcher instance.
    *
@@ -69,7 +72,26 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    */
   public ViewOperationDispatcher(
       CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
+    this(catalogManager, store, idGenerator, () -> GravitinoEnv.getInstance().schemaDispatcher());
+  }
+
+  /**
+   * Creates a new ViewOperationDispatcher instance.
+   *
+   * @param catalogManager The CatalogManager instance to be used for view operations.
+   * @param store The EntityStore instance to be used for view operations.
+   * @param idGenerator The IdGenerator instance to be used for view operations.
+   * @param schemaDispatcherSupplier The SchemaDispatcher supplier to ensure schemas are imported.
+   */
+  public ViewOperationDispatcher(
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      Supplier<SchemaDispatcher> schemaDispatcherSupplier) {
     super(catalogManager, store, idGenerator);
+    this.schemaDispatcherSupplier =
+        Preconditions.checkNotNull(
+            schemaDispatcherSupplier, "schemaDispatcherSupplier must not be null");
   }
 
   /**
@@ -107,7 +129,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
 
     if (!entityCombinedView.imported()) {
-      SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
       NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
       schemaDispatcher.loadSchema(schemaIdent);
 
@@ -148,7 +170,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         "representations must not be null or empty");
 
     // Load the schema to make sure the schema exists.
-    SchemaDispatcher schemaDispatcher = GravitinoEnv.getInstance().schemaDispatcher();
+    SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
@@ -525,6 +547,15 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                 HasPropertyMetadata::tablePropertiesMetadata,
                 catalogView.properties()))
         .withImported(true);
+  }
+
+  private SchemaDispatcher getSchemaDispatcher() {
+    SchemaDispatcher schemaDispatcher = schemaDispatcherSupplier.get();
+    Preconditions.checkArgument(
+        schemaDispatcher != null,
+        "schemaDispatcherSupplier returned null. "
+            + "SchemaDispatcher must be available for view operations.");
+    return schemaDispatcher;
   }
 
   private ViewEntity applyChangesToEntity(
