@@ -79,6 +79,7 @@ jobs:
 
       - name: Apply Gravitino MySQL schema
         run: |
+          # Keep in sync with the latest schema file under scripts/mysql/ when the version bumps.
           mysql -h 127.0.0.1 -P 3306 -ugravitino -pgravitino gravitino \
             < scripts/mysql/schema-1.3.0-mysql.sql
 
@@ -91,13 +92,13 @@ jobs:
           # MySQL JDBC driver: the entity store needs the connector in libs/, not
           # only under catalogs/jdbc-mysql/libs/ (which is for the JDBC catalog
           # backend, not the entity store).
-          JDBC_JAR=distribution/package/libs/mysql-connector-java-8.0.14.jar
+          JDBC_JAR=distribution/package/libs/mysql-connector-java-8.0.33.jar
           curl -fsSL \
-            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.14/mysql-connector-java-8.0.14.jar \
+            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.33/mysql-connector-java-8.0.33.jar \
             -o "$JDBC_JAR"
           # Verify integrity against Maven Central's published SHA-1.
           EXPECTED_SHA1="$(curl -fsSL \
-            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.14/mysql-connector-java-8.0.14.jar.sha1)"
+            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.33/mysql-connector-java-8.0.33.jar.sha1)"
           echo "${EXPECTED_SHA1}  ${JDBC_JAR}" | sha1sum --check
 
           # Second instance is a full copy with its own conf/, logs/, data/.
@@ -133,8 +134,15 @@ jobs:
             (r'^gravitino\.lance-rest\.httpPort\s*=.*$',
              f'gravitino.lance-rest.httpPort = {lance}'),
           ]
+          appended = []
           for pat, repl in subs:
-            src = re.sub(pat, repl, src, flags=re.MULTILINE)
+            new_src = re.sub(pat, repl, src, flags=re.MULTILINE)
+            if new_src == src:
+              # Key absent from default config — append it so it is never silently skipped.
+              appended.append(repl)
+            src = new_src
+          if appended:
+            src = src.rstrip('\n') + '\n' + '\n'.join(appended) + '\n'
           p.write_text(src)
           PY
           }

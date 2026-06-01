@@ -112,12 +112,14 @@ api() {
   local tmp
   tmp="$(mktemp -t graviton_api.XXXX)"
   if [[ -n "$body" ]]; then
-    HTTP_CODE=$(curl -sS -o "$tmp" -w '%{http_code}' \
+    HTTP_CODE=$(curl -sS --connect-timeout 10 --max-time 30 \
+      -o "$tmp" -w '%{http_code}' \
       -H "Authorization: $(auth_header "$user")" \
       -H 'Content-Type: application/json' \
       -X "$method" --data "$body" "${base}${path}" || echo 000)
   else
-    HTTP_CODE=$(curl -sS -o "$tmp" -w '%{http_code}' \
+    HTTP_CODE=$(curl -sS --connect-timeout 10 --max-time 30 \
+      -o "$tmp" -w '%{http_code}' \
       -H "Authorization: $(auth_header "$user")" \
       -X "$method" "${base}${path}" || echo 000)
   fi
