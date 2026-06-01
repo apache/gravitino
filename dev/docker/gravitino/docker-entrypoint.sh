@@ -42,17 +42,22 @@ fi
 
 # Create soft links for JDBC drivers
 jdbc_driver_dir="${gravitino_dir}/jdbc-drivers"
+iceberg_rest_lib_dir="${gravitino_dir}/iceberg-rest-server/libs"
 
 if [ -d "${jdbc_driver_dir}" ]; then
   mkdir -p "${gravitino_dir}/libs"
+  mkdir -p "${iceberg_rest_lib_dir}"
   find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
   find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
+  find "${jdbc_driver_dir}" -name "sqlite-jdbc-*.jar" -exec ln -sfv {} "${gravitino_dir}/libs/" \;
+  find "${jdbc_driver_dir}" -name "mysql-connector-java-*.jar" -exec ln -sfv {} "${iceberg_rest_lib_dir}/" \;
+  find "${jdbc_driver_dir}" -name "postgresql-*.jar" -exec ln -sfv {} "${iceberg_rest_lib_dir}/" \;
+  find "${jdbc_driver_dir}" -name "sqlite-jdbc-*.jar" -exec ln -sfv {} "${iceberg_rest_lib_dir}/" \;
 fi
 
 # Create soft links for Iceberg bundle jars
 iceberg_bundle_dir="${gravitino_dir}/iceberg-bundles"
 lakehouse_iceberg_lib_dir="${gravitino_dir}/catalogs/lakehouse-iceberg/libs"
-iceberg_rest_lib_dir="${gravitino_dir}/iceberg-rest-server/libs"
 
 if [ -d "${iceberg_bundle_dir}" ]; then
   mkdir -p "${lakehouse_iceberg_lib_dir}"
