@@ -306,6 +306,37 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   }
 
   @Test
+  void testCreateTableInNonExistentNamespace() {
+    // The child namespace is intentionally never created.
+    String namespaceName = getTestNamespace("absent_create_ns");
+    Throwable thrown =
+        Assertions.assertThrows(
+            Throwable.class,
+            () ->
+                sql(
+                    String.format(
+                        "CREATE TABLE %s.create_in_absent(id bigint) using iceberg",
+                        namespaceName)));
+    // Creating a table in a namespace that does not exist must surface a NoSuchNamespace error
+    // (HTTP 404) instead of implicitly creating the namespace. This holds for the memory and hive
+    // backends, and for the JDBC backend now that strict mode is enabled by default.
+    Assertions.assertTrue(
+        isNoSuchNamespace(thrown), () -> "Expected a NoSuchNamespace error but got: " + thrown);
+  }
+
+  // Walks the cause chain because the missing namespace may surface as either Spark's or Iceberg's
+  // NoSuchNamespaceException, and Spark may wrap it.
+  private static boolean isNoSuchNamespace(Throwable thrown) {
+    for (Throwable t = thrown; t != null; t = t.getCause()) {
+      if (t instanceof NoSuchNamespaceException
+          || t instanceof org.apache.iceberg.exceptions.NoSuchNamespaceException) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  @Test
   void testDropTable() {
     sql(
         String.format("CREATE TABLE %s.drop_foo1", getTestNamespace())
