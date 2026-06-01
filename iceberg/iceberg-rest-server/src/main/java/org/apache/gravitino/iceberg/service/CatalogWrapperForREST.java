@@ -108,7 +108,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private static final String DATA_ACCESS_VENDED_CREDENTIALS = "vended-credentials";
   private static final String DATA_ACCESS_REMOTE_SIGNING = "remote-signing";
   private static final Schema EMPTY_SCHEMA = new Schema();
-  private static final String CLIENT_CREDENTIALS_PROVIDER_PREFIX = "client.credentials-provider.";
 
   private static final Set<String> catalogPropertiesToClientKeys =
       ImmutableSet.of(
@@ -289,7 +288,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     }
 
     Map<String, String> filtered =
-        MapUtils.getFilteredMap(sourceProps, key -> shouldExposeCatalogProperty((String) key));
+        MapUtils.getFilteredMap(sourceProps, key -> catalogPropertiesToClientKeys.contains(key));
     filtered = new HashMap<>(filtered);
     validateAndNormalizeDataAccessProperty(filtered);
 
@@ -706,7 +705,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return LoadTableResponse.builder()
           .withTableMetadata(((BaseTable) table).operations().current())
           .addAllConfig(
-              MapUtils.getFilteredMap(properties, key -> shouldExposeCatalogProperty((String) key)))
+              MapUtils.getFilteredMap(
+                  properties, key -> catalogPropertiesToClientKeys.contains(key)))
           // Keep only credential fields from FileIO properties before returning them to the client.
           .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
           .build();
@@ -744,7 +744,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
 
     Map<String, String> tableProperties = retrieveFileIOProperties(table.io());
     config.putAll(
-        MapUtils.getFilteredMap(tableProperties, key -> shouldExposeCatalogProperty((String) key)));
+        MapUtils.getFilteredMap(
+            tableProperties, key -> catalogPropertiesToClientKeys.contains(key)));
     config.putAll(CredentialPropertyUtils.filterCredentialProperties(tableProperties));
 
     TableMetadata metadata =
@@ -812,7 +813,8 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return LoadTableResponse.builder()
           .withTableMetadata(((BaseTable) table).operations().current())
           .addAllConfig(
-              MapUtils.getFilteredMap(properties, key -> shouldExposeCatalogProperty((String) key)))
+              MapUtils.getFilteredMap(
+                  properties, key -> catalogPropertiesToClientKeys.contains(key)))
           // Keep only credential fields from FileIO properties before returning them to the client.
           .addAllConfig(CredentialPropertyUtils.filterCredentialProperties(properties))
           .build();
@@ -954,10 +956,5 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           "Service unavailable when generating scan planning credentials for {}", table.name(), e);
       return Collections.emptyList();
     }
-  }
-
-  private static boolean shouldExposeCatalogProperty(String key) {
-    return catalogPropertiesToClientKeys.contains(key)
-        || key.startsWith(CLIENT_CREDENTIALS_PROVIDER_PREFIX);
   }
 }
