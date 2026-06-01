@@ -6,7 +6,7 @@ name: Multi-Instance Consistency Test
 # and authorization enabled, so the only consistency contracts under test are
 # the JcasbinAuthorizer caches and the JcasbinChangePoller invalidation paths.
 #
-# The test plan and assertions live in dev/test_multi_instance_consistency.sh.
+# The test plan and assertions live in dev/ci/test_multi_instance_consistency.sh.
 
 on:
   push:
@@ -91,9 +91,14 @@ jobs:
           # MySQL JDBC driver: the entity store needs the connector in libs/, not
           # only under catalogs/jdbc-mysql/libs/ (which is for the JDBC catalog
           # backend, not the entity store).
+          JDBC_JAR=distribution/package/libs/mysql-connector-java-8.0.14.jar
           curl -fsSL \
             https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.14/mysql-connector-java-8.0.14.jar \
-            -o distribution/package/libs/mysql-connector-java-8.0.14.jar
+            -o "$JDBC_JAR"
+          # Verify integrity against Maven Central's published SHA-256.
+          EXPECTED_SHA256="$(curl -fsSL \
+            https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.14/mysql-connector-java-8.0.14.jar.sha256)"
+          echo "${EXPECTED_SHA256}  ${JDBC_JAR}" | sha256sum --check
 
           # Second instance is a full copy with its own conf/, logs/, data/.
           cp -a distribution/package distribution/package-b
@@ -137,8 +142,7 @@ jobs:
           configure_instance distribution/package-b/conf/gravitino.conf 8190 9011 9111
 
           # Instance B also needs the JDBC driver.
-          cp distribution/package/libs/mysql-connector-java-8.0.14.jar \
-             distribution/package-b/libs/
+          cp "$JDBC_JAR" distribution/package-b/libs/
 
           # bin/gravitino.sh's found_gravitino_server_pid() greps `ps` only by
           # the "GravitinoServer" process name. When two installs share a host

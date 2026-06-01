@@ -68,8 +68,8 @@
 # -----------------------------------------------------------------------------
 #
 # Usage:
-#   bash dev/test_multi_instance_consistency.sh
-#   INSTANCE_A=http://host1:8090 INSTANCE_B=http://host2:8090 bash dev/test_multi_instance_consistency.sh
+#   bash dev/ci/test_multi_instance_consistency.sh
+#   INSTANCE_A=http://host1:8090 INSTANCE_B=http://host2:8090 bash dev/ci/test_multi_instance_consistency.sh
 #
 # Exit code = number of failed assertions (0 = all pass).
 
@@ -162,11 +162,13 @@ expect "instance B reachable + admin auth works" 200 'gitCommit'
 SCRATCH="scratch_${SUFFIX}"
 api "$INSTANCE_A" "$ADMIN_USER" POST '/api/metalakes' \
   "{\"name\":\"$SCRATCH\",\"comment\":\"scratch\",\"properties\":{}}"
-if [[ "$HTTP_CODE" == "403" ]]; then
-  fail "admin lacks service-admin rights on A — add '$ADMIN_USER' to gravitino.authorization.serviceAdmins on both instances and restart"
-elif [[ "$HTTP_CODE" == "200" ]]; then
+if [[ "$HTTP_CODE" == "200" ]]; then
   pass "admin is a service admin on A (can create metalake)"
-  api "$INSTANCE_A" "$ADMIN_USER" DELETE "/api/metalakes/$SCRATCH?force=true" >/dev/null
+  api "$INSTANCE_A" "$ADMIN_USER" DELETE "/api/metalakes/$SCRATCH?force=true"
+elif [[ "$HTTP_CODE" == "403" ]]; then
+  fail "admin lacks service-admin rights on A — add '$ADMIN_USER' to gravitino.authorization.serviceAdmins on both instances and restart"
+else
+  fail "preflight metalake-create returned unexpected HTTP $HTTP_CODE (expected 200 or 403) — instance A may not be ready or the entity store is not configured"
 fi
 
 if [[ $FAIL -gt 0 ]]; then
@@ -411,19 +413,11 @@ expect "B: $USER_WANGWU createRole succeeds immediately after CREATE_ROLE grante
 # ---- F. delete role on A → users with that role lose its privileges --------
 
 section "F. Delete role on A — holders lose its privileges on B (immediate)"
-# NOTE: this phase exposes a known cache-invalidation gap when running against
-# the *current* JcasbinAuthorizer implementation:
-#   - userRoleCache on B is version-validated against user_meta.updated_at, but
-#     role deletion does NOT bump user_meta.updated_at for users still holding
-#     that role. B's cache therefore considers wangwu's role list still valid.
-#   - versionCheckAndLoadRoles only iterates the rows returned by
-#     batchGetRoleUpdatedAt; a deleted role simply doesn't appear and is
-#     silently skipped, so its cached policies in loadedRoles are never evicted.
-# The fix would be either (a) bump user_meta.updated_at on every user that
-# held the deleted role, or (b) compare the requested roleIds against the
-# returned rows in versionCheckAndLoadRoles and evict the missing ones.
-# The assertion below is left strict on purpose: it will turn green once the
-# implementation is fixed.
+# versionCheckAndLoadRoles compares the caller's cached roleIds against the
+# rows returned by batchGetRoleUpdatedAt; any roleId absent from the DB
+# (i.e., the deleted role) is evicted from loadedRoles. The per-request
+# userRoleCache is also revalidated on the next request so the deleted
+# role's policies are never applied.
 
 # Sanity: wangwu currently holds ROLE_NAME which has CREATE_ROLE.
 api "$INSTANCE_B" "$USER_WANGWU" POST "/api/metalakes/$METALAKE/roles" "$(cat <<EOF
@@ -625,6 +619,33 @@ expect "A: delete group $GROUP_NAME" 200
 api "$INSTANCE_B" "$ADMIN_USER" GET "/api/metalakes/$METALAKE/groups/$GROUP_NAME"
 expect "B: GET group returns 404 after deletion" 404
 
+# ---- N. setOwner propagation for non-METALAKE entities (TAG) ---------------
+
+section "N. setOwner on TAG — same propagation guarantee as METALAKE (eventual, ~${POLL_WAIT_SECS}s)"
+# The schema/table case in the original ask works identically — substitute SCHEMA/TABLE
+# for TAG once a catalog is configured.
+api "$INSTANCE_A" "$USER_LISI" POST "/api/metalakes/$METALAKE/tags" \
+  "{\"name\":\"$TAG_NAME\",\"comment\":\"phase N tag\",\"properties\":{}}"
+expect "A: $USER_LISI creates tag $TAG_NAME (lisi = metalake owner)" 200
+
+# Transfer tag ownership to wangwu on A. lisi is metalake owner so this is allowed.
+api "$INSTANCE_A" "$USER_LISI" PUT \
+  "/api/metalakes/$METALAKE/owners/TAG/$TAG_NAME" \
+  "{\"name\":\"$USER_WANGWU\",\"type\":\"USER\"}"
+expect "A: setOwner(TAG $TAG_NAME) = $USER_WANGWU" 200
+
+echo "  ...sleeping ${POLL_WAIT_SECS}s for the change poller"
+sleep "$POLL_WAIT_SECS"
+
+# GET owner on a TAG requires LOAD_TAG (METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG),
+# so the GET is done as $USER_LISI (metalake owner) rather than admin.
+api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/owners/TAG/$TAG_NAME"
+expect "B: GET owner(TAG $TAG_NAME) = $USER_WANGWU" 200 "\"name\"[^}]*\"$USER_WANGWU\""
+
+# Enforcement: wangwu (now TAG owner) can DELETE the tag on B (TAG::OWNER required).
+api "$INSTANCE_B" "$USER_WANGWU" DELETE "/api/metalakes/$METALAKE/tags/$TAG_NAME"
+expect "B: $USER_WANGWU (tag owner) can DELETE the tag on B" 200
+
 # ---- O. multi-role partial revoke ------------------------------------------
 
 section "O. Multi-role partial revoke — only revoked role's privileges go away"
@@ -775,33 +796,6 @@ expect "A: revoke $ROLE_ALLOW from $USER_WANGWU" 200
 api "$INSTANCE_B" "$USER_WANGWU" POST "/api/metalakes/$METALAKE/users" \
   "{\"name\":\"r_after_revoke_${SUFFIX}\"}"
 expect "B: $USER_WANGWU addUser denied after single revoke (no duplicate binding leftover)" 403
-
-# ---- N. setOwner propagation for non-METALAKE entities (TAG) ---------------
-
-section "N. setOwner on TAG — same propagation guarantee as METALAKE (eventual, ~${POLL_WAIT_SECS}s)"
-# The schema/table case in the original ask works identically — substitute SCHEMA/TABLE
-# for TAG once a catalog is configured.
-api "$INSTANCE_A" "$USER_LISI" POST "/api/metalakes/$METALAKE/tags" \
-  "{\"name\":\"$TAG_NAME\",\"comment\":\"phase N tag\",\"properties\":{}}"
-expect "A: $USER_LISI creates tag $TAG_NAME (lisi = metalake owner)" 200
-
-# Transfer tag ownership to wangwu on A. lisi is metalake owner so this is allowed.
-api "$INSTANCE_A" "$USER_LISI" PUT \
-  "/api/metalakes/$METALAKE/owners/TAG/$TAG_NAME" \
-  "{\"name\":\"$USER_WANGWU\",\"type\":\"USER\"}"
-expect "A: setOwner(TAG $TAG_NAME) = $USER_WANGWU" 200
-
-echo "  ...sleeping ${POLL_WAIT_SECS}s for the change poller"
-sleep "$POLL_WAIT_SECS"
-
-# GET owner on a TAG requires LOAD_TAG (METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG),
-# so the GET is done as $USER_LISI (metalake owner) rather than admin.
-api "$INSTANCE_B" "$USER_LISI" GET "/api/metalakes/$METALAKE/owners/TAG/$TAG_NAME"
-expect "B: GET owner(TAG $TAG_NAME) = $USER_WANGWU" 200 "\"name\"[^}]*\"$USER_WANGWU\""
-
-# Enforcement: wangwu (now TAG owner) can DELETE the tag on B (TAG::OWNER required).
-api "$INSTANCE_B" "$USER_WANGWU" DELETE "/api/metalakes/$METALAKE/tags/$TAG_NAME"
-expect "B: $USER_WANGWU (tag owner) can DELETE the tag on B" 200
 
 # ---- summary ---------------------------------------------------------------
 
