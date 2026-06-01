@@ -701,7 +701,5 @@ class TestErrorHandler(unittest.TestCase):
 
         with self.assertRaises(NotFoundException):
             PERMISSION_ERROR_HANDLER.handle(
-                ErrorResponse.generate_error_response(
-                    NotFoundException, "mock error"
-                )
+                ErrorResponse.generate_error_response(NotFoundException, "mock error")
             )

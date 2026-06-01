@@ -664,6 +664,8 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         Raises:
             NoSuchRoleException: If the role does not exist.
             NoSuchMetalakeException: If the metalake does not exist.
+            NoSuchMetadataObjectException: If the securable object does not exist.
+            IllegalPrivilegeException: If a privilege is invalid.
         """
         return self.get_metalake().grant_privileges_to_role(
             role_name, securable_object, privileges
@@ -688,6 +690,8 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         Raises:
             NoSuchRoleException: If the role does not exist.
             NoSuchMetalakeException: If the metalake does not exist.
+            NoSuchMetadataObjectException: If the securable object does not exist.
+            IllegalPrivilegeException: If a privilege is invalid.
         """
         return self.get_metalake().revoke_privileges_from_role(
             role_name, securable_object, privileges

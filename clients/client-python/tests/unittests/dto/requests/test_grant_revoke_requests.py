@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import json
 import unittest
 
 from gravitino.api.authorization.privileges import Privilege
@@ -28,7 +29,8 @@ from gravitino.dto.requests.role_revoke_request import RoleRevokeRequest
 class TestRoleGrantRequest(unittest.TestCase):
     def test_create(self):
         req = RoleGrantRequest(["role1", "role2"])
-        self.assertEqual(["role1", "role2"], req._role_names)
+        data = json.loads(req.to_json())
+        self.assertEqual(["role1", "role2"], data["roleNames"])
 
     def test_validate(self):
         req = RoleGrantRequest(["role1"])
@@ -48,7 +50,8 @@ class TestRoleGrantRequest(unittest.TestCase):
 class TestRoleRevokeRequest(unittest.TestCase):
     def test_create(self):
         req = RoleRevokeRequest(["role1"])
-        self.assertEqual(["role1"], req._role_names)
+        data = json.loads(req.to_json())
+        self.assertEqual(["role1"], data["roleNames"])
 
     def test_validate_empty_rejected(self):
         req = RoleRevokeRequest([])
@@ -62,7 +65,8 @@ class TestPrivilegeGrantRequest(unittest.TestCase):
             PrivilegeDTO(Privilege.Name.USE_CATALOG, Privilege.Condition.ALLOW)
         ]
         req = PrivilegeGrantRequest(privileges)
-        self.assertEqual(1, len(req._privileges))
+        data = json.loads(req.to_json())
+        self.assertEqual(1, len(data["privileges"]))
 
     def test_validate_empty_rejected(self):
         req = PrivilegeGrantRequest([])
@@ -84,7 +88,8 @@ class TestPrivilegeRevokeRequest(unittest.TestCase):
             PrivilegeDTO(Privilege.Name.USE_CATALOG, Privilege.Condition.DENY)
         ]
         req = PrivilegeRevokeRequest(privileges)
-        self.assertEqual(1, len(req._privileges))
+        data = json.loads(req.to_json())
+        self.assertEqual(1, len(data["privileges"]))
 
     def test_validate_empty_rejected(self):
         req = PrivilegeRevokeRequest([])

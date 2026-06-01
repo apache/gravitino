@@ -1274,6 +1274,8 @@ class GravitinoMetalake(
         Raises:
             NoSuchRoleException: If the role does not exist.
             NoSuchMetalakeException: If the metalake does not exist.
+            NoSuchMetadataObjectException: If the securable object does not exist.
+            IllegalPrivilegeException: If a privilege is invalid.
         """
         Precondition.check_string_not_empty(
             role_name, "role name must not be null or empty"
@@ -1313,6 +1315,8 @@ class GravitinoMetalake(
         Raises:
             NoSuchRoleException: If the role does not exist.
             NoSuchMetalakeException: If the metalake does not exist.
+            NoSuchMetadataObjectException: If the securable object does not exist.
+            IllegalPrivilegeException: If a privilege is invalid.
         """
         Precondition.check_string_not_empty(
             role_name, "role name must not be null or empty"

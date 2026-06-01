@@ -155,8 +155,16 @@ class TestRoleManagement(IntegrationTestEnv):
             "priv_role", securable_obj, privileges
         )
         self.assertEqual("priv_role", granted.name())
+        self.assertGreater(len(granted.securable_objects()), 0)
+        granted_privs = granted.securable_objects()[0].privileges()
+        granted_names = [p.name().name for p in granted_privs]
+        self.assertIn("USE_CATALOG", granted_names)
 
         revoked = self._gravitino_client.revoke_privileges_from_role(
             "priv_role", securable_obj, privileges
         )
         self.assertEqual("priv_role", revoked.name())
+        revoked_objs = revoked.securable_objects()
+        if revoked_objs:
+            revoked_names = [p.name().name for p in revoked_objs[0].privileges()]
+            self.assertNotIn("USE_CATALOG", revoked_names)
