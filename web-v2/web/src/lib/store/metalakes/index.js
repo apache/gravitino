@@ -294,7 +294,10 @@ export const setIntoTreeNodeWithFetch = createAsyncThunk(
           break
       }
 
-      const viewsPromise = type === 'relational' ? getViewsApi({ metalake, catalog, schema }) : Promise.resolve(null)
+      const viewsPromise =
+        type === 'relational'
+          ? getViewsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' })
+          : Promise.resolve(null)
 
       const [funcResult, entityResult, viewResult] = await Promise.allSettled([
         getFunctionsApi({ metalake, catalog, schema, details: false }),
@@ -2185,10 +2188,16 @@ export const getFunctionDetails = createAsyncThunk(
 export const fetchViews = createAsyncThunk(
   'appMetalakes/fetchViews',
   async ({ init, metalake, catalog, schema }, { getState, dispatch }) => {
-    const [err, res] = await to(getViewsApi({ metalake, catalog, schema }))
+    const [err, res] = await to(getViewsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' }))
 
-    if (init && (err || !res)) {
-      throw new Error(err)
+    if (err || !res) {
+      // Catalog doesn't support views (HTTP 405) — return empty views silently
+      if (err?.response?.status === 405) {
+        return { views: [], init }
+      }
+      if (init) {
+        throw new Error(err)
+      }
     }
 
     const { identifiers = [] } = res || {}
@@ -2233,9 +2242,13 @@ export const fetchViews = createAsyncThunk(
 export const getViewDetails = createAsyncThunk(
   'appMetalakes/getViewDetails',
   async ({ init, metalake, catalog, schema, view }) => {
-    const [err, res] = await to(getViewDetailsApi({ metalake, catalog, schema, view }))
+    const [err, res] = await to(getViewDetailsApi({ metalake, catalog, schema, view }, { errorMessageMode: 'none' }))
 
     if (err || !res) {
+      // Catalog doesn't support views (HTTP 405) — return empty result silently
+      if (err?.response?.status === 405) {
+        return { view: null, init }
+      }
       throw new Error(err)
     }
 
