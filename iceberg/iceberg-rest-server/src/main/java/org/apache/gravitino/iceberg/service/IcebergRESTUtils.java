@@ -40,7 +40,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.Strings;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.ADLSTokenCredential;
 import org.apache.gravitino.credential.AwsIrsaCredential;
@@ -142,7 +141,8 @@ public class IcebergRESTUtils {
               RESTUtil.encodeString(tableIdentifier.name())));
     }
 
-    String prefix = Strings.CS.appendIfMissing(tableMetadata.location(), "/");
+    String location = tableMetadata.location();
+    String prefix = location.endsWith("/") ? location : location + "/";
     return new org.apache.iceberg.rest.credentials.Credential() {
       @Override
       public String prefix() {
