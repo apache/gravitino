@@ -121,8 +121,7 @@ public class IcebergRESTUtils {
         new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
     CredentialPropertyUtils.appendRefreshEndpoint(
         config, credential, tableCredentialsPath(catalogName, tableIdentifier));
-    String location = tableMetadata.location();
-    String prefix = location.endsWith("/") ? location : location + "/";
+    String prefix = StringUtils.appendIfMissing(tableMetadata.location(), "/");
     return new org.apache.iceberg.rest.credentials.Credential() {
       @Override
       public String prefix() {

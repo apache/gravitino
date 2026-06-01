@@ -532,8 +532,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * @param scanRequest The scan request parameters
    * @return CloseableIterable of FileScanTask
    */
-  @VisibleForTesting
-  protected CloseableIterable<FileScanTask> createFilePlanScanTasks(
+  private CloseableIterable<FileScanTask> createFilePlanScanTasks(
       Table table, TableIdentifier tableIdentifier, PlanTableScanRequest scanRequest) {
     Long startSnapshotId = scanRequest.startSnapshotId();
     Long endSnapshotId = scanRequest.endSnapshotId();
