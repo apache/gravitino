@@ -724,7 +724,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
                 catalogOptions, table.properties(), tablePath));
     flinkTableProperties.putAll(fromGravitinoDistribution(table.distribution()));
     List<String> partitionKeys = partitionConverter.toFlinkPartitionKeys(table.partitioning());
-    return newCatalogTable(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
+    CatalogTable baseTable =
+        newCatalogTable(builder.build(), table.comment(), partitionKeys, flinkTableProperties);
+    return enrichCatalogTable(baseTable, tablePath);
   }
 
   protected CatalogTable newCatalogTable(
@@ -1026,6 +1028,28 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return new Representation[] {
       SQLRepresentation.builder().withDialect(dialect).withSql(sql).build()
     };
+  }
+
+  /**
+   * Hook for subclasses to enrich or replace the plain {@link CatalogTable} built from Gravitino
+   * metadata with a connector-native representation.
+   *
+   * <p>The default implementation returns the table unchanged. Connector-specific subclasses (e.g.
+   * {@code GravitinoPaimonCatalog}) can override this method to return a native table object that
+   * carries additional runtime context required by the underlying engine — for example, Paimon's
+   * {@code DataCatalogTable} with a non-null {@code CatalogEnvironment} that enables {@code
+   * AddPartitionCommitCallback} registration on write.
+   *
+   * <p>This hook is called <em>after</em> Gravitino authorization has already been enforced in
+   * {@link #getTable(ObjectPath)}, so implementations do not need to repeat auth checks.
+   *
+   * @param table the plain {@link CatalogTable} built from Gravitino metadata
+   * @param tablePath the object path of the table
+   * @return the (possibly enriched) {@link CatalogBaseTable} to return to Flink
+   * @throws CatalogException if enrichment fails due to a catalog-level error
+   */
+  public CatalogBaseTable enrichCatalogTable(CatalogTable table, ObjectPath tablePath) {
+    return table;
   }
 
   protected Catalog catalog() {

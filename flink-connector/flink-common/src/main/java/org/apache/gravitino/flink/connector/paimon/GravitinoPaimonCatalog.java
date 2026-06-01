@@ -28,6 +28,8 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.CatalogBaseTable;
+import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.catalog.exceptions.TableNotExistException;
@@ -48,6 +50,14 @@ import org.apache.paimon.flink.FlinkCatalogFactory;
 /**
  * The GravitinoPaimonCatalog class is an implementation of the BaseCatalog class that is used to
  * proxy the PaimonCatalog class.
+ *
+ * <p>DDL operations (CREATE / ALTER / DROP) are routed through the Gravitino REST API, keeping
+ * Gravitino as the single source of truth for metadata. The internal {@code paimonCatalog} is used
+ * only by {@link #enrichCatalogTable} so that {@code getTable()} returns Paimon's native {@code
+ * DataCatalogTable} — which carries a fully-initialised {@code CatalogEnvironment} (non-null {@code
+ * catalogLoader}). Without this, the {@code AddPartitionCommitCallback} that syncs new partitions
+ * to Hive Metastore is never registered, causing {@code SHOW PARTITIONS} to return empty results
+ * even when {@code metastore.partitioned-table=true}.
  */
 public class GravitinoPaimonCatalog extends BaseCatalog {
 
@@ -68,6 +78,20 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     this.paimonCatalog = flinkCatalogFactory.createCatalog(context);
   }
 
+  // ---------------------------------------------------------------------------
+  // Lifecycle — keep paimonCatalog in sync with the outer catalog
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void open() throws CatalogException {
+    super.open(); // opens realCatalog() == paimonCatalog, so paimonCatalog.open() is called here
+  }
+
+  @Override
+  public void close() throws CatalogException {
+    super.close(); // closes realCatalog() == paimonCatalog
+  }
+
   @Override
   protected AbstractCatalog realCatalog() {
     return paimonCatalog;
@@ -82,6 +106,38 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
             .purgeTable(NameIdentifier.of(tablePath.getDatabaseName(), tablePath.getObjectName()));
     if (!dropped && !ignoreIfNotExists) {
       throw new TableNotExistException(catalogName(), tablePath);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // getTable enrichment — return Paimon-native DataCatalogTable
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns the Paimon-native {@code DataCatalogTable} for {@code tablePath}.
+   *
+   * <p>{@link BaseCatalog#getTable} has already verified via the Gravitino REST API that (a) the
+   * caller is authorised and (b) the table exists before this hook is invoked. Therefore, a {@link
+   * TableNotExistException} from {@code paimonCatalog.getTable()} indicates a metadata
+   * inconsistency between Gravitino and the underlying Paimon store.
+   *
+   * <p>The returned {@code DataCatalogTable} wraps a {@code FileStoreTable} whose {@code
+   * CatalogEnvironment} holds a valid {@code catalogLoader}. Paimon's write path uses this to
+   * register {@code AddPartitionCommitCallback}, which in turn calls the Hive Metastore to record
+   * new partitions after each checkpoint commit.
+   */
+  @Override
+  public CatalogBaseTable enrichCatalogTable(CatalogTable ignoredBaseTable, ObjectPath tablePath)
+      throws CatalogException {
+    try {
+      return paimonCatalog.getTable(tablePath);
+    } catch (TableNotExistException e) {
+      throw new CatalogException(
+          String.format(
+              "Table '%s.%s' was found in Gravitino but is absent from the underlying Paimon "
+                  + "catalog '%s'. The two metadata stores may be out of sync.",
+              tablePath.getDatabaseName(), tablePath.getObjectName(), catalogName()),
+          e);
     }
   }
 
