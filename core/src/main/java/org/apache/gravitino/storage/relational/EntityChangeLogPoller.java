@@ -100,7 +100,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * @param listener the listener to register
    */
   public void registerListener(EntityChangeLogListener listener) {
-    Preconditions.checkNotNull(listener, "listener cannot be null");
+    Preconditions.checkArgument(listener != null, "listener cannot be null");
     listeners.add(listener);
   }
 
@@ -110,7 +110,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * @param listener the listener to unregister
    */
   public void unregisterListener(EntityChangeLogListener listener) {
-    Preconditions.checkNotNull(listener, "listener cannot be null");
+    Preconditions.checkArgument(listener != null, "listener cannot be null");
     listeners.remove(listener);
   }
 
@@ -139,6 +139,21 @@ public class EntityChangeLogPoller implements AutoCloseable {
             });
     scheduler.scheduleWithFixedDelay(
         this::pollChanges, pollIntervalSecs, pollIntervalSecs, TimeUnit.SECONDS);
+  }
+
+  @Override
+  public void close() {
+    if (scheduler != null) {
+      scheduler.shutdown();
+      try {
+        if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+          scheduler.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        scheduler.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   @VisibleForTesting
@@ -224,21 +239,6 @@ public class EntityChangeLogPoller implements AutoCloseable {
       // should not cause repeated prune attempts on every poll cycle (every few seconds)
       // until one eventually succeeds — the next cleanup will happen after cleanupIntervalMs.
       lastCleanupMs = now;
-    }
-  }
-
-  @Override
-  public void close() {
-    if (scheduler != null) {
-      scheduler.shutdown();
-      try {
-        if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
-          scheduler.shutdownNow();
-        }
-      } catch (InterruptedException e) {
-        scheduler.shutdownNow();
-        Thread.currentThread().interrupt();
-      }
     }
   }
 

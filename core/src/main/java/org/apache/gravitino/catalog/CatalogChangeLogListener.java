@@ -73,15 +73,15 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       } catch (RuntimeException e) {
         LOG.warn(
             "Failed to process catalog change log record: fullName={}, entityType={}",
-            change == null ? null : change.getFullName(),
-            change == null ? null : change.getEntityType(),
+            change.getFullName(),
+            change.getEntityType(),
             e);
       }
     }
   }
 
   private boolean isCatalogChange(EntityChangeRecord change) {
-    if (change == null || change.getEntityType() == null) {
+    if (change.getEntityType() == null) {
       return false;
     }
     return EntityType.CATALOG.name().equals(change.getEntityType().toUpperCase(Locale.ROOT));
