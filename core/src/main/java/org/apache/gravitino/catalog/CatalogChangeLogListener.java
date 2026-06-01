@@ -46,26 +46,46 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
   @Override
   public void onEntityChange(List<EntityChangeRecord> changes) {
     for (EntityChangeRecord change : changes) {
-      if (!EntityType.CATALOG.name().equals(change.getEntityType().toUpperCase(Locale.ROOT))) {
-        continue;
-      }
+      try {
+        if (!isCatalogChange(change)) {
+          continue;
+        }
 
-      NameIdentifier ident = catalogIdentifier(change);
-      if (ident == null) {
-        continue;
-      }
+        NameIdentifier ident = catalogIdentifier(change);
+        if (ident == null) {
+          continue;
+        }
 
-      if (catalogManager.consumeLocalMutation(ident)) {
-        LOG.debug("Skipping catalog cache invalidation for local mutation: {}", ident);
-        continue;
-      }
+        if (catalogManager.consumeLocalMutation(ident)) {
+          LOG.debug("Skipping catalog cache invalidation for local mutation: {}", ident);
+          continue;
+        }
 
-      LOG.debug("Invalidating catalog cache due to entity change log: {}", ident);
-      catalogManager.getCatalogCache().invalidate(ident);
+        LOG.debug("Invalidating catalog cache due to entity change log: {}", ident);
+        catalogManager.getCatalogCache().invalidate(ident);
+      } catch (RuntimeException e) {
+        LOG.warn(
+            "Failed to process catalog change log record: fullName={}, entityType={}",
+            change == null ? null : change.getFullName(),
+            change == null ? null : change.getEntityType(),
+            e);
+      }
     }
   }
 
+  private boolean isCatalogChange(EntityChangeRecord change) {
+    if (change == null || change.getEntityType() == null) {
+      return false;
+    }
+    return EntityType.CATALOG.name().equals(change.getEntityType().toUpperCase(Locale.ROOT));
+  }
+
   private NameIdentifier catalogIdentifier(EntityChangeRecord change) {
+    if (change.getFullName() == null) {
+      LOG.warn("Invalid catalog full name in entity change log: null");
+      return null;
+    }
+
     String[] names = change.getFullName().split("\\.");
     if (names.length != 2) {
       LOG.warn("Invalid catalog full name in entity change log: {}", change.getFullName());

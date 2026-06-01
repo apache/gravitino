@@ -666,6 +666,38 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testCatalogChangeLogListenerSkipsBadRecordAndStillProcessesLaterValidChange()
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "change_log_batch");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3");
+
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    Assertions.assertNotNull(catalogManager.loadCatalogAndWrap(ident));
+    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+    listener.onEntityChange(
+        List.of(
+            new EntityChangeRecord(
+                1L, "metalake", null, "metalake.change_log_batch", OperateType.ALTER, 0L),
+            new EntityChangeRecord(
+                2L, "metalake", "CATALOG", "metalake.change_log_batch", OperateType.ALTER, 0L)));
+
+    Assertions.assertNull(
+        catalogManager.getCatalogCache().getIfPresent(ident),
+        "Cache should still be invalidated by the later valid record");
+  }
+
+  @Test
   public void testDropCatalogSkipsImportedSchemas() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
     Map<String, String> props =
