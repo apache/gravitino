@@ -17,77 +17,83 @@
 # under the License.
 #
 
-suite: test gravitino iceberg rest server ingress
+suite: test gravitino iceberg rest server httproute
 templates:
-  - ingress.yaml
+  - httproute.yaml
 tests:
-  - it: does not render ingress by default
+  - it: does not render httproute by default
     asserts:
       - hasDocuments:
           count: 0
 
-  - it: does not render ingress when type is gateway
+  - it: does not render httproute when type is the default ingress
+    set:
+      ingress:
+        enabled: true
+        type: ingress
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders a Gateway API HTTPRoute when type is gateway
+    release:
+      name: iceberg-rest
     set:
       ingress:
         enabled: true
         type: gateway
-    asserts:
-      - hasDocuments:
-          count: 0
-
-  - it: renders networking v1 ingress for supported Kubernetes versions
-    release:
-      name: iceberg-rest
-    capabilities:
-      majorVersion: 1
-      minorVersion: 29
-    set:
-      ingress:
-        enabled: true
-        className: nginx
         annotations:
-          nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+          example.com/route: "true"
         hosts:
           - host: iceberg-rest.example.com
             paths:
               - path: /iceberg
                 pathType: Prefix
-        tls:
-          - secretName: iceberg-rest-tls
-            hosts:
-              - iceberg-rest.example.com
+              - path: /exact
+                pathType: Exact
+        gateway:
+          parentRefs:
+            - name: external
+              namespace: gateway-system
+              sectionName: https
     asserts:
       - isAPIVersion:
-          of: networking.k8s.io/v1
+          of: gateway.networking.k8s.io/v1
       - isKind:
-          of: Ingress
+          of: HTTPRoute
       - equal:
           path: metadata.name
           value: iceberg-rest-gravitino-iceberg-rest-server-helm
       - equal:
-          path: metadata.annotations["nginx.ingress.kubernetes.io/proxy-read-timeout"]
-          value: "3600"
+          path: metadata.annotations["example.com/route"]
+          value: "true"
       - equal:
-          path: spec.ingressClassName
-          value: nginx
+          path: spec.parentRefs[0].name
+          value: external
       - equal:
-          path: spec.rules[0].host
-          value: iceberg-rest.example.com
+          path: spec.parentRefs[0].namespace
+          value: gateway-system
       - equal:
-          path: spec.rules[0].http.paths[0].path
+          path: spec.parentRefs[0].sectionName
+          value: https
+      - contains:
+          path: spec.hostnames
+          content: iceberg-rest.example.com
+      - equal:
+          path: spec.rules[0].matches[0].path.type
+          value: PathPrefix
+      - equal:
+          path: spec.rules[0].matches[0].path.value
           value: /iceberg
       - equal:
-          path: spec.rules[0].http.paths[0].pathType
-          value: Prefix
+          path: spec.rules[1].matches[0].path.type
+          value: Exact
       - equal:
-          path: spec.rules[0].http.paths[0].backend.service.name
+          path: spec.rules[1].matches[0].path.value
+          value: /exact
+      - equal:
+          path: spec.rules[0].backendRefs[0].name
           value: iceberg-rest-gravitino-iceberg-rest-server-helm
       - equal:
-          path: spec.rules[0].http.paths[0].backend.service.port.number
+          path: spec.rules[0].backendRefs[0].port
           value: 9001
-      - equal:
-          path: spec.tls[0].secretName
-          value: iceberg-rest-tls
-      - contains:
-          path: spec.tls[0].hosts
-          content: iceberg-rest.example.com

@@ -504,6 +504,10 @@ extraExposePorts:
 
 ingress:
   enabled: false
+  # Resource type to render when ingress is enabled.
+  # "ingress"  renders a networking.k8s.io/v1 Ingress (default, backward compatible).
+  # "gateway"  renders a Gateway API gateway.networking.k8s.io HTTPRoute instead.
+  type: ingress
   className: "nginx"
   annotations: {}
   # kubernetes.io/tls-acme: "true"
@@ -516,6 +520,15 @@ ingress:
   #  - secretName: chart-gravitino-tls
   #    hosts:
   #      - chart-gravitino.local
+  # Gateway API (HTTPRoute) settings. Used only when type is "gateway".
+  # hosts (above) become the HTTPRoute hostnames and rule paths; annotations are reused.
+  gateway:
+    apiVersion: gateway.networking.k8s.io/v1
+    # Parent Gateway(s) this HTTPRoute attaches to.
+    parentRefs: []
+    #  - name: gateway
+    #    namespace: gateway-system
+    #    sectionName: http
 
 ## Deployment annotations
 ##

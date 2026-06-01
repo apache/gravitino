@@ -1,0 +1,59 @@
+{{- /*
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+  */}}
+
+{{- if and .Values.ingress.enabled (eq (.Values.ingress.type | default "ingress") "gateway") -}}
+{{- $fullName := include "gravitino-lance-rest-server.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+{{- $gateway := .Values.ingress.gateway | default dict -}}
+apiVersion: {{ $gateway.apiVersion | default "gateway.networking.k8s.io/v1" }}
+kind: HTTPRoute
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "gravitino-lance-rest-server.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with $gateway.parentRefs }}
+  parentRefs:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if .Values.ingress.hosts }}
+  hostnames:
+    {{- range .Values.ingress.hosts }}
+    {{- if .host }}
+    - {{ .host | quote }}
+    {{- end }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.ingress.hosts }}
+    {{- range .paths }}
+    - matches:
+        - path:
+            type: {{ if eq (.pathType | default "") "Exact" }}Exact{{ else }}PathPrefix{{ end }}
+            value: {{ .path | quote }}
+      backendRefs:
+        - name: {{ $fullName }}
+          port: {{ $svcPort }}
+    {{- end }}
+    {{- end }}
+{{- end }}
