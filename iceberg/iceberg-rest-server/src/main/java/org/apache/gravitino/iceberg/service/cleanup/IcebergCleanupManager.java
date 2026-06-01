@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.cleanup;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -177,6 +178,7 @@ public class IcebergCleanupManager implements AutoCloseable {
     // connection pool lifecycle, so there is nothing to close here.
   }
 
+  @VisibleForTesting
   void cleanupFiles(FileIO io, String metadataLocation) {
     cleanupFiles(io, metadataLocation, () -> true);
   }
@@ -202,25 +204,27 @@ public class IcebergCleanupManager implements AutoCloseable {
     // Data files are the only huge level, so they are streamed and deleted one manifest at a time
     // rather than all collected first; only the smaller manifest/list/metadata paths are held.
     //
-    // requireOwnership stops between levels if a peer reclaimed the job, so we never
-    // delete a parent while the new owner is still deleting its children.
+    // deleteOwned re-checks ownership before each level, so if a peer reclaimed the job we stop and
+    // never delete a parent while the new owner is still deleting its children.
     Set<String> manifests = new LinkedHashSet<>();
     deleteDataFiles(io, metadata, manifests, stillOwned);
-    requireOwnership(stillOwned);
-    deleteAll(io, manifests);
-    requireOwnership(stillOwned);
-    deleteAll(io, ReachableFileUtil.manifestListLocations(table));
-    requireOwnership(stillOwned);
-    deleteAll(io, ReachableFileUtil.statisticsFilesLocations(table));
-    requireOwnership(stillOwned);
+    deleteOwned(io, manifests, stillOwned);
+    deleteOwned(io, ReachableFileUtil.manifestListLocations(table), stillOwned);
+    deleteOwned(io, ReachableFileUtil.statisticsFilesLocations(table), stillOwned);
 
     // metadataFileLocations includes the current metadata.json; drop it so it is deleted last.
     Set<String> ancestorMetadata =
         new LinkedHashSet<>(ReachableFileUtil.metadataFileLocations(table, true));
     ancestorMetadata.remove(metadataLocation);
-    deleteAll(io, ancestorMetadata);
+    deleteOwned(io, ancestorMetadata, stillOwned);
+    deleteOwned(io, Collections.singletonList(metadataLocation), stillOwned);
+  }
+
+  // Deletes one dependency level, but only after confirming we still own the job; throws to stop
+  // the cleanup if the lease was lost.
+  private void deleteOwned(FileIO io, Iterable<String> files, BooleanSupplier stillOwned) {
     requireOwnership(stillOwned);
-    deleteAll(io, Collections.singletonList(metadataLocation));
+    deleteAll(io, files);
   }
 
   void deleteAll(FileIO io, Iterable<String> files) {
@@ -267,7 +271,7 @@ public class IcebergCleanupManager implements AutoCloseable {
         long now = System.currentTimeMillis();
         Optional<IcebergCleanupJob> job =
             store.takePendingJob(now, heartbeatTimeoutMs, candidateWindow);
-        if (!job.isPresent()) {
+        if (job.isEmpty()) {
           sleep(pollIntervalMs);
           continue;
         }
