@@ -105,6 +105,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.EntityChangeLogPoller;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -297,6 +298,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
       new ConcurrentHashMap<>();
 
+  // Set to true when a CatalogChangeLogListener is active. markLocalMutation() is a no-op
+  // unless this flag is set, preventing unbounded growth of localMutationCounts in deployments
+  // that do not use a relational entity store (where the poller never runs).
+  private volatile boolean trackLocalMutations = false;
+
   /**
    * Constructs a CatalogManager instance.
    *
@@ -366,11 +372,20 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param ident the catalog identifier (pre-mutation name for renames)
    */
   void markLocalMutation(NameIdentifier ident) {
+    if (!trackLocalMutations) {
+      return;
+    }
     localMutationCounts.computeIfAbsent(ident, k -> new AtomicInteger()).incrementAndGet();
   }
 
   /**
    * Attempts to consume one local mutation marker for the given identifier.
+   *
+   * <p>Thread-safety note: {@link ConcurrentHashMap#computeIfPresent} executes the remapping
+   * function atomically under a per-bucket lock, so {@code consumed[0]} is set and the counter is
+   * decremented as a single atomic step. {@code consumed[0]} is a single-element array (the
+   * standard Java pattern for a mutable capture in a lambda) that is only read by this thread after
+   * {@code computeIfPresent} returns, so no additional synchronization is needed.
    *
    * @return true if a local mutation was pending and has been consumed (caller should skip
    *     invalidation), false if the change originated from a remote node
@@ -384,6 +399,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           return count.decrementAndGet() <= 0 ? null : count;
         });
     return consumed[0];
+  }
+
+  /**
+   * Registers this {@link CatalogManager} as a listener on the given {@link EntityChangeLogPoller}
+   * and enables local-mutation tracking. This is the preferred wiring point because {@link
+   * CatalogChangeLogListener} is an implementation detail of this class.
+   *
+   * @param poller the global entity-change-log poller to register with
+   */
+  public void registerToPoller(EntityChangeLogPoller poller) {
+    this.trackLocalMutations = true;
+    poller.registerListener(new CatalogChangeLogListener(this));
   }
 
   /**

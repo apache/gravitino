@@ -100,6 +100,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * @param listener the listener to register
    */
   public void registerListener(EntityChangeLogListener listener) {
+    Preconditions.checkNotNull(listener, "listener cannot be null");
     listeners.add(listener);
   }
 
@@ -109,13 +110,18 @@ public class EntityChangeLogPoller implements AutoCloseable {
    * @param listener the listener to unregister
    */
   public void unregisterListener(EntityChangeLogListener listener) {
+    Preconditions.checkNotNull(listener, "listener cannot be null");
     listeners.remove(listener);
   }
 
   /**
    * Initializes the high-water cursor to the current DB tail and schedules periodic polling.
    *
-   * <p>Startup does not scan historical changes because this process has no warm local cache yet.
+   * <p>On every start (including restarts), the cursor is set to the current maximum change ID in
+   * the DB, so historical change records written before this server process started are NOT
+   * replayed. This is intentional: on startup the local cache is cold, so there is no stale state
+   * to invalidate. Only changes written after this server started need to be applied to the warming
+   * cache.
    */
   public void start() {
     entityPollHighWaterId =
@@ -211,9 +217,13 @@ public class EntityChangeLogPoller implements AutoCloseable {
     try {
       SessionUtils.doWithoutCommit(
           EntityChangeLogMapper.class, mapper -> mapper.pruneOldEntityChanges(before));
-      lastCleanupMs = now;
     } catch (Exception e) {
       LOG.warn("Failed to prune expired entity change logs before {}", before, e);
+    } finally {
+      // Always advance the cursor regardless of success or failure. A transient DB error
+      // should not cause repeated prune attempts on every poll cycle (every few seconds)
+      // until one eventually succeeds — the next cleanup will happen after cleanupIntervalMs.
+      lastCleanupMs = now;
     }
   }
 

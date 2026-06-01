@@ -30,7 +30,6 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
-import org.apache.gravitino.catalog.CatalogChangeLogListener;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -125,7 +124,6 @@ public class GravitinoEnv {
   private EntityStore entityStore;
 
   private EntityChangeLogPoller entityChangeLogPoller;
-  private CatalogChangeLogListener catalogChangeLogListener;
 
   private CatalogDispatcher catalogDispatcher;
 
@@ -497,9 +495,6 @@ public class GravitinoEnv {
     LOG.info("Shutting down Gravitino Environment...");
 
     if (entityChangeLogPoller != null) {
-      if (catalogChangeLogListener != null) {
-        entityChangeLogPoller.unregisterListener(catalogChangeLogListener);
-      }
       try {
         entityChangeLogPoller.close();
       } catch (Exception e) {
@@ -598,7 +593,6 @@ public class GravitinoEnv {
     // CatalogManager
     this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
     this.entityChangeLogPoller = null;
-    this.catalogChangeLogListener = null;
     if (entityStore instanceof RelationalEntityStore) {
       this.entityChangeLogPoller =
           new EntityChangeLogPoller(
@@ -606,8 +600,10 @@ public class GravitinoEnv {
               TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
               TimeUnit.SECONDS.toMillis(
                   config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)));
-      this.catalogChangeLogListener = new CatalogChangeLogListener(catalogManager);
-      this.entityChangeLogPoller.registerListener(catalogChangeLogListener);
+      // Registration and local-mutation tracking are encapsulated in CatalogManager so that
+      // CatalogChangeLogListener remains an implementation detail of that class rather than
+      // being wired externally here.
+      catalogManager.registerToPoller(entityChangeLogPoller);
     }
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);

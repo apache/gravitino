@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.storage.relational.EntityChangeLogListener;
@@ -27,7 +28,12 @@ import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Invalidates {@link CatalogManager}'s local catalog cache from {@code entity_change_log}. */
+/**
+ * Invalidates {@link CatalogManager}'s local catalog cache from {@code entity_change_log}.
+ *
+ * <p>This listener is called <em>synchronously</em> in the poller thread. Implementations must not
+ * block or perform expensive I/O; only fast, in-memory cache invalidations are permitted.
+ */
 public class CatalogChangeLogListener implements EntityChangeLogListener {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogChangeLogListener.class);
@@ -51,10 +57,11 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
           continue;
         }
 
-        NameIdentifier ident = catalogIdentifier(change);
-        if (ident == null) {
+        Optional<NameIdentifier> identOpt = catalogIdentifier(change);
+        if (identOpt.isEmpty()) {
           continue;
         }
+        NameIdentifier ident = identOpt.get();
 
         if (catalogManager.consumeLocalMutation(ident)) {
           LOG.debug("Skipping catalog cache invalidation for local mutation: {}", ident);
@@ -80,17 +87,17 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
     return EntityType.CATALOG.name().equals(change.getEntityType().toUpperCase(Locale.ROOT));
   }
 
-  private NameIdentifier catalogIdentifier(EntityChangeRecord change) {
+  private Optional<NameIdentifier> catalogIdentifier(EntityChangeRecord change) {
     if (change.getFullName() == null) {
       LOG.warn("Invalid catalog full name in entity change log: null");
-      return null;
+      return Optional.empty();
     }
 
     String[] names = change.getFullName().split("\\.");
     if (names.length != 2) {
       LOG.warn("Invalid catalog full name in entity change log: {}", change.getFullName());
-      return null;
+      return Optional.empty();
     }
-    return NameIdentifier.of(names[0], names[1]);
+    return Optional.of(NameIdentifier.of(names[0], names[1]));
   }
 }
