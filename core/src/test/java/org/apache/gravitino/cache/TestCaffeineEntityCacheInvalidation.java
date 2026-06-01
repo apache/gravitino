@@ -91,7 +91,7 @@ public class TestCaffeineEntityCacheInvalidation {
    * listBindingRoleNames must miss cache and re-query.
    */
   @Test
-  void testRoleInvalidationPropagatestoMetadataObjectRoleRelCache() {
+  void testRoleInvalidationPropagatesToMetadataObjectRoleRelCache() {
     String metalake = "metalake";
     String catalogName = "catalog";
     String schemaName = "test_schema";
