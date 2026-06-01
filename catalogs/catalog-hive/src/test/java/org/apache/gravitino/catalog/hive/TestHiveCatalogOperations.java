@@ -390,6 +390,8 @@ class TestHiveCatalogOperations {
             });
     op.clientPool = clientPool;
 
+    // Callers must supply spark.sql.create.version so HMS detectDialect identifies the view as
+    // Spark
     View view =
         op.createView(
             NameIdentifier.of("db", "v_spark"),
@@ -400,7 +402,7 @@ class TestHiveCatalogOperations {
             },
             null,
             null,
-            Maps.newHashMap());
+            Maps.newHashMap(ImmutableMap.of("spark.sql.create.version", "3.5.3")));
 
     Assertions.assertNotNull(view);
     Assertions.assertEquals(1, view.representations().length);
