@@ -153,7 +153,7 @@ def _deps_sentinel(venv_dir: Path, version: str, ray_spec: str, lance_namespace_
     a reinstall, while an identical set of specs skips all pip invocations.
     """
     key = f"{version}|{ray_spec}|{lance_namespace_spec}"
-    digest = hashlib.sha1(key.encode()).hexdigest()[:12]
+    digest = hashlib.sha1(key.encode(), usedforsecurity=False).hexdigest()[:12]
     return venv_dir / f".deps-installed-{digest}"
 
 
