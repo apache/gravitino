@@ -34,16 +34,22 @@ const Apis = {
     )}/schemas/${encodeURIComponent(schema)}/views/${encodeURIComponent(view)}`
 }
 
-export const getViewsApi = params => {
-  return defHttp.get({
-    url: `${Apis.GET(params)}`
-  })
+export const getViewsApi = (params, options) => {
+  return defHttp.get(
+    {
+      url: `${Apis.GET(params)}`
+    },
+    options
+  )
 }
 
-export const getViewDetailsApi = ({ metalake, catalog, schema, view }) => {
-  return defHttp.get({
-    url: `${Apis.GET_DETAIL({ metalake, catalog, schema, view })}`
-  })
+export const getViewDetailsApi = ({ metalake, catalog, schema, view }, options) => {
+  return defHttp.get(
+    {
+      url: `${Apis.GET_DETAIL({ metalake, catalog, schema, view })}`
+    },
+    options
+  )
 }
 
 export const deleteViewApi = ({ metalake, catalog, schema, view }) => {
