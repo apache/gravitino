@@ -102,22 +102,6 @@ public class IcebergRESTUtils {
   private IcebergRESTUtils() {}
 
   /**
-   * Relative path for the Iceberg table credentials refresh endpoint (no leading slash; Trino and
-   * other clients resolve it against the catalog URI).
-   *
-   * @param catalogName IRC catalog name
-   * @param tableIdentifier table identifier
-   * @return path such as {@code v1/{catalog}/namespaces/{ns}/tables/{table}/credentials}
-   */
-  private static String tableCredentialsPath(String catalogName, TableIdentifier tableIdentifier) {
-    return String.format(
-        "v1/%s/namespaces/%s/tables/%s/credentials",
-        RESTUtil.encodeString(catalogName),
-        RESTUtil.encodeNamespace(tableIdentifier.namespace(), NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
-        RESTUtil.encodeString(tableIdentifier.name()));
-  }
-
-  /**
    * Builds an Iceberg REST {@link org.apache.iceberg.rest.credentials.Credential} for load-table,
    * scan-plan, or credentials API responses.
    *
@@ -134,19 +118,29 @@ public class IcebergRESTUtils {
       TableMetadata tableMetadata) {
     Map<String, String> config =
         new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
+
+    String refreshProperty = null;
     if (credential instanceof GCSTokenCredential) {
-      config.put(
-          GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT,
-          tableCredentialsPath(catalogName, tableIdentifier));
+      refreshProperty = GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT;
     } else if (credential instanceof ADLSTokenCredential) {
-      config.put(
-          ADLS_REFRESH_CREDENTIALS_ENDPOINT, tableCredentialsPath(catalogName, tableIdentifier));
+      refreshProperty = ADLS_REFRESH_CREDENTIALS_ENDPOINT;
     } else if (credential instanceof S3TokenCredential
         || credential instanceof AwsIrsaCredential
         || credential instanceof OSSTokenCredential) {
-      config.put(
-          CLIENT_REFRESH_CREDENTIALS_ENDPOINT, tableCredentialsPath(catalogName, tableIdentifier));
+      refreshProperty = CLIENT_REFRESH_CREDENTIALS_ENDPOINT;
     }
+
+    if (refreshProperty != null) {
+      config.put(
+          refreshProperty,
+          String.format(
+              "v1/%s/namespaces/%s/tables/%s/credentials",
+              RESTUtil.encodeString(catalogName),
+              RESTUtil.encodeNamespace(
+                  tableIdentifier.namespace(), NAMESPACE_SEPARATOR_URLENCODED_UTF_8),
+              RESTUtil.encodeString(tableIdentifier.name())));
+    }
+
     String prefix = Strings.CS.appendIfMissing(tableMetadata.location(), "/");
     return new org.apache.iceberg.rest.credentials.Credential() {
       @Override
