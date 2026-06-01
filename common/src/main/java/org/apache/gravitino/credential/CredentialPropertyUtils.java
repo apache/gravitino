@@ -96,19 +96,22 @@ public class CredentialPropertyUtils {
   public static Map<String, String> toIcebergProperties(Credential credential) {
     if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
       Map<String, String> icebergProperties =
-          transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
+          new HashMap<>(
+              transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap));
       icebergProperties.put(
           ICEBERG_S3_TOKEN_EXPIRES_AT_MS, String.valueOf(credential.expireTimeInMs()));
       return icebergProperties;
     } else if (credential instanceof OSSTokenCredential) {
       Map<String, String> icebergProperties =
-          transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
+          new HashMap<>(
+              transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap));
       icebergProperties.put(
           ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS, String.valueOf(credential.expireTimeInMs()));
       return icebergProperties;
     } else if (credential instanceof GCSTokenCredential) {
       Map<String, String> icebergGCSCredentialProperties =
-          transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
+          new HashMap<>(
+              transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap));
       icebergGCSCredentialProperties.put(
           ICEBERG_GCS_TOKEN_EXPIRES_AT, String.valueOf(credential.expireTimeInMs()));
       return icebergGCSCredentialProperties;
