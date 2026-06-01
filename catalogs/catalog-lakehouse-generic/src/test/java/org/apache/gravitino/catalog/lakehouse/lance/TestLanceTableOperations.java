@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.function.Function;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -147,7 +148,7 @@ public class TestLanceTableOperations {
     Dataset dataset = mock(Dataset.class);
     when(dataset.getSchema())
         .thenReturn(
-            new org.apache.arrow.vector.types.pojo.Schema(
+            new Schema(
                 List.of(
                     Field.nullable("id", new ArrowType.Int(32, true)),
                     Field.nullable("name", new ArrowType.Utf8()))));
@@ -225,7 +226,7 @@ public class TestLanceTableOperations {
     Dataset dataset = mock(Dataset.class);
     when(dataset.getSchema())
         .thenReturn(
-            new org.apache.arrow.vector.types.pojo.Schema(
+            new Schema(
                 List.of(
                     Field.nullable("id", new ArrowType.Int(32, true)),
                     Field.nullable("name", new ArrowType.Utf8()))));

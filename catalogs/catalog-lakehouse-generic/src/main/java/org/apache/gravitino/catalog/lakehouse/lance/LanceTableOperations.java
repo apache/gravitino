@@ -31,8 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -160,9 +160,23 @@ public class LanceTableOperations extends ManagedTableOperations {
       return table;
     }
 
+    // A genuinely-empty Lance dataset has no schema to repair; skip to avoid a metadata write
+    // that would immediately repeat on the next load because emptySchema remains true.
+    if (columns.length == 0) {
+      return table;
+    }
+
     List<TableChange> changes = new ArrayList<>();
     if (!emptySchema) {
       for (Column column : table.columns()) {
+        changes.add(TableChange.deleteColumn(new String[] {column.name()}, true));
+      }
+    } else {
+      // When the stored schema is empty there are no old columns to delete first. Add a
+      // protective deleteColumn(ifExists=true) for each incoming column so that a second
+      // concurrent loadTable that arrives after the first has already committed the repair
+      // will issue a no-op delete rather than failing with "column already exists".
+      for (Column column : columns) {
         changes.add(TableChange.deleteColumn(new String[] {column.name()}, true));
       }
     }
@@ -265,7 +279,9 @@ public class LanceTableOperations extends ManagedTableOperations {
   @Override
   public boolean purgeTable(NameIdentifier ident) {
     try {
-      Table table = loadTable(ident);
+      // Use super.loadTable to avoid triggering an unnecessary schema-refresh (which may open the
+      // dataset) for a table that is about to be deleted anyway.
+      Table table = super.loadTable(ident);
       String location = table.properties().get(Table.PROPERTY_LOCATION);
 
       boolean purged = super.purgeTable(ident);
@@ -291,7 +307,8 @@ public class LanceTableOperations extends ManagedTableOperations {
   @Override
   public boolean dropTable(NameIdentifier ident) {
     try {
-      Table table = loadTable(ident);
+      // Use super.loadTable to skip schema-refresh overhead when dropping.
+      Table table = super.loadTable(ident);
       boolean external =
           Optional.ofNullable(table.properties().get(Table.PROPERTY_EXTERNAL))
               .map(Boolean::parseBoolean)
@@ -361,7 +378,6 @@ public class LanceTableOperations extends ManagedTableOperations {
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, properties);
     try (Dataset ignored =
         Dataset.write()
-            .allocator(new RootAllocator())
             .schema(convertColumnsToArrowSchema(columns))
             .uri(location)
             .mode(WriteParams.WriteMode.CREATE)
@@ -402,7 +418,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
   }
 
-  private org.apache.arrow.vector.types.pojo.Schema convertColumnsToArrowSchema(Column[] columns) {
+  private Schema convertColumnsToArrowSchema(Column[] columns) {
     List<Field> fields =
         Arrays.stream(columns)
             .map(
@@ -410,7 +426,7 @@ public class LanceTableOperations extends ManagedTableOperations {
                     LanceDataTypeConverter.CONVERTER.toArrowField(
                         col.name(), col.dataType(), col.nullable()))
             .collect(Collectors.toList());
-    return new org.apache.arrow.vector.types.pojo.Schema(fields);
+    return new Schema(fields);
   }
 
   private SchemaRefreshMode schemaRefreshMode() {
@@ -448,11 +464,12 @@ public class LanceTableOperations extends ManagedTableOperations {
               column.comment(),
               null,
               column.nullable(),
-              column.autoIncrement()));
+              column.autoIncrement(),
+              column.defaultValue()));
     }
   }
 
-  private Column[] extractColumns(org.apache.arrow.vector.types.pojo.Schema arrowSchema) {
+  private Column[] extractColumns(Schema arrowSchema) {
     return arrowSchema.getFields().stream()
         .map(
             field ->
@@ -525,8 +542,10 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   Dataset openDataset(String location, Map<String, String> storageOptions) {
+    // Do not pass an explicit allocator: OpenDatasetBuilder then sets selfManagedAllocator=true
+    // so Dataset.close() will release the off-heap memory. Passing new RootAllocator() sets
+    // selfManagedAllocator=false and leaks the allocator on every call.
     return Dataset.open()
-        .allocator(new RootAllocator())
         .uri(location)
         .readOptions(new ReadOptions.Builder().setStorageOptions(storageOptions).build())
         .build();
