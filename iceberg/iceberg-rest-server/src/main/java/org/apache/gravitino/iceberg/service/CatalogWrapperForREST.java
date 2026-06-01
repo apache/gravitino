@@ -36,7 +36,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -908,36 +907,5 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     return fileIO instanceof InMemoryFileIO
         ? Maps.newHashMap()
         : new HashMap<>(fileIO.properties());
-  }
-
-  @VisibleForTesting
-  protected String newPlanId() {
-    return UUID.randomUUID().toString();
-  }
-
-  @VisibleForTesting
-  protected List<org.apache.iceberg.rest.credentials.Credential> planTableScanCredentials(
-      TableIdentifier tableIdentifier, Table table) {
-    if (getCatalog() instanceof RESTCatalog || !(table instanceof BaseTable)) {
-      return Collections.emptyList();
-    }
-
-    TableMetadata metadata = ((BaseTable) table).operations().current();
-    if (metadata == null || isLocalOrHdfsTable(metadata)) {
-      return Collections.emptyList();
-    }
-
-    try {
-      return Collections.singletonList(
-          IcebergRESTUtils.toRestCredential(
-              catalogName,
-              tableIdentifier,
-              getCredential(metadata, CredentialPrivilege.READ),
-              metadata));
-    } catch (ServiceUnavailableException e) {
-      LOG.warn(
-          "Service unavailable when generating scan planning credentials for {}", table.name(), e);
-      return Collections.emptyList();
-    }
   }
 }
