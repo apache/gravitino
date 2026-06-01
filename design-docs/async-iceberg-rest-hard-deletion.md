@@ -183,10 +183,10 @@ public void dropTable(IcebergRequestContext ctx, TableIdentifier id,
 
   TableMetadata metadata = w.loadTableMetadata(id);
   w.dropTable(id);                          // metadata-only drop in the catalog
-  cleanupManager.enqueue(
+  cleanupManager.addJob(
       new IcebergCleanupJob(
-          0L,                               // id assigned from IdGenerator at enqueue (§5.4)
-          catalogId,                        // resolved catalog entity id (§5.4)
+          0L,                               // id assigned by IdGenerator at enqueue
+          catalogId,                        // resolved catalog entity id
           id.namespace().toString(),
           id.name(),
           metadata.metadataFileLocation(),
@@ -337,8 +337,11 @@ statement can register its own provider without touching the rest of the design.
 1. **Poll & claim.** Read the candidate window above and CAS the first
    winnable row to `RUNNING` with a fresh `heartbeat_at`. If nothing is
    claimable, wait `poll-interval-secs` and repeat.
-2. **Load metadata.** `TableMetadataParser.read(io, metadata_location)`. A
-   transient failure releases the job for retry; a terminal one fails it
+2. **Load metadata.** `TableMetadataParser.read(io, metadata_location)`. The
+   root `metadata.json` is the only file whose absence means "the table is
+   already gone": a `NotFoundException` here completes the job (a prior attempt
+   already deleted it). Any other failure (e.g. corrupt/unreadable metadata)
+   releases the job for retry, failing it once `attempts` hits the ceiling
    (§5.6).
 3. **Stream & delete.** Walk the snapshot graph lazily, group reachable files
    into batches of `delete-batch-size`, and hand each batch to the shared
@@ -440,18 +443,19 @@ rows age out for reclaim.
 
 Per-file failures are logged but do not fail the whole job — the
 synchronous purge has the same "best effort" stance. A job fails only if the
-**metadata phase** fails. `NotFoundException` from `deleteFile` counts as
-success. A transient failure goes back to `PENDING` and is retried when a
-free thread next polls (§5.5), incrementing `attempts` each time; when `attempts`
-reaches `max-attempts` the job goes to `FAILED` instead of `PENDING`. A
-clearly terminal failure skips the retries and goes straight to `FAILED`.
+**metadata phase** fails. A `NotFoundException` counts as success rather than a
+failure: a missing root `metadata.json` means the table is already gone, and a
+missing data file, manifest, or manifest list (from `deleteFile` or while
+enumerating reachable files) is already deleted. Any other failure goes back to
+`PENDING` and is retried when a free thread next polls (§5.5), incrementing
+`attempts` each time; when `attempts` reaches `max-attempts` the job goes to
+`FAILED` instead of `PENDING`.
 
 | Outcome                                              | Action                                                                                |
 |------------------------------------------------------|---------------------------------------------------------------------------------------|
 | All files deleted (or already gone)                  | `state='SUCCEEDED'`                                                                    |
-| Transient failure, `attempts < max-attempts`         | `attempts++`, set `last_error`, back to `PENDING`, `heartbeat_at=0`; re-claimed later |
-| Transient failure, `attempts` reaches `max-attempts` | `attempts++`, set `last_error` → `FAILED` (gave up retrying)                            |
-| Terminal failure (e.g. metadata gone/corrupt)        | set `last_error` → `FAILED` immediately; retrying cannot help                          |
+| Failure, `attempts < max-attempts`                   | `attempts++`, set `last_error`, back to `PENDING`, `heartbeat_at=0`; re-claimed later  |
+| Failure, `attempts` reaches `max-attempts`           | `attempts++`, set `last_error` → `FAILED` (gave up retrying)                            |
 | Worker killed mid-job                                | `RUNNING` row's heartbeat goes stale; another worker reclaims; deletes are idempotent  |
 
 **After `SUCCEEDED`.** The files are gone, so the tombstone lifts at once:

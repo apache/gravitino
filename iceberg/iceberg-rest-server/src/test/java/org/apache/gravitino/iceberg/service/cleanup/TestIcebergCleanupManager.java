@@ -201,6 +201,20 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testCleanupFilesTreatsMissingMetadataAsAlreadyGone() {
+    // A missing root metadata.json is the only NotFoundException treated as "table already gone":
+    // cleanupFiles swallows it and returns rather than failing, so the job can be marked SUCCEEDED.
+    IcebergCleanupManager svc =
+        new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
+    try {
+      Assertions.assertDoesNotThrow(
+          () -> svc.cleanupFiles(new InMemoryFileIO(), "memory://db/t/metadata/missing.json"));
+    } finally {
+      svc.close();
+    }
+  }
+
+  @TestTemplate
   void testWorkerRunsJobToSucceeded() {
     AtomicInteger calls = new AtomicInteger();
     IcebergCleanupManager svc =
@@ -252,7 +266,7 @@ class TestIcebergCleanupManager extends TestJDBCBackend {
         new IcebergCleanupManager(store, new IcebergConfig(new HashMap<>()));
     try {
       Assertions.assertFalse(svc.isNameOccupied(CATALOG_ID, "db", "t"));
-      svc.enqueue(sampleJob());
+      svc.addJob(sampleJob());
       Assertions.assertTrue(svc.isNameOccupied(CATALOG_ID, "db", "t"));
     } finally {
       svc.close();

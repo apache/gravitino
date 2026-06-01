@@ -110,14 +110,6 @@ abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend
   }
 
   @TestTemplate
-  void testMarkFailed() {
-    long id = store.addJob(sampleJob());
-    store.takePendingJob(System.currentTimeMillis(), 300_000L, 10);
-    Assertions.assertTrue(store.markFailed(id, "corrupt metadata"));
-    Assertions.assertEquals(IcebergCleanupJob.State.FAILED, store.stateOf(id));
-  }
-
-  @TestTemplate
   void testTransientFailureRetriesThenFailsAtCeiling() {
     long id = store.addJob(sampleJob());
     for (int i = 0; i < 2; i++) {

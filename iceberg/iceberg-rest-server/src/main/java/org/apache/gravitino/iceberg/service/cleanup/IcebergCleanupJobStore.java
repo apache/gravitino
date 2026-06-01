@@ -108,23 +108,6 @@ public class IcebergCleanupJobStore {
   }
 
   /**
-   * Marks a RUNNING job FAILED immediately.
-   *
-   * @param id job id
-   * @param reason failure text
-   * @return {@code true} iff the row was still RUNNING and was updated (i.e. the caller still owned
-   *     the job)
-   */
-  public boolean markFailed(long id, String reason) {
-    long now = System.currentTimeMillis();
-    String err = truncate(reason);
-    return SessionUtils.doWithCommitAndFetchResult(
-            IcebergCleanupJobMapper.class,
-            mapper -> mapper.markFinished(id, IcebergCleanupJob.State.FAILED.name(), err, now))
-        > 0;
-  }
-
-  /**
    * Records a transient failure: {@code attempts++}, then FAILED at the ceiling else PENDING.
    *
    * @param id job id

@@ -105,12 +105,12 @@ public class IcebergCleanupManager implements AutoCloseable {
   }
 
   /**
-   * Enqueues a cleanup job.
+   * Persists a new cleanup job.
    *
    * @param job job to persist
    * @return generated id
    */
-  public long enqueue(IcebergCleanupJob job) {
+  public long addJob(IcebergCleanupJob job) {
     return store.addJob(job);
   }
 
@@ -133,7 +133,17 @@ public class IcebergCleanupManager implements AutoCloseable {
     }
 
     running = true;
-    workers = Executors.newFixedThreadPool(workerThreads, daemon("iceberg-cleanup-worker"));
+    // Exactly workerThreads long-running loops are submitted below, so the bounded queue is never
+    // actually used; it is declared explicitly to avoid Executors.newFixedThreadPool's unbounded
+    // LinkedBlockingQueue.
+    workers =
+        new ThreadPoolExecutor(
+            workerThreads,
+            workerThreads,
+            0L,
+            TimeUnit.MILLISECONDS,
+            new ArrayBlockingQueue<>(workerThreads),
+            daemon("iceberg-cleanup-worker"));
     scheduler = Executors.newScheduledThreadPool(1, daemon("iceberg-cleanup-scheduler"));
     for (int i = 0; i < workerThreads; i++) {
       workers.submit(this::workerLoop);
@@ -165,7 +175,23 @@ public class IcebergCleanupManager implements AutoCloseable {
   }
 
   void cleanupFiles(FileIO io, String metadataLocation) {
-    TableMetadata metadata = TableMetadataParser.read(io, metadataLocation);
+    TableMetadata metadata;
+    try {
+      metadata = TableMetadataParser.read(io, metadataLocation);
+    } catch (NotFoundException metadataAlreadyGone) {
+      // The root metadata.json pointer is the ONLY file whose absence means "the table is already
+      // gone", so this is the single place a NotFoundException is treated as success: a prior
+      // attempt finished deleting the table before its row was marked, or the table was never
+      // fully written. Downstream, enumeration (reachableFiles) and bulk deletion (deleteAll)
+      // tolerate already-deleted files locally instead of letting a NotFoundException escape, so
+      // it never reaches here from anywhere but this read. There is nothing left to clean up;
+      // return so runJob marks the job SUCCEEDED.
+      LOG.info(
+          "Cleanup metadata {} already absent; treating as completed",
+          metadataLocation,
+          metadataAlreadyGone);
+      return;
+    }
     deleteAll(io, reachableFiles(io, metadata));
   }
 
@@ -231,14 +257,9 @@ public class IcebergCleanupManager implements AutoCloseable {
   private void runJob(IcebergCleanupJob job) {
     try {
       FileIO io = CatalogUtil.loadFileIO(job.fileIOImpl(), job.fileIOProperties(), null);
+      // cleanupFiles swallows the only legitimate already-gone signal (a missing metadata.json)
+      // internally, so reaching this line means the table's files were enumerated and deleted.
       cleanupFiles(io, job.metadataLocation());
-      store.markSucceeded(job.id());
-    } catch (NotFoundException alreadyGone) {
-      // The metadata file is missing, so the table's files are already gone (a prior attempt
-      // finished deleting them before the row was marked, or the table was never fully written).
-      // There is nothing left to clean up, so treat it as success rather than a failure.
-      LOG.info(
-          "Cleanup job {} metadata already absent; treating as completed", job.id(), alreadyGone);
       store.markSucceeded(job.id());
     } catch (RuntimeException e) {
       LOG.warn("Cleanup job {} failed transiently; will retry", job.id(), e);
@@ -288,11 +309,17 @@ public class IcebergCleanupManager implements AutoCloseable {
           for (String path : paths) {
             files.add(path);
           }
-        } catch (NotFoundException alreadyGone) {
+        } catch (NotFoundException alreadyDeleted) {
           // A concurrent worker (e.g. one that reclaimed this job after a heartbeat timeout) may
-          // have already deleted this manifest. Propagate so runJob treats the job as completed
-          // rather than a transient failure, keeping cleanup idempotent under double processing.
-          throw alreadyGone;
+          // already have deleted this manifest; its data files are gone with it. Skip it and keep
+          // enumerating the rest rather than surfacing the NotFoundException -- only the root
+          // metadata.json read in cleanupFiles treats a NotFoundException as "table already gone".
+          // This mirrors deleteAll tolerating already-deleted files and keeps cleanup idempotent
+          // under double processing.
+          LOG.debug(
+              "Manifest {} already deleted during async cleanup; skipping",
+              manifest.path(),
+              alreadyDeleted);
         } catch (Exception e) {
           throw new RuntimeException("Failed to read manifest " + manifest.path(), e);
         }
