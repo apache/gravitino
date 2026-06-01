@@ -84,6 +84,8 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     return true;
   }
 
+  protected void customizeSparkConf(SparkConf sparkConf) {}
+
   @Override
   protected SparkSession getSparkSession() {
     Assertions.assertNotNull(sparkSession);
@@ -275,6 +277,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .set("hive.exec.dynamic.partition.mode", "nonstrict")
             .set("spark.sql.warehouse.dir", warehouse)
             .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
+    customizeSparkConf(sparkConf);
     sparkSession =
         SparkSession.builder()
             .master("local[1]")

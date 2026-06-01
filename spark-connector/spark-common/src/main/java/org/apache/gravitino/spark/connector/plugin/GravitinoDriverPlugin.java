@@ -40,6 +40,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
@@ -50,6 +51,8 @@ import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.CatalogUtil;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
@@ -65,6 +68,16 @@ import org.slf4j.LoggerFactory;
 public class GravitinoDriverPlugin implements DriverPlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
+
+  @VisibleForTesting
+  static final String ICEBERG_SPARK_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
+
+  @VisibleForTesting
+  static final String ICEBERG_ACCESS_DELEGATION_HEADER = "header.X-Iceberg-Access-Delegation";
+
+  @VisibleForTesting static final String VENDED_CREDENTIALS = "vended-credentials";
+
+  private static final String LAKEHOUSE_ICEBERG_PROVIDER = "lakehouse-iceberg";
 
   @VisibleForTesting
   static final String PAIMON_SPARK_EXTENSIONS =
@@ -107,7 +120,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
       gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
     }
     if (enableIcebergSupport) {
-      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
+      gravitinoDriverExtensions.addAll(getIcebergExtensions(conf));
     }
 
     this.catalogManager =
@@ -137,7 +150,11 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               String catalogName = entry.getKey();
               Catalog gravitinoCatalog = entry.getValue();
               String provider = gravitinoCatalog.provider();
-              if ("lakehouse-iceberg".equals(provider.toLowerCase(Locale.ROOT))
+              if (StringUtils.isBlank(provider)) {
+                LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
+                return;
+              }
+              if (LAKEHOUSE_ICEBERG_PROVIDER.equals(provider.toLowerCase(Locale.ROOT))
                   && !enableIcebergSupport) {
                 return;
               }
@@ -146,16 +163,25 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                 return;
               }
               try {
-                registerCatalog(sparkConf, catalogName, provider);
+                registerCatalog(sparkConf, catalogName, gravitinoCatalog);
               } catch (Exception e) {
+                if (isNativeIcebergCatalog(sparkConf, provider)) {
+                  throw e;
+                }
                 LOG.warn("Register catalog {} failed.", catalogName, e);
               }
             });
   }
 
-  private void registerCatalog(SparkConf sparkConf, String catalogName, String provider) {
+  private void registerCatalog(SparkConf sparkConf, String catalogName, Catalog gravitinoCatalog) {
+    String provider = gravitinoCatalog.provider();
     if (StringUtils.isBlank(provider)) {
       LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
+      return;
+    }
+
+    if (isNativeIcebergCatalog(sparkConf, provider)) {
+      registerNativeIcebergCatalog(sparkConf, catalogName, gravitinoCatalog.properties());
       return;
     }
 
@@ -171,6 +197,75 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         catalogName + " is already registered to SparkCatalogManager");
     sparkConf.set(sparkCatalogConfigName, catalogClassName);
     LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
+  }
+
+  private static boolean isNativeIcebergCatalog(SparkConf sparkConf, String provider) {
+    return StringUtils.isNotBlank(provider)
+        && LAKEHOUSE_ICEBERG_PROVIDER.equals(provider.toLowerCase(Locale.ROOT))
+        && getEngineAccessMode(sparkConf, provider) == EngineAccessMode.NATIVE;
+  }
+
+  @VisibleForTesting
+  static EngineAccessMode getEngineAccessMode(SparkConf sparkConf, String provider) {
+    return EngineAccessMode.from(
+        sparkConf.get(GravitinoSparkConfig.engineAccessModeConfig(provider), null));
+  }
+
+  private static void registerNativeIcebergCatalog(
+      SparkConf sparkConf, String catalogName, Map<String, String> properties) {
+    String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+    Preconditions.checkArgument(
+        !sparkConf.contains(sparkCatalogConfigName),
+        catalogName + " is already registered to SparkCatalogManager");
+
+    buildNativeIcebergCatalogConfigurations(catalogName, properties).forEach(sparkConf::set);
+    LOG.info(
+        "Register {} catalog to Spark catalog manager with native Iceberg REST catalog.",
+        catalogName);
+  }
+
+  @VisibleForTesting
+  static Map<String, String> buildNativeIcebergCatalogConfigurations(
+      String catalogName, Map<String, String> properties) {
+    Preconditions.checkArgument(
+        properties != null, "Iceberg catalog properties should not be null");
+
+    String catalogBackend = properties.get(IcebergConstants.CATALOG_BACKEND);
+    Preconditions.checkArgument(
+        CatalogUtil.ICEBERG_CATALOG_TYPE_REST.equalsIgnoreCase(catalogBackend),
+        "Native Iceberg Spark catalog only supports catalog-backend=rest");
+
+    String uri = properties.get(IcebergConstants.URI);
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(uri), "uri should not be empty for native Iceberg REST catalog");
+
+    ImmutableMap.Builder<String, String> configs = ImmutableMap.builder();
+    String catalogConfigPrefix = "spark.sql.catalog." + catalogName;
+    configs.put(catalogConfigPrefix, ICEBERG_SPARK_CATALOG);
+    configs.put(
+        catalogConfigPrefix + "." + CatalogUtil.ICEBERG_CATALOG_TYPE,
+        CatalogUtil.ICEBERG_CATALOG_TYPE_REST);
+    configs.put(catalogConfigPrefix + "." + CatalogProperties.URI, uri);
+
+    String warehouse = properties.get(IcebergConstants.WAREHOUSE);
+    if (StringUtils.isNotBlank(warehouse)) {
+      configs.put(catalogConfigPrefix + "." + CatalogProperties.WAREHOUSE_LOCATION, warehouse);
+    }
+
+    String dataAccess = properties.get(IcebergConstants.DATA_ACCESS);
+    if (VENDED_CREDENTIALS.equalsIgnoreCase(dataAccess)) {
+      configs.put(catalogConfigPrefix + "." + ICEBERG_ACCESS_DELEGATION_HEADER, VENDED_CREDENTIALS);
+    }
+
+    return configs.build();
+  }
+
+  @VisibleForTesting
+  List<String> getIcebergExtensions(SparkConf conf) {
+    if (getEngineAccessMode(conf, LAKEHOUSE_ICEBERG_PROVIDER) == EngineAccessMode.NATIVE) {
+      return Collections.singletonList(ICEBERG_SPARK_EXTENSIONS);
+    }
+    return gravitinoIcebergExtensions;
   }
 
   private void registerSqlExtensions(SparkConf conf) {
@@ -261,5 +356,28 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                             t -> t._2,
                             (oldVal, newVal) -> newVal)))
         .orElse(ImmutableMap.of());
+  }
+
+  @VisibleForTesting
+  enum EngineAccessMode {
+    AUTO,
+    GRAVITINO,
+    NATIVE;
+
+    static EngineAccessMode from(@Nullable String value) {
+      if (StringUtils.isBlank(value)) {
+        return AUTO;
+      }
+
+      try {
+        return EngineAccessMode.valueOf(value.trim().toUpperCase(Locale.ROOT));
+      } catch (IllegalArgumentException e) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Unsupported engine access mode: %s. Supported values are: auto, gravitino, native",
+                value),
+            e);
+      }
+    }
   }
 }

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector;
 
+import java.util.Locale;
 import org.apache.gravitino.auth.AuthProperties;
 
 public class GravitinoSparkConfig {
@@ -30,6 +31,7 @@ public class GravitinoSparkConfig {
       GRAVITINO_PREFIX + "enableIcebergSupport";
   public static final String GRAVITINO_ENABLE_PAIMON_SUPPORT =
       GRAVITINO_PREFIX + "enablePaimonSupport";
+  public static final String GRAVITINO_ENGINE_ACCESS_MODE = "engine-access-mode";
   public static final String GRAVITINO_CLIENT_CONFIG_PREFIX = GRAVITINO_PREFIX + "client.";
 
   public static final String GRAVITINO_AUTH_TYPE =
@@ -47,6 +49,19 @@ public class GravitinoSparkConfig {
 
   public static final String GRAVITINO_HIVE_METASTORE_URI = "metastore.uris";
   public static final String SPARK_HIVE_METASTORE_URI = "hive.metastore.uris";
+
+  /**
+   * Returns the Spark config key for the given Gravitino provider's engine access mode.
+   *
+   * @param provider Gravitino catalog provider.
+   * @return Spark config key for the provider's engine access mode.
+   */
+  public static String engineAccessModeConfig(String provider) {
+    return GRAVITINO_PREFIX
+        + provider.toLowerCase(Locale.ROOT)
+        + "."
+        + GRAVITINO_ENGINE_ACCESS_MODE;
+  }
 
   private GravitinoSparkConfig() {}
 }

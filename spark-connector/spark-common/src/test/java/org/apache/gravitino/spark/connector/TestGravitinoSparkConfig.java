@@ -43,4 +43,14 @@ public class TestGravitinoSparkConfig {
     Assertions.assertEquals(clientConfig.get("gravitino.client.socketTimeoutMs"), "1000");
     Assertions.assertEquals(clientConfig.get("gravitino.client.connectionTimeoutMs"), "2000");
   }
+
+  @Test
+  void testEngineAccessModeConfig() {
+    Assertions.assertEquals(
+        "spark.sql.gravitino.lakehouse-iceberg.engine-access-mode",
+        GravitinoSparkConfig.engineAccessModeConfig("lakehouse-iceberg"));
+    Assertions.assertEquals(
+        "spark.sql.gravitino.lakehouse-iceberg.engine-access-mode",
+        GravitinoSparkConfig.engineAccessModeConfig("LAKEHOUSE-ICEBERG"));
+  }
 }
