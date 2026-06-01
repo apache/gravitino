@@ -409,6 +409,48 @@ class TestHiveCatalogOperations {
     SQLRepresentation rep = (SQLRepresentation) view.representations()[0];
     Assertions.assertEquals("spark", rep.dialect());
     Assertions.assertEquals("SELECT 1", rep.sql());
+    Assertions.assertNull(view.defaultCatalog());
+    Assertions.assertNull(view.defaultSchema());
+  }
+
+  @Test
+  void testCreateViewPersistsDefaultCatalogAndSchema() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
+    when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+    doNothing().when(hiveClient).createTable(any());
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    View view =
+        op.createView(
+            NameIdentifier.of("db", "v_spark_defaults"),
+            null,
+            new Column[0],
+            new SQLRepresentation[] {
+              SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+            },
+            "my_catalog",
+            "my_schema",
+            Maps.newHashMap(ImmutableMap.of("spark.sql.create.version", "3.5.3")));
+
+    Assertions.assertEquals("my_catalog", view.defaultCatalog());
+    Assertions.assertEquals("my_schema", view.defaultSchema());
+    Assertions.assertFalse(
+        view.properties().containsKey("gravitino.view.default.catalog"),
+        "defaultCatalog should be removed from properties after extraction");
+    Assertions.assertFalse(
+        view.properties().containsKey("gravitino.view.default.schema"),
+        "defaultSchema should be removed from properties after extraction");
   }
 
   @Test

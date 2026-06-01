@@ -119,6 +119,12 @@ class HiveViewCatalogOperations implements ViewCatalog {
       Map<String, String> params =
           Maps.newHashMap(properties == null ? ImmutableMap.of() : properties);
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
+      if (defaultCatalog != null) {
+        params.put(HiveView.SPARK_DEFAULT_CATALOG_KEY, defaultCatalog);
+      }
+      if (defaultSchema != null) {
+        params.put(HiveView.SPARK_DEFAULT_SCHEMA_KEY, defaultSchema);
+      }
       String viewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
 
       HiveTable hiveTable =
@@ -387,6 +393,8 @@ class HiveViewCatalogOperations implements ViewCatalog {
         .withComment(comment)
         .withColumns(copyColumns(columns))
         .withRepresentations(new SQLRepresentation[] {rep})
+        .withDefaultCatalog(params.remove(HiveView.SPARK_DEFAULT_CATALOG_KEY))
+        .withDefaultSchema(params.remove(HiveView.SPARK_DEFAULT_SCHEMA_KEY))
         .withProperties(params)
         .withAuditInfo(auditInfo)
         .build();
