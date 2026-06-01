@@ -102,7 +102,7 @@ public class TestJcasbinAuthorizationLookups {
   }
 
   @Test
-  void testResolveOwnerIdDoesNotCacheMissingOwnerInSharedCache() {
+  void testResolveOwnerIdCachesMissingOwnerInSharedCacheWithSameContext() {
     CountingCache<String, Long> metadataIdCache = new CountingCache<>(100L);
     CountingCache<Long, Optional<OwnerInfo>> ownerRelCache = new CountingCache<>();
     JcasbinAuthorizationLookups lookups =
@@ -118,9 +118,11 @@ public class TestJcasbinAuthorizationLookups {
           lookups.resolveOwnerId(100L, MetadataObject.Type.TABLE, requestContext).isPresent());
     }
 
+    // Shared cache consulted once; second call hits per-request cache.
     Assertions.assertEquals(1, ownerRelCache.getCount);
     Assertions.assertEquals(0, ownerRelCache.getIfPresentCount);
-    Assertions.assertEquals(0, ownerRelCache.putCount);
+    // Absent result is now stored in the shared cache (putCount=1) so later requests skip the DB.
+    Assertions.assertEquals(1, ownerRelCache.putCount);
   }
 
   @Test
