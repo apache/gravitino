@@ -213,27 +213,20 @@ public class IcebergCleanupManager implements AutoCloseable {
     // Data files are the only huge level, so they are streamed and deleted one manifest at a time
     // rather than all collected first; only the smaller manifest/list/metadata paths are held.
     //
-    // deleteOwned and deleteAll re-check ownership between levels and batches, so if a peer
-    // reclaimed the job we stop and never delete a parent while the new owner is still deleting
-    // its children.
+    // deleteAll checks ownership before each delete batch. Because each dependency level is
+    // deleted through deleteAll, a reclaimed worker stops before submitting more file deletes.
     Set<String> manifests = new LinkedHashSet<>();
     deleteDataFiles(io, metadata, manifests, stillOwned);
-    deleteOwned(io, manifests, stillOwned);
-    deleteOwned(io, ReachableFileUtil.manifestListLocations(table), stillOwned);
-    deleteOwned(io, ReachableFileUtil.statisticsFilesLocations(table), stillOwned);
+    deleteAll(io, manifests, stillOwned);
+    deleteAll(io, ReachableFileUtil.manifestListLocations(table), stillOwned);
+    deleteAll(io, ReachableFileUtil.statisticsFilesLocations(table), stillOwned);
 
     // metadataFileLocations includes the current metadata.json; drop it so it is deleted last.
     Set<String> ancestorMetadata =
         new LinkedHashSet<>(ReachableFileUtil.metadataFileLocations(table, true));
     ancestorMetadata.remove(metadataLocation);
-    deleteOwned(io, ancestorMetadata, stillOwned);
-    deleteOwned(io, Collections.singletonList(metadataLocation), stillOwned);
-  }
-
-  // Deletes one dependency level, but only after confirming we still own the job; throws to stop
-  // the cleanup if the lease was lost.
-  private void deleteOwned(FileIO io, Iterable<String> files, BooleanSupplier stillOwned) {
-    deleteAll(io, files, stillOwned);
+    deleteAll(io, ancestorMetadata, stillOwned);
+    deleteAll(io, Collections.singletonList(metadataLocation), stillOwned);
   }
 
   void deleteAll(FileIO io, Iterable<String> files) {
@@ -380,9 +373,6 @@ public class IcebergCleanupManager implements AutoCloseable {
         continue;
       }
       for (ManifestFile manifest : snapshotManifests) {
-        // Check before each manifest (outside the try, so it propagates) so a worker that lost its
-        // lease stops within about one heartbeat interval instead of deleting the whole table.
-        requireOwnership(stillOwned);
         if (!manifests.add(manifest.path())) {
           continue; // shared by several snapshots; its data files were already deleted
         }
