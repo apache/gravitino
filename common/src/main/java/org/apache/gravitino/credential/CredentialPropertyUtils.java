@@ -25,7 +25,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -61,19 +60,6 @@ public class CredentialPropertyUtils {
 
   @VisibleForTesting
   static final String ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX = "adls.sas-token-expires-at-ms.";
-
-  @VisibleForTesting
-  static final String S3_REFRESH_CREDENTIALS_ENDPOINT = "client.refresh-credentials-endpoint";
-
-  @VisibleForTesting
-  static final String OSS_REFRESH_CREDENTIALS_ENDPOINT = "client.refresh-credentials-endpoint";
-
-  @VisibleForTesting
-  static final String GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT =
-      "gcs.oauth2.refresh-credentials-endpoint";
-
-  @VisibleForTesting
-  static final String ADLS_REFRESH_CREDENTIALS_ENDPOINT = "adls.refresh-credentials-endpoint";
 
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
@@ -178,48 +164,6 @@ public class CredentialPropertyUtils {
                     && !entry.getKey().startsWith(ICEBERG_ADLS_TOKEN)
                     && !entry.getKey().startsWith(ICEBERG_ADLS_SAS_TOKEN_EXPIRES_AT_MS_PREFIX));
     return filteredProperties;
-  }
-
-  /**
-   * Appends the table-scoped refresh endpoint to {@code config} when the credential type supports
-   * refresh.
-   *
-   * <p>Callers should start from {@link #toIcebergProperties(Credential)} and supply the relative
-   * credentials path from the Iceberg REST catalog (for example {@code
-   * v1/{catalog}/namespaces/{ns}/tables/{table}/credentials}).
-   *
-   * @param config mutable Iceberg client config map
-   * @param credential Gravitino credential to vend
-   * @param refreshEndpointPath relative path for the table credentials refresh endpoint
-   */
-  public static void appendRefreshEndpoint(
-      Map<String, String> config, Credential credential, String refreshEndpointPath) {
-    refreshEndpointProperty(credential)
-        .ifPresent(property -> config.put(property, refreshEndpointPath));
-  }
-
-  /**
-   * Iceberg catalog property name for the refresh endpoint, if this credential type expires and
-   * supports catalog refresh.
-   *
-   * @param credential Gravitino credential
-   * @return refresh-endpoint property key, or empty when refresh is not applicable
-   */
-  @VisibleForTesting
-  static Optional<String> refreshEndpointProperty(Credential credential) {
-    if (credential instanceof GCSTokenCredential) {
-      return Optional.of(GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT);
-    }
-    if (credential instanceof ADLSTokenCredential) {
-      return Optional.of(ADLS_REFRESH_CREDENTIALS_ENDPOINT);
-    }
-    if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
-      return Optional.of(S3_REFRESH_CREDENTIALS_ENDPOINT);
-    }
-    if (credential instanceof OSSTokenCredential) {
-      return Optional.of(OSS_REFRESH_CREDENTIALS_ENDPOINT);
-    }
-    return Optional.empty();
   }
 
   private static Map<String, String> transformProperties(

@@ -22,8 +22,16 @@ package org.apache.gravitino.iceberg.service;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.ADLSTokenCredential;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.credential.GCSTokenCredential;
+import org.apache.gravitino.credential.OSSTokenCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
@@ -120,5 +128,74 @@ public class TestIcebergRESTUtils {
         IcebergRESTUtils.toRestCredential(
             "cat", table, new S3TokenCredential("k", "s", "t", 99L), metadataWithoutSlash);
     Assertions.assertEquals("s3://bucket/path/to/table/", credentialWithoutSlash.prefix());
+  }
+
+  @Test
+  void testAppendRefreshEndpointForS3Token() {
+    Map<String, String> config =
+        new HashMap<>(
+            CredentialPropertyUtils.toIcebergProperties(
+                new S3TokenCredential("key", "secret", "token", 1234L)));
+    IcebergRESTUtils.appendRefreshEndpoint(
+        config,
+        new S3TokenCredential("key", "secret", "token", 1234L),
+        "v1/aws/namespaces/ns/tables/tbl/credentials");
+
+    Assertions.assertEquals(
+        "v1/aws/namespaces/ns/tables/tbl/credentials",
+        config.get(IcebergRESTUtils.S3_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testAppendRefreshEndpointForGcsToken() {
+    Credential gcsToken = new GCSTokenCredential("gcs-token", 5678L);
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(gcsToken));
+    IcebergRESTUtils.appendRefreshEndpoint(
+        config, gcsToken, "v1/gcs/namespaces/ns/tables/tbl/credentials");
+
+    Assertions.assertEquals(
+        "v1/gcs/namespaces/ns/tables/tbl/credentials",
+        config.get(IcebergRESTUtils.GCS_OAUTH2_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testAppendRefreshEndpointForOssToken() {
+    Credential ossToken = new OSSTokenCredential("key", "secret", "oss-token", 9012L);
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(ossToken));
+    IcebergRESTUtils.appendRefreshEndpoint(
+        config, ossToken, "v1/oss/namespaces/ns/tables/tbl/credentials");
+
+    Assertions.assertEquals(
+        "v1/oss/namespaces/ns/tables/tbl/credentials",
+        config.get(IcebergRESTUtils.OSS_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testAppendRefreshEndpointForAdlsToken() {
+    Credential adlsToken = new ADLSTokenCredential("storageacct", "sas-token", 3456L);
+    Map<String, String> config =
+        new HashMap<>(CredentialPropertyUtils.toIcebergProperties(adlsToken));
+    IcebergRESTUtils.appendRefreshEndpoint(
+        config, adlsToken, "v1/adls/namespaces/ns/tables/tbl/credentials");
+
+    Assertions.assertEquals(
+        "v1/adls/namespaces/ns/tables/tbl/credentials",
+        config.get(IcebergRESTUtils.ADLS_REFRESH_CREDENTIALS_ENDPOINT));
+  }
+
+  @Test
+  void testAppendRefreshEndpointOmitsStaticSecretKey() {
+    Map<String, String> config =
+        new HashMap<>(
+            CredentialPropertyUtils.toIcebergProperties(
+                new S3SecretKeyCredential("key", "secret")));
+    IcebergRESTUtils.appendRefreshEndpoint(
+        config,
+        new S3SecretKeyCredential("key", "secret"),
+        "v1/aws/namespaces/ns/tables/tbl/credentials");
+
+    Assertions.assertFalse(config.containsKey(IcebergRESTUtils.S3_REFRESH_CREDENTIALS_ENDPOINT));
   }
 }

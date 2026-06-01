@@ -320,7 +320,7 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     // response.
     Map<String, String> credentialConfig =
         new HashMap<>(CredentialPropertyUtils.toIcebergProperties(credential));
-    CredentialPropertyUtils.appendRefreshEndpoint(
+    IcebergRESTUtils.appendRefreshEndpoint(
         credentialConfig,
         credential,
         IcebergRESTUtils.tableCredentialsPath(
