@@ -96,22 +96,19 @@ public class CredentialPropertyUtils {
   public static Map<String, String> toIcebergProperties(Credential credential) {
     if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
       Map<String, String> icebergProperties =
-          new HashMap<>(
-              transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap));
+          transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
       icebergProperties.put(
           ICEBERG_S3_TOKEN_EXPIRES_AT_MS, String.valueOf(credential.expireTimeInMs()));
       return icebergProperties;
     } else if (credential instanceof OSSTokenCredential) {
       Map<String, String> icebergProperties =
-          new HashMap<>(
-              transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap));
+          transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
       icebergProperties.put(
           ICEBERG_OSS_SECURITY_TOKEN_EXPIRES_AT_MS, String.valueOf(credential.expireTimeInMs()));
       return icebergProperties;
     } else if (credential instanceof GCSTokenCredential) {
       Map<String, String> icebergGCSCredentialProperties =
-          new HashMap<>(
-              transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap));
+          transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
       icebergGCSCredentialProperties.put(
           ICEBERG_GCS_TOKEN_EXPIRES_AT, String.valueOf(credential.expireTimeInMs()));
       return icebergGCSCredentialProperties;
@@ -163,9 +160,16 @@ public class CredentialPropertyUtils {
     return filteredProperties;
   }
 
+  /**
+   * Transforms Gravitino credential keys to Iceberg property keys.
+   *
+   * @param originProperties the source credential info map
+   * @param transformMap mapping from Gravitino keys to Iceberg keys
+   * @return a new mutable map of transformed Iceberg properties
+   */
   private static Map<String, String> transformProperties(
       Map<String, String> originProperties, Map<String, String> transformMap) {
-    HashMap<String, String> properties = new HashMap();
+    Map<String, String> properties = new HashMap<>();
     originProperties.forEach(
         (k, v) -> {
           if (transformMap.containsKey(k)) {
