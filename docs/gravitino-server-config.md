@@ -508,10 +508,6 @@ column shows when each alias became available.
 | `GRAVITINO_OSS_EXTERNAL_ID` / `GRAVITINO_ICEBERG_REST_OSS_EXTERNAL_ID`                       | `gravitino.iceberg-rest.oss-external-id`            | (none)                                               | 1.3.0 / 1.3.0                |
 
 :::note
-The short name for `gravitino.iceberg-rest.classpath` is `GRAVITINO_REST_CLASSPATH` rather than
-`GRAVITINO_CLASSPATH`, because `GRAVITINO_CLASSPATH` is also used as the Java classpath variable
-in the Gravitino startup scripts.
-
 The Gravitino server Docker image bundles SQLite, MySQL, and PostgreSQL JDBC drivers under
 `jdbc-drivers/`. The container startup script links them into `libs/` and
 `iceberg-rest-server/libs/` for the auxiliary Iceberg REST service.
