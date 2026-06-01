@@ -51,7 +51,7 @@ public class TestConfigServlet {
     configServlet.doGet(null, res);
     verify(writer)
         .write(
-            "{\"gravitino.authorization.enable\":false,\"gravitino.authenticators\":[\"simple\"]}");
+            "{\"gravitino.schema.separator\":\":\",\"gravitino.authorization.enable\":false,\"gravitino.authenticators\":[\"simple\"]}");
     configServlet.destroy();
   }
 
@@ -69,7 +69,7 @@ public class TestConfigServlet {
     configServlet.doGet(null, res);
     verify(writer)
         .write(
-            "{\"gravitino.authorization.enable\":true,\"gravitino.authenticators\":[\"simple\"]}");
+            "{\"gravitino.schema.separator\":\":\",\"gravitino.authorization.enable\":true,\"gravitino.authenticators\":[\"simple\"]}");
     configServlet.destroy();
   }
 
@@ -86,7 +86,7 @@ public class TestConfigServlet {
     configServlet.doGet(null, res);
     verify(writer)
         .write(
-            "{\"gravitino.authorization.enable\":true,\"gravitino.authenticators\":[\"simple\"],\"gravitino.authorization.serviceAdmins\":[\"admin1\",\"admin2\"]}");
+            "{\"gravitino.schema.separator\":\":\",\"gravitino.authorization.enable\":true,\"gravitino.authenticators\":[\"simple\"],\"gravitino.authorization.serviceAdmins\":[\"admin1\",\"admin2\"]}");
     configServlet.destroy();
   }
 
@@ -111,7 +111,24 @@ public class TestConfigServlet {
     configServlet.doGet(null, res);
     verify(writer)
         .write(
-            "{\"gravitino.extended.custom.config\":\"test\",\"gravitino.authorization.enable\":false,\"gravitino.authenticators\":[\"simple\"]}");
+            "{\"gravitino.extended.custom.config\":\"test\",\"gravitino.schema.separator\":\":\",\"gravitino.authorization.enable\":false,\"gravitino.authenticators\":[\"simple\"]}");
+    configServlet.destroy();
+  }
+
+  @Test
+  public void testConfigServletExposesCustomSchemaSeparator() throws Exception {
+    // The schema separator must reflect the configured value, not a hard-coded default.
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.set(Configs.SCHEMA_SEPARATOR, "|");
+    ConfigServlet configServlet = new ConfigServlet(serverConfig);
+    configServlet.init();
+    HttpServletResponse res = mock(HttpServletResponse.class);
+    PrintWriter writer = mock(PrintWriter.class);
+    when(res.getWriter()).thenReturn(writer);
+    configServlet.doGet(null, res);
+    verify(writer)
+        .write(
+            "{\"gravitino.schema.separator\":\"|\",\"gravitino.authorization.enable\":false,\"gravitino.authenticators\":[\"simple\"]}");
     configServlet.destroy();
   }
 
