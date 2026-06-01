@@ -319,8 +319,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
     // Merge temporary credential fields as Iceberg client config entries in the load-table
     // response.
     Map<String, String> credentialConfig =
-        IcebergRESTUtils.toClientCredentialConfig(
-            catalogCredentialManager.catalogName(), tableIdentifier, credential);
+        IcebergRESTUtils.toRestCredential(
+                catalogCredentialManager.catalogName(),
+                tableIdentifier,
+                credential,
+                loadTableResponse.tableMetadata())
+            .config();
     return LoadTableResponse.builder()
         .withTableMetadata(loadTableResponse.tableMetadata())
         .addAllConfig(loadTableResponse.config())

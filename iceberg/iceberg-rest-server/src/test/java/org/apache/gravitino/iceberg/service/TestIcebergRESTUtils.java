@@ -102,9 +102,14 @@ public class TestIcebergRESTUtils {
   @Test
   void testTableCredentialsPath() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("s3://bucket/t/");
+    org.apache.iceberg.rest.credentials.Credential credential =
+        IcebergRESTUtils.toRestCredential(
+            "my_catalog", table, new S3TokenCredential("k", "s", "t", 99L), tableMetadata);
     Assertions.assertEquals(
         "v1/my_catalog/namespaces/ns/tables/tbl/credentials",
-        IcebergRESTUtils.tableCredentialsPath("my_catalog", table));
+        credential.config().get("client.refresh-credentials-endpoint"));
   }
 
   @Test
@@ -131,11 +136,14 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToClientCredentialConfigForS3Token() {
+  void testToRestCredentialForS3Token() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("s3://bucket/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toClientCredentialConfig(
-            "aws", table, new S3TokenCredential("key", "secret", "token", 1234L));
+        IcebergRESTUtils.toRestCredential(
+                "aws", table, new S3TokenCredential("key", "secret", "token", 1234L), tableMetadata)
+            .config();
 
     Assertions.assertEquals(
         "v1/aws/namespaces/ns/tables/tbl/credentials",
@@ -143,11 +151,14 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToClientCredentialConfigForGcsToken() {
+  void testToRestCredentialForGcsToken() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("gs://bucket/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toClientCredentialConfig(
-            "gcs", table, new GCSTokenCredential("gcs-token", 5678L));
+        IcebergRESTUtils.toRestCredential(
+                "gcs", table, new GCSTokenCredential("gcs-token", 5678L), tableMetadata)
+            .config();
 
     Assertions.assertEquals(
         "v1/gcs/namespaces/ns/tables/tbl/credentials",
@@ -155,11 +166,17 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToClientCredentialConfigForOssToken() {
+  void testToRestCredentialForOssToken() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("oss://bucket/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toClientCredentialConfig(
-            "oss", table, new OSSTokenCredential("key", "secret", "oss-token", 9012L));
+        IcebergRESTUtils.toRestCredential(
+                "oss",
+                table,
+                new OSSTokenCredential("key", "secret", "oss-token", 9012L),
+                tableMetadata)
+            .config();
 
     Assertions.assertEquals(
         "v1/oss/namespaces/ns/tables/tbl/credentials",
@@ -167,11 +184,17 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToClientCredentialConfigForAdlsToken() {
+  void testToRestCredentialForAdlsToken() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("abfss://container@account.dfs.core.windows.net/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toClientCredentialConfig(
-            "adls", table, new ADLSTokenCredential("storageacct", "sas-token", 3456L));
+        IcebergRESTUtils.toRestCredential(
+                "adls",
+                table,
+                new ADLSTokenCredential("storageacct", "sas-token", 3456L),
+                tableMetadata)
+            .config();
 
     Assertions.assertEquals(
         "v1/adls/namespaces/ns/tables/tbl/credentials",
@@ -179,11 +202,14 @@ public class TestIcebergRESTUtils {
   }
 
   @Test
-  void testToClientCredentialConfigOmitsStaticSecretKey() {
+  void testToRestCredentialOmitsStaticSecretKey() {
     TableIdentifier table = TableIdentifier.of(Namespace.of("ns"), "tbl");
+    TableMetadata tableMetadata = mock(TableMetadata.class);
+    when(tableMetadata.location()).thenReturn("s3://bucket/t/");
     Map<String, String> config =
-        IcebergRESTUtils.toClientCredentialConfig(
-            "aws", table, new S3SecretKeyCredential("key", "secret"));
+        IcebergRESTUtils.toRestCredential(
+                "aws", table, new S3SecretKeyCredential("key", "secret"), tableMetadata)
+            .config();
 
     Assertions.assertFalse(config.containsKey("client.refresh-credentials-endpoint"));
   }
