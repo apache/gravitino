@@ -63,14 +63,12 @@ public class CredentialPropertyUtils {
 
   private static Map<String, String> icebergCredentialPropertyMap =
       ImmutableMap.<String, String>builder()
+          .put(GCSTokenCredential.GCS_TOKEN_NAME, ICEBERG_GCS_TOKEN)
           .put(S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
           .put(
               S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY,
               ICEBERG_S3_SECRET_ACCESS_KEY)
           .put(S3TokenCredential.GRAVITINO_S3_TOKEN, ICEBERG_S3_TOKEN)
-          .put(AwsIrsaCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
-          .put(AwsIrsaCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
-          .put(AwsIrsaCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
           .put(OSSTokenCredential.GRAVITINO_OSS_TOKEN, ICEBERG_OSS_SECURITY_TOKEN)
           .put(OSSTokenCredential.GRAVITINO_OSS_SESSION_ACCESS_KEY_ID, ICEBERG_OSS_ACCESS_KEY_ID)
           .put(
@@ -82,7 +80,9 @@ public class CredentialPropertyUtils {
           .put(
               AzureAccountKeyCredential.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
               ICEBERG_ADLS_ACCOUNT_KEY)
-          .put(GCSTokenCredential.GCS_TOKEN_NAME, ICEBERG_GCS_TOKEN)
+          .put(AwsIrsaCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
+          .put(AwsIrsaCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
+          .put(AwsIrsaCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
           .build();
 
   /**
